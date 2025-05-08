@@ -79,7 +79,10 @@ use miden_objects::{
     note::{Note, NoteDetails, NoteId, NoteTag},
     transaction::{ForeignAccountInputs, TransactionArgs},
 };
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::{
+    NoteAccountExecution, NoteConsumptionChecker,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 use tracing::info;
 
 use super::Client;
@@ -140,7 +143,7 @@ impl TransactionResult {
     /// [`TransactionResult`].
     pub async fn new(
         transaction: ExecutedTransaction,
-        note_screener: NoteScreener,
+        note_screener: NoteScreener<'_>,
         partial_notes: Vec<(NoteDetails, NoteTag)>,
         current_block_num: BlockNumber,
         current_timestamp: Option<u64>,
@@ -374,15 +377,15 @@ impl TransactionStoreUpdate {
 pub struct TransactionUpdates {
     /// Transaction updates for any transaction that was committed between the sync request's block
     /// number and the response's block number.
-    committed_transactions: Vec<TransactionUpdate>,
+    committed: Vec<TransactionUpdate>,
     /// Transaction IDs for any transactions that were discarded in the sync.
-    discarded_transactions: Vec<TransactionId>,
+    discarded: Vec<TransactionId>,
     /// Transactions that were pending before the sync and were not committed.
     ///
     /// These transactions have been pending for more than [`TX_GRACEFUL_BLOCKS`] blocks and can be
     /// assumed to have been rejected by the network. They will be marked as discarded in the
     /// store.
-    stale_transactions: Vec<TransactionRecord>,
+    stale: Vec<TransactionRecord>,
 }
 
 impl TransactionUpdates {
@@ -393,37 +396,37 @@ impl TransactionUpdates {
         stale_transactions: Vec<TransactionRecord>,
     ) -> Self {
         Self {
-            committed_transactions,
-            discarded_transactions,
-            stale_transactions,
+            committed: committed_transactions,
+            discarded: discarded_transactions,
+            stale: stale_transactions,
         }
     }
 
     /// Extends the transaction update information with `other`.
     pub fn extend(&mut self, other: Self) {
-        self.committed_transactions.extend(other.committed_transactions);
-        self.discarded_transactions.extend(other.discarded_transactions);
-        self.stale_transactions.extend(other.stale_transactions);
+        self.committed.extend(other.committed);
+        self.discarded.extend(other.discarded);
+        self.stale.extend(other.stale);
     }
 
     /// Returns a reference to committed transactions.
     pub fn committed_transactions(&self) -> &[TransactionUpdate] {
-        &self.committed_transactions
+        &self.committed
     }
 
     /// Returns a reference to discarded transactions.
     pub fn discarded_transactions(&self) -> &[TransactionId] {
-        &self.discarded_transactions
+        &self.discarded
     }
 
     /// Inserts a discarded transaction into the transaction updates.
     pub fn insert_discarded_transaction(&mut self, transaction_id: TransactionId) {
-        self.discarded_transactions.push(transaction_id);
+        self.discarded.push(transaction_id);
     }
 
     /// Returns a reference to stale transactions.
     pub fn stale_transactions(&self) -> &[TransactionRecord] {
-        &self.stale_transactions
+        &self.stale
     }
 }
 
@@ -502,7 +505,7 @@ impl Client {
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let notes = {
+        let mut notes = {
             let note_ids = transaction_request.get_input_note_ids();
 
             let mut input_notes: Vec<InputNote> = Vec::new();
@@ -531,6 +534,8 @@ impl Client {
         let (fpi_block_num, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
+        let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
+
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -547,6 +552,11 @@ impl Client {
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
         self.mast_store.load_transaction_code(account.code(), &notes, &tx_args);
+
+        if ignore_invalid_notes {
+            // Remove invalid notes
+            notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
+        }
 
         // Execute the transaction and get the witness
         let executed_transaction = self
@@ -573,7 +583,8 @@ impl Client {
             return Err(ClientError::MissingOutputNotes(missing_note_ids));
         }
 
-        let screener = NoteScreener::new(self.store.clone());
+        let screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
         TransactionResult::new(
             executed_transaction,
@@ -891,9 +902,40 @@ impl Client {
         }
     }
 
+    async fn get_valid_input_notes(
+        &self,
+        account_id: AccountId,
+        mut input_notes: InputNotes<InputNote>,
+        tx_args: TransactionArgs,
+    ) -> Result<InputNotes<InputNote>, ClientError> {
+        loop {
+            let execution = NoteConsumptionChecker::new(&self.tx_executor)
+                .check_notes_consumability(
+                    account_id,
+                    self.store.get_sync_height().await?,
+                    input_notes.clone(),
+                    tx_args.clone(),
+                )
+                .await?;
+
+            if let NoteAccountExecution::Failure { failed_note_id, .. } = execution {
+                let filtered_input_notes = InputNotes::new(
+                    input_notes.into_iter().filter(|note| note.id() != failed_note_id).collect(),
+                )
+                .expect("Created from a valid input notes list");
+
+                input_notes = filtered_input_notes;
+            } else {
+                break;
+            }
+        }
+
+        Ok(input_notes)
+    }
+
     /// Retrieves the account interface for the specified account.
-    async fn get_account_interface(
-        &mut self,
+    pub(crate) async fn get_account_interface(
+        &self,
         account_id: AccountId,
     ) -> Result<AccountInterface, ClientError> {
         let account: Account = self.try_get_account(account_id).await?.into();
