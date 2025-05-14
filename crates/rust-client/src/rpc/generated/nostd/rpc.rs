@@ -377,5 +377,27 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns the status info of the node.
+        pub async fn status(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> core::result::Result<
+            tonic::Response<super::super::responses::RpcStatusResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/Status");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "Status"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }

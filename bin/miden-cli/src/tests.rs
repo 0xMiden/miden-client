@@ -790,6 +790,7 @@ fn test_exec_parse() {
     // Create wallet account
     let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
 
+    sync_cli(&temp_dir);
     let mut success_cmd = Command::cargo_bin("miden").unwrap();
     success_cmd.args([
         "exec",
