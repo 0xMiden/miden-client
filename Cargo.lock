@@ -638,9 +638,9 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "errno"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
+checksum = "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
@@ -1358,10 +1358,10 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
  "thiserror 2.0.12",
 ]
 
@@ -1375,8 +1375,8 @@ dependencies = [
  "figment",
  "miden-client",
  "miden-client-tests",
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "miette",
  "predicates",
  "rand 0.9.1",
@@ -1401,12 +1401,12 @@ dependencies = [
  "getrandom 0.3.3",
  "hex",
  "miden-client",
- "miden-lib",
+ "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "miden-node-proto-build",
- "miden-objects",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "miden-proving-service-client",
  "miden-testing",
- "miden-tx",
+ "miden-tx 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "miette",
  "prost",
  "prost-build",
@@ -1434,8 +1434,8 @@ version = "0.9.0"
 dependencies = [
  "async-trait",
  "miden-client",
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "rand 0.9.1",
  "tokio",
  "toml",
@@ -1448,8 +1448,8 @@ name = "miden-client-web"
 version = "0.9.0"
 dependencies = [
  "miden-client",
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "rand 0.9.1",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1509,10 +1509,23 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
  "miden-assembly",
- "miden-objects",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-stdlib",
+ "regex",
+ "thiserror 2.0.12",
+ "walkdir",
+]
+
+[[package]]
+name = "miden-lib"
+version = "0.9.0"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
+dependencies = [
+ "miden-assembly",
+ "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
  "miden-stdlib",
  "regex",
  "thiserror 2.0.12",
@@ -1564,7 +1577,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#ff6ce58768f84112aa776efb5cec87dc47de95f2"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#2aad55041968983dd08975bfce22bc8c1ef426e0"
 dependencies = [
  "anyhow",
  "prost",
@@ -1575,7 +1588,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -1590,6 +1603,25 @@ dependencies = [
  "serde",
  "thiserror 2.0.12",
  "toml",
+ "winter-rand-utils",
+]
+
+[[package]]
+name = "miden-objects"
+version = "0.9.0"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
+dependencies = [
+ "bech32",
+ "getrandom 0.3.3",
+ "miden-assembly",
+ "miden-core",
+ "miden-crypto",
+ "miden-processor",
+ "miden-verifier",
+ "rand 0.9.1",
+ "rand_xoshiro",
+ "semver 1.0.26",
+ "thiserror 2.0.12",
  "winter-rand-utils",
 ]
 
@@ -1622,12 +1654,12 @@ dependencies = [
 [[package]]
 name = "miden-proving-service-client"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
- "miden-objects",
- "miden-tx",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-tx 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
  "miette",
  "prost",
  "prost-build",
@@ -1652,16 +1684,16 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
  "anyhow",
  "async-trait",
  "miden-block-prover",
  "miden-crypto",
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
  "miden-processor",
- "miden-tx",
+ "miden-tx 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
  "rand 0.9.1",
  "rand_chacha 0.9.0",
  "winter-maybe-async",
@@ -1671,11 +1703,27 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#a30142d0653ff833af501179fb3ccbc9e98767ae"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
 dependencies = [
  "async-trait",
- "miden-lib",
- "miden-objects",
+ "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-processor",
+ "miden-prover",
+ "miden-verifier",
+ "rand 0.9.1",
+ "thiserror 2.0.12",
+ "winter-maybe-async",
+]
+
+[[package]]
+name = "miden-tx"
+version = "0.9.0"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#7b448857f6a49799653342344de5ca320e3ca620"
+dependencies = [
+ "async-trait",
+ "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
  "miden-processor",
  "miden-prover",
  "miden-verifier",
@@ -1905,9 +1953,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "owo-colors"
-version = "4.2.0"
+version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1036865bb9422d3300cf723f657c2851d0e9ab12567854b1f4eba3d77decf564"
+checksum = "26995317201fa17f3656c36716aed4a7c81743a9634ac4c99c0eeda495db0cec"
 
 [[package]]
 name = "parking_lot"
@@ -3621,9 +3669,9 @@ dependencies = [
 
 [[package]]
 name = "windows-core"
-version = "0.61.0"
+version = "0.61.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4763c1de310c86d75a878046489e2e5ba02c649d185f21c67d4cf8a56d098980"
+checksum = "46ec44dc15085cea82cf9c78f85a9114c463a369786585ad2882d1ff0b0acf40"
 dependencies = [
  "windows-implement",
  "windows-interface",
@@ -3634,12 +3682,13 @@ dependencies = [
 
 [[package]]
 name = "windows-future"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a1d6bbefcb7b60acd19828e1bc965da6fcf18a7e39490c5f8be71e54a19ba32"
+checksum = "fc6a41e98427b19fe4b73c550f060b59fa592d7d686537eebf9385621bfbad8e"
 dependencies = [
  "windows-core",
  "windows-link",
+ "windows-threading",
 ]
 
 [[package]]
@@ -3682,18 +3731,18 @@ dependencies = [
 
 [[package]]
 name = "windows-result"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c64fd11a4fd95df68efcfee5f44a294fe71b8bc6a91993e2791938abcc712252"
+checksum = "4b895b5356fc36103d0f64dd1e94dfa7ac5633f1c9dd6e80fe9ec4adef69e09d"
 dependencies = [
  "windows-link",
 ]
 
 [[package]]
 name = "windows-strings"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a2ba9642430ee452d5a7aa78d72907ebe8cfda358e8cb7918a2050581322f97"
+checksum = "2a7ab927b2637c19b3dbe0965e75d8f2d30bdd697a1516191cad2ec4df8fb28a"
 dependencies = [
  "windows-link",
 ]
@@ -3754,6 +3803,15 @@ dependencies = [
  "windows_x86_64_gnu 0.52.6",
  "windows_x86_64_gnullvm 0.52.6",
  "windows_x86_64_msvc 0.52.6",
+]
+
+[[package]]
+name = "windows-threading"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66463ad2e0ea3bbf808b7f1d371311c80e115c0b71d60efc142cafbcfb057a6"
+dependencies = [
+ "windows-link",
 ]
 
 [[package]]
