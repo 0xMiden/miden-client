@@ -374,15 +374,15 @@ impl TransactionStoreUpdate {
 pub struct TransactionUpdates {
     /// Transaction updates for any transaction that was committed between the sync request's block
     /// number and the response's block number.
-    committed_transactions: Vec<TransactionUpdate>,
+    committed: Vec<TransactionUpdate>,
     /// Transaction IDs for any transactions that were discarded in the sync.
-    discarded_transactions: Vec<TransactionId>,
+    discarded: Vec<TransactionId>,
     /// Transactions that were pending before the sync and were not committed.
     ///
     /// These transactions have been pending for more than [`TX_GRACEFUL_BLOCKS`] blocks and can be
     /// assumed to have been rejected by the network. They will be marked as discarded in the
     /// store.
-    stale_transactions: Vec<TransactionRecord>,
+    stale: Vec<TransactionRecord>,
 }
 
 impl TransactionUpdates {
@@ -393,37 +393,37 @@ impl TransactionUpdates {
         stale_transactions: Vec<TransactionRecord>,
     ) -> Self {
         Self {
-            committed_transactions,
-            discarded_transactions,
-            stale_transactions,
+            committed: committed_transactions,
+            discarded: discarded_transactions,
+            stale: stale_transactions,
         }
     }
 
     /// Extends the transaction update information with `other`.
     pub fn extend(&mut self, other: Self) {
-        self.committed_transactions.extend(other.committed_transactions);
-        self.discarded_transactions.extend(other.discarded_transactions);
-        self.stale_transactions.extend(other.stale_transactions);
+        self.committed.extend(other.committed);
+        self.discarded.extend(other.discarded);
+        self.stale.extend(other.stale);
     }
 
     /// Returns a reference to committed transactions.
     pub fn committed_transactions(&self) -> &[TransactionUpdate] {
-        &self.committed_transactions
+        &self.committed
     }
 
     /// Returns a reference to discarded transactions.
     pub fn discarded_transactions(&self) -> &[TransactionId] {
-        &self.discarded_transactions
+        &self.discarded
     }
 
     /// Inserts a discarded transaction into the transaction updates.
     pub fn insert_discarded_transaction(&mut self, transaction_id: TransactionId) {
-        self.discarded_transactions.push(transaction_id);
+        self.discarded.push(transaction_id);
     }
 
     /// Returns a reference to stale transactions.
     pub fn stale_transactions(&self) -> &[TransactionRecord] {
-        &self.stale_transactions
+        &self.stale
     }
 }
 
