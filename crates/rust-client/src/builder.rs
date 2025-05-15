@@ -63,6 +63,9 @@ pub struct ClientBuilder {
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    max_block_number_delta: Option<u32>,
 }
 
 impl Default for ClientBuilder {
@@ -76,6 +79,7 @@ impl Default for ClientBuilder {
             keystore: None,
             in_debug_mode: false,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
+            max_block_number_delta: None,
         }
     }
 }
@@ -135,6 +139,14 @@ impl ClientBuilder {
     #[must_use]
     pub fn with_authenticator(mut self, authenticator: Arc<dyn TransactionAuthenticator>) -> Self {
         self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
+        self
+    }
+
+    /// Optionally set a maximum number of blocks that the client can be behind the network.
+    /// By default, there's no maximum.
+    #[must_use]
+    pub fn with_max_block_number_delta(mut self, delta: u32) -> Self {
+        self.max_block_number_delta = Some(delta);
         self
     }
 
@@ -226,6 +238,7 @@ impl ClientBuilder {
             authenticator,
             self.in_debug_mode,
             self.tx_graceful_blocks,
+            self.max_block_number_delta,
         ))
     }
 }

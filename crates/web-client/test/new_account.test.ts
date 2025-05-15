@@ -15,37 +15,25 @@ describe("new_wallet tests", () => {
       description: "creates a new private, immutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: false,
-      expected: {
-        isPublic: false,
-        isUpdatable: false,
-      },
+      expected: { isPublic: false, isUpdatable: false },
     },
     {
       description: "creates a new public, immutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: false,
-      expected: {
-        isPublic: true,
-        isUpdatable: false,
-      },
+      expected: { isPublic: true, isUpdatable: false },
     },
     {
       description: "creates a new private, mutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: true,
-      expected: {
-        isPublic: false,
-        isUpdatable: true,
-      },
+      expected: { isPublic: false, isUpdatable: true },
     },
     {
       description: "creates a new public, mutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: true,
-      expected: {
-        isPublic: true,
-        isUpdatable: true,
-      },
+      expected: { isPublic: true, isUpdatable: true },
     },
   ];
 
@@ -174,7 +162,7 @@ describe("new_faucet tests", () => {
         BigInt(10000000)
       )
     ).to.be.rejectedWith(
-      `token symbol of length 13 is not between 1 and 6 characters long`
+      `token symbol should have length between 1 and 6 characters, but 13 was provided`
     );
   });
 });
