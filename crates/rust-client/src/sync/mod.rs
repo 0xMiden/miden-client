@@ -57,7 +57,6 @@
 use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
 use core::cmp::max;
 
-pub(crate) use block_header::MAX_BLOCK_NUMBER_DELTA;
 use miden_objects::{
     account::AccountId,
     block::BlockNumber,

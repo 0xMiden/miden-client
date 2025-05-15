@@ -17,6 +17,7 @@
 * Added account code to `miden account --show` command (#835).
 * Changed exec's input file format to TOML instead of JSON (#870).
 * [BREAKING] Client's methods renamed after `PartialMmr` change to `PartialBlockchain` (#894).
+* [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
 

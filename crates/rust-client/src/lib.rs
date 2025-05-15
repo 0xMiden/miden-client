@@ -79,6 +79,9 @@
 //! // Determine the number of blocks to consider a transaction stale.
 //! // 20 is simply an example value.
 //! let tx_graceful_blocks = Some(20);
+//! // Determine the maximum number of blocks that the client can be behind from the network.
+//! // 256 is simply an example value.
+//! let max_block_number_delta = Some(256);
 //!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
@@ -89,6 +92,7 @@
 //!     Arc::new(keystore),
 //!     false, // Set to true for debug mode, if needed.
 //!     tx_graceful_blocks,
+//!     max_block_number_delta,
 //! );
 //!
 //! # Ok(())
@@ -233,6 +237,9 @@ pub struct Client {
     in_debug_mode: bool,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    max_block_number_delta: Option<u32>,
 }
 
 /// Construction and access methods.
@@ -258,6 +265,8 @@ impl Client {
     ///   MASM debugging.
     /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
     ///   pending transactions.
+    /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
+    ///   behind the network for transactions and account proofs to be considered valid.
     ///
     /// # Errors
     ///
@@ -269,6 +278,7 @@ impl Client {
         authenticator: Arc<dyn TransactionAuthenticator>,
         in_debug_mode: bool,
         tx_graceful_blocks: Option<u32>,
+        max_block_number_delta: Option<u32>,
     ) -> Self {
         let client_data_store = Arc::new(ClientDataStore::new(store.clone()));
         let mast_store = client_data_store.mast_store();
@@ -290,6 +300,7 @@ impl Client {
             tx_executor,
             in_debug_mode,
             tx_graceful_blocks,
+            max_block_number_delta,
             mast_store,
         }
     }
