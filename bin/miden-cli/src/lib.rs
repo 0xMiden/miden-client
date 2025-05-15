@@ -128,6 +128,7 @@ impl Cli {
             Arc::new(keystore.clone()),
             in_debug_mode,
             Some(TX_GRACEFUL_BLOCK_DELTA),
+            cli_config.max_block_number_delta,
         );
 
         // Execute CLI command
