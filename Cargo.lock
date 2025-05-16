@@ -1358,10 +1358,10 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
- "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "thiserror 2.0.12",
 ]
 
@@ -1375,8 +1375,8 @@ dependencies = [
  "figment",
  "miden-client",
  "miden-client-tests",
- "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "miette",
  "predicates",
  "rand 0.9.1",
@@ -1401,12 +1401,12 @@ dependencies = [
  "getrandom 0.3.3",
  "hex",
  "miden-client",
- "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-lib",
  "miden-node-proto-build",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects",
  "miden-proving-service-client",
  "miden-testing",
- "miden-tx 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-tx",
  "miette",
  "prost",
  "prost-build",
@@ -1434,8 +1434,8 @@ version = "0.9.0"
 dependencies = [
  "async-trait",
  "miden-client",
- "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "rand 0.9.1",
  "tokio",
  "toml",
@@ -1448,8 +1448,8 @@ name = "miden-client-web"
 version = "0.9.0"
 dependencies = [
  "miden-client",
- "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "rand 0.9.1",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1512,20 +1512,7 @@ version = "0.9.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "miden-assembly",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-stdlib",
- "regex",
- "thiserror 2.0.12",
- "walkdir",
-]
-
-[[package]]
-name = "miden-lib"
-version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
-dependencies = [
- "miden-assembly",
- "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-objects",
  "miden-stdlib",
  "regex",
  "thiserror 2.0.12",
@@ -1607,25 +1594,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-objects"
-version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
-dependencies = [
- "bech32",
- "getrandom 0.3.3",
- "miden-assembly",
- "miden-core",
- "miden-crypto",
- "miden-processor",
- "miden-verifier",
- "rand 0.9.1",
- "rand_xoshiro",
- "semver 1.0.26",
- "thiserror 2.0.12",
- "winter-rand-utils",
-]
-
-[[package]]
 name = "miden-processor"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1658,8 +1626,8 @@ source = "git+https://github.com/0xMiden/miden-base?branch=next#3d8c3b28048fffbb
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-tx 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
+ "miden-objects",
+ "miden-tx",
  "miette",
  "prost",
  "prost-build",
@@ -1684,16 +1652,16 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "anyhow",
  "async-trait",
  "miden-block-prover",
  "miden-crypto",
- "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "miden-processor",
- "miden-tx 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-tx",
  "rand 0.9.1",
  "rand_chacha 0.9.0",
  "winter-maybe-async",
@@ -1706,24 +1674,8 @@ version = "0.9.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "async-trait",
- "miden-lib 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xMiden/miden-base?branch=next)",
- "miden-processor",
- "miden-prover",
- "miden-verifier",
- "rand 0.9.1",
- "thiserror 2.0.12",
- "winter-maybe-async",
-]
-
-[[package]]
-name = "miden-tx"
-version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
-dependencies = [
- "async-trait",
- "miden-lib 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
- "miden-objects 0.9.0 (git+https://github.com/0xPolygonMiden/miden-base?branch=next)",
+ "miden-lib",
+ "miden-objects",
  "miden-processor",
  "miden-prover",
  "miden-verifier",
