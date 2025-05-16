@@ -20,6 +20,7 @@
 * [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
+* [BREAKING] Added `DiscardCause` and merged stale and expired transactions (#853).
 
 ## 0.8.2 (TBD)
 
