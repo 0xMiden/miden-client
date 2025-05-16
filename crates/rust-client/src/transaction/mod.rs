@@ -77,7 +77,7 @@ use miden_objects::{
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
-    transaction::{ForeignAccountInputs, TransactionArgs},
+    transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::info;
@@ -115,9 +115,8 @@ pub use miden_tx::{
     TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, ForeignAccountInformation, NoteArgs, PaymentTransactionData,
-    SwapTransactionData, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -960,7 +959,7 @@ impl Client {
     async fn retrieve_foreign_account_inputs(
         &mut self,
         foreign_accounts: BTreeSet<ForeignAccount>,
-    ) -> Result<(Option<BlockNumber>, Vec<ForeignAccountInputs>), ClientError> {
+    ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
             return Ok((None, Vec::new()));
         }
@@ -987,26 +986,26 @@ impl Client {
                         .remove(account_id)
                         .expect("proof was requested and received");
 
-                    let foreign_account_inputs: ForeignAccountInputs = account_proof.try_into()?;
+                    let foreign_account_inputs: AccountInputs = account_proof.try_into()?;
 
                     // Update  our foreign account code cache
                     self.store
                         .upsert_foreign_account_code(
                             *account_id,
-                            foreign_account_inputs.account_code().clone(),
+                            foreign_account_inputs.code().clone(),
                         )
                         .await?;
 
                     foreign_account_inputs
                 },
-                ForeignAccount::Private(foreign_account_info) => {
-                    let account_id = foreign_account_info.account_header().id();
+                ForeignAccount::Private(partial_account) => {
+                    let account_id = partial_account.id();
                     let (witness, _) = account_proofs
                         .remove(&account_id)
                         .expect("proof was requested and received")
                         .into_parts();
 
-                    foreign_account_info.clone().into_foreign_account_inputs(witness)
+                    AccountInputs::new(partial_account.clone(), witness)
                 },
             };
 
@@ -1060,7 +1059,7 @@ impl Client {
         self.mast_store.insert(tx_script.mast());
         self.mast_store.insert(account.code().mast());
         for fpi_account in &foreign_account_inputs {
-            self.mast_store.insert(fpi_account.account_code().mast());
+            self.mast_store.insert(fpi_account.code().mast());
         }
 
         Ok(self
