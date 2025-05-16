@@ -18,7 +18,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 NODE_DIR="miden-node"
 NODE_REPO="https://github.com/0xMiden/miden-node.git"
-NODE_BRANCH="next"
+NODE_BRANCH="tomyrd-update-base"
 
 PROVER_DIR="miden-base"
 PROVER_REPO="https://github.com/0xMiden/miden-base.git"
