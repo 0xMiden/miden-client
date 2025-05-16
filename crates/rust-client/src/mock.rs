@@ -350,8 +350,15 @@ pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore
     let rpc_api = MockRpcApi::new();
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
-    let client =
-        MockClient::new(arc_rpc_api, Box::new(rng), store, Arc::new(keystore.clone()), true, None);
+    let client = MockClient::new(
+        arc_rpc_api,
+        Box::new(rng),
+        store,
+        Arc::new(keystore.clone()),
+        true,
+        None,
+        None,
+    );
     (client, rpc_api, keystore)
 }
 
