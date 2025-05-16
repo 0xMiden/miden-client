@@ -357,9 +357,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.22"
+version = "1.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32db95edf998450acc7881c932f94cd9b05c87b4b2599e8bab064753da4acfd1"
+checksum = "5f4ac86a9e5bc1e2b3449ab9d7d3a6a405e3d1bb28d7b9be8614f55846ae3766"
 dependencies = [
  "jobserver",
  "libc",
@@ -1358,7 +1358,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -1509,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -1564,7 +1564,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#2aad55041968983dd08975bfce22bc8c1ef426e0"
+source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#490903d6b9aa0623e47579160f12b046d5995558"
 dependencies = [
  "anyhow",
  "prost",
@@ -1575,7 +1575,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -1622,7 +1622,7 @@ dependencies = [
 [[package]]
 name = "miden-proving-service-client"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -1652,7 +1652,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#b98448dc3d5690e8b8e2255e300cb6b82d2e3511"
+source = "git+https://github.com/0xPolygonMiden/miden-base?branch=next#3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
 dependencies = [
  "async-trait",
  "miden-lib",
