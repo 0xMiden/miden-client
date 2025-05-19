@@ -17,7 +17,7 @@ fn ensure_data_dir(data_dir: &PathBuf) -> anyhow::Result<()> {
     if data_dir.exists() {
         // Remove all contents of the directory
         fs::remove_dir_all(data_dir)?;
-        println!("Cleaned existing data directory at {data_dir:?}");
+        println!("Cleaned existing data directory at {}", data_dir.display());
     }
     // Create fresh directory
     fs::create_dir_all(data_dir)?;
@@ -31,7 +31,7 @@ fn ensure_data_dir(data_dir: &PathBuf) -> anyhow::Result<()> {
         fs::set_permissions(data_dir, perms)?;
     }
 
-    println!("Created data directory at {data_dir:?}");
+    println!("Created data directory at {}", data_dir.display());
     Ok(())
 }
 
