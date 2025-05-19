@@ -5,6 +5,7 @@
 ### Features
 
 * Added support for `bech32` account IDs in the CLI (#840).
+* Added support for MASM account component libraries in Web Client (#900).
 * Added `NoteUpdate` type to the note update tracker to distinguish between different types of updates (#821).
 
 ### Changes
@@ -18,6 +19,7 @@
 * Changed exec's input file format to TOML instead of JSON (#870).
 * [BREAKING] Client's methods renamed after `PartialMmr` change to `PartialBlockchain` (#894).
 * [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
+* Improve Web Client Publishing Flow on Next Branch (#906).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
 
