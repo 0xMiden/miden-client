@@ -13,7 +13,7 @@ use miden_objects::{
     assembly::AssemblyError,
     crypto::merkle::MerkleStore,
     note::{Note, NoteDetails, NoteId, NoteTag, PartialNote},
-    transaction::{ForeignAccountInputs, TransactionArgs, TransactionScript},
+    transaction::{AccountInputs, TransactionArgs, TransactionScript},
     vm::AdviceMap,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -23,7 +23,7 @@ mod builder;
 pub use builder::{PaymentTransactionData, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
-pub use foreign::{ForeignAccount, ForeignAccountInformation};
+pub use foreign::ForeignAccount;
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -168,7 +168,7 @@ impl TransactionRequest {
     pub(crate) fn into_transaction_args(
         self,
         tx_script: TransactionScript,
-        foreign_account_inputs: Vec<ForeignAccountInputs>,
+        foreign_account_inputs: Vec<AccountInputs>,
     ) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
@@ -361,10 +361,7 @@ mod tests {
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
-    use crate::{
-        rpc::domain::account::AccountStorageRequirements,
-        transaction::{ForeignAccount, ForeignAccountInformation},
-    };
+    use crate::{rpc::domain::account::AccountStorageRequirements, transaction::ForeignAccount};
 
     #[test]
     fn transaction_request_serialization() {
@@ -419,14 +416,7 @@ mod tests {
                     AccountStorageRequirements::new([(5u8, &[Digest::default()])]),
                 )
                 .unwrap(),
-                ForeignAccount::private(
-                    ForeignAccountInformation::from_account(
-                        account,
-                        &AccountStorageRequirements::default(),
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
+                ForeignAccount::private(account).unwrap(),
             ])
             .with_own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),
