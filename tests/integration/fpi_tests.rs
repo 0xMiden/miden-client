@@ -5,9 +5,7 @@ use miden_client::{
     block::BlockHeader,
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
     testing::common::*,
-    transaction::{
-        ForeignAccount, ForeignAccountInformation, TransactionKernel, TransactionRequestBuilder,
-    },
+    transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
 };
 use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
 use miden_objects::{
@@ -309,10 +307,7 @@ async fn test_standard_fpi(storage_mode: AccountStorageMode) {
         // Get current foreign account current state from the store (after 1st deployment tx)
         let foreign_account: Account =
             client.get_account(foreign_account_id).await.unwrap().unwrap().into();
-        ForeignAccount::private(
-            ForeignAccountInformation::from_account(foreign_account, &storage_requirements)
-                .unwrap(),
-        )
+        ForeignAccount::private(foreign_account)
     };
 
     let tx_request = builder.with_foreign_accounts([foreign_account.unwrap()]).build().unwrap();

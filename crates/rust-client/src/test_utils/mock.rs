@@ -57,7 +57,7 @@ impl Default for MockRpcApi {
 impl MockRpcApi {
     /// Creates a new `MockRpcApi` instance with pre-populated blocks and notes.
     pub fn new() -> Self {
-        let mock_chain = MockChain::empty();
+        let mock_chain = MockChain::new();
         let api = Self {
             committed_transactions: Arc::new(RwLock::new(vec![])),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
@@ -79,7 +79,6 @@ impl MockRpcApi {
         .build(&TransactionKernel::testing_assembler())
         .unwrap();
 
-        api.seal_block(vec![], vec![]); // Block 0
         api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note
         api.seal_block(vec![], vec![]); // Block 2
         api.seal_block(vec![], vec![]); // Block 3
@@ -98,15 +97,15 @@ impl MockRpcApi {
         }
 
         for nullifier in nullifiers {
-            mock_chain.add_nullifier(nullifier);
+            mock_chain.add_pending_nullifier(nullifier);
         }
 
-        mock_chain.seal_block(None, None);
+        mock_chain.prove_next_block();
     }
 
     /// Returns the current MMR of the blockchain.
     pub fn get_mmr(&self) -> Mmr {
-        self.mock_chain.read().block_chain().as_mmr().clone()
+        self.mock_chain.read().blockchain().as_mmr().clone()
     }
 
     /// Returns the chain tip block number.
@@ -129,8 +128,8 @@ impl MockRpcApi {
         let next_block_num = self
             .mock_chain
             .read()
-            .available_notes()
-            .into_iter()
+            .committed_notes()
+            .values()
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
                 if note_tags.contains(&note.metadata().tag()) && block_num > request_block_num {
@@ -184,8 +183,8 @@ impl MockRpcApi {
     ) -> Vec<NoteSyncRecord> {
         self.mock_chain
             .read()
-            .available_notes()
-            .into_iter()
+            .committed_notes()
+            .values()
             .filter_map(move |note| {
                 if note.inclusion_proof().location().block_num() == block_num
                     && note_tags.contains(&note.metadata().tag())
@@ -206,14 +205,13 @@ impl MockRpcApi {
     }
 
     pub fn get_available_notes(&self) -> Vec<MockChainNote> {
-        self.mock_chain.read().available_notes()
+        self.mock_chain.read().committed_notes().values().cloned().collect()
     }
 
     pub fn advance_blocks(&self, num_blocks: u32) {
+        let current_height = self.get_chain_tip_block_num();
         let mut mock_chain = self.mock_chain.write();
-        for _ in 0..num_blocks {
-            mock_chain.seal_block(None, None);
-        }
+        mock_chain.prove_until_block(current_height + num_blocks).unwrap();
     }
 }
 use alloc::boxed::Box;
@@ -285,7 +283,7 @@ impl NodeRpcClient for MockRpcApi {
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
         // assume all public notes for now
-        let notes = self.mock_chain.read().available_notes_map().clone();
+        let notes = self.mock_chain.read().committed_notes().clone();
 
         let hit_notes = note_ids.iter().filter_map(|id| notes.get(id));
         let mut return_notes = vec![];
@@ -350,7 +348,7 @@ impl NodeRpcClient for MockRpcApi {
         let nullifiers = self
             .mock_chain
             .read()
-            .nullifiers()
+            .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
                 if prefixes.contains(&nullifier.prefix()) && block_num >= from_block_num {
