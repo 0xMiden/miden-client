@@ -74,6 +74,7 @@ use core::fmt::{self};
 use miden_objects::{
     AssetError, Digest, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
+    assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
@@ -550,7 +551,13 @@ impl Client {
         // Execute the transaction and get the witness
         let executed_transaction = self
             .tx_executor
-            .execute_transaction(account_id, block_num, notes, tx_args)
+            .execute_transaction(
+                account_id,
+                block_num,
+                notes,
+                tx_args,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
+            )
             .await?;
 
         // Check that the expected output notes matches the transaction outcome.
@@ -1024,6 +1031,7 @@ impl Client {
                 tx_script,
                 advice_inputs,
                 foreign_account_inputs,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
     }
