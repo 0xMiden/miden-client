@@ -4,6 +4,8 @@ use std::{
     collections::HashMap,
     fs::File,
     io::Write,
+    net::SocketAddr,
+    num::NonZeroUsize,
     path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -12,6 +14,7 @@ use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_lib::{AuthScheme, account::faucets::create_basic_fungible_faucet, utils::Serializable};
 use miden_node_block_producer::BlockProducer;
+use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::{crypto::get_rpo_random_coin, grpc::UrlExt};
@@ -22,7 +25,10 @@ use miden_objects::{
     crypto::dsa::rpo_falcon512::SecretKey,
 };
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
-use tokio::{net::TcpListener, task::JoinSet};
+use tokio::{
+    net::TcpListener,
+    task::{Id, JoinSet},
+};
 use url::Url;
 
 // CONSTANTS
@@ -132,52 +138,34 @@ impl NodeBuilder {
         let grpc_rpc = TcpListener::bind(grpc_rpc)
             .await
             .context("Failed to bind to RPC gRPC endpoint")?;
-        let grpc_store = TcpListener::bind("127.0.0.1:0")
-            .await
-            .context("Failed to bind to store gRPC endpoint")?;
-        let store_address =
-            grpc_store.local_addr().context("Failed to retrieve the store's gRPC address")?;
 
-        let block_producer_address = {
-            let grpc_block_producer = TcpListener::bind("127.0.0.1:0")
-                .await
-                .context("Failed to bind to block-producer gRPC endpoint")?;
-            grpc_block_producer
-                .local_addr()
-                .context("Failed to retrieve the block-producer's gRPC address")?
-        };
+        // Define the block producer and ntx builder addresses.
+        let block_producer_address = available_socket_addr()
+            .await
+            .context("Failed to bind to block-producer gRPC endpoint")?;
+
+        let ntx_builder_address = available_socket_addr()
+            .await
+            .context("Failed to bind to ntx-builder gRPC endpoint")?;
 
         let mut join_set = JoinSet::new();
 
-        // Start store. The store endpoint is available after loading completes.
-        let store_id = join_set
-            .spawn(async move {
-                Store {
-                    listener: grpc_store,
-                    data_directory: self.data_directory,
-                }
-                .serve()
-                .await
-                .context("failed while serving store component")
-            })
-            .id();
+        let (store_id, store_address) =
+            self.start_store(&mut join_set).await.context("failed to start store")?;
 
-        // Start block-producer. The block-producer's endpoint is available after loading completes.
-        let block_producer_id = join_set
-            .spawn(async move {
-                BlockProducer {
-                    block_producer_address,
-                    store_address,
-                    batch_prover_url: None,
-                    block_prover_url: None,
-                    batch_interval: self.batch_interval,
-                    block_interval: self.block_interval,
-                }
-                .serve()
-                .await
-                .context("failed while serving block-producer component")
-            })
-            .id();
+        let ntx_builder_id = NodeBuilder::start_ntx_builder(
+            ntx_builder_address,
+            block_producer_address,
+            store_address,
+            &mut join_set,
+        );
+
+        let block_producer_id = self.start_block_producer(
+            block_producer_address,
+            store_address,
+            ntx_builder_address,
+            &mut join_set,
+        );
 
         // Start RPC component.
         let rpc_id = join_set
@@ -198,6 +186,7 @@ impl NodeBuilder {
             (store_id, "store"),
             (block_producer_id, "block-producer"),
             (rpc_id, "rpc"),
+            (ntx_builder_id, "ntx-builder"),
         ]);
 
         // SAFETY: The joinset is definitely not empty.
@@ -217,6 +206,88 @@ impl NodeBuilder {
         // node there is no point.
 
         err.context(format!("Component {component} failed"))
+    }
+
+    // Start store and return the tokio task ID plus the store's gRPC address. The store endpoint is
+    // available after loading completes.
+    async fn start_store(&self, join_set: &mut JoinSet<Result<()>>) -> Result<(Id, SocketAddr)> {
+        let grpc_store = TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("Failed to bind to store gRPC endpoint")?;
+        let store_address =
+            grpc_store.local_addr().context("Failed to retrieve the store's gRPC address")?;
+
+        let data_directory = self.data_directory.clone();
+        Ok((
+            join_set
+                .spawn(async move {
+                    Store { listener: grpc_store, data_directory }
+                        .serve()
+                        .await
+                        .context("failed while serving store component")
+                })
+                .id(),
+            store_address,
+        ))
+    }
+
+    // Start block-producer and return the tokio task ID. The block-producer's endpoint is available
+    // after loading completes.
+    fn start_block_producer(
+        &self,
+        block_producer_address: SocketAddr,
+        store_address: SocketAddr,
+        ntx_builder_address: SocketAddr,
+        join_set: &mut JoinSet<Result<()>>,
+    ) -> Id {
+        let batch_interval = self.batch_interval;
+        let block_interval = self.block_interval;
+        join_set
+            .spawn(async move {
+                BlockProducer {
+                    block_producer_address,
+                    store_address,
+                    ntx_builder_address: Some(ntx_builder_address),
+                    batch_prover_url: None,
+                    block_prover_url: None,
+                    batch_interval,
+                    block_interval,
+                }
+                .serve()
+                .await
+                .context("failed while serving block-producer component")
+            })
+            .id()
+    }
+
+    // Start ntx-builder and return the tokio task ID. The ntx-builder's endpoint is available after
+    // loading completes.
+    fn start_ntx_builder(
+        ntx_builder_address: SocketAddr,
+        block_producer_address: SocketAddr,
+        store_address: SocketAddr,
+        join_set: &mut JoinSet<Result<()>>,
+    ) -> Id {
+        // SAFETY: socket addr yields valid URLs
+        let store_url =
+            Url::parse(&format!("http://{}:{}/", store_address.ip(), store_address.port()))
+                .unwrap();
+
+        join_set
+            .spawn(async move {
+                NetworkTransactionBuilder {
+                    ntx_builder_address,
+                    store_url,
+                    block_producer_address,
+                    tx_prover_url: None,
+                    ticker_interval: Duration::from_millis(200),
+                    account_cache_capacity: NonZeroUsize::new(128).expect("non-zero"),
+                }
+                .serve_resilient()
+                .await
+                .context("failed while serving ntx builder component")
+            })
+            .id()
     }
 }
 
@@ -284,4 +355,9 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         Some(account_seed),
         AuthSecretKey::RpoFalcon512(secret),
     ))
+}
+
+async fn available_socket_addr() -> Result<SocketAddr> {
+    let listener = TcpListener::bind("127.0.0.1:0").await.context("Failed to bind to endpoint")?;
+    listener.local_addr().context("Failed to retrieve the address")
 }

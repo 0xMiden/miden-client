@@ -269,7 +269,9 @@ impl NodeRpcClient for TonicRpcClient {
         let commitment = commitment.try_into()?;
 
         let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
-        if account_id.is_public() {
+        if account_id.is_private() {
+            Ok(AccountDetails::Private(account_id, update_summary))
+        } else {
             let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
                 "GetAccountDetails response's account should have `details`".to_string(),
             ))?;
@@ -277,8 +279,6 @@ impl NodeRpcClient for TonicRpcClient {
             let account = Account::read_from_bytes(&details_bytes)?;
 
             Ok(AccountDetails::Public(account, update_summary))
-        } else {
-            Ok(AccountDetails::Private(account_id, update_summary))
         }
     }
 

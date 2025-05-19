@@ -92,19 +92,25 @@ impl<'a> NoteScreener<'a> {
                 .await?
                 .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
 
-            if let Some(relevance) =
-                self.check_standard_consumability(account_record.account(), note).await?
-            {
-                note_relevances.push((id, relevance));
-            } else {
-                // The note might be consumable after a certain block height if the note is p2idr
-                let script_root = note.script().root();
+            match self.check_standard_consumability(account_record.account(), note).await {
+                Ok(Some(relevance)) => {
+                    note_relevances.push((id, relevance));
+                },
+                Ok(None) => {
+                    // The note might be consumable after a certain block height if the note is
+                    // p2idr
+                    let script_root = note.script().root();
 
-                if script_root == WellKnownNote::P2IDR.script_root() {
-                    if let Some(relevance) = Self::check_p2idr_recall_consumability(note, &id)? {
-                        note_relevances.push((id, relevance));
+                    if script_root == WellKnownNote::P2IDR.script_root() {
+                        if let Some(relevance) = Self::check_p2idr_recall_consumability(note, &id)?
+                        {
+                            note_relevances.push((id, relevance));
+                        }
                     }
-                }
+                },
+                // If an error occurs while checking consumability, we count it as not relevant for
+                // that account
+                Err(_) => {},
             }
         }
 
