@@ -9,25 +9,29 @@ compile_error!("The `web-tonic` feature is only supported when targeting wasm32.
 
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
+    use super::{MetadataInterceptor, accept_header_interceptor};
+    use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
     use alloc::string::String;
+    use tonic::service::interceptor::InterceptedService;
 
-    use crate::rpc::RpcError;
-
-    pub type ApiClient =
-        crate::rpc::generated::rpc::api_client::ApiClient<tonic_web_wasm_client::Client>;
+    type WasmClient = tonic_web_wasm_client::Client;
+    type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
+    #[derive(Clone)]
+    pub struct ApiClient(InnerClient);
 
     impl ApiClient {
         #[allow(clippy::unused_async)]
         pub async fn new_client(endpoint: String, _timeout_ms: u64) -> Result<ApiClient, RpcError> {
-            let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
-            Ok(ApiClient::new(wasm_client))
+            let wasm_client = WasmClient::new(endpoint);
+            let interceptor = accept_header_interceptor();
+            Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
         }
     }
 }
 
 #[cfg(feature = "tonic")]
 pub(crate) mod api_client_wrapper {
-    use super::MetadataInterceptor;
+    use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
     use alloc::{boxed::Box, string::String};
     use core::{
@@ -68,11 +72,7 @@ pub(crate) mod api_client_wrapper {
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
 
             // Set up the accept metadata interceptor.
-            let version = env!("CARGO_PKG_VERSION");
-            let accept_value = format!("application/vnd.miden.{version}+grpc");
-            let interceptor = MetadataInterceptor::default()
-                .with_metadata("accept", accept_value)
-                .expect("valid key/value metadata for interceptor");
+            let interceptor = accept_header_interceptor();
 
             // Return the connected client.
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
@@ -109,4 +109,13 @@ impl Interceptor for MetadataInterceptor {
         }
         Ok(request)
     }
+}
+
+/// Returns the HTTP ACCEPT header [`MetadataInterceptor`] that is expected by Miden RPC.
+fn accept_header_interceptor() -> MetadataInterceptor {
+    let version = env!("CARGO_PKG_VERSION");
+    let accept_value = format!("application/vnd.miden.{version}+grpc");
+    MetadataInterceptor::default()
+        .with_metadata("accept", accept_value)
+        .expect("valid key/value metadata for interceptor")
 }
