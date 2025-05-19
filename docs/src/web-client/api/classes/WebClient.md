@@ -220,6 +220,16 @@ Meant to be used in conjunction with the force_import_store method
 
 ***
 
+### getLatestEpochBlock()
+
+> **getLatestEpochBlock**(): `Promise`\<[`BlockHeader`](BlockHeader.md)\>
+
+#### Returns
+
+`Promise`\<[`BlockHeader`](BlockHeader.md)\>
+
+***
+
 ### getOutputNote()
 
 > **getOutputNote**(`note_id`): `Promise`\<`any`\>
@@ -327,6 +337,30 @@ Meant to be used in conjunction with the force_import_store method
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### newAccount()
+
+> **newAccount**(`account`, `account_seed`, `overwrite`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account
+
+[`Account`](Account.md)
+
+##### account\_seed
+
+[`Word`](Word.md)
+
+##### overwrite
+
+`boolean`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 
