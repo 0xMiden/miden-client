@@ -6,6 +6,7 @@
 
 ## Enumerations
 
+- [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
@@ -13,7 +14,10 @@
 ## Classes
 
 - [Account](classes/Account.md)
+- [AccountBuilder](classes/AccountBuilder.md)
+- [AccountBuilderResult](classes/AccountBuilderResult.md)
 - [AccountCode](classes/AccountCode.md)
+- [AccountComponent](classes/AccountComponent.md)
 - [AccountDelta](classes/AccountDelta.md)
 - [AccountHeader](classes/AccountHeader.md)
 - [AccountId](classes/AccountId.md)
@@ -21,6 +25,8 @@
 - [AccountStorageMode](classes/AccountStorageMode.md)
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
+- [Assembler](classes/Assembler.md)
+- [AssemblerUtils](classes/AssemblerUtils.md)
 - [AssetVault](classes/AssetVault.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BlockHeader](classes/BlockHeader.md)
@@ -36,6 +42,7 @@
 - [IntoUnderlyingByteSource](classes/IntoUnderlyingByteSource.md)
 - [IntoUnderlyingSink](classes/IntoUnderlyingSink.md)
 - [IntoUnderlyingSource](classes/IntoUnderlyingSource.md)
+- [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
 - [NewSwapTransactionResult](classes/NewSwapTransactionResult.md)
 - [Note](classes/Note.md)
@@ -68,11 +75,14 @@
 - [PartialNote](classes/PartialNote.md)
 - [Rpo256](classes/Rpo256.md)
 - [RpoDigest](classes/RpoDigest.md)
+- [StorageMap](classes/StorageMap.md)
+- [StorageSlot](classes/StorageSlot.md)
 - [SyncSummary](classes/SyncSummary.md)
 - [TestUtils](classes/TestUtils.md)
 - [TransactionArgs](classes/TransactionArgs.md)
 - [TransactionFilter](classes/TransactionFilter.md)
 - [TransactionId](classes/TransactionId.md)
+- [TransactionKernel](classes/TransactionKernel.md)
 - [TransactionProver](classes/TransactionProver.md)
 - [TransactionRecord](classes/TransactionRecord.md)
 - [TransactionRequest](classes/TransactionRequest.md)

@@ -1,7 +1,7 @@
 use miden_objects::account::AccountStorage as NativeAccountStorage;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
+use crate::models::rpo_digest::RpoDigest;
 
 #[derive(Clone)]
 #[wasm_bindgen]
