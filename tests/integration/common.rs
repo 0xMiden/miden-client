@@ -74,6 +74,7 @@ pub async fn create_test_client() -> (TestClient, TestClientKeyStore) {
         store,
         Arc::new(keystore.clone()),
         true,
+        None,
     );
 
     client.sync_state().await.unwrap();
@@ -223,7 +224,6 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
     // wait until tx is committed
     let now = Instant::now();
     loop {
-        println!("Syncing State...");
         client.sync_state().await.unwrap();
 
         // Check if executed transaction got committed by the node

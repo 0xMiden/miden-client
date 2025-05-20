@@ -15,8 +15,8 @@ use miden_client::{
     account::{AccountId, AccountStorageMode},
     crypto::{FeltRng, RpoRandomCoin},
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-        NoteRecipient, NoteTag, NoteType,
+        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId, NoteInputs,
+        NoteMetadata, NoteRecipient, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
     store::sqlite_store::SqliteStore,
@@ -108,6 +108,58 @@ async fn test_mint_with_untracked_account() {
     sync_until_committed_note(&temp_dir);
 }
 
+/// This test tries to run a mint TX using the CLI for an account that isn't tracked.
+#[tokio::test]
+async fn test_token_symbol_mapping() {
+    let (store_path, temp_dir) = init_cli();
+
+    // Create faucet account
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+
+    // Create a token symbol mapping file
+    let token_symbol_map_path = temp_dir.join("token_symbol_map.toml");
+    let token_symbol_map_content =
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+    fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
+
+    sync_cli(&temp_dir);
+
+    let mut mint_cmd = Command::cargo_bin("miden").unwrap();
+    mint_cmd.args([
+        "mint",
+        "--target",
+        AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex().as_str(),
+        "--asset",
+        "0.00001::BTC",
+        "-n",
+        "private",
+        "--force",
+    ]);
+
+    let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success());
+
+    let note_id = String::from_utf8(output.stdout)
+        .unwrap()
+        .split_whitespace()
+        .skip_while(|&word| word != "Output")
+        .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string();
+
+    let note = {
+        let (client, _) = create_rust_client_with_store_path(&store_path).await;
+        client
+            .get_output_note(NoteId::try_from_hex(&note_id).unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+    };
+
+    assert_eq!(note.assets().num_assets(), 1);
+    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+}
+
 // IMPORT TESTS
 // ================================================================================================
 
@@ -131,8 +183,7 @@ async fn test_import_genesis_accounts_can_be_used_for_transactions() {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path =
-            format!("{cargo_workspace_dir}/../../miden-node/accounts/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -708,6 +759,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
             store,
             std::sync::Arc::new(keystore.clone()),
             true,
+            None,
         ),
         keystore,
     )
@@ -737,6 +789,7 @@ fn test_exec_parse() {
     // Create wallet account
     let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
 
+    sync_cli(&temp_dir);
     let mut success_cmd = Command::cargo_bin("miden").unwrap();
     success_cmd.args([
         "exec",

@@ -20,7 +20,7 @@ pub(crate) const SHARED_TOKEN_DOCUMENTATION: &str = "There are two accepted form
 the token (specified to the precision allowed by the token's decimals), and `<TOKEN_SYMBOL>`
 is a symbol tracked in the token symbol map file.
 
-For example, `100::0xabcdef0123456789` or `1.23::POL`";
+For example, `100::0xabcdef0123456789` or `1.23::TST`";
 
 /// Returns a tracked Account ID matching a hex string or the default one defined in the Client
 /// config.

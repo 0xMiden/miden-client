@@ -25,3 +25,27 @@
 #### Returns
 
 [`RpoDigest`](RpoDigest.md)
+
+***
+
+### compile()
+
+> `static` **compile**(`script_code`, `inputs`, `assembler`): `TransactionScript`
+
+#### Parameters
+
+##### script\_code
+
+`string`
+
+##### inputs
+
+[`TransactionScriptInputPairArray`](TransactionScriptInputPairArray.md)
+
+##### assembler
+
+[`Assembler`](Assembler.md)
+
+#### Returns
+
+`TransactionScript`

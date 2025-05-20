@@ -77,7 +77,7 @@ use miden_objects::{
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
-    transaction::{ForeignAccountInputs, TransactionArgs},
+    transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::info;
@@ -91,7 +91,7 @@ use crate::{
         InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
         TransactionFilter, input_note_states::ExpectedNoteState,
     },
-    sync::{MAX_BLOCK_NUMBER_DELTA, NoteTagRecord},
+    sync::NoteTagRecord,
 };
 
 mod request;
@@ -115,9 +115,8 @@ pub use miden_tx::{
     TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, ForeignAccountInformation, NoteArgs, PaymentTransactionData,
-    SwapTransactionData, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -374,15 +373,15 @@ impl TransactionStoreUpdate {
 pub struct TransactionUpdates {
     /// Transaction updates for any transaction that was committed between the sync request's block
     /// number and the response's block number.
-    committed_transactions: Vec<TransactionUpdate>,
+    committed: Vec<TransactionUpdate>,
     /// Transaction IDs for any transactions that were discarded in the sync.
-    discarded_transactions: Vec<TransactionId>,
+    discarded: Vec<TransactionId>,
     /// Transactions that were pending before the sync and were not committed.
     ///
     /// These transactions have been pending for more than [`TX_GRACEFUL_BLOCKS`] blocks and can be
     /// assumed to have been rejected by the network. They will be marked as discarded in the
     /// store.
-    stale_transactions: Vec<TransactionRecord>,
+    stale: Vec<TransactionRecord>,
 }
 
 impl TransactionUpdates {
@@ -393,37 +392,37 @@ impl TransactionUpdates {
         stale_transactions: Vec<TransactionRecord>,
     ) -> Self {
         Self {
-            committed_transactions,
-            discarded_transactions,
-            stale_transactions,
+            committed: committed_transactions,
+            discarded: discarded_transactions,
+            stale: stale_transactions,
         }
     }
 
     /// Extends the transaction update information with `other`.
     pub fn extend(&mut self, other: Self) {
-        self.committed_transactions.extend(other.committed_transactions);
-        self.discarded_transactions.extend(other.discarded_transactions);
-        self.stale_transactions.extend(other.stale_transactions);
+        self.committed.extend(other.committed);
+        self.discarded.extend(other.discarded);
+        self.stale.extend(other.stale);
     }
 
     /// Returns a reference to committed transactions.
     pub fn committed_transactions(&self) -> &[TransactionUpdate] {
-        &self.committed_transactions
+        &self.committed
     }
 
     /// Returns a reference to discarded transactions.
     pub fn discarded_transactions(&self) -> &[TransactionId] {
-        &self.discarded_transactions
+        &self.discarded
     }
 
     /// Inserts a discarded transaction into the transaction updates.
     pub fn insert_discarded_transaction(&mut self, transaction_id: TransactionId) {
-        self.discarded_transactions.push(transaction_id);
+        self.discarded.push(transaction_id);
     }
 
     /// Returns a reference to stale transactions.
     pub fn stale_transactions(&self) -> &[TransactionRecord] {
-        &self.stale_transactions
+        &self.stale
     }
 }
 
@@ -872,10 +871,13 @@ impl Client {
         let current_chain_tip =
             self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
 
-        if current_chain_tip > self.store.get_sync_height().await? + MAX_BLOCK_NUMBER_DELTA {
-            return Err(ClientError::RecencyConditionError(
-                "The client is too far behind the chain tip to execute the transaction".to_string(),
-            ));
+        if let Some(max_block_number_delta) = self.max_block_number_delta {
+            if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
+                return Err(ClientError::RecencyConditionError(
+                    "The client is too far behind the chain tip to execute the transaction"
+                        .to_string(),
+                ));
+            }
         }
 
         let account: Account = self.try_get_account(account_id).await?.into();
@@ -911,7 +913,7 @@ impl Client {
     async fn retrieve_foreign_account_inputs(
         &mut self,
         foreign_accounts: BTreeSet<ForeignAccount>,
-    ) -> Result<(Option<BlockNumber>, Vec<ForeignAccountInputs>), ClientError> {
+    ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
             return Ok((None, Vec::new()));
         }
@@ -938,26 +940,26 @@ impl Client {
                         .remove(account_id)
                         .expect("proof was requested and received");
 
-                    let foreign_account_inputs: ForeignAccountInputs = account_proof.try_into()?;
+                    let foreign_account_inputs: AccountInputs = account_proof.try_into()?;
 
                     // Update  our foreign account code cache
                     self.store
                         .upsert_foreign_account_code(
                             *account_id,
-                            foreign_account_inputs.account_code().clone(),
+                            foreign_account_inputs.code().clone(),
                         )
                         .await?;
 
                     foreign_account_inputs
                 },
-                ForeignAccount::Private(foreign_account_info) => {
-                    let account_id = foreign_account_info.account_header().id();
+                ForeignAccount::Private(partial_account) => {
+                    let account_id = partial_account.id();
                     let (witness, _) = account_proofs
                         .remove(&account_id)
                         .expect("proof was requested and received")
                         .into_parts();
 
-                    foreign_account_info.clone().into_foreign_account_inputs(witness)
+                    AccountInputs::new(partial_account.clone(), witness)
                 },
             };
 
@@ -1011,7 +1013,7 @@ impl Client {
         self.mast_store.insert(tx_script.mast());
         self.mast_store.insert(account.code().mast());
         for fpi_account in &foreign_account_inputs {
-            self.mast_store.insert(fpi_account.account_code().mast());
+            self.mast_store.insert(fpi_account.code().mast());
         }
 
         Ok(self

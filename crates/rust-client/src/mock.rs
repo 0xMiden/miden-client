@@ -69,7 +69,7 @@ impl Default for MockRpcApi {
 impl MockRpcApi {
     /// Creates a new `MockRpcApi` instance with pre-populated blocks and notes.
     pub fn new() -> Self {
-        let mock_chain = MockChain::empty();
+        let mock_chain = MockChain::new();
         let mut api = Self {
             notes: BTreeMap::new(),
             blocks: vec![],
@@ -92,7 +92,7 @@ impl MockRpcApi {
         .build(&TransactionKernel::testing_assembler())
         .unwrap();
 
-        api.seal_block(vec![], vec![]); // Block 0
+        api.blocks.push(api.mock_chain.proven_blocks().first().unwrap().clone()); // Block 0 - Genesis block
         api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note
         api.seal_block(vec![], vec![]); // Block 2
         api.seal_block(vec![], vec![]); // Block 3
@@ -102,9 +102,9 @@ impl MockRpcApi {
         // Collect the notes from the mock_chain
         api.notes = api
             .mock_chain
-            .available_notes()
+            .committed_notes()
             .iter()
-            .map(|n| (n.id(), n.clone().try_into().unwrap()))
+            .map(|(n, note)| (*n, InputNote::try_from(note.clone()).unwrap()))
             .collect();
 
         api
@@ -117,10 +117,10 @@ impl MockRpcApi {
         }
 
         for nullifier in nullifiers {
-            self.mock_chain.add_nullifier(nullifier);
+            self.mock_chain.add_pending_nullifier(nullifier);
         }
 
-        let block = self.mock_chain.seal_block(None, None);
+        let block = self.mock_chain.prove_next_block();
         self.blocks.push(block);
     }
 
@@ -351,7 +351,7 @@ pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let client =
-        MockClient::new(arc_rpc_api, Box::new(rng), store, Arc::new(keystore.clone()), true);
+        MockClient::new(arc_rpc_api, Box::new(rng), store, Arc::new(keystore.clone()), true, None);
     (client, rpc_api, keystore)
 }
 

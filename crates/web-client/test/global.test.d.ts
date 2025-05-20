@@ -1,15 +1,21 @@
 import { Page } from "puppeteer";
 import {
   Account,
+  AccountBuilder,
+  AccountComponent,
   AccountHeader,
   AccountId,
   AccountStorageMode,
+  AccountType,
   AdviceMap,
+  Assembler,
+  AssemblerUtils,
   AuthSecretKey,
   ConsumableNoteRecord,
   Felt,
   FeltArray,
   FungibleAsset,
+  Library,
   Note,
   NoteAssets,
   NoteConsumability,
@@ -27,12 +33,16 @@ import {
   OutputNote,
   OutputNotesArray,
   Rpo256,
+  StorageMap,
+  StorageSlot,
   TestUtils,
   TransactionFilter,
+  TransactionKernel,
   TransactionProver,
   TransactionRequest,
   TransactionResult,
   TransactionRequestBuilder,
+  TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
@@ -47,15 +57,21 @@ declare global {
     remoteProverUrl: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
+    AccountBuilder: typeof AccountBuilder;
+    AccountComponent: typeof AccountComponent;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountStorageMode: typeof AccountStorageMode;
+    AccountType: typeof AccountType;
     AdviceMap: typeof AdviceMap;
+    Assembler: typeof Assembler;
+    AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
     FungibleAsset: typeof FungibleAsset;
+    Library: typeof Library;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;
     NoteAndArgsArray: typeof NoteAndArgsArray;
@@ -76,12 +92,16 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     Rpo256: typeof Rpo256;
+    StorageMap: typeof StorageMap;
+    StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
     TransactionFilter: typeof TransactionFilter;
+    TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
     TransactionResult: typeof TransactionResult;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
+    TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
     WebClient: typeof WebClient;

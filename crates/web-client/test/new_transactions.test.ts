@@ -572,6 +572,148 @@ describe("custom transaction with multiple output notes", () => {
   });
 });
 
+// CUSTOM ACCOUNT COMPONENT TESTS
+// =======================================================================================================
+
+export const customAccountComponent = async (): Promise<void> => {
+  return await testingPage.evaluate(async () => {
+    const accountCode = `
+        use.miden::account
+        use.std::sys
+
+        # Inputs: [KEY, VALUE]
+        # Outputs: []
+        export.write_to_map
+            # The storage map is in storage slot 1
+            push.1
+            # => [index, KEY, VALUE]
+
+            # Setting the key value pair in the map
+            exec.account::set_map_item
+            # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
+
+            dropw dropw dropw dropw
+            # => []
+
+            # Incrementing the nonce by 1
+            push.1 exec.account::incr_nonce
+            # => []
+        end
+
+        # Inputs: [KEY]
+        # Outputs: [VALUE]
+        export.get_value_in_map
+            # The storage map is in storage slot 1
+            push.1
+            # => [index, KEY]
+
+            exec.account::get_map_item
+            # => [VALUE]
+        end
+
+        # Inputs: []
+        # Outputs: [CURRENT_ROOT]
+        export.get_current_map_root
+            # Getting the current root from slot 1
+            push.1 exec.account::get_item
+            # => [CURRENT_ROOT]
+
+            exec.sys::truncate_stack
+            # => [CURRENT_ROOT]
+        end
+      `;
+    const scriptCode = `
+        use.miden_by_example::mapping_example_contract
+        use.std::sys
+
+        begin
+            push.1.2.3.4
+            push.0.0.0.0
+            # => [KEY, VALUE]
+
+            call.mapping_example_contract::write_to_map
+            # => []
+
+            push.0.0.0.0
+            # => [KEY]
+
+            call.mapping_example_contract::get_value_in_map
+            # => [VALUE]
+
+            dropw
+            # => []
+
+            call.mapping_example_contract::get_current_map_root
+            # => [CURRENT_ROOT]
+
+            exec.sys::truncate_stack
+        end
+      `;
+    const client = window.client;
+    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
+    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let storageMap = new window.StorageMap();
+    let storageSlotMap = window.StorageSlot.map(storageMap);
+
+    let mappingAccountComponent = window.AccountComponent.compile(
+      accountCode,
+      assembler,
+      [emptyStorageSlot, storageSlotMap]
+    ).withSupportsAllTypes();
+
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    let anchorBlock = await client.getLatestEpochBlock();
+
+    let accountBuilderResult = new window.AccountBuilder(walletSeed)
+      .anchor(anchorBlock)
+      .accountType(window.AccountType.RegularAccountImmutableCode)
+      .storageMode(window.AccountStorageMode.public())
+      .withComponent(mappingAccountComponent)
+      .build();
+
+    await client.newAccount(
+      accountBuilderResult.account,
+      accountBuilderResult.seed,
+      false
+    );
+
+    await client.syncState();
+
+    let accountComponentLib =
+      window.AssemblerUtils.createAccountComponentLibrary(
+        assembler,
+        "miden_by_example::mapping_example_contract",
+        accountCode
+      );
+
+    const inputs = new window.TransactionScriptInputPairArray();
+
+    let txScript = window.TransactionScript.compile(
+      scriptCode,
+      inputs,
+      assembler.withLibrary(accountComponentLib)
+    );
+
+    let txIncrementRequest = new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .build();
+
+    let txResult = await client.newTransaction(
+      accountBuilderResult.account.id(),
+      txIncrementRequest
+    );
+    await client.submitTransaction(txResult);
+  });
+};
+
+describe("custom account component tests", () => {
+  it("custom account component transaction completes successfully", async () => {
+    await expect(customAccountComponent()).to.be.fulfilled;
+  });
+});
+
 // DISCARDED TRANSACTIONS TESTS
 // ================================================================================================
 
