@@ -1,6 +1,6 @@
+use alloc::string::String;
 use core::ops::{Deref, DerefMut};
 
-use alloc::string::String;
 use api_client_wrapper::{ApiClient, InnerClient};
 use tonic::{
     metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
@@ -16,10 +16,12 @@ compile_error!("The `web-tonic` feature is only supported when targeting wasm32.
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
 
+    use alloc::string::String;
+
+    use tonic::service::interceptor::InterceptedService;
+
     use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
-    use alloc::string::String;
-    use tonic::service::interceptor::InterceptedService;
 
     pub type WasmClient = tonic_web_wasm_client::Client;
     pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
@@ -38,11 +40,13 @@ pub(crate) mod api_client_wrapper {
 
 #[cfg(feature = "tonic")]
 pub(crate) mod api_client_wrapper {
-    use super::{MetadataInterceptor, accept_header_interceptor};
-    use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
     use alloc::{boxed::Box, string::String};
     use core::time::Duration;
+
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
+
+    use super::{MetadataInterceptor, accept_header_interceptor};
+    use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
 
     pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
     #[derive(Clone)]
