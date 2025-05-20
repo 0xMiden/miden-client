@@ -1,23 +1,30 @@
+use core::ops::{Deref, DerefMut};
+
 use alloc::string::String;
+use api_client_wrapper::{ApiClient, InnerClient};
 use tonic::{
     metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
     service::Interceptor,
 };
+
+// CLIENT
+// ================================================================================================
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
 compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
 
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
+
     use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
     use alloc::string::String;
     use tonic::service::interceptor::InterceptedService;
 
-    type WasmClient = tonic_web_wasm_client::Client;
-    type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
+    pub type WasmClient = tonic_web_wasm_client::Client;
+    pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
     #[derive(Clone)]
-    pub struct ApiClient(InnerClient);
+    pub struct ApiClient(pub(crate) InnerClient);
 
     impl ApiClient {
         #[allow(clippy::unused_async)]
@@ -34,28 +41,12 @@ pub(crate) mod api_client_wrapper {
     use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
     use alloc::{boxed::Box, string::String};
-    use core::{
-        ops::{Deref, DerefMut},
-        time::Duration,
-    };
+    use core::time::Duration;
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
-    type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
+    pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
     #[derive(Clone)]
-    pub struct ApiClient(InnerClient);
-
-    impl Deref for ApiClient {
-        type Target = InnerClient;
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-
-    impl DerefMut for ApiClient {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
-    }
+    pub struct ApiClient(pub(crate) InnerClient);
 
     impl ApiClient {
         /// Connects to the Miden node API using the provided URL and timeout.
@@ -77,6 +68,19 @@ pub(crate) mod api_client_wrapper {
             // Return the connected client.
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
         }
+    }
+}
+
+impl Deref for ApiClient {
+    type Target = InnerClient;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ApiClient {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
