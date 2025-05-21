@@ -25,7 +25,7 @@ concurrent = ["miden-client/concurrent"]
 
 [[test]]
 name = "integration"
-path = "src/tests.rs"
+path = "tests/cli.rs"
 required-features = ["concurrent"]
 
 [dev-dependencies]

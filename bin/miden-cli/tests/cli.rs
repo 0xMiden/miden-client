@@ -8,7 +8,6 @@ use std::{
 };
 
 use assert_cmd::Command;
-use config::RpcConfig;
 use miden_cli::CliKeyStore;
 use miden_client::{
     self, Client, Felt,
@@ -31,8 +30,6 @@ use predicates::str::contains;
 use rand::Rng;
 use toml::Table;
 use uuid::Uuid;
-
-mod config;
 
 // CLI TESTS
 // ================================================================================================
@@ -183,8 +180,7 @@ async fn test_import_genesis_accounts_can_be_used_for_transactions() {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path =
-            format!("{cargo_workspace_dir}/../../miden-node/accounts/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -755,7 +751,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
 
     (
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, RpcConfig::default().timeout_ms)),
+            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             std::sync::Arc::new(keystore.clone()),
