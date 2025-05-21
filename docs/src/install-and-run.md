@@ -1,6 +1,6 @@
 ## Software prerequisites
 
-- [Rust installation](https://www.rust-lang.org/tools/install) minimum version 1.86.
+- [Rust installation](https://www.rust-lang.org/tools/install) minimum version 1.87.
 
 ## Install the client
 

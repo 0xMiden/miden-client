@@ -294,6 +294,22 @@ Meant to be used in conjunction with the force_import_store method
 
 ***
 
+### importAccountById()
+
+> **importAccountById**(`account_id`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### importNote()
 
 > **importNote**(`note_bytes`): `Promise`\<`any`\>
