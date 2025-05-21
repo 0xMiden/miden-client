@@ -100,7 +100,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Start prover
         run: make start-prover > /dev/null &
       - name: Run remote prover tests
