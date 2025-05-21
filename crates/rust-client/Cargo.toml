@@ -69,6 +69,7 @@ thiserror = { workspace = true }
 tonic = { version = "0.13", default-features = false, features = [
     "prost",
     "codegen",
+    "tls-native-roots",
 ] }
 tonic-web-wasm-client = { version = "0.7", optional = true, default-features = false }
 tracing = { workspace = true }

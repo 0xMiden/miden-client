@@ -62,6 +62,8 @@ pub(crate) mod api_client_wrapper {
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?
                 .timeout(Duration::from_millis(timeout_ms));
             let channel = endpoint
+                .tls_config(tonic::transport::ClientTlsConfig::new().with_native_roots())
+                .map_err(|err| RpcError::ConnectionError(Box::new(err)))?
                 .connect()
                 .await
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
