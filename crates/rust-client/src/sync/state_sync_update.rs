@@ -206,13 +206,13 @@ impl TransactionUpdateTracker {
                     transaction.details.block_num
                         < new_sync_height.checked_sub(tx_graceful_blocks).unwrap_or_default()
                 },
-                &DiscardCause::Stale,
+                DiscardCause::Stale,
             );
         }
 
         self.discard_transaction_with_predicate(
             |transaction| transaction.details.expiration_block_num <= new_sync_height,
-            &DiscardCause::Expired,
+            DiscardCause::Expired,
         );
     }
 
@@ -229,7 +229,7 @@ impl TransactionUpdateTracker {
                     .input_note_nullifiers
                     .contains(&input_note_nullifier.inner())
             },
-            &DiscardCause::InputConsumed,
+            DiscardCause::InputConsumed,
         );
     }
 
@@ -237,13 +237,13 @@ impl TransactionUpdateTracker {
     pub fn apply_invalid_initial_account_state(&mut self, invalid_account_state: Digest) {
         self.discard_transaction_with_predicate(
             |transaction| transaction.details.init_account_state == invalid_account_state,
-            &DiscardCause::InvalidInitialAccountState,
+            DiscardCause::DiscardedInitialState,
         );
     }
 
     /// Discards transactions that match the predicate and also applies the new invalid account
     /// states
-    fn discard_transaction_with_predicate<F>(&mut self, predicate: F, discard_cause: &DiscardCause)
+    fn discard_transaction_with_predicate<F>(&mut self, predicate: F, discard_cause: DiscardCause)
     where
         F: Fn(&TransactionRecord) -> bool,
     {
@@ -251,7 +251,7 @@ impl TransactionUpdateTracker {
 
         for transaction in self.mutable_pending_transactions() {
             if predicate(transaction) {
-                transaction.discard_transaction(discard_cause.clone());
+                transaction.discard_transaction(discard_cause);
                 new_invalid_account_states.push(transaction.details.final_account_state);
             }
         }

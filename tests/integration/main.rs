@@ -1874,7 +1874,7 @@ async fn test_subsequent_discarded_transactions() {
 
     assert!(matches!(
         second_tx_record.status,
-        TransactionStatus::Discarded(DiscardCause::InvalidInitialAccountState)
+        TransactionStatus::Discarded(DiscardCause::DiscardedInitialState)
     ));
 
     // Check that the account state has been rolled back to the value before both transactions
