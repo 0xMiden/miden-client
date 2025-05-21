@@ -23,6 +23,7 @@
 * [BREAKING] Refactored `TransactionRequestBuilder` preset builders (#901).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
+* [BREAKING] Added `DiscardCause` for transactions (#853).
 
 ## 0.8.2 (TBD)
 
