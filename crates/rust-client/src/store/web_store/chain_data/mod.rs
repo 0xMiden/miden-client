@@ -192,4 +192,13 @@ impl WebStore {
 
         Ok(())
     }
+
+    pub(crate) async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
+        let promise = idxdb_prune_irrelevant_blocks();
+        JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to prune block header: {js_error:?}",))
+        })?;
+
+        Ok(())
+    }
 }
