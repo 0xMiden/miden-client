@@ -99,7 +99,7 @@ export const sendTransaction = async (
 
       let mintTransactionRequest = client.newMintTransactionRequest(
         senderAccountId,
-        window.AccountId.fromHex(_faucetAccountId),
+        faucetAccountId,
         window.NoteType.Private,
         BigInt(1000)
       );
