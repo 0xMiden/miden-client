@@ -1,7 +1,5 @@
 use alloc::string::String;
-use core::ops::{Deref, DerefMut};
 
-use api_client_wrapper::{ApiClient, InnerClient};
 use tonic::{
     metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
     service::Interceptor,
@@ -15,25 +13,18 @@ compile_error!("The `web-tonic` feature is only supported when targeting wasm32.
 
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
-
     use alloc::string::String;
 
-    use tonic::service::interceptor::InterceptedService;
+    use crate::rpc::RpcError;
 
-    use super::{MetadataInterceptor, accept_header_interceptor};
-    use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
-
-    pub type WasmClient = tonic_web_wasm_client::Client;
-    pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
-    #[derive(Clone)]
-    pub struct ApiClient(pub(crate) InnerClient);
+    pub type ApiClient =
+        crate::rpc::generated::rpc::api_client::ApiClient<tonic_web_wasm_client::Client>;
 
     impl ApiClient {
         #[allow(clippy::unused_async)]
         pub async fn new_client(endpoint: String, _timeout_ms: u64) -> Result<ApiClient, RpcError> {
-            let wasm_client = WasmClient::new(endpoint);
-            let interceptor = accept_header_interceptor();
-            Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
+            let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
+            Ok(ApiClient::new(wasm_client))
         }
     }
 }
@@ -41,7 +32,10 @@ pub(crate) mod api_client_wrapper {
 #[cfg(feature = "tonic")]
 pub(crate) mod api_client_wrapper {
     use alloc::{boxed::Box, string::String};
-    use core::time::Duration;
+    use core::{
+        ops::{Deref, DerefMut},
+        time::Duration,
+    };
 
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
@@ -75,18 +69,17 @@ pub(crate) mod api_client_wrapper {
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
         }
     }
-}
-
-impl Deref for ApiClient {
-    type Target = InnerClient;
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    impl Deref for ApiClient {
+        type Target = InnerClient;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
     }
-}
 
-impl DerefMut for ApiClient {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    impl DerefMut for ApiClient {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
     }
 }
 
