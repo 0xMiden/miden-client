@@ -18,7 +18,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="miden-base"
 PROVER_REPO="https://github.com/0xMiden/miden-base.git"
-PROVER_BRANCH="3d8c3b28048fffbb63592a971d0fcae5dc58bce9"
+PROVER_BRANCH="next"
 PROVER_FEATURES_TESTING=--features "testing"
 PROVER_PORT=50051
 
@@ -81,7 +81,11 @@ test-docs: ## Run documentation tests
 
 .PHONY: start-node
 start-node: ## Start the testing node server
-	./scripts/start-node.sh
+	RUST_LOG=info cargo run --release --package node-builder
+
+.PHONY: start-node-background
+start-node-background: ## Start the testing node server in background
+	./scripts/start-node-bg.sh
 
 .PHONY: stop-node
 stop-node: ## Stop the testing node server

@@ -1,7 +1,7 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.8.1-next.2",
-  "description": "Miden Wasm SDK",
+  "version": "0.8.4",
+  "description": "Polygon Miden Wasm SDK",
   "collaborators": [
     "Miden",
     "Demox Labs <hi@demoxlabs.xyz>"

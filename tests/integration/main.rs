@@ -102,24 +102,30 @@ async fn test_multiple_tx_on_same_block() {
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    let tx_request_1 = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        None,
-        NoteType::Private,
-        client.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
-    let tx_request_2 = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        None,
-        NoteType::Private,
-        client.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request_1 = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            None,
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+    let tx_request_2 = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            None,
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
 
     println!("Running P2ID tx...");
 
@@ -190,15 +196,14 @@ async fn test_import_expected_notes() {
 
     wait_for_node(&mut client_2).await;
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        client_2_account.id(),
-        NoteType::Public,
-        client_2.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
+            client_2_account.id(),
+            NoteType::Public,
+            client_2.rng(),
+        )
+        .unwrap();
     let note: InputNoteRecord = tx_request.expected_output_notes().next().unwrap().clone().into();
     client_2.sync_state().await.unwrap();
 
@@ -225,15 +230,14 @@ async fn test_import_expected_notes() {
     // If client 2 succesfully consumes the note, we confirm we have MMR and block header data
     consume_notes(&mut client_2, client_2_account.id(), &[input_note.try_into().unwrap()]).await;
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        first_basic_account.id(),
-        NoteType::Private,
-        client_2.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
+            first_basic_account.id(),
+            NoteType::Private,
+            client_2.rng(),
+        )
+        .unwrap();
     let note: InputNoteRecord = tx_request.expected_output_notes().next().unwrap().clone().into();
 
     // Import an uncommited note without verification
@@ -280,15 +284,14 @@ async fn test_import_expected_note_uncommitted() {
 
     wait_for_node(&mut client_2).await;
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        client_2_account.id(),
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
+            client_2_account.id(),
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
 
     let note: InputNoteRecord = tx_request.expected_output_notes().next().unwrap().clone().into();
     client_2.sync_state().await.unwrap();
@@ -318,15 +321,14 @@ async fn test_import_expected_notes_from_the_past_as_committed() {
 
     wait_for_node(&mut client_2).await;
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        first_basic_account.id(),
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
+            first_basic_account.id(),
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
     let note: InputNoteRecord = tx_request.expected_output_notes().next().unwrap().clone().into();
 
     let block_height_before = client_1.get_sync_height().await.unwrap();
@@ -415,15 +417,18 @@ async fn test_sync_detail_values() {
 
     // Do a transfer with recall from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        Some(new_details.block_num + 5),
-        NoteType::Public,
-        client1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            Some(new_details.block_num + 5),
+            NoteType::Public,
+            client1.rng(),
+        )
+        .unwrap();
     let note_id = tx_request.expected_output_notes().next().unwrap().id();
     execute_tx_and_sync(&mut client1, from_account_id, tx_request).await;
 
@@ -434,7 +439,7 @@ async fn test_sync_detail_values() {
     assert_eq!(new_details.updated_accounts.len(), 0);
 
     // Consume the note with the second account
-    let tx_request = TransactionRequestBuilder::consume_notes(vec![note_id]).build().unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
     execute_tx_and_sync(&mut client2, to_account_id, tx_request).await;
 
     // First client sync should have a new nullifier as the note was consumed
@@ -461,15 +466,14 @@ async fn test_multiple_transactions_can_be_committed_in_different_blocks_without
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
         println!("Minting Asset");
-        let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-            fungible_asset,
-            from_account_id,
-            NoteType::Private,
-            client.rng(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                from_account_id,
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
 
         println!("Executing transaction...");
         let transaction_execution_result =
@@ -489,15 +493,14 @@ async fn test_multiple_transactions_can_be_committed_in_different_blocks_without
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
         println!("Minting Asset");
-        let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-            fungible_asset,
-            from_account_id,
-            NoteType::Private,
-            client.rng(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                from_account_id,
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
 
         println!("Executing transaction...");
         let transaction_execution_result =
@@ -527,15 +530,14 @@ async fn test_multiple_transactions_can_be_committed_in_different_blocks_without
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
         println!("Minting Asset");
-        let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-            fungible_asset,
-            from_account_id,
-            NoteType::Private,
-            client.rng(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                from_account_id,
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
 
         println!("Executing transaction...");
         let transaction_execution_result =
@@ -640,19 +642,17 @@ async fn test_consume_multiple_expected_notes() {
         expected_notes.partition(|note| client_notes_ids.contains(&note.id()));
 
     // Create and execute transactions
-    let tx_request_1 = TransactionRequestBuilder::consume_notes(
-        client_owned_notes.iter().map(|note| note.id()).collect(),
-    )
-    .with_authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
-    .build()
-    .unwrap();
+    let tx_request_1 = TransactionRequestBuilder::new()
+        .with_authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .build_consume_notes(client_owned_notes.iter().map(|note| note.id()).collect())
+        .unwrap();
 
-    let tx_request_2 = TransactionRequestBuilder::consume_notes(
-        unauth_owned_notes.iter().map(|note| note.id()).collect(),
-    )
-    .with_unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
-    .build()
-    .unwrap();
+    let tx_request_2 = TransactionRequestBuilder::new()
+        .with_unauthenticated_input_notes(
+            unauth_owned_notes.iter().map(|note| ((*note).clone(), None)),
+        )
+        .build_consume_notes(unauth_owned_notes.iter().map(|note| note.id()).collect())
+        .unwrap();
 
     let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
     let tx_id_2 = execute_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
@@ -715,15 +715,18 @@ async fn test_import_consumed_note_with_proof() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
     println!("Running P2IDR tx...");
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        Some(current_block_num),
-        NoteType::Private,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            Some(current_block_num),
+            NoteType::Private,
+            client_1.rng(),
+        )
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
     let note = client_1
         .get_input_notes(NoteFilter::Committed)
@@ -736,7 +739,7 @@ async fn test_import_consumed_note_with_proof() {
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::consume_notes(vec![note.id()]).build().unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
 
     // Import the consumed note
@@ -773,15 +776,18 @@ async fn test_import_consumed_note_with_id() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
     println!("Running P2IDR tx...");
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        Some(current_block_num),
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            Some(current_block_num),
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
     let note = client_1
         .get_input_notes(NoteFilter::Committed)
@@ -794,7 +800,7 @@ async fn test_import_consumed_note_with_id() {
     // Consume the note with the sender account
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::consume_notes(vec![note.id()]).build().unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
     client_2.sync_state().await.unwrap();
 
@@ -829,15 +835,18 @@ async fn test_discarded_transaction() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
     println!("Running P2IDR tx...");
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        Some(current_block_num),
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            Some(current_block_num),
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
 
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
     client_2.sync_state().await.unwrap();
@@ -850,7 +859,7 @@ async fn test_discarded_transaction() {
         .clone();
 
     println!("Consuming Note...");
-    let tx_request = TransactionRequestBuilder::consume_notes(vec![note.id()]).build().unwrap();
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
     let tx_result = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
@@ -939,15 +948,9 @@ async fn test_custom_transaction_prover() {
 
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        fungible_asset,
-        from_account_id,
-        NoteType::Private,
-        client.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(fungible_asset, from_account_id, NoteType::Private, client.rng())
+        .unwrap();
 
     let transaction_execution_result =
         client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
@@ -1044,16 +1047,10 @@ async fn test_expired_transaction_fails() {
     // Create a Mint Tx for 1000 units of our fungible asset
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        fungible_asset,
-        from_account_id,
-        NoteType::Public,
-        client.rng(),
-    )
-    .unwrap()
-    .with_expiration_delta(expiration_delta)
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .with_expiration_delta(expiration_delta)
+        .build_mint_fungible_asset(fungible_asset, from_account_id, NoteType::Public, client.rng())
+        .unwrap();
 
     println!("Executing transaction...");
     let transaction_execution_result =

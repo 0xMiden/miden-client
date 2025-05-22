@@ -66,6 +66,7 @@ web-sys = { version = "0.3", features = ["console", "Window", "Storage"] }
 miden-client = { path = ".", features = ["testing", "concurrent", "sqlite", "tonic"] }
 miden-lib = { workspace = true, features = ["testing"] }
 miden-objects = { workspace = true, default-features = false, features = ["testing"] }
+miden-testing = { workspace = true, default-features = false, features = ["async"] }
 tokio = { workspace = true }
 web-sys = { version = "0.3", features = ["console"]}
 
