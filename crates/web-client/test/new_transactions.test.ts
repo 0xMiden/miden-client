@@ -296,7 +296,7 @@ export const customTransaction = async (
                 mem_loadw
                 # => [NOTE_ARG_1]
 
-                push.${expectedNoteArg1} assert_eqw.err=101
+                push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
                 # => []
 
                 # read second word
@@ -305,15 +305,15 @@ export const customTransaction = async (
                 mem_loadw
                 # => [NOTE_ARG_2]
 
-                push.${expectedNoteArg2} assert_eqw.err=102
+                push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
                 # store the note inputs to memory starting at address 0
                 push.0 exec.note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
-                # make sure the number of inputs is 1
-                eq.2 assert.err=103
+                # make sure the number of inputs is 2
+                eq.2 assert.err="P2ID script expects exactly 2 note inputs"
                 # => [inputs_ptr]
 
                 # read the target account id from the note inputs
@@ -324,7 +324,7 @@ export const customTransaction = async (
                 # => [account_id_prefix, target_account_id_prefix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
-                assert_eq.err=104
+                assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
                 exec.add_note_assets_to_account

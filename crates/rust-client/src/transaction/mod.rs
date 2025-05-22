@@ -42,13 +42,12 @@
 //!     let asset = FungibleAsset::new(faucet_id, 100)?;
 //!
 //!     // Build a transaction request for a pay-to-id transaction.
-//!     let tx_request = TransactionRequestBuilder::pay_to_id(
+//!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
 //!         PaymentTransactionData::new(vec![asset.into()], sender_id, target_id),
 //!         None, // No recall height
 //!         NoteType::Private,
 //!         client.rng(),
-//!     )?
-//!     .build()?;
+//!     )?;
 //!
 //!     // Execute the transaction. This returns a TransactionResult.
 //!     let tx_result: TransactionResult = client.new_transaction(sender_id, tx_request).await?;
@@ -74,6 +73,7 @@ use core::fmt::{self};
 use miden_objects::{
     AssetError, Digest, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
+    assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
@@ -550,7 +550,13 @@ impl Client {
         // Execute the transaction and get the witness
         let executed_transaction = self
             .tx_executor
-            .execute_transaction(account_id, block_num, notes, tx_args)
+            .execute_transaction(
+                account_id,
+                block_num,
+                notes,
+                tx_args,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
+            )
             .await?;
 
         // Check that the expected output notes matches the transaction outcome.
@@ -1024,6 +1030,7 @@ impl Client {
                 tx_script,
                 advice_inputs,
                 foreign_account_inputs,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
     }
@@ -1159,19 +1166,18 @@ mod test {
 
         client.add_account(&account, None, false).await.unwrap();
         client.sync_state().await.unwrap();
-        let tx_request = TransactionRequestBuilder::pay_to_id(
-            PaymentTransactionData::new(
-                vec![asset_1, asset_2],
-                account.id(),
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
-            ),
-            None,
-            NoteType::Private,
-            client.rng(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(
+                PaymentTransactionData::new(
+                    vec![asset_1, asset_2],
+                    account.id(),
+                    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
+                ),
+                None,
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
 
         let tx_result = client.new_transaction(account.id(), tx_request).await.unwrap();
         assert!(

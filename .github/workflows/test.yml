@@ -48,7 +48,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
@@ -73,7 +73,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Run web client tests
         run: make integration-test-web-client
       - name: Stop test node
@@ -100,7 +100,7 @@ jobs:
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Start prover
         run: make start-prover > /dev/null &
       - name: Run remote prover tests
