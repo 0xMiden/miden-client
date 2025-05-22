@@ -8,7 +8,6 @@ use std::{
 };
 
 use assert_cmd::Command;
-use config::RpcConfig;
 use miden_cli::CliKeyStore;
 use miden_client::{
     self, Client, Felt,
@@ -31,8 +30,6 @@ use predicates::str::contains;
 use rand::Rng;
 use toml::Table;
 use uuid::Uuid;
-
-mod config;
 
 // CLI TESTS
 // ================================================================================================
@@ -754,7 +751,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
 
     (
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, RpcConfig::default().timeout_ms)),
+            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             std::sync::Arc::new(keystore.clone()),

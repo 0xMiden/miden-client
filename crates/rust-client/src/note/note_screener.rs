@@ -116,7 +116,7 @@ impl<'a> NoteScreener<'a> {
         note: &Note,
     ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
         let transaction_request =
-            TransactionRequestBuilder::consume_notes(vec![note.id()]).build()?;
+            TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
         let tx_script =
             transaction_request.build_transaction_script(&AccountInterface::from(account), true)?;
