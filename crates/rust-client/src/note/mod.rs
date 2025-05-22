@@ -110,16 +110,21 @@ impl Client {
         self.store.get_input_notes(filter).await.map_err(Into::into)
     }
 
-    /// Returns the input notes and their consumability.
+    /// Returns the input notes and their consumability. Assuming the notes will be consumed by a
+    /// normal consume transaction. If `account_id` is None then all consumable input notes are
+    /// returned.
     ///
-    /// If `account_id` is None then all consumable input notes are returned.
+    /// The note screener runs a series of checks to determine whether the note can be executed as
+    /// part of a transaction for a specific account. If the specific account ID can consume it (ie,
+    /// if it's compatible with the account), it will be returned as part of the result list.
     pub async fn get_consumable_notes(
         &self,
         account_id: Option<AccountId>,
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let commited_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener = NoteScreener::new(self.store.clone());
+        let note_screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in commited_notes {
@@ -140,12 +145,17 @@ impl Client {
         Ok(relevant_notes)
     }
 
-    /// Returns the consumability of the provided note.
+    /// Returns the consumability conditions for the provided note.
+    ///
+    /// The note screener runs a series of checks to determine whether the note can be executed as
+    /// part of a transaction for a specific account. If the specific account ID can consume it (ie,
+    /// if it's compatible with the account), it will be returned as part of the result list.
     pub async fn get_note_consumability(
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener = NoteScreener::new(self.store.clone());
+        let note_screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await

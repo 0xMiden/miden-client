@@ -35,11 +35,12 @@ use crate::{
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived = Box<
+pub type OnNoteReceived<'a> = Box<
     dyn Fn(
         CommittedNote,
         Option<InputNoteRecord>,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
+        Arc<NoteScreener<'a>>,
+    ) -> Pin<Box<(dyn Future<Output = Result<bool, ClientError>> + 'a)>>,
 >;
 
 // STATE SYNC
@@ -51,15 +52,16 @@ pub type OnNoteReceived = Box<
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
-pub struct StateSync {
+pub struct StateSync<'a> {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
     /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived,
+    on_note_received: OnNoteReceived<'a>,
     tx_graceful_blocks: Option<u32>,
+    note_screener: Arc<NoteScreener<'a>>,
 }
 
-impl StateSync {
+impl<'a> StateSync<'a> {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments
@@ -68,13 +70,16 @@ impl StateSync {
     /// * `on_note_received` - A callback to be executed when a new note inclusion is received.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived,
+        on_note_received: OnNoteReceived<'a>,
         tx_graceful_blocks: Option<u32>,
+        note_screener: NoteScreener<'a>,
     ) -> Self {
         Self {
             rpc_api,
             on_note_received,
             tx_graceful_blocks,
+            #[allow(clippy::arc_with_non_send_sync)]
+            note_screener: Arc::new(note_screener),
         }
     }
 
@@ -312,7 +317,13 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            if (self.on_note_received)(committed_note.clone(), public_note.clone()).await? {
+            if (self.on_note_received)(
+                committed_note.clone(),
+                public_note.clone(),
+                self.note_screener.clone(),
+            )
+            .await?
+            {
                 found_relevant_note = true;
 
                 note_updates.apply_committed_note_state_transitions(
@@ -446,9 +457,9 @@ pub async fn on_note_received(
     store: Arc<dyn Store>,
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
+    note_screener: Arc<NoteScreener<'_>>,
 ) -> Result<bool, ClientError> {
     let note_id = *committed_note.note_id();
-    let note_screener = NoteScreener::new(store.clone());
 
     if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
         || !store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()

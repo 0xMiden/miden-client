@@ -67,6 +67,7 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use crate::{
     Client, ClientError,
+    note::NoteScreener,
     store::{NoteFilter, TransactionFilter},
 };
 mod block_header;
@@ -114,15 +115,24 @@ impl Client {
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
+        let note_screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+
         let state_sync = StateSync::new(
             self.rpc_api.clone(),
             Box::new({
                 let store_clone = self.store.clone();
-                move |committed_note, public_note| {
-                    Box::pin(on_note_received(store_clone.clone(), committed_note, public_note))
+                move |committed_note, public_note, note_screener| {
+                    Box::pin(on_note_received(
+                        store_clone.clone(),
+                        committed_note,
+                        public_note,
+                        note_screener,
+                    ))
                 }
             }),
             self.tx_graceful_blocks,
+            note_screener,
         );
 
         // Get current state of the client

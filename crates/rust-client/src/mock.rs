@@ -8,19 +8,15 @@ use std::env::temp_dir;
 use async_trait::async_trait;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    Felt, Word,
+    Felt,
     account::{AccountCode, AccountDelta, AccountId},
-    asset::{FungibleAsset, NonFungibleAsset},
     block::{BlockHeader, BlockNumber, ProvenBlock},
     crypto::{
         merkle::{Mmr, MmrProof, SmtProof},
         rand::RpoRandomCoin,
     },
-    note::{NoteId, NoteLocation, NoteTag, Nullifier},
-    testing::{
-        account_id::{ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PRIVATE_SENDER},
-        note::NoteBuilder,
-    },
+    note::{NoteExecutionMode, NoteId, NoteLocation, NoteTag, NoteType, Nullifier},
+    testing::{account_id::ACCOUNT_ID_PRIVATE_SENDER, note::NoteBuilder},
     transaction::{InputNote, OutputNote, ProvenTransaction},
 };
 use miden_testing::MockChain;
@@ -76,21 +72,20 @@ impl MockRpcApi {
             mock_chain,
         };
 
-        let note_first = NoteBuilder::new(
-            ACCOUNT_ID_PRIVATE_SENDER.try_into().unwrap(),
-            RpoRandomCoin::new(Word::default()),
-        )
-        .add_assets([FungibleAsset::mock(20)])
-        .build(&TransactionKernel::testing_assembler())
-        .unwrap();
+        let from_account_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
 
-        let note_second = NoteBuilder::new(
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(),
-            RpoRandomCoin::new(Word::default()),
-        )
-        .add_assets([NonFungibleAsset::mock(&[1, 2, 3])])
-        .build(&TransactionKernel::testing_assembler())
-        .unwrap();
+        let note_first =
+            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new)))
+                .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+                .build(&TransactionKernel::assembler())
+                .unwrap();
+
+        let note_second =
+            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new)))
+                .note_type(NoteType::Private)
+                .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+                .build(&TransactionKernel::assembler())
+                .unwrap();
 
         api.blocks.push(api.mock_chain.proven_blocks().first().unwrap().clone()); // Block 0 - Genesis block
         api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note

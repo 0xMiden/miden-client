@@ -582,6 +582,7 @@ async fn test_p2idr_transfer_consumed_by_sender() {
     assert_note_cannot_be_consumed_twice(&mut client, to_account_id, notes[0].id()).await;
 }
 
+// TODO: Change this to a unit test
 #[tokio::test]
 async fn test_get_consumable_notes() {
     let (mut client, authenticator) = create_test_client().await;
@@ -613,6 +614,7 @@ async fn test_get_consumable_notes() {
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     println!("Running P2IDR tx...");
+    let current_block_num = client.get_sync_height().await.unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -620,7 +622,7 @@ async fn test_get_consumable_notes() {
                 from_account_id,
                 to_account_id,
             ),
-            Some(100.into()),
+            Some(current_block_num + RECALL_HEIGHT_DELTA),
             NoteType::Private,
             client.rng(),
         )
@@ -634,14 +636,17 @@ async fn test_get_consumable_notes() {
     assert!(!client.get_consumable_notes(Some(from_account_id)).await.unwrap().is_empty());
     assert!(!client.get_consumable_notes(Some(to_account_id)).await.unwrap().is_empty());
 
-    // Check that the note is only consumable after block 100 for the account that sent the
-    // transaction
+    // Check that the note is only consumable after the specified block for the account that sent
+    // the transaction
     let from_account_relevance = relevant_accounts
         .iter()
         .find(|relevance| relevance.0 == from_account_id)
         .unwrap()
         .1;
-    assert_eq!(from_account_relevance, NoteRelevance::After(100));
+    assert_eq!(
+        from_account_relevance,
+        NoteRelevance::After(current_block_num.as_u32() + RECALL_HEIGHT_DELTA)
+    );
 
     // Check that the note is always consumable for the account that received the transaction
     let to_account_relevance = relevant_accounts
@@ -649,7 +654,19 @@ async fn test_get_consumable_notes() {
         .find(|relevance| relevance.0 == to_account_id)
         .unwrap()
         .1;
-    assert_eq!(to_account_relevance, NoteRelevance::Always);
+    assert_eq!(to_account_relevance, NoteRelevance::Now);
+
+    wait_for_blocks(&mut client, RECALL_HEIGHT_DELTA).await;
+
+    // After waiting, the note is consumable by the sender account
+    let consumable_notes = client.get_consumable_notes(None).await.unwrap();
+    let relevant_accounts = &consumable_notes.first().unwrap().1;
+    let from_account_relevance = relevant_accounts
+        .iter()
+        .find(|relevance| relevance.0 == from_account_id)
+        .unwrap()
+        .1;
+    assert_eq!(from_account_relevance, NoteRelevance::Now);
 }
 
 #[tokio::test]
@@ -1898,4 +1915,40 @@ async fn test_subsequent_discarded_transactions() {
         account_after_sync.account().commitment(),
         account_before_tx.account().commitment(),
     );
+}
+
+#[tokio::test]
+async fn test_ignore_invalid_notes() {
+    let (mut client, authenticator) = create_test_client().await;
+    let (regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await;
+
+    let account_id = regular_account.id();
+    let second_account_id = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Mint 2 valid notes
+    let note_1 = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+    let note_2 = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+
+    // Mint 2 invalid notes
+    let note_3 =
+        mint_note(&mut client, second_account_id, faucet_account_id, NoteType::Private).await;
+    let note_4 =
+        mint_note(&mut client, second_account_id, faucet_account_id, NoteType::Private).await;
+
+    // Create a transaction to consume all 4 notes but ignore the invalid ones
+    let tx_request = TransactionRequestBuilder::new()
+        .ignore_invalid_input_notes()
+        .build_consume_notes(vec![note_1.id(), note_3.id(), note_2.id(), note_4.id()])
+        .unwrap();
+
+    execute_tx_and_sync(&mut client, account_id, tx_request).await;
+
+    // Check that only the valid notes were consumed
+    let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await.unwrap();
+    assert_eq!(consumed_notes.len(), 2);
+    assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
+    assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
 }
