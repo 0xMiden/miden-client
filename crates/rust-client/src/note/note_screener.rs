@@ -22,7 +22,7 @@ use crate::{
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NoteRelevance {
-    /// The note can be consumed in the current block.
+    /// The note can be consumed in the client's current block.
     Now,
     /// The note can be consumed after the block with the specified number.
     After(u32),
@@ -52,8 +52,8 @@ impl fmt::Display for NoteRelevance {
 pub struct NoteScreener<'a> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A consumability checker, used to check whether a note can be consumed by an account.
-    consumability_checker: NoteConsumptionChecker<'a>,
+    /// A consumption checker, used to check whether a note can be consumed by an account.
+    consumption_checker: NoteConsumptionChecker<'a>,
     /// A MAST store, used to provide code inputs to the VM.
     mast_store: Arc<TransactionMastStore>,
 }
@@ -66,7 +66,7 @@ impl<'a> NoteScreener<'a> {
     ) -> Self {
         Self {
             store,
-            consumability_checker: NoteConsumptionChecker::new(tx_executor),
+            consumption_checker: NoteConsumptionChecker::new(tx_executor),
             mast_store,
         }
     }
@@ -128,7 +128,7 @@ impl<'a> NoteScreener<'a> {
         self.mast_store.load_transaction_code(account.code(), &input_notes, &tx_args);
 
         if let NoteAccountExecution::Success = self
-            .consumability_checker
+            .consumption_checker
             .check_notes_consumability(
                 account.id(),
                 self.store.get_sync_height().await?,

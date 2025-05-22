@@ -12,7 +12,7 @@ use super::NoteUpdates;
 use crate::{
     Client, ClientError,
     note::NoteScreener,
-    store::{InputNoteRecord, NoteFilter, PartialBlockchainFilter, StoreError},
+    store::{NoteFilter, PartialBlockchainFilter, StoreError},
 };
 
 /// Network information management methods.
@@ -85,20 +85,8 @@ impl Client {
         let note_screener =
             NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
-        let tracked_notes = self
-            .store
-            .get_input_notes(NoteFilter::List(
-                committed_notes.updated_input_notes().map(InputNoteRecord::id).collect(),
-            ))
-            .await?;
-
         // Find all relevant Input Notes using the note checker
         for input_note in committed_notes.updated_input_notes() {
-            if tracked_notes.iter().any(|n| n.id() == input_note.id()) {
-                // If the note is already tracked then the block is relevant
-                return Ok(true);
-            }
-
             if !note_screener
                 .check_relevance(
                     &input_note.try_into().map_err(ClientError::NoteRecordConversionError)?,

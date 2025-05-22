@@ -1760,8 +1760,8 @@ async fn test_ignore_invalid_notes() {
     // Create a transaction to consume all 4 notes but ignore the invalid ones
     let tx_request = TransactionRequestBuilder::consume_notes(vec![
         note_1.id(),
-        note_2.id(),
         note_3.id(),
+        note_2.id(),
         note_4.id(),
     ])
     .ignore_invalid_input_notes()
