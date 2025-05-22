@@ -68,6 +68,7 @@ pub(crate) mod api_client_wrapper {
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
         }
     }
+
     impl Deref for ApiClient {
         type Target = InnerClient;
         fn deref(&self) -> &Self::Target {
