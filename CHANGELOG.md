@@ -6,6 +6,7 @@
 
 * Added support for `bech32` account IDs in the CLI (#840).
 * Added support for MASM account component libraries in Web Client (#900).
+* Added support for RPC client/server version matching through HTTP ACCEPT header (#912).
 
 ### Changes
 
