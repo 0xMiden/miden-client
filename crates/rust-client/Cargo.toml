@@ -21,22 +21,9 @@ workspace = true
 [features]
 concurrent = ["miden-tx/concurrent", "std"]
 default = ["std", "tonic/channel"]
-idxdb = [
-    "dep:base64",
-    "dep:serde-wasm-bindgen",
-    "dep:wasm-bindgen",
-    "dep:wasm-bindgen-futures",
-    "dep:serde",
-    "dep:getrandom",
-]
-sqlite = [
-    "dep:rusqlite",
-    "dep:deadpool",
-    "dep:deadpool-sync",
-    "dep:rusqlite_migration",
-    "std",
-]
-std = ["miden-objects/std", "miden-proving-service-client/std"]
+idxdb = ["dep:base64", "dep:serde-wasm-bindgen", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
+sqlite = ["dep:rusqlite", "dep:deadpool", "dep:deadpool-sync", "dep:rusqlite_migration", "std"]
+std = ["miden-objects/std","miden-proving-service-client/std"]
 testing = ["miden-objects/testing", "miden-lib/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/transport", "tonic/tls-ring", "tonic/tls-native-roots"]
 web-tonic = ["dep:tonic-web-wasm-client", "dep:getrandom"]
@@ -45,37 +32,24 @@ web-tonic = ["dep:tonic-web-wasm-client", "dep:getrandom"]
 async-trait = { workspace = true }
 base64 = { version = "0.22", optional = true }
 chrono = { version = "0.4", optional = false }
-deadpool = { version = "0.12", features = [
-    "managed",
-    "rt_tokio_1",
-], default-features = false, optional = true }
+deadpool = { version = "0.12", features = ["managed", "rt_tokio_1"], default-features = false, optional = true }
 deadpool-sync = { version = "0.1", optional = true }
 hex = { version = "0.4" }
-miden-proving-service-client = { workspace = true, features = ["tx-prover"] }
+miden-proving-service-client = { workspace = true , features = ["tx-prover"]}
 miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 miden-tx = { workspace = true, features = ["async"] }
 prost = { version = "0.13", default-features = false, features = ["derive"] }
 rand = { workspace = true }
-rusqlite = { version = "0.35", features = [
-    "vtab",
-    "array",
-    "bundled",
-], optional = true }
+rusqlite = { version = "0.35", features = ["vtab", "array", "bundled"], optional = true }
 rusqlite_migration = { version = "2.1", optional = true }
 serde = { workspace = true, optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 thiserror = { workspace = true }
-tonic = { version = "0.13", default-features = false, features = [
-    "prost",
-    "codegen",
-    "tls-native-roots",
-] }
+tonic = { version = "0.13", default-features = false, features = ["prost", "codegen"] }
 tonic-web-wasm-client = { version = "0.7", optional = true, default-features = false }
 tracing = { workspace = true }
-wasm-bindgen = { version = "0.2", features = [
-    "serde-serialize",
-], optional = true }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 
@@ -86,22 +60,13 @@ ignored = ["getrandom"]
 web-sys = { version = "0.3", features = ["console", "Window", "Storage"] }
 
 [dev-dependencies]
-miden-client = { path = ".", features = [
-    "testing",
-    "concurrent",
-    "sqlite",
-    "tonic",
-] }
+miden-client = { path = ".", features = ["testing", "concurrent", "sqlite", "tonic"] }
 miden-lib = { workspace = true, features = ["testing"] }
-miden-objects = { workspace = true, default-features = false, features = [
-    "testing",
-] }
-miden-testing = { git = "https://github.com/0xMiden/miden-base", branch = "next", default-features = false, features = [
-    "async",
-] }
+miden-objects = { workspace = true, default-features = false, features = ["testing"] }
+miden-testing = { git = "https://github.com/0xMiden/miden-base", branch = "next", default-features = false, features = ["async"] }
 tokio = { workspace = true }
 uuid = { version = "1.10", features = ["serde", "v4"] }
-web-sys = { version = "0.3", features = ["console"] }
+web-sys = { version = "0.3", features = ["console"]}
 
 [build-dependencies]
 miden-node-proto-build = { git = "https://github.com/0xMiden/miden-node", branch = "next", default-features = false }
