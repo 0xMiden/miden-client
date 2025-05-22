@@ -20,6 +20,7 @@
 * [BREAKING] Client's methods renamed after `PartialMmr` change to `PartialBlockchain` (#894).
 * [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
 * Improve Web Client Publishing Flow on Next Branch (#906).
+* [BREAKING] Refactored `TransactionRequestBuilder` preset builders (#901).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
 * [BREAKING] Added `DiscardCause` for transactions (#853).
@@ -28,6 +29,8 @@
 ## 0.8.2 (TBD)
 
 * Converted Web Client `NoteType` class to `enum` (#831)
+* Exported `import_account_by_id` function to Web Client (#858)
+* Fixed duplicate key bug in `import_account` (#899)
 
 ## 0.8.1 (2025-03-28)
 
