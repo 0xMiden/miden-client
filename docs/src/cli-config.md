@@ -9,7 +9,7 @@ miden
 
 ## Client Configuration
 
-We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`](https://github.com/0xMiden/miden-client/blob/main/miden-client.toml)).  The file is created automatically when you run the client for the first time. The file can be edited to change the default configuration of the client.
+We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]).  The file is created automatically when you run the client for the first time. The file can be edited to change the default configuration of the client.
 
 ```sh
 store_filepath = "store.sqlite3"
@@ -35,10 +35,10 @@ An `rpc` section is used to configure the connection to the Miden node. It conta
   - `host`: The host of the node. It can be either an IP address or a domain name.
   - `port`: The port of the node. It is an integer.
 
-By default, the node is set up to use the testnet.
+This field can be set with the `--network` flag when running the `miden init` command. For example, to set the testnet endpoint, you can run: `miden init --network testnet`.
 
 > [!Note]
-> - Running the node locally for development is encouraged. 
+> - Running the node locally for development is encouraged.
 > - However, the endpoint can point to any remote node.
 
 ### Store and keystore
@@ -48,7 +48,7 @@ The store filepath can be set when running the `miden init` command with the `--
 
 ### Default account ID
 
-The `default_account_id` field contains the default account ID used by the client. It is a hexadecimal string that represents the account ID and its optional. It is used to execute transactions against it when the account flag is not provided.
+The `default_account_id` field contains the default account ID to be used by the client's command when no `account` is provided. It is a hexadecimal string that represents the account ID. The field is optional, and if not set, the client will set it once the first account is created.
 
 By default none is set, but you can set and unset it with:
 
@@ -65,10 +65,11 @@ You can also see the current default account ID with:
 miden account --default
 ```
 ### Token symbol map
-The `token_symbol_map_filepath` field is used to configure the path to the TOML file that contains the token symbol map. The token symbol map is a mapping between the token ID and its symbol. The default value is `token_symbol_map.toml`.
+The `token_symbol_map_filepath` field is used to configure the path to the TOML file that contains the token symbol map. The token symbol map stores the faucet details for different token symbols. The default value is `token_symbol_map.toml`.
 
-A sample token symbol map file looks like this:
+This file must be updated manually with known token symbol mappings. A sample token symbol map file looks like this:
 ```toml
+# This addresses in this file are not real and are only for demonstration purposes.
 ETH = { id = "0xa031cc137adecd54", decimals = 18 }
 BTC = { id = "0x2f3c4b5e6a7b8c9d", decimals = 8 }
 ```

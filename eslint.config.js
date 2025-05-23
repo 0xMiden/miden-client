@@ -7,6 +7,7 @@ module.exports = [
       "**/target/**/*",
       "miden-node/**/*",
       "**/*.d.ts",
+      "docs/book/**/*",
     ],
   },
   {

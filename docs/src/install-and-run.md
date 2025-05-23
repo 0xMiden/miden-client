@@ -18,12 +18,19 @@ This installs the `miden` binary (at `~/.cargo/bin/miden`) with the [`concurrent
 
 The `concurrent` flag enables optimizations that result in faster transaction execution and proving times.
 
-## Run the client 
+## Run the client
 
-1. Make sure you have already [installed the client](#install-the-client). If you don't have a `miden-client.toml` file in your directory, create one or run `miden init` to initialize one at the current working directory. You can do so without any arguments to use its defaults or define either the RPC endpoint or the store config via `--network` and `--store-path`
+If the install worked correctly, you should be able to check the version by running:
 
-2. Run the client CLI using:
+```sh
+miden --version
+```
 
-    ```sh
-    miden
-    ```
+Once installed, you may run:
+```sh
+miden --help
+```
+
+This will show you the available commands and options for the client.
+
+An more in depth tutorial can be fund in the [Getting started section](./get-started/prerequisites.md).

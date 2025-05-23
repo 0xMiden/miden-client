@@ -262,7 +262,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let (mut account, account_seed) = create_basic_fungible_faucet(
         rng.random(),
         AccountIdAnchor::PRE_GENESIS,
-        TokenSymbol::try_from("POL").expect("POL should be a valid token symbol"),
+        TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),
         miden_objects::account::AccountStorageMode::Public,

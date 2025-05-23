@@ -1,4 +1,4 @@
-To use the Miden client library in a Rust project, include it as a dependency. 
+To use the Miden client library in a Rust project, include it as a dependency.
 
 In your project's `Cargo.toml`, add:
 

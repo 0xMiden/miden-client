@@ -1606,7 +1606,7 @@ dependencies = [
  "hex",
  "miden-client",
  "miden-lib",
- "miden-node-proto-build 0.9.0 (git+https://github.com/0xMiden/miden-node?branch=next)",
+ "miden-node-proto-build",
  "miden-objects",
  "miden-proving-service-client",
  "miden-testing",
@@ -1768,7 +1768,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
 dependencies = [
  "anyhow",
  "futures",
@@ -1795,11 +1795,11 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
 dependencies = [
  "anyhow",
  "hex",
- "miden-node-proto-build 0.9.0 (git+https://github.com/0xPolygonMiden/miden-node?branch=next)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-objects",
  "prost",
@@ -1822,20 +1822,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-node-proto-build"
-version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
-dependencies = [
- "anyhow",
- "prost",
- "protox 0.8.0",
- "tonic-build 0.12.3",
-]
-
-[[package]]
 name = "miden-node-rpc"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
 dependencies = [
  "anyhow",
  "futures",
@@ -1859,7 +1848,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -1882,7 +1871,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.9.0"
-source = "git+https://github.com/0xPolygonMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#c8f1661f4a7fd81876efa0b31e80e8570f5fdf16"
 dependencies = [
  "anyhow",
  "figment",
