@@ -8,7 +8,6 @@ use std::{
 };
 
 use assert_cmd::Command;
-use config::RpcConfig;
 use miden_cli::CliKeyStore;
 use miden_client::{
     self, Client, Felt,
@@ -20,19 +19,19 @@ use miden_client::{
     },
     rpc::{Endpoint, TonicRpcClient},
     store::sqlite_store::SqliteStore,
-    testing::account_id::ACCOUNT_ID_PRIVATE_SENDER,
+    testing::{
+        account_id::ACCOUNT_ID_PRIVATE_SENDER,
+        common::{
+            ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
+        },
+    },
     transaction::{OutputNote, TransactionRequestBuilder},
     utils::Serializable,
-};
-use miden_client_tests::common::{
-    ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
 };
 use predicates::str::contains;
 use rand::Rng;
 use toml::Table;
 use uuid::Uuid;
-
-mod config;
 
 // CLI TESTS
 // ================================================================================================
@@ -754,7 +753,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
 
     (
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, RpcConfig::default().timeout_ms)),
+            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             std::sync::Arc::new(keystore.clone()),

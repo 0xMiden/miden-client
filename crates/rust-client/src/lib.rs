@@ -122,8 +122,8 @@ pub mod transaction;
 #[cfg(feature = "std")]
 pub mod builder;
 
-#[cfg(test)]
-pub mod mock;
+#[cfg(feature = "testing")]
+mod test_utils;
 
 #[cfg(test)]
 pub mod tests;
@@ -193,6 +193,8 @@ pub mod utils {
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_objects::testing::*;
+
+    pub use crate::test_utils::*;
 }
 
 use alloc::sync::Arc;

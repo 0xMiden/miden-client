@@ -24,6 +24,7 @@
 * Improved Web Client Publishing Flow on Next Branch (#906).
 * [BREAKING] Refactored `TransactionRequestBuilder` preset builders (#901).
 * Improved the consumability check of the `NoteScreener` (#898).
+* Exposed new test utilities in the `testing` feature (#882).
 * [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
 * [BREAKING] Added `DiscardCause` for transactions (#853).

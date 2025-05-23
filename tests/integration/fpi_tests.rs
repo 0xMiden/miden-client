@@ -4,6 +4,7 @@ use miden_client::{
     auth::AuthSecretKey,
     block::BlockHeader,
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
+    testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
 };
 use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
@@ -14,8 +15,6 @@ use miden_objects::{
     transaction::TransactionScript,
     vm::AdviceInputs,
 };
-
-use super::common::*;
 
 // FPI TESTS
 // ================================================================================================

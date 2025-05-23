@@ -5,6 +5,7 @@ use miden_lib::{account::interface::AccountInterface, note::well_known_note::Wel
 use miden_objects::{
     AccountError, AssetError,
     account::{Account, AccountId},
+    assembly::DefaultSourceManager,
     note::{Note, NoteId},
     transaction::{InputNote, InputNotes},
 };
@@ -136,6 +137,7 @@ impl<'a> NoteScreener<'a> {
                 self.store.get_sync_height().await?,
                 input_notes,
                 tx_args,
+                Arc::new(DefaultSourceManager::default()),
             )
             .await?
         {
