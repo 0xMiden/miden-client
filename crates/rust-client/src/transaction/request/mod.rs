@@ -13,7 +13,7 @@ use miden_objects::{
     assembly::AssemblyError,
     crypto::merkle::MerkleStore,
     note::{Note, NoteDetails, NoteId, NoteTag, PartialNote},
-    transaction::{TransactionArgs, TransactionScript},
+    transaction::{AccountInputs, TransactionArgs, TransactionScript},
     vm::AdviceMap,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -23,7 +23,7 @@ mod builder;
 pub use builder::{PaymentTransactionData, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
-pub use foreign::{ForeignAccount, ForeignAccountInputs};
+pub use foreign::ForeignAccount;
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -78,6 +78,10 @@ pub struct TransactionRequest {
     /// The number of blocks in relation to the transaction's reference block after which the
     /// transaction will expire.
     expiration_delta: Option<u16>,
+    /// Indicates whether to **silently** ignore invalid input notes when executing the
+    /// transaction. This will allow the transaction to be executed even if some input notes
+    /// are invalid.
+    ignore_invalid_input_notes: bool,
 }
 
 impl TransactionRequest {
@@ -154,9 +158,18 @@ impl TransactionRequest {
         &self.foreign_accounts
     }
 
+    /// Returns whether to ignore invalid input notes or not.
+    pub fn ignore_invalid_input_notes(&self) -> bool {
+        self.ignore_invalid_input_notes
+    }
+
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(super) fn into_transaction_args(self, tx_script: TransactionScript) -> TransactionArgs {
+    pub(crate) fn into_transaction_args(
+        self,
+        tx_script: TransactionScript,
+        foreign_account_inputs: Vec<AccountInputs>,
+    ) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
             expected_output_notes,
@@ -165,7 +178,12 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args = TransactionArgs::new(Some(tx_script), note_args.into(), advice_map);
+        let mut tx_args = TransactionArgs::new(
+            Some(tx_script),
+            note_args.into(),
+            advice_map,
+            foreign_account_inputs,
+        );
 
         tx_args.extend_output_note_recipients(expected_output_notes.into_values());
         tx_args.extend_merkle_store(merkle_store.inner_nodes());
@@ -219,6 +237,7 @@ impl Serializable for TransactionRequest {
         self.merkle_store.write_into(target);
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
+        target.write_u8(u8::from(self.ignore_invalid_input_notes));
     }
 }
 
@@ -253,6 +272,7 @@ impl Deserializable for TransactionRequest {
         let merkle_store = MerkleStore::read_from(source)?;
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;
+        let ignore_invalid_input_notes = source.read_u8()? == 1;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -264,6 +284,7 @@ impl Deserializable for TransactionRequest {
             merkle_store,
             foreign_accounts,
             expiration_delta,
+            ignore_invalid_input_notes,
         })
     }
 }
@@ -286,10 +307,10 @@ pub enum TransactionRequestError {
     ForeignAccountStorageSlotInvalidIndex(u8),
     #[error("requested foreign account with ID {0} does not have an expected storage mode")]
     InvalidForeignAccountId(AccountId),
-    #[error(
-        "every authenticated note to be consumed should be committed and contain a valid inclusion proof"
-    )]
-    InputNoteNotAuthenticated,
+    #[error("note {0} does not contain a valid inclusion proof")]
+    InputNoteNotAuthenticated(NoteId),
+    #[error("note {0} has already been consumed")]
+    InputNoteAlreadyConsumed(NoteId),
     #[error("the input notes map should include keys for all provided unauthenticated input notes")]
     InputNotesMapMissingUnauthenticatedNotes,
     #[error("own notes shouldn't be of the header variant")]
@@ -340,10 +361,7 @@ mod tests {
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
-    use crate::{
-        rpc::domain::account::AccountStorageRequirements,
-        transaction::{ForeignAccount, ForeignAccountInputs},
-    };
+    use crate::{rpc::domain::account::AccountStorageRequirements, transaction::ForeignAccount};
 
     #[test]
     fn transaction_request_serialization() {
@@ -398,14 +416,7 @@ mod tests {
                     AccountStorageRequirements::new([(5u8, &[Digest::default()])]),
                 )
                 .unwrap(),
-                ForeignAccount::private(
-                    ForeignAccountInputs::from_account(
-                        account,
-                        &AccountStorageRequirements::default(),
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
+                ForeignAccount::private(account).unwrap(),
             ])
             .with_own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),

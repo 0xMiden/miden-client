@@ -31,11 +31,11 @@ Creates a configuration file for the client in the current directory.
 miden init
 
 # You can set up the CLI for any of the default networks
-miden init --network testnet # This is the default value if no network is provided
+miden init --network testnet
 miden init --network devnet
 miden init --network localhost
 
-# You can use the --network flag to override the default RPC config
+# You must specify the networki using the `--network` flag
 miden init --network 18.203.155.106
 # You can specify the port
 miden init --network 18.203.155.106:8080
@@ -46,6 +46,9 @@ miden init --network https://18.203.155.106:1234
 
 # You can use the --store_path flag to override the default store config
 miden init --store_path db/store.sqlite3
+
+# You can use the --block-delta flag to set maximum number of blocks the client can be behind
+miden init --block-delta 250
 
 # You can provide both flags
 miden init --network 18.203.155.106 --store_path db/store.sqlite3
@@ -263,7 +266,7 @@ TX Summary:
 
 ...
 
-Continue with proving and submission? Changes will be irreversible once the proof is finalized on the rollup (Y/N)
+Continue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)
 ```
 
 This confirmation can be skipped in non-interactive environments by providing the `--force` flag (`miden send --force ...`):

@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use figment::{
@@ -10,6 +11,8 @@ use figment::{
 };
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
+
+use crate::errors::CliError;
 
 const TOKEN_SYMBOL_MAP_FILEPATH: &str = "token_symbol_map.toml";
 const DEFAULT_COMPONENT_TEMPLATE_DIR: &str = "./templates";
@@ -33,6 +36,9 @@ pub struct CliConfig {
     pub remote_prover_endpoint: Option<CliEndpoint>,
     /// Path to the directory from where account component template files will be loaded.
     pub component_template_directory: PathBuf,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    pub max_block_number_delta: Option<u32>,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -67,6 +73,7 @@ impl Default for CliConfig {
             token_symbol_map_filepath: Path::new(TOKEN_SYMBOL_MAP_FILEPATH).to_path_buf(),
             remote_prover_endpoint: None,
             component_template_directory: Path::new(DEFAULT_COMPONENT_TEMPLATE_DIR).to_path_buf(),
+            max_block_number_delta: None,
         }
     }
 }
@@ -119,6 +126,16 @@ impl From<Endpoint> for CliEndpoint {
     }
 }
 
+impl TryFrom<Network> for CliEndpoint {
+    type Error = CliError;
+
+    fn try_from(value: Network) -> Result<Self, Self::Error> {
+        Ok(Self(Endpoint::try_from(value.to_rpc_endpoint().as_str()).map_err(|err| {
+            CliError::Parse(err.into(), "Failed to parse RPC endpoint".to_string())
+        })?))
+    }
+}
+
 impl From<CliEndpoint> for Endpoint {
     fn from(endpoint: CliEndpoint) -> Self {
         endpoint.0
@@ -147,5 +164,44 @@ impl<'de> Deserialize<'de> for CliEndpoint {
     {
         let endpoint = String::deserialize(deserializer)?;
         CliEndpoint::try_from(endpoint.as_str()).map_err(serde::de::Error::custom)
+    }
+}
+
+// NETWORK
+// ================================================================================================
+
+/// Represents the network to which the client connects. It is used to determine the RPC endpoint
+/// and network ID for the CLI.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Network {
+    Custom(String),
+    Devnet,
+    Localhost,
+    Testnet,
+}
+
+impl FromStr for Network {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "devnet" => Ok(Network::Devnet),
+            "localhost" => Ok(Network::Localhost),
+            "testnet" => Ok(Network::Testnet),
+            custom => Ok(Network::Custom(custom.to_string())),
+        }
+    }
+}
+
+impl Network {
+    /// Converts the Network variant to its corresponding RPC endpoint string
+    #[allow(dead_code)]
+    pub fn to_rpc_endpoint(&self) -> String {
+        match self {
+            Network::Custom(custom) => custom.clone(),
+            Network::Devnet => Endpoint::devnet().to_string(),
+            Network::Localhost => Endpoint::default().to_string(),
+            Network::Testnet => Endpoint::testnet().to_string(),
+        }
     }
 }

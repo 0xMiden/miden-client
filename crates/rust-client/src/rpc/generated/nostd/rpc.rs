@@ -16,7 +16,7 @@ pub mod api_client {
     }
     impl<T> ApiClient<T>
     where
-        T: tonic::client::GrpcService<tonic::body::BoxBody>,
+        T: tonic::client::GrpcService<tonic::body::Body>,
         T::Error: Into<StdError>,
         T::ResponseBody: Body<Data = Bytes> + core::marker::Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + core::marker::Send,
@@ -37,13 +37,13 @@ pub mod api_client {
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
             T: tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
+                http::Request<tonic::body::Body>,
                 Response = http::Response<
-                    <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
+                    <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
                 >,
             >,
             <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
+                http::Request<tonic::body::Body>,
             >>::Error: Into<StdError> + core::marker::Send + core::marker::Sync,
         {
             ApiClient::new(InterceptedService::new(inner, interceptor))
@@ -375,6 +375,28 @@ pub mod api_client {
             let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncState");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns the status info of the node.
+        pub async fn status(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> core::result::Result<
+            tonic::Response<super::super::responses::RpcStatusResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/Status");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "Status"));
             self.inner.unary(req, path, codec).await
         }
     }

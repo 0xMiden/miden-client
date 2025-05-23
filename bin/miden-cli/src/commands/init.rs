@@ -2,16 +2,14 @@ use std::{
     fs::{self, File},
     io::Write,
     path::PathBuf,
-    str::FromStr,
 };
 
 use clap::Parser;
-use miden_client::rpc::Endpoint;
 use tracing::info;
 
 use crate::{
     CLIENT_CONFIG_FILE_NAME,
-    config::{CliConfig, CliEndpoint},
+    config::{CliConfig, CliEndpoint, Network},
     errors::CliError,
 };
 
@@ -28,39 +26,6 @@ const BASIC_AUTH_TEMPLATE_FILE: &[u8] =
 // INIT COMMAND
 // ================================================================================================
 
-#[derive(Debug, Clone)]
-enum Network {
-    Custom(String),
-    Devnet,
-    Localhost,
-    Testnet,
-}
-
-impl FromStr for Network {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "devnet" => Ok(Network::Devnet),
-            "localhost" => Ok(Network::Localhost),
-            "testnet" => Ok(Network::Testnet),
-            custom => Ok(Network::Custom(custom.to_string())),
-        }
-    }
-}
-
-impl Network {
-    /// Converts the Network variant to its corresponding RPC endpoint string
-    pub fn to_rpc_endpoint(&self) -> String {
-        match self {
-            Network::Custom(custom) => custom.clone(),
-            Network::Devnet => Endpoint::devnet().to_string(),
-            Network::Localhost => Endpoint::default().to_string(),
-            Network::Testnet => Endpoint::testnet().to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Parser)]
 #[clap(
     about = "Initialize the client. It will create a file named `miden-client.toml` that holds \
@@ -70,8 +35,8 @@ directory"
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. Defaults to the testnet network.
-    #[clap(long, short, default_value = "testnet")]
-    network: Option<Network>,
+    #[clap(long, short)]
+    network: Network,
 
     /// Path to the store file.
     #[clap(long)]
@@ -83,6 +48,10 @@ pub struct InitCmd {
     /// If the proving RPC isn't set, the proving mode will be set to local.
     #[clap(long)]
     remote_prover_endpoint: Option<String>,
+
+    /// Maximum number of blocks the client can be behind the network.
+    #[clap(long)]
+    block_delta: Option<u32>,
 }
 
 impl InitCmd {
@@ -98,14 +67,8 @@ impl InitCmd {
 
         let mut cli_config = CliConfig::default();
 
-        if let Some(endpoint) = &self.network {
-            let endpoint =
-                CliEndpoint::try_from(endpoint.to_rpc_endpoint().as_str()).map_err(|err| {
-                    CliError::Parse(err.into(), "Failed to parse RPC endpoint".to_string())
-                })?;
-
-            cli_config.rpc.endpoint = endpoint;
-        }
+        let endpoint = CliEndpoint::try_from(self.network.clone())?;
+        cli_config.rpc.endpoint = endpoint;
 
         if let Some(path) = &self.store_path {
             cli_config.store_filepath = PathBuf::from(path);
@@ -115,6 +78,8 @@ impl InitCmd {
             Some(rpc) => CliEndpoint::try_from(rpc.as_str()).ok(),
             None => None,
         };
+
+        cli_config.max_block_number_delta = self.block_delta;
 
         let config_as_toml_string = toml::to_string_pretty(&cli_config).map_err(|err| {
             CliError::Config("failed to serialize config".to_string().into(), err.to_string())

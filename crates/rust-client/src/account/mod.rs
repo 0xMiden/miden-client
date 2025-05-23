@@ -49,13 +49,14 @@ use crate::{
     store::{AccountRecord, AccountStatus},
 };
 
+pub mod procedure_roots;
+
 // RE-EXPORTS
 // ================================================================================================
-pub mod procedure_roots;
 
 pub use miden_objects::account::{
     Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-    AccountStorage, AccountStorageMode, AccountType, StorageSlot,
+    AccountStorage, AccountStorageMode, AccountType, StorageMap, StorageSlot,
 };
 
 pub mod component {
@@ -66,7 +67,8 @@ pub mod component {
     };
     pub use miden_objects::account::{
         AccountComponent, AccountComponentMetadata, AccountComponentTemplate, FeltRepresentation,
-        InitStorageData, StorageEntry, StorageSlotType, WordRepresentation,
+        InitStorageData, StorageEntry, StorageSlotType, StorageValueName, TemplateType,
+        WordRepresentation,
     };
 }
 
@@ -321,7 +323,7 @@ pub mod tests {
         },
     };
 
-    use crate::mock::create_test_client;
+    use crate::tests::create_test_client;
 
     fn create_account_data(account_id: u128) -> AccountFile {
         let account =

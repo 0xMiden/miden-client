@@ -1,10 +1,11 @@
 //! Contains structures and functions related to FPI (Foreign Procedure Invocation) transactions.
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
 use core::cmp::Ordering;
 
 use miden_objects::{
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageSlot},
-    crypto::merkle::{MerklePath, SmtProof},
+    account::{AccountId, PartialAccount, PartialStorage},
+    asset::PartialVault,
+    transaction::AccountInputs,
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
@@ -22,9 +23,10 @@ pub enum ForeignAccount {
     /// account ID. The second element of the tuple indicates which storage slot indices
     /// and map keys are desired to be retrieved.
     Public(AccountId, AccountStorageRequirements),
-    /// Private account data requires [`ForeignAccountInputs`] to be input. Proof of the account's
-    /// existence will be retrieved from the network at execution time.
-    Private(ForeignAccountInputs),
+    /// Private account data requires [`PartialAccount`] to be passed. An account witness
+    /// will be retrieved from the network at execution time so that it can be used as inputs to
+    /// the transaction kernel.
+    Private(PartialAccount),
 }
 
 impl ForeignAccount {
@@ -44,17 +46,13 @@ impl ForeignAccount {
 
     /// Creates a new [`ForeignAccount::Private`]. A proof of the account's inclusion will be
     /// retrieved at execution time.
-    pub fn private(
-        account: impl Into<ForeignAccountInputs>,
-    ) -> Result<Self, TransactionRequestError> {
-        let foreign_account: ForeignAccountInputs = account.into();
-        if foreign_account.account_header().id().is_public() {
-            return Err(TransactionRequestError::InvalidForeignAccountId(
-                foreign_account.account_header().id(),
-            ));
+    pub fn private(account: impl Into<PartialAccount>) -> Result<Self, TransactionRequestError> {
+        let partial_account: PartialAccount = account.into();
+        if partial_account.id().is_public() {
+            return Err(TransactionRequestError::InvalidForeignAccountId(partial_account.id()));
         }
 
-        Ok(Self::Private(foreign_account))
+        Ok(Self::Private(partial_account))
     }
 
     pub fn storage_slot_requirements(&self) -> AccountStorageRequirements {
@@ -70,9 +68,7 @@ impl ForeignAccount {
     pub fn account_id(&self) -> AccountId {
         match self {
             ForeignAccount::Public(account_id, _) => *account_id,
-            ForeignAccount::Private(foreign_account_inputs) => {
-                foreign_account_inputs.account_header.id()
-            },
+            ForeignAccount::Private(partial_account) => partial_account.id(),
         }
     }
 }
@@ -97,9 +93,9 @@ impl Serializable for ForeignAccount {
                 account_id.write_into(target);
                 storage_requirements.write_into(target);
             },
-            ForeignAccount::Private(foreign_account_inputs) => {
+            ForeignAccount::Private(partial_account) => {
                 target.write(1u8);
-                foreign_account_inputs.write_into(target);
+                partial_account.write_into(target);
             },
         }
     }
@@ -117,7 +113,7 @@ impl Deserializable for ForeignAccount {
                 Ok(ForeignAccount::Public(account_id, storage_requirements))
             },
             1 => {
-                let foreign_inputs = ForeignAccountInputs::read_from(source)?;
+                let foreign_inputs = PartialAccount::read_from(source)?;
                 Ok(ForeignAccount::Private(foreign_inputs))
             },
             _ => Err(DeserializationError::InvalidValue("Invalid account type".to_string())),
@@ -125,158 +121,12 @@ impl Deserializable for ForeignAccount {
     }
 }
 
-// FOREIGN ACCOUNT INPUTS
-// ================================================================================================
-
-/// Contains information about a foreign account, with everything required to execute its code.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForeignAccountInputs {
-    /// Account header of the foreign account.
-    account_header: AccountHeader,
-    /// Header information about the account's storage.
-    storage_header: AccountStorageHeader,
-    /// Code associated with the account.
-    account_code: AccountCode,
-    /// Storage SMT proof for storage map values that the transaction will access.
-    storage_map_proofs: Vec<SmtProof>,
-}
-
-impl ForeignAccountInputs {
-    /// Creates a new [`ForeignAccountInputs`]
-    pub fn new(
-        account_header: AccountHeader,
-        storage_header: AccountStorageHeader,
-        account_code: AccountCode,
-        storage_map_proofs: Vec<SmtProof>,
-    ) -> ForeignAccountInputs {
-        ForeignAccountInputs {
-            account_header,
-            storage_header,
-            account_code,
-            storage_map_proofs,
-        }
-    }
-
-    /// Creates a new [`ForeignAccountInputs`] from an [`Account`] and a list of storage keys.
-    ///
-    /// # Errors
-    ///
-    /// - If one of the specified slots in `storage_requirements` is not a map-type slot or it is
-    ///   not found.
-    pub fn from_account(
-        account: Account,
-        storage_requirements: &AccountStorageRequirements,
-    ) -> Result<ForeignAccountInputs, TransactionRequestError> {
-        // Get required proofs
-        let mut smt_proofs = vec![];
-        for (slot_index, keys) in storage_requirements.inner() {
-            for key in keys {
-                let slot = account.storage().slots().get(*slot_index as usize);
-                match slot {
-                    Some(StorageSlot::Map(map)) => {
-                        smt_proofs.push(map.open(key));
-                    },
-                    Some(StorageSlot::Value(_)) => {
-                        return Err(
-                            TransactionRequestError::ForeignAccountStorageSlotInvalidIndex(
-                                *slot_index,
-                            ),
-                        );
-                    },
-                    None => {
-                        return Err(TransactionRequestError::StorageSlotNotFound(
-                            *slot_index,
-                            account.id(),
-                        ));
-                    },
-                }
-            }
-        }
-
-        let account_code: AccountCode = account.code().clone();
-        let storage_header: AccountStorageHeader = account.storage().get_header();
-        let account_header: AccountHeader = account.into();
-
-        Ok(ForeignAccountInputs::new(
-            account_header,
-            storage_header,
-            account_code,
-            smt_proofs,
-        ))
-    }
-
-    /// Returns the account's [`AccountHeader`]
-    pub fn account_header(&self) -> &AccountHeader {
-        &self.account_header
-    }
-
-    /// Returns the account's [`AccountStorageHeader`].
-    pub fn storage_header(&self) -> &AccountStorageHeader {
-        &self.storage_header
-    }
-
-    /// Returns the account's storage maps.
-    pub fn storage_map_proofs(&self) -> &[SmtProof] {
-        &self.storage_map_proofs
-    }
-
-    /// Returns the account's [`AccountCode`].
-    pub fn account_code(&self) -> &AccountCode {
-        &self.account_code
-    }
-
-    /// Extends the storage proofs with the input `smt_proofs` and returns the new structure
-    #[must_use]
-    pub fn with_storage_map_proofs(
-        mut self,
-        smt_proofs: impl IntoIterator<Item = SmtProof>,
-    ) -> Self {
-        self.storage_map_proofs.extend(smt_proofs);
-        self
-    }
-
-    /// Consumes the [`ForeignAccountInputs`] and returns its parts.
-    pub fn into_parts(self) -> (AccountHeader, AccountStorageHeader, AccountCode, Vec<SmtProof>) {
-        (
-            self.account_header,
-            self.storage_header,
-            self.account_code,
-            self.storage_map_proofs,
-        )
-    }
-}
-
-impl Serializable for ForeignAccountInputs {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
-        self.account_header.write_into(target);
-        self.storage_header.write_into(target);
-        self.account_code.write_into(target);
-        self.storage_map_proofs.write_into(target);
-    }
-}
-
-impl Deserializable for ForeignAccountInputs {
-    fn read_from<R: miden_tx::utils::ByteReader>(
-        source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
-        let account_header = AccountHeader::read_from(source)?;
-        let storage_header = AccountStorageHeader::read_from(source)?;
-        let account_code = AccountCode::read_from(source)?;
-        let storage_maps = Vec::<SmtProof>::read_from(source)?;
-        Ok(ForeignAccountInputs::new(
-            account_header,
-            storage_header,
-            account_code,
-            storage_maps,
-        ))
-    }
-}
-
-impl TryFrom<AccountProof> for (ForeignAccountInputs, MerklePath) {
+impl TryFrom<AccountProof> for AccountInputs {
     type Error = TransactionRequestError;
 
     fn try_from(value: AccountProof) -> Result<Self, Self::Error> {
-        let (_, merkle_proof, _, state_headers) = value.into_parts();
+        let (witness, state_headers) = value.into_parts();
+
         if let Some(StateHeaders {
             account_header,
             storage_header,
@@ -285,9 +135,23 @@ impl TryFrom<AccountProof> for (ForeignAccountInputs, MerklePath) {
         }) = state_headers
         {
             // discard slot indices - not needed for execution
-            let slots = storage_slots.into_iter().flat_map(|(_, slots)| slots).collect();
-            let inputs = ForeignAccountInputs::new(account_header, storage_header, code, slots);
-            return Ok((inputs, merkle_proof));
+            let storage_map_proofs =
+                storage_slots.into_iter().flat_map(|(_, slots)| slots).collect();
+
+            return Ok(AccountInputs::new(
+                PartialAccount::new(
+                    account_header.id(),
+                    account_header.nonce(),
+                    code,
+                    PartialStorage::new(storage_header, storage_map_proofs),
+                    PartialVault::new(account_header.vault_root(), vec![]), /* We don't use
+                                                                             * vault
+                                                                             * information so we
+                                                                             * leave it
+                                                                             * empty */
+                ),
+                witness,
+            ));
         }
         Err(TransactionRequestError::ForeignAccountDataMissing)
     }

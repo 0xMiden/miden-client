@@ -1,6 +1,7 @@
 use miden_client::{
     ZERO,
     note::NoteExecutionHint,
+    testing::common::*,
     transaction::{TransactionRequest, TransactionRequestBuilder},
     utils::{Deserializable, Serializable},
 };
@@ -20,8 +21,6 @@ use miden_objects::{
     transaction::OutputNote,
     vm::AdviceMap,
 };
-
-use super::common::*;
 
 // CUSTOM TRANSACTION REQUEST
 // ================================================================================================
@@ -200,7 +199,7 @@ async fn test_merkle_store() {
             push.4000 push.{pos} exec.mmr::get
 
             # check the element matches what was inserted at `pos`
-            push.{expected_element} assert_eqw.err=999
+            push.{expected_element} assert_eqw.err=\"element in merkle store didn't match expected\"
         "
         )
         .as_str();

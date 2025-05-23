@@ -66,20 +66,20 @@ impl MintCmd {
         let force = self.force;
         let faucet_details_map = load_faucet_details_map()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&self.asset)?;
+        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
 
         let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
 
-        let transaction_request = TransactionRequestBuilder::mint_fungible_asset(
-            fungible_asset,
-            target_account_id,
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                target_account_id,
+                (&self.note_type).into(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -130,7 +130,7 @@ impl SendCmd {
 
         let faucet_details_map = load_faucet_details_map()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&self.asset)?;
+        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -143,16 +143,16 @@ impl SendCmd {
             target_account_id,
         );
 
-        let transaction_request = TransactionRequestBuilder::pay_to_id(
-            payment_transaction,
-            self.recall_height.map(BlockNumber::from),
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(
+                payment_transaction,
+                self.recall_height.map(BlockNumber::from),
+                (&self.note_type).into(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -199,9 +199,9 @@ impl SwapCmd {
         let faucet_details_map = load_faucet_details_map()?;
 
         let offered_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&self.offered_asset)?;
+            faucet_details_map.parse_fungible_asset(&client, &self.offered_asset).await?;
         let requested_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&self.requested_asset)?;
+            faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -213,15 +213,11 @@ impl SwapCmd {
             requested_fungible_asset.into(),
         );
 
-        let transaction_request = TransactionRequestBuilder::swap(
-            &swap_transaction,
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_swap(&swap_transaction, (&self.note_type).into(), client.rng())
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -351,7 +347,7 @@ async fn execute_transaction(
     print_transaction_details(&transaction_execution_result)?;
     if !force {
         println!(
-            "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the rollup (Y/N)"
+            "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"
         );
         let mut proceed_str: String = String::new();
         io::stdin().read_line(&mut proceed_str).expect("Should read line");

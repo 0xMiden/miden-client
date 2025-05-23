@@ -4,7 +4,7 @@
 //! accounts and their state, and facilitates executing, proving, and submitting transactions.
 //!
 //! For a protocol-level overview and guides for getting started, please visit the official
-//! [Polygon Miden docs](https://0xpolygonmiden.github.io/miden-docs/).
+//! [Miden docs](https://0xMiden.github.io/miden-docs/).
 //!
 //! ## Overview
 //!
@@ -43,7 +43,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! miden-client = "0.8"
+//! miden-client = "0.9"
 //! ```
 //!
 //! ## Example
@@ -76,6 +76,10 @@
 //! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
+//! // Determine the maximum number of blocks that the client can be behind from the network.
+//! // 256 is simply an example value.
+//! let max_block_number_delta = Some(256);
+//!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client = Client::new(
@@ -84,6 +88,7 @@
 //!     store,
 //!     Arc::new(keystore),
 //!     false, // Set to true for debug mode, if needed.
+//!     max_block_number_delta,
 //! );
 //!
 //! # Ok(())
@@ -113,8 +118,8 @@ pub mod transaction;
 #[cfg(feature = "std")]
 pub mod builder;
 
-#[cfg(test)]
-pub mod mock;
+#[cfg(feature = "testing")]
+mod test_utils;
 
 #[cfg(test)]
 pub mod tests;
@@ -184,13 +189,16 @@ pub mod utils {
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_objects::testing::*;
+
+    pub use crate::test_utils::*;
 }
 
 use alloc::sync::Arc;
 
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::{
-    DataStore, LocalTransactionProver, TransactionExecutor, auth::TransactionAuthenticator,
+    LocalTransactionProver, TransactionExecutor, TransactionMastStore,
+    auth::TransactionAuthenticator,
 };
 use rand::RngCore;
 use rpc::NodeRpcClient;
@@ -221,8 +229,13 @@ pub struct Client {
     tx_prover: Arc<LocalTransactionProver>,
     /// An instance of a [`TransactionExecutor`] that will be used to execute transactions.
     tx_executor: TransactionExecutor,
+    /// A MAST store, used to provide code inputs to the VM.
+    mast_store: Arc<TransactionMastStore>,
     /// Flag to enable the debug mode for scripts compilation and execution.
     in_debug_mode: bool,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    max_block_number_delta: Option<u32>,
 }
 
 /// Construction and access methods.
@@ -246,6 +259,8 @@ impl Client {
     /// - `in_debug_mode`: Instantiates the transaction executor (and in turn, its compiler) in
     ///   debug mode, which will enable debug logs for scripts compiled with this mode for easier
     ///   MASM debugging.
+    /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
+    ///   behind the network for transactions and account proofs to be considered valid.
     ///
     /// # Errors
     ///
@@ -256,10 +271,13 @@ impl Client {
         store: Arc<dyn Store>,
         authenticator: Arc<dyn TransactionAuthenticator>,
         in_debug_mode: bool,
+        max_block_number_delta: Option<u32>,
     ) -> Self {
-        let data_store = Arc::new(ClientDataStore::new(store.clone())) as Arc<dyn DataStore>;
+        let client_data_store = Arc::new(ClientDataStore::new(store.clone()));
+        let mast_store = client_data_store.mast_store();
+
         let authenticator = Some(authenticator);
-        let mut tx_executor = TransactionExecutor::new(data_store, authenticator);
+        let mut tx_executor = TransactionExecutor::new(client_data_store, authenticator);
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
         if in_debug_mode {
@@ -274,6 +292,8 @@ impl Client {
             tx_prover,
             tx_executor,
             in_debug_mode,
+            max_block_number_delta,
+            mast_store,
         }
     }
 

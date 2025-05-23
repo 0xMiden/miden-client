@@ -1,6 +1,8 @@
 use alloc::string::{String, ToString};
 use core::fmt;
 
+use miden_objects::{NetworkIdError, account::NetworkId};
+
 // ENDPOINT
 // ================================================================================================
 
@@ -58,6 +60,18 @@ impl Endpoint {
     pub fn port(&self) -> Option<u16> {
         self.port
     }
+
+    pub fn to_network_id(&self) -> Result<NetworkId, NetworkIdError> {
+        if self == &Endpoint::testnet() {
+            Ok(NetworkId::Testnet)
+        } else if self == &Endpoint::devnet() {
+            Ok(NetworkId::Devnet)
+        } else if self == &Endpoint::localhost() {
+            Ok(NetworkId::new("mlcl")?)
+        } else {
+            Ok(NetworkId::new("mcst")?)
+        }
+    }
 }
 
 impl fmt::Display for Endpoint {
@@ -93,7 +107,10 @@ impl TryFrom<&str> for Endpoint {
         let (protocol, hostname, port) = match (protocol_separator_index, port_separator_index) {
             (Some(protocol_idx), Some(port_idx)) => {
                 let (protocol_and_hostname, port) = endpoint.split_at(port_idx);
-                let port = port[1..].parse::<u16>().map_err(|err| err.to_string())?;
+                let port = port[1..]
+                    .trim_end_matches('/')
+                    .parse::<u16>()
+                    .map_err(|err| err.to_string())?;
 
                 let (protocol, hostname) = protocol_and_hostname.split_at(protocol_idx);
                 // skip the separator
@@ -110,7 +127,10 @@ impl TryFrom<&str> for Endpoint {
             },
             (None, Some(port_idx)) => {
                 let (hostname, port) = endpoint.split_at(port_idx);
-                let port = port[1..].parse::<u16>().map_err(|err| err.to_string())?;
+                let port = port[1..]
+                    .trim_end_matches('/')
+                    .parse::<u16>()
+                    .map_err(|err| err.to_string())?;
 
                 ("https", hostname, Some(port))
             },
@@ -227,5 +247,17 @@ mod test {
     fn test_endpoint_parsing_should_fail_for_invalid_port() {
         let endpoint = Endpoint::try_from("some.test.domain:8000/hello");
         assert!(endpoint.is_err());
+    }
+
+    #[test]
+    fn test_endpoint_parsing_with_final_forward_slash() {
+        let endpoint = Endpoint::try_from("https://some.test.domain:8000/").unwrap();
+        let expected_endpoint = Endpoint {
+            protocol: "https".to_string(),
+            host: "some.test.domain".to_string(),
+            port: Some(8000),
+        };
+
+        assert_eq!(endpoint, expected_endpoint);
     }
 }

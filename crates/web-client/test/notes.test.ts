@@ -3,6 +3,7 @@ import { testingPage } from "./mocha.global.setup.mjs";
 import {
   badHexId,
   consumeTransaction,
+  getSyncHeight,
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
@@ -98,7 +99,6 @@ describe("get_consumable_notes", () => {
   it("filter by account", async () => {
     const { createdNoteId: noteId1, accountId: accountId1 } =
       await setupMintedNote();
-    await setupMintedNote();
 
     const result = await getConsumableNotes(accountId1);
     expect(result).to.have.lengthOf(1);
@@ -139,12 +139,11 @@ describe("get_consumable_notes", () => {
     const { accountId: senderAccountId, faucetId } =
       await setupWalletAndFaucet();
     const { accountId: targetAccountId } = await setupWalletAndFaucet();
-    const recallHeight = 100;
+    const recallHeight = (await getSyncHeight()) + 30;
     await sendTransaction(
       senderAccountId,
       targetAccountId,
       faucetId,
-      100,
       recallHeight
     );
 

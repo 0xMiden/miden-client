@@ -12,12 +12,8 @@ use super::NoteUpdates;
 use crate::{
     Client, ClientError,
     note::NoteScreener,
-    store::{ChainMmrNodeFilter, NoteFilter, StoreError},
+    store::{NoteFilter, PartialBlockchainFilter, StoreError},
 };
-
-/// Maximum number of blocks the client can be behind the network for transactions and account
-/// proofs to be considered valid.
-pub(crate) const MAX_BLOCK_NUMBER_DELTA: u32 = 256;
 
 /// Network information management methods.
 impl Client {
@@ -86,12 +82,15 @@ impl Client {
         // We'll only do the check for either incoming public notes or expected input notes as
         // output notes are not really candidates to be consumed here.
 
-        let note_screener = NoteScreener::new(self.store.clone());
+        let note_screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
         // Find all relevant Input Notes using the note checker
         for input_note in committed_notes.updated_input_notes() {
             if !note_screener
-                .check_relevance(&input_note.try_into().map_err(ClientError::NoteRecordError)?)
+                .check_relevance(
+                    &input_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
+                )
                 .await?
                 .is_empty()
             {
@@ -114,8 +113,10 @@ impl Client {
     ) -> Result<PartialMmr, ClientError> {
         let current_block_num = self.store.get_sync_height().await?;
 
-        let tracked_nodes = self.store.get_chain_mmr_nodes(ChainMmrNodeFilter::All).await?;
-        let current_peaks = self.store.get_chain_mmr_peaks_by_block_num(current_block_num).await?;
+        let tracked_nodes =
+            self.store.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
+        let current_peaks =
+            self.store.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
 
         let track_latest = if current_block_num.as_u32() != 0 {
             match self
@@ -185,7 +186,7 @@ impl Client {
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_chain_mmr_nodes(&path_nodes).await?;
+        self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
 
         Ok(block_header)
     }

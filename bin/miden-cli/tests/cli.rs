@@ -8,31 +8,30 @@ use std::{
 };
 
 use assert_cmd::Command;
-use config::RpcConfig;
 use miden_cli::CliKeyStore;
 use miden_client::{
     self, Client, Felt,
     account::{AccountId, AccountStorageMode},
     crypto::{FeltRng, RpoRandomCoin},
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-        NoteRecipient, NoteTag, NoteType,
+        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId, NoteInputs,
+        NoteMetadata, NoteRecipient, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
     store::sqlite_store::SqliteStore,
-    testing::account_id::ACCOUNT_ID_PRIVATE_SENDER,
+    testing::{
+        account_id::ACCOUNT_ID_PRIVATE_SENDER,
+        common::{
+            ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
+        },
+    },
     transaction::{OutputNote, TransactionRequestBuilder},
     utils::Serializable,
-};
-use miden_client_tests::common::{
-    ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
 };
 use predicates::str::contains;
 use rand::Rng;
 use toml::Table;
 use uuid::Uuid;
-
-mod config;
 
 // CLI TESTS
 // ================================================================================================
@@ -108,11 +107,63 @@ async fn test_mint_with_untracked_account() {
     sync_until_committed_note(&temp_dir);
 }
 
+/// This test tries to run a mint TX using the CLI for an account that isn't tracked.
+#[tokio::test]
+async fn test_token_symbol_mapping() {
+    let (store_path, temp_dir) = init_cli();
+
+    // Create faucet account
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+
+    // Create a token symbol mapping file
+    let token_symbol_map_path = temp_dir.join("token_symbol_map.toml");
+    let token_symbol_map_content =
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+    fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
+
+    sync_cli(&temp_dir);
+
+    let mut mint_cmd = Command::cargo_bin("miden").unwrap();
+    mint_cmd.args([
+        "mint",
+        "--target",
+        AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex().as_str(),
+        "--asset",
+        "0.00001::BTC",
+        "-n",
+        "private",
+        "--force",
+    ]);
+
+    let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success());
+
+    let note_id = String::from_utf8(output.stdout)
+        .unwrap()
+        .split_whitespace()
+        .skip_while(|&word| word != "Output")
+        .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string();
+
+    let note = {
+        let (client, _) = create_rust_client_with_store_path(&store_path).await;
+        client
+            .get_output_note(NoteId::try_from_hex(&note_id).unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+    };
+
+    assert_eq!(note.assets().num_assets(), 1);
+    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+}
+
 // IMPORT TESTS
 // ================================================================================================
 
 // Only one faucet is being created on the genesis block
-const GENESIS_ACCOUNTS_FILENAMES: [&str; 1] = ["account_0.mac"];
+const GENESIS_ACCOUNTS_FILENAMES: [&str; 1] = ["account.mac"];
 
 // This tests that it's possible to import the genesis accounts and interact with them. To do so it:
 //
@@ -131,8 +182,7 @@ async fn test_import_genesis_accounts_can_be_used_for_transactions() {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path =
-            format!("{cargo_workspace_dir}/../../miden-node/accounts/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -703,11 +753,12 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
 
     (
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, RpcConfig::default().timeout_ms)),
+            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             std::sync::Arc::new(keystore.clone()),
             true,
+            None,
         ),
         keystore,
     )
@@ -719,4 +770,48 @@ fn assert_command_fails_but_does_not_panic(command: &mut Command) {
     let exit_code = output_error.as_output().unwrap().status.code().unwrap();
     assert_ne!(exit_code, 0); // Command failed
     assert_ne!(exit_code, 101); // Command didn't panic
+}
+
+// COMMANDS TESTS
+// ================================================================================================
+
+#[test]
+fn test_exec_parse() {
+    let failure_script =
+        fs::canonicalize("tests/files/test_cli_advice_inputs_expect_failure.masm").unwrap();
+    let success_script =
+        fs::canonicalize("tests/files/test_cli_advice_inputs_expect_success.masm").unwrap();
+    let toml_path = fs::canonicalize("tests/files/test_cli_advice_inputs_input.toml").unwrap();
+
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+    let mut success_cmd = Command::cargo_bin("miden").unwrap();
+    success_cmd.args([
+        "exec",
+        "-s",
+        success_script.to_str().unwrap(),
+        "-a",
+        &basic_account_id[0..8],
+        "-i",
+        toml_path.to_str().unwrap(),
+    ]);
+
+    success_cmd.current_dir(&temp_dir).assert().success();
+
+    let mut failure_cmd = Command::cargo_bin("miden").unwrap();
+    failure_cmd.args([
+        "exec",
+        "-s",
+        failure_script.to_str().unwrap(),
+        "-a",
+        &basic_account_id[0..8],
+        "-i",
+        toml_path.to_str().unwrap(),
+    ]);
+
+    failure_cmd.current_dir(&temp_dir).assert().failure();
 }
