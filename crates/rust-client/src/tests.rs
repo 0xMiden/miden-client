@@ -44,6 +44,7 @@ use uuid::Uuid;
 
 use crate::{
     Client, ClientError,
+    builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     note::NoteRelevance,
     rpc::NodeRpcClient,
@@ -51,7 +52,7 @@ use crate::{
         InputNoteRecord, InputNoteState, NoteFilter, StoreError, TransactionFilter,
         input_note_states::ConsumedAuthenticatedLocalNoteState, sqlite_store::SqliteStore,
     },
-    sync::{NoteTagSource, TX_GRACEFUL_BLOCKS},
+    sync::NoteTagSource,
     testing::{
         common::{
             ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT,
@@ -62,15 +63,20 @@ use crate::{
         mock::{MockClient, MockRpcApi},
     },
     transaction::{
-        PaymentTransactionData, TransactionRequestBuilder, TransactionRequestError,
+        DiscardCause, PaymentTransactionData, TransactionRequestBuilder, TransactionRequestError,
         TransactionStatus,
     },
 };
 
+/// Constant that represents the number of blocks until the transaction is considered
+/// stale.
+const TX_GRACEFUL_BLOCKS: u32 = 20;
+
 // HELPERS
 // ================================================================================================
 
-pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
+pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, FilesystemKeyStore<StdRng>)
+{
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let store = Arc::new(store);
 
@@ -79,13 +85,27 @@ pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore
 
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 
-    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
     let rpc_api = MockRpcApi::new();
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
-    let client =
-        MockClient::new(arc_rpc_api, Box::new(rng), store, Arc::new(keystore.clone()), true, None);
+    let builder = ClientBuilder::new()
+        .with_rpc(arc_rpc_api)
+        .with_rng(Box::new(rng))
+        .with_store(store)
+        .with_filesystem_keystore(keystore_path.to_str().unwrap())
+        .in_debug_mode(true)
+        .with_tx_graceful_blocks(None);
+
+    (builder, rpc_api, keystore)
+}
+
+pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
+    let (builder, rpc_api, keystore) = create_test_client_builder().await;
+    let client = builder.build().await.unwrap();
+
     (client, rpc_api, keystore)
 }
 
@@ -450,7 +470,7 @@ async fn test_sync_state_mmr() {
     );
 
     // Try reconstructing the partial_mmr from what's in the database
-    let partial_mmr = client.build_current_partial_mmr(true).await.unwrap();
+    let partial_mmr = client.build_current_partial_mmr().await.unwrap();
     assert_eq!(partial_mmr.forest(), 6);
     assert!(partial_mmr.open(0).unwrap().is_some()); // Account anchor block
     assert!(partial_mmr.open(1).unwrap().is_some());
@@ -467,6 +487,40 @@ async fn test_sync_state_mmr() {
     let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
     let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
     partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
+
+    // the blocks for both notes should be stored as they are relevant for the client's accounts
+    // with the addition of the chain tip
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn test_sync_state_tags() {
+    // generate test client with a random store name
+    let (mut client, rpc_api, _) = create_test_client().await;
+
+    // Import first mockchain note as expected
+    let expected_notes = rpc_api.get_available_notes();
+
+    for tag in expected_notes.iter().map(|n| n.metadata().tag()) {
+        client.add_note_tag(tag).await.unwrap();
+    }
+
+    // assert that we have no  expected notes prior to syncing state
+    assert!(client.get_input_notes(NoteFilter::Expected).await.unwrap().is_empty());
+
+    // sync state
+    let sync_details = client.sync_state().await.unwrap();
+
+    // verify that the client is synced to the latest block
+    assert_eq!(
+        sync_details.block_num,
+        rpc_api.get_block_header_by_number(None, false).await.unwrap().0.block_num()
+    );
+
+    // as we are syncing with tags, the response should containt blocks for both notes but they
+    // shouldn't be stored as they are not relevant for the client's accounts. Only the chain
+    // tip should be stored in the database
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -1377,8 +1431,14 @@ async fn test_get_output_notes() {
 }
 
 #[tokio::test]
-async fn test_stale_transactions_discarded() {
-    let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
+async fn test_account_rollback() {
+    let (builder, rpc_api, authenticator) = create_test_client_builder().await;
+
+    let mut client =
+        builder.with_tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
+
+    client.sync_state().await.unwrap();
+
     let (regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
 
@@ -1430,10 +1490,10 @@ async fn test_stale_transactions_discarded() {
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .unwrap();
-    assert!(matches!(tx_record.transaction_status, TransactionStatus::Pending));
+    assert!(matches!(tx_record.status, TransactionStatus::Pending));
 
     // Sync the state, which should discard the old pending transaction
-    mock_rpc_api.advance_blocks(TX_GRACEFUL_BLOCKS + 1);
+    rpc_api.advance_blocks(TX_GRACEFUL_BLOCKS + 1);
     client.sync_state().await.unwrap();
 
     // Verify the transaction is now discarded
@@ -1445,7 +1505,7 @@ async fn test_stale_transactions_discarded() {
         .find(|tx| tx.id == tx_id)
         .unwrap();
 
-    assert!(matches!(tx_record.transaction_status, TransactionStatus::Discarded));
+    assert!(matches!(tx_record.status, TransactionStatus::Discarded(DiscardCause::Stale)));
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
@@ -1458,5 +1518,99 @@ async fn test_stale_transactions_discarded() {
     assert_eq!(
         account_commitment_after_sync, account_commitment_before_tx,
         "Account commitment should be rolled back to the value before the transaction"
+    );
+}
+
+#[tokio::test]
+async fn test_subsequent_discarded_transactions() {
+    let (mut client, rpc_api, keystore) = create_test_client().await;
+
+    let (regular_account, faucet_account_header) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await;
+
+    wait_for_node(&mut client).await;
+
+    let account_id = regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    let note = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+    consume_notes(&mut client, account_id, &[note]).await;
+
+    // Create a transaction that will expire in 2 blocks
+    let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .with_expiration_delta(2)
+        .build_pay_to_id(
+            PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            None,
+            NoteType::Public,
+            client.rng(),
+        )
+        .unwrap();
+
+    // Execute the transaction but don't submit it to the node
+    let tx_result = client.new_transaction(account_id, tx_request).await.unwrap();
+    let first_tx_id = tx_result.executed_transaction().id();
+    client.testing_prove_transaction(&tx_result).await.unwrap();
+
+    let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
+
+    client.testing_apply_transaction(tx_result).await.unwrap();
+
+    // Create a second transaction that will not expire
+    let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            None,
+            NoteType::Public,
+            client.rng(),
+        )
+        .unwrap();
+
+    // Execute the transaction but don't submit it to the node
+    let tx_result = client.new_transaction(account_id, tx_request).await.unwrap();
+    let second_tx_id = tx_result.executed_transaction().id();
+    client.testing_prove_transaction(&tx_result).await.unwrap();
+    client.testing_apply_transaction(tx_result).await.unwrap();
+
+    // Sync the state, which should discard the first transaction
+    rpc_api.advance_blocks(3);
+    client.sync_state().await.unwrap();
+
+    let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
+
+    // Verify the first transaction is now discarded
+    let first_tx_record = client
+        .get_transactions(TransactionFilter::Ids(vec![first_tx_id]))
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert!(matches!(
+        first_tx_record.status,
+        TransactionStatus::Discarded(DiscardCause::Expired)
+    ));
+
+    // Verify the second transaction is also discarded
+    let second_tx_record = client
+        .get_transactions(TransactionFilter::Ids(vec![second_tx_id]))
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    println!("Second tx record: {:?}", second_tx_record.status);
+
+    assert!(matches!(
+        second_tx_record.status,
+        TransactionStatus::Discarded(DiscardCause::DiscardedInitialState)
+    ));
+
+    // Check that the account state has been rolled back to the value before both transactions
+    assert_eq!(
+        account_after_sync.account().commitment(),
+        account_before_tx.account().commitment(),
     );
 }

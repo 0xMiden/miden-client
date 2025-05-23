@@ -54,7 +54,7 @@ pub struct TransactionRequestBuilder {
     /// added to the executor and prover.
     foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     /// The number of blocks in relation to the transaction's reference block after which the
-    /// transaction will expire.
+    /// transaction will expire. If `None`, the transaction will not expire.
     expiration_delta: Option<u16>,
     /// Indicates whether to **silently** ignore invalid input notes when executing the
     /// transaction. This will allow the transaction to be executed even if some input notes
@@ -202,7 +202,7 @@ impl TransactionRequestBuilder {
     }
 
     /// The number of blocks in relation to the transaction's reference block after which the
-    /// transaction will expire.
+    /// transaction will expire. By default, the transaction will not expire.
     ///
     /// Setting transaction expiration delta defines an upper bound for transaction expiration,
     /// but other code executed during the transaction may impose an even smaller transaction

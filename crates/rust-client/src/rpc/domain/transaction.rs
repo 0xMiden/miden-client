@@ -37,16 +37,16 @@ impl From<TransactionId> for ProtoTransactionId {
     }
 }
 
-// TRANSACTION UPDATE
+// TRANSACTION INCLUSION
 // ================================================================================================
 
 /// Represents a transaction that was included in the node at a certain block.
-#[derive(PartialEq, Eq)]
-pub struct TransactionUpdate {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransactionInclusion {
     /// The transaction identifier.
     pub transaction_id: TransactionId,
     /// The number of the block in which the transaction was included.
     pub block_num: u32,
-    /// The account that the transcation was executed against.
+    /// The account that the transaction was executed against.
     pub account_id: AccountId,
 }

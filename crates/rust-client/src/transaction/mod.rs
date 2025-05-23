@@ -88,8 +88,8 @@ use tracing::info;
 use super::Client;
 use crate::{
     ClientError,
-    note::{NoteScreener, NoteUpdates},
-    rpc::domain::{account::AccountProof, transaction::TransactionUpdate},
+    note::{NoteScreener, NoteUpdateTracker},
+    rpc::domain::account::AccountProof,
     store::{
         InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
         TransactionFilter, input_note_states::ExpectedNoteState,
@@ -247,45 +247,159 @@ impl Deserializable for TransactionResult {
 // ================================================================================================
 
 /// Describes a transaction that has been executed and is being tracked on the Client.
-///
-/// Currently, the `commit_height` (and `committed` status) is set based on the height
-/// at which the transaction's output notes are committed.
 #[derive(Debug, Clone)]
 pub struct TransactionRecord {
+    /// Unique identifier for the transaction.
     pub id: TransactionId,
-    pub account_id: AccountId,
-    pub init_account_state: Digest,
-    pub final_account_state: Digest,
-    pub input_note_nullifiers: Vec<Digest>,
-    pub output_notes: OutputNotes,
-    pub transaction_script: Option<TransactionScript>,
-    pub block_num: BlockNumber,
-    pub transaction_status: TransactionStatus,
+    /// Details associated with the transaction.
+    pub details: TransactionDetails,
+    /// Script associated with the transaction, if no script is provided, only note scripts are
+    /// executed.
+    pub script: Option<TransactionScript>,
+    /// Current status of the transaction.
+    pub status: TransactionStatus,
 }
 
 impl TransactionRecord {
-    #[allow(clippy::too_many_arguments)]
+    /// Creates a new [`TransactionRecord`] instance.
     pub fn new(
         id: TransactionId,
-        account_id: AccountId,
-        init_account_state: Digest,
-        final_account_state: Digest,
-        input_note_nullifiers: Vec<Digest>,
-        output_notes: OutputNotes,
-        transaction_script: Option<TransactionScript>,
-        block_num: BlockNumber,
-        transaction_status: TransactionStatus,
+        details: TransactionDetails,
+        script: Option<TransactionScript>,
+        status: TransactionStatus,
     ) -> TransactionRecord {
-        TransactionRecord {
-            id,
+        TransactionRecord { id, details, script, status }
+    }
+
+    /// Updates (if necessary) the transaction status to signify that the transaction was
+    /// committed. Will return true if the record was modified, false otherwise.
+    pub fn commit_transaction(&mut self, commit_height: BlockNumber) -> bool {
+        match self.status {
+            TransactionStatus::Pending => {
+                self.status = TransactionStatus::Committed(commit_height);
+                true
+            },
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+        }
+    }
+
+    /// Updates (if necessary) the transaction status to signify that the transaction was
+    /// discarded. Will return true if the record was modified, false otherwise.
+    pub fn discard_transaction(&mut self, cause: DiscardCause) -> bool {
+        match self.status {
+            TransactionStatus::Pending => {
+                self.status = TransactionStatus::Discarded(cause);
+                true
+            },
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+        }
+    }
+}
+
+/// Describes the details associated with a transaction.
+#[derive(Debug, Clone)]
+pub struct TransactionDetails {
+    /// ID of the account that executed the transaction.
+    pub account_id: AccountId,
+    /// Initial state of the account before the transaction was executed.
+    pub init_account_state: Digest,
+    /// Final state of the account after the transaction was executed.
+    pub final_account_state: Digest,
+    /// Nullifiers of the input notes consumed in the transaction.
+    pub input_note_nullifiers: Vec<Digest>,
+    /// Output notes generated as a result of the transaction.
+    pub output_notes: OutputNotes,
+    /// Block number for the block against which the transaction was executed.
+    pub block_num: BlockNumber,
+    /// Block number at which the transaction is set to expire.
+    pub expiration_block_num: BlockNumber,
+}
+
+impl Serializable for TransactionDetails {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.account_id.write_into(target);
+        self.init_account_state.write_into(target);
+        self.final_account_state.write_into(target);
+        self.input_note_nullifiers.write_into(target);
+        self.output_notes.write_into(target);
+        self.block_num.write_into(target);
+        self.expiration_block_num.write_into(target);
+    }
+}
+
+impl Deserializable for TransactionDetails {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let account_id = AccountId::read_from(source)?;
+        let init_account_state = Digest::read_from(source)?;
+        let final_account_state = Digest::read_from(source)?;
+        let input_note_nullifiers = Vec::<Digest>::read_from(source)?;
+        let output_notes = OutputNotes::read_from(source)?;
+        let block_num = BlockNumber::read_from(source)?;
+        let expiration_block_num = BlockNumber::read_from(source)?;
+
+        Ok(Self {
             account_id,
             init_account_state,
             final_account_state,
             input_note_nullifiers,
             output_notes,
-            transaction_script,
             block_num,
-            transaction_status,
+            expiration_block_num,
+        })
+    }
+}
+
+/// Represents the cause of the discarded transaction.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DiscardCause {
+    Expired,
+    InputConsumed,
+    DiscardedInitialState,
+    Stale,
+}
+
+impl DiscardCause {
+    pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
+        match cause {
+            "Expired" => Ok(DiscardCause::Expired),
+            "InputConsumed" => Ok(DiscardCause::InputConsumed),
+            "DiscardedInitialState" => Ok(DiscardCause::DiscardedInitialState),
+            "Stale" => Ok(DiscardCause::Stale),
+            _ => Err(DeserializationError::InvalidValue(format!("Invalid discard cause: {cause}"))),
+        }
+    }
+}
+
+impl fmt::Display for DiscardCause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiscardCause::Expired => write!(f, "Expired"),
+            DiscardCause::InputConsumed => write!(f, "InputConsumed"),
+            DiscardCause::DiscardedInitialState => write!(f, "DiscardedInitialState"),
+            DiscardCause::Stale => write!(f, "Stale"),
+        }
+    }
+}
+
+impl Serializable for DiscardCause {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            DiscardCause::Expired => target.write_u8(0),
+            DiscardCause::InputConsumed => target.write_u8(1),
+            DiscardCause::DiscardedInitialState => target.write_u8(2),
+            DiscardCause::Stale => target.write_u8(3),
+        }
+    }
+}
+
+impl Deserializable for DiscardCause {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(DiscardCause::Expired),
+            1 => Ok(DiscardCause::InputConsumed),
+            2 => Ok(DiscardCause::DiscardedInitialState),
+            3 => Ok(DiscardCause::Stale),
+            _ => Err(DeserializationError::InvalidValue("Invalid discard cause".to_string())),
         }
     }
 }
@@ -298,7 +412,7 @@ pub enum TransactionStatus {
     /// Transaction has been committed and included at the specified block number.
     Committed(BlockNumber),
     /// Transaction has been discarded and isn't included in the node.
-    Discarded,
+    Discarded(DiscardCause),
 }
 
 impl fmt::Display for TransactionStatus {
@@ -308,7 +422,7 @@ impl fmt::Display for TransactionStatus {
             TransactionStatus::Committed(block_number) => {
                 write!(f, "Committed (Block: {block_number})")
             },
-            TransactionStatus::Discarded => write!(f, "Discarded"),
+            TransactionStatus::Discarded(_) => write!(f, "Discarded"),
         }
     }
 }
@@ -324,7 +438,7 @@ pub struct TransactionStoreUpdate {
     /// Updated account state after the [`AccountDelta`] has been applied.
     updated_account: Account,
     /// Information about note changes after the transaction execution.
-    note_updates: NoteUpdates,
+    note_updates: NoteUpdateTracker,
     /// New note tags to be tracked.
     new_tags: Vec<NoteTagRecord>,
 }
@@ -334,18 +448,13 @@ impl TransactionStoreUpdate {
     pub fn new(
         executed_transaction: ExecutedTransaction,
         updated_account: Account,
-        created_input_notes: Vec<InputNoteRecord>,
-        created_output_notes: Vec<OutputNoteRecord>,
-        updated_input_notes: Vec<InputNoteRecord>,
+        note_updates: NoteUpdateTracker,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
             executed_transaction,
             updated_account,
-            note_updates: NoteUpdates::new(
-                [created_input_notes, updated_input_notes].concat(),
-                created_output_notes,
-            ),
+            note_updates,
             new_tags,
         }
     }
@@ -361,71 +470,13 @@ impl TransactionStoreUpdate {
     }
 
     /// Returns the note updates that need to be applied after the transaction execution.
-    pub fn note_updates(&self) -> &NoteUpdates {
+    pub fn note_updates(&self) -> &NoteUpdateTracker {
         &self.note_updates
     }
 
     /// Returns the new tags that were created as part of the transaction.
     pub fn new_tags(&self) -> &[NoteTagRecord] {
         &self.new_tags
-    }
-}
-
-/// Contains transaction changes to apply to the store.
-#[derive(Default)]
-pub struct TransactionUpdates {
-    /// Transaction updates for any transaction that was committed between the sync request's block
-    /// number and the response's block number.
-    committed: Vec<TransactionUpdate>,
-    /// Transaction IDs for any transactions that were discarded in the sync.
-    discarded: Vec<TransactionId>,
-    /// Transactions that were pending before the sync and were not committed.
-    ///
-    /// These transactions have been pending for more than [`TX_GRACEFUL_BLOCKS`] blocks and can be
-    /// assumed to have been rejected by the network. They will be marked as discarded in the
-    /// store.
-    stale: Vec<TransactionRecord>,
-}
-
-impl TransactionUpdates {
-    /// Creates a new [`TransactionUpdate`]
-    pub fn new(
-        committed_transactions: Vec<TransactionUpdate>,
-        discarded_transactions: Vec<TransactionId>,
-        stale_transactions: Vec<TransactionRecord>,
-    ) -> Self {
-        Self {
-            committed: committed_transactions,
-            discarded: discarded_transactions,
-            stale: stale_transactions,
-        }
-    }
-
-    /// Extends the transaction update information with `other`.
-    pub fn extend(&mut self, other: Self) {
-        self.committed.extend(other.committed);
-        self.discarded.extend(other.discarded);
-        self.stale.extend(other.stale);
-    }
-
-    /// Returns a reference to committed transactions.
-    pub fn committed_transactions(&self) -> &[TransactionUpdate] {
-        &self.committed
-    }
-
-    /// Returns a reference to discarded transactions.
-    pub fn discarded_transactions(&self) -> &[TransactionId] {
-        &self.discarded
-    }
-
-    /// Inserts a discarded transaction into the transaction updates.
-    pub fn insert_discarded_transaction(&mut self, transaction_id: TransactionId) {
-        self.discarded.push(transaction_id);
-    }
-
-    /// Returns a reference to stale transactions.
-    pub fn stale_transactions(&self) -> &[TransactionRecord] {
-        &self.stale
     }
 }
 
@@ -718,14 +769,14 @@ impl Client {
             }
         }
 
-        let tx_update = TransactionStoreUpdate::new(
-            tx_result.into(),
-            account,
+        let note_updates = NoteUpdateTracker::for_transaction_updates(
             created_input_notes,
-            created_output_notes,
             updated_input_notes,
-            new_tags,
+            created_output_notes,
         );
+
+        let tx_update =
+            TransactionStoreUpdate::new(tx_result.into(), account, note_updates, new_tags);
 
         self.store.apply_transaction(tx_update).await?;
         info!("Transaction stored.");
@@ -1023,7 +1074,7 @@ impl Client {
             let summary = self.sync_state().await?;
 
             if summary.block_num != block_num {
-                let mut current_partial_mmr = self.build_current_partial_mmr(true).await?;
+                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
                 self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
                     .await?;
             }

@@ -7,7 +7,7 @@ use miden_client::{
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
-        PaymentTransactionData, TransactionProver, TransactionProverError,
+        DiscardCause, PaymentTransactionData, TransactionProver, TransactionProverError,
         TransactionRequestBuilder, TransactionStatus,
     },
 };
@@ -165,13 +165,10 @@ async fn test_multiple_tx_on_same_block() {
         .collect::<Vec<_>>();
 
     assert_eq!(transactions.len(), 2);
-    assert!(matches!(
-        transactions[0].transaction_status,
-        TransactionStatus::Committed { .. }
-    ));
-    assert_eq!(transactions[0].transaction_status, transactions[1].transaction_status);
+    assert!(matches!(transactions[0].status, TransactionStatus::Committed { .. }));
+    assert_eq!(transactions[0].status, transactions[1].status);
 
-    let note_id = transactions[0].output_notes.iter().next().unwrap().id();
+    let note_id = transactions[0].details.output_notes.iter().next().unwrap().id();
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
@@ -434,7 +431,8 @@ async fn test_sync_detail_values() {
 
     // Second client sync should have new note
     let new_details = client2.sync_state().await.unwrap();
-    assert_eq!(new_details.committed_notes.len(), 1);
+    assert_eq!(new_details.new_public_notes.len(), 1);
+    assert_eq!(new_details.committed_notes.len(), 0);
     assert_eq!(new_details.consumed_notes.len(), 0);
     assert_eq!(new_details.updated_accounts.len(), 0);
 
@@ -579,11 +577,7 @@ async fn test_multiple_transactions_can_be_committed_in_different_blocks_without
     let second_tx = all_transactions.iter().find(|tx| tx.id == second_note_tx_id).unwrap();
     let third_tx = all_transactions.iter().find(|tx| tx.id == third_note_tx_id).unwrap();
 
-    match (
-        first_tx.transaction_status.clone(),
-        second_tx.transaction_status.clone(),
-        third_tx.transaction_status.clone(),
-    ) {
+    match (first_tx.status.clone(), second_tx.status.clone(), third_tx.status.clone()) {
         (
             TransactionStatus::Committed(first_tx_commit_height),
             TransactionStatus::Committed(second_tx_commit_height),
@@ -812,6 +806,69 @@ async fn test_import_consumed_note_with_id() {
 }
 
 #[tokio::test]
+async fn test_import_note_with_proof() {
+    let (mut client_1, authenticator) = create_test_client().await;
+    let (first_regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
+            .await;
+
+    let (mut client_2, _) = create_test_client().await;
+
+    wait_for_node(&mut client_2).await;
+
+    let from_account_id = first_regular_account.id();
+    let to_account_id = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    let note =
+        mint_note(&mut client_1, from_account_id, faucet_account_id, NoteType::Private).await;
+
+    consume_notes(&mut client_1, from_account_id, &[note]).await;
+
+    let current_block_num = client_1.get_sync_height().await.unwrap();
+    let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+
+    println!("Running P2IDR tx...");
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            Some(current_block_num),
+            NoteType::Private,
+            client_1.rng(),
+        )
+        .unwrap();
+    execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
+
+    let note = client_1
+        .get_input_notes(NoteFilter::Committed)
+        .await
+        .unwrap()
+        .first()
+        .unwrap()
+        .clone();
+
+    // Import the consumed note
+    client_2
+        .import_note(NoteFile::NoteWithProof(
+            note.clone().try_into().unwrap(),
+            note.inclusion_proof().unwrap().clone(),
+        ))
+        .await
+        .unwrap();
+
+    let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    assert!(matches!(imported_note.state(), InputNoteState::Unverified { .. }));
+
+    client_2.sync_state().await.unwrap();
+    let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
+}
+
+#[tokio::test]
 async fn test_discarded_transaction() {
     let (mut client_1, authenticator_1) = create_test_client().await;
     let (first_regular_account, faucet_account_header) =
@@ -902,7 +959,10 @@ async fn test_discarded_transaction() {
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .unwrap();
-    assert!(matches!(tx_record.transaction_status, TransactionStatus::Discarded));
+    assert!(matches!(
+        tx_record.status,
+        TransactionStatus::Discarded(DiscardCause::InputConsumed)
+    ));
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client_1.get_account(from_account_id).await.unwrap().unwrap();
@@ -1126,4 +1186,40 @@ async fn test_unused_rpc_api() {
 
     assert_eq!(account_delta.nonce(), Some(ONE));
     assert_eq!(*account_delta.vault().fungible().iter().next().unwrap().1, MINT_AMOUNT as i64);
+}
+
+#[tokio::test]
+async fn test_ignore_invalid_notes() {
+    let (mut client, authenticator) = create_test_client().await;
+    let (regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await;
+
+    let account_id = regular_account.id();
+    let second_account_id = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Mint 2 valid notes
+    let note_1 = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+    let note_2 = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+
+    // Mint 2 invalid notes
+    let note_3 =
+        mint_note(&mut client, second_account_id, faucet_account_id, NoteType::Private).await;
+    let note_4 =
+        mint_note(&mut client, second_account_id, faucet_account_id, NoteType::Private).await;
+
+    // Create a transaction to consume all 4 notes but ignore the invalid ones
+    let tx_request = TransactionRequestBuilder::new()
+        .ignore_invalid_input_notes()
+        .build_consume_notes(vec![note_1.id(), note_3.id(), note_2.id(), note_4.id()])
+        .unwrap();
+
+    execute_tx_and_sync(&mut client, account_id, tx_request).await;
+
+    // Check that only the valid notes were consumed
+    let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await.unwrap();
+    assert_eq!(consumed_notes.len(), 2);
+    assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
+    assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
 }
