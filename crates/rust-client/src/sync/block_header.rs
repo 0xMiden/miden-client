@@ -82,7 +82,8 @@ impl Client {
         // We'll only do the check for either incoming public notes or expected input notes as
         // output notes are not really candidates to be consumed here.
 
-        let note_screener = NoteScreener::new(self.store.clone());
+        let note_screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
         // Find all relevant Input Notes using the note checker
         for input_note in committed_notes.updated_input_notes() {

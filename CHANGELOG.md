@@ -7,6 +7,7 @@
 * Added support for `bech32` account IDs in the CLI (#840).
 * Added support for MASM account component libraries in Web Client (#900).
 * Added support for RPC client/server version matching through HTTP ACCEPT header (#912).
+* Added a way to ignore invalid input notes when consuming them in a transaction (#898).
 
 ### Changes
 
@@ -19,8 +20,9 @@
 * Changed exec's input file format to TOML instead of JSON (#870).
 * [BREAKING] Client's methods renamed after `PartialMmr` change to `PartialBlockchain` (#894).
 * [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
-* Improve Web Client Publishing Flow on Next Branch (#906).
+* Improved Web Client Publishing Flow on Next Branch (#906).
 * [BREAKING] Refactored `TransactionRequestBuilder` preset builders (#901).
+* Improved the consumability check of the `NoteScreener` (#898).
 * Exposed new test utilities in the `testing` feature (#882).
 
 ## 0.8.2 (TBD)

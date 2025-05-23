@@ -540,8 +540,8 @@ async fn test_import_note_validation() {
     let (mut client, rpc_api, _) = create_test_client().await;
 
     // generate test data
-    let consumed_note = rpc_api.get_available_notes()[0].clone();
-    let expected_note = rpc_api.get_available_notes()[1].clone();
+    let expected_note = rpc_api.get_available_notes()[0].clone();
+    let consumed_note = rpc_api.get_available_notes()[1].clone();
 
     client
         .import_note(NoteFile::NoteWithProof(
@@ -1319,7 +1319,7 @@ async fn test_get_consumable_notes() {
         .find(|relevance| relevance.0 == to_account_id)
         .unwrap()
         .1;
-    assert_eq!(to_account_relevance, NoteRelevance::Always);
+    assert_eq!(to_account_relevance, NoteRelevance::Now);
 }
 
 #[tokio::test]

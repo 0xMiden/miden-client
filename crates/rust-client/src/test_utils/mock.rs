@@ -3,19 +3,15 @@ use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 use async_trait::async_trait;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    Digest, Word,
+    Digest, Felt,
     account::{AccountCode, AccountDelta, AccountId},
-    asset::{FungibleAsset, NonFungibleAsset},
     block::{BlockHeader, BlockNumber, ProvenBlock},
     crypto::{
         merkle::{MerklePath, Mmr, MmrProof, SmtProof},
         rand::RpoRandomCoin,
     },
-    note::{NoteId, NoteTag, Nullifier},
-    testing::{
-        account_id::{ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PRIVATE_SENDER},
-        note::NoteBuilder,
-    },
+    note::{NoteExecutionMode, NoteId, NoteTag, NoteType, Nullifier},
+    testing::{account_id::ACCOUNT_ID_PRIVATE_SENDER, note::NoteBuilder},
     transaction::{InputNoteCommitment, OutputNote, ProvenTransaction},
 };
 use miden_testing::{MockChain, MockChainNote};
@@ -63,21 +59,20 @@ impl MockRpcApi {
             mock_chain: Arc::new(RwLock::new(mock_chain)),
         };
 
-        let note_first = NoteBuilder::new(
-            ACCOUNT_ID_PRIVATE_SENDER.try_into().unwrap(),
-            RpoRandomCoin::new(Word::default()),
-        )
-        .add_assets([FungibleAsset::mock(20)])
-        .build(&TransactionKernel::testing_assembler())
-        .unwrap();
+        let from_account_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
 
-        let note_second = NoteBuilder::new(
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(),
-            RpoRandomCoin::new(Word::default()),
-        )
-        .add_assets([NonFungibleAsset::mock(&[1, 2, 3])])
-        .build(&TransactionKernel::testing_assembler())
-        .unwrap();
+        let note_first =
+            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new)))
+                .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+                .build(&TransactionKernel::assembler())
+                .unwrap();
+
+        let note_second =
+            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new)))
+                .note_type(NoteType::Private)
+                .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+                .build(&TransactionKernel::assembler())
+                .unwrap();
 
         api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note
         api.seal_block(vec![], vec![]); // Block 2
