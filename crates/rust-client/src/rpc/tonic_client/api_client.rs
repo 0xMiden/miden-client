@@ -1,6 +1,5 @@
-use core::ops::{Deref, DerefMut};
-
 use alloc::string::String;
+use core::ops::{Deref, DerefMut};
 
 use api_client_wrapper::{ApiClient, InnerClient};
 use tonic::{
@@ -11,8 +10,8 @@ use tonic::{
 // WEB CLIENT
 // ================================================================================================
 
-//#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
-//compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
+#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
+compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
 
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
