@@ -1,5 +1,8 @@
+use core::ops::{Deref, DerefMut};
+
 use alloc::string::String;
 
+use api_client_wrapper::{ApiClient, InnerClient};
 use tonic::{
     metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
     service::Interceptor,
@@ -41,10 +44,7 @@ pub(crate) mod api_client_wrapper {
 #[cfg(feature = "tonic")]
 pub(crate) mod api_client_wrapper {
     use alloc::{boxed::Box, string::String};
-    use core::{
-        ops::{Deref, DerefMut},
-        time::Duration,
-    };
+    use core::time::Duration;
 
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
@@ -78,18 +78,18 @@ pub(crate) mod api_client_wrapper {
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
         }
     }
+}
 
-    impl Deref for ApiClient {
-        type Target = InnerClient;
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
+impl Deref for ApiClient {
+    type Target = InnerClient;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    impl DerefMut for ApiClient {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
+impl DerefMut for ApiClient {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
