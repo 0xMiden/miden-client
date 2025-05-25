@@ -17,19 +17,20 @@ pub(crate) mod api_client_wrapper {
 
     use tonic::service::interceptor::InterceptedService;
 
-    use super::MetadataInterceptor;
+    use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
 
-    type WasmClient = tonic_web_wasm_client::Client;
+    pub type WasmClient = tonic_web_wasm_client::Client;
     pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
-    pub type ApiClient =
-        crate::rpc::generated::rpc::api_client::ApiClient<tonic_web_wasm_client::Client>;
+    #[derive(Clone)]
+    pub struct ApiClient(pub(crate) InnerClient);
 
     impl ApiClient {
         #[allow(clippy::unused_async)]
         pub async fn new_client(endpoint: String, _timeout_ms: u64) -> Result<ApiClient, RpcError> {
-            let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
-            Ok(ApiClient::new(wasm_client))
+            let wasm_client = WasmClient::new(endpoint);
+            let interceptor = accept_header_interceptor();
+            Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
         }
     }
 }
