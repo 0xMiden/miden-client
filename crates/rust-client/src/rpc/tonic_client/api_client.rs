@@ -1,15 +1,27 @@
+use alloc::string::String;
+
+use tonic::{
+    metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
+    service::Interceptor,
+};
+
 // WEB CLIENT
 // ================================================================================================
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
-compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
+//#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
+//compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
 
 #[cfg(feature = "web-tonic")]
 pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
-    use crate::rpc::RpcError;
+    use tonic::service::interceptor::InterceptedService;
 
+    use super::MetadataInterceptor;
+    use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
+
+    type WasmClient = tonic_web_wasm_client::Client;
+    pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
     pub type ApiClient =
         crate::rpc::generated::rpc::api_client::ApiClient<tonic_web_wasm_client::Client>;
 
@@ -33,12 +45,9 @@ pub(crate) mod api_client_wrapper {
         time::Duration,
     };
 
-    use tonic::{
-        metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
-        service::{Interceptor, interceptor::InterceptedService},
-        transport::Channel,
-    };
+    use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
+    use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
 
     pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
@@ -81,47 +90,44 @@ pub(crate) mod api_client_wrapper {
             &mut self.0
         }
     }
+}
 
-    // INTERCEPTOR
-    // ================================================================================================
+// INTERCEPTOR
+// ================================================================================================
 
-    /// Interceptor designed to inject required metadata into all [`ApiClient`] requests.
-    #[derive(Default, Clone)]
-    pub struct MetadataInterceptor {
-        metadata: alloc::collections::BTreeMap<&'static str, AsciiMetadataValue>,
+/// Interceptor designed to inject required metadata into all [`ApiClient`] requests.
+#[derive(Default, Clone)]
+pub struct MetadataInterceptor {
+    metadata: alloc::collections::BTreeMap<&'static str, AsciiMetadataValue>,
+}
+
+impl MetadataInterceptor {
+    /// Adds or overwrites metadata to the interceptor.
+    pub fn with_metadata(
+        mut self,
+        key: &'static str,
+        value: String,
+    ) -> Result<Self, InvalidMetadataValue> {
+        self.metadata.insert(key, AsciiMetadataValue::try_from(value)?);
+        Ok(self)
     }
+}
 
-    impl MetadataInterceptor {
-        /// Adds or overwrites metadata to the interceptor.
-        pub fn with_metadata(
-            mut self,
-            key: &'static str,
-            value: String,
-        ) -> Result<Self, InvalidMetadataValue> {
-            self.metadata.insert(key, AsciiMetadataValue::try_from(value)?);
-            Ok(self)
+impl Interceptor for MetadataInterceptor {
+    fn call(&mut self, request: tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
+        let mut request = request;
+        for (key, value) in &self.metadata {
+            request.metadata_mut().insert(*key, value.clone());
         }
+        Ok(request)
     }
+}
 
-    impl Interceptor for MetadataInterceptor {
-        fn call(
-            &mut self,
-            request: tonic::Request<()>,
-        ) -> Result<tonic::Request<()>, tonic::Status> {
-            let mut request = request;
-            for (key, value) in &self.metadata {
-                request.metadata_mut().insert(*key, value.clone());
-            }
-            Ok(request)
-        }
-    }
-
-    /// Returns the HTTP ACCEPT header [`MetadataInterceptor`] that is expected by Miden RPC.
-    fn accept_header_interceptor() -> MetadataInterceptor {
-        let version = env!("CARGO_PKG_VERSION");
-        let accept_value = format!("application/vnd.miden.{version}+grpc");
-        MetadataInterceptor::default()
-            .with_metadata("accept", accept_value)
-            .expect("valid key/value metadata for interceptor")
-    }
+/// Returns the HTTP ACCEPT header [`MetadataInterceptor`] that is expected by Miden RPC.
+fn accept_header_interceptor() -> MetadataInterceptor {
+    let version = env!("CARGO_PKG_VERSION");
+    let accept_value = format!("application/vnd.miden.{version}+grpc");
+    MetadataInterceptor::default()
+        .with_metadata("accept", accept_value)
+        .expect("valid key/value metadata for interceptor")
 }
