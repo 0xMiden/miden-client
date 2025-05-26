@@ -3,6 +3,7 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+use core::pin::Pin;
 use std::env::temp_dir;
 
 use async_trait::async_trait;
@@ -196,135 +197,178 @@ impl MockRpcApi {
     }
 }
 use alloc::boxed::Box;
-#[async_trait]
 impl NodeRpcClient for MockRpcApi {
-    async fn sync_notes(
-        &self,
-        _block_num: BlockNumber,
-        _note_tags: &[NoteTag],
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let response = SyncNoteResponse {
-            chain_tip: u32::try_from(self.blocks.len()).expect("block number overflow"),
-            notes: vec![],
-            block_header: Some(self.blocks.last().unwrap().header().into()),
-            mmr_path: Some(MerklePath::default()),
-        };
-        let response = Response::new(response.clone());
-        response.into_inner().try_into()
+    fn sync_notes<'a, 'b>(
+        &'a self,
+        block_num: BlockNumber,
+        note_tags: &'b [NoteTag],
+    ) -> Pin<Box<dyn Future<Output = Result<NoteSyncInfo, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let response = SyncNoteResponse {
+                chain_tip: u32::try_from(self.blocks.len()).expect("block number overflow"),
+                notes: vec![],
+                block_header: Some(self.blocks.last().unwrap().header().into()),
+                mmr_path: Some(MerklePath::default()),
+            };
+            let response = Response::new(response.clone());
+            response.into_inner().try_into()
+        })
     }
 
     /// Executes the specified sync state request and returns the response.
-    async fn sync_state(
-        &self,
+    fn sync_state<'a, 'b, 'c>(
+        &'a self,
         block_num: BlockNumber,
-        _account_ids: &[AccountId],
-        _note_tags: &[NoteTag],
-    ) -> Result<StateSyncInfo, RpcError> {
-        // Match request -> response through block_num
-        let response = self.get_sync_state_request(block_num);
+        account_ids: &'b [AccountId],
+        note_tags: &'c [NoteTag],
+    ) -> Pin<Box<dyn Future<Output = Result<StateSyncInfo, RpcError>> + 'a>>
+    where
+        'b: 'a,
+        'c: 'a,
+    {
+        Box::pin(async move {
+            // Match request -> response through block_num
+            let response = self.get_sync_state_request(block_num);
 
-        Ok(response.try_into().unwrap())
+            Ok(response.try_into().unwrap())
+        })
     }
 
     /// Creates and executes a [GetBlockHeaderByNumberRequest]. Will retrieve the block header
     /// for the specified block number. If the block number is not provided, the chain tip block
     /// header will be returned.
-    async fn get_block_header_by_number(
-        &self,
+    fn get_block_header_by_number<'a>(
+        &'a self,
         mut block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        if block_num.is_none() {
-            block_num = Some(self.get_chain_tip_block_num());
-        }
+    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + 'a>> {
+        Box::pin(async move {
+            if block_num.is_none() {
+                block_num = Some(self.get_chain_tip_block_num());
+            }
 
-        if block_num == Some(0.into()) {
-            return Ok((self.blocks.first().unwrap().header().clone(), None));
-        }
-        let block = self
-            .blocks
-            .iter()
-            .find(|b| b.header().block_num() == block_num.unwrap())
-            .unwrap();
+            if block_num == Some(0.into()) {
+                return Ok((self.blocks.first().unwrap().header().clone(), None));
+            }
+            let block = self
+                .blocks
+                .iter()
+                .find(|b| b.header().block_num() == block_num.unwrap())
+                .unwrap();
 
-        let mmr_proof = if include_mmr_proof {
-            Some(self.get_mmr().open(block_num.unwrap().as_usize()).unwrap())
-        } else {
-            None
-        };
+            let mmr_proof = if include_mmr_proof {
+                Some(self.get_mmr().open(block_num.unwrap().as_usize()).unwrap())
+            } else {
+                None
+            };
 
-        Ok((block.header().clone(), mmr_proof))
+            Ok((block.header().clone(), mmr_proof))
+        })
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
-        // assume all private notes for now
-        let hit_notes = note_ids.iter().filter_map(|id| self.notes.get(id));
-        let mut return_notes = vec![];
-        for note in hit_notes {
-            return_notes.push(NetworkNote::Private(
-                note.id(),
-                *note.note().metadata(),
-                note.proof().expect("Note should have an inclusion proof").clone(),
-            ));
-        }
-        Ok(return_notes)
+    fn get_notes_by_id<'a, 'b>(
+        &'a self,
+        note_ids: &'b [NoteId],
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<NetworkNote>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            // assume all private notes for now
+            let hit_notes = note_ids.iter().filter_map(|id| self.notes.get(id));
+            let mut return_notes = vec![];
+            for note in hit_notes {
+                return_notes.push(NetworkNote::Private(
+                    note.id(),
+                    *note.note().metadata(),
+                    note.proof().expect("Note should have an inclusion proof").clone(),
+                ));
+            }
+            Ok(return_notes)
+        })
     }
 
-    async fn submit_proven_transaction(
-        &self,
-        _proven_transaction: ProvenTransaction,
-    ) -> std::result::Result<(), RpcError> {
-        // TODO: add some basic validations to test error cases
-        Ok(())
+    fn submit_proven_transaction<'a>(
+        &'a self,
+        proven_transaction: ProvenTransaction,
+    ) -> Pin<Box<dyn Future<Output = Result<(), RpcError>> + 'a>> {
+        Box::pin(async move {
+            // TODO: add some basic validations to test error cases
+            Ok(())
+        })
     }
 
-    async fn get_account_details(
-        &self,
-        _account_id: AccountId,
-    ) -> Result<AccountDetails, RpcError> {
-        panic!("shouldn't be used for now")
+    fn get_account_details<'a>(
+        &'a self,
+        account_id: AccountId,
+    ) -> Pin<Box<dyn Future<Output = Result<AccountDetails, RpcError>> + 'a>> {
+        Box::pin(async move { panic!("shouldn't be used for now") })
     }
 
-    async fn get_account_proofs(
-        &self,
-        _: &BTreeSet<ForeignAccount>,
-        _code_commitments: Vec<AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
-        // TODO: Implement fully
-        Ok((self.blocks.last().unwrap().header().block_num(), vec![]))
+    fn get_account_proofs<'a, 'b>(
+        &'a self,
+        account_requests: &'b BTreeSet<ForeignAccount>,
+        known_account_codes: Vec<AccountCode>,
+    ) -> Pin<Box<dyn Future<Output = Result<AccountProofs, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            // TODO: Implement fully
+            Ok((self.blocks.last().unwrap().header().block_num(), vec![]))
+        })
     }
 
-    async fn check_nullifiers_by_prefix(
-        &self,
-        _prefix: &[u16],
-        _block_num: BlockNumber,
-    ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        // Always return an empty list for now since it's only used when importing
-        Ok(vec![])
+    fn check_nullifiers_by_prefix<'a, 'b>(
+        &'a self,
+        prefixes: &'b [u16],
+        block_num: BlockNumber,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<NullifierUpdate>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            // Always return an empty list for now since it's only used when importing
+            Ok(vec![])
+        })
     }
 
-    async fn check_nullifiers(&self, _nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        unimplemented!("shouldn't be used for now")
+    fn check_nullifiers<'a, 'b>(
+        &'a self,
+        nullifiers: &'b [Nullifier],
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<SmtProof>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move { unimplemented!("shouldn't be used for now") })
     }
 
-    async fn get_account_state_delta(
-        &self,
-        _account_id: AccountId,
-        _from_block: BlockNumber,
-        _to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError> {
-        unimplemented!("shouldn't be used for now")
+    fn get_account_state_delta<'a>(
+        &'a self,
+        account_id: AccountId,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
+    ) -> Pin<Box<dyn Future<Output = Result<AccountDelta, RpcError>> + 'a>> {
+        Box::pin(async move { unimplemented!("shouldn't be used for now") })
     }
 
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let block = self
-            .blocks
-            .iter()
-            .find(|b| b.header().block_num() == block_num)
-            .unwrap()
-            .clone();
+    fn get_block_by_number<'a>(
+        &'a self,
+        block_num: BlockNumber,
+    ) -> Pin<Box<dyn Future<Output = Result<ProvenBlock, RpcError>> + 'a>> {
+        Box::pin(async move {
+            let block = self
+                .blocks
+                .iter()
+                .find(|b| b.header().block_num() == block_num)
+                .unwrap()
+                .clone();
 
-        Ok(block)
+            Ok(block)
+        })
     }
 }
 

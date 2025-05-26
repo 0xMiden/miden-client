@@ -1,3 +1,5 @@
+use core::pin::Pin;
+
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, BTreeSet},
@@ -83,151 +85,173 @@ impl TonicRpcClient {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
-    async fn submit_proven_transaction(
-        &self,
+    fn submit_proven_transaction<'a>(
+        &'a self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError> {
-        let request = SubmitProvenTransactionRequest {
-            transaction: proven_transaction.to_bytes(),
-        };
+    ) -> Pin<Box<dyn Future<Output = Result<(), RpcError>> + 'a>> {
+        Box::pin(async move {
+            let request = SubmitProvenTransactionRequest {
+                transaction: proven_transaction.to_bytes(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        rpc_api.submit_proven_transaction(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
-                err.to_string(),
-            )
-        })?;
+            rpc_api.submit_proven_transaction(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-        Ok(())
+            Ok(())
+        })
     }
 
-    async fn get_block_header_by_number(
-        &self,
+    fn get_block_header_by_number<'a>(
+        &'a self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        let request = GetBlockHeaderByNumberRequest {
-            block_num: block_num.as_ref().map(BlockNumber::as_u32),
-            include_mmr_proof: Some(include_mmr_proof),
-        };
+    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + 'a>> {
+        Box::pin(async move {
+            let request = GetBlockHeaderByNumberRequest {
+                block_num: block_num.as_ref().map(BlockNumber::as_u32),
+                include_mmr_proof: Some(include_mmr_proof),
+            };
 
-        info!("Calling GetBlockHeaderByNumber: {:?}", request);
+            info!("Calling GetBlockHeaderByNumber: {:?}", request);
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
-        })?;
+            let api_response =
+                rpc_api.get_block_header_by_number(request).await.map_err(|err| {
+                    RpcError::RequestError(
+                        NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
+                        err.to_string(),
+                    )
+                })?;
 
-        let response = api_response.into_inner();
+            let response = api_response.into_inner();
 
-        let block_header: BlockHeader = response
-            .block_header
-            .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
-            .try_into()?;
-
-        let mmr_proof = if include_mmr_proof {
-            let forest = response
-                .chain_length
-                .ok_or(RpcError::ExpectedDataMissing("ChainLength".into()))?;
-            let merkle_path: MerklePath = response
-                .mmr_path
-                .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
+            let block_header: BlockHeader = response
+                .block_header
+                .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
                 .try_into()?;
 
-            Some(MmrProof {
-                forest: forest as usize,
-                position: block_header.block_num().as_usize(),
-                merkle_path,
-            })
-        } else {
-            None
-        };
+            let mmr_proof = if include_mmr_proof {
+                let forest = response
+                    .chain_length
+                    .ok_or(RpcError::ExpectedDataMissing("ChainLength".into()))?;
+                let merkle_path: MerklePath = response
+                    .mmr_path
+                    .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
+                    .try_into()?;
 
-        Ok((block_header, mmr_proof))
+                Some(MmrProof {
+                    forest: forest as usize,
+                    position: block_header.block_num().as_usize(),
+                    merkle_path,
+                })
+            } else {
+                None
+            };
+
+            Ok((block_header, mmr_proof))
+        })
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
-        let request = GetNotesByIdRequest {
-            note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
-        };
-
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
-        })?;
-
-        let rpc_notes = api_response.into_inner().notes;
-        let mut response_notes = Vec::with_capacity(rpc_notes.len());
-        for note in rpc_notes {
-            let inclusion_details = {
-                let merkle_path = note
-                    .merkle_path
-                    .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
-                    .try_into()?;
-
-                NoteInclusionProof::new(
-                    note.block_num.into(),
-                    u16::try_from(note.note_index).expect("note index out of range"),
-                    merkle_path,
-                )?
+    fn get_notes_by_id<'a, 'b>(
+        &'a self,
+        note_ids: &'b [NoteId],
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<NetworkNote>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let request = GetNotesByIdRequest {
+                note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
             };
 
-            let note = if let Some(details) = note.details {
-                let note = Note::read_from_bytes(&details)?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-                NetworkNote::Public(note, inclusion_details)
-            } else {
-                let note_metadata = note
-                    .metadata
-                    .ok_or(RpcError::ExpectedDataMissing("Metadata".into()))?
-                    .try_into()?;
+            let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-                let note_id: Digest = note
-                    .note_id
-                    .ok_or(RpcError::ExpectedDataMissing("Notes.NoteId".into()))?
-                    .try_into()?;
+            let rpc_notes = api_response.into_inner().notes;
+            let mut response_notes = Vec::with_capacity(rpc_notes.len());
+            for note in rpc_notes {
+                let inclusion_details = {
+                    let merkle_path = note
+                        .merkle_path
+                        .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
+                        .try_into()?;
 
-                NetworkNote::Private(NoteId::from(note_id), note_metadata, inclusion_details)
-            };
-            response_notes.push(note);
-        }
-        Ok(response_notes)
+                    NoteInclusionProof::new(
+                        note.block_num.into(),
+                        u16::try_from(note.note_index).expect("note index out of range"),
+                        merkle_path,
+                    )?
+                };
+
+                let note = if let Some(details) = note.details {
+                    let note = Note::read_from_bytes(&details)?;
+
+                    NetworkNote::Public(note, inclusion_details)
+                } else {
+                    let note_metadata = note
+                        .metadata
+                        .ok_or(RpcError::ExpectedDataMissing("Metadata".into()))?
+                        .try_into()?;
+
+                    let note_id: Digest = note
+                        .note_id
+                        .ok_or(RpcError::ExpectedDataMissing("Notes.NoteId".into()))?
+                        .try_into()?;
+
+                    NetworkNote::Private(NoteId::from(note_id), note_metadata, inclusion_details)
+                };
+                response_notes.push(note);
+            }
+            Ok(response_notes)
+        })
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
     /// into a [StateSyncInfo] struct.
-    async fn sync_state(
-        &self,
+    fn sync_state<'a, 'b, 'c>(
+        &'a self,
         block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &[NoteTag],
-    ) -> Result<StateSyncInfo, RpcError> {
-        let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
+        account_ids: &'b [AccountId],
+        note_tags: &'c [NoteTag],
+    ) -> Pin<Box<dyn Future<Output = Result<StateSyncInfo, RpcError>> + 'a>>
+    where
+        'b: 'a,
+        'c: 'a,
+    {
+        Box::pin(async move {
+            let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
 
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+            let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncStateRequest {
-            block_num: block_num.as_u32(),
-            account_ids,
-            note_tags,
-        };
+            let request = SyncStateRequest {
+                block_num: block_num.as_u32(),
+                account_ids,
+                note_tags,
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_state(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncState.to_string(), err.to_string())
-        })?;
-        response.into_inner().try_into()
+            let response = rpc_api.sync_state(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::SyncState.to_string(),
+                    err.to_string(),
+                )
+            })?;
+            response.into_inner().try_into()
+        })
     }
 
     /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [AccountDetails] from
@@ -241,44 +265,50 @@ impl NodeRpcClient for TonicRpcClient {
     /// - The answer had a `None` for one of the expected fields (account, summary,
     ///   account_commitment, details).
     /// - There is an error during [Account] deserialization.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<AccountDetails, RpcError> {
-        let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
+    fn get_account_details<'a>(
+        &'a self,
+        account_id: AccountId,
+    ) -> Pin<Box<dyn Future<Output = Result<AccountDetails, RpcError>> + 'a>> {
+        Box::pin(async move {
+            let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountDetails.to_string(),
-                err.to_string(),
-            )
-        })?;
-        let response = response.into_inner();
-        let account_info = response.details.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `account`".to_string(),
-        ))?;
-
-        let account_summary = account_info.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response's account should have a `summary`".to_string(),
-        ))?;
-
-        let hash = account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response's account should have an `account_commitment`".to_string(),
-        ))?;
-
-        let hash = hash.try_into()?;
-
-        let update_summary = AccountUpdateSummary::new(hash, account_summary.block_num);
-        if account_id.is_public() {
-            let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have `details`".to_string(),
+            let response = rpc_api.get_account_details(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::GetAccountDetails.to_string(),
+                    err.to_string(),
+                )
+            })?;
+            let response = response.into_inner();
+            let account_info = response.details.ok_or(RpcError::ExpectedDataMissing(
+                "GetAccountDetails response should have an `account`".to_string(),
             ))?;
 
-            let account = Account::read_from_bytes(&details_bytes)?;
+            let account_summary = account_info.summary.ok_or(RpcError::ExpectedDataMissing(
+                "GetAccountDetails response's account should have a `summary`".to_string(),
+            ))?;
 
-            Ok(AccountDetails::Public(account, update_summary))
-        } else {
-            Ok(AccountDetails::Private(account_id, update_summary))
-        }
+            let hash = account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
+                "GetAccountDetails response's account should have an `account_commitment`"
+                    .to_string(),
+            ))?;
+
+            let hash = hash.try_into()?;
+
+            let update_summary = AccountUpdateSummary::new(hash, account_summary.block_num);
+            if account_id.is_public() {
+                let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
+                    "GetAccountDetails response's account should have `details`".to_string(),
+                ))?;
+
+                let account = Account::read_from_bytes(&details_bytes)?;
+
+                Ok(AccountDetails::Public(account, update_summary))
+            } else {
+                Ok(AccountDetails::Private(account_id, update_summary))
+            }
+        })
     }
 
     /// Sends a `GetAccountProofs` request to the Miden node, and extracts a list of [AccountProof]
@@ -292,198 +322,245 @@ impl NodeRpcClient for TonicRpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proofs(
-        &self,
-        account_requests: &BTreeSet<ForeignAccount>,
+    fn get_account_proofs<'a, 'b>(
+        &'a self,
+        account_requests: &'b BTreeSet<ForeignAccount>,
         known_account_codes: Vec<AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
-        let requested_accounts = account_requests.len();
-        let mut rpc_account_requests: Vec<get_account_proofs_request::AccountRequest> =
-            Vec::with_capacity(account_requests.len());
+    ) -> Pin<Box<dyn Future<Output = Result<AccountProofs, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let requested_accounts = account_requests.len();
+            let mut rpc_account_requests: Vec<get_account_proofs_request::AccountRequest> =
+                Vec::with_capacity(account_requests.len());
 
-        for foreign_account in account_requests {
-            rpc_account_requests.push(get_account_proofs_request::AccountRequest {
-                account_id: Some(foreign_account.account_id().into()),
-                storage_requests: foreign_account.storage_slot_requirements().into(),
-            });
-        }
+            for foreign_account in account_requests {
+                rpc_account_requests.push(get_account_proofs_request::AccountRequest {
+                    account_id: Some(foreign_account.account_id().into()),
+                    storage_requests: foreign_account.storage_slot_requirements().into(),
+                });
+            }
 
-        let known_account_codes: BTreeMap<Digest, AccountCode> =
-            known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
+            let known_account_codes: BTreeMap<Digest, AccountCode> =
+                known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
 
-        let request = GetAccountProofsRequest {
-            account_requests: rpc_account_requests,
-            include_headers: Some(true),
-            code_commitments: known_account_codes.keys().map(Into::into).collect(),
-        };
-
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api
-            .get_account_proofs(request)
-            .await
-            .map_err(|err| {
-                RpcError::RequestError(
-                    NodeRpcClientEndpoint::GetAccountProofs.to_string(),
-                    err.to_string(),
-                )
-            })?
-            .into_inner();
-
-        let mut account_proofs = Vec::with_capacity(response.account_proofs.len());
-        let block_num = response.block_num.into();
-
-        // sanity check response
-        if requested_accounts != response.account_proofs.len() {
-            return Err(RpcError::ExpectedDataMissing(
-                "AccountProof did not contain all account IDs".to_string(),
-            ));
-        }
-
-        for account in response.account_proofs {
-            let account_witness: AccountWitness = account
-                .witness
-                .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
-                .try_into()?;
-
-            // Because we set `include_headers` to true, for any public account we requested we
-            // should have the corresponding `state_header` field
-            let headers = if account_witness.id().is_public() {
-                Some(
-                    account
-                        .state_header
-                        .ok_or(RpcError::ExpectedDataMissing("Account.StateHeader".to_string()))?
-                        .into_domain(account_witness.id(), &known_account_codes)?,
-                )
-            } else {
-                None
+            let request = GetAccountProofsRequest {
+                account_requests: rpc_account_requests,
+                include_headers: Some(true),
+                code_commitments: known_account_codes.keys().map(Into::into).collect(),
             };
 
-            let proof = AccountProof::new(account_witness, headers)
-                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
-            account_proofs.push(proof);
-        }
+            let mut rpc_api = self.ensure_connected().await?;
 
-        Ok((block_num, account_proofs))
+            let response = rpc_api
+                .get_account_proofs(request)
+                .await
+                .map_err(|err| {
+                    RpcError::RequestError(
+                        NodeRpcClientEndpoint::GetAccountProofs.to_string(),
+                        err.to_string(),
+                    )
+                })?
+                .into_inner();
+
+            let mut account_proofs = Vec::with_capacity(response.account_proofs.len());
+            let block_num = response.block_num.into();
+
+            // sanity check response
+            if requested_accounts != response.account_proofs.len() {
+                return Err(RpcError::ExpectedDataMissing(
+                    "AccountProof did not contain all account IDs".to_string(),
+                ));
+            }
+
+            for account in response.account_proofs {
+                let account_witness: AccountWitness = account
+                    .witness
+                    .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
+                    .try_into()?;
+
+                // Because we set `include_headers` to true, for any public account we requested we
+                // should have the corresponding `state_header` field
+                let headers = if account_witness.id().is_public() {
+                    Some(
+                        account
+                            .state_header
+                            .ok_or(RpcError::ExpectedDataMissing(
+                                "Account.StateHeader".to_string(),
+                            ))?
+                            .into_domain(account_witness.id(), &known_account_codes)?,
+                    )
+                } else {
+                    None
+                };
+
+                let proof = AccountProof::new(account_witness, headers)
+                    .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+                account_proofs.push(proof);
+            }
+
+            Ok((block_num, account_proofs))
+        })
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [NoteSyncInfo] from the
     /// response.
-    async fn sync_notes(
-        &self,
+    fn sync_notes<'a, 'b>(
+        &'a self,
         block_num: BlockNumber,
-        note_tags: &[NoteTag],
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+        note_tags: &'b [NoteTag],
+    ) -> Pin<Box<dyn Future<Output = Result<NoteSyncInfo, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncNoteRequest { block_num: block_num.as_u32(), note_tags };
+            let request = SyncNoteRequest { block_num: block_num.as_u32(), note_tags };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_notes(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncNotes.to_string(), err.to_string())
-        })?;
+            let response = rpc_api.sync_notes(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::SyncNotes.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-        response.into_inner().try_into()
+            response.into_inner().try_into()
+        })
     }
 
-    async fn check_nullifiers_by_prefix(
-        &self,
-        prefixes: &[u16],
+    fn check_nullifiers_by_prefix<'a, 'b>(
+        &'a self,
+        prefixes: &'b [u16],
         block_num: BlockNumber,
-    ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = CheckNullifiersByPrefixRequest {
-            nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
-            prefix_len: 16,
-            block_num: block_num.as_u32(),
-        };
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<NullifierUpdate>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let request = CheckNullifiersByPrefixRequest {
+                nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
+                prefix_len: 16,
+                block_num: block_num.as_u32(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
-                err.to_string(),
-            )
-        })?;
-        let response = response.into_inner();
-        let nullifiers = response
-            .nullifiers
-            .iter()
-            .map(TryFrom::try_from)
-            .collect::<Result<Vec<NullifierUpdate>, _>>()
-            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+            let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
+                    err.to_string(),
+                )
+            })?;
+            let response = response.into_inner();
+            let nullifiers = response
+                .nullifiers
+                .iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<Vec<NullifierUpdate>, _>>()
+                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-        Ok(nullifiers)
+            Ok(nullifiers)
+        })
     }
 
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = CheckNullifiersRequest {
-            nullifiers: nullifiers.iter().map(|nul| nul.inner().into()).collect(),
-        };
+    fn check_nullifiers<'a, 'b>(
+        &'a self,
+        nullifiers: &'b [Nullifier],
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<SmtProof>, RpcError>> + 'a>>
+    where
+        'b: 'a,
+    {
+        Box::pin(async move {
+            let request = CheckNullifiersRequest {
+                nullifiers: nullifiers.iter().map(|nul| nul.inner().into()).collect(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiers.to_string(),
-                err.to_string(),
-            )
-        })?;
+            let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::CheckNullifiers.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-        let response = response.into_inner();
-        let proofs = response.proofs.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
+            let response = response.into_inner();
+            let proofs = response.proofs.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
 
-        Ok(proofs)
+            Ok(proofs)
+        })
     }
 
-    async fn get_account_state_delta(
-        &self,
+    fn get_account_state_delta<'a>(
+        &'a self,
         account_id: AccountId,
         from_block: BlockNumber,
         to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError> {
-        let request = GetAccountStateDeltaRequest {
-            account_id: Some(account_id.into()),
-            from_block_num: from_block.as_u32(),
-            to_block_num: to_block.as_u32(),
-        };
+    ) -> Pin<Box<dyn Future<Output = Result<AccountDelta, RpcError>> + 'a>> {
+        Box::pin(async move {
+            let request = GetAccountStateDeltaRequest {
+                account_id: Some(account_id.into()),
+                from_block_num: from_block.as_u32(),
+                to_block_num: to_block.as_u32(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_state_delta(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountStateDelta.to_string(),
-                err.to_string(),
-            )
-        })?;
+            let response = rpc_api.get_account_state_delta(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::GetAccountStateDelta.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-        let response = response.into_inner();
-        let delta = AccountDelta::read_from_bytes(&response.delta.ok_or(
-            RpcError::ExpectedDataMissing("GetAccountStateDeltaResponse.delta".to_string()),
-        )?)?;
+            let response = response.into_inner();
+            let delta = AccountDelta::read_from_bytes(&response.delta.ok_or(
+                RpcError::ExpectedDataMissing("GetAccountStateDeltaResponse.delta".to_string()),
+            )?)?;
 
-        Ok(delta)
+            Ok(delta)
+        })
     }
 
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = GetBlockByNumberRequest { block_num: block_num.as_u32() };
+    fn get_block_by_number<'a>(
+        &'a self,
+        block_num: BlockNumber,
+    ) -> Pin<Box<dyn Future<Output = Result<ProvenBlock, RpcError>> + 'a>> {
+        Box::pin(async move {
+            let request = GetBlockByNumberRequest { block_num: block_num.as_u32() };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
-                err.to_string(),
-            )
-        })?;
+            let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
+                RpcError::RequestError(
+                    NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
+                    err.to_string(),
+                )
+            })?;
 
-        let response = response.into_inner();
-        let block =
-            ProvenBlock::read_from_bytes(&response.block.ok_or(RpcError::ExpectedDataMissing(
-                "GetBlockByNumberResponse.block".to_string(),
-            ))?)?;
+            let response = response.into_inner();
+            let block = ProvenBlock::read_from_bytes(&response.block.ok_or(
+                RpcError::ExpectedDataMissing("GetBlockByNumberResponse.block".to_string()),
+            )?)?;
 
-        Ok(block)
+            Ok(block)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rpc::Endpoint;
+
+    use super::TonicRpcClient;
+
+    fn assert_send_sync<T: Send + Sync>() {}
+    #[test]
+    fn send_sync() {
+        assert_send_sync::<TonicRpcClient>();
     }
 }

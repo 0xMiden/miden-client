@@ -36,7 +36,7 @@ enum AuthenticatorConfig {
 /// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
 pub struct ClientBuilder {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
-    rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
+    rpc_api: Option<Arc<dyn NodeRpcClient + Send + Sync>>,
     /// An optional store provided by the user.
     store: Option<Arc<dyn Store>>,
     /// An optional RNG provided by the user.
@@ -80,7 +80,7 @@ impl ClientBuilder {
 
     /// Sets a custom RPC client directly.
     #[must_use]
-    pub fn with_rpc(mut self, client: Arc<dyn NodeRpcClient + Send>) -> Self {
+    pub fn with_rpc(mut self, client: Arc<dyn NodeRpcClient + Send + Sync>) -> Self {
         self.rpc_api = Some(client);
         self
     }
@@ -146,7 +146,7 @@ impl ClientBuilder {
     #[allow(clippy::unused_async, unused_mut)]
     pub async fn build(mut self) -> Result<Client, ClientError> {
         // Determine the RPC client to use.
-        let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
+        let rpc_api: Arc<dyn NodeRpcClient + Send + Sync> = if let Some(client) = self.rpc_api {
             client
         } else {
             return Err(ClientError::ClientInitializationError(
