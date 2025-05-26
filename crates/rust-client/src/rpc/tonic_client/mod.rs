@@ -82,7 +82,6 @@ impl TonicRpcClient {
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
     fn submit_proven_transaction<'a>(
@@ -111,7 +110,14 @@ impl NodeRpcClient for TonicRpcClient {
         &'a self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + 'a>> {
+    ) -> Pin<
+        Box<
+            dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>>
+                + Send
+                + Sync
+                + 'a,
+        >,
+    > {
         Box::pin(async move {
             let request = GetBlockHeaderByNumberRequest {
                 block_num: block_num.as_ref().map(BlockNumber::as_u32),
@@ -554,7 +560,11 @@ impl NodeRpcClient for TonicRpcClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::rpc::Endpoint;
+    use std::boxed::Box;
+
+    use miden_objects::account::AccountId;
+
+    use crate::rpc::{Endpoint, NodeRpcClient};
 
     use super::TonicRpcClient;
 
@@ -562,5 +572,21 @@ mod tests {
     #[test]
     fn send_sync() {
         assert_send_sync::<TonicRpcClient>();
+        assert_send_sync::<Box<dyn NodeRpcClient + Send + Sync>>();
+    }
+
+    async fn fn_dyn_trait(client: Box<dyn NodeRpcClient + Send + Sync>) {
+        // This wouldn't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
+        // This only tests one method but that might still be enough to prove that it's possible
+        let res = client.get_block_header_by_number(None, false).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn send_it() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+        let client: Box<TonicRpcClient> = client.into();
+        tokio::task::spawn(async move { fn_dyn_trait(client) });
     }
 }

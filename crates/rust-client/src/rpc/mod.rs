@@ -112,7 +112,14 @@ pub trait NodeRpcClient {
         &'a self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + 'a>>;
+    ) -> Pin<
+        Box<
+            dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>>
+                + Send
+                + Sync
+                + 'a,
+        >,
+    >;
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
