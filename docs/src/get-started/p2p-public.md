@@ -53,7 +53,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
     ```
 
     > **Note**
-    > The faucet account id is `0xad904b3138d71d3e` and can also be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
+    > The faucet account ID can be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
 
     This generates a Pay-to-ID (`P2ID`) note containing `50` tokens, transferred from one account to the other. As the note is public, the second account can receive the necessary details by syncing with the node.
 
@@ -63,7 +63,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
     miden sync
     ```
 
-3. At this point, we should have received the public note details. 
+3. At this point, we should have received the public note details.
 
     ```sh
     miden notes --list
@@ -85,11 +85,11 @@ That's it!
 Account C has now consumed the note and there should be new assets in the account:
 
 ```sh
-miden account --show <account-ID> 
+miden account --show <account-ID>
 ```
 
 ## Clear state
 
-All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file. 
+All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file.
 
 To clear all state, delete this file. It recreates on any command execution.

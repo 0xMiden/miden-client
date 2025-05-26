@@ -31,8 +31,8 @@ let coin_seed: [u64; 4] = rng.random();
 // Initialize the random coin using the generated seed.
 let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 
-// Create a store authenticator with the store and random coin.
-let authenticator = StoreAuthenticator::new_with_rng(store.clone(), rng);
+// Create a keystore to manage cryptographic keys.
+let keystore = FilesystemKeyStore::new(path.into())?;
 
 // Instantiate the client using a Tonic RPC client
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
@@ -40,8 +40,10 @@ let client:Client = Client::new(
     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
     rng,
     store,
-    Arc::new(authenticator),
+    Arc::new(keystore),
     false, // Set to true for debug mode, if needed.
+    None, // Set to Some to enable stale transactions after an amount of blocks.
+    None, // Set to Some to enable recency checks when executing transactions.
 );
 ```
 
@@ -63,7 +65,8 @@ let (new_account, seed) = AccountBuilder::new(init_seed) // Seed should be rando
     .with_component(BasicWallet)
     .build()?;
 
-client.add_account(&new_account, Some(seed), &AuthSecretKey::RpoFalcon512(key_pair), false).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+client.add_account(&new_account, Some(seed), false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
 
@@ -81,7 +84,8 @@ let (new_account, seed) = AccountBuilder::new(init_seed) // Seed should be rando
     .with_component(BasicWallet)
     .build()?;
 
-client.add_account(&new_account, Some(seed), &AuthSecretKey::RpoFalcon512(key_pair), false).await?;
+keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
+client.add_account(&new_account, Some(seed), false).await?;
 ```
 
 The account's state is also tracked locally, but during sync the client updates the account state by querying the node for the most recent account data.
@@ -120,4 +124,4 @@ client.submit_transaction(transaction_execution_result).await?
 ```
 
 You can decide whether you want the note details to be public or private through the `note_type` parameter.
-You may also execute a transaction by manually defining a `TransactionRequest` instance. This allows you to run custom code, with custom note arguments as well.
+You may also customize the transaction request with the other `TransactionRequestBuilder` methods. This allows you to run custom code, with custom note arguments and additional output/input notes as well.

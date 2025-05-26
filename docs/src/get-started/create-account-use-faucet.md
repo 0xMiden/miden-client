@@ -75,7 +75,7 @@ Save the account ID for a future step.
       Successfully imported note 0x0ff340133840d35e95e0dc2e62c88ed75ab2e383dc6673ce0341bd486fed8cb6
       ```
 
-3. Now that the note has been successfully imported, you can view the note's information using the following command: 
+3. Now that the note has been successfully imported, you can view the note's information using the following command:
 
       ```shell
       miden notes
@@ -103,10 +103,10 @@ You will see something like this as output:
 
 ```sh
 State synced to block 179672
-New public notes: 0
-Tracked notes updated: 1
+Committed notes: 1
 Tracked notes consumed: 0
 Tracked accounts updated: 0
+Locked accounts: 0
 Commited transactions: 0
 ```
 

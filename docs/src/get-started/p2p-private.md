@@ -27,7 +27,7 @@ In this section, we show you how to make private transactions and send funds to 
 
 ## Transfer assets between accounts
 
-1. Now we can transfer some of the tokens we received from the faucet to our second account B. 
+1. Now we can transfer some of the tokens we received from the faucet to our second account B.
 
     To do this, run:
 
@@ -36,7 +36,7 @@ In this section, we show you how to make private transactions and send funds to 
     ```
 
     > **Note**
-    > The faucet account id can be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
+    > The faucet account ID can be found on the [Miden faucet website](https://testnet.miden.io/) under the title **Miden faucet**.
 
     This generates a private Pay-to-ID (`P2ID`) note containing `50` assets, transferred from one account to the other.
 
@@ -83,7 +83,7 @@ Wanna do more? [Sending public notes](p2p-public.md)
 
 ## Congratulations!
 
-You have successfully configured and used the Miden client to interact with a Miden rollup and faucet. 
+You have successfully configured and used the Miden client to interact with a Miden rollup and faucet.
 
 You have performed basic Miden rollup operations like submitting proofs of transactions, generating and consuming notes.
 
@@ -91,6 +91,6 @@ For more information on the Miden client, refer to the [Miden client documentati
 
 ## Clear data
 
-All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file. 
+All state is maintained in `store.sqlite3`, located in the directory defined in the `miden-client.toml` file.
 
 To clear all state, delete this file. It recreates on any command execution.
