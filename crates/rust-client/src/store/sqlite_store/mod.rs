@@ -100,7 +100,7 @@ impl SqliteStore {
 //
 // To simplify, all implementations rely on inner SqliteStore functions that map 1:1 by name
 // This way, the actual implementations are grouped by entity types in their own sub-modules
-#[async_trait(?Send)]
+#[async_trait]
 impl Store for SqliteStore {
     fn get_current_timestamp(&self) -> Option<u64> {
         let now = chrono::Utc::now();
@@ -358,8 +358,32 @@ pub fn u64_to_value(v: u64) -> Value {
 
 #[cfg(test)]
 pub mod tests {
+    use std::boxed::Box;
+
     use super::SqliteStore;
-    use crate::tests::create_test_store_path;
+    use crate::{store::Store, tests::create_test_store_path};
+
+    fn assert_send_sync<T: Send + Sync>() {}
+    #[test]
+    fn send_sync() {
+        assert_send_sync::<SqliteStore>();
+        assert_send_sync::<Box<dyn Store + Send + Sync>>();
+    }
+
+    async fn fn_dyn_trait(store: Box<dyn Store + Send + Sync>) {
+        // This wouldn't compile if `get_tracked_block_headers` doesn't return a `Send+Sync`
+        // future. This only tests one method but that might still be enough to prove that
+        // it's possible
+        let res = store.get_tracked_block_headers().await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn send_it() {
+        let client = SqliteStore::new(create_test_store_path()).await.unwrap();
+        let client: Box<SqliteStore> = client.into();
+        tokio::task::spawn(async move { fn_dyn_trait(client).await });
+    }
 
     pub(crate) async fn create_test_store() -> SqliteStore {
         SqliteStore::new(create_test_store_path()).await.unwrap()

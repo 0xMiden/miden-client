@@ -27,7 +27,6 @@ use alloc::{
 };
 use core::fmt::Debug;
 
-use async_trait::async_trait;
 use miden_objects::{
     Digest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
@@ -83,7 +82,8 @@ pub use note_record::{
 /// Because the [`Store`]'s ownership is shared between the executor and the client, interior
 /// mutability is expected to be implemented, which is why all methods receive `&self` and
 /// not `&mut self`.
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return

@@ -1,6 +1,5 @@
 use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 
-use async_trait::async_trait;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
     Digest, Felt,
@@ -210,7 +209,8 @@ impl MockRpcApi {
     }
 }
 use alloc::boxed::Box;
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
