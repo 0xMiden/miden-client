@@ -110,7 +110,7 @@ impl<'a> StateSync<'a> {
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         self,
-        mut current_partial_blockchain: PartialBlockchain,
+        current_partial_blockchain: PartialBlockchain,
         accounts: Vec<AccountHeader>,
         note_tags: Vec<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
@@ -127,14 +127,11 @@ impl<'a> StateSync<'a> {
             ..Default::default()
         };
 
+        let mut partial_mmr = current_partial_blockchain.mmr().clone();
+
         loop {
             if !self
-                .sync_state_step(
-                    &mut state_sync_update,
-                    &mut current_partial_blockchain,
-                    &accounts,
-                    &note_tags,
-                )
+                .sync_state_step(&mut state_sync_update, &mut partial_mmr, &accounts, &note_tags)
                 .await?
             {
                 break;
@@ -158,7 +155,7 @@ impl<'a> StateSync<'a> {
     async fn sync_state_step(
         &self,
         state_sync_update: &mut StateSyncUpdate,
-        current_partial_blockchain: &mut PartialBlockchain,
+        current_partial_mmr: &mut PartialMmr,
         accounts: &[AccountHeader],
         note_tags: &[NoteTag],
     ) -> Result<bool, ClientError> {
@@ -201,7 +198,7 @@ impl<'a> StateSync<'a> {
         let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
             &response.block_header,
             found_relevant_note,
-            current_partial_blockchain.partial_mmr_mut(),
+            current_partial_mmr,
             response.mmr_delta,
         )?;
 
