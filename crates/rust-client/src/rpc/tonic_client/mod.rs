@@ -82,7 +82,6 @@ impl TonicRpcClient {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
     fn submit_proven_transaction<'a>(
         &'a self,
@@ -110,14 +109,8 @@ impl NodeRpcClient for TonicRpcClient {
         &'a self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>>
-                + Send
-                + Sync
-                + 'a,
-        >,
-    > {
+    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + Send + 'a>>
+    {
         Box::pin(async move {
             let request = GetBlockHeaderByNumberRequest {
                 block_num: block_num.as_ref().map(BlockNumber::as_u32),

@@ -244,7 +244,8 @@ impl NodeRpcClient for MockRpcApi {
         &'a self,
         mut block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + Send + 'a>>
+    {
         Box::pin(async move {
             if block_num.is_none() {
                 block_num = Some(self.get_chain_tip_block_num());

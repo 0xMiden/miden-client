@@ -92,8 +92,6 @@ use crate::{
 /// The implementers are responsible for connecting to the Miden node, handling endpoint
 /// requests/responses, and translating responses into domain objects relevant for each of the
 /// endpoints.
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-//#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait NodeRpcClient {
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
@@ -112,14 +110,7 @@ pub trait NodeRpcClient {
         &'a self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>>
-                + Send
-                + Sync
-                + 'a,
-        >,
-    >;
+    ) -> Pin<Box<dyn Future<Output = Result<(BlockHeader, Option<MmrProof>), RpcError>> + Send + 'a>>;
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
