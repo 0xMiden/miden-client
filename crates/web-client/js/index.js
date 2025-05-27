@@ -119,6 +119,13 @@ export class WebClient {
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
+
+      // Initialize the thread pool in the main thread before creating the worker
+      this.threadPoolReady = wasm.initThreadPool(
+          new URL("./workers/thread-pool-worker.js", import.meta.url),
+          navigator.hardwareConcurrency || 4
+      );
+
       // Create the worker.
       this.worker = new Worker(
         new URL("./workers/web-client-methods-worker.js", import.meta.url),
@@ -172,7 +179,9 @@ export class WebClient {
       });
 
       // Once the worker script has loaded, initialize the worker.
-      this.loaded.then(() => {
+      this.loaded.then(async () => {
+        // Wait for the thread pool to be ready before initializing the worker
+        await this.threadPoolReady;
         this.worker.postMessage({
           action: WorkerAction.INIT,
           args: [this.rpcUrl, this.seed],

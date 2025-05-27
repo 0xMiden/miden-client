@@ -10,6 +10,7 @@ use miden_client::{
 };
 use miden_objects::{Felt, crypto::rand::RpoRandomCoin};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+use thread_pool::ThreadPool;
 use wasm_bindgen::prelude::*;
 
 pub mod account;
@@ -22,6 +23,7 @@ pub mod new_transactions;
 pub mod notes;
 pub mod sync;
 pub mod tags;
+pub mod thread_pool;
 pub mod transactions;
 pub mod utils;
 
@@ -95,6 +97,13 @@ impl WebClient {
 
         Ok(JsValue::from_str("Client created successfully"))
     }
+}
+
+#[wasm_bindgen(js_name = "initThreadPool")]
+pub async fn init_thread_pool(url: web_sys::Url, num_threads: usize) -> Result<(), JsValue> {
+    ThreadPool::builder().url(url).num_threads(num_threads).build_global().await?;
+
+    Ok(())
 }
 
 // ERROR HANDLING HELPERS

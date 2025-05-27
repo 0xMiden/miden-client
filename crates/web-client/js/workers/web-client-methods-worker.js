@@ -128,11 +128,12 @@ async function processMessage(event) {
   try {
     if (action === WorkerAction.INIT) {
       const [rpcUrl, seed] = args;
-      // Initialize the WASM WebClient.
+
+      // Initialize the WASM WebClient
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createClient(rpcUrl, seed);
       ready = true;
-      // Signal that the worker is fully initialized.
+      // Signal that the worker is fully initialized
       self.postMessage({ ready: true });
       return;
     } else if (action === WorkerAction.CALL_METHOD) {
@@ -142,7 +143,7 @@ async function processMessage(event) {
       if (!wasmWebClient) {
         throw new Error("WebClient not initialized in worker.");
       }
-      // Look up the handler from the mapping.
+      // Look up the handler from the mapping
       const handler = methodHandlers[methodName];
       if (!handler) {
         throw new Error(`Unsupported method: ${methodName}`);

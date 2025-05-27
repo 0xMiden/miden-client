@@ -80,6 +80,26 @@ export default [
       }),
     ],
   },
+  // Build the thread pool worker file
+  {
+    input: "./js/workers/thread-pool-worker.js",
+    output: {
+      dir: `dist/workers`,
+      format: "es",
+      sourcemap: true,
+    },
+    plugins: [
+      resolve(),
+      commonjs(),
+      copy({
+        targets: [
+          // Copy WASM to `dist/workers/assets` for worker accessibility
+          { src: "dist/assets/*.wasm", dest: "dist/workers/assets" },
+        ],
+        verbose: true,
+      }),
+    ],
+  },
   // Build the main entry point
   {
     input: "./js/index.js",
