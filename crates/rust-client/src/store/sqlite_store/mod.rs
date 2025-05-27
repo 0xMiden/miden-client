@@ -358,31 +358,30 @@ pub fn u64_to_value(v: u64) -> Value {
 
 #[cfg(test)]
 pub mod tests {
-    use std::boxed::Box;
-
     use super::SqliteStore;
     use crate::{store::Store, tests::create_test_store_path};
+    use std::boxed::Box;
 
     fn assert_send_sync<T: Send + Sync>() {}
+
     #[test]
-    fn send_sync() {
+    fn is_send_sync() {
         assert_send_sync::<SqliteStore>();
-        assert_send_sync::<Box<dyn Store + Send + Sync>>();
+        assert_send_sync::<Box<dyn Store>>();
     }
 
-    async fn fn_dyn_trait(store: Box<dyn Store + Send + Sync>) {
-        // This wouldn't compile if `get_tracked_block_headers` doesn't return a `Send+Sync`
-        // future. This only tests one method but that might still be enough to prove that
-        // it's possible
+    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
+    async fn dyn_trait_send_fut(store: Box<dyn Store>) {
+        // This wouldn't compile if `get_tracked_block_headers` doesn't return a `Send` future.
         let res = store.get_tracked_block_headers().await;
         assert!(res.is_ok());
     }
 
     #[tokio::test]
-    async fn send_it() {
+    async fn future_is_send() {
         let client = SqliteStore::new(create_test_store_path()).await.unwrap();
         let client: Box<SqliteStore> = client.into();
-        tokio::task::spawn(async move { fn_dyn_trait(client).await });
+        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
     }
 
     pub(crate) async fn create_test_store() -> SqliteStore {

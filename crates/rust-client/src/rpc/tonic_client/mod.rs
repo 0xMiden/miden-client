@@ -491,31 +491,30 @@ impl NodeRpcClient for TonicRpcClient {
 
 #[cfg(test)]
 mod tests {
-    use std::boxed::Box;
-
     use super::TonicRpcClient;
     use crate::rpc::{Endpoint, NodeRpcClient};
+    use std::boxed::Box;
 
     fn assert_send_sync<T: Send + Sync>() {}
+
     #[test]
-    fn send_sync() {
+    fn is_send_sync() {
         assert_send_sync::<TonicRpcClient>();
-        assert_send_sync::<Box<dyn NodeRpcClient + Send + Sync>>();
+        assert_send_sync::<Box<dyn NodeRpcClient>>();
     }
 
-    async fn fn_dyn_trait(client: Box<dyn NodeRpcClient + Send + Sync>) {
-        // This wouldn't compile if `get_block_header_by_number` doesn't return a `Send+Sync`
-        // future. This only tests one method but that might still be enough to prove that
-        // it's possible
+    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
+    async fn dyn_trait_send_fut(client: Box<dyn NodeRpcClient>) {
+        // This won't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
         let res = client.get_block_header_by_number(None, false).await;
         assert!(res.is_ok());
     }
 
     #[tokio::test]
-    async fn send_it() {
+    async fn future_is_send() {
         let endpoint = &Endpoint::devnet();
         let client = TonicRpcClient::new(endpoint, 10000);
         let client: Box<TonicRpcClient> = client.into();
-        tokio::task::spawn(async move { fn_dyn_trait(client).await });
+        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
     }
 }
