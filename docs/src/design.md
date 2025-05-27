@@ -28,7 +28,7 @@ The store can track any number of accounts, and any number of notes that those a
 
 ## RPC client
 
-The RPC client communicates with the node through a defined set of gRPC methods. The implemented client works both for normal and web gRPC requests.
+The RPC client communicates with the node through a defined set of gRPC methods. The provided client works both in `std` and `wasm` environments.
 
 Currently, these include:
 
@@ -46,7 +46,7 @@ Currently, these include:
 
 ## Transaction executor
 
-The transaction executor executes transactions using the Miden VM.
+The transaction executor uses the [Miden VM](https://0xmiden.github.io/miden-docs/imported/miden-vm/src/intro/main.html) to execute transactions. All transactions run within the [transaction kernel](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html).
 
 When executing, the executor needs access to relevant blockchain history. The executor uses a `DataStore` interface for accessing this data. This means that there may be some coupling between the executor and the store.
 

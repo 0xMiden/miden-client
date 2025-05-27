@@ -9,7 +9,7 @@ miden
 
 ## Client Configuration
 
-We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]).  The file is created automatically when you run the client for the first time. The file can be edited to change the default configuration of the client.
+We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]).  The file gets created when running `miden init`. It can also be edited to use a different configuration for the client.
 
 ```sh
 store_filepath = "store.sqlite3"

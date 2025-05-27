@@ -319,7 +319,7 @@ Execute the specified program against the specified account.
 | `--inputs-path <INPUTS_PATH>`  | Path to the inputs file.                       | `-i`    |
 | `--hex-words`                  | Print the output stack grouped into words.     |         |
 
- The file referenced by `--inputs-path` should contain a TOML array of inline tables, where each table has two fields: - `key`: a 256-bit hexadecimal string representing a word to be used as a key for the input entry. The hexadecimal value must be prefixed with 0x. - `values`: an array of 64-bit unsigned integers representing field elements to be used as values for the input entry. Each integer must be written as a separate string, within double quotes.
+The file referenced by `--inputs-path` should contain a TOML array of inline tables, where each table has two fields: - `key`: a 256-bit hexadecimal string representing a word to be used as a key for the input entry. The hexadecimal value must be prefixed with 0x. - `values`: an array of 64-bit unsigned integers representing field elements to be used as values for the input entry. Each integer must be written as a separate string, within double quotes.
 
 The input file should contain a TOML table called `inputs`, as in the following example: 
 ```toml
