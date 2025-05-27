@@ -30,7 +30,7 @@ The TOML file should reside in same the directory from which you run the CLI.
 ### RPC
 
 An `rpc` section is used to configure the connection to the Miden node. It contains the following fields:
-- `endpoint`: The endpoint of the Miden node. It is a table with the following fields:
+- `endpoint`: The endpoint of the Miden node. It can be a specific url (like `"https://rpc.devnet.miden.io"`) or a table with the following fields:
   - `protocol`: The protocol used to connect to the node. It can be either `http` or `https`.
   - `host`: The host of the node. It can be either an IP address or a domain name.
   - `port`: The port of the node. It is an integer.
