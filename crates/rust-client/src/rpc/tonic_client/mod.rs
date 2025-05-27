@@ -491,9 +491,10 @@ impl NodeRpcClient for TonicRpcClient {
 
 #[cfg(test)]
 mod tests {
+    use std::boxed::Box;
+
     use super::TonicRpcClient;
     use crate::rpc::{Endpoint, NodeRpcClient};
-    use std::boxed::Box;
 
     fn assert_send_sync<T: Send + Sync>() {}
 

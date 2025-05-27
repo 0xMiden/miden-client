@@ -358,9 +358,10 @@ pub fn u64_to_value(v: u64) -> Value {
 
 #[cfg(test)]
 pub mod tests {
+    use std::boxed::Box;
+
     use super::SqliteStore;
     use crate::{store::Store, tests::create_test_store_path};
-    use std::boxed::Box;
 
     fn assert_send_sync<T: Send + Sync>() {}
 
