@@ -29,6 +29,7 @@
 * [BREAKING] Updated the client so that only relevant block headers are stored (#828).
 * [BREAKING] Added `DiscardCause` for transactions (#853).
 * Chained pending transactions get discarded when one of the transactions in the chain is discarded (#889).
+* [BREAKING] Renamed `NetworkNote` and `AccountDetails` to `FetchedNote` and `FetchedAccount` respectively (#931).
 
 ## 0.8.2 (TBD)
 
