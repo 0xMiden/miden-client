@@ -8,7 +8,7 @@ The Miden client facilitates the execution of transactions on the Miden rollup; 
 
 The Miden rollup supports user-generated proofs which are key to ensuring the validity of transactions on the Miden rollup.
 
-To enable such proofs, the client contains the functionality for executing, proving, and submitting transactions. 
+To enable such proofs, the client contains the functionality for executing, proving, and submitting transactions.
 
 ### Miden network interactivity
 

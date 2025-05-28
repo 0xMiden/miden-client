@@ -28,14 +28,14 @@ Creates a configuration file for the client in the current directory.
 ```sh
 # This will create a config file named `miden-client.toml` using default values
 # This file contains information useful for the CLI like the RPC provider and database path
-miden init
+miden init --network <network>
 
 # You can set up the CLI for any of the default networks
 miden init --network testnet
 miden init --network devnet
 miden init --network localhost
 
-# You must specify the networki using the `--network` flag
+# You can also specify a custom network
 miden init --network 18.203.155.106
 # You can specify the port
 miden init --network 18.203.155.106:8080
@@ -44,15 +44,20 @@ miden init --network https://18.203.155.106
 # You can specify both
 miden init --network https://18.203.155.106:1234
 
-# You can use the --store_path flag to override the default store config
-miden init --store_path db/store.sqlite3
+# You can use the --store-path flag to override the default store config
+miden init --store-path db/store.sqlite3
 
 # You can use the --block-delta flag to set maximum number of blocks the client can be behind
 miden init --block-delta 250
 
 # You can provide both flags
-miden init --network 18.203.155.106 --store_path db/store.sqlite3
+miden init --network 18.203.155.106 --store-path db/store.sqlite3
+
+# You can set a remote prover to offload the proving process (along with the `--delegate-proving` flag in transaction commands)
+miden init --remote-prover-endpoint <PROVER_URL>
 ```
+
+More information on the configuration file can be found in the [configuration section](./cli-config.md).
 
 ### `account`
 
@@ -82,7 +87,7 @@ For the `--default` flag, if `<ID>` is "none" then the previous default account 
 
 ### `new-wallet`
 
-Creates a new wallet account. 
+Creates a new wallet account.
 
 A basic wallet is comprised of a basic authentication component (for RPO Falcon signature verification), alongside a basic wallet component (for sending and receiving assets).
 
@@ -90,6 +95,7 @@ This command has three optional flags:
 - `--storage-mode <TYPE>`: Used to select the storage mode of the account (private if not specified). It may receive "private" or "public".
 - `--mutable`: Makes the account code mutable (it's immutable by default).
 - `--extra-components <TEMPLATE_FILES_LIST>`: Allows to pass a list of account component template files which can be added to the account. If the templates contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
+- `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the provided component templates. The CLI will prompt for any keys that are not present in the file.
 
 After creating an account with the `new-wallet` command, it is automatically stored and tracked by the client. This means the client can execute transactions that modify the state of accounts and track related changes by synchronizing with the Miden network.
 
@@ -269,7 +275,11 @@ TX Summary:
 Continue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)
 ```
 
-This confirmation can be skipped in non-interactive environments by providing the `--force` flag (`miden send --force ...`):
+This confirmation can be skipped in non-interactive environments by providing the `--force` flag (`miden send --force ...`).
+
+#### Delegated proving
+
+If a remote prover is configured, the CLI can offload the proving process to it. This is done by providing the `--delegate-proving` flag when creating a transaction. The CLI will then send the transaction to the remote prover for processing.
 
 ### Importing and exporting
 
@@ -294,6 +304,8 @@ The user needs to specify how the note should be exported via the `--export-type
 
 Import entities managed by the client, such as accounts and notes. The type of entities is inferred.
 
+The `--overwrite` flag can be used when importing accounts. It allows the user to overwrite existing accounts with the same ID. This is useful when you want to update the account's information or replace it with a new version.
+
 ### Executing scripts
 
 #### `exec`
@@ -306,3 +318,10 @@ Execute the specified program against the specified account.
 | `--script-path <SCRIPT_PATH>`  | Path to script's source code to be executed.   | `-s`    |
 | `--inputs-path <INPUTS_PATH>`  | Path to the inputs file.                       | `-i`    |
 | `--hex-words`                  | Print the output stack grouped into words.     |         |
+
+The file referenced by `--inputs-path` should contain a TOML array of inline tables, where each table has two fields: - `key`: a 256-bit hexadecimal string representing a word to be used as a key for the input entry. The hexadecimal value must be prefixed with 0x. - `values`: an array of 64-bit unsigned integers representing field elements to be used as values for the input entry. Each integer must be written as a separate string, within double quotes.
+
+The input file should contain a TOML table called `inputs`, as in the following example: 
+```toml
+inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
+```

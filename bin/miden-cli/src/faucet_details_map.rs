@@ -79,7 +79,7 @@ impl FaucetDetailsMap {
     ///   of the token (specified to the precision allowed by the token's decimals), and
     ///   `<TOKEN_SYMBOL>` is a symbol tracked in the token symbol map file.
     ///
-    /// Some examples of valid `arg` values are `100::0xabcdef0123456789` and `1.23::POL`.
+    /// Some examples of valid `arg` values are `100::0xabcdef0123456789` and `1.23::TST`.
     ///
     /// # Errors
     ///
