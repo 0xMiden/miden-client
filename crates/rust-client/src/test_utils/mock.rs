@@ -22,8 +22,8 @@ use crate::{
     rpc::{
         NodeRpcClient, RpcError,
         domain::{
-            account::{AccountDetails, AccountProofs},
-            note::{CommittedNote, NetworkNote, NoteSyncInfo},
+            account::{AccountProofs, FetchedAccount},
+            note::{CommittedNote, FetchedNote, NoteSyncInfo},
             nullifier::NullifierUpdate,
             sync::StateSyncInfo,
         },
@@ -276,22 +276,22 @@ impl NodeRpcClient for MockRpcApi {
         Ok((block, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         // assume all public notes for now
         let notes = self.mock_chain.read().committed_notes().clone();
 
         let hit_notes = note_ids.iter().filter_map(|id| notes.get(id));
         let mut return_notes = vec![];
         for note in hit_notes {
-            let network_note = match note {
+            let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    NetworkNote::Private(*note_id, *note_metadata, note_inclusion_proof.clone())
+                    FetchedNote::Private(*note_id, *note_metadata, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
-                    NetworkNote::Public(note.clone(), note_inclusion_proof.clone())
+                    FetchedNote::Public(note.clone(), note_inclusion_proof.clone())
                 },
             };
-            return_notes.push(network_note);
+            return_notes.push(fetched_note);
         }
         Ok(return_notes)
     }
@@ -322,7 +322,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_account_details(
         &self,
         _account_id: AccountId,
-    ) -> Result<AccountDetails, RpcError> {
+    ) -> Result<FetchedAccount, RpcError> {
         unimplemented!("shouldn't be used for now")
     }
 

@@ -45,7 +45,7 @@ use miden_objects::{
 use super::Client;
 use crate::{
     errors::ClientError,
-    rpc::domain::account::AccountDetails,
+    rpc::domain::account::FetchedAccount,
     store::{AccountRecord, AccountStatus},
 };
 
@@ -178,13 +178,13 @@ impl Client {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let account_details = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
 
-        let account = match account_details {
-            AccountDetails::Private(..) => {
+        let account = match fetched_account {
+            FetchedAccount::Private(..) => {
                 return Err(ClientError::AccountIsPrivate(account_id));
             },
-            AccountDetails::Public(account, ..) => account,
+            FetchedAccount::Public(account, ..) => account,
         };
 
         self.add_account(&account, None, true).await

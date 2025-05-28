@@ -17,7 +17,7 @@ use miden_objects::{
 
 use crate::{
     Client, ClientError,
-    rpc::{RpcError, domain::note::NetworkNote},
+    rpc::{RpcError, domain::note::FetchedNote},
     store::{InputNoteRecord, InputNoteState, input_note_states::ExpectedNoteState},
     sync::NoteTagRecord,
 };
@@ -97,15 +97,15 @@ impl Client {
         previous_note: Option<InputNoteRecord>,
         id: NoteId,
     ) -> Result<Option<InputNoteRecord>, ClientError> {
-        let network_note = self.rpc_api.get_note_by_id(id).await.map_err(|err| match err {
+        let fetched_note = self.rpc_api.get_note_by_id(id).await.map_err(|err| match err {
             RpcError::NoteNotFound(note_id) => ClientError::NoteNotFoundOnChain(note_id),
             err => ClientError::RpcError(err),
         })?;
 
-        let inclusion_proof = network_note.inclusion_proof().clone();
+        let inclusion_proof = fetched_note.inclusion_proof().clone();
 
         if let Some(mut previous_note) = previous_note {
-            if previous_note.inclusion_proof_received(inclusion_proof, *network_note.metadata())? {
+            if previous_note.inclusion_proof_received(inclusion_proof, *fetched_note.metadata())? {
                 self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
                 Ok(Some(previous_note))
@@ -113,16 +113,16 @@ impl Client {
                 Ok(None)
             }
         } else {
-            let network_note = match network_note {
-                NetworkNote::Public(note, _) => note,
-                NetworkNote::Private(..) => {
+            let fetched_note = match fetched_note {
+                FetchedNote::Public(note, _) => note,
+                FetchedNote::Private(..) => {
                     return Err(ClientError::NoteImportError(
                         "Incomplete imported note is private".to_string(),
                     ));
                 },
             };
 
-            self.import_note_record_by_proof(previous_note, network_note, inclusion_proof)
+            self.import_note_record_by_proof(previous_note, fetched_note, inclusion_proof)
                 .await
         }
     }

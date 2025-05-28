@@ -20,11 +20,11 @@ use miden_tx::utils::{Serializable, sync::RwLock};
 use tracing::info;
 
 use super::{
-    AccountDetails, Endpoint, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
     domain::{
         account::{AccountProof, AccountProofs, AccountUpdateSummary},
-        note::NetworkNote,
+        note::FetchedNote,
         nullifier::NullifierUpdate,
     },
     generated::requests::{
@@ -152,7 +152,7 @@ impl NodeRpcClient for TonicRpcClient {
         Ok((block_header, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let request = GetNotesByIdRequest {
             note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
         };
@@ -189,14 +189,14 @@ impl NodeRpcClient for TonicRpcClient {
             let note = if let Some(details) = note.details {
                 let (assets, recipient) = NoteDetails::read_from_bytes(&details)?.into_parts();
 
-                NetworkNote::Public(Note::new(assets, metadata, recipient), inclusion_details)
+                FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_details)
             } else {
                 let note_id: Digest = note
                     .note_id
                     .ok_or(RpcError::ExpectedDataMissing("Notes.NoteId".into()))?
                     .try_into()?;
 
-                NetworkNote::Private(NoteId::from(note_id), metadata, inclusion_details)
+                FetchedNote::Private(NoteId::from(note_id), metadata, inclusion_details)
             };
             response_notes.push(note);
         }
@@ -229,7 +229,7 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [AccountDetails] from
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [FetchedAccount] from
     /// the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
@@ -240,7 +240,7 @@ impl NodeRpcClient for TonicRpcClient {
     /// - The answer had a `None` for one of the expected fields (account, summary,
     ///   account_commitment, details).
     /// - There is an error during [Account] deserialization.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<AccountDetails, RpcError> {
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
 
         let mut rpc_api = self.ensure_connected().await?;
@@ -270,7 +270,7 @@ impl NodeRpcClient for TonicRpcClient {
 
         let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
         if account_id.is_private() {
-            Ok(AccountDetails::Private(account_id, update_summary))
+            Ok(FetchedAccount::Private(account_id, update_summary))
         } else {
             let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
                 "GetAccountDetails response's account should have `details`".to_string(),
@@ -278,7 +278,7 @@ impl NodeRpcClient for TonicRpcClient {
 
             let account = Account::read_from_bytes(&details_bytes)?;
 
-            Ok(AccountDetails::Public(account, update_summary))
+            Ok(FetchedAccount::Public(account, update_summary))
         }
     }
 

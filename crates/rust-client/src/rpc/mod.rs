@@ -44,8 +44,8 @@ use core::fmt;
 
 use async_trait::async_trait;
 use domain::{
-    account::{AccountDetails, AccountProofs},
-    note::{NetworkNote, NoteSyncInfo},
+    account::{AccountProofs, FetchedAccount},
+    note::{FetchedNote, NoteSyncInfo},
     nullifier::NullifierUpdate,
     sync::StateSyncInfo,
 };
@@ -123,7 +123,7 @@ pub trait NodeRpcClient {
     /// For any NoteType::Private note, the return data is only the
     /// [miden_objects::note::NoteMetadata], whereas for NoteType::Onchain notes, the return
     /// data includes all details.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError>;
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
@@ -148,7 +148,7 @@ pub trait NodeRpcClient {
     /// endpoint.
     ///
     /// - `account_id` is the ID of the wanted account.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<AccountDetails, RpcError>;
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError>;
 
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
@@ -229,7 +229,7 @@ pub trait NodeRpcClient {
 
         let mut public_notes = vec![];
         for detail in note_details {
-            if let NetworkNote::Public(note, inclusion_proof) = detail {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
                     metadata: *note.metadata(),
                     inclusion_proof,
@@ -260,7 +260,7 @@ pub trait NodeRpcClient {
         for local_account in local_accounts {
             let response = self.get_account_details(local_account.id()).await?;
 
-            if let AccountDetails::Public(account, _) = response {
+            if let FetchedAccount::Public(account, _) = response {
                 // We should only return an account if it's newer, otherwise we ignore it
                 if account.nonce().as_int() > local_account.nonce().as_int() {
                     public_accounts.push(account);
@@ -289,7 +289,7 @@ pub trait NodeRpcClient {
     ///
     /// Errors:
     /// - [RpcError::NoteNotFound] if the note with the specified ID is not found.
-    async fn get_note_by_id(&self, note_id: NoteId) -> Result<NetworkNote, RpcError> {
+    async fn get_note_by_id(&self, note_id: NoteId) -> Result<FetchedNote, RpcError> {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }

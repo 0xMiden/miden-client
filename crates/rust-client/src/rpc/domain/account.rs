@@ -22,11 +22,11 @@ use crate::rpc::{
     },
 };
 
-// ACCOUNT DETAILS
+// FETCHED ACCOUNT
 // ================================================================================================
 
 /// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
-pub enum AccountDetails {
+pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
     /// shared with the network. The full account state is to be tracked locally.
     Private(AccountId, AccountUpdateSummary),
@@ -35,7 +35,7 @@ pub enum AccountDetails {
     Public(Account, AccountUpdateSummary),
 }
 
-impl AccountDetails {
+impl FetchedAccount {
     /// Returns the account ID.
     pub fn account_id(&self) -> AccountId {
         match self {

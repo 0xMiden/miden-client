@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
-    rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::AccountDetails},
+    rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
@@ -382,8 +382,8 @@ async fn test_get_account_update() {
     let details1 = rpc_api.get_account_details(basic_wallet_1.id()).await.unwrap();
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 
-    assert!(matches!(details1, AccountDetails::Private(_, _)));
-    assert!(matches!(details2, AccountDetails::Public(_, _)));
+    assert!(matches!(details1, FetchedAccount::Private(_, _)));
+    assert!(matches!(details2, FetchedAccount::Public(_, _)));
 }
 
 #[tokio::test]
