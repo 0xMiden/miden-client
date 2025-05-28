@@ -1625,7 +1625,7 @@ dependencies = [
  "toml",
  "tonic 0.13.1",
  "tonic-build 0.13.1",
- "tonic-web-wasm-client 0.7.0",
+ "tonic-web-wasm-client 0.7.1",
  "tracing",
  "uuid",
  "wasm-bindgen",
@@ -3712,9 +3712,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-web-wasm-client"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12abe1160d2a9a3e4bf578e2e37fd8b4f65c5e64fca6037d6f1ed6c0e02a78ac"
+checksum = "66e3bb7acca55e6790354be650f4042d418fcf8e2bc42ac382348f2b6bf057e5"
 dependencies = [
  "base64",
  "byteorder",
