@@ -222,11 +222,11 @@ fn print_summary_table(account: &Account, cli_config: &CliConfig) -> Result<(), 
         .load_preset(presets::UTF8_HORIZONTAL_ONLY)
         .set_content_arrangement(ContentArrangement::DynamicFullWidth);
 
-    table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
-        Cell::new("Account ID (bech32)"),
+        Cell::new("Address"),
         Cell::new(account.id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?)),
     ]);
+    table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
         Cell::new("Account Commitment"),
         Cell::new(account.commitment().to_string()),

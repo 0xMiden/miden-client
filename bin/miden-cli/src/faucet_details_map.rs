@@ -7,7 +7,7 @@ use miden_client::{Client, account::AccountId, asset::FungibleAsset};
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::CliError, utils::parse_account_id};
+use crate::{errors::CliError, load_config_file, utils::parse_account_id};
 
 /// Stores the detail information of a faucet to be stored in the token symbol map file.
 #[derive(Debug, Serialize, Deserialize)]
@@ -145,7 +145,12 @@ impl FaucetDetailsMap {
 
             Ok((token_symbol, amount))
         } else {
-            Ok((asset.faucet_id().to_hex(), asset.amount().to_string()))
+            let (cli_config, _) = load_config_file()?;
+
+            Ok((
+                asset.faucet_id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
+                asset.amount().to_string(),
+            ))
         }
     }
 }
