@@ -1,9 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::{env::temp_dir, fs::create_dir_all, sync::Arc, time::Duration};
 
 use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
+    crypto::SecretKey,
     rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
+    single_account::{BasicWalletClient, FungibleFaucetClient, SingleAccountClient},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
@@ -1223,3 +1225,90 @@ async fn test_ignore_invalid_notes() {
     assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
     assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
 }
+
+#[tokio::test]
+async fn test_single_account_clients() {
+    let mut client = create_test_client().await.0; // This won't be needed in the future
+    let anchor_block = client.get_latest_epoch_block().await.unwrap();
+
+    let temp = temp_dir().join(Uuid::new_v4().to_string());
+    create_dir_all(&temp).unwrap();
+
+    let mut wallet1 = BasicWalletClient::new(
+        (&anchor_block).try_into().unwrap(), // This won't be needed in the future
+        AccountStorageMode::Private,
+        temp,
+        Endpoint::localhost(),
+    )
+    .await
+    .unwrap();
+
+    let temp = temp_dir().join(Uuid::new_v4().to_string());
+    create_dir_all(&temp).unwrap();
+
+    let mut wallet2 = BasicWalletClient::new(
+        (&anchor_block).try_into().unwrap(), // This won't be needed in the future
+        AccountStorageMode::Private,
+        temp,
+        Endpoint::localhost(),
+    )
+    .await
+    .unwrap();
+
+    let temp = temp_dir().join(Uuid::new_v4().to_string());
+    create_dir_all(&temp).unwrap();
+
+    let mut faucet = FungibleFaucetClient::new(
+        (&anchor_block).try_into().unwrap(), // This won't be needed in the future
+        AccountStorageMode::Private,
+        temp,
+        Endpoint::localhost(),
+    )
+    .await
+    .unwrap();
+
+    let mint_note = faucet.mint_assets(wallet1.account_id(), 100, NoteType::Private).await.unwrap();
+
+    wallet1.receive_assets(mint_note).await.unwrap();
+
+    let p2id_note = wallet1
+        .send_asset(
+            wallet2.account_id(),
+            FungibleAsset::new(faucet.account_id(), 50).unwrap(),
+            None,
+            NoteType::Private,
+        )
+        .await
+        .unwrap();
+
+    wallet2.receive_assets(p2id_note).await.unwrap();
+
+    assert_eq!(
+        wallet1
+            .inner_client()
+            .get_account()
+            .await
+            .unwrap()
+            .account()
+            .vault()
+            .get_balance(faucet.account_id())
+            .unwrap(),
+        50
+    );
+
+    assert_eq!(
+        wallet2
+            .inner_client()
+            .get_account()
+            .await
+            .unwrap()
+            .account()
+            .vault()
+            .get_balance(faucet.account_id())
+            .unwrap(),
+        50
+    );
+}
+
+#[tokio::test]
+async fn test_counter_single_account_client() {}
