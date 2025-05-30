@@ -105,7 +105,7 @@ impl TransactionRequest {
 
         self.input_notes()
             .keys()
-            .map(|note_id| *note_id)
+            .copied()
             .filter(move |note_id| !unauthenticated_note_ids.contains(note_id))
     }
 

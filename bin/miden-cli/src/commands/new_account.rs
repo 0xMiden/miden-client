@@ -200,10 +200,14 @@ impl NewAccountCmd {
 
         client.add_account(&new_account, Some(seed), false).await?;
 
-        println!("Succesfully created new account.");
+        let (current_config, _) = load_config_file()?;
+        let account_address =
+            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
+
+        println!("Succesfully created new wallet.");
         println!(
             "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
-            new_account.id()
+            account_address
         );
 
         Ok(())
