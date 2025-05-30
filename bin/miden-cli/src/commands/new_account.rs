@@ -131,8 +131,7 @@ impl NewWalletCmd {
 
         println!("Succesfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
-            account_address
+            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}",
         );
 
         maybe_set_default_account(&mut current_config, new_account.id())?;
@@ -206,8 +205,7 @@ impl NewAccountCmd {
 
         println!("Succesfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
-            account_address
+            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
         );
 
         Ok(())
