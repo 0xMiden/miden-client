@@ -4,7 +4,6 @@
 # Usage: ./publish-crates.sh [args]
 #
 # E.G:   ./publish-crates.sh
-#        ./publish-crates.sh --dry-run
 
 set -e
 
@@ -31,5 +30,5 @@ miden-client-web
 
 for crate in ${crates[@]}; do
     echo "Publishing $crate..."
-    cargo publish -p "$crate" $@
+    cargo publish -p "$crate" 
 done
