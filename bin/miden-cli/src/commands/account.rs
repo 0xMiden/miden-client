@@ -304,7 +304,8 @@ pub(crate) fn maybe_set_default_account(
     }
 
     set_default_account(Some(account_id))?;
-    let account_id = account_id.to_hex();
+
+    let account_id = account_id.to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
     println!("Setting account {account_id} as the default account ID.");
     println!("You can unset it with `{CLIENT_BINARY_NAME} account --default none`.");
     current_config.default_account_id = Some(account_id);

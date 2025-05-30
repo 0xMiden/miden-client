@@ -339,8 +339,18 @@ async fn test_cli_export_import_account() {
 
     // Ensure the account was imported
     let client_2 = create_rust_client_with_store_path(&store_path_2).await.0;
-    assert!(client_2.get_account(AccountId::from_hex(&faucet_id).unwrap()).await.is_ok());
-    assert!(client_2.get_account(AccountId::from_hex(&wallet_id).unwrap()).await.is_ok());
+    assert!(
+        client_2
+            .get_account(AccountId::from_bech32(&faucet_id).unwrap().1)
+            .await
+            .is_ok()
+    );
+    assert!(
+        client_2
+            .get_account(AccountId::from_bech32(&wallet_id).unwrap().1)
+            .await
+            .is_ok()
+    );
 
     sync_cli(&temp_dir_2);
 
@@ -503,7 +513,7 @@ async fn debug_mode_outputs_logs() {
     // Consume the note and check the output
     let mut consume_note_cmd = Command::cargo_bin("miden").unwrap();
     let note_id = note.id().to_hex();
-    let mut cli_args = vec!["consume-notes", "--account", &wallet_account_id[0..8], "--force"];
+    let mut cli_args = vec!["consume-notes", "--account", &wallet_account_id, "--force"];
     cli_args.extend_from_slice(vec![note_id.as_str()].as_slice());
     consume_note_cmd.args(&cli_args);
     consume_note_cmd
@@ -631,7 +641,7 @@ fn send_cli(cli_path: &Path, from_account_id: &str, to_account_id: &str, faucet_
     send_cmd.args([
         "send",
         "--sender",
-        &from_account_id[0..8],
+        from_account_id,
         "--target",
         to_account_id,
         "--asset",
@@ -653,7 +663,7 @@ fn sync_until_committed_note(cli_path: &Path) {
 /// Consumes a series of notes with a given account using the CLI given by `cli_path`.
 fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
     let mut consume_note_cmd = Command::cargo_bin("miden").unwrap();
-    let mut cli_args = vec!["consume-notes", "--account", &account_id[0..8], "--force"];
+    let mut cli_args = vec!["consume-notes", "--account", &account_id, "--force"];
     cli_args.extend_from_slice(note_ids);
     consume_note_cmd.args(&cli_args);
     consume_note_cmd.current_dir(cli_path).assert().success();
@@ -689,12 +699,11 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     let output = create_faucet_cmd.current_dir(cli_path).output().unwrap();
     assert!(output.status.success());
 
-    String::from_utf8(output.stdout)
+    std::str::from_utf8(&output.stdout)
         .unwrap()
-        .split_whitespace()
-        .find(|word| word.starts_with("0x"))
+        .split(|c: char| !c.is_alphanumeric())
+        .find(|s| s.starts_with("mlcl"))
         .unwrap()
-        .trim_end_matches(|c: char| !c.is_alphanumeric())
         .to_string()
 }
 
@@ -706,12 +715,12 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
     assert!(output.status.success());
 
-    String::from_utf8(output.stdout)
+    //println!("stoud {}", String::from_utf8(output.stdout.clone()).unwrap());
+    std::str::from_utf8(&output.stdout)
         .unwrap()
-        .split_whitespace()
-        .find(|word| word.starts_with("0x"))
+        .split(|c: char| !c.is_alphanumeric())
+        .find(|s| s.starts_with("mlcl"))
         .unwrap()
-        .trim_end_matches(|c: char| !c.is_alphanumeric())
         .to_string()
 }
 
@@ -796,7 +805,7 @@ fn test_exec_parse() {
         "-s",
         success_script.to_str().unwrap(),
         "-a",
-        &basic_account_id[0..8],
+        &basic_account_id,
         "-i",
         toml_path.to_str().unwrap(),
     ]);
@@ -809,7 +818,7 @@ fn test_exec_parse() {
         "-s",
         failure_script.to_str().unwrap(),
         "-a",
-        &basic_account_id[0..8],
+        &basic_account_id,
         "-i",
         toml_path.to_str().unwrap(),
     ]);
