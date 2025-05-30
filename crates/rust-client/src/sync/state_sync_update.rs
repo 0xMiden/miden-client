@@ -203,7 +203,7 @@ impl TransactionUpdateTracker {
         if let Some(tx_graceful_blocks) = tx_graceful_blocks {
             self.discard_transaction_with_predicate(
                 |transaction| {
-                    transaction.details.block_num
+                    transaction.details.submition_height
                         < new_sync_height.checked_sub(tx_graceful_blocks).unwrap_or_default()
                 },
                 DiscardCause::Stale,

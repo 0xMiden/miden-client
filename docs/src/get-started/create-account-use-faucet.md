@@ -103,6 +103,7 @@ You will see something like this as output:
 
 ```sh
 State synced to block 179672
+New public notes: 0
 Committed notes: 1
 Tracked notes consumed: 0
 Tracked accounts updated: 0

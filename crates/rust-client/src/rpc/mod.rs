@@ -100,7 +100,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError>;
+    ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// using the `/GetBlockHeaderByNumber` endpoint.

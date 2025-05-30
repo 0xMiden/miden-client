@@ -5,6 +5,7 @@ use alloc::{
 
 use miden_objects::{
     Digest,
+    block::BlockNumber,
     transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript},
 };
 use miden_tx::utils::Serializable;
@@ -33,6 +34,7 @@ pub struct SerializedTransactionData {
 
 pub async fn insert_proven_transaction_data(
     executed_transaction: &ExecutedTransaction,
+    submition_height: BlockNumber,
 ) -> Result<(), StoreError> {
     // Build transaction record
     let nullifiers: Vec<Digest> = executed_transaction
@@ -50,6 +52,7 @@ pub async fn insert_proven_transaction_data(
         input_note_nullifiers: nullifiers,
         output_notes: output_notes.clone(),
         block_num: executed_transaction.block_header().block_num(),
+        submition_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
     };
 

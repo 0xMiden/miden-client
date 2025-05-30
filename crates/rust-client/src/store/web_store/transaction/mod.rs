@@ -92,7 +92,11 @@ impl WebStore {
         tx_update: TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         // Transaction Data
-        insert_proven_transaction_data(tx_update.executed_transaction()).await?;
+        insert_proven_transaction_data(
+            tx_update.executed_transaction(),
+            tx_update.submition_height(),
+        )
+        .await?;
 
         // Account Data
         update_account(tx_update.updated_account()).await.map_err(|err| {

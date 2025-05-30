@@ -152,6 +152,7 @@ impl SqliteStore {
             input_note_nullifiers: nullifiers,
             output_notes: output_notes.clone(),
             block_num: executed_transaction.block_header().block_num(),
+            submition_height: tx_update.submition_height(),
             expiration_block_num: executed_transaction.expiration_block_num(),
         };
 

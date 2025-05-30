@@ -86,21 +86,21 @@ impl NodeRpcClient for TonicRpcClient {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError> {
+    ) -> Result<BlockNumber, RpcError> {
         let request = SubmitProvenTransactionRequest {
             transaction: proven_transaction.to_bytes(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        rpc_api.submit_proven_transaction(request).await.map_err(|err| {
+        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
                 err.to_string(),
             )
         })?;
 
-        Ok(())
+        Ok(BlockNumber::from(api_response.into_inner().block_height))
     }
 
     async fn get_block_header_by_number(

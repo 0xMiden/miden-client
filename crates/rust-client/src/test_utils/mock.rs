@@ -299,7 +299,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError> {
+    ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
         let notes: Vec<OutputNote> = proven_transaction.output_notes().iter().cloned().collect();
 
@@ -316,7 +316,7 @@ impl NodeRpcClient for MockRpcApi {
             account_id: Some(proven_transaction.account_id().into()),
         });
 
-        Ok(())
+        Ok(self.get_chain_tip_block_num())
     }
 
     async fn get_account_details(

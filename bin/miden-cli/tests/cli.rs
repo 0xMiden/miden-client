@@ -571,11 +571,14 @@ fn sync_cli(cli_path: &Path) -> u64 {
         if output.status.success() {
             let updated_notes = String::from_utf8(output.stdout)
                 .unwrap()
-                .split_whitespace()
-                .skip_while(|&word| word != "notes:")
-                .find(|word| word.parse::<u64>().is_ok())
-                .unwrap()
-                .parse()
+                .lines()
+                .find_map(|line| {
+                    if let Some(rest) = line.strip_prefix("Committed notes: ") {
+                        rest.trim().parse::<u64>().ok()
+                    } else {
+                        None
+                    }
+                })
                 .unwrap();
 
             return updated_notes;
