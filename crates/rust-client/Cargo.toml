@@ -35,7 +35,7 @@ chrono = { version = "0.4", optional = false }
 deadpool = { version = "0.12", features = ["managed", "rt_tokio_1"], default-features = false, optional = true }
 deadpool-sync = { version = "0.1", optional = true }
 hex = { version = "0.4" }
-miden-proving-service-client = { workspace = true , features = ["tx-prover"]}
+miden-proving-service-client = { workspace = true , features = ["tx-prover"] }
 miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 miden-testing = { workspace = true, optional = true }
