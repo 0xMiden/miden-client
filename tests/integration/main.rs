@@ -1152,7 +1152,7 @@ async fn test_unused_rpc_api() {
         mint_note(&mut client, first_basic_account.id(), faucet_account.id(), NoteType::Public)
             .await;
 
-    consume_notes(&mut client, first_basic_account.id(), &[note.clone()]).await;
+    consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
 
     client.sync_state().await.unwrap();
 
