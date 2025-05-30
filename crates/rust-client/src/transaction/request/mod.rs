@@ -104,8 +104,8 @@ impl TransactionRequest {
             self.unauthenticated_input_note_ids().collect::<BTreeSet<_>>();
 
         self.input_notes()
-            .iter()
-            .map(|(note_id, _)| *note_id)
+            .keys()
+            .map(|note_id| *note_id)
             .filter(move |note_id| !unauthenticated_note_ids.contains(note_id))
     }
 

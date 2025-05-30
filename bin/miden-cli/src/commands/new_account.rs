@@ -16,10 +16,10 @@ use miden_client::{
     crypto::SecretKey,
     utils::Deserializable,
 };
-use miden_lib::{account::{auth::RpoFalcon512, wallets::BasicWallet}, StdLibrary};
-use miden_objects::{account::{
+use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
-}, assembly::Library};
+};
 use rand::RngCore;
 
 use crate::{
@@ -126,13 +126,14 @@ impl NewWalletCmd {
         client.add_account(&new_account, Some(seed), false).await?;
 
         let (mut current_config, _) = load_config_file()?;
-        let account_address = new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
+        let account_address =
+            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
 
         println!("Succesfully created new wallet.");
         println!(
             "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
             account_address
-        );  
+        );
 
         maybe_set_default_account(&mut current_config, new_account.id())?;
 
