@@ -312,7 +312,7 @@ pub struct TransactionDetails {
     /// Block number for the block against which the transaction was executed.
     pub block_num: BlockNumber,
     /// Block number at which the transaction was submitted.
-    pub submition_height: BlockNumber,
+    pub submission_height: BlockNumber,
     /// Block number at which the transaction is set to expire.
     pub expiration_block_num: BlockNumber,
 }
@@ -325,7 +325,7 @@ impl Serializable for TransactionDetails {
         self.input_note_nullifiers.write_into(target);
         self.output_notes.write_into(target);
         self.block_num.write_into(target);
-        self.submition_height.write_into(target);
+        self.submission_height.write_into(target);
         self.expiration_block_num.write_into(target);
     }
 }
@@ -338,7 +338,7 @@ impl Deserializable for TransactionDetails {
         let input_note_nullifiers = Vec::<Digest>::read_from(source)?;
         let output_notes = OutputNotes::read_from(source)?;
         let block_num = BlockNumber::read_from(source)?;
-        let submition_height = BlockNumber::read_from(source)?;
+        let submission_height = BlockNumber::read_from(source)?;
         let expiration_block_num = BlockNumber::read_from(source)?;
 
         Ok(Self {
@@ -348,7 +348,7 @@ impl Deserializable for TransactionDetails {
             input_note_nullifiers,
             output_notes,
             block_num,
-            submition_height,
+            submission_height,
             expiration_block_num,
         })
     }
@@ -441,7 +441,7 @@ pub struct TransactionStoreUpdate {
     /// Details of the executed transaction to be inserted.
     executed_transaction: ExecutedTransaction,
     /// Block number at which the transaction was submitted.
-    submition_height: BlockNumber,
+    submission_height: BlockNumber,
     /// Updated account state after the [`AccountDelta`] has been applied.
     updated_account: Account,
     /// Information about note changes after the transaction execution.
@@ -452,16 +452,24 @@ pub struct TransactionStoreUpdate {
 
 impl TransactionStoreUpdate {
     /// Creates a new [`TransactionStoreUpdate`] instance.
+    ///
+    /// # Arguments
+    /// - `executed_transaction`: The executed transaction details.
+    /// - `submission_height`: The block number at which the transaction was submitted.
+    /// - `updated_account`: The updated account state after applying the transaction.
+    /// - `note_updates`: The note updates that need to be applied to the store after the
+    ///   transaction execution.
+    /// - `new_tags`: New note tags that were need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
-        submition_height: BlockNumber,
+        submission_height: BlockNumber,
         updated_account: Account,
         note_updates: NoteUpdateTracker,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
             executed_transaction,
-            submition_height,
+            submission_height,
             updated_account,
             note_updates,
             new_tags,
@@ -474,8 +482,8 @@ impl TransactionStoreUpdate {
     }
 
     /// Returns the block number at which the transaction was submitted.
-    pub fn submition_height(&self) -> BlockNumber {
-        self.submition_height
+    pub fn submission_height(&self) -> BlockNumber {
+        self.submission_height
     }
 
     /// Returns the updated account.
@@ -716,7 +724,7 @@ impl Client {
 
     async fn apply_transaction(
         &self,
-        submition_height: BlockNumber,
+        submission_height: BlockNumber,
         tx_result: TransactionResult,
     ) -> Result<(), ClientError> {
         let transaction_id = tx_result.executed_transaction().id();
@@ -768,7 +776,7 @@ impl Client {
             .iter()
             .cloned()
             .filter_map(|output_note| {
-                OutputNoteRecord::try_from_output_note(output_note, submition_height).ok()
+                OutputNoteRecord::try_from_output_note(output_note, submission_height).ok()
             })
             .collect::<Vec<_>>();
 
@@ -794,7 +802,7 @@ impl Client {
 
         let tx_update = TransactionStoreUpdate::new(
             tx_result.into(),
-            submition_height,
+            submission_height,
             account,
             note_updates,
             new_tags,

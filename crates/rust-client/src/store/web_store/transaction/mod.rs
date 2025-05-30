@@ -94,7 +94,7 @@ impl WebStore {
         // Transaction Data
         insert_proven_transaction_data(
             tx_update.executed_transaction(),
-            tx_update.submition_height(),
+            tx_update.submission_height(),
         )
         .await?;
 
