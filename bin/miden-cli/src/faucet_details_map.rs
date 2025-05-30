@@ -74,12 +74,16 @@ impl FaucetDetailsMap {
 
     /// Parses a string representing a [`FungibleAsset`]. There are two accepted formats for the
     /// string:
-    /// - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units.
+    /// - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units and `<FAUCET_ID>` is
+    ///   the faucet's account iD.
+    /// - `<AMOUNT>::<FAUCET_ADDRESS>` where `<AMOUNT>` is in the faucet base units and
+    ///   `<FAUCET_ADDRESS>` is the faucet address.
     /// - `<AMOUNT>::<TOKEN_SYMBOL>` where `<AMOUNT>` is a decimal number representing the quantity
     ///   of the token (specified to the precision allowed by the token's decimals), and
     ///   `<TOKEN_SYMBOL>` is a symbol tracked in the token symbol map file.
     ///
-    /// Some examples of valid `arg` values are `100::0xabcdef0123456789` and `1.23::TST`.
+    /// Some examples of valid `arg` values are `100::mlcl1qru2e5yvx40ndgqqqzusrryr0ucyd0uj`,
+    /// `100::0xabcdef0123456789` and `1.23::TST`.
     ///
     /// # Errors
     ///
