@@ -28,6 +28,7 @@ miden-client
 miden-cli
 miden-client-web
 )
+
 for crate in ${crates[@]}; do
     echo "Publishing $crate..."
     cargo publish -p "$crate" $@
