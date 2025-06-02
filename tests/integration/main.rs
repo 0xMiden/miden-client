@@ -3,9 +3,8 @@ use std::{env::temp_dir, fs::create_dir_all, sync::Arc, time::Duration};
 use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
-    crypto::SecretKey,
     rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
-    single_account::{BasicWalletClient, FungibleFaucetClient, SingleAccountClient},
+    single_account::{BasicWalletClient, FungibleFaucetClient},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
@@ -19,6 +18,7 @@ use miden_objects::{
     note::{NoteFile, NoteType},
     transaction::{ProvenTransaction, ToInputNoteCommitments, TransactionWitness},
 };
+use uuid::Uuid;
 use winter_maybe_async::maybe_async_trait;
 
 mod custom_transactions_tests;

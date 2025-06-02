@@ -1,18 +1,22 @@
 use core::time::Duration;
 use std::{boxed::Box, path::PathBuf, sync::Arc, vec::Vec};
 
-use miden_lib::account::{auth::RpoFalcon512, faucets::BasicFungibleFaucet, wallets::BasicWallet};
+use miden_lib::{
+    account::{auth::RpoFalcon512, faucets::BasicFungibleFaucet, wallets::BasicWallet},
+    transaction::TransactionKernel,
+};
 use miden_objects::{
-    Digest, Felt, Word,
+    Felt,
     account::{
-        Account, AccountBuilder, AccountId, AccountIdAnchor, AccountStorageMode, AccountType,
-        AuthSecretKey,
+        AccountBuilder, AccountComponent, AccountId, AccountIdAnchor, AccountStorageMode,
+        AccountType, AuthSecretKey,
     },
+    assembly::Assembler,
     asset::{Asset, FungibleAsset, TokenSymbol},
     block::BlockNumber,
     crypto::{dsa::rpo_falcon512::SecretKey, rand::RpoRandomCoin},
     note::{NoteFile, NoteType},
-    transaction::OutputNote,
+    transaction::{OutputNote, TransactionScript},
 };
 use rand::{Rng, RngCore};
 
@@ -34,16 +38,25 @@ use crate::{
 pub struct SingleAccountClient {
     client: Client,
     account_id: AccountId,
+    assembler: Assembler,
 }
 
 impl SingleAccountClient {
     pub async fn new(
-        account: Account,
-        seed: Option<Word>,
-        key_pair: SecretKey,
+        mut account_builder: AccountBuilder,
+        components: Vec<AccountComponent>, // TODO: Should this be accesible from the builder?
+        key_pair: Option<SecretKey>,
         directory: PathBuf,
         node_endpoint: Endpoint,
     ) -> Result<Self, ClientError> {
+        let mut assembler = TransactionKernel::assembler().with_debug_mode(true);
+
+        for component in components {
+            assembler.add_library(component.library()).unwrap(); //TODO: This isn't working as expected because the libraries are in anon namespaces.
+
+            account_builder = account_builder.with_component(component);
+        }
+
         let store_filepath = directory.join("store.sqlite3");
         let store = {
             let sqlite_store = SqliteStore::new(store_filepath).await.unwrap();
@@ -68,11 +81,25 @@ impl SingleAccountClient {
             .await
             .unwrap();
 
-        client.sync_state().await?;
-        client.add_account(&account, seed, false).await.unwrap();
-        keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+        let (account, seed) = account_builder.build().unwrap();
 
-        Ok(Self { client, account_id: account.id() })
+        client.add_account(&account, Some(seed), false).await.unwrap();
+        if let Some(key_pair) = key_pair {
+            keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+        }
+
+        client.sync_state().await?;
+
+        Ok(Self {
+            client,
+            account_id: account.id(),
+            assembler,
+        })
+    }
+
+    pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
+        TransactionScript::compile(program, [], self.assembler.clone())
+            .map_err(ClientError::TransactionScriptError)
     }
 
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
@@ -176,18 +203,19 @@ impl BasicWalletClient {
         let mut init_seed = [0u8; 32];
         rng.fill_bytes(&mut init_seed);
 
-        let (account, seed) = AccountBuilder::new(init_seed)
+        let builder = AccountBuilder::new(init_seed)
             .anchor(anchor_id)
             .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(storage_mode)
-            .with_component(RpoFalcon512::new(pub_key))
-            .with_component(BasicWallet)
-            .build()
-            .unwrap();
+            .storage_mode(storage_mode);
 
-        let client =
-            SingleAccountClient::new(account, Some(seed), key_pair, directory, node_endpoint)
-                .await?;
+        let client = SingleAccountClient::new(
+            builder,
+            vec![RpoFalcon512::new(pub_key).into(), BasicWallet.into()],
+            Some(key_pair),
+            directory,
+            node_endpoint,
+        )
+        .await?;
         Ok(Self { client })
     }
 
@@ -225,7 +253,7 @@ impl BasicWalletClient {
             .iter()
             .map(|note| match note {
                 // TODO: Implement this on miden-base
-                NoteFile::NoteId(note_id) => note_id.clone(),
+                NoteFile::NoteId(note_id) => *note_id,
                 NoteFile::NoteDetails { details, .. } => details.id(),
                 NoteFile::NoteWithProof(note, _) => note.id(),
             })
@@ -264,18 +292,22 @@ impl FungibleFaucetClient {
         let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
             .expect("u64 can be safely converted to a field element");
 
-        let (account, seed) = AccountBuilder::new(init_seed)
+        let builder = AccountBuilder::new(init_seed)
             .anchor(anchor_id)
             .account_type(AccountType::FungibleFaucet)
-            .storage_mode(storage_mode)
-            .with_component(RpoFalcon512::new(pub_key))
-            .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-            .build()
-            .unwrap();
+            .storage_mode(storage_mode);
 
-        let client =
-            SingleAccountClient::new(account, Some(seed), key_pair, directory, node_endpoint)
-                .await?;
+        let client = SingleAccountClient::new(
+            builder,
+            vec![
+                RpoFalcon512::new(pub_key).into(),
+                BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap().into(),
+            ],
+            Some(key_pair),
+            directory,
+            node_endpoint,
+        )
+        .await?;
         Ok(Self { client })
     }
 

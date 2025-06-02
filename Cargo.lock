@@ -1661,6 +1661,7 @@ dependencies = [
  "miden-objects",
  "rand 0.9.1",
  "tokio",
+ "uuid",
  "winter-maybe-async",
 ]
 
