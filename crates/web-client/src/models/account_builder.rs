@@ -1,6 +1,4 @@
-use miden_objects::{
-    account::AccountBuilder as NativeAccountBuilder, block::BlockHeader as NativeBlockHeader,
-};
+use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -8,7 +6,7 @@ use crate::{
     models::{
         account::Account, account_component::AccountComponent,
         account_storage_mode::AccountStorageMode, account_type::AccountType,
-        block_header::BlockHeader, word::Word,
+         word::Word,
     },
 };
 

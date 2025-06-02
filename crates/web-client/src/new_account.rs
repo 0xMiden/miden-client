@@ -5,7 +5,7 @@ use miden_client::{
     crypto::SecretKey,
 };
 use miden_lib::account::{auth::RpoFalcon512, faucets::BasicFungibleFaucet};
-use miden_objects::{AccountIdError, asset::TokenSymbol};
+use miden_objects::asset::TokenSymbol;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
 
@@ -69,13 +69,7 @@ impl WebClient {
             let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
 
-            let anchor_block = client
-                .get_latest_epoch_block()
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to get latest epoch block"))?;
-
             let (new_account, seed) = match AccountBuilder::new(init_seed)
-                .anchor((&anchor_block).try_into().map_err(|err: AccountIdError| err.to_string())?)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
                 .with_component(RpoFalcon512::new(pub_key))
