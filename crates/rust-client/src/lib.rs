@@ -112,6 +112,7 @@ use alloc::boxed::Box;
 extern crate std;
 
 pub mod account;
+pub mod client_utils;
 pub mod keystore;
 pub mod note;
 pub mod rpc;

@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
+use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, string::ToString, sync::Arc};
 
 // TESTS
 // ================================================================================================
@@ -45,6 +45,7 @@ use uuid::Uuid;
 use crate::{
     Client, ClientError,
     builder::ClientBuilder,
+    client_utils::{compile_library, compile_tx_script},
     keystore::FilesystemKeyStore,
     note::NoteRelevance,
     rpc::NodeRpcClient,
@@ -1613,4 +1614,47 @@ async fn test_subsequent_discarded_transactions() {
         account_after_sync.account().commitment(),
         account_before_tx.account().commitment(),
     );
+}
+
+#[tokio::test]
+async fn test_create_library_and_create_tx_script() {
+    // ── transaction-level script (calls increment) ───────────────────────────
+    let script_code = r#"
+        use.external_contract::counter_contract
+
+        begin
+            call.counter_contract::increment
+        end
+    "#;
+
+    // ── counter-contract library code ───────────────────────────────────────
+    let account_code = r#"
+        use.miden::account
+        use.std::sys
+
+        export.get_count
+            # => []
+            push.0
+            exec.account::get_item
+            exec.sys::truncate_stack
+        end
+
+        export.increment
+            # => []
+            push.0
+            exec.account::get_item
+            push.1 add
+            debug.stack
+            push.0
+            exec.account::set_item
+            push.1 exec.account::incr_nonce
+            exec.sys::truncate_stack
+        end
+    "#;
+
+    let library_path = "external_contract::counter_contract";
+    let library = compile_library(account_code.to_string(), library_path).unwrap();
+    let tx_script = compile_tx_script(script_code.to_string(), library);
+
+    assert!(tx_script.is_ok());
 }
