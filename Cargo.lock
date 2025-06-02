@@ -1579,22 +1579,11 @@ dependencies = [
 
 [[package]]
 name = "miden-block-prover"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58d59a53f9ff3585d1a3a9b9432b949397a014ffa6f9092cab2bd92528a0e382"
-dependencies = [
- "miden-lib 0.9.0",
- "miden-objects 0.9.1",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "miden-block-prover"
 version = "0.10.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282ab3131d7301ce085ed09f76fe"
 dependencies = [
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "thiserror 2.0.12",
 ]
 
@@ -1607,8 +1596,8 @@ dependencies = [
  "comfy-table",
  "figment",
  "miden-client",
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "miette",
  "predicates",
  "rand 0.9.1",
@@ -1633,12 +1622,12 @@ dependencies = [
  "getrandom 0.3.3",
  "hex",
  "miden-client",
- "miden-lib 0.10.0",
+ "miden-lib",
  "miden-node-proto-build",
- "miden-objects 0.10.0",
- "miden-proving-service-client 0.10.0",
+ "miden-objects",
+ "miden-proving-service-client",
  "miden-testing",
- "miden-tx 0.10.0",
+ "miden-tx",
  "miette",
  "prost",
  "prost-build",
@@ -1667,8 +1656,8 @@ version = "0.10.0"
 dependencies = [
  "async-trait",
  "miden-client",
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "rand 0.9.1",
  "tokio",
  "winter-maybe-async",
@@ -1679,8 +1668,8 @@ name = "miden-client-web"
 version = "0.10.0"
 dependencies = [
  "miden-client",
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "rand 0.9.1",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1739,25 +1728,11 @@ dependencies = [
 
 [[package]]
 name = "miden-lib"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cb98502ec0b2fb58846cdecbaefd7dc1e1655d86c2302c28a3f80a470cdd1d4"
-dependencies = [
- "miden-assembly",
- "miden-objects 0.9.1",
- "miden-stdlib",
- "regex",
- "thiserror 2.0.12",
- "walkdir",
-]
-
-[[package]]
-name = "miden-lib"
 version = "0.10.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282ab3131d7301ce085ed09f76fe"
 dependencies = [
  "miden-assembly",
- "miden-objects 0.10.0",
+ "miden-objects",
  "miden-stdlib",
  "regex",
  "thiserror 2.0.12",
@@ -1809,18 +1784,18 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "futures",
  "itertools 0.14.0",
- "miden-block-prover 0.9.0",
- "miden-lib 0.9.0",
+ "miden-block-prover",
+ "miden-lib",
  "miden-node-proto",
  "miden-node-utils",
- "miden-objects 0.9.1",
- "miden-proving-service-client 0.9.0",
- "miden-tx 0.9.0",
+ "miden-objects",
+ "miden-proving-service-client",
+ "miden-tx",
  "miden-tx-batch-prover",
  "rand 0.9.1",
  "thiserror 2.0.12",
@@ -1835,18 +1810,18 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "async-trait",
  "futures",
  "lru",
- "miden-lib 0.9.0",
+ "miden-lib",
  "miden-node-proto",
  "miden-node-utils",
- "miden-objects 0.9.1",
- "miden-proving-service-client 0.9.0",
- "miden-tx 0.9.0",
+ "miden-objects",
+ "miden-proving-service-client",
+ "miden-tx",
  "rand 0.9.1",
  "thiserror 2.0.12",
  "tokio",
@@ -1860,14 +1835,14 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "hex",
  "http",
  "miden-node-proto-build",
  "miden-node-utils",
- "miden-objects 0.9.1",
+ "miden-objects",
  "prost",
  "prost-build",
  "protox 0.8.0",
@@ -1879,7 +1854,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "prost",
@@ -1890,15 +1865,15 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "futures",
  "http",
  "miden-node-proto",
  "miden-node-utils",
- "miden-objects 0.9.1",
- "miden-tx 0.9.0",
+ "miden-objects",
+ "miden-tx",
  "nom 8.0.0",
  "semver 1.0.26",
  "tokio",
@@ -1914,16 +1889,16 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "deadpool",
  "deadpool-sync",
  "hex",
- "miden-lib 0.9.0",
+ "miden-lib",
  "miden-node-proto",
  "miden-node-utils",
- "miden-objects 0.9.1",
+ "miden-objects",
  "rusqlite",
  "rusqlite_migration",
  "thiserror 2.0.12",
@@ -1937,13 +1912,13 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#2fe9cd83195699e6d27465289821a7d30e0beed8"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
 dependencies = [
  "anyhow",
  "figment",
  "http",
  "itertools 0.14.0",
- "miden-objects 0.9.1",
+ "miden-objects",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
@@ -1955,25 +1930,6 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
-]
-
-[[package]]
-name = "miden-objects"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b4c5d037aa609fb247141a0707f0012a12ff7e14bba350b6f119a2010a65f9"
-dependencies = [
- "bech32",
- "getrandom 0.3.3",
- "miden-assembly",
- "miden-core",
- "miden-crypto",
- "miden-processor",
- "miden-verifier",
- "semver 1.0.26",
- "serde",
- "thiserror 2.0.12",
- "toml",
 ]
 
 [[package]]
@@ -2026,34 +1982,13 @@ dependencies = [
 
 [[package]]
 name = "miden-proving-service-client"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcbd9676d8f6e8b9cbeba33a1c7fb115ef376d2f4101a5f97b5572ce9e10fb47"
-dependencies = [
- "async-trait",
- "getrandom 0.3.3",
- "miden-objects 0.9.1",
- "miden-tx 0.9.0",
- "miette",
- "prost",
- "prost-build",
- "protox 0.7.2",
- "thiserror 2.0.12",
- "tokio",
- "tonic 0.12.3",
- "tonic-build 0.12.3",
- "tonic-web-wasm-client 0.6.2",
-]
-
-[[package]]
-name = "miden-proving-service-client"
 version = "0.10.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282ab3131d7301ce085ed09f76fe"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
- "miden-objects 0.10.0",
- "miden-tx 0.10.0",
+ "miden-objects",
+ "miden-tx",
  "miette",
  "prost",
  "prost-build",
@@ -2082,12 +2017,12 @@ source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282a
 dependencies = [
  "anyhow",
  "async-trait",
- "miden-block-prover 0.10.0",
+ "miden-block-prover",
  "miden-crypto",
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "miden-processor",
- "miden-tx 0.10.0",
+ "miden-tx",
  "rand 0.9.1",
  "rand_chacha 0.9.0",
  "winter-maybe-async",
@@ -2096,29 +2031,12 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbea7c2a870e69e86e4d7bdf21936447552442f4ec274e499d2d9b8a90a70653"
-dependencies = [
- "async-trait",
- "miden-lib 0.9.0",
- "miden-objects 0.9.1",
- "miden-processor",
- "miden-prover",
- "miden-verifier",
- "rand 0.9.1",
- "thiserror 2.0.12",
- "winter-maybe-async",
-]
-
-[[package]]
-name = "miden-tx"
 version = "0.10.0"
 source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282ab3131d7301ce085ed09f76fe"
 dependencies = [
  "async-trait",
- "miden-lib 0.10.0",
- "miden-objects 0.10.0",
+ "miden-lib",
+ "miden-objects",
  "miden-processor",
  "miden-prover",
  "miden-verifier",
@@ -2129,12 +2047,11 @@ dependencies = [
 
 [[package]]
 name = "miden-tx-batch-prover"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8ec59ad67da64407aeb62ca248b09289d32defe70d724484e137652a40f9f74"
+version = "0.10.0"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f2ea4cd44d87282ab3131d7301ce085ed09f76fe"
 dependencies = [
- "miden-objects 0.9.1",
- "miden-tx 0.9.0",
+ "miden-objects",
+ "miden-tx",
 ]
 
 [[package]]
@@ -2229,13 +2146,13 @@ name = "node-builder"
 version = "0.10.0"
 dependencies = [
  "anyhow",
- "miden-lib 0.10.0",
+ "miden-lib",
  "miden-node-block-producer",
  "miden-node-ntx-builder",
  "miden-node-rpc",
  "miden-node-store",
  "miden-node-utils",
- "miden-objects 0.10.0",
+ "miden-objects",
  "rand 0.9.1",
  "rand_chacha 0.9.0",
  "tempfile",
