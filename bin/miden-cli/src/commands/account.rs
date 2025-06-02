@@ -1,14 +1,14 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::{
-    Client, ZERO,
+    ZERO,
     account::{Account, AccountId, AccountType, StorageSlot},
     asset::Asset,
 };
 use miden_objects::PrettyPrint;
 
 use crate::{
-    CLIENT_BINARY_NAME,
+    CLIENT_BINARY_NAME, ClientMap,
     config::CliConfig,
     create_dynamic_table,
     errors::CliError,
@@ -41,7 +41,7 @@ pub struct AccountCmd {
 }
 
 impl AccountCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, clients: ClientMap) -> Result<(), CliError> {
         let (cli_config, _) = load_config_file()?;
         match self {
             AccountCmd {
@@ -50,8 +50,8 @@ impl AccountCmd {
                 default: None,
                 ..
             } => {
-                let account_id = parse_account_id(&client, id).await?;
-                show_account(client, account_id, &cli_config, self.with_code).await?;
+                let account_id = parse_account_id(&clients, id).await?;
+                show_account(clients, account_id, &cli_config, self.with_code).await?;
             },
             AccountCmd {
                 list: false,
@@ -67,12 +67,16 @@ impl AccountCmd {
                         let default_account = if id == "none" {
                             None
                         } else {
-                            let account_id: AccountId = parse_account_id(&client, id).await?;
+                            let account_id: AccountId = parse_account_id(&clients, id).await?;
 
                             // Check whether we're tracking that account
-                            let (account, _) = client.try_get_account_header(account_id).await?;
+                            if !clients.contains_key(&account_id) {
+                                return Err(CliError::Input(format!(
+                                    "Account with ID {id} is not tracked by the client"
+                                )));
+                            }
 
-                            Some(account.id())
+                            Some(account_id)
                         };
 
                         set_default_account(default_account)?;
@@ -87,7 +91,7 @@ impl AccountCmd {
                 }
             },
             _ => {
-                list_accounts(client, &cli_config).await?;
+                list_accounts(clients, &cli_config).await?;
             },
         }
         Ok(())
@@ -97,18 +101,13 @@ impl AccountCmd {
 // LIST ACCOUNTS
 // ================================================================================================
 
-async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), CliError> {
-    let accounts = client.get_account_headers().await?;
-
+async fn list_accounts(client: ClientMap, cli_config: &CliConfig) -> Result<(), CliError> {
     let mut table =
-        create_dynamic_table(&["Address", "Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
-    for (acc, _acc_seed) in &accounts {
-        let status = client
-            .get_account(acc.id())
-            .await?
-            .expect("Account should be in store")
-            .status()
-            .to_string();
+        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+    for id in client.keys() {
+        let account_record =
+            client.get(id).expect("Account should be in store").get_account().await?;
+        let acc = account_record.account();
 
         table.add_row(vec![
             acc.id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
@@ -116,7 +115,6 @@ async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), Cli
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_int().to_string(),
-            status,
         ]);
     }
 
@@ -128,15 +126,16 @@ async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), Cli
 // ================================================================================================
 
 pub async fn show_account(
-    client: Client,
+    client: ClientMap,
     account_id: AccountId,
     cli_config: &CliConfig,
     with_code: bool,
 ) -> Result<(), CliError> {
     let account: Account = client
-        .get_account(account_id)
-        .await?
+        .get(&account_id)
         .ok_or(CliError::Input(format!("Account with ID {account_id} not found")))?
+        .get_account()
+        .await?
         .into();
 
     print_summary_table(&account, cli_config)?;

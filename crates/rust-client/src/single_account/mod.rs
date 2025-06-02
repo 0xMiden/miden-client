@@ -8,8 +8,8 @@ use miden_lib::{
 use miden_objects::{
     Felt,
     account::{
-        AccountBuilder, AccountComponent, AccountId, AccountIdAnchor, AccountStorageMode,
-        AccountType, AuthSecretKey,
+        AccountBuilder, AccountComponent, AccountHeader, AccountId, AccountIdAnchor,
+        AccountStorageMode, AccountType, AuthSecretKey,
     },
     assembly::Assembler,
     asset::{Asset, FungibleAsset, TokenSymbol},
@@ -97,6 +97,42 @@ impl SingleAccountClient {
         })
     }
 
+    pub async fn from_existing_store(
+        account_id: AccountId,
+        directory: PathBuf,
+        node_endpoint: Endpoint,
+    ) -> Result<Self, ClientError> {
+        let store_filepath = directory.join("store.sqlite3");
+        let store = {
+            let sqlite_store = SqliteStore::new(store_filepath).await.unwrap();
+            Arc::new(sqlite_store)
+        };
+
+        let mut rng = rand::rng();
+        let coin_seed: [u64; 4] = rng.random();
+
+        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+
+        let client = ClientBuilder::new()
+            .with_rpc(Arc::new(TonicRpcClient::new(&node_endpoint, 10_000)))
+            .with_rng(Box::new(rng))
+            .with_store(store)
+            .with_filesystem_keystore(directory.to_str().unwrap())
+            .in_debug_mode(true)
+            .with_tx_graceful_blocks(None)
+            .build()
+            .await
+            .unwrap();
+
+        // TODO: Assert account actually exists in the store
+
+        Ok(Self {
+            client,
+            account_id,
+            assembler: TransactionKernel::assembler().with_debug_mode(true),
+        })
+    }
+
     pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
         TransactionScript::compile(program, [], self.assembler.clone())
             .map_err(ClientError::TransactionScriptError)
@@ -110,6 +146,16 @@ impl SingleAccountClient {
         let account = self.client.get_account(self.account_id).await?;
 
         Ok(account.expect("Account should be present"))
+    }
+
+    pub async fn get_header(&self) -> Result<AccountHeader, ClientError> {
+        Ok(self
+            .client
+            .get_account_headers()
+            .await?
+            .pop()
+            .expect("Header should be present")
+            .0)
     }
 
     pub async fn get_input_notes(&self) -> Result<Vec<InputNoteRecord>, ClientError> {
