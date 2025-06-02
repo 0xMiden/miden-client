@@ -1,6 +1,5 @@
 use miden_objects::{
-    account::{AccountBuilder as NativeAccountBuilder, AccountIdAnchor as NativeAccountIdAnchor},
-    block::BlockHeader as NativeBlockHeader,
+    account::AccountBuilder as NativeAccountBuilder, block::BlockHeader as NativeBlockHeader,
 };
 use wasm_bindgen::prelude::*;
 
@@ -43,15 +42,6 @@ impl AccountBuilder {
             .try_into()
             .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
         Ok(AccountBuilder(NativeAccountBuilder::new(seed_array)))
-    }
-
-    pub fn anchor(mut self, anchor: &BlockHeader) -> Result<AccountBuilder, JsValue> {
-        let native_block_header: NativeBlockHeader = anchor.into();
-        let native_account_id_anchor: NativeAccountIdAnchor = (&native_block_header)
-            .try_into()
-            .map_err(|_| JsValue::from_str("Error converting block header to account id anchor"))?;
-        self.0 = self.0.anchor(native_account_id_anchor);
-        Ok(self)
     }
 
     #[wasm_bindgen(js_name = "accountType")]

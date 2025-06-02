@@ -265,9 +265,7 @@ async fn build_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let anchor_block = client.get_latest_epoch_block().await?;
     let mut builder = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().expect("anchor block should be valid"))
         .account_type(account_type)
         .storage_mode(storage_mode);
 

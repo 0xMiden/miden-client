@@ -2,7 +2,6 @@ use miden_client::{
     Felt, Word,
     account::{Account, StorageSlot},
     auth::AuthSecretKey,
-    block::BlockHeader,
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
     testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
@@ -336,7 +335,6 @@ async fn test_standard_fpi(storage_mode: AccountStorageMode) {
 /// - `Digest` - The procedure root of the custom component's procedure.
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
-    anchor_block_header: &BlockHeader,
     code: String,
 ) -> (Account, Word, Digest, SecretKey) {
     // store our expected value on map from slot 0 (map key 15)
@@ -355,7 +353,6 @@ fn foreign_account_with_code(
     let auth_component = RpoFalcon512::new(secret_key.public_key());
 
     let (account, seed) = AccountBuilder::new(Default::default())
-        .anchor(anchor_block_header.try_into().unwrap())
         .with_component(get_item_component.clone())
         .with_component(auth_component)
         .storage_mode(storage_mode)
@@ -380,9 +377,8 @@ async fn deploy_foreign_account(
     storage_mode: AccountStorageMode,
     code: String,
 ) -> Result<(Account, Digest), String> {
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
     let (foreign_account, foreign_seed, proc_root, secret_key) =
-        foreign_account_with_code(storage_mode, &anchor_block, code);
+        foreign_account_with_code(storage_mode, code);
     let foreign_account_id = foreign_account.id();
 
     keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();

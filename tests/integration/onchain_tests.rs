@@ -93,13 +93,10 @@ async fn get_counter_contract_account(client: &mut TestClient) -> (Account, Word
     .unwrap()
     .with_supports_all_types();
 
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
     let (account, seed) = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().unwrap())
         .storage_mode(AccountStorageMode::Network)
         .with_component(counter_component)
         .build()
@@ -460,15 +457,9 @@ async fn test_import_account_by_id() {
         mint_note(&mut client_1, target_account_id, faucet_account_id, NoteType::Public).await;
 
     // Import the public account by id
-    let anchor_block = client_1.get_latest_epoch_block().await.unwrap();
-    let built_wallet_id = build_wallet_id(
-        user_seed,
-        secret_key.public_key(),
-        AccountStorageMode::Public,
-        false,
-        &anchor_block,
-    )
-    .unwrap();
+    let built_wallet_id =
+        build_wallet_id(user_seed, secret_key.public_key(), AccountStorageMode::Public, false)
+            .unwrap();
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await.unwrap();
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();

@@ -18,7 +18,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="miden-base"
 PROVER_REPO="https://github.com/0xMiden/miden-base.git"
-PROVER_BRANCH="main"
+PROVER_BRANCH="next"
 PROVER_FEATURES_TESTING=--features "testing"
 PROVER_PORT=50051
 
