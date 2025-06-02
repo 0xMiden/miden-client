@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-tests"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "miden-client",
@@ -1700,9 +1700,9 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto"
-version = "0.14.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dd5fee625e5024c1e47c2914ae2f9bcf36055afe47a680314b4613709bdbdf4"
+checksum = "d521a9d5fa949d60e4029e55ff1da892561b298ed636afb5f71d0dde0925bf57"
 dependencies = [
  "blake3",
  "cc",
