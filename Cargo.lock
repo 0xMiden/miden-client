@@ -1699,9 +1699,9 @@ dependencies = [
 
 [[package]]
 name = "miden-crypto"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d521a9d5fa949d60e4029e55ff1da892561b298ed636afb5f71d0dde0925bf57"
+checksum = "6dd5fee625e5024c1e47c2914ae2f9bcf36055afe47a680314b4613709bdbdf4"
 dependencies = [
  "blake3",
  "cc",
@@ -1784,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "futures",
@@ -1810,7 +1810,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1835,7 +1835,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "hex",
@@ -1854,7 +1854,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "prost",
@@ -1865,7 +1865,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "futures",
@@ -1889,7 +1889,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -1912,7 +1912,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#8fc06c8115bc66c64cf247bda527d3e15ff93ac6"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-base-next#4bf83713cef4d0ca0b5443f99c3d4e86b7b4d875"
 dependencies = [
  "anyhow",
  "figment",
