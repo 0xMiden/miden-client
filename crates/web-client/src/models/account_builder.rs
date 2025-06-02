@@ -5,8 +5,7 @@ use crate::{
     js_error_with_context,
     models::{
         account::Account, account_component::AccountComponent,
-        account_storage_mode::AccountStorageMode, account_type::AccountType,
-         word::Word,
+        account_storage_mode::AccountStorageMode, account_type::AccountType, word::Word,
     },
 };
 
