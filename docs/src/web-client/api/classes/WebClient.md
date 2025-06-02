@@ -220,16 +220,6 @@ Meant to be used in conjunction with the force_import_store method
 
 ***
 
-### getLatestEpochBlock()
-
-> **getLatestEpochBlock**(): `Promise`\<[`BlockHeader`](BlockHeader.md)\>
-
-#### Returns
-
-`Promise`\<[`BlockHeader`](BlockHeader.md)\>
-
-***
-
 ### getOutputNote()
 
 > **getOutputNote**(`note_id`): `Promise`\<`any`\>
