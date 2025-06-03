@@ -17,7 +17,7 @@ The Miden client facilitates interaction with the Miden rollup and provides a wa
 2. Install the Miden client.
 
       ```shell
-      cargo install miden-cli --features concurrent
+      cargo install miden-cli
       ```
       You can now use the `miden --version` command, and you should see `Miden 0.9.0`.
 
