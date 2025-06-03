@@ -30,3 +30,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - build-wasm
         run: make build-wasm
+  build-prover:
+    name: Build prover on ubuntu-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust toolchain
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: make - build-prover
+        run: make build-prover

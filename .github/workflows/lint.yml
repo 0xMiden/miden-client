@@ -27,7 +27,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - clippy
         run: make clippy
-  
+
   clippy-wasm:
     name: Clippy WASM
     runs-on: ubuntu-latest
@@ -42,6 +42,20 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - clippy-wasm
         run: make clippy-wasm
+
+  clippy-prover:
+    name: Clippy prover
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust with clippy
+        run: |
+          rustup update --no-self-update
+          rustup component add clippy
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: make - clippy-prover
+        run: make clippy-prover
 
   format:
     name: format check

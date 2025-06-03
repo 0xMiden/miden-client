@@ -1,0 +1,19 @@
+[package]
+name = "miden-prover-service"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+miden-proving-service = { git = "https://github.com/0xMiden/miden-base", branch = "santiagopittella-expose-proving-service-lib", features = ["concurrent"] }
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = { version = "0.12", default-features = false, features = ["transport"] }
+tonic-web = { version = "0.12" }
+
+[lints]
+workspace = true

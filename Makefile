@@ -15,28 +15,33 @@ FEATURES_WEB_CLIENT=--features "testing"
 FEATURES_CLIENT=--features "testing, concurrent" --no-default-features
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
-PROVER_DIR="miden-node"
-PROVER_REPO="https://github.com/0xMiden/miden-node.git"
-PROVER_BRANCH="next"
-PROVER_PORT=50051
+PROVER_DIR="crates/testing/prover"
 
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
- clippy: ## Run Clippy with configs
-	cargo clippy --workspace --exclude miden-client-web --all-targets -- -D warnings
+clippy: ## Run Clippy with configs
+	cargo clippy --workspace --exclude miden-client-web --exclude miden-prover-service --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
- clippy-wasm: ## Run Clippy for the miden-client-web package
+clippy-wasm: ## Run Clippy for the miden-client-web package
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets $(FEATURES_WEB_CLIENT) -- -D warnings
+
+.PHONY: clippy-prover
+clippy-prover: ## Run Clippy for the prover package
+	cd $(PROVER_DIR) && cargo clippy --all-targets -- -D warnings
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo +nightly fix --workspace --exclude miden-client-web --allow-staged --allow-dirty --all-targets
+	cargo +nightly fix --workspace --exclude miden-client-web --exclude miden-prover-service --allow-staged --allow-dirty --all-targets
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the miden-client-web package
 	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets $(FEATURES_WEB_CLIENT)
+
+.PHONY: fix-prover
+fix-prover: ## Run Fix for the prover package
+	cd $(PROVER_DIR) && cargo +nightly fix --all-targets --allow-staged --allow-dirty
 
 .PHONY: format
 format: ## Run format using nightly toolchain
@@ -47,7 +52,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix clippy fix-wasm clippy-wasm ## Run all linting tasks at once (clippy, fixing, formatting)
+lint: format fix clippy fix-wasm clippy-wasm fix-prover clippy-prover ## Run all linting tasks at once (clippy, fixing, formatting)
 
 # --- Documentation --------------------------------------------------------------------------
 
@@ -65,7 +70,7 @@ book: ## Builds the book & serves documentation site
 
 .PHONY: test
 test: ## Run tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --lib $(FEATURES_CLIENT)
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude miden-prover-service --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-deps
 test-deps: ## Install dependencies for tests
@@ -83,7 +88,7 @@ start-node: ## Start the testing node server
 
 .PHONY: start-node-background
 start-node-background: ## Start the testing node server in background
-	./scripts/start-node-bg.sh
+	./scripts/start-binary-bg.sh node-builder
 
 .PHONY: stop-node
 stop-node: ## Stop the testing node server
@@ -92,7 +97,7 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude miden-prover-service --release --test=integration
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -104,35 +109,21 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
-
-.PHONY: clean-prover
-clean-prover: ## Uninstall prover
-	cargo uninstall miden-proving-service || echo 'prover not installed'
-
-.PHONY: prover
-prover: setup-miden-base update-prover-branch build-prover ## Setup prover directory
-
-.PHONY: setup-miden-base
-setup-miden-base: ## Clone the miden-base repository if it doesn't exist
-	if [ ! -d $(PROVER_DIR) ]; then git clone $(PROVER_REPO) $(PROVER_DIR); fi
-
-.PHONY: update-prover-branch
-update-prover-branch: setup-miden-base ## Checkout and update the specified branch in miden-base
-	cd $(PROVER_DIR) && git checkout $(PROVER_BRANCH) && git pull origin $(PROVER_BRANCH)
-
-.PHONY: build-prover
-build-prover: update-prover-branch ## Build the prover binary with specified features
-	cd $(PROVER_DIR) && cargo build -p miden-proving-service --locked --release
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude miden-prover-service --release --test=integration
+	cargo nextest run --workspace --exclude miden-client-web --exclude miden-prover-service --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: start-prover
-start-prover: ## Run prover. This requires the base repo to be present at `miden-base`
-	cd $(PROVER_DIR) && RUST_LOG=info cargo run -p miden-proving-service --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
+start-prover: ## Start the prover service
+	cd $(PROVER_DIR) && RUST_LOG=info cargo run --release --locked
 
-.PHONY: kill-prover
-kill-prover: ## Kill prover process
-	pkill miden-tx-prover || echo 'process not running'
+.PHONY: start-prover-background
+start-prover-background: ## Start the prover service in background
+	cd $(PROVER_DIR) && ../../../scripts/start-binary-bg.sh miden-prover-service
+
+.PHONY: stop-prover
+stop-prover: ## Stop prover process
+	-pkill -f "miden-prover-service"
+	sleep 1
 
 # --- Installing ----------------------------------------------------------------------------------
 
@@ -142,16 +133,19 @@ install: ## Install the CLI binary
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary and client library in release mode
-	CODEGEN=1 cargo build --workspace --exclude miden-client-web --release
+	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude miden-prover-service --release
 
 build-wasm: ## Build the client library for wasm32
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
+
+build-prover: ## Build the prover package
+	cd $(PROVER_DIR) && cargo build --release
 
 # --- Check ---------------------------------------------------------------------------------------
 
 .PHONY: check
 check: ## Build the CLI binary and client library in release mode
-	cargo check --workspace --exclude miden-client-web --release
+	cargo check --workspace --exclude miden-client-web --exclude miden-prover-service --release
 
 .PHONY: check-wasm
 check-wasm: ## Build the client library for wasm32
