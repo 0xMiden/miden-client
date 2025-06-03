@@ -6,6 +6,7 @@ import {
   AccountHeader,
   AccountId,
   AccountStorageMode,
+  AccountStorageRequirements
   AccountType,
   AdviceMap,
   Assembler,
@@ -14,6 +15,7 @@ import {
   ConsumableNoteRecord,
   Felt,
   FeltArray,
+  ForeignAccount,
   FungibleAsset,
   Library,
   Note,
@@ -62,6 +64,7 @@ declare global {
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountStorageMode: typeof AccountStorageMode;
+    AccountStorageRequirements: typeof AccountStorageRequirements;
     AccountType: typeof AccountType;
     AdviceMap: typeof AdviceMap;
     Assembler: typeof Assembler;
@@ -70,6 +73,7 @@ declare global {
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
+    ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
     Library: typeof Library;
     Note: typeof Note;

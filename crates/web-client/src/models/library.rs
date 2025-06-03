@@ -1,5 +1,7 @@
-use miden_objects::assembly::Library as NativeLibrary;
+use miden_objects::assembly::{Library as NativeLibrary, QualifiedProcedureName as NativeQualifiedProcedureName};
 use wasm_bindgen::prelude::*;
+
+use crate::js_error_with_context;
 
 #[wasm_bindgen]
 pub struct Library(NativeLibrary);

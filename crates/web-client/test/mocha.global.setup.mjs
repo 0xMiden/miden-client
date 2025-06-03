@@ -66,6 +66,7 @@ before(async () => {
         AccountHeader,
         AccountId,
         AccountStorageMode,
+        AccountStorageRequirements,
         AccountType,
         AdviceMap,
         Assembler,
@@ -74,6 +75,7 @@ before(async () => {
         ConsumableNoteRecord,
         Felt,
         FeltArray,
+        ForeignAccount,
         FungibleAsset,
         Library,
         Note,
@@ -125,6 +127,7 @@ before(async () => {
       window.AccountHeader = AccountHeader;
       window.AccountId = AccountId;
       window.AccountStorageMode = AccountStorageMode;
+      window.AccountStorageRequirements = AccountStorageRequirements;
       window.AccountType = AccountType;
       window.AdviceMap = AdviceMap;
       window.Assembler = Assembler;
@@ -133,6 +136,7 @@ before(async () => {
       window.ConsumableNoteRecord = ConsumableNoteRecord;
       window.Felt = Felt;
       window.FeltArray = FeltArray;
+      window.ForeignAccount = ForeignAccount;
       window.FungibleAsset = FungibleAsset;
       window.Library = Library;
       window.Note = Note;
