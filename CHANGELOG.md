@@ -2,6 +2,10 @@
 
 ## 0.10.0 (TBD)
 
+### Features
+
+* Support Operations From Counter Contract FPI Example in Web Client (#958).
+
 ## 0.9.0 (2025-05-30)
 
 ### Features
