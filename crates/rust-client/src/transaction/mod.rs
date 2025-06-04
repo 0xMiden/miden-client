@@ -73,7 +73,7 @@ use core::fmt::{self};
 use miden_objects::{
     AssetError, Digest, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
-    assembly::DefaultSourceManager,
+    assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
@@ -813,16 +813,49 @@ impl Client {
         Ok(())
     }
 
-    /// Compiles the provided transaction script source and inputs into a [`TransactionScript`].
+    /// Compiles the provided account code, library path into a [`Library`]
+    pub fn compile_library(
+        &self,
+        account_code: &str,
+        library_path: &str,
+    ) -> Result<Library, ClientError> {
+        let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+        let source_manager = Arc::new(DefaultSourceManager::default());
+
+        let module = Module::parser(ModuleKind::Library)
+            .parse_str(
+                LibraryPath::new(library_path)
+                    .map_err(|err| ClientError::LibraryBuildError(err.to_string()))?,
+                account_code,
+                &source_manager,
+            )
+            .map_err(|err| ClientError::LibraryBuildError(err.to_string()))?;
+
+        let library = assembler
+            .assemble_library([module])
+            .map_err(|err| ClientError::LibraryBuildError(err.to_string()))?;
+        Ok(library)
+    }
+
+    /// Compiles the provided transaction script source, inputs, and optional library into a
+    /// [`TransactionScript`].
     pub fn compile_tx_script<T>(
         &self,
         inputs: T,
+        library: Option<Library>,
         program: &str,
     ) -> Result<TransactionScript, ClientError>
     where
         T: IntoIterator<Item = (Word, Vec<Felt>)>,
     {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode);
+        let mut assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode);
+
+        if let Some(lib) = library {
+            assembler = assembler
+                .with_library(lib)
+                .map_err(|err| ClientError::TransactionScriptLibraryError(err.to_string()))?;
+        }
+
         TransactionScript::compile(program, inputs, assembler)
             .map_err(ClientError::TransactionScriptError)
     }

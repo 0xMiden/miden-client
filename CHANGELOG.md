@@ -4,7 +4,7 @@
 
 ### Changes
 
-* Added `compile_library` and `compile_tx_script` helper functions (#TBD).
+* Added `compile_library` and updated the `compile_tx_script` helper function (#TBD).
 
 ## 0.9.0 (2025-05-30)
 

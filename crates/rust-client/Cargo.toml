@@ -40,7 +40,6 @@ miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 miden-testing = { workspace = true, optional = true }
 miden-tx = { workspace = true, features = ["async"] }
-miden-assembly = { workspace = true }
 prost = { version = "0.13", default-features = false, features = ["derive"] }
 rand = { workspace = true }
 rusqlite = { version = "0.35", features = ["vtab", "array", "bundled"], optional = true }
@@ -68,7 +67,6 @@ miden-client = { path = ".", features = ["testing", "concurrent", "sqlite", "ton
 miden-lib = { workspace = true, features = ["testing"] }
 miden-objects = { workspace = true, default-features = false, features = ["testing"] }
 miden-testing = { workspace = true, default-features = false, features = ["async"] }
-miden-assembly = { workspace = true }
 tokio = { workspace = true }
 web-sys = { version = "0.3", features = ["console"]}
 

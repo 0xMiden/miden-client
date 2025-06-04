@@ -81,7 +81,7 @@ async fn test_fpi_execute_program() {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.compile_tx_script(vec![], &code).unwrap();
+    let tx_script = client.compile_tx_script(vec![], None, &code).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
