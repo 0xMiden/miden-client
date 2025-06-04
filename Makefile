@@ -13,7 +13,6 @@ CODEGEN=CODEGEN=1
 
 FEATURES_WEB_CLIENT=--features "testing"
 FEATURES_CLIENT=--features "testing, concurrent" --no-default-features
-FEATURES_CLI=--features "concurrent"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="miden-base"
@@ -26,7 +25,7 @@ PROVER_PORT=50051
 
 .PHONY: clippy
  clippy: ## Run Clippy with configs
-	cargo clippy --workspace --exclude miden-client-web --all-targets $(FEATURES_CLI) -- -D warnings
+	cargo clippy --workspace --exclude miden-client-web --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
  clippy-wasm: ## Run Clippy for the miden-client-web package
@@ -34,7 +33,7 @@ PROVER_PORT=50051
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo +nightly fix --workspace --exclude miden-client-web --allow-staged --allow-dirty --all-targets $(FEATURES_CLI)
+	cargo +nightly fix --workspace --exclude miden-client-web --allow-staged --allow-dirty --all-targets
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the miden-client-web package
@@ -94,7 +93,7 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI)
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -106,8 +105,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI)
-	cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI) --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
+	cargo nextest run --workspace --exclude miden-client-web --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: clean-prover
 clean-prover: ## Uninstall prover
@@ -139,12 +138,12 @@ kill-prover: ## Kill prover process
 # --- Installing ----------------------------------------------------------------------------------
 
 install: ## Install the CLI binary
-	cargo install $(FEATURES_CLI) --path bin/miden-cli --locked
+	cargo install --path bin/miden-cli --locked
 
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary and client library in release mode
-	CODEGEN=1 cargo build --workspace --exclude miden-client-web --release $(FEATURES_CLI)
+	CODEGEN=1 cargo build --workspace --exclude miden-client-web --release
 
 build-wasm: ## Build the client library for wasm32
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
@@ -153,7 +152,7 @@ build-wasm: ## Build the client library for wasm32
 
 .PHONY: check
 check: ## Build the CLI binary and client library in release mode
-	cargo check --workspace --exclude miden-client-web --release $(FEATURES_CLI)
+	cargo check --workspace --exclude miden-client-web --release
 
 .PHONY: check-wasm
 check-wasm: ## Build the client library for wasm32

@@ -4,19 +4,13 @@
 
 ## Install the client
 
-We currently recommend installing and running the client with the [`concurrent`](#concurrent-feature) feature.
-
 Run the following command to install the miden-client:
 
 ```sh
-cargo install miden-cli --features concurrent --locked
+cargo install miden-cli --locked
 ```
 
-This installs the `miden` binary (at `~/.cargo/bin/miden`) with the [`concurrent`](#concurrent-feature) feature.
-
-### `Concurrent` feature
-
-The `concurrent` flag enables optimizations that result in faster transaction execution and proving times.
+This installs the `miden` binary (at `~/.cargo/bin/miden`).
 
 ## Run the client
 

@@ -21,12 +21,10 @@ workspace = true
 
 [features]
 default = []
-concurrent = ["miden-client/concurrent"]
 
 [[test]]
 name = "integration"
 path = "tests/cli.rs"
-required-features = ["concurrent"]
 
 [dev-dependencies]
 assert_cmd = { version = "2.0" }
