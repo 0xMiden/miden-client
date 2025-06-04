@@ -8,11 +8,11 @@ use figment::{
     Figment,
     providers::{Format, Toml},
 };
-use miden_client::{Client, account::AccountId};
+use miden_client::account::AccountId;
 use tracing::info;
 
 use super::{CLIENT_CONFIG_FILE_NAME, config::CliConfig, get_account_with_id_prefix};
-use crate::{errors::CliError, faucet_details_map::FaucetDetailsMap};
+use crate::{ClientMap, errors::CliError, faucet_details_map::FaucetDetailsMap};
 
 pub(crate) const SHARED_TOKEN_DOCUMENTATION: &str = "There are two accepted formats for the asset:
 - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units.
@@ -25,7 +25,7 @@ For example, `100::0xabcdef0123456789` or `1.23::TST`";
 /// Returns a tracked Account ID matching a hex string or the default one defined in the Client
 /// config.
 pub(crate) async fn get_input_acc_id_by_prefix_or_default(
-    client: &Client,
+    clients: &ClientMap,
     account_id: Option<String>,
 ) -> Result<AccountId, CliError> {
     let account_id_str = if let Some(account_id_prefix) = account_id {
@@ -38,7 +38,7 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default(
             .ok_or(CliError::Input("No input account ID nor default account defined".to_string()))?
     };
 
-    parse_account_id(client, &account_id_str).await
+    parse_account_id(clients, &account_id_str).await
 }
 
 /// Parses a user provided account ID string and returns the corresponding `AccountId`.
@@ -54,7 +54,7 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default(
 /// - Will return a `IdPrefixFetchError` if the provided account ID string can't be parsed as an
 ///   `AccountId` and doesn't correspond to an account tracked by the client either.
 pub(crate) async fn parse_account_id(
-    client: &Client,
+    clients: &ClientMap,
     account_id: &str,
 ) -> Result<AccountId, CliError> {
     if account_id.starts_with("0x") {
@@ -62,7 +62,7 @@ pub(crate) async fn parse_account_id(
             return Ok(account_id);
         }
 
-        Ok(get_account_with_id_prefix(client, account_id)
+        Ok(get_account_with_id_prefix(clients, account_id)
         .await
         .map_err(|_| CliError::Input(format!("Input account ID {account_id} is neither a valid Account ID nor a hex prefix of a known Account ID")))?
         .id())

@@ -115,6 +115,8 @@ pub mod account;
 pub mod keystore;
 pub mod note;
 pub mod rpc;
+#[cfg(feature = "std")]
+pub mod single_account;
 pub mod store;
 pub mod sync;
 pub mod transaction;

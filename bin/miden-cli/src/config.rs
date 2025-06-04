@@ -22,6 +22,7 @@ const DEFAULT_COMPONENT_TEMPLATE_DIR: &str = "./templates";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CliConfig {
+    pub tracked_account_ids: Vec<String>,
     /// Describes settings related to the RPC endpoint.
     pub rpc: RpcConfig,
     /// Path to the `SQLite` store file.
@@ -66,6 +67,7 @@ impl Default for CliConfig {
         let exec_dir = PathBuf::new();
 
         Self {
+            tracked_account_ids: Vec::new(),
             rpc: RpcConfig::default(),
             store_filepath: exec_dir.join(STORE_FILENAME),
             secret_keys_directory: exec_dir.join(KEYSTORE_DIRECTORY),

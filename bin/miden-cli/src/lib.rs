@@ -1,14 +1,15 @@
-use std::{env, sync::Arc};
+use std::{collections::BTreeMap, env, sync::Arc};
 
 use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::{
     Client, ClientError, Felt, IdPrefixFetchError,
-    account::AccountHeader,
+    account::{AccountHeader, AccountId},
     crypto::RpoRandomCoin,
     keystore::FilesystemKeyStore,
     rpc::TonicRpcClient,
+    single_account::SingleAccountClient,
     store::{NoteFilter as ClientNoteFilter, OutputNoteRecord, Store, sqlite_store::SqliteStore},
 };
 use rand::{Rng, rngs::StdRng};
@@ -46,6 +47,8 @@ pub const CLIENT_BINARY_NAME: &str = "miden";
 /// Number of blocks that must elapse after a transaction’s reference block before it is marked
 /// stale and discarded.
 const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
+
+pub type ClientMap = BTreeMap<AccountId, SingleAccountClient>;
 
 /// Root CLI struct.
 #[derive(Parser, Debug)]
@@ -106,30 +109,23 @@ impl Cli {
 
         // Create the client
         let (cli_config, _config_path) = load_config_file()?;
-        let store = SqliteStore::new(cli_config.store_filepath.clone())
+
+        let clients = ClientMap::new();
+
+        for account_address in cli_config.tracked_account_ids {
+            let account_id = AccountId::from_hex(&account_address)
+                .map_err(|_| CliError::Input(format!("Invalid account ID: {account_address}")))?;
+
+            let single_account_client = SingleAccountClient::from_existing_store(
+                account_id,
+                cli_config.store_filepath.join(account_address),
+                cli_config.rpc.endpoint.clone().into(),
+            )
             .await
-            .map_err(ClientError::StoreError)?;
-        let store = Arc::new(store);
+            .unwrap();
 
-        let mut rng = rand::rng();
-        let coin_seed: [u64; 4] = rng.random();
-
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
-        let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
-            .map_err(CliError::KeyStore)?;
-
-        let client = Client::new(
-            Arc::new(TonicRpcClient::new(
-                &cli_config.rpc.endpoint.clone().into(),
-                cli_config.rpc.timeout_ms,
-            )),
-            Box::new(rng),
-            store as Arc<dyn Store>,
-            Arc::new(keystore.clone()),
-            in_debug_mode,
-            Some(TX_GRACEFUL_BLOCK_DELTA),
-            cli_config.max_block_number_delta,
-        );
+            clients.insert(account_id, single_account_client);
+        }
 
         // Execute CLI command
         match &self.action {
@@ -223,21 +219,12 @@ pub(crate) async fn get_output_note_with_id_prefix(
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one account found
 ///   where `account_id_prefix` is a prefix of its ID.
 async fn get_account_with_id_prefix(
-    client: &Client,
+    clients: &ClientMap,
     account_id_prefix: &str,
 ) -> Result<AccountHeader, IdPrefixFetchError> {
-    let mut accounts = client
-        .get_account_headers()
-        .await
-        .map_err(|err| {
-            tracing::error!("Error when fetching all accounts from the store: {err}");
-            IdPrefixFetchError::NoMatch(
-                format!("account ID prefix {account_id_prefix}").to_string(),
-            )
-        })?
-        .into_iter()
-        .filter(|(account_header, _)| account_header.id().to_hex().starts_with(account_id_prefix))
-        .map(|(acc, _)| acc)
+    let accounts = clients
+        .keys()
+        .filter(|account_id| account_id.to_hex().starts_with(account_id_prefix))
         .collect::<Vec<_>>();
 
     if accounts.is_empty() {
@@ -246,16 +233,25 @@ async fn get_account_with_id_prefix(
         ));
     }
     if accounts.len() > 1 {
-        let account_ids = accounts.iter().map(AccountHeader::id).collect::<Vec<_>>();
         tracing::error!(
             "Multiple accounts found for the prefix {}: {:?}",
             account_id_prefix,
-            account_ids
+            accounts
         );
         return Err(IdPrefixFetchError::MultipleMatches(
             format!("account ID prefix {account_id_prefix}").to_string(),
         ));
     }
 
-    Ok(accounts.pop().expect("account_ids should always have one element"))
+    Ok(clients
+        .get(accounts[0])
+        .expect("account_ids should always have one element")
+        .get_header()
+        .await
+        .map_err(|err| {
+            tracing::error!("Error when fetching account header: {err}");
+            IdPrefixFetchError::NoMatch(
+                format!("account ID prefix {account_id_prefix}").to_string(),
+            )
+        })?)
 }
