@@ -12,6 +12,7 @@ edition.workspace = true
 
 [dependencies]
 miden-client = { path = "../crates/rust-client", features = [
+    "concurrent",
     "testing",
     "std",
     "sqlite",
