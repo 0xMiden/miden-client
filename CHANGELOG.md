@@ -32,6 +32,7 @@
 * [BREAKING] Added `DiscardCause` for transactions (#853).
 * Chained pending transactions get discarded when one of the transactions in the chain is discarded (#889).
 * [BREAKING] Renamed `NetworkNote` and `AccountDetails` to `FetchedNote` and `FetchedAccount` respectively (#931).
+* Fixed wasm-opt options to improve performance of generated wasm. wasm-opt settings were broken before.
 
 ## 0.8.2 (TBD)
 

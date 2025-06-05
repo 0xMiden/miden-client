@@ -24,7 +24,7 @@ impl WebClient {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, account_seed, key_pair) =
-                generate_wallet(client, storage_mode, mutable, init_seed).await?;
+                generate_wallet(storage_mode, mutable, init_seed).await?;
 
             client
                 .add_account(&new_account, Some(account_seed), false)
