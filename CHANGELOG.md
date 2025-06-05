@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1 (TBD)
+
+### Features
+
+* Added necessary methods to support network transactions in the Web Client (#955).
+
+### Fixes
+
+* Fixed bug where network accounts were not being updated correctly in the client (#955).
+
 ## 0.9.0 (2025-05-30)
 
 ### Features
