@@ -813,10 +813,10 @@ impl Client {
         Ok(())
     }
 
-    /// Compiles the provided account code, library path into a [`Library`]
+    /// Compiles the provided library code and library path into a [`Library`]
     pub fn compile_library(
         &self,
-        account_code: &str,
+        library_code: &str,
         library_path: &str,
     ) -> Result<Library, ClientError> {
         let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
@@ -826,7 +826,7 @@ impl Client {
             .parse_str(
                 LibraryPath::new(library_path)
                     .map_err(|err| ClientError::LibraryBuildError(err.to_string()))?,
-                account_code,
+                library_code,
                 &source_manager,
             )
             .map_err(|err| ClientError::LibraryBuildError(err.to_string()))?;
