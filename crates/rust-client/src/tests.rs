@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, string::ToString, sync::Arc};
+use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 
 // TESTS
 // ================================================================================================
@@ -1620,16 +1620,16 @@ async fn test_create_library_and_create_tx_script() {
     let (client, ..) = create_test_client().await;
 
     // ── transaction-level script (calls increment) ───────────────────────────
-    let script_code = r#"
+    let script_code = "
         use.external_contract::counter_contract
 
         begin
             call.counter_contract::increment
         end
-    "#;
+    ";
 
     // ── counter-contract library code ───────────────────────────────────────
-    let account_code = r#"
+    let account_code = "
         use.miden::account
         use.std::sys
 
@@ -1651,11 +1651,11 @@ async fn test_create_library_and_create_tx_script() {
             push.1 exec.account::incr_nonce
             exec.sys::truncate_stack
         end
-    "#;
+    ";
 
     let library_path = "external_contract::counter_contract";
-    let library = client.compile_library(&account_code.to_string(), library_path).unwrap();
-    let tx_script = client.compile_tx_script([], Some(library), &script_code.to_string());
+    let library = client.compile_library(account_code, library_path).unwrap();
+    let tx_script = client.compile_tx_script([], Some(library), script_code);
 
     assert!(tx_script.is_ok());
 }
