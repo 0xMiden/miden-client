@@ -238,7 +238,7 @@ impl<'a> StateSync<'a> {
         account_commitment_updates: &[(AccountId, Digest)],
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
-            accounts.iter().partition(|account_header| account_header.id().is_public());
+            accounts.iter().partition(|account_header| !account_header.id().is_private());
 
         let updated_public_accounts = self
             .get_updated_public_accounts(account_commitment_updates, &public_accounts)

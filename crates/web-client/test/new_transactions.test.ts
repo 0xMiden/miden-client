@@ -893,3 +893,175 @@ describe("discarded_transaction tests", () => {
     );
   });
 });
+
+// NETWORK TRANSACTION TESTS
+// ================================================================================================
+
+export const counterAccountComponent = async (): Promise<
+  string | undefined
+> => {
+  return await testingPage.evaluate(async () => {
+    const accountCode = `
+        use.miden::account
+        use.std::sys
+
+        # => []
+        export.get_count
+            push.0
+            exec.account::get_item
+            exec.sys::truncate_stack
+        end
+
+        # => []
+        export.increment_count
+            push.0
+            # => [index]
+            exec.account::get_item
+            # => [count]
+            push.1 add
+            # => [count+1]
+            push.0
+            # [index, count+1]
+            exec.account::set_item
+            # => []
+            push.1 exec.account::incr_nonce
+            # => []
+            exec.sys::truncate_stack
+            # => []
+        end
+      `;
+    const scriptCode = `
+        use.external_contract::counter_contract
+        begin
+            call.counter_contract::increment_count
+        end
+      `;
+    const client = window.client;
+
+    // Create counter account
+    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
+    let emptyStorageSlot = window.StorageSlot.emptyValue();
+
+    let counterAccountComponent = window.AccountComponent.compile(
+      accountCode,
+      assembler,
+      [emptyStorageSlot]
+    ).withSupportsAllTypes();
+
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    let accountBuilderResult = new window.AccountBuilder(walletSeed)
+      .storageMode(window.AccountStorageMode.network())
+      .withComponent(counterAccountComponent)
+      .build();
+
+    await client.newAccount(
+      accountBuilderResult.account,
+      accountBuilderResult.seed,
+      false
+    );
+
+    const nativeAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      false
+    );
+
+    await client.syncState();
+
+    // Deploy counter account
+    let accountComponentLib =
+      window.AssemblerUtils.createAccountComponentLibrary(
+        assembler,
+        "external_contract::counter_contract",
+        accountCode
+      );
+
+    const inputs = new window.TransactionScriptInputPairArray();
+
+    let txScript = window.TransactionScript.compile(
+      scriptCode,
+      inputs,
+      assembler.withLibrary(accountComponentLib)
+    );
+
+    let txIncrementRequest = new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .build();
+
+    let txResult = await client.newTransaction(
+      accountBuilderResult.account.id(),
+      txIncrementRequest
+    );
+    await client.submitTransaction(txResult);
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    // Create transaction with network note
+    assembler = window.TransactionKernel.assembler()
+      .withDebugMode(true)
+      .withLibrary(accountComponentLib);
+
+    let compiledNoteScript = await assembler.compileNoteScript(scriptCode);
+
+    let noteInputs = new window.NoteInputs(new window.FeltArray([]));
+
+    let serialNum = window.Word.newFromU64s(
+      new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
+    );
+    let noteRecipient = new window.NoteRecipient(
+      serialNum,
+      compiledNoteScript,
+      noteInputs
+    );
+
+    let noteAssets = new window.NoteAssets([]);
+
+    let noteMetadata = new window.NoteMetadata(
+      nativeAccount.id(),
+      window.NoteType.Public,
+      window.NoteTag.fromAccountId(
+        accountBuilderResult.account.id(),
+        window.NoteExecutionMode.newNetwork()
+      ),
+      window.NoteExecutionHint.none(),
+      undefined
+    );
+
+    let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
+
+    let transactionRequest = new window.TransactionRequestBuilder()
+      .withOwnOutputNotes(
+        new window.OutputNotesArray([window.OutputNote.full(note)])
+      )
+      .build();
+
+    let transactionResult = await client.newTransaction(
+      nativeAccount.id(),
+      transactionRequest
+    );
+
+    await client.submitTransaction(transactionResult);
+    await window.helpers.waitForTransaction(
+      transactionResult.executedTransaction().id().toHex()
+    );
+
+    // Wait for network account to update
+    await client.syncState();
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+    await client.syncState();
+
+    let account = await client.getAccount(accountBuilderResult.account.id());
+    let counter = account?.storage().getItem(0)?.toHex();
+
+    return counter?.charAt(51);
+  });
+};
+
+describe("counter account component tests", () => {
+  it("counter account component transaction completes successfully", async () => {
+    let finalCounter = await counterAccountComponent();
+    expect(finalCounter).to.equal("2");
+  });
+});
