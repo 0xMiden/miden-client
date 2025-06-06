@@ -951,7 +951,10 @@ export const counterAccountComponent = async (): Promise<
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
+    let anchorBlock = await client.getLatestEpochBlock();
+
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
+      .anchor(anchorBlock)
       .storageMode(window.AccountStorageMode.network())
       .withComponent(counterAccountComponent)
       .build();
