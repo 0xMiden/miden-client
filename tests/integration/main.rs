@@ -49,8 +49,7 @@ async fn test_client_builder_initializes_client_with_endpoint() -> Result<(), Cl
 async fn test_client_builder_initializes_client_with_rpc() -> Result<(), ClientError> {
     let (_, _, store_config, auth_path) = get_client_config();
 
-    let endpoint =
-        Endpoint::new("https".to_string(), "rpc.testnet.miden.io".to_string(), Some(443));
+    let endpoint = Endpoint::localhost();
     let timeout_ms = 10_000;
     let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
 
