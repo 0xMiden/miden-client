@@ -704,8 +704,9 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     std::str::from_utf8(&output.stdout)
         .unwrap()
-        .split(|c: char| !c.is_alphanumeric())
-        .find(|s| s.starts_with("mlcl"))
+        .split_whitespace()
+        .skip_while(|&word| word != "-s")
+        .nth(1)
         .unwrap()
         .to_string()
 }
@@ -721,8 +722,9 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     //println!("stoud {}", String::from_utf8(output.stdout.clone()).unwrap());
     std::str::from_utf8(&output.stdout)
         .unwrap()
-        .split(|c: char| !c.is_alphanumeric())
-        .find(|s| s.starts_with("mlcl"))
+        .split_whitespace()
+        .skip_while(|&word| word != "-s")
+        .nth(1)
         .unwrap()
         .to_string()
 }

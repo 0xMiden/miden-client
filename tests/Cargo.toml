@@ -29,4 +29,4 @@ winter-maybe-async = { version = "0.12", features = ["async"]}
 
 [[test]]
 name = "integration"
-path = "integration/main.rs"
+path = "src/main_tests.rs"
