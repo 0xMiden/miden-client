@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "miden-cli"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1613,7 +1613,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-tests"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "async-trait",
  "miden-client",
@@ -1666,7 +1666,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-web"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "miden-client",
  "miden-lib",
@@ -2157,7 +2157,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "node-builder"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "miden-lib",
