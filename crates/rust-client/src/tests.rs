@@ -729,7 +729,7 @@ async fn test_no_nonce_change_transaction_request() {
         end
         ";
 
-    let tx_script = client.compile_tx_script(vec![], code).unwrap();
+    let tx_script = client.compile_tx_script(vec![], None, code).unwrap();
 
     let transaction_request =
         TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
@@ -849,7 +849,7 @@ async fn test_execute_program() {
         end
         ";
 
-    let tx_script = client.compile_tx_script(vec![], code).unwrap();
+    let tx_script = client.compile_tx_script(vec![], None, code).unwrap();
 
     let output_stack = client
         .execute_program(wallet.id(), tx_script, AdviceInputs::default(), BTreeSet::new())
@@ -1606,4 +1606,49 @@ async fn test_subsequent_discarded_transactions() {
         account_after_sync.account().commitment(),
         account_before_tx.account().commitment(),
     );
+}
+
+#[tokio::test]
+async fn test_create_library_and_create_tx_script() {
+    let (client, ..) = create_test_client().await;
+
+    // ── transaction-level script (calls increment) ───────────────────────────
+    let script_code = "
+        use.external_contract::counter_contract
+
+        begin
+            call.counter_contract::increment
+        end
+    ";
+
+    // ── counter-contract library code ───────────────────────────────────────
+    let account_code = "
+        use.miden::account
+        use.std::sys
+
+        export.get_count
+            # => []
+            push.0
+            exec.account::get_item
+            exec.sys::truncate_stack
+        end
+
+        export.increment
+            # => []
+            push.0
+            exec.account::get_item
+            push.1 add
+            debug.stack
+            push.0
+            exec.account::set_item
+            push.1 exec.account::incr_nonce
+            exec.sys::truncate_stack
+        end
+    ";
+
+    let library_path = "external_contract::counter_contract";
+    let library = client.compile_library(account_code, library_path).unwrap();
+    let tx_script = client.compile_tx_script([], Some(library), script_code);
+
+    assert!(tx_script.is_ok());
 }

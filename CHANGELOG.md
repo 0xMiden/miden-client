@@ -2,6 +2,10 @@
 
 ## 0.10.0 (TBD)
 
+### Changes
+
+* Added `compile_library` and updated the `compile_tx_script` helper function (#944).
+
 ## 0.9.0 (2025-05-30)
 
 ### Features

@@ -88,6 +88,10 @@ pub enum ClientError {
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]
     TransactionScriptError(#[source] TransactionScriptError),
+    #[error("transaction script library error: {0}")]
+    TransactionScriptLibraryError(String),
+    #[error("library build error: {0}")]
+    LibraryBuildError(String),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
 }
