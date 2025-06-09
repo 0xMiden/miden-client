@@ -14,12 +14,12 @@ You can either build from source with:
 cargo build --release
 ```
 
-Once the binary is built, you can find it on `./target/release/miden`.
+Once the binary is built, you can find it on `./target/release/miden-client`.
 
 Or you can install the CLI from crates.io with:
 
 ```bash
-cargo install miden-cli
+cargo install miden-client-cli
 ```
 
 These actions can also be executed when inside the repository via the Makefile with `make build` or `make install`.
@@ -29,7 +29,7 @@ These actions can also be executed when inside the repository via the Makefile w
 To have a fully-functional client CLI, you would need to set it up first. You can accomplish that with:
 
 ```shell
-miden init
+miden-client init
 ```
 
 This would generate the `miden-client.toml` file, which contains useful information for the client like RPC provider's URL and database path.
@@ -37,12 +37,12 @@ This would generate the `miden-client.toml` file, which contains useful informat
 After this, your client should be set and ready to use. Get the available commands with:
 
 ```shell
-miden
+miden-client
 # or
-miden --help
+miden-client --help
 ```
 
-The first time that you sync your client (`miden sync`) a new file will be generated based on the configurations set on `miden-client.toml`. This file is the database of the client.
+The first time that you sync your client (`miden-client sync`) a new file will be generated based on the configurations set on `miden-client.toml`. This file is the database of the client.
 
 ## License
 This project is [MIT licensed](../../LICENSE).

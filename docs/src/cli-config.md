@@ -1,15 +1,15 @@
 After [installation](./install-and-run.md#install-the-client), use the client by running the following and adding the [relevant commands](cli-reference.md#commands):
 
 ```sh
-miden
+miden-client
 ```
 
 > [!Tip]
-> Run `miden --help` for information on `miden` commands.
+> Run `miden-client --help` for information on `miden` commands.
 
 ## Client Configuration
 
-We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]).  The file gets created when running `miden init`. It can also be edited to use a different configuration for the client.
+We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]).  The file gets created when running `miden-client init`. It can also be edited to use a different configuration for the client.
 
 ```sh
 store_filepath = "store.sqlite3"
@@ -35,7 +35,7 @@ An `rpc` section is used to configure the connection to the Miden node. It conta
   - `host`: The host of the node. It can be either an IP address or a domain name.
   - `port`: The port of the node. It is an integer.
 
-This field can be set with the `--network` flag when running the `miden init` command. For example, to set the testnet endpoint, you can run: `miden init --network testnet`.
+This field can be set with the `--network` flag when running the `miden-client init` command. For example, to set the testnet endpoint, you can run: `miden-client init --network testnet`.
 
 > [!Note]
 > - Running the node locally for development is encouraged.
@@ -44,7 +44,7 @@ This field can be set with the `--network` flag when running the `miden init` co
 ### Store and keystore
 The `store_filepath` field is used to configure the path to the SQLite database file used by the client. The `secret_keys_directory` field is used to configure the path to the directory where the keystore files are stored. The default values are `store.sqlite3` and `keystore`, respectively.
 
-The store filepath can be set when running the `miden init` command with the `--store-path` flag.
+The store filepath can be set when running the `miden-client init` command with the `--store-path` flag.
 
 ### Default account ID
 
@@ -53,8 +53,8 @@ The `default_account_id` field contains the default account ID to be used by the
 By default none is set, but you can set and unset it with:
 
 ```sh
-miden account --default <ACCOUNT_ID> #Sets default account
-miden account --default none #Unsets default account
+miden-client account --default <ACCOUNT_ID> #Sets default account
+miden-client account --default none #Unsets default account
 ```
 > [!Note]
 > The account must be tracked by the client in order to be set as the default account.
@@ -62,7 +62,7 @@ miden account --default none #Unsets default account
 You can also see the current default account ID with:
 
 ```sh
-miden account --default
+miden-client account --default
 ```
 ### Token symbol map
 The `token_symbol_map_filepath` field is used to configure the path to the TOML file that contains the token symbol map. The token symbol map stores the faucet details for different token symbols. The default value is `token_symbol_map.toml`.
@@ -85,7 +85,7 @@ But if the faucet is included in the token symbol map (using the sample above as
 Notice how the amount specified when using the token symbol takes into account the decimals of the token (`1` base unit of the token is `0.00000001` for BTC as it uses 8 decimals).
 
 ### Remote prover endpoint
-The `remote_prover_endpoint` field is used to configure the usage of a remote prover. You can set a remote prover when calling the `miden prover` command with the `--remote-prover-endpoint` flag. The prover will be used for all transactions that are executed with the `miden` command. By default, no remote prover is used and all transactions are executed locally.
+The `remote_prover_endpoint` field is used to configure the usage of a remote prover. You can set a remote prover when calling the `miden-client prover` command with the `--remote-prover-endpoint` flag. The prover will be used for all transactions that are executed with the `miden` command. By default, no remote prover is used and all transactions are executed locally.
 
 ### Component template directory
 The `component_template_directory` field is used to configure the path to the directory where the account component templates are stored. The default value is `./templates`.
@@ -106,7 +106,7 @@ slot = 0
 value = [
     { name = "max_supply", type = "felt", description = "Maximum supply of the token in base units" },
     { name = "decimals",type = "u8", description = "Number of decimal places" },
-    { name = "ticker", type = "token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." }, 
+    { name = "ticker", type = "token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." },
     { value = "0" },
 ]
 ```
@@ -117,9 +117,9 @@ The `max_block_number_delta` is an optional field that is used to configure the 
 If not set, the default behavior is to ignore the block difference between the client and the network. If set, the client will check this difference is within the specified maximum when validating a transaction.
 
 ```sh
-miden init --block-delta 256
+miden-client init --block-delta 256
 ```
 
 ### Environment variables
 
-- `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag. 
+- `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.

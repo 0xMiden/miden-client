@@ -2,6 +2,10 @@
 
 ## 0.10.0 (TBD)
 
+### Changes
+
+* [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client`
+
 ## 0.9.0 (2025-05-30)
 
 ### Features

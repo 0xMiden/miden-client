@@ -1588,29 +1588,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-cli"
-version = "0.10.0"
-dependencies = [
- "assert_cmd",
- "clap",
- "comfy-table",
- "figment",
- "miden-client",
- "miden-lib",
- "miden-objects",
- "miette",
- "predicates",
- "rand 0.9.1",
- "serde",
- "thiserror 2.0.12",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "miden-client"
 version = "0.10.0"
 dependencies = [
@@ -1648,6 +1625,29 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "miden-client-cli"
+version = "0.10.0"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "comfy-table",
+ "figment",
+ "miden-client",
+ "miden-lib",
+ "miden-objects",
+ "miette",
+ "predicates",
+ "rand 0.9.1",
+ "serde",
+ "thiserror 2.0.12",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

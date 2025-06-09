@@ -7,22 +7,22 @@
 Run the following command to install the miden-client:
 
 ```sh
-cargo install miden-cli
+cargo install miden-client-cli
 ```
 
-This installs the `miden` binary (at `~/.cargo/bin/miden`).
+This installs the `miden-client` binary (at `~/.cargo/bin/miden-client`).
 
 ## Run the client
 
 If the install worked correctly, you should be able to check the version by running:
 
 ```sh
-miden --version
+miden-client --version
 ```
 
 Once installed, you may run:
 ```sh
-miden --help
+miden-client --help
 ```
 
 This will show you the available commands and options for the client.

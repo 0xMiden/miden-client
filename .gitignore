@@ -36,7 +36,7 @@ node_modules/
 *.iml
 *.ps1
 
-# Ignore files that spawn using `miden init`
+# Ignore files that spawn using `miden-client init`
 miden-client.toml
 ./templates/
 keystore/

@@ -8,13 +8,13 @@ The following document lists the commands that the CLI currently supports.
 Call a command on the `miden-client` like this:
 
 ```sh
-miden <command> <flags> <arguments>
+miden-client <command> <flags> <arguments>
 ```
 
 Optionally, you can include the `--debug` flag to run the command with debug mode, which enables debug output logs from scripts that were compiled in this mode:
 
 ```sh
-miden --debug <flags> <arguments>
+miden-client --debug <flags> <arguments>
 ```
 
 Note that the debug flag overrides the `MIDEN_DEBUG` environment variable.
@@ -28,33 +28,33 @@ Creates a configuration file for the client in the current directory.
 ```sh
 # This will create a config file named `miden-client.toml` using default values
 # This file contains information useful for the CLI like the RPC provider and database path
-miden init --network <network>
+miden-client init --network <network>
 
 # You can set up the CLI for any of the default networks
-miden init --network testnet
-miden init --network devnet
-miden init --network localhost
+miden-client init --network testnet
+miden-client init --network devnet
+miden-client init --network localhost
 
 # You can also specify a custom network
-miden init --network 18.203.155.106
+miden-client init --network 18.203.155.106
 # You can specify the port
-miden init --network 18.203.155.106:8080
+miden-client init --network 18.203.155.106:8080
 # You can also specify the protocol (http/https)
-miden init --network https://18.203.155.106
+miden-client init --network https://18.203.155.106
 # You can specify both
-miden init --network https://18.203.155.106:1234
+miden-client init --network https://18.203.155.106:1234
 
 # You can use the --store-path flag to override the default store config
-miden init --store-path db/store.sqlite3
+miden-client init --store-path db/store.sqlite3
 
 # You can use the --block-delta flag to set maximum number of blocks the client can be behind
-miden init --block-delta 250
+miden-client init --block-delta 250
 
 # You can provide both flags
-miden init --network 18.203.155.106 --store-path db/store.sqlite3
+miden-client init --network 18.203.155.106 --store-path db/store.sqlite3
 
 # You can set a remote prover to offload the proving process (along with the `--delegate-proving` flag in transaction commands)
-miden init --remote-prover-endpoint <PROVER_URL>
+miden-client init --remote-prover-endpoint <PROVER_URL>
 ```
 
 More information on the configuration file can be found in the [configuration section](./cli-config.md).
@@ -74,13 +74,13 @@ Inspect account details.
 The `--show` flag also accepts a partial ID instead of the full ID. For example, instead of:
 
 ```sh
-miden account --show 0x8fd4b86a6387f8d8
+miden-client account --show 0x8fd4b86a6387f8d8
 ```
 
 You can call:
 
 ```sh
-miden account --show 0x8fd4b86
+miden-client account --show 0x8fd4b86
 ```
 
 For the `--default` flag, if `<ID>` is "none" then the previous default account is cleared. If no `<ID>` is specified then the default account is shown.
@@ -112,7 +112,7 @@ This command has four flags:
   - `non-fungible-faucet`
   - `regular-account-immutable-code`
   - `regular-account-updatable-code`
-- `--component-templates <COMPONENT_TEMPLATES>`: Allows you to provide a list of file paths for account component template files to include in the account. These components are looked up from your configured `component_template_directory` field in `miden-client.toml`. 
+- `--component-templates <COMPONENT_TEMPLATES>`: Allows you to provide a list of file paths for account component template files to include in the account. These components are looked up from your configured `component_template_directory` field in `miden-client.toml`.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the provided component templates. The CLI will prompt for any keys that are not present in the file.
 
 After creating an account with the `new-account` command, the account is stored locally and tracked by the client, enabling it to execute transactions and synchronize state changes with the Miden network.
@@ -121,19 +121,19 @@ After creating an account with the `new-account` command, the account is stored 
 
 ```bash
 # Create a new wallet with default settings (private storage, immutable, no extra components)
-miden new-wallet
+miden-client new-wallet
 
 # Create a new wallet with public storage and a mutable code
-miden new-wallet --storage-mode public --mutable
+miden-client new-wallet --storage-mode public --mutable
 
 # Create a new wallet that includes extra components from local templates
-miden new-wallet --extra-components template1,template2
+miden-client new-wallet --extra-components template1,template2
 
 # Create a fungible faucet with interactive input
-miden new-account --account-type fungible-faucet -c basic-fungible-faucet
+miden-client new-account --account-type fungible-faucet -c basic-fungible-faucet
 
 # Create a fungible faucet with preset fields
-miden new-account --account-type fungible-faucet --component-templates basic-fungible-faucet --init-storage-data-path init_data.toml
+miden-client new-account --account-type fungible-faucet --component-templates basic-fungible-faucet --init-storage-data-path init_data.toml
 ```
 
 ### `info`
@@ -162,13 +162,13 @@ If no filter is specified then all notes are listed.
 The `--show` flag also accepts a partial ID instead of the full ID. For example, instead of:
 
 ```sh
-miden notes --show 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
+miden-client notes --show 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
 ```
 
 You can call:
 
 ```sh
-miden notes --show 0x70b7ec
+miden-client notes --show 0x70b7ec
 ```
 
 ### `sync`
@@ -207,24 +207,24 @@ After a transaction gets executed, two entities start being tracked:
 
 Creates a note that contains a specific amount tokens minted by a faucet, that the target Account ID can consume.
 
-Usage: `miden mint --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE>`
+Usage: `miden-client mint --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE>`
 
 #### `consume-notes`
 
 Account ID consumes a list of notes, specified by their Note ID.
 
-Usage: `miden consume-notes --account <ACCOUNT ID> [NOTES]`
+Usage: `miden-client consume-notes --account <ACCOUNT ID> [NOTES]`
 
 For this command, you can also provide a partial ID instead of the full ID for each note. So instead of
 
 ```sh
-miden consume-notes --account <some-account-id> 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0 0x80b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
+miden-client consume-notes --account <some-account-id> 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0 0x80b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
 ```
 
 You can do:
 
 ```sh
-miden consume-notes --account <some-account-id> 0x70b7ecb 0x80b7ecb
+miden-client consume-notes --account <some-account-id> 0x70b7ecb 0x80b7ecb
 ```
 
 Additionally, you can optionally not specify note IDs, in which case any note that is known to be consumable by the executor account ID will be consumed.
@@ -235,13 +235,13 @@ Either `Expected` or `Committed` notes may be consumed by this command, changing
 
 Sends assets to another account. Sender Account creates a note that a target Account ID can consume. The asset is identified by the tuple `(FAUCET ID, AMOUNT)`. The note can be configured to be recallable making the sender able to consume it after a height is reached.
 
-Usage: `miden send --sender <SENDER ACCOUNT ID> --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE> <RECALL_HEIGHT>`
+Usage: `miden-client send --sender <SENDER ACCOUNT ID> --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE> <RECALL_HEIGHT>`
 
 #### `swap`
 
 The source account creates a `SWAP` note that offers some asset in exchange for some other asset. When another account consumes that note, it will receive the offered asset amount and the requested asset will removed from its vault (and put into a new note which the first account can then consume). Consuming the note will fail if the account doesn't have enough of the requested asset.
 
-Usage:  `miden swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED AMOUNT>::<OFFERED FAUCET ID> --requested-asset <REQUESTED AMOUNT>::<REQUESTED FAUCET ID> --note-type <NOTE_TYPE>`
+Usage:  `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED AMOUNT>::<OFFERED FAUCET ID> --requested-asset <REQUESTED AMOUNT>::<REQUESTED FAUCET ID> --note-type <NOTE_TYPE>`
 
 #### Tips
 For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](./cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
@@ -249,13 +249,13 @@ For `send` and `consume-notes`, you can omit the `--sender` and `--account` flag
 For every command which needs an account ID (either wallet or faucet), you can also provide a partial ID instead of the full ID for each account. So instead of
 
 ```sh
-miden send --sender 0x80519a1c5e3680fc --target 0x8fd4b86a6387f8d8 --asset 100::0xa99c5c8764d4e011
+miden-client send --sender 0x80519a1c5e3680fc --target 0x8fd4b86a6387f8d8 --asset 100::0xa99c5c8764d4e011
 ```
 
 You can do:
 
 ```sh
-miden send --sender 0x80519 --target 0x8fd4b --asset 100::0xa99c5c8764d4e011
+miden-client send --sender 0x80519 --target 0x8fd4b --asset 100::0xa99c5c8764d4e011
 ```
 
 !!! note
@@ -266,7 +266,7 @@ miden send --sender 0x80519 --target 0x8fd4b --asset 100::0xa99c5c8764d4e011
 When creating a new transaction, a summary of the transaction updates will be shown and confirmation for those updates will be prompted:
 
 ```sh
-miden <tx command> ...
+miden-client <tx command> ...
 
 TX Summary:
 
@@ -275,7 +275,7 @@ TX Summary:
 Continue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)
 ```
 
-This confirmation can be skipped in non-interactive environments by providing the `--force` flag (`miden send --force ...`).
+This confirmation can be skipped in non-interactive environments by providing the `--force` flag (`miden-client send --force ...`).
 
 #### Delegated proving
 
@@ -321,7 +321,7 @@ Execute the specified program against the specified account.
 
 The file referenced by `--inputs-path` should contain a TOML array of inline tables, where each table has two fields: - `key`: a 256-bit hexadecimal string representing a word to be used as a key for the input entry. The hexadecimal value must be prefixed with 0x. - `values`: an array of 64-bit unsigned integers representing field elements to be used as values for the input entry. Each integer must be written as a separate string, within double quotes.
 
-The input file should contain a TOML table called `inputs`, as in the following example: 
+The input file should contain a TOML table called `inputs`, as in the following example:
 ```toml
 inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
 ```
