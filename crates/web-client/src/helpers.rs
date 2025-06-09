@@ -1,4 +1,5 @@
 use miden_client::{
+    Client,
     account::{Account, AccountBuilder, AccountType},
     crypto::SecretKey,
 };
@@ -22,6 +23,7 @@ use crate::{js_error_with_context, models::account_storage_mode::AccountStorageM
 /// - If rust client calls fail
 /// - If the seed is passed in and is not exactly 32 bytes
 pub(crate) async fn generate_wallet(
+    client: &mut Client,
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
