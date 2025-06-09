@@ -15,10 +15,9 @@ FEATURES_WEB_CLIENT=--features "testing"
 FEATURES_CLIENT=--features "testing, concurrent" --no-default-features
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
-PROVER_DIR="miden-base"
-PROVER_REPO="https://github.com/0xMiden/miden-base.git"
+PROVER_DIR="miden-node"
+PROVER_REPO="https://github.com/0xMiden/miden-node.git"
 PROVER_BRANCH="next"
-PROVER_FEATURES_TESTING=--features "testing"
 PROVER_PORT=50051
 
 # --- Linting -------------------------------------------------------------------------------------
@@ -125,11 +124,11 @@ update-prover-branch: setup-miden-base ## Checkout and update the specified bran
 
 .PHONY: build-prover
 build-prover: update-prover-branch ## Build the prover binary with specified features
-	cd $(PROVER_DIR) && cargo build --bin miden-proving-service --locked $(PROVER_FEATURES_TESTING) --release
+	cd $(PROVER_DIR) && cargo build -p miden-proving-service --locked --release
 
 .PHONY: start-prover
 start-prover: ## Run prover. This requires the base repo to be present at `miden-base`
-	cd $(PROVER_DIR) && RUST_LOG=info cargo run --bin miden-proving-service $(PROVER_FEATURES_TESTING) --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
+	cd $(PROVER_DIR) && RUST_LOG=info cargo run -p miden-proving-service --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
 
 .PHONY: kill-prover
 kill-prover: ## Kill prover process
