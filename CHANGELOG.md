@@ -3,7 +3,8 @@
 ## 0.9.1 (TBD)
 
 ### Changes
-* Fixed wasm-opt options to improve performance of generated wasm. wasm-opt settings were broken before.
+
+* Fixed wasm-opt options to improve performance of generated wasm (#961).
 
 ## 0.9.0 (2025-05-30)
 
