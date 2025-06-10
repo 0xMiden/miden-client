@@ -150,7 +150,11 @@ async function updateBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    await tx.blockHeaders.add(data);
+    const existingBlockHeader = await tx.blockHeaders.get(blockNum);
+
+    if (!existingBlockHeader) {
+      await tx.blockHeaders.add(data);
+    }
   } catch (err) {
     console.error("Failed to insert block header: ", err.toString());
     throw err;

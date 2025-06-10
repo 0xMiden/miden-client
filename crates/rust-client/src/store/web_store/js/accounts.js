@@ -492,7 +492,6 @@ export async function getForeignAccountCode(accountIds) {
         code: codeBase64,
       };
     });
-
     return processedCode;
   } catch (error) {
     console.error("Error fetching foreign account code:", error.toString());

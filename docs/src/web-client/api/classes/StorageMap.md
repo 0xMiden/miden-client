@@ -25,3 +25,23 @@
 #### Returns
 
 `void`
+
+***
+
+### insert()
+
+> **insert**(`key`, `value`): [`Word`](Word.md)
+
+#### Parameters
+
+##### key
+
+[`RpoDigest`](RpoDigest.md)
+
+##### value
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)

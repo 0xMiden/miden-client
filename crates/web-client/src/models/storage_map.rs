@@ -1,6 +1,8 @@
 use miden_objects::account::StorageMap as NativeStorageMap;
 use wasm_bindgen::prelude::*;
 
+use crate::models::{rpo_digest::RpoDigest, word::Word};
+
 #[wasm_bindgen]
 pub struct StorageMap(NativeStorageMap);
 
@@ -9,6 +11,10 @@ impl StorageMap {
     #[wasm_bindgen(constructor)]
     pub fn new() -> StorageMap {
         StorageMap(NativeStorageMap::new())
+    }
+
+    pub fn insert(&mut self, key: &RpoDigest, value: &Word) -> Word {
+        self.0.insert(key.into(), value.into()).into()
     }
 }
 
