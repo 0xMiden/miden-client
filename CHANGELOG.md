@@ -4,7 +4,11 @@
 
 ### Changes
 
-* [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client`
+* [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
+
+### Features
+
+* Added support for FPI in Web Client (#958).
 
 ## 0.9.0 (2025-05-30)
 

@@ -18,6 +18,22 @@
 
 ## Methods
 
+### addAccountSecretKeyToWebStore()
+
+> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### secret\_key
+
+[`SecretKey`](SecretKey.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### addTag()
 
 > **addTag**(`tag`): `Promise`\<`void`\>

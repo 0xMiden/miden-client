@@ -2,14 +2,16 @@ use miden_client::{
     Felt,
     account::{AccountBuilder, AccountType},
     auth::AuthSecretKey,
-    crypto::SecretKey,
+    crypto::SecretKey as NativeSecretKey,
 };
 use miden_lib::account::{auth::RpoFalcon512, faucets::BasicFungibleFaucet};
 use miden_objects::asset::TokenSymbol;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
 
-use super::models::{account::Account, account_storage_mode::AccountStorageMode, word::Word};
+use super::models::{
+    account::Account, account_storage_mode::AccountStorageMode, secret_key::SecretKey, word::Word,
+};
 use crate::{WebClient, helpers::generate_wallet, js_error_with_context};
 
 #[wasm_bindgen]
@@ -58,7 +60,7 @@ impl WebClient {
 
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let key_pair = SecretKey::with_rng(client.rng());
+            let key_pair = NativeSecretKey::with_rng(client.rng());
             let pub_key = key_pair.public_key();
 
             let mut init_seed = [0u8; 32];
@@ -121,5 +123,18 @@ impl WebClient {
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
+    }
+
+    #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
+    pub async fn add_account_secret_key_to_web_store(
+        &mut self,
+        secret_key: &SecretKey,
+    ) -> Result<(), JsValue> {
+        let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
+        keystore
+            .add_key(&AuthSecretKey::RpoFalcon512(secret_key.into()))
+            .await
+            .map_err(|err| err.to_string())?;
+        Ok(())
     }
 }
