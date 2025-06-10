@@ -9,7 +9,7 @@ We currently recommend installing and running the client with the [`concurrent`]
 Run the following command to install the miden-client:
 
 ```sh
-cargo install miden-cli --features concurrent
+cargo install miden-cli --features concurrent --locked
 ```
 
 This installs the `miden` binary (at `~/.cargo/bin/miden`) with the [`concurrent`](#concurrent-feature) feature.
