@@ -1,13 +1,17 @@
-use anyhow::Error;
-use miden_proving_service::{ProverType, RpcListener, setup_tracing};
+use miden_proving_service::api::{ProverType, RpcListener};
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
+use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
 const DEFAULT_PROVER_PORT: u16 = 50051;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    setup_tracing().map_err(|err| Error::msg(err.to_string()))?;
+    let subscriber = Registry::default()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(tracing_subscriber::fmt::layer());
+
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let addr = format!("127.0.0.1:{DEFAULT_PROVER_PORT}");
     let rpc = RpcListener::new(TcpListener::bind(&addr).await?, ProverType::Transaction);
