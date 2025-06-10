@@ -9,6 +9,7 @@
 ### Features
 
 * Added support for FPI in Web Client (#958).
+* [BREAKING] Added `utils` module to `miden-client` for common utilities (#971).
 
 ## 0.9.2 (2025-06-11)
 

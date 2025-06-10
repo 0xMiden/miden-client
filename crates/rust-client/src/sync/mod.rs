@@ -218,6 +218,8 @@ pub struct SyncSummary {
     pub locked_accounts: Vec<AccountId>,
     /// IDs of committed transactions.
     pub committed_transactions: Vec<TransactionId>,
+    /// IDs of discarded transactions.
+    pub discarded_transactions: Vec<TransactionId>,
 }
 
 impl SyncSummary {
@@ -229,6 +231,7 @@ impl SyncSummary {
         updated_accounts: Vec<AccountId>,
         locked_accounts: Vec<AccountId>,
         committed_transactions: Vec<TransactionId>,
+        discarded_transactions: Vec<TransactionId>,
     ) -> Self {
         Self {
             block_num,
@@ -238,6 +241,7 @@ impl SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            discarded_transactions,
         }
     }
 
@@ -250,6 +254,7 @@ impl SyncSummary {
             updated_accounts: vec![],
             locked_accounts: vec![],
             committed_transactions: vec![],
+            discarded_transactions: vec![],
         }
     }
 
@@ -260,6 +265,7 @@ impl SyncSummary {
             && self.updated_accounts.is_empty()
             && self.locked_accounts.is_empty()
             && self.committed_transactions.is_empty()
+            && self.discarded_transactions.is_empty()
     }
 
     pub fn combine_with(&mut self, mut other: Self) {
@@ -270,6 +276,7 @@ impl SyncSummary {
         self.updated_accounts.append(&mut other.updated_accounts);
         self.locked_accounts.append(&mut other.locked_accounts);
         self.committed_transactions.append(&mut other.committed_transactions);
+        self.discarded_transactions.append(&mut other.discarded_transactions);
     }
 }
 
@@ -282,6 +289,7 @@ impl Serializable for SyncSummary {
         self.updated_accounts.write_into(target);
         self.locked_accounts.write_into(target);
         self.committed_transactions.write_into(target);
+        self.discarded_transactions.write_into(target);
     }
 }
 
@@ -296,6 +304,7 @@ impl Deserializable for SyncSummary {
         let updated_accounts = Vec::<AccountId>::read_from(source)?;
         let locked_accounts = Vec::<AccountId>::read_from(source)?;
         let committed_transactions = Vec::<TransactionId>::read_from(source)?;
+        let discarded_transactions = Vec::<TransactionId>::read_from(source)?;
 
         Ok(Self {
             block_num,
@@ -305,6 +314,7 @@ impl Deserializable for SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            discarded_transactions,
         })
     }
 }

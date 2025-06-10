@@ -98,6 +98,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .map(|(id, _)| *id)
                 .collect(),
             value.transaction_updates.committed_transactions().map(|t| t.id).collect(),
+            value.transaction_updates.discarded_transactions().map(|t| t.id).collect(),
         )
     }
 }

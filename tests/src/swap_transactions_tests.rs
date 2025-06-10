@@ -3,6 +3,7 @@ use miden_client::{
     note::{Note, build_swap_tag},
     testing::common::*,
     transaction::{SwapTransactionData, TransactionRequestBuilder},
+    utils::{execute_tx_and_sync, insert_new_fungible_faucet, insert_new_wallet},
 };
 use miden_objects::{
     account::AccountStorageMode,
@@ -84,7 +85,7 @@ async fn test_swap_fully_onchain() {
     assert_eq!(expected_output_notes.len(), 1);
     assert_eq!(expected_payback_note_details.len(), 1);
 
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await;
+    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
 
     let swap_note_tag = build_swap_tag(
         NoteType::Public,
@@ -107,7 +108,7 @@ async fn test_swap_fully_onchain() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_output_notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await;
+    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await.unwrap();
 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
@@ -117,7 +118,7 @@ async fn test_swap_fully_onchain() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_payback_note_details[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await;
+    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
 
     // At the end we should end up with
     //
@@ -246,7 +247,7 @@ async fn test_swap_private() {
     assert_eq!(expected_output_notes.len(), 1);
     assert_eq!(expected_payback_note_details.len(), 1);
 
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await;
+    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
 
     // Export note from client 1 to client 2
     let output_note =
@@ -277,7 +278,7 @@ async fn test_swap_private() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_output_notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await;
+    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await.unwrap();
 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
@@ -287,7 +288,7 @@ async fn test_swap_private() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_payback_note_details[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await;
+    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
 
     // At the end we should end up with
     //

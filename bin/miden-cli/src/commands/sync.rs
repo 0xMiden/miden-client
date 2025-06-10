@@ -18,6 +18,7 @@ impl SyncCmd {
         println!("Tracked accounts updated: {}", new_details.updated_accounts.len());
         println!("Locked accounts: {}", new_details.locked_accounts.len());
         println!("Commited transactions: {}", new_details.committed_transactions.len());
+        println!("Discarded transactions: {}", new_details.discarded_transactions.len());
         Ok(())
     }
 }

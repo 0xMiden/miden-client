@@ -4,7 +4,10 @@ use miden_client::{
     store::NoteFilter,
     testing::common::*,
     transaction::{InputNote, TransactionRequest, TransactionRequestBuilder},
-    utils::{Deserializable, Serializable},
+    utils::{
+        Deserializable, Serializable, execute_tx_and_sync, insert_new_fungible_faucet,
+        insert_new_wallet,
+    },
 };
 use miden_objects::{
     Felt, Word,
@@ -128,7 +131,9 @@ async fn test_transaction_request() {
     let deserialized_transaction_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
     assert_eq!(transaction_request, deserialized_transaction_request);
 
-    execute_tx_and_sync(&mut client, regular_account.id(), transaction_request).await;
+    execute_tx_and_sync(&mut client, regular_account.id(), transaction_request)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 }
@@ -219,7 +224,9 @@ async fn test_merkle_store() {
         .build()
         .unwrap();
 
-    execute_tx_and_sync(&mut client, regular_account.id(), transaction_request).await;
+    execute_tx_and_sync(&mut client, regular_account.id(), transaction_request)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 }
@@ -279,7 +286,9 @@ async fn test_onchain_notes_sync_with_tag() {
         .unwrap();
 
     let note = tx_request.expected_output_notes().next().unwrap().clone();
-    execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await;
+    execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request)
+        .await
+        .unwrap();
 
     // Load tag into client 2
     client_2
@@ -315,7 +324,9 @@ async fn mint_custom_note(
         .build()
         .unwrap();
 
-    execute_tx_and_sync(client, faucet_account_id, transaction_request).await;
+    execute_tx_and_sync(client, faucet_account_id, transaction_request)
+        .await
+        .unwrap();
     note
 }
 
