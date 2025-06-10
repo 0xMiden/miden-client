@@ -19,7 +19,7 @@ crate-type = ["lib"]
 workspace = true
 
 [features]
-concurrent = ["miden-tx/concurrent"]
+concurrent = ["miden-tx/concurrent", "std"]
 default = ["std", "tonic/channel"]
 idxdb = ["dep:base64", "dep:serde-wasm-bindgen", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
 sqlite = ["dep:rusqlite", "dep:deadpool", "dep:deadpool-sync", "dep:rusqlite_migration", "std"]
