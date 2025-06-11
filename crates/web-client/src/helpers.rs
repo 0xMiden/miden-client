@@ -1,11 +1,11 @@
 use miden_client::{
     Client,
     account::{Account, AccountBuilder, AccountType},
-    crypto::{FeltRng, RpoRandomCoin, SecretKey},
+    crypto::SecretKey,
 };
 use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
 use miden_objects::Felt;
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngCore, SeedableRng, rngs::StdRng};
 use wasm_bindgen::JsValue;
 
 use crate::{js_error_with_context, models::account_storage_mode::AccountStorageMode};
@@ -28,28 +28,24 @@ pub(crate) async fn generate_wallet(
     mutable: bool,
     seed: Option<Vec<u8>>,
 ) -> Result<(Account, [Felt; 4], SecretKey), JsValue> {
-    let mut rng: &mut Box<dyn FeltRng> = match seed {
+    let mut rng = match seed {
         Some(seed_bytes) => {
             // Attempt to convert the seed slice into a 32-byte array.
             let seed_array: [u8; 32] = seed_bytes
                 .try_into()
                 .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
-            let mut std_rng = StdRng::from_seed(seed_array);
-            let coin_seed: [u64; 4] = std_rng.random();
-            &mut (Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new))) as Box<dyn FeltRng>)
+            StdRng::from_seed(seed_array)
         },
-        None => client.rng().inner_mut(),
+        None => StdRng::from_os_rng(),
     };
     let key_pair = SecretKey::with_rng(&mut rng);
-
-    let mut init_seed = [0u8; 32];
-    rng.fill_bytes(&mut init_seed);
-
     let account_type = if mutable {
         AccountType::RegularAccountUpdatableCode
     } else {
         AccountType::RegularAccountImmutableCode
     };
+    let mut init_seed = [0u8; 32];
+    rng.fill_bytes(&mut init_seed);
 
     let anchor_block = client
         .ensure_genesis_in_place()
