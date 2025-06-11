@@ -84,17 +84,13 @@
 
 ### fromAccountId()
 
-> `static` **fromAccountId**(`account_id`, `execution`): `NoteTag`
+> `static` **fromAccountId**(`account_id`): `NoteTag`
 
 #### Parameters
 
 ##### account\_id
 
 [`AccountId`](AccountId.md)
-
-##### execution
-
-[`NoteExecutionMode`](NoteExecutionMode.md)
 
 #### Returns
 

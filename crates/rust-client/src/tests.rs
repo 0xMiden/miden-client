@@ -22,10 +22,7 @@ use miden_objects::{
         dsa::rpo_falcon512::SecretKey,
         rand::{FeltRng, RpoRandomCoin},
     },
-    note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteMetadata, NoteTag,
-        NoteType,
-    },
+    note::{Note, NoteAssets, NoteExecutionHint, NoteFile, NoteMetadata, NoteTag, NoteType},
     testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
@@ -763,7 +760,7 @@ async fn test_note_without_asset() {
     // Create note without assets
     let serial_num = client.rng().draw_word();
     let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
-    let tag = NoteTag::from_account_id(wallet.id(), NoteExecutionMode::Local).unwrap();
+    let tag = NoteTag::from_account_id(wallet.id());
     let metadata =
         NoteMetadata::new(wallet.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
             .unwrap();

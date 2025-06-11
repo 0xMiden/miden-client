@@ -348,7 +348,7 @@ mod tests {
         account::{AccountBuilder, AccountId, AccountType},
         asset::FungibleAsset,
         crypto::rand::{FeltRng, RpoRandomCoin},
-        note::{NoteExecutionMode, NoteTag, NoteType},
+        note::{NoteTag, NoteType},
         testing::{
             account_component::AccountMockComponent,
             account_id::{
@@ -406,7 +406,7 @@ mod tests {
             .with_expected_output_notes(vec![notes.pop().unwrap()])
             .with_expected_future_notes(vec![(
                 notes.pop().unwrap().into(),
-                NoteTag::from_account_id(sender_id, NoteExecutionMode::Local).unwrap(),
+                NoteTag::from_account_id(sender_id),
             )])
             .extend_advice_map(advice_vec)
             .with_foreign_accounts([

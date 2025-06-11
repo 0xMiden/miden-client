@@ -13,11 +13,9 @@ pub struct NoteTag(NativeNoteTag);
 #[wasm_bindgen]
 impl NoteTag {
     #[wasm_bindgen(js_name = "fromAccountId")]
-    pub fn from_account_id(account_id: &AccountId, execution: &NoteExecutionMode) -> NoteTag {
+    pub fn from_account_id(account_id: &AccountId) -> NoteTag {
         let native_account_id: NativeAccountId = account_id.into();
-        let native_execution: NativeNoteExecutionMode = execution.into();
-        let native_note_tag =
-            NativeNoteTag::from_account_id(native_account_id, native_execution).unwrap();
+        let native_note_tag = NativeNoteTag::from_account_id(native_account_id);
         NoteTag(native_note_tag)
     }
 

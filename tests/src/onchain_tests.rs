@@ -4,7 +4,7 @@ use miden_client::{
     Felt, Word, ZERO,
     account::{Account, AccountBuilder, StorageSlot, build_wallet_id},
     auth::AuthSecretKey,
-    note::{NoteExecutionMode, NoteTag},
+    note::NoteTag,
     store::{InputNoteState, NoteFilter},
     testing::{common::*, note::NoteBuilder},
     transaction::{
@@ -523,11 +523,7 @@ async fn test_counter_contract_ntx() {
                     call.counter_contract::increment_count
                 end",
                 )
-                .tag(
-                    NoteTag::from_account_id(network_account.id(), NoteExecutionMode::Network)
-                        .unwrap()
-                        .into(),
-                )
+                .tag(NoteTag::from_account_id(network_account.id()).into())
                 .build(&assembler)
                 .unwrap(),
         ));

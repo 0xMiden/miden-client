@@ -134,7 +134,7 @@ impl<'a> NoteScreener<'a> {
         let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
             .expect("Single note should be valid");
 
-        self.mast_store.load_transaction_code(account.code(), &input_notes, &tx_args);
+        self.mast_store.load_account_code(account.code());
 
         if let NoteAccountExecution::Success = self
             .consumption_checker
