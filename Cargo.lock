@@ -2412,20 +2412,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-prover-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "miden-proving-service",
- "tokio",
- "tokio-stream",
- "tonic 0.12.3",
- "tonic-web",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "miden-proving-service"
 version = "0.10.0"
 source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-proving-service-lib#7d0d86444f051551c9442c5cdd66ed71a95ab14f"
@@ -4561,6 +4547,20 @@ name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+
+[[package]]
+name = "testing-proving-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "miden-proving-service",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.12.3",
+ "tonic-web",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "textwrap"
