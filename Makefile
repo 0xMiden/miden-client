@@ -12,7 +12,7 @@ help: ## Show description of all commands
 CODEGEN=CODEGEN=1
 
 FEATURES_WEB_CLIENT=--features "testing"
-FEATURES_CLIENT=--features "testing, concurrent" --no-default-features
+FEATURES_CLIENT=--features "testing" --no-default-features
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="miden-node"
