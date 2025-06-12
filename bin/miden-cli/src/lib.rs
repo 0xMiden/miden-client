@@ -41,11 +41,20 @@ mod utils;
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 
 /// Client binary name.
-pub const CLIENT_BINARY_NAME: &str = "miden";
+pub const CLIENT_BINARY_NAME: &str = "miden-client";
+
+/// Number of blocks that must elapse after a transaction’s reference block before it is marked
+/// stale and discarded.
+const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
 
 /// Root CLI struct.
 #[derive(Parser, Debug)]
-#[command(name = "Miden", about = "Miden client", version, rename_all = "kebab-case")]
+#[command(
+    name = "miden-client",
+    about = "The Miden client",
+    version,
+    rename_all = "kebab-case"
+)]
 pub struct Cli {
     #[command(subcommand)]
     action: Command,
@@ -123,6 +132,8 @@ impl Cli {
             store as Arc<dyn Store>,
             Arc::new(keystore.clone()),
             in_debug_mode,
+            Some(TX_GRACEFUL_BLOCK_DELTA),
+            cli_config.max_block_number_delta,
         );
 
         // Execute CLI command

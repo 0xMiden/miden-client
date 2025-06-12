@@ -1,8 +1,8 @@
 use alloc::{
-    boxed::Box,
     string::{String, ToString},
     sync::Arc,
 };
+use std::boxed::Box;
 
 use miden_objects::{
     Felt,
@@ -17,6 +17,15 @@ use crate::rpc::{Endpoint, TonicRpcClient};
 use crate::store::sqlite_store::SqliteStore;
 use crate::{Client, ClientError, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store};
 
+// CONSTANTS
+// ================================================================================================
+
+/// The number of blocks that are considered old enough to discard pending transactions.
+const TX_GRACEFUL_BLOCKS: u32 = 20;
+
+// AUTHENTICATOR CONFIGURATION
+// ================================================================================================
+
 /// Represents the configuration for an authenticator.
 ///
 /// This enum defers authenticator instantiation until the build phase. The builder can accept
@@ -28,6 +37,9 @@ enum AuthenticatorConfig {
     Path(String),
     Instance(Arc<dyn TransactionAuthenticator>),
 }
+
+// CLIENT BUILDER
+// ================================================================================================
 
 /// A builder for constructing a Miden client.
 ///
@@ -48,6 +60,12 @@ pub struct ClientBuilder {
     keystore: Option<AuthenticatorConfig>,
     /// A flag to enable debug mode.
     in_debug_mode: bool,
+    /// The number of blocks that are considered old enough to discard pending transactions. If
+    /// `None`, there is no limit and transactions will be kept indefinitely.
+    tx_graceful_blocks: Option<u32>,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    max_block_number_delta: Option<u32>,
 }
 
 impl Default for ClientBuilder {
@@ -60,6 +78,8 @@ impl Default for ClientBuilder {
             store_path: "store.sqlite3".to_string(),
             keystore: None,
             in_debug_mode: false,
+            tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
+            max_block_number_delta: None,
         }
     }
 }
@@ -121,11 +141,24 @@ impl ClientBuilder {
         self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
         self
     }
-}
 
-/// Methods that only make sense when using the default keystore type,
-/// i.e. `FilesystemKeyStore<rand::rngs::StdRng>`.
-impl ClientBuilder {
+    /// Optionally set a maximum number of blocks that the client can be behind the network.
+    /// By default, there's no maximum.
+    #[must_use]
+    pub fn with_max_block_number_delta(mut self, delta: u32) -> Self {
+        self.max_block_number_delta = Some(delta);
+        self
+    }
+
+    /// Optionally set a maximum number of blocks to wait for a transaction to be confirmed. If
+    /// `None`, there is no limit and transactions will be kept indefinitely.
+    /// By default, the maximum is set to `TX_GRACEFUL_BLOCKS`.
+    #[must_use]
+    pub fn with_tx_graceful_blocks(mut self, delta: Option<u32>) -> Self {
+        self.tx_graceful_blocks = delta;
+        self
+    }
+
     /// **Required:** Provide the keystore path as a string.
     ///
     /// This stores the keystore path as a configuration option so that actual keystore
@@ -198,6 +231,14 @@ impl ClientBuilder {
             }
         };
 
-        Ok(Client::new(rpc_api, rng, arc_store, authenticator, self.in_debug_mode))
+        Ok(Client::new(
+            rpc_api,
+            rng,
+            arc_store,
+            authenticator,
+            self.in_debug_mode,
+            self.tx_graceful_blocks,
+            self.max_block_number_delta,
+        ))
     }
 }

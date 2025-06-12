@@ -1,29 +1,30 @@
 ## Software prerequisites
 
-- [Rust installation](https://www.rust-lang.org/tools/install) minimum version 1.86.
+- [Rust installation](https://www.rust-lang.org/tools/install) minimum version 1.87.
 
 ## Install the client
-
-We currently recommend installing and running the client with the [`concurrent`](#concurrent-feature) feature.
 
 Run the following command to install the miden-client:
 
 ```sh
-cargo install miden-cli --features concurrent
+cargo install miden-client-cli --locked
 ```
 
-This installs the `miden` binary (at `~/.cargo/bin/miden`) with the [`concurrent`](#concurrent-feature) feature.
+This installs the `miden-client` binary (at `~/.cargo/bin/miden-client`).
 
-### `Concurrent` feature
+## Run the client
 
-The `concurrent` flag enables optimizations that result in faster transaction execution and proving times.
+If the install worked correctly, you should be able to check the version by running:
 
-## Run the client 
+```sh
+miden-client --version
+```
 
-1. Make sure you have already [installed the client](#install-the-client). If you don't have a `miden-client.toml` file in your directory, create one or run `miden init` to initialize one at the current working directory. You can do so without any arguments to use its defaults or define either the RPC endpoint or the store config via `--network` and `--store-path`
+Once installed, you may run:
+```sh
+miden-client --help
+```
 
-2. Run the client CLI using:
+This will show you the available commands and options for the client.
 
-    ```sh
-    miden
-    ```
+An more in depth tutorial can be fund in the [Getting started section](./get-started/prerequisites.md).

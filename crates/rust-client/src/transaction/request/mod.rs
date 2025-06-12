@@ -13,7 +13,7 @@ use miden_objects::{
     assembly::AssemblyError,
     crypto::merkle::MerkleStore,
     note::{Note, NoteDetails, NoteId, NoteTag, PartialNote},
-    transaction::{ForeignAccountInputs, TransactionArgs, TransactionScript},
+    transaction::{AccountInputs, TransactionArgs, TransactionScript},
     vm::AdviceMap,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -23,7 +23,7 @@ mod builder;
 pub use builder::{PaymentTransactionData, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
-pub use foreign::{ForeignAccount, ForeignAccountInformation};
+pub use foreign::ForeignAccount;
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -76,8 +76,12 @@ pub struct TransactionRequest {
     /// added to the executor and prover.
     foreign_accounts: BTreeSet<ForeignAccount>,
     /// The number of blocks in relation to the transaction's reference block after which the
-    /// transaction will expire.
+    /// transaction will expire. If `None`, the transaction will not expire.
     expiration_delta: Option<u16>,
+    /// Indicates whether to **silently** ignore invalid input notes when executing the
+    /// transaction. This will allow the transaction to be executed even if some input notes
+    /// are invalid.
+    ignore_invalid_input_notes: bool,
 }
 
 impl TransactionRequest {
@@ -100,8 +104,8 @@ impl TransactionRequest {
             self.unauthenticated_input_note_ids().collect::<BTreeSet<_>>();
 
         self.input_notes()
-            .iter()
-            .map(|(note_id, _)| *note_id)
+            .keys()
+            .copied()
             .filter(move |note_id| !unauthenticated_note_ids.contains(note_id))
     }
 
@@ -154,12 +158,17 @@ impl TransactionRequest {
         &self.foreign_accounts
     }
 
+    /// Returns whether to ignore invalid input notes or not.
+    pub fn ignore_invalid_input_notes(&self) -> bool {
+        self.ignore_invalid_input_notes
+    }
+
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(super) fn into_transaction_args(
+    pub(crate) fn into_transaction_args(
         self,
         tx_script: TransactionScript,
-        foreign_account_inputs: Vec<ForeignAccountInputs>,
+        foreign_account_inputs: Vec<AccountInputs>,
     ) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
@@ -228,6 +237,7 @@ impl Serializable for TransactionRequest {
         self.merkle_store.write_into(target);
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
+        target.write_u8(u8::from(self.ignore_invalid_input_notes));
     }
 }
 
@@ -262,6 +272,7 @@ impl Deserializable for TransactionRequest {
         let merkle_store = MerkleStore::read_from(source)?;
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;
+        let ignore_invalid_input_notes = source.read_u8()? == 1;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -273,6 +284,7 @@ impl Deserializable for TransactionRequest {
             merkle_store,
             foreign_accounts,
             expiration_delta,
+            ignore_invalid_input_notes,
         })
     }
 }
@@ -333,7 +345,7 @@ mod tests {
     use miden_lib::{note::create_p2id_note, transaction::TransactionKernel};
     use miden_objects::{
         Digest, Felt, ZERO,
-        account::{AccountBuilder, AccountId, AccountIdAnchor, AccountType},
+        account::{AccountBuilder, AccountId, AccountType},
         asset::FungibleAsset,
         crypto::rand::{FeltRng, RpoRandomCoin},
         note::{NoteExecutionMode, NoteTag, NoteType},
@@ -349,10 +361,7 @@ mod tests {
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
-    use crate::{
-        rpc::domain::account::AccountStorageRequirements,
-        transaction::{ForeignAccount, ForeignAccountInformation},
-    };
+    use crate::{rpc::domain::account::AccountStorageRequirements, transaction::ForeignAccount};
 
     #[test]
     fn transaction_request_serialization() {
@@ -382,7 +391,6 @@ mod tests {
         }
 
         let account = AccountBuilder::new(Default::default())
-            .anchor(AccountIdAnchor::new_unchecked(0, Digest::default()))
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap(),
             )
@@ -407,14 +415,7 @@ mod tests {
                     AccountStorageRequirements::new([(5u8, &[Digest::default()])]),
                 )
                 .unwrap(),
-                ForeignAccount::private(
-                    ForeignAccountInformation::from_account(
-                        account,
-                        &AccountStorageRequirements::default(),
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
+                ForeignAccount::private(account).unwrap(),
             ])
             .with_own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),

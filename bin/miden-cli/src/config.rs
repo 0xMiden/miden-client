@@ -12,6 +12,8 @@ use figment::{
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 
+use crate::errors::CliError;
+
 const TOKEN_SYMBOL_MAP_FILEPATH: &str = "token_symbol_map.toml";
 const DEFAULT_COMPONENT_TEMPLATE_DIR: &str = "./templates";
 
@@ -34,6 +36,9 @@ pub struct CliConfig {
     pub remote_prover_endpoint: Option<CliEndpoint>,
     /// Path to the directory from where account component template files will be loaded.
     pub component_template_directory: PathBuf,
+    /// Maximum number of blocks the client can be behind the network for transactions and account
+    /// proofs to be considered valid.
+    pub max_block_number_delta: Option<u32>,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -68,6 +73,7 @@ impl Default for CliConfig {
             token_symbol_map_filepath: Path::new(TOKEN_SYMBOL_MAP_FILEPATH).to_path_buf(),
             remote_prover_endpoint: None,
             component_template_directory: Path::new(DEFAULT_COMPONENT_TEMPLATE_DIR).to_path_buf(),
+            max_block_number_delta: None,
         }
     }
 }
@@ -117,6 +123,16 @@ impl TryFrom<&str> for CliEndpoint {
 impl From<Endpoint> for CliEndpoint {
     fn from(endpoint: Endpoint) -> Self {
         Self(endpoint)
+    }
+}
+
+impl TryFrom<Network> for CliEndpoint {
+    type Error = CliError;
+
+    fn try_from(value: Network) -> Result<Self, Self::Error> {
+        Ok(Self(Endpoint::try_from(value.to_rpc_endpoint().as_str()).map_err(|err| {
+            CliError::Parse(err.into(), "Failed to parse RPC endpoint".to_string())
+        })?))
     }
 }
 

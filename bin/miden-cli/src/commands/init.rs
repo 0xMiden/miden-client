@@ -35,8 +35,8 @@ directory"
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. Defaults to the testnet network.
-    #[arg(long, short, default_value = "testnet")]
-    network: Option<Network>,
+    #[clap(long, short)]
+    network: Network,
 
     /// Path to the store file.
     #[arg(long)]
@@ -48,6 +48,10 @@ pub struct InitCmd {
     /// If the proving RPC isn't set, the proving mode will be set to local.
     #[arg(long)]
     remote_prover_endpoint: Option<String>,
+
+    /// Maximum number of blocks the client can be behind the network.
+    #[clap(long)]
+    block_delta: Option<u32>,
 }
 
 impl InitCmd {
@@ -63,14 +67,8 @@ impl InitCmd {
 
         let mut cli_config = CliConfig::default();
 
-        if let Some(network) = &self.network {
-            let endpoint =
-                CliEndpoint::try_from(network.to_rpc_endpoint().as_str()).map_err(|err| {
-                    CliError::Parse(err.into(), "Failed to parse RPC endpoint".to_string())
-                })?;
-
-            cli_config.rpc.endpoint = endpoint;
-        }
+        let endpoint = CliEndpoint::try_from(self.network.clone())?;
+        cli_config.rpc.endpoint = endpoint;
 
         if let Some(path) = &self.store_path {
             cli_config.store_filepath = PathBuf::from(path);
@@ -80,6 +78,8 @@ impl InitCmd {
             Some(rpc) => CliEndpoint::try_from(rpc.as_str()).ok(),
             None => None,
         };
+
+        cli_config.max_block_number_delta = self.block_delta;
 
         let config_as_toml_string = toml::to_string_pretty(&cli_config).map_err(|err| {
             CliError::Config("failed to serialize config".to_string().into(), err.to_string())

@@ -89,6 +89,8 @@ impl WebClient {
             web_store.clone(),
             Arc::new(keystore.clone()),
             false,
+            None,
+            None,
         ));
         self.store = Some(web_store);
         self.keystore = Some(keystore);

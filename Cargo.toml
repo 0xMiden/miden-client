@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "bin/miden-cli",
+    "crates/testing/node-builder",
     "crates/rust-client",
     "crates/web-client",
     "tests"
@@ -12,17 +13,18 @@ default-members = ["crates/rust-client", "bin/miden-cli"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.87"
 license = "MIT"
 authors = ["miden contributors"]
-repository = "https://github.com/0xPolygonMiden/miden-client"
+repository = "https://github.com/0xMiden/miden-client"
 
 [workspace.dependencies]
 async-trait = "0.1"
-miden-lib = { git = "https://github.com/0xPolygonMiden/miden-base", branch = "next", default-features = false }
-miden-objects = { git = "https://github.com/0xPolygonMiden/miden-base", branch = "next", default-features = false }
-miden-tx = { git = "https://github.com/0xPolygonMiden/miden-base", branch = "next", default-features = false, features = ["async"] }
-miden-proving-service-client = { git = "https://github.com/0xPolygonMiden/miden-base", branch = "next",  default-features = false, features = ["tx-prover"] }
+miden-lib = { git = "https://github.com/0xMiden/miden-base", branch = "next" , default-features = false }
+miden-objects = { git = "https://github.com/0xMiden/miden-base", branch = "next" , default-features = false }
+miden-tx = { git = "https://github.com/0xMiden/miden-base", branch = "next" , default-features = false, features = ["async"] }
+miden-testing = { git = "https://github.com/0xMiden/miden-base", branch = "next" , default-features = false, features = ["async"] }
+miden-proving-service-client = { git = "https://github.com/0xMiden/miden-base", branch = "next" ,  default-features = false, features = ["tx-prover"] }
 miette = { version = "7.2", features = ["fancy"] }
 rand = { version = "0.9" }
 serde = { version = "1.0", features = ["derive"] }

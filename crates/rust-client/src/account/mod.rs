@@ -35,17 +35,15 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::vec::Vec;
 
 use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
-use miden_objects::{
-    AccountError, Word, block::BlockHeader, crypto::dsa::rpo_falcon512::PublicKey,
-};
+use miden_objects::{Word, crypto::dsa::rpo_falcon512::PublicKey};
 
 use super::Client;
 use crate::{
     errors::ClientError,
-    rpc::domain::account::AccountDetails,
+    rpc::domain::account::FetchedAccount,
     store::{AccountRecord, AccountStatus},
 };
 
@@ -178,13 +176,13 @@ impl Client {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let account_details = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
 
-        let account = match account_details {
-            AccountDetails::Private(..) => {
+        let account = match fetched_account {
+            FetchedAccount::Private(..) => {
                 return Err(ClientError::AccountIsPrivate(account_id));
             },
-            AccountDetails::Public(account, ..) => account,
+            FetchedAccount::Public(account, ..) => account,
         };
 
         self.add_account(&account, None, true).await
@@ -271,17 +269,14 @@ impl Client {
 /// - `public_key`: Public key of the account used in the [`RpoFalcon512`] component.
 /// - `storage_mode`: Storage mode of the account.
 /// - `is_mutable`: Whether the account is mutable or not.
-/// - `anchor_block`: Anchor block of the account.
 ///
 /// # Errors
-/// - If the provided block header is not an anchor block.
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
     public_key: PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
-    anchor_block: &BlockHeader,
 ) -> Result<AccountId, ClientError> {
     let account_type = if is_mutable {
         AccountType::RegularAccountUpdatableCode
@@ -289,14 +284,7 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let accound_id_anchor = anchor_block.try_into().map_err(|_| {
-        ClientError::AccountError(AccountError::AssumptionViolated(
-            "Provided block header is not an anchor block".to_string(),
-        ))
-    })?;
-
     let (account, _) = AccountBuilder::new(init_seed)
-        .anchor(accound_id_anchor)
         .account_type(account_type)
         .storage_mode(storage_mode)
         .with_component(RpoFalcon512::new(public_key))
@@ -323,7 +311,7 @@ pub mod tests {
         },
     };
 
-    use crate::mock::create_test_client;
+    use crate::tests::create_test_client;
 
     fn create_account_data(account_id: u128) -> AccountFile {
         let account =

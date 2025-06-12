@@ -13,24 +13,18 @@ CODEGEN=CODEGEN=1
 
 FEATURES_WEB_CLIENT=--features "testing"
 FEATURES_CLIENT=--features "testing, concurrent" --no-default-features
-FEATURES_CLI=--features "concurrent"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
-NODE_DIR="miden-node"
-NODE_REPO="https://github.com/0xPolygonMiden/miden-node.git"
-NODE_BRANCH="next"
-
-PROVER_DIR="miden-base"
-PROVER_REPO="https://github.com/0xPolygonMiden/miden-base.git"
+PROVER_DIR="miden-node"
+PROVER_REPO="https://github.com/0xMiden/miden-node.git"
 PROVER_BRANCH="next"
-PROVER_FEATURES_TESTING=--features "testing"
 PROVER_PORT=50051
 
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
  clippy: ## Run Clippy with configs
-	cargo clippy --workspace --exclude miden-client-web --all-targets $(FEATURES_CLI) -- -D warnings
+	cargo clippy --workspace --exclude miden-client-web --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
  clippy-wasm: ## Run Clippy for the miden-client-web package
@@ -38,7 +32,7 @@ PROVER_PORT=50051
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo +nightly fix --workspace --exclude miden-client-web --allow-staged --allow-dirty --all-targets $(FEATURES_CLI)
+	cargo +nightly fix --workspace --exclude miden-client-web --allow-staged --allow-dirty --all-targets
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the miden-client-web package
@@ -83,9 +77,22 @@ test-docs: ## Run documentation tests
 
 # --- Integration testing -------------------------------------------------------------------------
 
+.PHONY: start-node
+start-node: ## Start the testing node server
+	RUST_LOG=info cargo run --release --package node-builder --locked
+
+.PHONY: start-node-background
+start-node-background: ## Start the testing node server in background
+	./scripts/start-node-bg.sh
+
+.PHONY: stop-node
+stop-node: ## Stop the testing node server
+	-pkill -f "node-builder"
+	sleep 1
+
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI) 
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -97,35 +104,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI)
-	cargo nextest run --workspace --exclude miden-client-web --release --test=integration $(FEATURES_CLI) --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
-
-.PHONY: kill-node
-kill-node: ## Kill node process
-	pkill miden-node || echo 'process not running'
-
-.PHONY: clean-node
-clean-node: ## Clean node directory
-	rm -rf miden-node
-
-.PHONY: node
-node: setup-miden-node update-node-branch build-node ## Setup node directory
-
-.PHONY: setup-miden-node
-setup-miden-node: ## Clone the miden-node repository if it doesn't exist
-	if [ ! -d $(NODE_DIR) ]; then git clone $(NODE_REPO) $(NODE_DIR); fi
-
-.PHONY: update-node-branch
-update-node-branch: setup-miden-base ## Checkout and update the specified branch in miden-node
-	cd $(NODE_DIR) && git checkout $(NODE_BRANCH) && git pull origin $(NODE_BRANCH)
-
-.PHONY: build-node
-build-node: update-node-branch ## Update dependencies and build the node binary with specified features
-	cd $(NODE_DIR) && rm -rf data accounts && mkdir data accounts && cargo run --locked --bin miden-node $(NODE_FEATURES_TESTING) --release -- bundled bootstrap --data-directory data --accounts-directory accounts
-
-.PHONY: start-node
-start-node: ## Run node. This requires the node repo to be present at `miden-node`
-	cd $(NODE_DIR) && cargo run --bin miden-node $(NODE_FEATURES_TESTING) --release --locked -- bundled start --data-directory data --rpc.url http://localhost:57291
+	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
+	cargo nextest run --workspace --exclude miden-client-web --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: clean-prover
 clean-prover: ## Uninstall prover
@@ -144,11 +124,11 @@ update-prover-branch: setup-miden-base ## Checkout and update the specified bran
 
 .PHONY: build-prover
 build-prover: update-prover-branch ## Build the prover binary with specified features
-	cd $(PROVER_DIR) && cargo build --bin miden-proving-service --locked $(PROVER_FEATURES_TESTING) --release
+	cd $(PROVER_DIR) && cargo build -p miden-proving-service --locked --release
 
 .PHONY: start-prover
 start-prover: ## Run prover. This requires the base repo to be present at `miden-base`
-	cd $(PROVER_DIR) && RUST_LOG=info cargo run --bin miden-proving-service $(PROVER_FEATURES_TESTING) --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
+	cd $(PROVER_DIR) && RUST_LOG=info cargo run -p miden-proving-service --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
 
 .PHONY: kill-prover
 kill-prover: ## Kill prover process
@@ -157,12 +137,12 @@ kill-prover: ## Kill prover process
 # --- Installing ----------------------------------------------------------------------------------
 
 install: ## Install the CLI binary
-	cargo install $(FEATURES_CLI) --path bin/miden-cli --locked
+	cargo install --path bin/miden-cli --locked
 
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary and client library in release mode
-	CODEGEN=1 cargo build --workspace --exclude miden-client-web --release $(FEATURES_CLI)
+	CODEGEN=1 cargo build --workspace --exclude miden-client-web --release
 
 build-wasm: ## Build the client library for wasm32
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
@@ -171,7 +151,7 @@ build-wasm: ## Build the client library for wasm32
 
 .PHONY: check
 check: ## Build the CLI binary and client library in release mode
-	cargo check --workspace --exclude miden-client-web --release $(FEATURES_CLI)
+	cargo check --workspace --exclude miden-client-web --release
 
 .PHONY: check-wasm
 check-wasm: ## Build the client library for wasm32

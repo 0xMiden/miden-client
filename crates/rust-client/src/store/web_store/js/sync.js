@@ -80,16 +80,21 @@ export async function removeNoteTag(tag, sourceNoteId, sourceAccountId) {
 
 export async function applyStateSync(
   blockNum,
-  blockHeader,
-  partialBlockchainPeaks,
+  newBlockHeadersAsFlattenedVec,
+  newBlockNums,
+  partialBlockchainPeaksAsFlattenedVec,
   hasClientNotes,
   nodeIndexes,
   nodes,
-  inputNoteIds,
-  committedTransactionIds,
-  transactionBlockNums,
-  discardTransactionIds
+  inputNoteIds
 ) {
+  const newBlockHeaders = reconstructFlattenedVec(
+    newBlockHeadersAsFlattenedVec
+  );
+  const partialBlockchainPeaks = reconstructFlattenedVec(
+    partialBlockchainPeaksAsFlattenedVec
+  );
+
   return db.transaction(
     "rw",
     stateSync,
@@ -101,21 +106,17 @@ export async function applyStateSync(
     tags,
     async (tx) => {
       await updateSyncHeight(tx, blockNum);
-      await updateBlockHeader(
-        tx,
-        blockNum,
-        blockHeader,
-        partialBlockchainPeaks,
-        hasClientNotes
-      );
+      for (let i = 0; i < newBlockHeaders.length; i++) {
+        await updateBlockHeader(
+          tx,
+          newBlockNums[i],
+          newBlockHeaders[i],
+          partialBlockchainPeaks[i],
+          hasClientNotes[i]
+        );
+      }
       await updatePartialBlockchainNodes(tx, nodeIndexes, nodes);
       await updateCommittedNoteTags(tx, inputNoteIds);
-      await updateCommittedTransactions(
-        tx,
-        transactionBlockNums,
-        committedTransactionIds
-      );
-      await discardTransactions(discardTransactionIds);
     }
   );
 }
@@ -200,71 +201,24 @@ async function updateCommittedNoteTags(tx, inputNoteIds) {
   }
 }
 
-async function updateCommittedTransactions(tx, blockNums, transactionIds) {
-  try {
-    if (transactionIds.length === 0) {
-      return;
-    }
-
-    // Fetch existing records
-    const existingRecords = await tx.transactions
-      .where("id")
-      .anyOf(transactionIds)
-      .toArray();
-
-    // Create a mapping of transaction IDs to block numbers
-    const transactionBlockMap = transactionIds.reduce((map, id, index) => {
-      map[id] = blockNums[index];
-      return map;
-    }, {});
-
-    // Create updates by merging existing records with the new values
-    const updates = existingRecords.map((record) => ({
-      ...record, // Spread existing fields
-      commitHeight: transactionBlockMap[record.id], // Update specific field
-    }));
-
-    // Perform the update
-    await tx.transactions.bulkPut(updates);
-  } catch (err) {
-    console.error("Failed to mark transactions as committed: ", err.toString());
-    throw err;
-  }
-}
-
-export async function discardTransactions(transactionIds) {
-  return db.transaction("rw", transactions, async (tx) => {
-    await updateDiscardedTransactions(tx, transactionIds);
-  });
-}
-
-async function updateDiscardedTransactions(tx, transactionIds) {
-  try {
-    if (transactionIds.length === 0) {
-      return;
-    }
-
-    const existingRecords = await tx.transactions
-      .where("id")
-      .anyOf(transactionIds)
-      .toArray();
-
-    const updates = existingRecords.map((record) => ({
-      ...record,
-      discarded: true,
-    }));
-
-    await tx.transactions.bulkPut(updates);
-  } catch (err) {
-    console.error("Failed to mark transactions as discarded: ", err.toString());
-    throw err;
-  }
-}
-
 function uint8ArrayToBase64(bytes) {
   const binary = bytes.reduce(
     (acc, byte) => acc + String.fromCharCode(byte),
     ""
   );
   return btoa(binary);
+}
+
+// Helper function to reconstruct arrays from flattened data
+function reconstructFlattenedVec(flattenedVec) {
+  const data = flattenedVec.data();
+  const lengths = flattenedVec.lengths();
+
+  let index = 0;
+  const result = [];
+  lengths.forEach((length) => {
+    result.push(data.slice(index, index + length));
+    index += length;
+  });
+  return result;
 }

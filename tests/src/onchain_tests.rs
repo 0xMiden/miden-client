@@ -1,18 +1,123 @@
+use std::sync::Arc;
+
 use miden_client::{
-    account::build_wallet_id,
+    Felt, Word, ZERO,
+    account::{Account, AccountBuilder, StorageSlot, build_wallet_id},
     auth::AuthSecretKey,
+    note::{NoteExecutionMode, NoteTag},
     store::{InputNoteState, NoteFilter},
-    transaction::{PaymentTransactionData, TransactionRequestBuilder},
+    testing::{common::*, note::NoteBuilder},
+    transaction::{
+        OutputNote, PaymentTransactionData, TransactionRequestBuilder, TransactionScript,
+    },
 };
+use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    account::{AccountId, AccountStorageMode},
+    Digest,
+    account::{AccountComponent, AccountStorageMode},
+    assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
     asset::{Asset, FungibleAsset},
-    note::{NoteFile, NoteTag, NoteType},
+    note::{NoteFile, NoteType},
     transaction::InputNote,
 };
 use rand::RngCore;
 
-use super::common::*;
+// HELPERS
+// ================================================================================================
+
+const COUNTER_CONTRACT: &str = "
+        use.miden::account
+        use.std::sys
+
+        # => []
+        export.get_count
+            push.0
+            exec.account::get_item
+            exec.sys::truncate_stack
+        end
+
+        # => []
+        export.increment_count
+            push.0
+            # => [index]
+            exec.account::get_item
+            # => [count]
+            push.1 add
+            # => [count+1]
+            push.0
+            # [index, count+1]
+            exec.account::set_item
+            # => []
+            push.1 exec.account::incr_nonce
+            # => []
+            exec.sys::truncate_stack
+            # => []
+        end";
+
+/// Deploys a counter contract as a network account
+async fn deploy_counter_contract(client: &mut TestClient) -> Result<(Account, Library), String> {
+    let (acc, seed, library) = get_counter_contract_account(client).await;
+
+    client.add_account(&acc, Some(seed), false).await.unwrap();
+
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let tx_script = TransactionScript::compile(
+        "use.external_contract::counter_contract
+        begin
+            call.counter_contract::increment_count
+        end",
+        [],
+        assembler.with_library(&library).unwrap(),
+    )
+    .unwrap();
+
+    // Build a transaction request with the custom script
+    let tx_increment_request =
+        TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
+
+    // Execute the transaction locally
+    let tx_result = client.new_transaction(acc.id(), tx_increment_request).await.unwrap();
+    let tx_id = tx_result.executed_transaction().id();
+    client.submit_transaction(tx_result).await.unwrap();
+    wait_for_tx(client, tx_id).await;
+
+    Ok((acc, library))
+}
+
+async fn get_counter_contract_account(client: &mut TestClient) -> (Account, Word, Library) {
+    let counter_component = AccountComponent::compile(
+        COUNTER_CONTRACT,
+        TransactionKernel::assembler(),
+        vec![StorageSlot::empty_value()],
+    )
+    .unwrap()
+    .with_supports_all_types();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .storage_mode(AccountStorageMode::Network)
+        .with_component(counter_component)
+        .build()
+        .unwrap();
+
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("external_contract::counter_contract").unwrap(),
+            COUNTER_CONTRACT,
+            &source_manager,
+        )
+        .unwrap();
+    let library = assembler.clone().assemble_library([module]).unwrap();
+
+    (account, seed, library)
+}
+
+// TESTS
+// ================================================================================================
 
 #[tokio::test]
 async fn test_onchain_notes_flow() {
@@ -45,15 +150,14 @@ async fn test_onchain_notes_flow() {
     client_1.sync_state().await.unwrap();
     client_2.sync_state().await.unwrap();
 
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        basic_wallet_1.id(),
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
+            basic_wallet_1.id(),
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
     let note = tx_request.expected_output_notes().next().unwrap().clone();
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
@@ -77,24 +181,47 @@ async fn test_onchain_notes_flow() {
     .await;
 
     let p2id_asset = FungibleAsset::new(faucet_account.id(), TRANSFER_AMOUNT).unwrap();
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(
-            vec![p2id_asset.into()],
-            basic_wallet_1.id(),
-            basic_wallet_2.id(),
-        ),
-        None,
-        NoteType::Public,
-        client_2.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![p2id_asset.into()],
+                basic_wallet_1.id(),
+                basic_wallet_2.id(),
+            ),
+            None,
+            NoteType::Public,
+            client_2.rng(),
+        )
+        .unwrap();
+    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
+
+    // Create a note for client 3 that is already consumed before syncing
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![p2id_asset.into()],
+                basic_wallet_1.id(),
+                basic_wallet_2.id(),
+            ),
+            Some(1.into()),
+            NoteType::Public,
+            client_2.rng(),
+        )
+        .unwrap();
+    let note = tx_request.expected_output_notes().next().unwrap().clone();
+    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
+
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
 
     // sync client 3 (basic account 2)
     client_3.sync_state().await.unwrap();
-    // client 3 should only have one note
+
+    // client 3 should have two notes, the one directed to them and the one consumed by client 2
+    // (which should come from the tag added)
+    assert_eq!(client_3.get_input_notes(NoteFilter::Committed).await.unwrap().len(), 1);
+    assert_eq!(client_3.get_input_notes(NoteFilter::Consumed).await.unwrap().len(), 1);
+
     let note = client_3
         .get_input_notes(NoteFilter::Committed)
         .await
@@ -236,15 +363,18 @@ async fn test_onchain_accounts() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
     println!("Running P2ID tx...");
-    let tx_request = TransactionRequestBuilder::pay_to_id(
-        PaymentTransactionData::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
-        None,
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentTransactionData::new(
+                vec![Asset::Fungible(asset)],
+                from_account_id,
+                to_account_id,
+            ),
+            None,
+            NoteType::Public,
+            client_1.rng(),
+        )
+        .unwrap();
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
 
     // sync on second client until we receive the note
@@ -257,7 +387,9 @@ async fn test_onchain_accounts() {
 
     // Consume the note
     println!("Consuming note on second client...");
-    let tx_request = TransactionRequestBuilder::consume_notes(vec![notes[0].id()]).build().unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![notes[0].id()])
+        .unwrap();
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await;
 
     // sync on first client
@@ -289,66 +421,6 @@ async fn test_onchain_accounts() {
 
     assert_eq!(new_from_account_balance, from_account_balance - TRANSFER_AMOUNT);
     assert_eq!(new_to_account_balance, to_account_balance + TRANSFER_AMOUNT);
-}
-
-#[tokio::test]
-async fn test_onchain_notes_sync_with_tag() {
-    // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore) = create_test_client().await;
-    // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
-    // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, _) = create_test_client().await;
-    // Client 3 will be the control client. We won't add any tags and expect the note not to be
-    // fetched
-    let (mut client_3, _) = create_test_client().await;
-    wait_for_node(&mut client_3).await;
-
-    // Create faucet account
-    let (faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
-
-    client_1.sync_state().await.unwrap();
-    client_2.sync_state().await.unwrap();
-    client_3.sync_state().await.unwrap();
-
-    let target_account_id = AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap();
-
-    let tx_request = TransactionRequestBuilder::mint_fungible_asset(
-        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT).unwrap(),
-        target_account_id,
-        NoteType::Public,
-        client_1.rng(),
-    )
-    .unwrap()
-    .build()
-    .unwrap();
-    let note = tx_request.expected_output_notes().next().unwrap().clone();
-    execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
-
-    // Load tag into client 2
-    client_2
-        .add_note_tag(
-            NoteTag::from_account_id(
-                target_account_id,
-                miden_objects::note::NoteExecutionMode::Local,
-            )
-            .unwrap(),
-        )
-        .await
-        .unwrap();
-
-    // Client 2's account should receive the note here:
-    client_2.sync_state().await.unwrap();
-    client_3.sync_state().await.unwrap();
-
-    // Assert that the note is the same
-    let received_note: InputNote =
-        client_2.get_input_note(note.id()).await.unwrap().unwrap().try_into().unwrap();
-    assert_eq!(received_note.note().commitment(), note.commitment());
-    assert_eq!(received_note.note(), &note);
-    assert!(client_3.get_input_notes(NoteFilter::All).await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -385,15 +457,9 @@ async fn test_import_account_by_id() {
         mint_note(&mut client_1, target_account_id, faucet_account_id, NoteType::Public).await;
 
     // Import the public account by id
-    let anchor_block = client_1.get_latest_epoch_block().await.unwrap();
-    let built_wallet_id = build_wallet_id(
-        user_seed,
-        secret_key.public_key(),
-        AccountStorageMode::Public,
-        false,
-        &anchor_block,
-    )
-    .unwrap();
+    let built_wallet_id =
+        build_wallet_id(user_seed, secret_key.public_key(), AccountStorageMode::Public, false)
+            .unwrap();
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await.unwrap();
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
@@ -413,4 +479,80 @@ async fn test_import_account_by_id() {
         MINT_AMOUNT * 2,
     )
     .await;
+}
+
+#[tokio::test]
+async fn test_counter_contract_ntx() {
+    const BUMP_NOTE_NUMBER: u64 = 5;
+    let (mut client, keystore) = create_test_client().await;
+    client.sync_state().await.unwrap();
+
+    let (network_account, library) = deploy_counter_contract(&mut client).await.unwrap();
+
+    assert_eq!(
+        client
+            .get_account(network_account.id())
+            .await
+            .unwrap()
+            .unwrap()
+            .account()
+            .storage()
+            .get_item(0)
+            .unwrap(),
+        Digest::from([ZERO, ZERO, ZERO, Felt::new(1)])
+    );
+
+    let (native_account, _native_seed, _) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
+            .await
+            .unwrap();
+
+    let assembler = TransactionKernel::assembler()
+        .with_debug_mode(true)
+        .with_library(library)
+        .unwrap();
+
+    let mut network_notes = vec![];
+
+    for _ in 0..BUMP_NOTE_NUMBER {
+        network_notes.push(OutputNote::Full(
+            NoteBuilder::new(native_account.id(), client.rng())
+                .code(
+                    "use.external_contract::counter_contract
+                begin
+                    call.counter_contract::increment_count
+                end",
+                )
+                .tag(
+                    NoteTag::from_account_id(network_account.id(), NoteExecutionMode::Network)
+                        .unwrap()
+                        .into(),
+                )
+                .build(&assembler)
+                .unwrap(),
+        ));
+    }
+
+    let tx_request = TransactionRequestBuilder::new()
+        .with_own_output_notes(network_notes)
+        .build()
+        .unwrap();
+
+    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+
+    wait_for_blocks(&mut client, 2).await;
+
+    let a = client
+        .test_rpc_api()
+        .get_account_details(network_account.id())
+        .await
+        .unwrap()
+        .account()
+        .cloned()
+        .unwrap();
+
+    assert_eq!(
+        a.storage().get_item(0).unwrap(),
+        Digest::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
+    );
 }

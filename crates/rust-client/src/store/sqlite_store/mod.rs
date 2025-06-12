@@ -21,7 +21,6 @@ use miden_objects::{
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
     note::{NoteTag, Nullifier},
-    transaction::TransactionId,
 };
 use rusqlite::{Connection, types::Value};
 use tonic::async_trait;
@@ -31,7 +30,6 @@ use super::{
     PartialBlockchainFilter, Store, TransactionFilter,
 };
 use crate::{
-    note::NoteUpdates,
     store::StoreError,
     sync::{NoteTagRecord, StateSyncUpdate},
     transaction::{TransactionRecord, TransactionStoreUpdate},
@@ -102,7 +100,7 @@ impl SqliteStore {
 //
 // To simplify, all implementations rely on inner SqliteStore functions that map 1:1 by name
 // This way, the actual implementations are grouped by entity types in their own sub-modules
-#[async_trait(?Send)]
+#[async_trait]
 impl Store for SqliteStore {
     fn get_current_timestamp(&self) -> Option<u64> {
         let now = chrono::Utc::now();
@@ -191,6 +189,10 @@ impl Store for SqliteStore {
             )
         })
         .await
+    }
+
+    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
+        self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
     async fn get_block_headers(
@@ -318,17 +320,6 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::get_unspent_input_note_nullifiers)
             .await
     }
-
-    async fn apply_nullifiers(
-        &self,
-        note_updates: NoteUpdates,
-        transactions_to_discard: Vec<TransactionId>,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::apply_nullifiers(conn, &note_updates, &transactions_to_discard)
-        })
-        .await
-    }
 }
 
 // UTILS
@@ -367,8 +358,32 @@ pub fn u64_to_value(v: u64) -> Value {
 
 #[cfg(test)]
 pub mod tests {
+    use std::boxed::Box;
+
     use super::SqliteStore;
-    use crate::mock::create_test_store_path;
+    use crate::{store::Store, tests::create_test_store_path};
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn is_send_sync() {
+        assert_send_sync::<SqliteStore>();
+        assert_send_sync::<Box<dyn Store>>();
+    }
+
+    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
+    async fn dyn_trait_send_fut(store: Box<dyn Store>) {
+        // This wouldn't compile if `get_tracked_block_headers` doesn't return a `Send` future.
+        let res = store.get_tracked_block_headers().await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn future_is_send() {
+        let client = SqliteStore::new(create_test_store_path()).await.unwrap();
+        let client: Box<SqliteStore> = client.into();
+        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
+    }
 
     pub(crate) async fn create_test_store() -> SqliteStore {
         SqliteStore::new(create_test_store_path()).await.unwrap()

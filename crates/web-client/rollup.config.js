@@ -3,8 +3,23 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import copy from "rollup-plugin-copy";
 
-// Flag that indicates if the build is meant for testing purposes.
-const testing = process.env.MIDEN_WEB_TESTING === "true";
+// Flag that indicates if the build is meant for development purposes.
+// If true, wasm-opt is not applied.
+const devMode = process.env.MIDEN_WEB_DEV === "true";
+const wasmOptArgs = [
+  devMode ? "-O0" : "-O3",
+  "--enable-bulk-memory",
+  "--enable-nontrapping-float-to-int",
+];
+
+// Base cargo arguments
+const baseCargoArgs = [
+  "--features",
+  "testing",
+  "--config",
+  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296"]`,
+  "--no-default-features",
+];
 
 /**
  * Rollup configuration file for building a Cargo project and creating a WebAssembly (WASM) module,
@@ -40,21 +55,15 @@ export default [
     },
     plugins: [
       rust({
+        verbose: true,
         extraArgs: {
-          cargo: [
-            "--features",
-            "testing",
-            "--config",
-            `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296"]`,
-            "--no-default-features",
-          ],
-          wasmOpt: testing
-            ? ["-O0", "--enable-threads", "--enable-bulk-memory-opt"]
-            : ["--enable-threads", "--enable-bulk-memory-opt"],
+          cargo: [...baseCargoArgs],
+          wasmOpt: wasmOptArgs,
         },
         experimental: {
           typescriptDeclarationDir: "dist/crates",
         },
+        optimize: { release: true, rustc: true },
       }),
       resolve(),
       commonjs(),

@@ -1,4 +1,3 @@
-#![allow(clippy::await_holding_lock)]
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, BTreeSet},
@@ -6,7 +5,6 @@ use alloc::{
     vec::Vec,
 };
 
-use async_trait::async_trait;
 use miden_objects::{
     Digest,
     account::{Account, AccountCode, AccountDelta, AccountId},
@@ -20,11 +18,11 @@ use miden_tx::utils::{Serializable, sync::RwLock};
 use tracing::info;
 
 use super::{
-    AccountDetails, Endpoint, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
     domain::{
         account::{AccountProof, AccountProofs, AccountUpdateSummary},
-        note::NetworkNote,
+        note::FetchedNote,
         nullifier::NullifierUpdate,
     },
     generated::requests::{
@@ -72,35 +70,37 @@ impl TonicRpcClient {
     /// Takes care of establishing the RPC connection if not connected yet. It ensures that the
     /// `rpc_api` field is initialized and returns a write guard to it.
     async fn ensure_connected(&self) -> Result<ApiClient, RpcError> {
-        let mut client = self.client.write();
-        if client.is_none() {
-            client.replace(ApiClient::new_client(self.endpoint.clone(), self.timeout_ms).await?);
+        if self.client.read().is_none() {
+            let new_client = ApiClient::new_client(self.endpoint.clone(), self.timeout_ms).await?;
+            let mut client = self.client.write();
+            client.replace(new_client);
         }
 
-        Ok(client.as_ref().expect("rpc_api should be initialized").clone())
+        Ok(self.client.read().as_ref().expect("rpc_api should be initialized").clone())
     }
 }
 
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError> {
+    ) -> Result<BlockNumber, RpcError> {
         let request = SubmitProvenTransactionRequest {
             transaction: proven_transaction.to_bytes(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        rpc_api.submit_proven_transaction(request).await.map_err(|err| {
+        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
                 err.to_string(),
             )
         })?;
 
-        Ok(())
+        Ok(BlockNumber::from(api_response.into_inner().block_height))
     }
 
     async fn get_block_header_by_number(
@@ -152,7 +152,7 @@ impl NodeRpcClient for TonicRpcClient {
         Ok((block_header, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError> {
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let request = GetNotesByIdRequest {
             note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
         };
@@ -189,14 +189,14 @@ impl NodeRpcClient for TonicRpcClient {
             let note = if let Some(details) = note.details {
                 let (assets, recipient) = NoteDetails::read_from_bytes(&details)?.into_parts();
 
-                NetworkNote::Public(Note::new(assets, metadata, recipient), inclusion_details)
+                FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_details)
             } else {
                 let note_id: Digest = note
                     .note_id
                     .ok_or(RpcError::ExpectedDataMissing("Notes.NoteId".into()))?
                     .try_into()?;
 
-                NetworkNote::Private(NoteId::from(note_id), metadata, inclusion_details)
+                FetchedNote::Private(NoteId::from(note_id), metadata, inclusion_details)
             };
             response_notes.push(note);
         }
@@ -229,7 +229,7 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [AccountDetails] from
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [FetchedAccount] from
     /// the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
@@ -240,7 +240,7 @@ impl NodeRpcClient for TonicRpcClient {
     /// - The answer had a `None` for one of the expected fields (account, summary,
     ///   account_commitment, details).
     /// - There is an error during [Account] deserialization.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<AccountDetails, RpcError> {
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
 
         let mut rpc_api = self.ensure_connected().await?;
@@ -260,23 +260,25 @@ impl NodeRpcClient for TonicRpcClient {
             "GetAccountDetails response's account should have a `summary`".to_string(),
         ))?;
 
-        let hash = account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response's account should have an `account_commitment`".to_string(),
-        ))?;
+        let commitment =
+            account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
+                "GetAccountDetails response's account should have an `account_commitment`"
+                    .to_string(),
+            ))?;
 
-        let hash = hash.try_into()?;
+        let commitment = commitment.try_into()?;
 
-        let update_summary = AccountUpdateSummary::new(hash, account_summary.block_num);
-        if account_id.is_public() {
+        let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
+        if account_id.is_private() {
+            Ok(FetchedAccount::Private(account_id, update_summary))
+        } else {
             let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
                 "GetAccountDetails response's account should have `details`".to_string(),
             ))?;
 
             let account = Account::read_from_bytes(&details_bytes)?;
 
-            Ok(AccountDetails::Public(account, update_summary))
-        } else {
-            Ok(AccountDetails::Private(account_id, update_summary))
+            Ok(FetchedAccount::Public(account, update_summary))
         }
     }
 
@@ -484,5 +486,36 @@ impl NodeRpcClient for TonicRpcClient {
             ))?)?;
 
         Ok(block)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::boxed::Box;
+
+    use super::TonicRpcClient;
+    use crate::rpc::{Endpoint, NodeRpcClient};
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn is_send_sync() {
+        assert_send_sync::<TonicRpcClient>();
+        assert_send_sync::<Box<dyn NodeRpcClient>>();
+    }
+
+    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
+    async fn dyn_trait_send_fut(client: Box<dyn NodeRpcClient>) {
+        // This won't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
+        let res = client.get_block_header_by_number(None, false).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn future_is_send() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+        let client: Box<TonicRpcClient> = client.into();
+        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
     }
 }

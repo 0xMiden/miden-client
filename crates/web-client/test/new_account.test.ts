@@ -15,37 +15,25 @@ describe("new_wallet tests", () => {
       description: "creates a new private, immutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: false,
-      expected: {
-        isPublic: false,
-        isUpdatable: false,
-      },
+      expected: { isPublic: false, isUpdatable: false },
     },
     {
       description: "creates a new public, immutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: false,
-      expected: {
-        isPublic: true,
-        isUpdatable: false,
-      },
+      expected: { isPublic: true, isUpdatable: false },
     },
     {
       description: "creates a new private, mutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: true,
-      expected: {
-        isPublic: false,
-        isUpdatable: true,
-      },
+      expected: { isPublic: false, isUpdatable: true },
     },
     {
       description: "creates a new public, mutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: true,
-      expected: {
-        isPublic: true,
-        isUpdatable: true,
-      },
+      expected: { isPublic: true, isUpdatable: true },
     },
   ];
 
@@ -67,15 +55,20 @@ describe("new_wallet tests", () => {
   });
 
   it("Constructs the same account when given the same init seed", async () => {
-    const clientSeed = new Uint8Array(32);
-    crypto.getRandomValues(clientSeed);
+    const clientSeed1 = new Uint8Array(32);
+    const clientSeed2 = new Uint8Array(32);
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(clientSeed1);
+    crypto.getRandomValues(clientSeed2);
+    crypto.getRandomValues(walletSeed);
 
     // Isolate the client instance both times to ensure the outcome is deterministic
     await createNewWallet({
       storageMode: StorageMode.PUBLIC,
       mutable: false,
-      clientSeed,
+      clientSeed: clientSeed1,
       isolatedClient: true,
+      walletSeed: walletSeed,
     });
 
     // This should fail, as the wallet is already tracked within the same browser context
@@ -83,10 +76,11 @@ describe("new_wallet tests", () => {
       createNewWallet({
         storageMode: StorageMode.PUBLIC,
         mutable: false,
-        clientSeed,
+        clientSeed: clientSeed2,
         isolatedClient: true,
+        walletSeed: walletSeed,
       })
-    ).to.be.rejectedWith(/storage error: Failed to insert item/);
+    ).to.be.rejectedWith(/failed to insert new wallet/);
   });
 });
 
@@ -174,7 +168,7 @@ describe("new_faucet tests", () => {
         BigInt(10000000)
       )
     ).to.be.rejectedWith(
-      `token symbol of length 13 is not between 1 and 6 characters long`
+      `token symbol should have length between 1 and 6 characters, but 13 was provided`
     );
   });
 });

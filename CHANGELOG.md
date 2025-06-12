@@ -1,10 +1,34 @@
 # Changelog
 
-## 0.9.0 (TBD)
+## 0.10.0 (TBD)
+
+### Changes
+
+* [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
+
+### Features
+
+* Added support for FPI in Web Client (#958).
+
+## 0.9.2 (2025-06-11)
+
+* Refresh dependencies (#972).
+
+### Changes
+
+* Fixed wasm-opt options to improve performance of generated wasm (#961).
+
+## 0.9.0 (2025-05-30)
 
 ### Features
 
 * Added support for `bech32` account IDs in the CLI (#840).
+* Added support for MASM account component libraries in Web Client (#900).
+* Added support for RPC client/server version matching through HTTP ACCEPT header (#912).
+* Added a way to ignore invalid input notes when consuming them in a transaction (#898).
+* Added `NoteUpdate` type to the note update tracker to distinguish between different types of updates (#821).
+* Updated `TonicRpcClient` and `Store` traits to be subtraits of `Send` and `Sync` (#926).
+* Updated `TonicRpcClient` and `Store` trait functions to return futures which are `Send` (#926).
 
 ### Changes
 
@@ -16,10 +40,23 @@
 * Added account code to `miden account --show` command (#835).
 * Changed exec's input file format to TOML instead of JSON (#870).
 * [BREAKING] Client's methods renamed after `PartialMmr` change to `PartialBlockchain` (#894).
+* [BREAKING] Made the maximum number of blocks the client can be behind the network customizable (#895).
+* Improved Web Client Publishing Flow on Next Branch (#906).
+* [BREAKING] Refactored `TransactionRequestBuilder` preset builders (#901).
+* Improved the consumability check of the `NoteScreener` (#898).
+* Exposed new test utilities in the `testing` feature (#882).
+* [BREAKING] Added `tx_graceful_blocks` to `Client` constructor and refactored `TransactionRecord` (#848).
+* [BREAKING] Updated the client so that only relevant block headers are stored (#828).
+* [BREAKING] Added `DiscardCause` for transactions (#853).
+* Chained pending transactions get discarded when one of the transactions in the chain is discarded (#889).
+* [BREAKING] Renamed `NetworkNote` and `AccountDetails` to `FetchedNote` and `FetchedAccount` respectively (#931).
+* Fixed wasm-opt options to improve performance of generated wasm. wasm-opt settings were broken before.
 
 ## 0.8.2 (TBD)
 
 * Converted Web Client `NoteType` class to `enum` (#831)
+* Exported `import_account_by_id` function to Web Client (#858)
+* Fixed duplicate key bug in `import_account` (#899)
 
 ## 0.8.1 (2025-03-28)
 
@@ -108,6 +145,7 @@
 
 ### Changes
 
+* [BREAKING] Refactored the sync process to use a new `SyncState` component (#650).
 * [BREAKING] Return `None` instead of `Err` when an entity is not found (#632).
 * Add support for notes without assets in transaction requests (#654).
 * Refactored RPC functions and structs to improve code quality (#616).

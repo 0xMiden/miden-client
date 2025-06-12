@@ -42,13 +42,12 @@
 //!     let asset = FungibleAsset::new(faucet_id, 100)?;
 //!
 //!     // Build a transaction request for a pay-to-id transaction.
-//!     let tx_request = TransactionRequestBuilder::pay_to_id(
+//!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
 //!         PaymentTransactionData::new(vec![asset.into()], sender_id, target_id),
 //!         None, // No recall height
 //!         NoteType::Private,
 //!         client.rng(),
-//!     )?
-//!     .build()?;
+//!     )?;
 //!
 //!     // Execute the transaction. This returns a TransactionResult.
 //!     let tx_result: TransactionResult = client.new_transaction(sender_id, tx_request).await?;
@@ -74,24 +73,28 @@ use core::fmt::{self};
 use miden_objects::{
     AssetError, Digest, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
+    assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteTag},
-    transaction::{ForeignAccountInputs, TransactionArgs},
+    transaction::{AccountInputs, TransactionArgs},
 };
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::{
+    NoteAccountExecution, NoteConsumptionChecker,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 use tracing::info;
 
 use super::Client;
 use crate::{
     ClientError,
-    note::{NoteScreener, NoteUpdates},
-    rpc::domain::{account::AccountProof, transaction::TransactionUpdate},
+    note::{NoteScreener, NoteUpdateTracker},
+    rpc::domain::account::AccountProof,
     store::{
         InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
         TransactionFilter, input_note_states::ExpectedNoteState,
     },
-    sync::{MAX_BLOCK_NUMBER_DELTA, NoteTagRecord},
+    sync::NoteTagRecord,
 };
 
 mod request;
@@ -115,9 +118,8 @@ pub use miden_tx::{
     TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, ForeignAccountInformation, NoteArgs, PaymentTransactionData,
-    SwapTransactionData, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -140,7 +142,7 @@ impl TransactionResult {
     /// [`TransactionResult`].
     pub async fn new(
         transaction: ExecutedTransaction,
-        note_screener: NoteScreener,
+        note_screener: NoteScreener<'_>,
         partial_notes: Vec<(NoteDetails, NoteTag)>,
         current_block_num: BlockNumber,
         current_timestamp: Option<u64>,
@@ -245,45 +247,164 @@ impl Deserializable for TransactionResult {
 // ================================================================================================
 
 /// Describes a transaction that has been executed and is being tracked on the Client.
-///
-/// Currently, the `commit_height` (and `committed` status) is set based on the height
-/// at which the transaction's output notes are committed.
 #[derive(Debug, Clone)]
 pub struct TransactionRecord {
+    /// Unique identifier for the transaction.
     pub id: TransactionId,
-    pub account_id: AccountId,
-    pub init_account_state: Digest,
-    pub final_account_state: Digest,
-    pub input_note_nullifiers: Vec<Digest>,
-    pub output_notes: OutputNotes,
-    pub transaction_script: Option<TransactionScript>,
-    pub block_num: BlockNumber,
-    pub transaction_status: TransactionStatus,
+    /// Details associated with the transaction.
+    pub details: TransactionDetails,
+    /// Script associated with the transaction, if no script is provided, only note scripts are
+    /// executed.
+    pub script: Option<TransactionScript>,
+    /// Current status of the transaction.
+    pub status: TransactionStatus,
 }
 
 impl TransactionRecord {
-    #[allow(clippy::too_many_arguments)]
+    /// Creates a new [`TransactionRecord`] instance.
     pub fn new(
         id: TransactionId,
-        account_id: AccountId,
-        init_account_state: Digest,
-        final_account_state: Digest,
-        input_note_nullifiers: Vec<Digest>,
-        output_notes: OutputNotes,
-        transaction_script: Option<TransactionScript>,
-        block_num: BlockNumber,
-        transaction_status: TransactionStatus,
+        details: TransactionDetails,
+        script: Option<TransactionScript>,
+        status: TransactionStatus,
     ) -> TransactionRecord {
-        TransactionRecord {
-            id,
+        TransactionRecord { id, details, script, status }
+    }
+
+    /// Updates (if necessary) the transaction status to signify that the transaction was
+    /// committed. Will return true if the record was modified, false otherwise.
+    pub fn commit_transaction(&mut self, commit_height: BlockNumber) -> bool {
+        match self.status {
+            TransactionStatus::Pending => {
+                self.status = TransactionStatus::Committed(commit_height);
+                true
+            },
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+        }
+    }
+
+    /// Updates (if necessary) the transaction status to signify that the transaction was
+    /// discarded. Will return true if the record was modified, false otherwise.
+    pub fn discard_transaction(&mut self, cause: DiscardCause) -> bool {
+        match self.status {
+            TransactionStatus::Pending => {
+                self.status = TransactionStatus::Discarded(cause);
+                true
+            },
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+        }
+    }
+}
+
+/// Describes the details associated with a transaction.
+#[derive(Debug, Clone)]
+pub struct TransactionDetails {
+    /// ID of the account that executed the transaction.
+    pub account_id: AccountId,
+    /// Initial state of the account before the transaction was executed.
+    pub init_account_state: Digest,
+    /// Final state of the account after the transaction was executed.
+    pub final_account_state: Digest,
+    /// Nullifiers of the input notes consumed in the transaction.
+    pub input_note_nullifiers: Vec<Digest>,
+    /// Output notes generated as a result of the transaction.
+    pub output_notes: OutputNotes,
+    /// Block number for the block against which the transaction was executed.
+    pub block_num: BlockNumber,
+    /// Block number at which the transaction was submitted.
+    pub submission_height: BlockNumber,
+    /// Block number at which the transaction is set to expire.
+    pub expiration_block_num: BlockNumber,
+}
+
+impl Serializable for TransactionDetails {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.account_id.write_into(target);
+        self.init_account_state.write_into(target);
+        self.final_account_state.write_into(target);
+        self.input_note_nullifiers.write_into(target);
+        self.output_notes.write_into(target);
+        self.block_num.write_into(target);
+        self.submission_height.write_into(target);
+        self.expiration_block_num.write_into(target);
+    }
+}
+
+impl Deserializable for TransactionDetails {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let account_id = AccountId::read_from(source)?;
+        let init_account_state = Digest::read_from(source)?;
+        let final_account_state = Digest::read_from(source)?;
+        let input_note_nullifiers = Vec::<Digest>::read_from(source)?;
+        let output_notes = OutputNotes::read_from(source)?;
+        let block_num = BlockNumber::read_from(source)?;
+        let submission_height = BlockNumber::read_from(source)?;
+        let expiration_block_num = BlockNumber::read_from(source)?;
+
+        Ok(Self {
             account_id,
             init_account_state,
             final_account_state,
             input_note_nullifiers,
             output_notes,
-            transaction_script,
             block_num,
-            transaction_status,
+            submission_height,
+            expiration_block_num,
+        })
+    }
+}
+
+/// Represents the cause of the discarded transaction.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DiscardCause {
+    Expired,
+    InputConsumed,
+    DiscardedInitialState,
+    Stale,
+}
+
+impl DiscardCause {
+    pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
+        match cause {
+            "Expired" => Ok(DiscardCause::Expired),
+            "InputConsumed" => Ok(DiscardCause::InputConsumed),
+            "DiscardedInitialState" => Ok(DiscardCause::DiscardedInitialState),
+            "Stale" => Ok(DiscardCause::Stale),
+            _ => Err(DeserializationError::InvalidValue(format!("Invalid discard cause: {cause}"))),
+        }
+    }
+}
+
+impl fmt::Display for DiscardCause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiscardCause::Expired => write!(f, "Expired"),
+            DiscardCause::InputConsumed => write!(f, "InputConsumed"),
+            DiscardCause::DiscardedInitialState => write!(f, "DiscardedInitialState"),
+            DiscardCause::Stale => write!(f, "Stale"),
+        }
+    }
+}
+
+impl Serializable for DiscardCause {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            DiscardCause::Expired => target.write_u8(0),
+            DiscardCause::InputConsumed => target.write_u8(1),
+            DiscardCause::DiscardedInitialState => target.write_u8(2),
+            DiscardCause::Stale => target.write_u8(3),
+        }
+    }
+}
+
+impl Deserializable for DiscardCause {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(DiscardCause::Expired),
+            1 => Ok(DiscardCause::InputConsumed),
+            2 => Ok(DiscardCause::DiscardedInitialState),
+            3 => Ok(DiscardCause::Stale),
+            _ => Err(DeserializationError::InvalidValue("Invalid discard cause".to_string())),
         }
     }
 }
@@ -296,7 +417,7 @@ pub enum TransactionStatus {
     /// Transaction has been committed and included at the specified block number.
     Committed(BlockNumber),
     /// Transaction has been discarded and isn't included in the node.
-    Discarded,
+    Discarded(DiscardCause),
 }
 
 impl fmt::Display for TransactionStatus {
@@ -306,7 +427,7 @@ impl fmt::Display for TransactionStatus {
             TransactionStatus::Committed(block_number) => {
                 write!(f, "Committed (Block: {block_number})")
             },
-            TransactionStatus::Discarded => write!(f, "Discarded"),
+            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
         }
     }
 }
@@ -319,31 +440,38 @@ impl fmt::Display for TransactionStatus {
 pub struct TransactionStoreUpdate {
     /// Details of the executed transaction to be inserted.
     executed_transaction: ExecutedTransaction,
+    /// Block number at which the transaction was submitted.
+    submission_height: BlockNumber,
     /// Updated account state after the [`AccountDelta`] has been applied.
     updated_account: Account,
     /// Information about note changes after the transaction execution.
-    note_updates: NoteUpdates,
+    note_updates: NoteUpdateTracker,
     /// New note tags to be tracked.
     new_tags: Vec<NoteTagRecord>,
 }
 
 impl TransactionStoreUpdate {
     /// Creates a new [`TransactionStoreUpdate`] instance.
+    ///
+    /// # Arguments
+    /// - `executed_transaction`: The executed transaction details.
+    /// - `submission_height`: The block number at which the transaction was submitted.
+    /// - `updated_account`: The updated account state after applying the transaction.
+    /// - `note_updates`: The note updates that need to be applied to the store after the
+    ///   transaction execution.
+    /// - `new_tags`: New note tags that were need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
+        submission_height: BlockNumber,
         updated_account: Account,
-        created_input_notes: Vec<InputNoteRecord>,
-        created_output_notes: Vec<OutputNoteRecord>,
-        updated_input_notes: Vec<InputNoteRecord>,
+        note_updates: NoteUpdateTracker,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
             executed_transaction,
+            submission_height,
             updated_account,
-            note_updates: NoteUpdates::new(
-                [created_input_notes, updated_input_notes].concat(),
-                created_output_notes,
-            ),
+            note_updates,
             new_tags,
         }
     }
@@ -353,77 +481,24 @@ impl TransactionStoreUpdate {
         &self.executed_transaction
     }
 
+    /// Returns the block number at which the transaction was submitted.
+    pub fn submission_height(&self) -> BlockNumber {
+        self.submission_height
+    }
+
     /// Returns the updated account.
     pub fn updated_account(&self) -> &Account {
         &self.updated_account
     }
 
     /// Returns the note updates that need to be applied after the transaction execution.
-    pub fn note_updates(&self) -> &NoteUpdates {
+    pub fn note_updates(&self) -> &NoteUpdateTracker {
         &self.note_updates
     }
 
     /// Returns the new tags that were created as part of the transaction.
     pub fn new_tags(&self) -> &[NoteTagRecord] {
         &self.new_tags
-    }
-}
-
-/// Contains transaction changes to apply to the store.
-#[derive(Default)]
-pub struct TransactionUpdates {
-    /// Transaction updates for any transaction that was committed between the sync request's block
-    /// number and the response's block number.
-    committed_transactions: Vec<TransactionUpdate>,
-    /// Transaction IDs for any transactions that were discarded in the sync.
-    discarded_transactions: Vec<TransactionId>,
-    /// Transactions that were pending before the sync and were not committed.
-    ///
-    /// These transactions have been pending for more than [`TX_GRACEFUL_BLOCKS`] blocks and can be
-    /// assumed to have been rejected by the network. They will be marked as discarded in the
-    /// store.
-    stale_transactions: Vec<TransactionRecord>,
-}
-
-impl TransactionUpdates {
-    /// Creates a new [`TransactionUpdate`]
-    pub fn new(
-        committed_transactions: Vec<TransactionUpdate>,
-        discarded_transactions: Vec<TransactionId>,
-        stale_transactions: Vec<TransactionRecord>,
-    ) -> Self {
-        Self {
-            committed_transactions,
-            discarded_transactions,
-            stale_transactions,
-        }
-    }
-
-    /// Extends the transaction update information with `other`.
-    pub fn extend(&mut self, other: Self) {
-        self.committed_transactions.extend(other.committed_transactions);
-        self.discarded_transactions.extend(other.discarded_transactions);
-        self.stale_transactions.extend(other.stale_transactions);
-    }
-
-    /// Returns a reference to committed transactions.
-    pub fn committed_transactions(&self) -> &[TransactionUpdate] {
-        &self.committed_transactions
-    }
-
-    /// Returns a reference to discarded transactions.
-    pub fn discarded_transactions(&self) -> &[TransactionId] {
-        &self.discarded_transactions
-    }
-
-    /// Inserts a discarded transaction into the transaction updates.
-    pub fn insert_discarded_transaction(&mut self, transaction_id: TransactionId) {
-        self.discarded_transactions.push(transaction_id);
-    }
-
-    /// Returns a reference to stale transactions.
-    pub fn stale_transactions(&self) -> &[TransactionRecord] {
-        &self.stale_transactions
     }
 }
 
@@ -502,7 +577,7 @@ impl Client {
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let notes = {
+        let mut notes = {
             let note_ids = transaction_request.get_input_note_ids();
 
             let mut input_notes: Vec<InputNote> = Vec::new();
@@ -531,6 +606,8 @@ impl Client {
         let (fpi_block_num, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
+        let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
+
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -548,10 +625,21 @@ impl Client {
         let account: Account = account_record.into();
         self.mast_store.load_transaction_code(account.code(), &notes, &tx_args);
 
+        if ignore_invalid_notes {
+            // Remove invalid notes
+            notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
+        }
+
         // Execute the transaction and get the witness
         let executed_transaction = self
             .tx_executor
-            .execute_transaction(account_id, block_num, notes, tx_args)
+            .execute_transaction(
+                account_id,
+                block_num,
+                notes,
+                tx_args,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
+            )
             .await?;
 
         // Check that the expected output notes matches the transaction outcome.
@@ -573,7 +661,8 @@ impl Client {
             return Err(ClientError::MissingOutputNotes(missing_note_ids));
         }
 
-        let screener = NoteScreener::new(self.store.clone());
+        let screener =
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
 
         TransactionResult::new(
             executed_transaction,
@@ -602,8 +691,8 @@ impl Client {
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<(), ClientError> {
         let proven_transaction = self.prove_transaction(&tx_result, tx_prover).await?;
-        self.submit_proven_transaction(proven_transaction).await?;
-        self.apply_transaction(tx_result).await
+        let block_num = self.submit_proven_transaction(proven_transaction).await?;
+        self.apply_transaction(block_num, tx_result).await
     }
 
     /// Proves the specified transaction result using the provided prover.
@@ -625,17 +714,20 @@ impl Client {
     async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), ClientError> {
+    ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
-        self.rpc_api.submit_proven_transaction(proven_transaction).await?;
+        let block_num = self.rpc_api.submit_proven_transaction(proven_transaction).await?;
         info!("Transaction submitted.");
 
-        Ok(())
+        Ok(block_num)
     }
 
-    async fn apply_transaction(&self, tx_result: TransactionResult) -> Result<(), ClientError> {
+    async fn apply_transaction(
+        &self,
+        submission_height: BlockNumber,
+        tx_result: TransactionResult,
+    ) -> Result<(), ClientError> {
         let transaction_id = tx_result.executed_transaction().id();
-        let sync_height = self.get_sync_height().await?;
 
         // Transaction was proven and submitted to the node correctly, persist note details and
         // update account
@@ -684,7 +776,7 @@ impl Client {
             .iter()
             .cloned()
             .filter_map(|output_note| {
-                OutputNoteRecord::try_from_output_note(output_note, sync_height).ok()
+                OutputNoteRecord::try_from_output_note(output_note, submission_height).ok()
             })
             .collect::<Vec<_>>();
 
@@ -702,12 +794,17 @@ impl Client {
             }
         }
 
+        let note_updates = NoteUpdateTracker::for_transaction_updates(
+            created_input_notes,
+            updated_input_notes,
+            created_output_notes,
+        );
+
         let tx_update = TransactionStoreUpdate::new(
             tx_result.into(),
+            submission_height,
             account,
-            created_input_notes,
-            created_output_notes,
-            updated_input_notes,
+            note_updates,
             new_tags,
         );
 
@@ -872,10 +969,13 @@ impl Client {
         let current_chain_tip =
             self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
 
-        if current_chain_tip > self.store.get_sync_height().await? + MAX_BLOCK_NUMBER_DELTA {
-            return Err(ClientError::RecencyConditionError(
-                "The client is too far behind the chain tip to execute the transaction".to_string(),
-            ));
+        if let Some(max_block_number_delta) = self.max_block_number_delta {
+            if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
+                return Err(ClientError::RecencyConditionError(
+                    "The client is too far behind the chain tip to execute the transaction"
+                        .to_string(),
+                ));
+            }
         }
 
         let account: Account = self.try_get_account(account_id).await?.into();
@@ -888,9 +988,41 @@ impl Client {
         }
     }
 
+    async fn get_valid_input_notes(
+        &self,
+        account_id: AccountId,
+        mut input_notes: InputNotes<InputNote>,
+        tx_args: TransactionArgs,
+    ) -> Result<InputNotes<InputNote>, ClientError> {
+        loop {
+            let execution = NoteConsumptionChecker::new(&self.tx_executor)
+                .check_notes_consumability(
+                    account_id,
+                    self.store.get_sync_height().await?,
+                    input_notes.clone(),
+                    tx_args.clone(),
+                    Arc::new(DefaultSourceManager::default()),
+                )
+                .await?;
+
+            if let NoteAccountExecution::Failure { failed_note_id, .. } = execution {
+                let filtered_input_notes = InputNotes::new(
+                    input_notes.into_iter().filter(|note| note.id() != failed_note_id).collect(),
+                )
+                .expect("Created from a valid input notes list");
+
+                input_notes = filtered_input_notes;
+            } else {
+                break;
+            }
+        }
+
+        Ok(input_notes)
+    }
+
     /// Retrieves the account interface for the specified account.
-    async fn get_account_interface(
-        &mut self,
+    pub(crate) async fn get_account_interface(
+        &self,
         account_id: AccountId,
     ) -> Result<AccountInterface, ClientError> {
         let account: Account = self.try_get_account(account_id).await?.into();
@@ -911,7 +1043,7 @@ impl Client {
     async fn retrieve_foreign_account_inputs(
         &mut self,
         foreign_accounts: BTreeSet<ForeignAccount>,
-    ) -> Result<(Option<BlockNumber>, Vec<ForeignAccountInputs>), ClientError> {
+    ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
             return Ok((None, Vec::new()));
         }
@@ -938,26 +1070,26 @@ impl Client {
                         .remove(account_id)
                         .expect("proof was requested and received");
 
-                    let foreign_account_inputs: ForeignAccountInputs = account_proof.try_into()?;
+                    let foreign_account_inputs: AccountInputs = account_proof.try_into()?;
 
                     // Update  our foreign account code cache
                     self.store
                         .upsert_foreign_account_code(
                             *account_id,
-                            foreign_account_inputs.account_code().clone(),
+                            foreign_account_inputs.code().clone(),
                         )
                         .await?;
 
                     foreign_account_inputs
                 },
-                ForeignAccount::Private(foreign_account_info) => {
-                    let account_id = foreign_account_info.account_header().id();
+                ForeignAccount::Private(partial_account) => {
+                    let account_id = partial_account.id();
                     let (witness, _) = account_proofs
                         .remove(&account_id)
                         .expect("proof was requested and received")
                         .into_parts();
 
-                    foreign_account_info.clone().into_foreign_account_inputs(witness)
+                    AccountInputs::new(partial_account.clone(), witness)
                 },
             };
 
@@ -972,7 +1104,7 @@ impl Client {
             let summary = self.sync_state().await?;
 
             if summary.block_num != block_num {
-                let mut current_partial_mmr = self.build_current_partial_mmr(true).await?;
+                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
                 self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
                     .await?;
             }
@@ -1011,7 +1143,7 @@ impl Client {
         self.mast_store.insert(tx_script.mast());
         self.mast_store.insert(account.code().mast());
         for fpi_account in &foreign_account_inputs {
-            self.mast_store.insert(fpi_account.account_code().mast());
+            self.mast_store.insert(fpi_account.code().mast());
         }
 
         Ok(self
@@ -1022,6 +1154,7 @@ impl Client {
                 tx_script,
                 advice_inputs,
                 foreign_account_inputs,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
     }
@@ -1042,7 +1175,7 @@ impl Client {
     pub async fn testing_submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), ClientError> {
+    ) -> Result<BlockNumber, ClientError> {
         self.submit_proven_transaction(proven_transaction).await
     }
 
@@ -1050,7 +1183,7 @@ impl Client {
         &self,
         tx_result: TransactionResult,
     ) -> Result<(), ClientError> {
-        self.apply_transaction(tx_result).await
+        self.apply_transaction(self.get_sync_height().await.unwrap(), tx_result).await
     }
 }
 
@@ -1117,7 +1250,7 @@ mod test {
 
     use super::PaymentTransactionData;
     use crate::{
-        mock::create_test_client,
+        tests::create_test_client,
         transaction::{TransactionRequestBuilder, TransactionResult},
     };
 
@@ -1145,10 +1278,7 @@ mod test {
         .unwrap()
         .with_supports_all_types();
 
-        let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
         let account = AccountBuilder::new(Default::default())
-            .anchor((&anchor_block).try_into().unwrap())
             .with_component(wallet_component)
             .with_component(RpoFalcon512::new(pub_key))
             .with_assets([asset_1, asset_2])
@@ -1157,19 +1287,18 @@ mod test {
 
         client.add_account(&account, None, false).await.unwrap();
         client.sync_state().await.unwrap();
-        let tx_request = TransactionRequestBuilder::pay_to_id(
-            PaymentTransactionData::new(
-                vec![asset_1, asset_2],
-                account.id(),
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
-            ),
-            None,
-            NoteType::Private,
-            client.rng(),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(
+                PaymentTransactionData::new(
+                    vec![asset_1, asset_2],
+                    account.id(),
+                    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
+                ),
+                None,
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
 
         let tx_result = client.new_transaction(account.id(), tx_request).await.unwrap();
         assert!(

@@ -39,8 +39,8 @@ impl From<&NoteType> for MidenNoteType {
     }
 }
 
-#[derive(Debug, Parser, Clone)]
 /// Mint tokens from a fungible faucet to a wallet.
+#[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
     /// Target account ID or its hex prefix.
     #[arg(short = 't', long = "target")]
@@ -70,16 +70,16 @@ impl MintCmd {
 
         let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
 
-        let transaction_request = TransactionRequestBuilder::mint_fungible_asset(
-            fungible_asset,
-            target_account_id,
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                target_account_id,
+                (&self.note_type).into(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -92,8 +92,8 @@ impl MintCmd {
     }
 }
 
-#[derive(Debug, Parser, Clone)]
 /// Create a pay-to-id transaction.
+#[derive(Debug, Parser, Clone)]
 pub struct SendCmd {
     /// Sender account ID or its hex prefix. If none is provided, the default account's ID is used
     /// instead.
@@ -143,16 +143,16 @@ impl SendCmd {
             target_account_id,
         );
 
-        let transaction_request = TransactionRequestBuilder::pay_to_id(
-            payment_transaction,
-            self.recall_height.map(BlockNumber::from),
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(
+                payment_transaction,
+                self.recall_height.map(BlockNumber::from),
+                (&self.note_type).into(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -165,8 +165,8 @@ impl SendCmd {
     }
 }
 
-#[derive(Debug, Parser, Clone)]
 /// Create a swap transaction.
+#[derive(Debug, Parser, Clone)]
 pub struct SwapCmd {
     /// Sender account ID or its hex prefix. If none is provided, the default account's ID is used
     /// instead.
@@ -213,15 +213,11 @@ impl SwapCmd {
             requested_fungible_asset.into(),
         );
 
-        let transaction_request = TransactionRequestBuilder::swap(
-            &swap_transaction,
-            (&self.note_type).into(),
-            client.rng(),
-        )
-        .and_then(TransactionRequestBuilder::build)
-        .map_err(|err| {
-            CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
-        })?;
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_swap(&swap_transaction, (&self.note_type).into(), client.rng())
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
+            })?;
 
         execute_transaction(
             &mut client,
@@ -247,10 +243,10 @@ impl SwapCmd {
     }
 }
 
-#[derive(Debug, Parser, Clone)]
 /// Consume with the account corresponding to `account_id` all of the notes from `list_of_notes`.
 /// If no account ID is provided, the default one is used. If no notes are provided, any notes
 /// that are identified to be owned by the account ID are consumed.
+#[derive(Debug, Parser, Clone)]
 pub struct ConsumeNotesCmd {
     /// The account ID to be used to consume the note or its hex prefix. If none is provided, the
     /// default account's ID is used instead.

@@ -74,6 +74,14 @@ export const mintTransaction = async (
   );
 };
 
+export const getSyncHeight = async () => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
+    let summary = await client.syncState();
+    return summary.blockNum();
+  });
+};
+
 export const sendTransaction = async (
   senderAccountId: string,
   targetAccountId: string,
@@ -99,7 +107,7 @@ export const sendTransaction = async (
 
       let mintTransactionRequest = client.newMintTransactionRequest(
         senderAccountId,
-        window.AccountId.fromHex(_faucetAccountId),
+        faucetAccountId,
         window.NoteType.Private,
         BigInt(1000)
       );

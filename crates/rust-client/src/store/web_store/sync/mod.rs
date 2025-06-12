@@ -7,7 +7,6 @@ use miden_objects::{
     account::AccountId,
     block::BlockNumber,
     note::{NoteId, NoteTag},
-    transaction::TransactionId,
 };
 use miden_tx::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
@@ -15,24 +14,27 @@ use wasm_bindgen_futures::JsFuture;
 
 use super::{
     WebStore,
-    account::{lock_account, utils::update_account},
+    account::utils::update_account,
     chain_data::utils::{SerializedPartialBlockchainNodeData, serialize_partial_blockchain_node},
     note::utils::apply_note_updates_tx,
+    transaction::utils::upsert_transaction_record,
 };
 use crate::{
-    note::NoteUpdates,
-    store::{StoreError, TransactionFilter},
+    store::StoreError,
     sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate},
 };
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_add_note_tag, idxdb_apply_state_sync, idxdb_discard_transactions, idxdb_get_note_tags,
-    idxdb_get_sync_height, idxdb_remove_note_tag,
+    idxdb_add_note_tag, idxdb_apply_state_sync, idxdb_get_note_tags, idxdb_get_sync_height,
+    idxdb_remove_note_tag,
 };
 
 mod models;
 use models::{NoteTagIdxdbObject, SyncHeightIdxdbObject};
+
+mod flattened_vec;
+use flattened_vec::flatten_nested_u8_vec;
 
 impl WebStore {
     pub(crate) async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
@@ -120,27 +122,30 @@ impl WebStore {
         state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
-            block_header,
-            block_has_relevant_notes,
-            new_mmr_peaks,
-            new_authentication_nodes,
+            block_num,
+            block_updates,
             note_updates,
-            account_updates,
-            tags_to_remove,
             transaction_updates,
+            account_updates,
         } = state_sync_update;
 
-        // Serialize data for updating state sync and block header
-        let block_num_as_str = block_header.block_num().to_string();
-
         // Serialize data for updating block header
-        let block_header_as_bytes = block_header.to_bytes();
-        let new_mmr_peaks_as_bytes = new_mmr_peaks.peaks().to_vec().to_bytes();
+        let mut block_headers_as_bytes = vec![];
+        let mut new_mmr_peaks_as_bytes = vec![];
+        let mut block_nums_as_str = vec![];
+        let mut block_has_relevant_notes = vec![];
+
+        for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
+            block_headers_as_bytes.push(block_header.to_bytes());
+            new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
+            block_nums_as_str.push(block_header.block_num().to_string());
+            block_has_relevant_notes.push(u8::from(*has_client_notes));
+        }
 
         // Serialize data for updating partial blockchain nodes
         let mut serialized_node_ids = Vec::new();
         let mut serialized_nodes = Vec::new();
-        for (id, node) in &new_authentication_nodes {
+        for (id, node) in block_updates.new_authentication_nodes() {
             let SerializedPartialBlockchainNodeData { id, node } =
                 serialize_partial_blockchain_node(*id, *node)?;
             serialized_node_ids.push(id);
@@ -152,33 +157,30 @@ impl WebStore {
         apply_note_updates_tx(&note_updates).await?;
 
         // Tags to remove
-        let note_tags_to_remove_as_str: Vec<String> = tags_to_remove
-            .iter()
-            .filter_map(|tag_record| {
-                if let NoteTagSource::Note(note_id) = tag_record.source {
-                    Some(note_id.to_hex())
+        let note_tags_to_remove_as_str: Vec<String> = note_updates
+            .updated_input_notes()
+            .filter_map(|note_update| {
+                let note = note_update.inner();
+                if note.is_committed() {
+                    Some(
+                        note.metadata()
+                            .expect("Committed notes should have metadata")
+                            .tag()
+                            .to_string(),
+                    )
                 } else {
                     None
                 }
             })
             .collect();
 
-        // Serialize data for updating committed transactions
-        let transactions_to_commit_block_nums_as_str = transaction_updates
+        // Upsert updated transactions
+        for transaction_record in transaction_updates
             .committed_transactions()
-            .iter()
-            .map(|tx_update| tx_update.block_num.to_string())
-            .collect();
-        let transactions_to_commit_as_str: Vec<String> = transaction_updates
-            .committed_transactions()
-            .iter()
-            .map(|tx_update| tx_update.transaction_id.to_string())
-            .collect();
-        let transactions_to_discard_as_str: Vec<String> = transaction_updates
-            .discarded_transactions()
-            .iter()
-            .map(TransactionId::to_string)
-            .collect();
+            .chain(transaction_updates.discarded_transactions())
+        {
+            upsert_transaction_record(transaction_record).await?;
+        }
 
         // TODO: LOP INTO idxdb_apply_state_sync call
         // Update public accounts on the db that have been updated onchain
@@ -188,58 +190,34 @@ impl WebStore {
             })?;
         }
 
-        for (account_id, _) in account_updates.mismatched_private_accounts() {
-            lock_account(account_id).await.map_err(|err| {
-                StoreError::DatabaseError(format!("failed to lock account: {err:?}"))
-            })?;
+        for (account_id, digest) in account_updates.mismatched_private_accounts() {
+            self.lock_account_on_unexpected_commitment(account_id, digest).await.map_err(
+                |err| {
+                    StoreError::DatabaseError(format!("failed to check account mismatch: {err:?}"))
+                },
+            )?;
         }
 
+        let account_states_to_rollback = transaction_updates
+            .discarded_transactions()
+            .map(|tx_record| tx_record.details.final_account_state)
+            .collect::<Vec<_>>();
+
+        // Remove the account states that are originated from the discarded transactions
+        self.undo_account_states(&account_states_to_rollback).await?;
+
         let promise = idxdb_apply_state_sync(
-            block_num_as_str,
-            block_header_as_bytes,
-            new_mmr_peaks_as_bytes,
+            block_num.to_string(),
+            flatten_nested_u8_vec(block_headers_as_bytes),
+            block_nums_as_str,
+            flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
             note_tags_to_remove_as_str,
-            transactions_to_commit_as_str,
-            transactions_to_commit_block_nums_as_str,
-            transactions_to_discard_as_str,
         );
         JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
-        })?;
-
-        Ok(())
-    }
-
-    pub(super) async fn apply_nullifiers(
-        &self,
-        note_updates: NoteUpdates,
-        transactions_to_discard: Vec<TransactionId>,
-    ) -> Result<(), StoreError> {
-        // First we need the `transaction` entries from the `transactions` table that matches the
-        // `transactions_to_discard`
-        let transactions_records_to_discard = self
-            .get_transactions(TransactionFilter::Ids(transactions_to_discard.clone()))
-            .await?;
-
-        apply_note_updates_tx(&note_updates).await?;
-        let transactions_ids_as_str: Vec<String> =
-            transactions_to_discard.iter().map(ToString::to_string).collect();
-
-        let promise = idxdb_discard_transactions(transactions_ids_as_str);
-
-        let final_account_states = transactions_records_to_discard
-            .iter()
-            .map(|tx_record| tx_record.final_account_state)
-            .collect::<Vec<_>>();
-
-        // Remove the account states that are originated from the discarded transactions
-        self.undo_account_states(&final_account_states).await?;
-
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to discard transactions: {js_error:?}"))
         })?;
 
         Ok(())

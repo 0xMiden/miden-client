@@ -42,10 +42,9 @@
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use core::fmt;
 
-use async_trait::async_trait;
 use domain::{
-    account::{AccountDetails, AccountProofs},
-    note::{NetworkNote, NoteSyncInfo},
+    account::{AccountProofs, FetchedAccount},
+    note::{FetchedNote, NoteSyncInfo},
     nullifier::NullifierUpdate,
     sync::StateSyncInfo,
 };
@@ -67,9 +66,9 @@ pub use errors::RpcError;
 mod endpoint;
 pub use endpoint::Endpoint;
 
-#[cfg(not(test))]
+#[cfg(not(feature = "testing"))]
 mod generated;
-#[cfg(test)]
+#[cfg(feature = "testing")]
 pub mod generated;
 
 #[cfg(all(feature = "tonic", feature = "web-tonic"))]
@@ -93,14 +92,15 @@ use crate::{
 /// The implementers are responsible for connecting to the Miden node, handling endpoint
 /// requests/responses, and translating responses into domain objects relevant for each of the
 /// endpoints.
-#[async_trait(?Send)]
-pub trait NodeRpcClient {
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait NodeRpcClient: Send + Sync {
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-    ) -> Result<(), RpcError>;
+    ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// using the `/GetBlockHeaderByNumber` endpoint.
@@ -123,7 +123,7 @@ pub trait NodeRpcClient {
     /// For any NoteType::Private note, the return data is only the
     /// [miden_objects::note::NoteMetadata], whereas for NoteType::Onchain notes, the return
     /// data includes all details.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<NetworkNote>, RpcError>;
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
@@ -148,7 +148,7 @@ pub trait NodeRpcClient {
     /// endpoint.
     ///
     /// - `account_id` is the ID of the wanted account.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<AccountDetails, RpcError>;
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError>;
 
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
@@ -229,7 +229,7 @@ pub trait NodeRpcClient {
 
         let mut public_notes = vec![];
         for detail in note_details {
-            if let NetworkNote::Public(note, inclusion_proof) = detail {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
                     metadata: *note.metadata(),
                     inclusion_proof,
@@ -260,7 +260,7 @@ pub trait NodeRpcClient {
         for local_account in local_accounts {
             let response = self.get_account_details(local_account.id()).await?;
 
-            if let AccountDetails::Public(account, _) = response {
+            if let FetchedAccount::Public(account, _) = response {
                 // We should only return an account if it's newer, otherwise we ignore it
                 if account.nonce().as_int() > local_account.nonce().as_int() {
                     public_accounts.push(account);
@@ -289,7 +289,7 @@ pub trait NodeRpcClient {
     ///
     /// Errors:
     /// - [RpcError::NoteNotFound] if the note with the specified ID is not found.
-    async fn get_note_by_id(&self, note_id: NoteId) -> Result<NetworkNote, RpcError> {
+    async fn get_note_by_id(&self, note_id: NoteId) -> Result<FetchedNote, RpcError> {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }

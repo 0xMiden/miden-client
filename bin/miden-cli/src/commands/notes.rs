@@ -251,8 +251,7 @@ async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(
     }
     println!("{table}");
 
-    if inputs.is_some() {
-        let inputs = inputs.expect("Inputs should be Some");
+    if let Some(inputs) = inputs {
         let inputs = NoteInputs::new(inputs.clone()).map_err(ClientError::NoteError)?;
         let mut table = create_dynamic_table(&["Note Inputs"]);
         table

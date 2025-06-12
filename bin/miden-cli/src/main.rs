@@ -1,4 +1,4 @@
-use miden_cli::Cli;
+use miden_client_cli::Cli;
 
 extern crate std;
 

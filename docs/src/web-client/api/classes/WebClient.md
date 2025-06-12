@@ -18,6 +18,22 @@
 
 ## Methods
 
+### addAccountSecretKeyToWebStore()
+
+> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### secret\_key
+
+[`SecretKey`](SecretKey.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### addTag()
 
 > **addTag**(`tag`): `Promise`\<`void`\>
@@ -252,6 +268,16 @@ Meant to be used in conjunction with the force_import_store method
 
 ***
 
+### getSyncHeight()
+
+> **getSyncHeight**(): `Promise`\<`number`\>
+
+#### Returns
+
+`Promise`\<`number`\>
+
+***
+
 ### getTransactions()
 
 > **getTransactions**(`transaction_filter`): `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
@@ -277,6 +303,22 @@ Meant to be used in conjunction with the force_import_store method
 ##### account\_bytes
 
 `any`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### importAccountById()
+
+> **importAccountById**(`account_id`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 #### Returns
 
@@ -327,6 +369,30 @@ Meant to be used in conjunction with the force_import_store method
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### newAccount()
+
+> **newAccount**(`account`, `account_seed`, `overwrite`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account
+
+[`Account`](Account.md)
+
+##### account\_seed
+
+[`Word`](Word.md)
+
+##### overwrite
+
+`boolean`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 

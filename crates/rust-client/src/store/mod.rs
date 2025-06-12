@@ -27,7 +27,6 @@ use alloc::{
 };
 use core::fmt::Debug;
 
-use async_trait::async_trait;
 use miden_objects::{
     Digest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
@@ -38,7 +37,6 @@ use miden_objects::{
 };
 
 use crate::{
-    note::NoteUpdates,
     sync::{NoteTagRecord, StateSyncUpdate},
     transaction::{TransactionRecord, TransactionStoreUpdate},
 };
@@ -84,7 +82,8 @@ pub use note_record::{
 /// Because the [`Store`]'s ownership is shared between the executor and the client, interior
 /// mutability is expected to be implemented, which is why all methods receive `&self` and
 /// not `&mut self`.
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return
@@ -209,9 +208,13 @@ pub trait Store: Send + Sync {
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        blockchain_mmr_peaks: MmrPeaks,
+        partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError>;
+
+    /// Removes block headers that do not contain any client notes and aren't the genesis or last
+    /// block.
+    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
 
     // ACCOUNT
     // --------------------------------------------------------------------------------------------
@@ -306,23 +309,17 @@ pub trait Store: Send + Sync {
     /// - Updating the corresponding tracked input/output notes.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
+    ///   - In turn, validating private account's state transitions. If a private account's
+    ///     commitment locally does not match the `StateSyncUpdate` information, the account may be
+    ///     locked.
     /// - Storing new MMR authentication nodes.
-    /// - Updating the tracked on-chain accounts.
+    /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
-
-    /// Applies nullifier updates to database.
-    /// Nullifiers are retrieved after completing a `StateSync`.
-    ///
-    /// This operation is temporary, to be removed as part of miden-client/650.
-    async fn apply_nullifiers(
-        &self,
-        note_updates: NoteUpdates,
-        transactions_to_discard: Vec<TransactionId>,
-    ) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
 // ================================================================================================
+
 /// Filters for searching specific MMR nodes.
 // TODO: Should there be filters for specific blocks instead of nodes?
 pub enum PartialBlockchainFilter {
@@ -342,7 +339,7 @@ pub enum TransactionFilter {
     All,
     /// Filter by transactions that haven't yet been committed to the blockchain as per the last
     /// sync.
-    Uncomitted,
+    Uncommitted,
     /// Return a list of the transaction that matches the provided [`TransactionId`]s.
     Ids(Vec<TransactionId>),
     /// Return a list of the expired transactions that were executed before the provided
@@ -363,8 +360,7 @@ pub enum NoteFilter {
     /// Return a list of all notes ([`InputNoteRecord`] or [`OutputNoteRecord`]).
     All,
     /// Return a list of committed notes ([`InputNoteRecord`] or [`OutputNoteRecord`]). These
-    /// represent notes that the blockchain has included in a block, and for which we are
-    /// storing anchor data.
+    /// represent notes that the blockchain has included in a block.
     Committed,
     /// Filter by consumed notes ([`InputNoteRecord`] or [`OutputNoteRecord`]). notes that have
     /// been used as inputs in transactions.

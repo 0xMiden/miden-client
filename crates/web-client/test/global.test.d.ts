@@ -1,15 +1,23 @@
 import { Page } from "puppeteer";
 import {
   Account,
+  AccountBuilder,
+  AccountComponent,
   AccountHeader,
   AccountId,
   AccountStorageMode,
+  AccountStorageRequirements,
+  AccountType,
   AdviceMap,
+  Assembler,
+  AssemblerUtils,
   AuthSecretKey,
   ConsumableNoteRecord,
   Felt,
   FeltArray,
+  ForeignAccount,
   FungibleAsset,
+  Library,
   Note,
   NoteAssets,
   NoteConsumability,
@@ -26,13 +34,22 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  PublicKey,
+  RpoDigest,
   Rpo256,
+  SecretKey,
+  SlotAndKeys,
+  SlotAndKeysArray,
+  StorageMap,
+  StorageSlot,
   TestUtils,
   TransactionFilter,
+  TransactionKernel,
   TransactionProver,
   TransactionRequest,
   TransactionResult,
   TransactionRequestBuilder,
+  TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
@@ -47,15 +64,23 @@ declare global {
     remoteProverUrl: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
+    AccountBuilder: typeof AccountBuilder;
+    AccountComponent: typeof AccountComponent;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountStorageMode: typeof AccountStorageMode;
+    AccountStorageRequirements: typeof AccountStorageRequirements;
+    AccountType: typeof AccountType;
     AdviceMap: typeof AdviceMap;
+    Assembler: typeof Assembler;
+    AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
+    ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
+    Library: typeof Library;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;
     NoteAndArgsArray: typeof NoteAndArgsArray;
@@ -75,13 +100,22 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    PublicKey: typeof PublicKey;
+    RpoDigest: typeof RpoDigest;
     Rpo256: typeof Rpo256;
+    SecretKey: typeof SecretKey;
+    SlotAndKeys: typeof SlotAndKeys;
+    SlotAndKeysArray: typeof SlotAndKeysArray;
+    StorageMap: typeof StorageMap;
+    StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
     TransactionFilter: typeof TransactionFilter;
+    TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
     TransactionResult: typeof TransactionResult;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
+    TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
     WebClient: typeof WebClient;
@@ -95,6 +129,7 @@ declare global {
         maxWaitTime?: number,
         delayInterval?: number
       ) => Promise<void>;
+      waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
     };
   }

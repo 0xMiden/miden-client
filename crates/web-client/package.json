@@ -1,9 +1,9 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.8.1-next.1",
-  "description": "Polygon Miden Wasm SDK",
+  "version": "0.10.0",
+  "description": "Miden Wasm SDK",
   "collaborators": [
-    "Polygon Miden",
+    "Miden",
     "Demox Labs <hi@demoxlabs.xyz>"
   ],
   "type": "module",
@@ -20,9 +20,9 @@
   "scripts": {
     "build": "rimraf dist && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "test": "node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs --grep \"with remote prover\" --invert",
-    "test:remote_prover": "npm install && cross-env MIDEN_WEB_TESTING=true npm run build && cross-env REMOTE_PROVER=true node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs -g \"with remote prover\"",
+    "test:remote_prover": "npm install && cross-env MIDEN_WEB_DEV=true npm run build && cross-env REMOTE_PROVER=true node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs -g \"with remote prover\"",
     "test:logs": "cross-env DEBUG_MODE=true node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs",
-    "test:clean": "npm install && MIDEN_WEB_TESTING=true npm run build && node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs --grep \"with remote prover\" --invert"
+    "test:clean": "npm install && MIDEN_WEB_DEV=true npm run build && node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs --grep \"with remote prover\" --invert"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",

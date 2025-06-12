@@ -116,8 +116,7 @@ impl NewWalletCmd {
             &[RpoFalcon512::new(key_pair.public_key()).into(), BasicWallet.into()],
             &extra_components,
             &init_storage_data,
-        )
-        .await?;
+        )?;
 
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
@@ -125,13 +124,15 @@ impl NewWalletCmd {
 
         client.add_account(&new_account, Some(seed), false).await?;
 
+        let (mut current_config, _) = load_config_file()?;
+        let account_address =
+            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
+
         println!("Succesfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
-            new_account.id()
+            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}",
         );
 
-        let (mut current_config, _) = load_config_file()?;
         maybe_set_default_account(&mut current_config, new_account.id())?;
 
         Ok(())
@@ -188,8 +189,7 @@ impl NewAccountCmd {
             &[RpoFalcon512::new(key_pair.public_key()).into()],
             &component_templates,
             &init_storage_data,
-        )
-        .await?;
+        )?;
 
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
@@ -197,10 +197,13 @@ impl NewAccountCmd {
 
         client.add_account(&new_account, Some(seed), false).await?;
 
-        println!("Succesfully created new account.");
+        let (current_config, _) = load_config_file()?;
+        let account_address =
+            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
+
+        println!("Succesfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {}",
-            new_account.id()
+            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
         );
 
         Ok(())
@@ -249,7 +252,7 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
-async fn build_account(
+fn build_account(
     client: &mut Client,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
@@ -260,9 +263,7 @@ async fn build_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let anchor_block = client.get_latest_epoch_block().await?;
     let mut builder = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().expect("anchor block should be valid"))
         .account_type(account_type)
         .storage_mode(storage_mode);
 
