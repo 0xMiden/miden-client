@@ -5,6 +5,7 @@ use miden_client::{
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
     testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
+    utils::{insert_new_wallet, wait_for_blocks},
 };
 use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
 use miden_objects::{
@@ -81,10 +82,10 @@ async fn test_fpi_execute_program() {
     );
 
     let tx_script = client.compile_tx_script(vec![], &code).unwrap();
-    _ = client.sync_state().await.unwrap();
+    client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
-    _ = wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await.unwrap();
 
     let storage_requirements =
         AccountStorageRequirements::new([(0u8, &[StorageMapKey::from(MAP_KEY)])]);
@@ -197,7 +198,7 @@ async fn test_nested_fpi_calls() {
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await.unwrap();
 
     // Create transaction request with FPI
     let builder = TransactionRequestBuilder::new().with_custom_script(tx_script);

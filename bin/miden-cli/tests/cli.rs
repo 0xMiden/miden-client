@@ -20,12 +20,10 @@ use miden_client::{
     store::sqlite_store::SqliteStore,
     testing::{
         account_id::ACCOUNT_ID_PRIVATE_SENDER,
-        common::{
-            ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
-        },
+        common::{ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE},
     },
     transaction::{OutputNote, TransactionRequestBuilder},
-    utils::Serializable,
+    utils::{Serializable, execute_tx_and_sync, insert_new_wallet},
 };
 use miden_client_cli::CliKeyStore;
 use predicates::str::contains;
@@ -483,7 +481,9 @@ async fn debug_mode_outputs_logs() {
         .with_own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    execute_tx_and_sync(&mut client, account.id(), transaction_request).await;
+    execute_tx_and_sync(&mut client, account.id(), transaction_request)
+        .await
+        .unwrap();
 
     // Export the note
     let note_file: NoteFile = NoteFile::NoteDetails {

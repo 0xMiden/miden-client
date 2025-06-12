@@ -112,6 +112,9 @@ use alloc::boxed::Box;
 extern crate std;
 
 pub mod account;
+#[cfg(feature = "std")]
+#[path = "utils/mod.rs"]
+mod internal_utils;
 pub mod keystore;
 pub mod note;
 pub mod rpc;
@@ -185,6 +188,9 @@ pub mod utils {
         bytes_to_hex_string,
         sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
+
+    #[cfg(feature = "std")]
+    pub use crate::internal_utils::*;
 }
 
 /// Provides test utilities for working with accounts and account IDs
