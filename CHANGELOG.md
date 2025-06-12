@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.9.1 (TBD)
+## 0.9.2 (2025-06-11)
+
+* Refresh dependencies (#972).
 
 ### Changes
 

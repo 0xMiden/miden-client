@@ -1,6 +1,6 @@
 [package]
 name = "miden-cli"
-version = "0.9.1"
+version = "0.9.2"
 description = "CLI binary application that facilitates interaction with the Miden rollup"
 readme = "README.md"
 documentation = "https://docs.rs/miden-cli/0.9.1"
