@@ -6,11 +6,13 @@ use alloc::{
     vec::Vec,
 };
 
-use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
+use miden_lib::{
+    account::interface::{AccountInterface, AccountInterfaceError},
+    transaction::TransactionKernel,
+};
 use miden_objects::{
-    Digest, Felt, NoteError, Word,
+    Digest, Felt, NoteError, TransactionScriptError, Word,
     account::AccountId,
-    assembly::AssemblyError,
     crypto::merkle::MerkleStore,
     note::{Note, NoteDetails, NoteId, NoteTag, PartialNote},
     transaction::{AccountInputs, TransactionArgs, TransactionScript},
@@ -204,7 +206,17 @@ impl TransactionRequest {
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode)?),
             None => {
                 if self.input_notes.is_empty() {
-                    Err(TransactionRequestError::NoInputNotes)
+                    return Err(TransactionRequestError::NoInputNotes);
+                }
+
+                if account_interface.auth().is_empty() {
+                    let empty_script = TransactionScript::compile(
+                        "begin nop end",
+                        [],
+                        TransactionKernel::assembler(),
+                    )?;
+
+                    Ok(empty_script)
                 } else {
                     Ok(account_interface.build_auth_script(in_debug_mode)?)
                 }
@@ -318,7 +330,7 @@ pub enum TransactionRequestError {
     #[error("invalid sender account id: {0}")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
-    InvalidTransactionScript(#[from] AssemblyError),
+    InvalidTransactionScript(#[from] TransactionScriptError),
     #[error("a transaction without output notes must have at least one input note")]
     NoInputNotes,
     #[error("note not found: {0}")]

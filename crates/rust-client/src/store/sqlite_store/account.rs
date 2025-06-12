@@ -467,7 +467,7 @@ mod tests {
     use crate::store::sqlite_store::{account::insert_account_code, tests::create_test_store};
 
     #[tokio::test]
-    async fn test_account_code_insertion_no_duplicates() {
+    async fn account_code_insertion_no_duplicates() {
         let store = create_test_store().await;
         let assembler = miden_lib::transaction::TransactionKernel::assembler();
         let account_component = AccountComponent::compile(BASIC_WALLET_CODE, assembler, vec![])

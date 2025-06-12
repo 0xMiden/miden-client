@@ -19,6 +19,10 @@ PROVER_DIR="miden-node"
 PROVER_REPO="https://github.com/0xMiden/miden-node.git"
 PROVER_BRANCH="next"
 PROVER_PORT=50051
+TEST=NAME=test
+
+hello:
+	$(TEST) ./scripts/integration-tests.sh
 
 # --- Linting -------------------------------------------------------------------------------------
 
@@ -91,8 +95,8 @@ stop-node: ## Stop the testing node server
 	sleep 1
 
 .PHONY: integration-test
-integration-test: ## Run integration tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
+integration-test: ## Run integration tests. The `FILTER` variable can be used to filter ran tests.
+	$(CODEGEN) FILTER=$(FILTER) ./scripts/integration-tests.sh
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -104,8 +108,7 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
+	$(CODEGEN) FULL=1 ./scripts/integration-tests.sh
 
 .PHONY: clean-prover
 clean-prover: ## Uninstall prover

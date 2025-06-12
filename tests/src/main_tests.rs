@@ -21,11 +21,12 @@ use winter_maybe_async::maybe_async_trait;
 
 mod custom_transactions_tests;
 mod fpi_tests;
+mod network_transaction_tests;
 mod onchain_tests;
 mod swap_transactions_tests;
 
 #[tokio::test]
-async fn test_client_builder_initializes_client_with_endpoint() -> Result<(), ClientError> {
+async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientError> {
     let (_, _, store_config, auth_path) = get_client_config();
 
     let mut client = ClientBuilder::new()
@@ -46,32 +47,7 @@ async fn test_client_builder_initializes_client_with_endpoint() -> Result<(), Cl
 }
 
 #[tokio::test]
-async fn test_client_builder_initializes_client_with_rpc() -> Result<(), ClientError> {
-    let (_, _, store_config, auth_path) = get_client_config();
-
-    let endpoint = Endpoint::localhost();
-    let timeout_ms = 10_000;
-    let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
-
-    let mut client = ClientBuilder::new()
-        .with_rpc(rpc_api)
-        .with_filesystem_keystore(auth_path.to_str().unwrap())
-        .with_sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(true)
-        .build()
-        .await?;
-
-    assert!(client.is_in_debug_mode());
-
-    let sync_summary = client.sync_state().await.expect("Sync state failed");
-
-    assert!(sync_summary.block_num.as_u32() > 0);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_client_builder_fails_without_keystore() {
+async fn client_builder_fails_without_keystore() {
     let (_, _, store_config, _) = get_client_config();
     let result = ClientBuilder::new()
         .with_tonic_rpc_client(&Endpoint::default(), Some(10_000))
@@ -84,7 +60,7 @@ async fn test_client_builder_fails_without_keystore() {
 }
 
 #[tokio::test]
-async fn test_multiple_tx_on_same_block() {
+async fn multiple_tx_on_same_block() {
     let (mut client, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -179,7 +155,7 @@ async fn test_multiple_tx_on_same_block() {
 }
 
 #[tokio::test]
-async fn test_import_expected_notes() {
+async fn import_expected_notes() {
     let (mut client_1, authenticator_1) = create_test_client().await;
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
@@ -264,7 +240,7 @@ async fn test_import_expected_notes() {
 }
 
 #[tokio::test]
-async fn test_import_expected_note_uncommitted() {
+async fn import_expected_note_uncommitted() {
     let (mut client_1, authenticator) = create_test_client().await;
     let faucet_account =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -308,7 +284,7 @@ async fn test_import_expected_note_uncommitted() {
 }
 
 #[tokio::test]
-async fn test_import_expected_notes_from_the_past_as_committed() {
+async fn import_expected_notes_from_the_past_as_committed() {
     let (mut client_1, authenticator_1) = create_test_client().await;
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
@@ -354,7 +330,7 @@ async fn test_import_expected_notes_from_the_past_as_committed() {
 }
 
 #[tokio::test]
-async fn test_get_account_update() {
+async fn get_account_update() {
     // Create a client with both public and private accounts.
     let (mut client, authenticator) = create_test_client().await;
 
@@ -386,7 +362,7 @@ async fn test_get_account_update() {
 }
 
 #[tokio::test]
-async fn test_sync_detail_values() {
+async fn sync_detail_values() {
     let (mut client1, authenticator_1) = create_test_client().await;
     let (mut client2, authenticator_2) = create_test_client().await;
     wait_for_node(&mut client1).await;
@@ -448,7 +424,7 @@ async fn test_sync_detail_values() {
 /// This test runs 3 mint transactions that get included in different blocks so that once we sync
 /// we can check that each transaction gets marked as committed in the corresponding block.
 #[tokio::test]
-async fn test_multiple_transactions_can_be_committed_in_different_blocks_without_sync() {
+async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync() {
     let (mut client, authenticator) = create_test_client().await;
 
     let (first_regular_account, faucet_account_header) =
@@ -596,7 +572,7 @@ async fn test_multiple_transactions_can_be_committed_in_different_blocks_without
 /// - Consuming authenticated notes.
 /// - Consuming unauthenticated notes.
 #[tokio::test]
-async fn test_consume_multiple_expected_notes() {
+async fn consume_multiple_expected_notes() {
     let (mut client, authenticator_1) = create_test_client().await;
     let (mut unauth_client, authenticator_2) = create_test_client().await;
 
@@ -685,7 +661,7 @@ async fn test_consume_multiple_expected_notes() {
 }
 
 #[tokio::test]
-async fn test_import_consumed_note_with_proof() {
+async fn import_consumed_note_with_proof() {
     let (mut client_1, authenticator_1) = create_test_client().await;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
@@ -749,7 +725,7 @@ async fn test_import_consumed_note_with_proof() {
 }
 
 #[tokio::test]
-async fn test_import_consumed_note_with_id() {
+async fn import_consumed_note_with_id() {
     let (mut client_1, authenticator) = create_test_client().await;
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -805,7 +781,7 @@ async fn test_import_consumed_note_with_id() {
 }
 
 #[tokio::test]
-async fn test_import_note_with_proof() {
+async fn import_note_with_proof() {
     let (mut client_1, authenticator) = create_test_client().await;
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -868,7 +844,7 @@ async fn test_import_note_with_proof() {
 }
 
 #[tokio::test]
-async fn test_discarded_transaction() {
+async fn discarded_transaction() {
     let (mut client_1, authenticator_1) = create_test_client().await;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
@@ -997,7 +973,7 @@ impl TransactionProver for AlwaysFailingProver {
 }
 
 #[tokio::test]
-async fn test_custom_transaction_prover() {
+async fn custom_transaction_prover() {
     let (mut client, authenticator) = create_test_client().await;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
@@ -1031,7 +1007,7 @@ async fn test_custom_transaction_prover() {
 }
 
 #[tokio::test]
-async fn test_locked_account() {
+async fn locked_account() {
     let (mut client_1, authenticator) = create_test_client().await;
 
     let (faucet_account, ..) =
@@ -1084,7 +1060,7 @@ async fn test_locked_account() {
 }
 
 #[tokio::test]
-async fn test_expired_transaction_fails() {
+async fn expired_transaction_fails() {
     let (mut client, authenticator) = create_test_client().await;
     let (faucet_account, ..) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1127,7 +1103,7 @@ async fn test_expired_transaction_fails() {
 /// Tests that RPC methods that are not directly related to the client logic
 /// (like GetBlockByNumber) work correctly
 #[tokio::test]
-async fn test_unused_rpc_api() {
+async fn unused_rpc_api() {
     let (mut client, keystore) = create_test_client().await;
 
     let (first_basic_account, faucet_account) =
@@ -1188,7 +1164,7 @@ async fn test_unused_rpc_api() {
 }
 
 #[tokio::test]
-async fn test_ignore_invalid_notes() {
+async fn ignore_invalid_notes() {
     let (mut client, authenticator) = create_test_client().await;
     let (regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)

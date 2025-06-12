@@ -1255,7 +1255,7 @@ mod test {
     };
 
     #[tokio::test]
-    async fn test_transaction_creates_two_notes() {
+    async fn transaction_creates_two_notes() {
         let (mut client, _, keystore) = create_test_client().await;
         let asset_1: Asset =
             FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
