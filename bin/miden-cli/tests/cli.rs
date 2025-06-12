@@ -13,8 +13,8 @@ use miden_client::{
     account::{AccountId, AccountStorageMode},
     crypto::{FeltRng, RpoRandomCoin},
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId, NoteInputs,
-        NoteMetadata, NoteRecipient, NoteTag, NoteType,
+        Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata,
+        NoteRecipient, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
     store::sqlite_store::SqliteStore,
@@ -468,7 +468,7 @@ async fn debug_mode_outputs_logs() {
     let note_metadata = NoteMetadata::new(
         account.id(),
         NoteType::Private,
-        NoteTag::from_account_id(account.id(), NoteExecutionMode::Local).unwrap(),
+        NoteTag::from_account_id(account.id()),
         NoteExecutionHint::None,
         Felt::default(),
     )

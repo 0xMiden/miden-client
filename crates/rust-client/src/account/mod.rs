@@ -132,7 +132,7 @@ impl Client {
             None => {
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.try_into()?).await?;
+                self.store.add_note_tag(account.into()).await?;
 
                 self.store
                     .insert_account(account, account_seed)

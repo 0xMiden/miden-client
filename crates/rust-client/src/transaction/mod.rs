@@ -623,7 +623,7 @@ impl Client {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
-        self.mast_store.load_transaction_code(account.code(), &notes, &tx_args);
+        self.mast_store.load_account_code(account.code());
 
         if ignore_invalid_notes {
             // Remove invalid notes

@@ -1,9 +1,8 @@
 use alloc::{string::ToString, vec::Vec};
 
 use miden_objects::{
-    NoteError,
     account::{Account, AccountId},
-    note::{NoteExecutionMode, NoteId, NoteTag},
+    note::{NoteId, NoteTag},
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::warn;
@@ -145,12 +144,8 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
     }
 }
 
-impl TryInto<NoteTagRecord> for &Account {
-    type Error = NoteError;
-    fn try_into(self) -> Result<NoteTagRecord, Self::Error> {
-        Ok(NoteTagRecord::with_account_source(
-            NoteTag::from_account_id(self.id(), NoteExecutionMode::Local)?,
-            self.id(),
-        ))
+impl From<&Account> for NoteTagRecord {
+    fn from(account: &Account) -> Self {
+        NoteTagRecord::with_account_source(NoteTag::from_account_id(account.id()), account.id())
     }
 }
