@@ -124,7 +124,7 @@ update-prover-branch: setup-miden-base ## Checkout and update the specified bran
 
 .PHONY: build-prover
 build-prover: update-prover-branch ## Build the prover binary with specified features
-	cd $(PROVER_DIR) && cargo build -p miden-proving-service --locked --release
+	cd $(PROVER_DIR) && cargo update && cargo build -p miden-proving-service --locked --release
 
 .PHONY: start-prover
 start-prover: ## Run prover. This requires the base repo to be present at `miden-base`
