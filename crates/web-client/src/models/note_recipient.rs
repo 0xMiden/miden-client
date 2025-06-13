@@ -57,3 +57,38 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
         note_recipient.0.clone()
     }
 }
+
+// RECIPIENT ARRAY
+// ================================================================================================
+
+#[derive(Clone)]
+#[wasm_bindgen]
+pub struct RecipientArray(Vec<NoteRecipient>);
+
+#[wasm_bindgen]
+impl RecipientArray {
+    #[wasm_bindgen(constructor)]
+    pub fn new(recipient_array: Option<Vec<NoteRecipient>>) -> RecipientArray {
+        let recipients = recipient_array.unwrap_or_default();
+        RecipientArray(recipients)
+    }
+
+    pub fn push(&mut self, recipient: &NoteRecipient) {
+        self.0.push(recipient.clone());
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<Vec<NativeNoteRecipient>> for RecipientArray {
+    fn from(recipients: Vec<NativeNoteRecipient>) -> Self {
+        RecipientArray(recipients.into_iter().map(NoteRecipient::from).collect())
+    }
+}
+
+impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
+    fn from(recipient_array: &RecipientArray) -> Self {
+        recipient_array.0.iter().map(NativeNoteRecipient::from).collect()
+    }
+}

@@ -5,7 +5,7 @@ use miden_client::transaction::{
 use miden_objects::{
     note::{
         Note as NativeNote, NoteDetails as NativeNoteDetails, NoteId as NativeNoteId,
-        NoteTag as NativeNoteTag,
+        NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag,
     },
     transaction::{OutputNote as NativeOutputNote, TransactionScript as NativeTransactionScript},
     vm::AdviceMap as NativeAdviceMap,
@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 use crate::models::{
     advice_map::AdviceMap,
     foreign_account::ForeignAccount,
-    note::NotesArray,
+    note_recipient::RecipientArray,
     output_note::OutputNotesArray,
     transaction_request::{
         TransactionRequest, note_and_args::NoteAndArgsArray,
@@ -65,10 +65,10 @@ impl TransactionRequestBuilder {
         self
     }
 
-    #[wasm_bindgen(js_name = "withExpectedOutputNotes")]
-    pub fn with_expected_output_notes(mut self, notes: &NotesArray) -> Self {
-        let native_notes: Vec<NativeNote> = notes.into();
-        self.0 = self.0.clone().with_expected_output_notes(native_notes);
+    #[wasm_bindgen(js_name = "withExpectedOutputRecipients")]
+    pub fn with_expected_output_notes(mut self, recipients: &RecipientArray) -> Self {
+        let native_recipients: Vec<NativeNoteRecipient> = recipients.into();
+        self.0 = self.0.clone().with_expected_output_recipients(native_recipients);
         self
     }
 
