@@ -1058,7 +1058,7 @@ export const counterAccountComponent = async (): Promise<
     let account = await client.getAccount(accountBuilderResult.account.id());
     let counter = account?.storage().getItem(0)?.toHex();
 
-    return counter?.charAt(51);
+    return counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
   });
 };
 
