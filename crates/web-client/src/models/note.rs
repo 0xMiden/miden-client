@@ -129,35 +129,3 @@ impl From<&Note> for NativeNote {
         note.0.clone()
     }
 }
-
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NotesArray(Vec<Note>);
-
-#[wasm_bindgen]
-impl NotesArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(notes_array: Option<Vec<Note>>) -> NotesArray {
-        let notes = notes_array.unwrap_or_default();
-        NotesArray(notes)
-    }
-
-    pub fn push(&mut self, note: &Note) {
-        self.0.push(note.clone());
-    }
-}
-
-// CONVERSIONS
-// ================================================================================================
-
-impl From<NotesArray> for Vec<NativeNote> {
-    fn from(notes_array: NotesArray) -> Self {
-        notes_array.0.into_iter().map(Into::into).collect()
-    }
-}
-
-impl From<&NotesArray> for Vec<NativeNote> {
-    fn from(notes_array: &NotesArray) -> Self {
-        notes_array.0.iter().map(Into::into).collect()
-    }
-}

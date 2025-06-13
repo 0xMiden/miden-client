@@ -240,6 +240,7 @@ impl WebClient {
                 swap_transaction_execution_result.executed_transaction().id().to_string(),
                 swap_transaction_request
                     .expected_output_notes()
+                    .into_iter()
                     .map(|note| note.id().to_string())
                     .collect(),
                 swap_transaction_request

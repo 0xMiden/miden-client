@@ -677,7 +677,7 @@ async fn test_import_processing_note_returns_error() {
         client.new_transaction(faucet.id(), transaction_request.clone()).await.unwrap();
     client.submit_transaction(transaction).await.unwrap();
 
-    let note_id = transaction_request.expected_output_notes().next().unwrap().id();
+    let note_id = transaction_request.expected_output_notes().pop().unwrap().id();
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
 
     let input = [(note.try_into().unwrap(), None)];
@@ -884,7 +884,7 @@ async fn test_real_note_roundtrip() {
         )
         .unwrap();
 
-    let note_id = transaction_request.expected_output_notes().next().unwrap().id();
+    let note_id = transaction_request.expected_output_notes().pop().unwrap().id();
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
     client.submit_transaction(transaction).await.unwrap();
 
@@ -973,7 +973,7 @@ async fn test_p2id_transfer() {
         )
         .unwrap();
 
-    let note = tx_request.expected_output_notes().next().unwrap().clone();
+    let note = tx_request.expected_output_notes().pop().unwrap();
     let transaction_id = execute_tx(&mut client, from_account_id, tx_request).await;
 
     // Check that a note tag started being tracked for this note.
@@ -1169,7 +1169,7 @@ async fn test_p2idr_transfer_consumed_by_target() {
     assert!(!notes.is_empty());
 
     // Make the `to_account_id` consume P2IDR note
-    let note_id = tx_request.expected_output_notes().next().unwrap().id();
+    let note_id = tx_request.expected_output_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
     execute_tx_and_sync(&mut client, to_account_id, tx_request).await;
@@ -1408,7 +1408,7 @@ async fn test_get_output_notes() {
         )
         .unwrap();
 
-    let output_note_id = tx_request.expected_output_notes().next().unwrap().id();
+    let output_note_id = tx_request.expected_output_notes().pop().unwrap().id();
 
     // Before executing, the output note is not found
     assert!(client.get_output_note(output_note_id).await.unwrap().is_none());
