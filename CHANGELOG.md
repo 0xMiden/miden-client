@@ -5,6 +5,7 @@
 ### Changes
 
 * [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
+* [BREAKING] Merged `concurrent` feature with `std` (#974).
 
 ### Features
 
