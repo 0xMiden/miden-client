@@ -29,6 +29,7 @@
 * Added `NoteUpdate` type to the note update tracker to distinguish between different types of updates (#821).
 * Updated `TonicRpcClient` and `Store` traits to be subtraits of `Send` and `Sync` (#926).
 * Updated `TonicRpcClient` and `Store` trait functions to return futures which are `Send` (#926).
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
 
 ### Changes
 
