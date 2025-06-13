@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0 (TBD)
+
+### Changes
+
+* [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
+* [BREAKING] Merged `concurrent` feature with `std` (#974).
+
+### Features
+
+* Added support for FPI in Web Client (#958).
+
 ## 0.9.2 (2025-06-11)
 
 * Refresh dependencies (#972).
@@ -40,6 +51,7 @@
 * [BREAKING] Added `DiscardCause` for transactions (#853).
 * Chained pending transactions get discarded when one of the transactions in the chain is discarded (#889).
 * [BREAKING] Renamed `NetworkNote` and `AccountDetails` to `FetchedNote` and `FetchedAccount` respectively (#931).
+* Fixed wasm-opt options to improve performance of generated wasm. wasm-opt settings were broken before.
 
 ## 0.8.2 (TBD)
 

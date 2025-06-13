@@ -345,7 +345,7 @@ mod tests {
     use miden_lib::{note::create_p2id_note, transaction::TransactionKernel};
     use miden_objects::{
         Digest, Felt, ZERO,
-        account::{AccountBuilder, AccountId, AccountIdAnchor, AccountType},
+        account::{AccountBuilder, AccountId, AccountType},
         asset::FungibleAsset,
         crypto::rand::{FeltRng, RpoRandomCoin},
         note::{NoteExecutionMode, NoteTag, NoteType},
@@ -391,7 +391,6 @@ mod tests {
         }
 
         let account = AccountBuilder::new(Default::default())
-            .anchor(AccountIdAnchor::new_unchecked(0, Digest::default()))
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap(),
             )

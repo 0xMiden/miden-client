@@ -6,16 +6,6 @@ In your project's `Cargo.toml`, add:
 miden-client = { version = "0.9" }
 ```
 
-### Features
-
-The Miden client library supports the [`concurrent`](https://github.com/0xMiden/miden-client/blob/main/docs/install-and-run.md#concurrent-feature) feature which is recommended for developing applications with the client. To use it, add the following to your project's `Cargo.toml`:
-
-```toml
-miden-client = { version = "0.9", features = ["concurrent"] }
-```
-
-The library also supports several other features. Please refer to the crate's documentation to learn more.
-
 ## Client instantiation
 
 Spin up a client using the following Rust code and supplying a store and RPC endpoint. 
@@ -55,10 +45,8 @@ The `AccountBuilder` can be used to create a new account with the specified para
 
 ```rust
 let key_pair = SecretKey::with_rng(client.rng());
-let anchor_block = client.get_latest_epoch_block().await.unwrap();
 
 let (new_account, seed) = AccountBuilder::new(init_seed) // Seed should be random for each account
-    .anchor((&anchor_block).try_into().unwrap())
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Private)
     .with_component(RpoFalcon512::new(key_pair.public_key()))

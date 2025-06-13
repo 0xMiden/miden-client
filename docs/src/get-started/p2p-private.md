@@ -12,13 +12,13 @@ In this section, we show you how to make private transactions and send funds to 
 1. Create a second account to send funds with. Previously, we created a type `mutable` account (account A). Now, create another `mutable` (account B) using the following command:
 
       ```shell
-      miden new-wallet --mutable
+      miden-client new-wallet --mutable
       ```
 
 2. List and view the newly created accounts with the following command:
 
       ```shell
-      miden account -l
+      miden-client account -l
       ```
 
 3. You should see two accounts:
@@ -32,7 +32,7 @@ In this section, we show you how to make private transactions and send funds to 
     To do this, run:
 
     ```shell
-    miden send --sender <regular-account-id-A> --target <regular-account-id-B> --asset 50::<faucet-account-id> --note-type private
+    miden-client send --sender <regular-account-id-A> --target <regular-account-id-B> --asset 50::<faucet-account-id> --note-type private
     ```
 
     > **Note**
@@ -43,19 +43,19 @@ In this section, we show you how to make private transactions and send funds to 
 2. First, sync the accounts.
 
     ```shell
-    miden sync
+    miden-client sync
     ```
 
 3. Get the second note id.
 
     ```sh
-    miden notes
+    miden-client notes
     ```
 
 4. Have the second account consume the note.
 
     ```sh
-    miden consume-notes --account <regular-account-ID-B> <input-note-id>
+    miden-client consume-notes --account <regular-account-ID-B> <input-note-id>
     ```
 
     > **Tip**
@@ -66,7 +66,7 @@ In this section, we show you how to make private transactions and send funds to 
 5. Check the second account:
 
     ```shell
-    miden account --show <regular-account-ID-B>
+    miden-client account --show <regular-account-ID-B>
     ```
 
     ![Result of listing miden accounts](../img/get-started/account-b.png)
@@ -74,7 +74,7 @@ In this section, we show you how to make private transactions and send funds to 
 6. Check the original account:
 
     ```sh
-    miden account --show <regular-account-ID-A>
+    miden-client account --show <regular-account-ID-A>
     ```
 
     ![Result of listing miden accounts](../img/get-started/account-a.png)

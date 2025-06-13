@@ -20,7 +20,7 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::{crypto::get_rpo_random_coin, grpc::UrlExt};
 use miden_objects::{
     Felt, ONE,
-    account::{AccountFile, AccountIdAnchor, AuthSecretKey},
+    account::{AccountFile, AuthSecretKey},
     asset::TokenSymbol,
     crypto::dsa::rpo_falcon512::SecretKey,
 };
@@ -332,7 +332,6 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 
     let (mut account, account_seed) = create_basic_fungible_faucet(
         rng.random(),
-        AccountIdAnchor::PRE_GENESIS,
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),

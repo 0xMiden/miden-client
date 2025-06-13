@@ -128,10 +128,7 @@ async fn insert_new_wallet(
     let mut init_seed = [0u8; 32];
     client.rng.fill_bytes(&mut init_seed);
 
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
     let (account, seed) = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().unwrap())
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
         .with_component(RpoFalcon512::new(pub_key))
@@ -162,10 +159,7 @@ async fn insert_new_fungible_faucet(
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
         .expect("u64 can be safely converted to a field element");
 
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
     let (account, seed) = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().unwrap())
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_component(RpoFalcon512::new(pub_key))
@@ -472,7 +466,7 @@ async fn test_sync_state_mmr() {
     // Try reconstructing the partial_mmr from what's in the database
     let partial_mmr = client.build_current_partial_mmr().await.unwrap();
     assert_eq!(partial_mmr.forest(), 6);
-    assert!(partial_mmr.open(0).unwrap().is_some()); // Account anchor block
+    assert!(partial_mmr.open(0).unwrap().is_none());
     assert!(partial_mmr.open(1).unwrap().is_some());
     assert!(partial_mmr.open(2).unwrap().is_none());
     assert!(partial_mmr.open(3).unwrap().is_none());
@@ -489,8 +483,7 @@ async fn test_sync_state_mmr() {
     partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
 
     // the blocks for both notes should be stored as they are relevant for the client's accounts
-    // with the addition of the chain tip
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 3);
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -517,10 +510,9 @@ async fn test_sync_state_tags() {
         rpc_api.get_block_header_by_number(None, false).await.unwrap().0.block_num()
     );
 
-    // as we are syncing with tags, the response should containt blocks for both notes but they
-    // shouldn't be stored as they are not relevant for the client's accounts. Only the chain
-    // tip should be stored in the database
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
+    // as we are syncing with tags, the response should contain blocks for both notes but they
+    // shouldn't be stored as they are not relevant for the client's accounts.
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 0);
 }
 
 #[tokio::test]
@@ -839,6 +831,7 @@ async fn test_note_without_asset() {
 #[tokio::test]
 async fn test_execute_program() {
     let (mut client, _, keystore) = create_test_client().await;
+    let _ = client.sync_state().await.unwrap();
 
     let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
@@ -1379,7 +1372,7 @@ async fn test_get_consumable_notes() {
 #[tokio::test]
 async fn test_get_output_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
-
+    let _ = client.sync_state().await.unwrap();
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
 

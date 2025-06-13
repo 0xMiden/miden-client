@@ -6,6 +6,7 @@ import {
   AccountHeader,
   AccountId,
   AccountStorageMode,
+  AccountStorageRequirements,
   AccountType,
   AdviceMap,
   Assembler,
@@ -14,6 +15,7 @@ import {
   ConsumableNoteRecord,
   Felt,
   FeltArray,
+  ForeignAccount,
   FungibleAsset,
   Library,
   Note,
@@ -32,7 +34,12 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  PublicKey,
+  RpoDigest,
   Rpo256,
+  SecretKey,
+  SlotAndKeys,
+  SlotAndKeysArray,
   StorageMap,
   StorageSlot,
   TestUtils,
@@ -62,6 +69,7 @@ declare global {
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountStorageMode: typeof AccountStorageMode;
+    AccountStorageRequirements: typeof AccountStorageRequirements;
     AccountType: typeof AccountType;
     AdviceMap: typeof AdviceMap;
     Assembler: typeof Assembler;
@@ -70,6 +78,7 @@ declare global {
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
+    ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
     Library: typeof Library;
     Note: typeof Note;
@@ -91,7 +100,12 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    PublicKey: typeof PublicKey;
+    RpoDigest: typeof RpoDigest;
     Rpo256: typeof Rpo256;
+    SecretKey: typeof SecretKey;
+    SlotAndKeys: typeof SlotAndKeys;
+    SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
     StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
@@ -115,6 +129,7 @@ declare global {
         maxWaitTime?: number,
         delayInterval?: number
       ) => Promise<void>;
+      waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
     };
   }

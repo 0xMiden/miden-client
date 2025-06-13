@@ -18,6 +18,22 @@
 
 ***
 
+### getProcedureHash()
+
+> **getProcedureHash**(`procedure_name`): `string`
+
+#### Parameters
+
+##### procedure\_name
+
+`string`
+
+#### Returns
+
+`string`
+
+***
+
 ### withSupportsAllTypes()
 
 > **withSupportsAllTypes**(): `AccountComponent`
@@ -45,6 +61,22 @@
 ##### storage\_slots
 
 [`StorageSlot`](StorageSlot.md)[]
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### createAuthComponent()
+
+> `static` **createAuthComponent**(`secret_key`): `AccountComponent`
+
+#### Parameters
+
+##### secret\_key
+
+[`SecretKey`](SecretKey.md)
 
 #### Returns
 

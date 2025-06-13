@@ -664,10 +664,7 @@ export const customAccountComponent = async (): Promise<void> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let anchorBlock = await client.getLatestEpochBlock();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
-      .anchor(anchorBlock)
       .accountType(window.AccountType.RegularAccountImmutableCode)
       .storageMode(window.AccountStorageMode.public())
       .withComponent(mappingAccountComponent)

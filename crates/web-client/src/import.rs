@@ -56,8 +56,7 @@ impl WebClient {
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
         let (generated_acct, _, key_pair) =
-            generate_wallet(client, &AccountStorageMode::public(), mutable, Some(init_seed))
-                .await?;
+            generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed)).await?;
 
         let native_id = generated_acct.id();
         client

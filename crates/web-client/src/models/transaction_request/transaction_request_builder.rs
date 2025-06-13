@@ -1,5 +1,6 @@
 use miden_client::transaction::{
-    NoteArgs as NativeNoteArgs, TransactionRequestBuilder as NativeTransactionRequestBuilder,
+    ForeignAccount as NativeForeignAccount, NoteArgs as NativeNoteArgs,
+    TransactionRequestBuilder as NativeTransactionRequestBuilder,
 };
 use miden_objects::{
     note::{
@@ -13,6 +14,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::{
     advice_map::AdviceMap,
+    foreign_account::ForeignAccount,
     note::NotesArray,
     output_note::OutputNotesArray,
     transaction_request::{
@@ -85,6 +87,14 @@ impl TransactionRequestBuilder {
     pub fn extend_advice_map(mut self, advice_map: &AdviceMap) -> Self {
         let native_advice_map: NativeAdviceMap = advice_map.into();
         self.0 = self.0.clone().extend_advice_map(native_advice_map);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withForeignAccounts")]
+    pub fn with_foreign_accounts(mut self, foreign_accounts: Vec<ForeignAccount>) -> Self {
+        let native_foreign_accounts: Vec<NativeForeignAccount> =
+            foreign_accounts.into_iter().map(Into::into).collect();
+        self.0 = self.0.clone().with_foreign_accounts(native_foreign_accounts);
         self
     }
 

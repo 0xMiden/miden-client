@@ -360,8 +360,7 @@ pub enum NoteFilter {
     /// Return a list of all notes ([`InputNoteRecord`] or [`OutputNoteRecord`]).
     All,
     /// Return a list of committed notes ([`InputNoteRecord`] or [`OutputNoteRecord`]). These
-    /// represent notes that the blockchain has included in a block, and for which we are
-    /// storing anchor data.
+    /// represent notes that the blockchain has included in a block.
     Committed,
     /// Filter by consumed notes ([`InputNoteRecord`] or [`OutputNoteRecord`]). notes that have
     /// been used as inputs in transactions.

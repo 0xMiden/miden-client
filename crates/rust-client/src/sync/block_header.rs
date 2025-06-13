@@ -37,9 +37,7 @@ impl Client {
 
         let blank_mmr_peaks =
             MmrPeaks::new(0, vec![]).expect("Blank MmrPeaks should not fail to instantiate");
-        // We specify that we want to store the MMR data from the genesis block as we might use it
-        // as an anchor for created accounts.
-        self.store.insert_block_header(&genesis_block, blank_mmr_peaks, true).await?;
+        self.store.insert_block_header(&genesis_block, blank_mmr_peaks, false).await?;
         Ok(genesis_block)
     }
 
@@ -118,42 +116,6 @@ impl Client {
         self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
 
         Ok(block_header)
-    }
-
-    /// Returns the epoch block for the specified block number.
-    ///
-    /// If the epoch block header is not stored, it will be retrieved and stored.
-    pub async fn get_epoch_block(
-        &mut self,
-        block_num: BlockNumber,
-    ) -> Result<BlockHeader, ClientError> {
-        let epoch = block_num.block_epoch();
-        let epoch_block_number = BlockNumber::from_epoch(epoch);
-
-        if let Some((epoch_block, _)) =
-            self.store.get_block_header_by_num(epoch_block_number).await?
-        {
-            return Ok(epoch_block);
-        }
-
-        if epoch_block_number == 0.into() {
-            return self.ensure_genesis_in_place().await;
-        }
-
-        let mut current_partial_mmr = self.build_current_partial_mmr().await?;
-        let anchor_block = self
-            .get_and_store_authenticated_block(epoch_block_number, &mut current_partial_mmr)
-            .await?;
-
-        Ok(anchor_block)
-    }
-
-    /// Returns the epoch block for the latest tracked block.
-    ///
-    /// If the epoch block header is not stored, it will be retrieved and stored.
-    pub async fn get_latest_epoch_block(&mut self) -> Result<BlockHeader, ClientError> {
-        let current_block_num = self.store.get_sync_height().await?;
-        self.get_epoch_block(current_block_num).await
     }
 }
 
