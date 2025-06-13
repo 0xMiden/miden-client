@@ -551,17 +551,16 @@ async fn test_counter_contract_ntx() {
 
     wait_for_blocks(&mut client, 2).await;
 
-    let a = client
-        .test_rpc_api()
-        .get_account_details(network_account.id())
-        .await
-        .unwrap()
-        .account()
-        .cloned()
-        .unwrap();
-
     assert_eq!(
-        a.storage().get_item(0).unwrap(),
+        client
+            .get_account(network_account.id())
+            .await
+            .unwrap()
+            .unwrap()
+            .account()
+            .storage()
+            .get_item(0)
+            .unwrap(),
         Digest::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
     );
 }
