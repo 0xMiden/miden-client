@@ -23,10 +23,10 @@ const importDb = async (db: any) => {
 const getAccount = async (accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
-    const accountId = window.AccountId.fromHex(_accountId);
+    const accountId = window.AccountId.fromBech32(_accountId);
     const account = await client.getAccount(accountId);
     return {
-      accountId: account?.id().toString(),
+      accountId: account?.id().toBech32(),
       accountCommitment: account?.commitment().toHex(),
     };
   }, accountId);
