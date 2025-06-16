@@ -55,7 +55,7 @@ const getConsumableNotes = async (accountId?: string) => {
     let records;
     if (_accountId) {
       console.log({ _accountId });
-      const accountId = window.AccountId.fromHex(_accountId);
+      const accountId = window.AccountId.fromBech32(_accountId);
       records = await client.getConsumableNotes(accountId);
     } else {
       records = await client.getConsumableNotes();
@@ -64,7 +64,7 @@ const getConsumableNotes = async (accountId?: string) => {
     return records.map((record) => ({
       noteId: record.inputNoteRecord().id().toString(),
       consumability: record.noteConsumability().map((c) => ({
-        accountId: c.accountId().toString(),
+        accountId: c.accountId().toBech32(),
         consumableAfterBlock: c.consumableAfterBlock(),
       })),
     }));

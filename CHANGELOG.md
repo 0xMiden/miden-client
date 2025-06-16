@@ -11,6 +11,7 @@
 ### Features
 
 * Added support for FPI in Web Client (#958).
+* Exposed `bech32` account IDs in Web Client (#978).
 
 ## 0.9.2 (2025-06-11)
 

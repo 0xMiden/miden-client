@@ -28,8 +28,8 @@ export const mintTransaction = async (
 
       await client.syncState();
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+      const targetAccountId = window.AccountId.fromBech32(_targetAccountId);
+      const faucetAccountId = window.AccountId.fromBech32(_faucetAccountId);
 
       const mintTransactionRequest = client.newMintTransactionRequest(
         targetAccountId,
@@ -101,9 +101,9 @@ export const sendTransaction = async (
 
       await client.syncState();
 
-      const senderAccountId = window.AccountId.fromHex(_senderAccountId);
-      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+      const senderAccountId = window.AccountId.fromBech32(_senderAccountId);
+      const targetAccountId = window.AccountId.fromBech32(_targetAccountId);
+      const faucetAccountId = window.AccountId.fromBech32(_faucetAccountId);
 
       let mintTransactionRequest = client.newMintTransactionRequest(
         senderAccountId,
@@ -256,7 +256,7 @@ export const createNewWallet = async ({
       );
 
       return {
-        id: newWallet.id().toString(),
+        id: newWallet.id().toBech32(),
         nonce: newWallet.nonce().toString(),
         vaultCommitment: newWallet.vault().root().toHex(),
         storageCommitment: newWallet.storage().commitment().toHex(),
@@ -296,7 +296,7 @@ export const createNewFaucet = async (
         _maxSupply
       );
       return {
-        id: newFaucet.id().toString(),
+        id: newFaucet.id().toBech32(),
         nonce: newFaucet.nonce().toString(),
         vaultCommitment: newFaucet.vault().root().toHex(),
         storageCommitment: newFaucet.storage().commitment().toHex(),
@@ -336,13 +336,13 @@ export const getAccountBalance = async (
     async (_accountId, _faucetId) => {
       const client = window.client;
       const account = await client.getAccount(
-        window.AccountId.fromHex(_accountId)
+        window.AccountId.fromBech32(_accountId)
       );
       let balance = BigInt(0);
       if (account) {
         balance = account
           .vault()
-          .getBalance(window.AccountId.fromHex(_faucetId));
+          .getBalance(window.AccountId.fromBech32(_faucetId));
       }
       return balance;
     },
@@ -370,8 +370,8 @@ export const consumeTransaction = async (
 
       await client.syncState();
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
-      const faucetId = window.AccountId.fromHex(_faucetId);
+      const targetAccountId = window.AccountId.fromBech32(_targetAccountId);
+      const faucetId = window.AccountId.fromBech32(_faucetId);
 
       const consumeTransactionRequest = client.newConsumeTransactionRequest([
         _noteId,
@@ -431,12 +431,12 @@ export const mintAndConsumeTransaction = async (
 
       await client.syncState();
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+      const targetAccountId = window.AccountId.fromBech32(_targetAccountId);
+      const faucetAccountId = window.AccountId.fromBech32(_faucetAccountId);
 
       let mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
-        window.AccountId.fromHex(_faucetAccountId),
+        faucetAccountId,
         window.NoteType.Private,
         BigInt(1000)
       );
@@ -553,9 +553,9 @@ export const setupWalletAndFaucet =
       );
 
       return {
-        accountId: account.id().toString(),
+        accountId: account.id().toBech32(),
         accountCommitment: account.commitment().toHex(),
-        faucetId: faucetAccount.id().toString(),
+        faucetId: faucetAccount.id().toBech32(),
       };
     });
   };
@@ -563,10 +563,10 @@ export const setupWalletAndFaucet =
 export const getAccount = async (accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
-    const accountId = window.AccountId.fromHex(_accountId);
+    const accountId = window.AccountId.fromBech32(_accountId);
     const account = await client.getAccount(accountId);
     return {
-      id: account?.id().toString(),
+      id: account?.id().toBech32(),
       commitment: account?.commitment().toHex(),
       nonce: account?.nonce().toString(),
       vaultCommitment: account?.vault().root().toHex(),
@@ -602,6 +602,10 @@ export const clearStore = async () => {
 
 export const isValidAddress = (address: string) => {
   expect(address.startsWith("0x")).to.be.true;
+};
+
+export const isValidBech32Address = (address: string) => {
+  expect(address.startsWith("mtst")).to.be.true;
 };
 
 // Constants
