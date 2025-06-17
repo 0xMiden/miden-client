@@ -15,6 +15,13 @@ CREATE TABLE account_code (
     PRIMARY KEY (root)
 );
 
+-- Create mast_forest table
+CREATE TABLE mast_forest (
+    digest TEXT NOT NULL,       -- digest of the mast forest.
+    mast BLOB NOT NULL,         -- serialized mast forest.
+    PRIMARY KEY (digest)
+);
+
 -- Create account_storage table
 CREATE TABLE account_storage (
     root TEXT NOT NULL,         -- root of the account storage Merkle tree.

@@ -4,10 +4,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use std::{collections::BTreeMap, rc::Rc};
+use std::{collections::BTreeMap, println, rc::Rc};
 
 use miden_objects::{
-    AccountError, Digest, Felt, Word,
+    AccountError, Digest, Felt, MastForest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
     asset::{Asset, AssetVault},
 };
@@ -208,6 +208,28 @@ impl SqliteStore {
             })
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
     }
+
+    pub fn get_mast_forest(
+        conn: &mut Connection,
+        digest: Digest,
+    ) -> Result<Option<MastForest>, StoreError> {
+        const QUERY: &str = "SELECT mast \
+            FROM mast_forest WHERE digest = ?";
+
+        conn.prepare(QUERY)?
+            .query_map(params![digest.to_hex()], |row| row.get(0))?
+            .map(|result| {
+                result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
+                    |mast: Vec<u8>| {
+                        MastForest::read_from_bytes(&mast)
+                            .map_err(StoreError::DataDeserializationError)
+                    },
+                )
+            })
+            .next()
+            .transpose()
+            .map_err(|err| StoreError::ParsingError(err.to_string()))
+    }
 }
 
 // HELPERS
@@ -270,9 +292,19 @@ pub(super) fn insert_account_record(
 
 /// Inserts an [`AccountCode`].
 fn insert_account_code(tx: &Transaction<'_>, account_code: &AccountCode) -> Result<(), StoreError> {
+    let mast_forest = account_code.mast();
+
+    let mast = mast_forest.to_bytes();
+    for proc_digest in mast_forest.local_procedure_digests() {
+        // TODO: Normalize mast forest to avoid duplication
+        println!("Inserting MAST for procedure: {}", proc_digest.to_hex());
+        const MAST_QUERY: &str = insert_sql!(mast_forest { digest, mast } | REPLACE);
+        tx.execute(MAST_QUERY, params![proc_digest.to_hex(), mast])?;
+    }
+
     let (code_root, code) = serialize_account_code(account_code);
-    const QUERY: &str = insert_sql!(account_code { root, code } | IGNORE);
-    tx.execute(QUERY, params![code_root, code])?;
+    const CODE_QUERY: &str = insert_sql!(account_code { root, code } | IGNORE);
+    tx.execute(CODE_QUERY, params![code_root, code])?;
     Ok(())
 }
 

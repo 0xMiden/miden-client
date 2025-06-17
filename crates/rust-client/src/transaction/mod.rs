@@ -616,15 +616,6 @@ impl Client {
             self.store.get_sync_height().await?
         };
 
-        // TODO: Refactor this to get account code only?
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
-        self.mast_store.load_account_code(account.code());
-
         if ignore_invalid_notes {
             // Remove invalid notes
             notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
@@ -661,8 +652,7 @@ impl Client {
             return Err(ClientError::MissingOutputNotes(missing_note_ids));
         }
 
-        let screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let screener = NoteScreener::new(self.store.clone(), &self.tx_executor);
 
         TransactionResult::new(
             executed_transaction,
@@ -1131,20 +1121,6 @@ impl Client {
         } else {
             self.get_sync_height().await?
         };
-
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
-
-        // Ensure code is loaded on MAST store
-        self.mast_store.insert(tx_script.mast());
-        self.mast_store.insert(account.code().mast());
-        for fpi_account in &foreign_account_inputs {
-            self.mast_store.insert(fpi_account.code().mast());
-        }
 
         Ok(self
             .tx_executor

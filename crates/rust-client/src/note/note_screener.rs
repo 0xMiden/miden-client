@@ -11,7 +11,6 @@ use miden_objects::{
 };
 use miden_tx::{
     NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
-    TransactionMastStore,
 };
 use thiserror::Error;
 
@@ -55,20 +54,13 @@ pub struct NoteScreener<'a> {
     store: Arc<dyn Store>,
     /// A consumption checker, used to check whether a note can be consumed by an account.
     consumption_checker: NoteConsumptionChecker<'a>,
-    /// A MAST store, used to provide code inputs to the VM.
-    mast_store: Arc<TransactionMastStore>,
 }
 
 impl<'a> NoteScreener<'a> {
-    pub fn new(
-        store: Arc<dyn Store>,
-        tx_executor: &'a TransactionExecutor,
-        mast_store: Arc<TransactionMastStore>,
-    ) -> Self {
+    pub fn new(store: Arc<dyn Store>, tx_executor: &'a TransactionExecutor) -> Self {
         Self {
             store,
             consumption_checker: NoteConsumptionChecker::new(tx_executor),
-            mast_store,
         }
     }
 
@@ -133,8 +125,6 @@ impl<'a> NoteScreener<'a> {
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
         let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
             .expect("Single note should be valid");
-
-        self.mast_store.load_account_code(account.code());
 
         if let NoteAccountExecution::Success = self
             .consumption_checker
