@@ -24,9 +24,9 @@ CREATE TABLE mast_forest (
 
 -- Create account_storage table
 CREATE TABLE account_storage (
-    root TEXT NOT NULL,         -- root of the account storage Merkle tree.
+    commitment TEXT NOT NULL,   -- commitment of the account storage Merkle tree.
     slots BLOB NOT NULL,        -- serialized key-value pair of non-empty account slots.
-    PRIMARY KEY (root)
+    PRIMARY KEY (commitment)
 );
 
 -- Create account_vaults table
@@ -49,7 +49,7 @@ CREATE TABLE accounts (
     account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
     code_root TEXT NOT NULL,                    -- Root of the account_code
-    storage_root TEXT NOT NULL,                 -- Root of the account_storage Merkle tree.
+    storage_commitment TEXT NOT NULL,           -- Commitment to the account_storage Merkle tree.
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
     nonce BIGINT NOT NULL,                      -- Account nonce.
     committed BOOLEAN NOT NULL,                 -- True if recorded, false if not.
@@ -57,7 +57,7 @@ CREATE TABLE accounts (
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_root) REFERENCES account_code(root),
-    FOREIGN KEY (storage_root) REFERENCES account_storage(root),
+    FOREIGN KEY (storage_commitment) REFERENCES account_storage(commitment),
     FOREIGN KEY (vault_root) REFERENCES account_vaults(root)
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
