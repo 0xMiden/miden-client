@@ -65,7 +65,16 @@ struct SerializedAccountStorageData {
     pub slots: Vec<u8>,
 }
 
-type SerializedFullAccountParts = (String, u64, Option<Vec<u8>>, Vec<u8>, Vec<u8>, Vec<u8>, bool);
+#[derive(Debug)]
+struct SerializedFullAccountParts {
+    pub id: String,
+    pub nonce: u64,
+    pub account_seed: Option<Vec<u8>>,
+    pub code: Vec<u8>,
+    pub storage: Vec<u8>,
+    pub assets: Vec<u8>,
+    pub locked: bool,
+}
 
 impl SqliteStore {
     // ACCOUNTS
@@ -453,10 +462,19 @@ fn parse_accounts(
 }
 
 /// Parse an account from the provided parts.
-pub(super) fn parse_account(
+fn parse_account(
     serialized_account_parts: SerializedFullAccountParts,
 ) -> Result<AccountRecord, StoreError> {
-    let (id, nonce, account_seed, code, storage, assets, locked) = serialized_account_parts;
+    let SerializedFullAccountParts {
+        id,
+        nonce,
+        account_seed,
+        code,
+        storage,
+        assets,
+        locked,
+    } = serialized_account_parts;
+
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
     let account_id: AccountId =
         AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic");
@@ -527,7 +545,7 @@ fn serialize_account_asset_vault(asset_vault: &AssetVault) -> SerializedAccountV
 }
 
 /// Parse accounts parts from the provided row into native types.
-pub(super) fn parse_account_columns(
+fn parse_account_columns(
     row: &rusqlite::Row<'_>,
 ) -> Result<SerializedFullAccountParts, rusqlite::Error> {
     let id: String = row.get(0)?;
@@ -538,7 +556,15 @@ pub(super) fn parse_account_columns(
     let assets: Vec<u8> = row.get(5)?;
     let locked: bool = row.get(6)?;
 
-    Ok((id, nonce, account_seed, code, storage, assets, locked))
+    Ok(SerializedFullAccountParts {
+        id,
+        nonce,
+        account_seed,
+        code,
+        storage,
+        assets,
+        locked,
+    })
 }
 
 /// Removes account states with the specified hashes from the database.
