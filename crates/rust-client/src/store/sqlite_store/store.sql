@@ -8,18 +8,20 @@ CREATE TABLE settings (
     CONSTRAINT settings_name_is_not_empty CHECK (length(name) > 0)
 ) STRICT, WITHOUT ROWID;
 
--- Create account_code table
-CREATE TABLE account_code (
-    root TEXT NOT NULL,         -- root of the Merkle tree for all exported procedures in account module.
-    code BLOB NOT NULL,         -- serialized account code.
-    PRIMARY KEY (root)
+
+CREATE TABLE account_procedures (
+    mast_forest_root TEXT NOT NULL, -- root of the Merkle tree for all exported procedures in account module.
+    procedure_root TEXT NOT NULL,   -- mast root of the procedure.
+    FOREIGN KEY (mast_forest_root) REFERENCES mast_forests(root),
+    PRIMARY KEY (mast_forest_root, procedure_root)
 );
 
--- Create mast_forest table
-CREATE TABLE mast_forest (
-    digest TEXT NOT NULL,       -- digest of the mast forest.
-    mast BLOB NOT NULL,         -- serialized mast forest.
-    PRIMARY KEY (digest)
+-- Create mast_forests table
+CREATE TABLE mast_forests (
+    root TEXT NOT NULL,             -- root of the Merkle tree for all exported procedures in account module.
+    procedure_info BLOB NOT NULL,   -- serialized procedure info list.
+    mast BLOB NOT NULL,             -- serialized mast forest.
+    PRIMARY KEY (root)
 );
 
 -- Create account_storage table
@@ -39,16 +41,16 @@ CREATE TABLE account_vaults (
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(
     account_id TEXT NOT NULL,              -- ID of the account
-    code_root TEXT NOT NULL,               -- Root of the account_code
+    code_root TEXT NOT NULL,               -- root of the Merkle tree for all exported procedures in account module.
     PRIMARY KEY (account_id),
-    FOREIGN KEY (code_root) REFERENCES account_code(root)
+    FOREIGN KEY (code_root) REFERENCES mast_forests(root)
 );
 
 -- Create accounts table
 CREATE TABLE accounts (
     account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
-    code_root TEXT NOT NULL,                    -- Root of the account_code
+    code_root TEXT NOT NULL,                    -- Root of the Merkle tree for all exported procedures in account module.
     storage_commitment TEXT NOT NULL,           -- Commitment to the account_storage Merkle tree.
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
     nonce BIGINT NOT NULL,                      -- Account nonce.
@@ -56,7 +58,7 @@ CREATE TABLE accounts (
     account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),
-    FOREIGN KEY (code_root) REFERENCES account_code(root),
+    FOREIGN KEY (code_root) REFERENCES mast_forests(root),
     FOREIGN KEY (storage_commitment) REFERENCES account_storage(commitment),
     FOREIGN KEY (vault_root) REFERENCES account_vaults(root)
 

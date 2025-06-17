@@ -4,11 +4,13 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use std::{collections::BTreeMap, println, rc::Rc};
+use std::{collections::BTreeMap, rc::Rc, sync::Arc};
 
 use miden_objects::{
     AccountError, Digest, Felt, MastForest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
+    account::{
+        Account, AccountCode, AccountHeader, AccountId, AccountProcedureInfo, AccountStorage,
+    },
     asset::{Asset, AssetVault},
 };
 use miden_tx::utils::{Deserializable, Serializable};
@@ -35,7 +37,7 @@ struct SerializedAccountData {
     pub commitment: String,
 }
 
-/// Represents the parts retrieved from the database to build an `Account`.
+/// Represents the basic account parts retrieved from the database.
 #[derive(Debug)]
 struct SerializedAccountsParts {
     pub id: String,
@@ -47,30 +49,36 @@ struct SerializedAccountsParts {
     pub locked: bool,
 }
 
+/// Represents the serialized parts of an account's vault.
 #[derive(Debug)]
 struct SerializedAccountVaultData {
     pub root: String,
     pub assets: Vec<u8>,
 }
 
+/// Represents the serialized parts of an account's code.
 #[derive(Debug)]
 struct SerializedAccountCodeData {
     pub root: String,
-    pub code: Vec<u8>,
+    pub procedure_info: Vec<u8>,
+    pub mast_forest: Vec<u8>,
 }
 
+/// Represents the serialized parts of an account's storage.
 #[derive(Debug)]
 struct SerializedAccountStorageData {
     pub commitment: String,
     pub slots: Vec<u8>,
 }
 
+/// Represents the full serialized account parts retrieved from the database.
 #[derive(Debug)]
 struct SerializedFullAccountParts {
     pub id: String,
     pub nonce: u64,
     pub account_seed: Option<Vec<u8>>,
-    pub code: Vec<u8>,
+    pub mast: Vec<u8>,
+    pub procedure_info: Vec<u8>,
     pub storage: Vec<u8>,
     pub assets: Vec<u8>,
     pub locked: bool,
@@ -144,9 +152,9 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        const QUERY: &str = "SELECT accounts.id, accounts.nonce, accounts.account_seed, account_code.code, account_storage.slots, account_vaults.assets, accounts.locked \
+        const QUERY: &str = "SELECT accounts.id, accounts.nonce, accounts.account_seed, account_storage.slots, account_vaults.assets, accounts.locked, mast_forests.mast, mast_forests.procedure_info \
                             FROM accounts \
-                            JOIN account_code ON accounts.code_root = account_code.root \
+                            JOIN mast_forests ON accounts.code_root = mast_forests.root \
                             JOIN account_storage ON accounts.storage_commitment = account_storage.commitment \
                             JOIN account_vaults ON accounts.vault_root = account_vaults.root \
                             WHERE accounts.id = ? \
@@ -227,23 +235,29 @@ impl SqliteStore {
         let params: Vec<Value> =
             account_ids.into_iter().map(|id| Value::from(id.to_hex())).collect();
         const QUERY: &str = "
-            SELECT account_id, code
-            FROM foreign_account_code JOIN account_code ON code_root = code_root
+            SELECT account_id, mast, procedure_info
+            FROM foreign_account_code JOIN mast_forests ON code_root = mast_forests.root
             WHERE account_id IN rarray(?)";
 
         conn.prepare(QUERY)?
-            .query_map([Rc::new(params)], |row| Ok((row.get(0)?, row.get(1)?)))
+            .query_map([Rc::new(params)], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
             .expect("no binding parameters used in query")
             .map(|result| {
                 result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
-                    |(id, code): (String, Vec<u8>)| {
+                    |(id, mast, procedure_info): (String, Vec<u8>, Vec<u8>)| {
+                        let mast = MastForest::read_from_bytes(&mast)
+                            .map_err(StoreError::DataDeserializationError)?;
+                        let procedure_info =
+                            Vec::<AccountProcedureInfo>::read_from_bytes(&procedure_info)
+                                .map_err(StoreError::DataDeserializationError)?;
+
                         Ok((
                             AccountId::from_hex(&id).map_err(|err| {
                                 StoreError::AccountError(
                                     AccountError::FinalAccountHeaderIdParsingFailed(err),
                                 )
                             })?,
-                            AccountCode::from_bytes(&code).map_err(StoreError::AccountError)?,
+                            AccountCode::from_parts(Arc::new(mast), procedure_info),
                         ))
                     },
                 )
@@ -255,8 +269,9 @@ impl SqliteStore {
         conn: &mut Connection,
         digest: Digest,
     ) -> Result<Option<MastForest>, StoreError> {
-        const QUERY: &str = "SELECT mast \
-            FROM mast_forest WHERE digest = ?";
+        const QUERY: &str = "SELECT mast_forests.mast \
+            FROM account_procedures JOIN mast_forests ON mast_forest_root = root \
+            WHERE procedure_root = ?";
 
         conn.prepare(QUERY)?
             .query_map(params![digest.to_hex()], |row| row.get(0))?
@@ -341,20 +356,18 @@ pub(super) fn insert_account_record(
 
 /// Inserts an [`AccountCode`].
 fn insert_account_code(tx: &Transaction<'_>, account_code: &AccountCode) -> Result<(), StoreError> {
-    let mast_forest = account_code.mast();
+    let SerializedAccountCodeData { root, procedure_info, mast_forest } =
+        serialize_account_code(account_code);
 
-    let mast = mast_forest.to_bytes();
-    for proc_digest in mast_forest.local_procedure_digests() {
-        // TODO: Normalize mast forest to avoid duplication
-        println!("Inserting MAST for procedure: {}", proc_digest.to_hex());
-        const MAST_QUERY: &str = insert_sql!(mast_forest { digest, mast } | REPLACE);
-        tx.execute(MAST_QUERY, params![proc_digest.to_hex(), mast])?;
+    const CODE_QUERY: &str = insert_sql!(mast_forests { root, procedure_info, mast } | IGNORE);
+    tx.execute(CODE_QUERY, params![root, procedure_info, mast_forest])?;
+
+    for procedure in account_code.procedures() {
+        const MAST_QUERY: &str =
+            insert_sql!(account_procedures { mast_forest_root, procedure_root } | IGNORE);
+        tx.execute(MAST_QUERY, params![root, procedure.mast_root().to_hex()])?;
     }
 
-    let SerializedAccountCodeData { root, code } = serialize_account_code(account_code);
-
-    const CODE_QUERY: &str = insert_sql!(account_code { root, code } | IGNORE);
-    tx.execute(CODE_QUERY, params![root, code])?;
     Ok(())
 }
 
@@ -469,7 +482,8 @@ fn parse_account(
         id,
         nonce,
         account_seed,
-        code,
+        mast,
+        procedure_info,
         storage,
         assets,
         locked,
@@ -478,7 +492,11 @@ fn parse_account(
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
     let account_id: AccountId =
         AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic");
-    let account_code = AccountCode::from_bytes(&code)?;
+
+    let mast = MastForest::read_from_bytes(&mast)?;
+    let procedure_info = Vec::<AccountProcedureInfo>::read_from_bytes(&procedure_info)?;
+    let account_code = AccountCode::from_parts(Arc::new(mast), procedure_info);
+
     let account_storage = AccountStorage::read_from_bytes(&storage)?;
     let account_assets: Vec<Asset> = Vec::<Asset>::read_from_bytes(&assets)?;
     let account = Account::from_parts(
@@ -523,9 +541,10 @@ fn serialize_account(account: &Account) -> SerializedAccountData {
 /// Serialize the provided `account_code` into database compatible types.
 fn serialize_account_code(account_code: &AccountCode) -> SerializedAccountCodeData {
     let root = account_code.commitment().to_string();
-    let code = account_code.to_bytes();
+    let procedure_info = account_code.procedures().to_vec().to_bytes();
+    let mast_forest = account_code.mast().to_bytes();
 
-    SerializedAccountCodeData { root, code }
+    SerializedAccountCodeData { root, procedure_info, mast_forest }
 }
 
 /// Serialize the provided `account_storage` into database compatible types.
@@ -551,16 +570,18 @@ fn parse_account_columns(
     let id: String = row.get(0)?;
     let nonce: u64 = column_value_as_u64(row, 1)?;
     let account_seed: Option<Vec<u8>> = row.get(2)?;
-    let code: Vec<u8> = row.get(3)?;
-    let storage: Vec<u8> = row.get(4)?;
-    let assets: Vec<u8> = row.get(5)?;
-    let locked: bool = row.get(6)?;
+    let storage: Vec<u8> = row.get(3)?;
+    let assets: Vec<u8> = row.get(4)?;
+    let locked: bool = row.get(5)?;
+    let mast: Vec<u8> = row.get(6)?;
+    let procedure_info: Vec<u8> = row.get(7)?;
 
     Ok(SerializedFullAccountParts {
         id,
         nonce,
         account_seed,
-        code,
+        mast,
+        procedure_info,
         storage,
         assets,
         locked,
@@ -612,21 +633,21 @@ mod tests {
 
                 // Table is empty at the beginning
                 let mut actual: usize = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .query_row("SELECT Count(*) FROM mast_forests", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(actual, 0);
 
                 // First insertion generates a new row
                 insert_account_code(&tx, &account_code).unwrap();
                 actual = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .query_row("SELECT Count(*) FROM mast_forests", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(actual, 1);
 
                 // Second insertion passes but does not generate a new row
                 assert!(insert_account_code(&tx, &account_code).is_ok());
                 actual = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .query_row("SELECT Count(*) FROM mast_forests", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(actual, 1);
 

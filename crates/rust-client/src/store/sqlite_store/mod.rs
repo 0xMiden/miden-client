@@ -316,9 +316,14 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn get_mast_forest(&self, digest: Digest) -> Result<Option<MastForest>, StoreError> {
-        self.interact_with_connection(move |conn| SqliteStore::get_mast_forest(conn, digest))
-            .await
+    async fn get_mast_forest(
+        &self,
+        procedure_hash: Digest,
+    ) -> Result<Option<MastForest>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_mast_forest(conn, procedure_hash)
+        })
+        .await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

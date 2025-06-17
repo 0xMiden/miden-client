@@ -277,7 +277,12 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
-    async fn get_mast_forest(&self, digest: Digest) -> Result<Option<MastForest>, StoreError>;
+    /// Retrieves the MAST forest that contains the provided procedure root. If the forest is not
+    /// found, returns `None`.
+    async fn get_mast_forest(
+        &self,
+        procedure_root: Digest,
+    ) -> Result<Option<MastForest>, StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
