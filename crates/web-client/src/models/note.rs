@@ -1,7 +1,7 @@
 use miden_client::note::{
-    NoteExecutionHint as NativeNoteExecutionHint, NoteExecutionMode as NativeNoteExecutionMode,
-    NoteInputs as NativeNoteInputs, NoteMetadata as NativeNoteMetadata,
-    NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag, WellKnownNote,
+    NoteExecutionHint as NativeNoteExecutionHint, NoteInputs as NativeNoteInputs,
+    NoteMetadata as NativeNoteMetadata, NoteRecipient as NativeNoteRecipient,
+    NoteTag as NativeNoteTag, WellKnownNote,
 };
 use miden_lib::note::utils;
 use miden_objects::note::Note as NativeNote;
@@ -53,11 +53,7 @@ impl Note {
         aux: &Felt,
     ) -> Self {
         let recipient = utils::build_p2id_recipient(target.into(), serial_num.into()).unwrap();
-        let tag = NativeNoteTag::from_account_id(
-            target.into(),
-            miden_client::note::NoteExecutionMode::Local,
-        )
-        .unwrap();
+        let tag = NativeNoteTag::from_account_id(target.into());
 
         let metadata = NativeNoteMetadata::new(
             sender.into(),
@@ -92,8 +88,7 @@ impl Note {
 
         let recipient = NativeNoteRecipient::new(serial_num.into(), note_script, inputs);
 
-        let tag =
-            NativeNoteTag::from_account_id(target.into(), NativeNoteExecutionMode::Local).unwrap();
+        let tag = NativeNoteTag::from_account_id(target.into());
 
         let metadata = NativeNoteMetadata::new(
             sender.into(),
