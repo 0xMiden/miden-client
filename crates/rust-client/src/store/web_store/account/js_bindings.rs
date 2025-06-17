@@ -39,7 +39,12 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = insertAccountCode)]
-    pub fn idxdb_insert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
+    pub fn idxdb_insert_account_code(
+        code_root: String,
+        mast: Vec<u8>,
+        procedure_info: Vec<u8>,
+        procedure_roots: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountStorage)]
     pub fn idxdb_insert_account_storage(
@@ -75,6 +80,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = getForeignAccountCode)]
     pub fn idxdb_get_foreign_account_code(account_ids: Vec<String>) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = getMastForest)]
+    pub fn idxdb_get_mast_forest(procedure_root: String) -> js_sys::Promise;
 
     // UPDATES
     // ================================================================================================

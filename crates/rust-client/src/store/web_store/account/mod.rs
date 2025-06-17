@@ -1,12 +1,15 @@
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
+    sync::Arc,
     vec::Vec,
 };
 
 use miden_objects::{
-    AccountIdError, Digest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
+    AccountIdError, Digest, MastForest, Word,
+    account::{
+        Account, AccountCode, AccountHeader, AccountId, AccountProcedureInfo, AccountStorage,
+    },
     asset::{Asset, AssetVault},
 };
 use miden_tx::utils::{Deserializable, Serializable};
@@ -14,7 +17,10 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
-use crate::store::{AccountRecord, AccountStatus, StoreError};
+use crate::store::{
+    AccountRecord, AccountStatus, StoreError,
+    web_store::account::js_bindings::idxdb_get_mast_forest,
+};
 
 mod js_bindings;
 use js_bindings::{
@@ -160,8 +166,10 @@ impl WebStore {
         let account_code_idxdb: AccountCodeIdxdbObject = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
-        let code =
-            AccountCode::from_bytes(&account_code_idxdb.code).map_err(StoreError::AccountError)?;
+        let mast = MastForest::read_from_bytes(&account_code_idxdb.mast)?;
+        let procedure_info =
+            Vec::<AccountProcedureInfo>::read_from_bytes(&account_code_idxdb.procedure_info)?;
+        let code = AccountCode::from_parts(Arc::new(mast), procedure_info);
 
         Ok(code)
     }
@@ -306,14 +314,38 @@ impl WebStore {
             .map(|idxdb_object| {
                 let account_id = AccountId::from_hex(&idxdb_object.account_id)
                     .map_err(StoreError::AccountIdError)?;
-                let code = AccountCode::from_bytes(&idxdb_object.code)
-                    .map_err(StoreError::AccountError)?;
+
+                let mast = MastForest::read_from_bytes(&idxdb_object.mast)?;
+                let procedure_info =
+                    Vec::<AccountProcedureInfo>::read_from_bytes(&idxdb_object.procedure_info)?;
+                let code = AccountCode::from_parts(Arc::new(mast), procedure_info);
 
                 Ok((account_id, code))
             })
             .collect::<Result<BTreeMap<AccountId, AccountCode>, StoreError>>()?;
 
         Ok(foreign_account_code)
+    }
+
+    pub(crate) async fn get_mast_forest(
+        &self,
+        procedure_root: Digest,
+    ) -> Result<Option<MastForest>, StoreError> {
+        let procedure_root_str = procedure_root.to_string();
+        let promise = idxdb_get_mast_forest(procedure_root_str);
+        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to fetch mast forest: {js_error:?}",))
+        })?;
+
+        if js_value.is_null() || js_value.is_undefined() {
+            return Ok(None);
+        }
+
+        let account_code_idxdb: ForeignAcountCodeIdxdbObject = from_value(js_value)
+            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let mast_forest = MastForest::read_from_bytes(&account_code_idxdb.mast)?;
+
+        Ok(Some(mast_forest))
     }
 
     pub(crate) async fn undo_account_states(

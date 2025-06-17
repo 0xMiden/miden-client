@@ -8,7 +8,9 @@ use serde::{Deserialize, Deserializer, Serialize, de::Error};
 pub struct AccountCodeIdxdbObject {
     pub root: String,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub code: Vec<u8>,
+    pub mast: Vec<u8>,
+    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    pub procedure_info: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,7 +53,9 @@ pub struct AccountRecordIdxdbObject {
 pub struct ForeignAcountCodeIdxdbObject {
     pub account_id: String,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub code: Vec<u8>,
+    pub mast: Vec<u8>,
+    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    pub procedure_info: Vec<u8>,
 }
 
 fn base64_to_vec_u8_required<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>

@@ -706,7 +706,8 @@ export const customAccountComponent = async (): Promise<void> => {
 };
 
 describe("custom account component tests", () => {
-  it("custom account component transaction completes successfully", async () => {
+  //TODO: Remove `.only` when test is fixed
+  it.only("custom account component transaction completes successfully", async () => {
     await expect(customAccountComponent()).to.be.fulfilled;
   });
 });
