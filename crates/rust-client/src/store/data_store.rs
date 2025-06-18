@@ -8,6 +8,7 @@ use miden_objects::{
     transaction::PartialBlockchain,
 };
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
+use pollster::FutureExt;
 
 use super::{PartialBlockchainFilter, Store};
 use crate::store::StoreError;
@@ -19,20 +20,17 @@ use crate::store::StoreError;
 pub(crate) struct ClientDataStore {
     /// Local database containing information about the accounts managed by this client.
     store: alloc::sync::Arc<dyn Store>,
-    /// Store used to provide MAST nodes to the transaction executor.
-    transaction_mast_store: Arc<TransactionMastStore>,
+    /// An in-memory store for the code available during transaction execution.
+    cache: TransactionMastStore,
 }
 
 impl ClientDataStore {
     pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
         Self {
             store,
-            transaction_mast_store: Arc::new(TransactionMastStore::new()),
+            // The cache is instantiated with the default libraries.
+            cache: TransactionMastStore::new(),
         }
-    }
-
-    pub fn mast_store(&self) -> Arc<TransactionMastStore> {
-        self.transaction_mast_store.clone()
     }
 }
 
@@ -91,7 +89,14 @@ impl DataStore for ClientDataStore {
 
 impl MastForestStore for ClientDataStore {
     fn get(&self, procedure_hash: &Digest) -> Option<Arc<MastForest>> {
-        self.transaction_mast_store.get(procedure_hash)
+        if let Some(mast) = self.cache.get(procedure_hash) {
+            return Some(mast);
+        }
+
+        let mast = self.store.get_mast_forest(*procedure_hash).block_on().unwrap().map(Arc::new)?;
+
+        self.cache.insert(mast.clone());
+        Some(mast)
     }
 }
 

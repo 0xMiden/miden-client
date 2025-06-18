@@ -16,7 +16,7 @@ use db_management::{
     utils::apply_migrations,
 };
 use miden_objects::{
-    Digest, Word,
+    Digest, MastForest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -312,6 +312,16 @@ impl Store for SqliteStore {
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_foreign_account_code(conn, account_ids)
+        })
+        .await
+    }
+
+    async fn get_mast_forest(
+        &self,
+        procedure_hash: Digest,
+    ) -> Result<Option<MastForest>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_mast_forest(conn, procedure_hash)
         })
         .await
     }
