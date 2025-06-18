@@ -17,10 +17,6 @@ impl AccountStorageMode {
         AccountStorageMode(NativeAccountStorageMode::Public)
     }
 
-    pub fn network() -> AccountStorageMode {
-        AccountStorageMode(NativeAccountStorageMode::Network)
-    }
-
     #[wasm_bindgen(js_name = "tryFromStr")]
     pub fn try_from_str(s: &str) -> Result<AccountStorageMode, JsValue> {
         let mode = NativeAccountStorageMode::from_str(s)
