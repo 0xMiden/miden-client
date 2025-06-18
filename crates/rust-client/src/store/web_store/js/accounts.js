@@ -458,9 +458,15 @@ export async function insertAccountAuth(pubKey, secretKey) {
   }
 }
 
-export async function upsertForeignAccountCode(accountId, code, codeRoot) {
+export async function upsertForeignAccountCode(
+  accountId,
+  codeRoot,
+  mast,
+  procedureInfo,
+  procedureRoots
+) {
   try {
-    await insertAccountCode(codeRoot, code);
+    await insertAccountCode(codeRoot, mast, procedureInfo, procedureRoots);
 
     const data = {
       accountId,
@@ -525,8 +531,6 @@ export async function getForeignAccountCode(accountIds) {
 
 export function getMastForest(procedureRoot) {
   let cachedMastForest = MAST_FOREST_MAP.get(procedureRoot);
-  console.log(`Fetching mast forest for procedure root: ${procedureRoot}`);
-  console.log(`Mast forest cache size: ${MAST_FOREST_MAP.size}`);
 
   if (!cachedMastForest) {
     throw new Error("Mast forest not found in cache.");
@@ -590,8 +594,6 @@ export async function fetchAndCacheMastForests() {
       for (const procedureRoot of procedureRoots) {
         // Cache the mast forest for each procedure root
         MAST_FOREST_MAP.set(procedureRoot, mastBase64);
-        console.log(`Cached mast forest for procedure root: ${procedureRoot}`);
-        console.log(`Mast forest cache size: ${MAST_FOREST_MAP.size}`);
       }
     })
   );

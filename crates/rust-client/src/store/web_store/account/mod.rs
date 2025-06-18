@@ -290,11 +290,24 @@ impl WebStore {
         account_id: AccountId,
         code: AccountCode,
     ) -> Result<(), StoreError> {
-        let root = code.commitment().to_string();
-        let code = code.to_bytes();
         let account_id = account_id.to_string();
+        let root = code.commitment().to_string();
+        let mast_forest = code.mast().to_bytes();
+        let procedure_info = code.procedures().to_vec().to_bytes();
+        let procedure_roots = code
+            .procedures()
+            .iter()
+            .map(|proc| proc.mast_root().to_hex())
+            .collect::<Vec<String>>();
 
-        let promise = idxdb_upsert_foreign_account_code(account_id, code, root);
+        let promise = idxdb_upsert_foreign_account_code(
+            account_id,
+            root,
+            mast_forest,
+            procedure_info,
+            procedure_roots,
+        );
+
         JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!(
                 "failed to upsert foreign account code: {js_error:?}",
