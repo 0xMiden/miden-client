@@ -8,7 +8,7 @@ use miden_objects::{
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
     crypto::merkle::{InnerNodeInfo, MerkleStore},
-    note::{Note, NoteDetails, NoteExecutionMode, NoteId, NoteTag, NoteType, PartialNote},
+    note::{Note, NoteDetails, NoteId, NoteTag, NoteType, PartialNote},
     transaction::{OutputNote, TransactionScript},
     vm::AdviceMap,
 };
@@ -348,8 +348,7 @@ impl TransactionRequestBuilder {
             rng,
         )?;
 
-        let payback_tag =
-            NoteTag::from_account_id(swap_data.account_id(), NoteExecutionMode::Local)?;
+        let payback_tag = NoteTag::from_account_id(swap_data.account_id());
 
         self.with_expected_future_notes(vec![(payback_note_details, payback_tag)])
             .with_own_output_notes(vec![OutputNote::Full(created_note)])

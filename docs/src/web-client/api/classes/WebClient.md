@@ -18,6 +18,22 @@
 
 ## Methods
 
+### addAccountSecretKeyToWebStore()
+
+> **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### secret\_key
+
+[`SecretKey`](SecretKey.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### addTag()
 
 > **addTag**(`tag`): `Promise`\<`void`\>
@@ -217,16 +233,6 @@ Meant to be used in conjunction with the force_import_store method
 #### Returns
 
 `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
-
-***
-
-### getLatestEpochBlock()
-
-> **getLatestEpochBlock**(): `Promise`\<[`BlockHeader`](BlockHeader.md)\>
-
-#### Returns
-
-`Promise`\<[`BlockHeader`](BlockHeader.md)\>
 
 ***
 

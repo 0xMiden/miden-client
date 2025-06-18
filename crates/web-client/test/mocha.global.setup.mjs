@@ -66,6 +66,7 @@ before(async () => {
         AccountHeader,
         AccountId,
         AccountStorageMode,
+        AccountStorageRequirements,
         AccountType,
         AdviceMap,
         Assembler,
@@ -74,6 +75,7 @@ before(async () => {
         ConsumableNoteRecord,
         Felt,
         FeltArray,
+        ForeignAccount,
         FungibleAsset,
         Library,
         Note,
@@ -95,7 +97,12 @@ before(async () => {
         NoteType,
         OutputNote,
         OutputNotesArray,
+        PublicKey,
+        RpoDigest,
         Rpo256,
+        SecretKey,
+        SlotAndKeys,
+        SlotAndKeysArray,
         StorageMap,
         StorageSlot,
         TestUtils,
@@ -125,6 +132,7 @@ before(async () => {
       window.AccountHeader = AccountHeader;
       window.AccountId = AccountId;
       window.AccountStorageMode = AccountStorageMode;
+      window.AccountStorageRequirements = AccountStorageRequirements;
       window.AccountType = AccountType;
       window.AdviceMap = AdviceMap;
       window.Assembler = Assembler;
@@ -133,6 +141,7 @@ before(async () => {
       window.ConsumableNoteRecord = ConsumableNoteRecord;
       window.Felt = Felt;
       window.FeltArray = FeltArray;
+      window.ForeignAccount = ForeignAccount;
       window.FungibleAsset = FungibleAsset;
       window.Library = Library;
       window.Note = Note;
@@ -154,7 +163,12 @@ before(async () => {
       window.NoteType = NoteType;
       window.OutputNote = OutputNote;
       window.OutputNotesArray = OutputNotesArray;
+      window.PublicKey = PublicKey;
+      window.RpoDigest = RpoDigest;
       window.Rpo256 = Rpo256;
+      window.SecretKey = SecretKey;
+      window.SlotAndKeys = SlotAndKeys;
+      window.SlotAndKeysArray = SlotAndKeysArray;
       window.StorageMap = StorageMap;
       window.StorageSlot = StorageSlot;
       window.TestUtils = TestUtils;
@@ -204,6 +218,25 @@ before(async () => {
           }
           await new Promise((r) => setTimeout(r, delayInterval));
           timeWaited += delayInterval;
+        }
+      };
+
+      window.helpers.waitForBlocks = async (amountOfBlocks) => {
+        const client = window.client;
+        let currentBlock = await client.getSyncHeight();
+        let finalBlock = currentBlock + amountOfBlocks;
+        console.log(
+          `Current block: ${currentBlock}, waiting for ${amountOfBlocks} blocks...`
+        );
+        while (true) {
+          let syncSummary = await client.syncState();
+          console.log(
+            `Synced to block ${syncSummary.blockNum()} (syncing until ${finalBlock})`
+          );
+          if (syncSummary.blockNum() >= finalBlock) {
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 1000));
         }
       };
 

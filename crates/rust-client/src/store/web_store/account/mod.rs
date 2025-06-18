@@ -294,6 +294,10 @@ impl WebStore {
             )
         })?;
 
+        if js_value.is_null() || js_value.is_undefined() {
+            return Ok(BTreeMap::new());
+        }
+
         let foreign_account_code_idxdb: Vec<ForeignAcountCodeIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 

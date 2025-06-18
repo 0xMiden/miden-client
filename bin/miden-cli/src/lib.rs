@@ -41,7 +41,7 @@ mod utils;
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 
 /// Client binary name.
-pub const CLIENT_BINARY_NAME: &str = "miden";
+pub const CLIENT_BINARY_NAME: &str = "miden-client";
 
 /// Number of blocks that must elapse after a transaction’s reference block before it is marked
 /// stale and discarded.
@@ -49,7 +49,12 @@ const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
 
 /// Root CLI struct.
 #[derive(Parser, Debug)]
-#[clap(name = "Miden", about = "Miden client", version, rename_all = "kebab-case")]
+#[clap(
+    name = "miden-client",
+    about = "The Miden client",
+    version,
+    rename_all = "kebab-case"
+)]
 pub struct Cli {
     #[clap(subcommand)]
     action: Command,

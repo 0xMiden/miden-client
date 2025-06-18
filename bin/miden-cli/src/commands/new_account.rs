@@ -116,8 +116,7 @@ impl NewWalletCmd {
             &[RpoFalcon512::new(key_pair.public_key()).into(), BasicWallet.into()],
             &extra_components,
             &init_storage_data,
-        )
-        .await?;
+        )?;
 
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
@@ -190,8 +189,7 @@ impl NewAccountCmd {
             &[RpoFalcon512::new(key_pair.public_key()).into()],
             &component_templates,
             &init_storage_data,
-        )
-        .await?;
+        )?;
 
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
@@ -254,7 +252,7 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
-async fn build_account(
+fn build_account(
     client: &mut Client,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
@@ -265,9 +263,7 @@ async fn build_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let anchor_block = client.get_latest_epoch_block().await?;
     let mut builder = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().expect("anchor block should be valid"))
         .account_type(account_type)
         .storage_mode(storage_mode);
 

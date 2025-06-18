@@ -623,7 +623,7 @@ impl Client {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
-        self.mast_store.load_transaction_code(account.code(), &notes, &tx_args);
+        self.mast_store.load_account_code(account.code());
 
         if ignore_invalid_notes {
             // Remove invalid notes
@@ -1278,10 +1278,7 @@ mod test {
         .unwrap()
         .with_supports_all_types();
 
-        let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
         let account = AccountBuilder::new(Default::default())
-            .anchor((&anchor_block).try_into().unwrap())
             .with_component(wallet_component)
             .with_component(RpoFalcon512::new(pub_key))
             .with_assets([asset_1, asset_2])

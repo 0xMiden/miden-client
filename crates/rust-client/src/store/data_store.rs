@@ -56,15 +56,6 @@ impl DataStore for ClientDataStore {
         let seed = account_record.seed().copied();
         let account: Account = account_record.into();
 
-        // If the account is new, add its anchor block to partial MMR
-        if seed.is_some() {
-            assert!(account.is_new());
-            let anchor_block = BlockNumber::from_epoch(account_id.anchor_epoch());
-            if anchor_block != ref_block {
-                block_refs.insert(anchor_block);
-            }
-        }
-
         // Get header data
         let (block_header, _had_notes) = self
             .store
