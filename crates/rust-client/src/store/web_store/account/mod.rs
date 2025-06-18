@@ -19,7 +19,10 @@ use wasm_bindgen_futures::JsFuture;
 use super::WebStore;
 use crate::store::{
     AccountRecord, AccountStatus, StoreError,
-    web_store::account::js_bindings::idxdb_get_mast_forest,
+    web_store::account::{
+        js_bindings::{idxdb_fetch_and_cache_mast_forests, idxdb_get_mast_forest},
+        models::MastForestIdxdbObject,
+    },
 };
 
 mod js_bindings;
@@ -271,6 +274,17 @@ impl WebStore {
         }
     }
 
+    pub async fn fetch_and_cache_mast_forests(&self) -> Result<(), StoreError> {
+        let promise = idxdb_fetch_and_cache_mast_forests();
+        JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!(
+                "failed to fetch and cache mast forests: {js_error:?}",
+            ))
+        })?;
+
+        Ok(())
+    }
+
     pub(crate) async fn upsert_foreign_account_code(
         &self,
         account_id: AccountId,
@@ -327,23 +341,21 @@ impl WebStore {
         Ok(foreign_account_code)
     }
 
-    pub(crate) async fn get_mast_forest(
+    #[allow(clippy::unused_self)]
+    pub(crate) fn get_mast_forest(
         &self,
         procedure_root: Digest,
     ) -> Result<Option<MastForest>, StoreError> {
         let procedure_root_str = procedure_root.to_string();
-        let promise = idxdb_get_mast_forest(procedure_root_str);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch mast forest: {js_error:?}",))
-        })?;
+        let js_value = idxdb_get_mast_forest(procedure_root_str);
 
         if js_value.is_null() || js_value.is_undefined() {
             return Ok(None);
         }
 
-        let account_code_idxdb: ForeignAcountCodeIdxdbObject = from_value(js_value)
+        let mast_forest_idxdb: MastForestIdxdbObject = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
-        let mast_forest = MastForest::read_from_bytes(&account_code_idxdb.mast)?;
+        let mast_forest = MastForest::read_from_bytes(&mast_forest_idxdb.mast)?;
 
         Ok(Some(mast_forest))
     }

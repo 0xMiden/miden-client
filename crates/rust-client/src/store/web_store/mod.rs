@@ -235,7 +235,7 @@ impl Store for WebStore {
         &self,
         procedure_root: Digest,
     ) -> Result<Option<MastForest>, StoreError> {
-        self.get_mast_forest(procedure_root).await
+        self.get_mast_forest(procedure_root)
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

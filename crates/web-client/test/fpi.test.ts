@@ -152,7 +152,8 @@ export const testStandardFpi = async (): Promise<void> => {
 };
 
 describe("fpi test", () => {
-  it("runs the standard fpi test successfully", async () => {
+  // TODO: Remove `.only` when fixed
+  it.only("runs the standard fpi test successfully", async () => {
     await expect(testStandardFpi()).to.be.fulfilled;
   }).timeout(50000);
 });

@@ -15,6 +15,13 @@ pub struct AccountCodeIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MastForestIdxdbObject {
+    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    pub mast: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountAuthIdxdbObject {
     pub secret_key: String,
 }

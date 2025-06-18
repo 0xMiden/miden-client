@@ -82,7 +82,10 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(account_ids: Vec<String>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getMastForest)]
-    pub fn idxdb_get_mast_forest(procedure_root: String) -> js_sys::Promise;
+    pub fn idxdb_get_mast_forest(procedure_root: String) -> JsValue;
+
+    #[wasm_bindgen(js_name = fetchAndCacheMastForests)]
+    pub fn idxdb_fetch_and_cache_mast_forests() -> js_sys::Promise;
 
     // UPDATES
     // ================================================================================================

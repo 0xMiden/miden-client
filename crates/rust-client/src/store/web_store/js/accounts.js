@@ -523,51 +523,78 @@ export async function getForeignAccountCode(accountIds) {
   }
 }
 
-export async function getMastForest(procedureRoot) {
-  try {
-    const allMatchingRecords = await accountProcedures
-      .where("procedureRoot")
-      .equals(procedureRoot)
-      .toArray();
+export function getMastForest(procedureRoot) {
+  let cachedMastForest = MAST_FOREST_MAP.get(procedureRoot);
+  console.log(`Fetching mast forest for procedure root: ${procedureRoot}`);
+  console.log(`Mast forest cache size: ${MAST_FOREST_MAP.size}`);
 
-    if (allMatchingRecords.length === 0) {
-      console.log("No records found for given procedure root.");
-      return null;
-    }
-
-    const procedureRecord = allMatchingRecords[0];
-
-    const mastForestRecord = await mastForests
-      .where("root")
-      .equals(procedureRecord.mastForestRoot)
-      .first();
-
-    if (!mastForestRecord) {
-      console.log("No mast forest found for given procedure root.");
-      return null;
-    }
-
-    const mastArrayBuffer = await mastForestRecord.mast.arrayBuffer();
-    const mastArray = new Uint8Array(mastArrayBuffer);
-    const mastBase64 = uint8ArrayToBase64(mastArray);
-
-    const procedureInfoArrayBuffer =
-      await mastForestRecord.procedureInfo.arrayBuffer();
-    const procedureInfoArray = new Uint8Array(procedureInfoArrayBuffer);
-    const procedureInfoBase64 = uint8ArrayToBase64(procedureInfoArray);
-
-    return {
-      root: mastForestRecord.root,
-      mast: mastBase64,
-      procedureInfo: procedureInfoBase64,
-    };
-  } catch (error) {
-    console.error(
-      `Error fetching mast forest for procedure root ${procedureRoot}:`,
-      error.toString()
-    );
-    throw error;
+  if (!cachedMastForest) {
+    throw new Error("Mast forest not found in cache.");
   }
+
+  let data = {
+    mast: cachedMastForest,
+  };
+
+  return data;
+}
+
+var MAST_FOREST_MAP = new Map();
+export async function fetchAndCacheMastForests() {
+  // Parse `accountProcedures` to mastForestRoot->[procedureRoot1, procedureRoot2, ...] mapping
+  const normalizedRecordsMap = new Map();
+
+  await accountProcedures.each((record) => {
+    if (MAST_FOREST_MAP.has(record.procedureRoot)) {
+      // If the procedureRoot is already cached, skip it
+      return;
+    }
+
+    const mappedProcedureRoots = normalizedRecordsMap.get(
+      record.mastForestRoot
+    );
+
+    if (mappedProcedureRoots) {
+      // If the mastForestRoot is tracked, push the procedureRoot to the array
+      mappedProcedureRoots.push(record.procedureRoot);
+    } else {
+      // If the mastForestRoot is not tracked, create a new entry with the procedureRoot
+      normalizedRecordsMap.set(record.mastForestRoot, [record.procedureRoot]);
+    }
+  });
+
+  const normalizedRecords = Array.from(normalizedRecordsMap.entries());
+
+  // Cache the mast forest for each procedure root
+  await Promise.all(
+    normalizedRecords.map(async (record) => {
+      let mastForestRoot = record[0];
+      let procedureRoots = record[1];
+
+      // Fetch the mast forest record for the given root
+      const allMatchingRecords = await mastForests
+        .where("root")
+        .equals(mastForestRoot)
+        .toArray();
+
+      if (allMatchingRecords.length === 0) {
+        throw new Error(`No mast forest found for root: ${mastForestRoot}`);
+      }
+
+      const mastForestRecord = allMatchingRecords[0];
+
+      const mastArrayBuffer = await mastForestRecord.mast.arrayBuffer();
+      const mastArray = new Uint8Array(mastArrayBuffer);
+      const mastBase64 = uint8ArrayToBase64(mastArray);
+
+      for (const procedureRoot of procedureRoots) {
+        // Cache the mast forest for each procedure root
+        MAST_FOREST_MAP.set(procedureRoot, mastBase64);
+        console.log(`Cached mast forest for procedure root: ${procedureRoot}`);
+        console.log(`Mast forest cache size: ${MAST_FOREST_MAP.size}`);
+      }
+    })
+  );
 }
 
 export async function lockAccount(accountId) {
