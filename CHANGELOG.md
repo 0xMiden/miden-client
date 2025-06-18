@@ -12,17 +12,9 @@
 
 * Refresh dependencies (#972).
 
-### Features
-
-* Added necessary methods to support network transactions in the Web Client (#955).
-
 ### Changes
 
 * Fixed wasm-opt options to improve performance of generated wasm (#961).
-
-### Fixes
-
-* Fixed bug where network accounts were not being updated correctly in the client (#955).
 
 ## 0.9.0 (2025-05-30)
 
