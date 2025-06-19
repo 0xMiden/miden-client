@@ -475,7 +475,7 @@ pub async fn on_note_received(
         // The note is not being tracked by the client and is public so we can screen it
         let new_note_relevance = note_screener
             .check_relevance(
-                &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
+                &public_note.clone().try_into().map_err(ClientError::NoteRecordConversionError)?,
             )
             .await?;
 
