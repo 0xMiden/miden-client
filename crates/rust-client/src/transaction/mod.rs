@@ -589,7 +589,7 @@ impl Client {
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
         };
 
-        let output_notes: Vec<Note> = transaction_request.expected_output_notes();
+        let output_notes: Vec<Note> = transaction_request.expected_output_own_notes();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
@@ -846,7 +846,7 @@ impl Client {
         };
         // Get transaction output notes assets
         let mut output_notes_assets = transaction_request
-            .expected_output_notes()
+            .expected_output_own_notes()
             .into_iter()
             .map(|note| (note.id(), note.assets().clone()))
             .collect::<BTreeMap<_, _>>();

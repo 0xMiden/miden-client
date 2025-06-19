@@ -158,7 +158,7 @@ async fn test_onchain_notes_flow() {
             client_1.rng(),
         )
         .unwrap();
-    let note = tx_request.expected_output_notes().pop().unwrap().clone();
+    let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
     // Client 2's account should receive the note here:
@@ -208,7 +208,7 @@ async fn test_onchain_notes_flow() {
             client_2.rng(),
         )
         .unwrap();
-    let note = tx_request.expected_output_notes().pop().unwrap().clone();
+    let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();

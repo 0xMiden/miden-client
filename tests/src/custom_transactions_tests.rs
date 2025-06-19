@@ -275,7 +275,7 @@ async fn test_onchain_notes_sync_with_tag() {
         .build()
         .unwrap();
 
-    let note = tx_request.expected_output_notes().pop().unwrap().clone();
+    let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
     execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await;
 
     // Load tag into client 2

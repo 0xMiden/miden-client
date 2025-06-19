@@ -239,7 +239,7 @@ impl WebClient {
             let mut result = NewSwapTransactionResult::new(
                 swap_transaction_execution_result.executed_transaction().id().to_string(),
                 swap_transaction_request
-                    .expected_output_notes()
+                    .expected_output_own_notes()
                     .into_iter()
                     .map(|note| note.id().to_string())
                     .collect(),
