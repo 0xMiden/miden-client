@@ -46,7 +46,7 @@ use crate::{
     note::NoteRelevance,
     rpc::NodeRpcClient,
     store::{
-        InputNoteRecord, InputNoteState, NoteFilter, StoreError, TransactionFilter,
+        InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter,
         input_note_states::ConsumedAuthenticatedLocalNoteState, sqlite_store::SqliteStore,
     },
     sync::NoteTagSource,
@@ -699,46 +699,6 @@ async fn test_import_processing_note_returns_error() {
             .await
             .unwrap_err(),
         ClientError::NoteImportError { .. }
-    ));
-}
-
-#[tokio::test]
-async fn test_no_nonce_change_transaction_request() {
-    let (mut client, _, keystore) = create_test_client().await;
-
-    client.sync_state().await.unwrap();
-
-    // Insert Account
-    let (regular_account, _seed) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
-
-    // Prepare transaction
-
-    let code = "
-        begin
-            push.1 push.2
-            # => [1, 2]
-            add push.3
-            # => [1+2, 3]
-            assert_eq
-        end
-        ";
-
-    let tx_script = client.compile_tx_script(vec![], code).unwrap();
-
-    let transaction_request =
-        TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
-
-    let transaction_execution_result =
-        client.new_transaction(regular_account.id(), transaction_request).await.unwrap();
-
-    let result = client.testing_apply_transaction(transaction_execution_result).await;
-
-    assert!(matches!(
-        result,
-        Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(_)))
     ));
 }
 

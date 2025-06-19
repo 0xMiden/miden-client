@@ -42,7 +42,7 @@ miden-testing = { workspace = true, optional = true }
 miden-tx = { workspace = true, features = ["async"] }
 prost = { version = "0.13", default-features = false, features = ["derive"] }
 rand = { workspace = true }
-rusqlite = { version = "0.35", features = ["vtab", "array", "bundled"], optional = true }
+rusqlite = { version = "0.36", features = ["vtab", "array", "bundled"], optional = true }
 rusqlite_migration = { version = "2.1", optional = true }
 serde = { workspace = true, optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
