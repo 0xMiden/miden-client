@@ -3,6 +3,7 @@ import {
   createNewFaucet,
   createNewWallet,
   isValidAddress,
+  isValidBech32Address,
   StorageMode,
 } from "./webClientTestUtils";
 
@@ -41,7 +42,7 @@ describe("new_wallet tests", () => {
     it(description, async () => {
       const result = await createNewWallet({ storageMode, mutable });
 
-      isValidAddress(result.id);
+      isValidBech32Address(result.id);
       expect(result.nonce).to.equal("0");
       isValidAddress(result.vaultCommitment);
       isValidAddress(result.storageCommitment);
@@ -138,7 +139,7 @@ describe("new_faucet tests", () => {
           maxSupply
         );
 
-        isValidAddress(result.id);
+        isValidBech32Address(result.id);
         expect(result.nonce).to.equal("0");
         isValidAddress(result.vaultCommitment);
         isValidAddress(result.storageCommitment);

@@ -25,7 +25,7 @@ const importWalletFromSeed = async (
         _mutable
       );
       return {
-        accountId: account.id().toString(),
+        accountId: account.id().toBech32(),
         accountCommitment: account.commitment().toHex(),
       };
     },
@@ -37,11 +37,11 @@ const importWalletFromSeed = async (
 const importAccountById = async (accountId: string) => {
   return await testingPage.evaluate(async (id) => {
     const client = window.client;
-    const _accountId = window.AccountId.fromHex(id);
+    const _accountId = window.AccountId.fromBech32(id);
     await client.importAccountById(_accountId);
     const account = await client.getAccount(_accountId);
     return {
-      accountId: account?.id().toString(),
+      accountId: account?.id().toBech32(),
       accountCommitment: account?.commitment().toHex(),
     };
   }, accountId);

@@ -87,9 +87,9 @@ export const sendTransactionTest = async (
 
       await client.syncState();
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccount);
-      const senderAccountId = window.AccountId.fromHex(_senderAccount);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccount);
+      const targetAccountId = window.AccountId.fromBech32(_targetAccount);
+      const senderAccountId = window.AccountId.fromBech32(_senderAccount);
+      const faucetAccountId = window.AccountId.fromBech32(_faucetAccount);
 
       const changedSenderAccount = await client.getAccount(senderAccountId);
       const changedTargetAccount = await client.getAccount(targetAccountId);
@@ -451,8 +451,8 @@ const customTxWithMultipleNotes = async (
         true
       );
       const targetAccountId = targetAccount.id();
-      const senderAccountId = window.AccountId.fromHex(_senderAccountId);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+      const senderAccountId = window.AccountId.fromBech32(_senderAccountId);
+      const faucetAccountId = window.AccountId.fromBech32(_faucetAccountId);
 
       // Create custom note with multiple assets to send to target account
       // Error should happen if serial numbers are the same in each set of
