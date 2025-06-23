@@ -1068,3 +1068,182 @@ describe("counter account component tests", () => {
     expect(finalCounter).to.equal("2");
   });
 });
+
+// WALLET BUG TEST
+// =======================================================================================================
+
+export const walletBugTest = async (
+  targetAccount: string,
+  faucetAccount: string
+): Promise<SendTransactionResult> => {
+  return await testingPage.evaluate(
+    async (_targetAccount: string, _faucetAccount: string) => {
+      const client = window.client;
+
+      const targetAccountId = window.AccountId.fromHex(_targetAccount);
+      const faucetAccountId = window.AccountId.fromHex(_faucetAccount);
+      await client.syncState();
+
+      // First mint
+      await client.syncState();
+      const firstMintTransactionRequest =
+        await client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+      const firstMintTransactionResult = await client.newTransaction(
+        faucetAccountId,
+        firstMintTransactionRequest
+      );
+      await client.submitTransaction(firstMintTransactionResult);
+
+      await window.helpers.waitForTransaction(
+        firstMintTransactionResult.executedTransaction().id().toHex()
+      );
+
+      // Second mint
+      await client.syncState();
+      const secondMintTransactionRequest =
+        await client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+      const secondMintTransactionResult = await client.newTransaction(
+        faucetAccountId,
+        secondMintTransactionRequest
+      );
+      await client.submitTransaction(secondMintTransactionResult);
+
+      await window.helpers.waitForTransaction(
+        secondMintTransactionResult.executedTransaction().id().toHex()
+      );
+
+      // Third mint
+      await client.syncState();
+      const thirdMintTransactionRequest =
+        await client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+      const thirdMintTransactionResult = await client.newTransaction(
+        faucetAccountId,
+        thirdMintTransactionRequest
+      );
+
+      await client.submitTransaction(thirdMintTransactionResult);
+
+      await window.helpers.waitForTransaction(
+        thirdMintTransactionResult.executedTransaction().id().toHex()
+      );
+
+      // Consume the first mint
+      console.log(
+        "Consming note: ",
+        firstMintTransactionResult.createdNotes().notes()[0].id().toString()
+      );
+
+      const firstConsumeTransactionRequest =
+        client.newConsumeTransactionRequest([
+          firstMintTransactionResult.createdNotes().notes()[0].id().toString(),
+        ]);
+      const firstConsumeTransactionResult = await client.newTransaction(
+        targetAccountId,
+        firstConsumeTransactionRequest
+      );
+      await client.submitTransaction(firstConsumeTransactionResult);
+
+      await window.helpers.waitForTransaction(
+        firstConsumeTransactionResult.executedTransaction().id().toHex()
+      );
+
+      let changedTargetAccount = await client.getAccount(targetAccountId);
+      console.log(
+        `Target account balance after consuming: ${changedTargetAccount
+          .vault()
+          .getBalance(faucetAccountId)
+          .toString()}`
+      );
+
+      console.log(
+        "Consming note: ",
+        secondMintTransactionResult.createdNotes().notes()[0].id().toString()
+      );
+
+      // Consume the second mint
+      const secondConsumeTransactionRequest =
+        client.newConsumeTransactionRequest([
+          secondMintTransactionResult.createdNotes().notes()[0].id().toString(),
+        ]);
+      const secondConsumeTransactionResult = await client.newTransaction(
+        targetAccountId,
+        secondConsumeTransactionRequest
+      );
+      await client.submitTransaction(secondConsumeTransactionResult);
+
+      await window.helpers.waitForTransaction(
+        secondConsumeTransactionResult.executedTransaction().id().toHex()
+      );
+
+      changedTargetAccount = await client.getAccount(targetAccountId);
+      console.log(
+        `Target account balance after consuming: ${changedTargetAccount
+          .vault()
+          .getBalance(faucetAccountId)
+          .toString()}`
+      );
+
+      // Consume the third mint
+      console.log(
+        "Consming note: ",
+        thirdMintTransactionResult.createdNotes().notes()[0].id().toString()
+      );
+
+      const thirdConsumeTransactionRequest =
+        client.newConsumeTransactionRequest([
+          thirdMintTransactionResult.createdNotes().notes()[0].id().toString(),
+        ]);
+      const thirdConsumeTransactionResult = await client.newTransaction(
+        targetAccountId,
+        thirdConsumeTransactionRequest
+      );
+      await client.submitTransaction(thirdConsumeTransactionResult);
+      await window.helpers.waitForTransaction(
+        thirdConsumeTransactionResult.executedTransaction().id().toHex()
+      );
+
+      changedTargetAccount = await client.getAccount(targetAccountId);
+      console.log(
+        `Target account balance after consuming: ${changedTargetAccount
+          .vault()
+          .getBalance(faucetAccountId)
+          .toString()}`
+      );
+
+      return changedTargetAccount
+        .vault()
+        .getBalance(faucetAccountId)
+        .toString();
+    },
+    targetAccount,
+    faucetAccount
+  );
+};
+
+describe("wallet bug tests", () => {
+  it.only("wallet bug test", async () => {
+    const { accountId: targetAccount, faucetId: faucetAccount } =
+      await setupWalletAndFaucet();
+    const result = await walletBugTest(targetAccount, faucetAccount);
+
+    expect(result).to.equal("3000");
+  });
+});
