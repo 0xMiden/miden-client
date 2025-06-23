@@ -84,6 +84,7 @@ use miden_tx::{
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
+use wasm_bindgen::JsValue;
 
 use super::Client;
 use crate::{
@@ -584,6 +585,14 @@ impl Client {
 
             for note in self.store.get_input_notes(NoteFilter::List(note_ids)).await? {
                 input_notes.push(note.try_into().map_err(ClientError::NoteRecordConversionError)?);
+            }
+
+            if let Some(input_note) = input_notes.first() {
+                web_sys::console::log_1(&JsValue::from_str(&format!(
+                    "Consuming note with block num: {} against block {}",
+                    input_note.location().unwrap().block_num(),
+                    self.store.get_sync_height().await?
+                )));
             }
 
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?

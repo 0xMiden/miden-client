@@ -55,6 +55,7 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 uuid = { version = "1.10", features = ["serde", "v4", "js"], optional = true }
 toml = { version = "0.8", optional = true }
+web-sys = { version = "0.3", features = ["console"]}
 
 [package.metadata.cargo-machete]
 ignored = ["getrandom"]

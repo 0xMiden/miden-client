@@ -8,6 +8,7 @@ use miden_objects::{
     transaction::PartialBlockchain,
 };
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
+use wasm_bindgen::JsValue;
 
 use super::{PartialBlockchainFilter, Store};
 use crate::store::StoreError;
@@ -166,6 +167,11 @@ async fn get_authentication_path_for_blocks(
 
     // Get all MMR nodes based on collected indices
     let node_indices: Vec<InOrderIndex> = node_indices.into_iter().collect();
+
+    web_sys::console::log_1(&JsValue::from_str(&format!(
+        "Getting nodes: {:?}",
+        node_indices.iter().map(|idx| idx.inner()).collect::<Vec<_>>()
+    )));
 
     let filter = PartialBlockchainFilter::List(node_indices);
     let mmr_nodes = store.get_partial_blockchain_nodes(filter).await?;

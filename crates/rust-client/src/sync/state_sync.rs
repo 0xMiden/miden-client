@@ -10,6 +10,7 @@ use miden_objects::{
     transaction::PartialBlockchain,
 };
 use tracing::info;
+use wasm_bindgen::JsValue;
 
 use super::{
     AccountUpdates, BlockUpdates, StateSyncUpdate, state_sync_update::TransactionUpdateTracker,
@@ -471,6 +472,12 @@ pub async fn on_note_received(
                 &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
             )
             .await?;
+
+        web_sys::console::log_1(&JsValue::from_str(&format!(
+            "Note with ID {} is relevant: {}",
+            note_id,
+            !new_note_relevance.is_empty()
+        )));
 
         Ok(!new_note_relevance.is_empty())
     } else {

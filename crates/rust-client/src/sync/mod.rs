@@ -64,6 +64,7 @@ use miden_objects::{
     transaction::{PartialBlockchain, TransactionId},
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use wasm_bindgen::JsValue;
 
 use crate::{
     Client, ClientError,
@@ -184,6 +185,22 @@ impl Client {
             .await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
+
+        web_sys::console::log_1(&JsValue::from_str(&format!(
+            "Block Num: {}, New nodes: {:?}, New notes: {:?}",
+            state_sync_update.block_num,
+            state_sync_update
+                .block_updates
+                .new_authentication_nodes()
+                .iter()
+                .map(|(idx, _)| idx.inner())
+                .collect::<Vec<_>>(),
+            sync_summary
+                .new_public_notes
+                .iter()
+                .map(|note_id| note_id.to_hex())
+                .collect::<Vec<_>>(),
+        )));
 
         // Apply received and computed updates to the store
         self.store

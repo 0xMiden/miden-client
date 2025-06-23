@@ -159,6 +159,10 @@ async function updateBlockHeader(
 
 async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
   try {
+    // nodeIndexes.forEach((id) => {
+    //   console.log("(1) Inserting nodes with id:", id);
+    // });
+
     // Check if the arrays are not of the same length
     if (nodeIndexes.length !== nodes.length) {
       throw new Error(
