@@ -45,9 +45,9 @@ export async function insertBlockHeader(
 
 export async function insertPartialBlockchainNodes(ids, nodes) {
   try {
-    // ids.forEach((id) => {
-    //   console.log("(2) Inserting nodes with id:", id);
-    // });
+    ids.forEach((id) => {
+      console.log("(2) Inserting nodes with id:", id);
+    });
 
     // Check if the arrays are not of the same length
     if (ids.length !== nodes.length) {
@@ -193,9 +193,9 @@ export async function getPartialBlockchainNodesAll() {
 
 export async function getPartialBlockchainNodes(ids) {
   try {
-    // ids.forEach((id) => {
-    //   console.log("(3) Getting nodes with id:", id);
-    // });
+    ids.forEach((id) => {
+      console.log("(3) Getting nodes with id:", id);
+    });
 
     const results = await partialBlockchainNodes.bulkGet(ids);
 

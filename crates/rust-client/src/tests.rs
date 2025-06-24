@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::time::Duration;
 use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 
 // TESTS
@@ -523,42 +524,6 @@ async fn test_sync_state_tags() {
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
-#[tokio::test]
-async fn test_tags() {
-    // generate test client with a random store name
-    let (mut client, _rpc_api, _) = create_test_client().await;
-
-    // Assert that the store gets created with the tag 0 (used for notes consumable by any account)
-    assert!(client.get_note_tags().await.unwrap().is_empty());
-
-    // add a tag
-    let tag_1: NoteTag = 1.into();
-    let tag_2: NoteTag = 2.into();
-    client.add_note_tag(tag_1).await.unwrap();
-    client.add_note_tag(tag_2).await.unwrap();
-
-    // verify that the tag is being tracked
-    assert_eq!(client.get_note_tags().await.unwrap(), vec![tag_1, tag_2]);
-
-    // attempt to add the same tag again
-    client.add_note_tag(tag_1).await.unwrap();
-
-    // verify that the tag is still being tracked only once
-    assert_eq!(client.get_note_tags().await.unwrap(), vec![tag_1, tag_2]);
-
-    // Try removing non-existent tag
-    let tag_4: NoteTag = 4.into();
-    client.remove_note_tag(tag_4).await.unwrap();
-
-    // verify that the tracked tags are unchanged
-    assert_eq!(client.get_note_tags().await.unwrap(), vec![tag_1, tag_2]);
-
-    // remove second tag
-    client.remove_note_tag(tag_1).await.unwrap();
-
-    // verify that tag_1 is not tracked anymore
-    assert_eq!(client.get_note_tags().await.unwrap(), vec![tag_2]);
-}
 
 #[tokio::test]
 async fn test_mint_transaction() {

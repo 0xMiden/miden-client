@@ -263,6 +263,8 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
     let now = Instant::now();
     println!("Syncing State...");
     loop {
+        //std::thread::sleep(Duration::from_secs(5));
+
         client.sync_state().await.unwrap();
 
         // Check if executed transaction got committed by the node
@@ -274,11 +276,12 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             .unwrap();
 
         match tracked_transaction.status {
-            TransactionStatus::Committed(_) => {
+            TransactionStatus::Committed(n) => {
+                println!("tx committed in {n}");
                 break;
             },
             TransactionStatus::Pending => {
-                std::thread::sleep(Duration::from_millis(100));
+                std::thread::sleep(Duration::from_secs(1));
             },
             TransactionStatus::Discarded(cause) => {
                 panic!("Transaction was discarded with cause: {:?}", cause);
@@ -318,7 +321,7 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
             return summary;
         }
 
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(9000));
     }
 }
 

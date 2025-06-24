@@ -185,7 +185,7 @@ impl Client {
             .await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
-
+        #[cfg(target_arch="wasm32")]
         web_sys::console::log_1(&JsValue::from_str(&format!(
             "Block Num: {}, New nodes: {:?}, New notes: {:?}",
             state_sync_update.block_num,

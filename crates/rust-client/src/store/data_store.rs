@@ -168,10 +168,14 @@ async fn get_authentication_path_for_blocks(
     // Get all MMR nodes based on collected indices
     let node_indices: Vec<InOrderIndex> = node_indices.into_iter().collect();
 
+    #[cfg(target_arch="wasm32")]
     web_sys::console::log_1(&JsValue::from_str(&format!(
         "Getting nodes: {:?}",
         node_indices.iter().map(|idx| idx.inner()).collect::<Vec<_>>()
     )));
+
+    #[cfg(not(target_arch="wasm32"))]
+    std::println!("Getting nodes: {:?}", node_indices.iter().map(|idx| idx.inner()).collect::<Vec<u64>>());
 
     let filter = PartialBlockchainFilter::List(node_indices);
     let mmr_nodes = store.get_partial_blockchain_nodes(filter).await?;

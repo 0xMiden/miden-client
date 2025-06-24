@@ -1222,3 +1222,49 @@ async fn test_ignore_invalid_notes() {
     assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
     assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
 }
+
+#[tokio::test]
+async fn wallet_bug_test() -> Result<(), ClientError> {
+    use miden_objects::{note::NoteType, asset::FungibleAsset};
+
+    let (mut client, keystore) = create_test_client().await;
+    wait_for_node(&mut client).await;
+
+    let (target_wallet, faucet_header) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
+
+    let target_id  = target_wallet.id();
+    let faucet_id  = faucet_header.id();
+    let mint_amt   = 1_000u64;
+
+    let mut minted_note_ids = Vec::with_capacity(3);
+
+    for _ in 0..3 {
+        let mint_req = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                FungibleAsset::new(faucet_id, mint_amt)?,
+                target_id,
+                NoteType::Public,
+                client.rng(),
+            )?;
+
+        let note_id = mint_req.expected_output_notes().next().unwrap().id();
+        let mint_tx = client.new_transaction(faucet_id, mint_req).await?;
+        client.submit_transaction(mint_tx.clone()).await?;
+        wait_for_tx(&mut client, mint_tx.executed_transaction().id()).await;
+
+        minted_note_ids.push(note_id);
+    }
+
+    for note_id in &minted_note_ids {
+        let consume_req = TransactionRequestBuilder::new()
+            .build_consume_notes(vec![*note_id])?;
+        let consume_tx = client.new_transaction(target_id, consume_req).await?;
+        client.submit_transaction(consume_tx.clone()).await?;
+        wait_for_tx(&mut client, consume_tx.executed_transaction().id()).await;
+    }
+
+    client.sync_state().await?;
+
+    Ok(())
+}
