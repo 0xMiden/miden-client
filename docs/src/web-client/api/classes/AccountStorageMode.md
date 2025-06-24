@@ -28,6 +28,16 @@
 
 ***
 
+### network()
+
+> `static` **network**(): `AccountStorageMode`
+
+#### Returns
+
+`AccountStorageMode`
+
+***
+
 ### private()
 
 > `static` **private**(): `AccountStorageMode`

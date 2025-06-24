@@ -102,31 +102,15 @@
 
 ***
 
-### withExpectedOutputRecipients()
+### withExpectedOutputNotes()
 
-> **withExpectedOutputRecipients**(`recipients`): `TransactionRequestBuilder`
-
-#### Parameters
-
-##### recipients
-
-[`RecipientArray`](RecipientArray.md)
-
-#### Returns
-
-`TransactionRequestBuilder`
-
-***
-
-### withForeignAccounts()
-
-> **withForeignAccounts**(`foreign_accounts`): `TransactionRequestBuilder`
+> **withExpectedOutputNotes**(`notes`): `TransactionRequestBuilder`
 
 #### Parameters
 
-##### foreign\_accounts
+##### notes
 
-[`ForeignAccount`](ForeignAccount.md)[]
+[`NotesArray`](NotesArray.md)
 
 #### Returns
 

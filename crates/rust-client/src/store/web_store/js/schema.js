@@ -15,7 +15,7 @@ export async function openDatabase() {
 }
 
 const Table = {
-  AccountCode: "accountCode",
+  AccountProcedures: "accountProcedures",
   AccountStorage: "accountStorage",
   AccountVaults: "accountVaults",
   AccountAuth: "accountAuth",
@@ -25,6 +25,7 @@ const Table = {
   InputNotes: "inputNotes",
   OutputNotes: "outputNotes",
   NotesScripts: "notesScripts",
+  MastForests: "mastForests",
   StateSync: "stateSync",
   BlockHeaders: "blockHeaders",
   PartialBlockchainNodes: "partialBlockchainNodes",
@@ -33,7 +34,7 @@ const Table = {
 
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
-  [Table.AccountCode]: indexes("root"),
+  [Table.AccountProcedures]: indexes("mastForestRoot", "procedureRoot"),
   [Table.AccountStorage]: indexes("root"),
   [Table.AccountVaults]: indexes("root"),
   [Table.AccountAuth]: indexes("pubKey"),
@@ -54,6 +55,7 @@ db.version(1).stores({
     "nullifier"
   ),
   [Table.NotesScripts]: indexes("scriptRoot"),
+  [Table.MastForests]: indexes("root"),
   [Table.StateSync]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
   [Table.PartialBlockchainNodes]: indexes("id"),
@@ -70,7 +72,7 @@ db.on("populate", () => {
   db.stateSync.put({ id: 1, blockNum: "0" });
 });
 
-const accountCodes = db.table(Table.AccountCode);
+const accountProcedures = db.table(Table.AccountProcedures);
 const accountStorages = db.table(Table.AccountStorage);
 const accountVaults = db.table(Table.AccountVaults);
 const accountAuths = db.table(Table.AccountAuth);
@@ -80,6 +82,7 @@ const transactionScripts = db.table(Table.TransactionScripts);
 const inputNotes = db.table(Table.InputNotes);
 const outputNotes = db.table(Table.OutputNotes);
 const notesScripts = db.table(Table.NotesScripts);
+const mastForests = db.table(Table.MastForests);
 const stateSync = db.table(Table.StateSync);
 const blockHeaders = db.table(Table.BlockHeaders);
 const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
@@ -88,7 +91,7 @@ const foreignAccountCode = db.table(Table.ForeignAccountCode);
 
 export {
   db,
-  accountCodes,
+  accountProcedures,
   accountStorages,
   accountVaults,
   accountAuths,
@@ -98,6 +101,7 @@ export {
   inputNotes,
   outputNotes,
   notesScripts,
+  mastForests,
   stateSync,
   blockHeaders,
   partialBlockchainNodes,

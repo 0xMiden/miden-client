@@ -40,6 +40,22 @@
 
 ***
 
+### anchor()
+
+> **anchor**(`anchor`): `AccountBuilder`
+
+#### Parameters
+
+##### anchor
+
+[`BlockHeader`](BlockHeader.md)
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
 ### build()
 
 > **build**(): [`AccountBuilderResult`](AccountBuilderResult.md)
