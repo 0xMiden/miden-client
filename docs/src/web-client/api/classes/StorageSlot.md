@@ -28,22 +28,6 @@
 
 ***
 
-### fromValue()
-
-> `static` **fromValue**(`value`): `StorageSlot`
-
-#### Parameters
-
-##### value
-
-[`Word`](Word.md)
-
-#### Returns
-
-`StorageSlot`
-
-***
-
 ### map()
 
 > `static` **map**(`storage_map`): `StorageSlot`
