@@ -102,15 +102,15 @@
 
 ***
 
-### withExpectedOutputNotes()
+### withExpectedOutputRecipients()
 
-> **withExpectedOutputNotes**(`notes`): `TransactionRequestBuilder`
+> **withExpectedOutputRecipients**(`recipients`): `TransactionRequestBuilder`
 
 #### Parameters
 
-##### notes
+##### recipients
 
-[`NotesArray`](NotesArray.md)
+[`RecipientArray`](RecipientArray.md)
 
 #### Returns
 

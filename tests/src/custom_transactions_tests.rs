@@ -48,7 +48,7 @@ const NOTE_ARGS: [Felt; 8] = [
 ];
 
 #[tokio::test]
-async fn test_transaction_request() {
+async fn transaction_request() {
     let (mut client, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -131,7 +131,7 @@ async fn test_transaction_request() {
 }
 
 #[tokio::test]
-async fn test_merkle_store() {
+async fn merkle_store() {
     let (mut client, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -222,7 +222,7 @@ async fn test_merkle_store() {
 }
 
 #[tokio::test]
-async fn test_onchain_notes_sync_with_tag() {
+async fn onchain_notes_sync_with_tag() {
     // Client 1 has an private faucet which will mint an onchain note for client 2
     let (mut client_1, keystore_1) = create_test_client().await;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
@@ -275,7 +275,7 @@ async fn test_onchain_notes_sync_with_tag() {
         .build()
         .unwrap();
 
-    let note = tx_request.expected_output_notes().next().unwrap().clone();
+    let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
     execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await;
 
     // Load tag into client 2

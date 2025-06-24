@@ -14,7 +14,6 @@ miden-client = { version = "0.9" }
 
 | Features     | Description                                                                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `concurrent` | Used to enable concurrency during execution and proof generation. **Disabled by default.**                                                               |
 | `idxdb`      | Includes `WebStore`, an IndexedDB implementation of the `Store` trait. **Disabled by default.**                                                          |
 | `sqlite`     | Includes `SqliteStore`, a SQLite implementation of the `Store` trait. This relies on the standard library. **Disabled by default.**                                                           |
 | `tonic`      | Includes `TonicRpcClient`, a `std`-compatible Tonic client to communicate with Miden node. This relies on the `tonic` for the inner transport.  **Disabled by default.**                                                        |

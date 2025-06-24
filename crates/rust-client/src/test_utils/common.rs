@@ -418,7 +418,7 @@ pub async fn mint_note(
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
-    let note_id = tx_request.expected_output_notes().next().unwrap().id();
+    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
     note.try_into().unwrap()
 }
@@ -516,8 +516,8 @@ pub async fn execute_tx_and_consume_output_notes(
     consumer: AccountId,
 ) {
     let output_notes = tx_request
-        .expected_output_notes()
-        .cloned()
+        .expected_output_own_notes()
+        .into_iter()
         .map(|note| (note, None::<NoteArgs>))
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 

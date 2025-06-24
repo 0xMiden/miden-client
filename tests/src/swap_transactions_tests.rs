@@ -14,7 +14,7 @@ use miden_objects::{
 // ================================================================================================
 
 #[tokio::test]
-async fn test_swap_fully_onchain() {
+async fn swap_fully_onchain() {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
     let (mut client1, authenticator_1) = create_test_client().await;
@@ -78,7 +78,7 @@ async fn test_swap_fully_onchain() {
         )
         .unwrap();
 
-    let expected_output_notes: Vec<Note> = tx_request.expected_output_notes().cloned().collect();
+    let expected_output_notes: Vec<Note> = tx_request.expected_output_own_notes();
     let expected_payback_note_details: Vec<NoteDetails> =
         tx_request.expected_future_notes().cloned().map(|(n, _)| n).collect();
     assert_eq!(expected_output_notes.len(), 1);
@@ -179,7 +179,7 @@ async fn test_swap_fully_onchain() {
 }
 
 #[tokio::test]
-async fn test_swap_private() {
+async fn swap_private() {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
     let (mut client1, authenticator_1) = create_test_client().await;
@@ -240,7 +240,7 @@ async fn test_swap_private() {
         )
         .unwrap();
 
-    let expected_output_notes: Vec<Note> = tx_request.expected_output_notes().cloned().collect();
+    let expected_output_notes: Vec<Note> = tx_request.expected_output_own_notes();
     let expected_payback_note_details =
         tx_request.expected_future_notes().cloned().map(|(n, _)| n).collect::<Vec<_>>();
     assert_eq!(expected_output_notes.len(), 1);

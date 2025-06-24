@@ -237,7 +237,7 @@ fn parse_number_as_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, 
 // ================================================================================================
 
 #[test]
-fn test_parse_number_as_base_units() {
+fn parsing_number_as_base_units() {
     assert_eq!(parse_number_as_base_units("18446744.073709551615", 12).unwrap(), u64::MAX);
     assert_eq!(parse_number_as_base_units("7531.2468", 8).unwrap(), 753_124_680_000);
     assert_eq!(parse_number_as_base_units("7531.2468", 4).unwrap(), 75_312_468);
@@ -258,7 +258,7 @@ fn test_parse_number_as_base_units() {
 }
 
 #[test]
-fn test_format_amount_from_faucet_units() {
+fn formating_amount_from_faucet_units() {
     assert_eq!(format_amount_from_faucet_units(u64::MAX, 12), "18446744.073709551615");
     assert_eq!(format_amount_from_faucet_units(753_124_680_000, 8), "7531.24680000");
     assert_eq!(format_amount_from_faucet_units(75_312_468, 4), "7531.2468");
