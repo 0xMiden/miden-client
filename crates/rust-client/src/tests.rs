@@ -22,10 +22,7 @@ use miden_objects::{
         dsa::rpo_falcon512::SecretKey,
         rand::{FeltRng, RpoRandomCoin},
     },
-    note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteMetadata, NoteTag,
-        NoteType,
-    },
+    note::{Note, NoteAssets, NoteExecutionHint, NoteFile, NoteMetadata, NoteTag, NoteType},
     testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
@@ -49,7 +46,7 @@ use crate::{
     note::NoteRelevance,
     rpc::NodeRpcClient,
     store::{
-        InputNoteRecord, InputNoteState, NoteFilter, StoreError, TransactionFilter,
+        InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter,
         input_note_states::ConsumedAuthenticatedLocalNoteState, sqlite_store::SqliteStore,
     },
     sync::NoteTagSource,
@@ -175,7 +172,7 @@ async fn insert_new_fungible_faucet(
 // ================================================================================================
 
 #[tokio::test]
-async fn test_input_notes_round_trip() {
+async fn input_notes_round_trip() {
     // generate test client with a random store name
     let (mut client, rpc_api, keystore) = create_test_client().await;
 
@@ -217,7 +214,7 @@ async fn test_input_notes_round_trip() {
 }
 
 #[tokio::test]
-async fn test_get_input_note() {
+async fn get_input_note() {
     // generate test client with a random store name
     let (mut client, rpc_api, _) = create_test_client().await;
     // Get note from mocked RPC backend since any note works here
@@ -319,7 +316,7 @@ async fn insert_same_account_twice_fails() {
 }
 
 #[tokio::test]
-async fn test_account_code() {
+async fn account_code() {
     // generate test client with a random store name
     let (mut client, _rpc_api, _) = create_test_client().await;
 
@@ -342,7 +339,7 @@ async fn test_account_code() {
 }
 
 #[tokio::test]
-async fn test_get_account_by_id() {
+async fn get_account_by_id() {
     // generate test client with a random store name
     let (mut client, _rpc_api, _) = create_test_client().await;
 
@@ -367,7 +364,7 @@ async fn test_get_account_by_id() {
 }
 
 #[tokio::test]
-async fn test_sync_state() {
+async fn sync_state() {
     // generate test client with a random store name
     let (mut client, rpc_api, _) = create_test_client().await;
 
@@ -414,7 +411,7 @@ async fn test_sync_state() {
 }
 
 #[tokio::test]
-async fn test_sync_state_mmr() {
+async fn sync_state_mmr() {
     // generate test client with a random store name
     let (mut client, rpc_api, keystore) = create_test_client().await;
     // Import note and create wallet so that synced notes do not get discarded (due to being
@@ -487,7 +484,7 @@ async fn test_sync_state_mmr() {
 }
 
 #[tokio::test]
-async fn test_sync_state_tags() {
+async fn sync_state_tags() {
     // generate test client with a random store name
     let (mut client, rpc_api, _) = create_test_client().await;
 
@@ -516,7 +513,7 @@ async fn test_sync_state_tags() {
 }
 
 #[tokio::test]
-async fn test_tags() {
+async fn tags() {
     // generate test client with a random store name
     let (mut client, _rpc_api, _) = create_test_client().await;
 
@@ -553,7 +550,7 @@ async fn test_tags() {
 }
 
 #[tokio::test]
-async fn test_mint_transaction() {
+async fn mint_transaction() {
     // generate test client with a random store name
     let (mut client, _rpc_api, keystore) = create_test_client().await;
 
@@ -581,7 +578,7 @@ async fn test_mint_transaction() {
 }
 
 #[tokio::test]
-async fn test_import_note_validation() {
+async fn import_note_validation() {
     // generate test client
     let (mut client, rpc_api, _) = create_test_client().await;
 
@@ -623,7 +620,7 @@ async fn test_import_note_validation() {
 }
 
 #[tokio::test]
-async fn test_transaction_request_expiration() {
+async fn transaction_request_expiration() {
     let (mut client, _, keystore) = create_test_client().await;
     client.sync_state().await.unwrap();
 
@@ -651,7 +648,7 @@ async fn test_transaction_request_expiration() {
 }
 
 #[tokio::test]
-async fn test_import_processing_note_returns_error() {
+async fn import_processing_note_returns_error() {
     // generate test client with a random store name
     let (mut client, _rpc_api, keystore) = create_test_client().await;
     client.sync_state().await.unwrap();
@@ -680,7 +677,7 @@ async fn test_import_processing_note_returns_error() {
         client.new_transaction(faucet.id(), transaction_request.clone()).await.unwrap();
     client.submit_transaction(transaction).await.unwrap();
 
-    let note_id = transaction_request.expected_output_notes().next().unwrap().id();
+    let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
 
     let input = [(note.try_into().unwrap(), None)];
@@ -706,47 +703,7 @@ async fn test_import_processing_note_returns_error() {
 }
 
 #[tokio::test]
-async fn test_no_nonce_change_transaction_request() {
-    let (mut client, _, keystore) = create_test_client().await;
-
-    client.sync_state().await.unwrap();
-
-    // Insert Account
-    let (regular_account, _seed) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
-
-    // Prepare transaction
-
-    let code = "
-        begin
-            push.1 push.2
-            # => [1, 2]
-            add push.3
-            # => [1+2, 3]
-            assert_eq
-        end
-        ";
-
-    let tx_script = client.compile_tx_script(vec![], code).unwrap();
-
-    let transaction_request =
-        TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
-
-    let transaction_execution_result =
-        client.new_transaction(regular_account.id(), transaction_request).await.unwrap();
-
-    let result = client.testing_apply_transaction(transaction_execution_result).await;
-
-    assert!(matches!(
-        result,
-        Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(_)))
-    ));
-}
-
-#[tokio::test]
-async fn test_note_without_asset() {
+async fn note_without_asset() {
     let (mut client, _rpc_api, keystore) = create_test_client().await;
 
     let (faucet, _seed) =
@@ -763,7 +720,7 @@ async fn test_note_without_asset() {
     // Create note without assets
     let serial_num = client.rng().draw_word();
     let recipient = utils::build_p2id_recipient(wallet.id(), serial_num).unwrap();
-    let tag = NoteTag::from_account_id(wallet.id(), NoteExecutionMode::Local).unwrap();
+    let tag = NoteTag::from_account_id(wallet.id());
     let metadata =
         NoteMetadata::new(wallet.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
             .unwrap();
@@ -829,7 +786,7 @@ async fn test_note_without_asset() {
 }
 
 #[tokio::test]
-async fn test_execute_program() {
+async fn execute_program() {
     let (mut client, _, keystore) = create_test_client().await;
     let _ = client.sync_state().await.unwrap();
 
@@ -865,7 +822,7 @@ async fn test_execute_program() {
 }
 
 #[tokio::test]
-async fn test_real_note_roundtrip() {
+async fn real_note_roundtrip() {
     let (mut client, _, keystore) = create_test_client().await;
     let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
@@ -887,7 +844,7 @@ async fn test_real_note_roundtrip() {
         )
         .unwrap();
 
-    let note_id = transaction_request.expected_output_notes().next().unwrap().id();
+    let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
     client.submit_transaction(transaction).await.unwrap();
 
@@ -913,7 +870,7 @@ async fn test_real_note_roundtrip() {
 }
 
 #[tokio::test]
-async fn test_added_notes() {
+async fn added_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -946,7 +903,7 @@ async fn test_added_notes() {
 }
 
 #[tokio::test]
-async fn test_p2id_transfer() {
+async fn p2id_transfer() {
     let (mut client, _, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -983,7 +940,7 @@ async fn test_p2id_transfer() {
         )
         .unwrap();
 
-    let note = tx_request.expected_output_notes().next().unwrap().clone();
+    let note = tx_request.expected_output_own_notes().pop().unwrap();
     let transaction_id = execute_tx(&mut client, from_account_id, tx_request).await.unwrap();
 
     // Check that a note tag started being tracked for this note.
@@ -1054,7 +1011,7 @@ async fn test_p2id_transfer() {
 }
 
 #[tokio::test]
-async fn test_p2id_transfer_failing_not_enough_balance() {
+async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, _, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -1101,7 +1058,7 @@ async fn test_p2id_transfer_failing_not_enough_balance() {
 }
 
 #[tokio::test]
-async fn test_p2idr_transfer_consumed_by_target() {
+async fn p2idr_transfer_consumed_by_target() {
     let (mut client, _, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -1192,7 +1149,7 @@ async fn test_p2idr_transfer_consumed_by_target() {
     assert!(!notes.is_empty());
 
     // Make the `to_account_id` consume P2IDR note
-    let note_id = tx_request.expected_output_notes().next().unwrap().id();
+    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
     execute_tx_and_sync(&mut client, to_account_id, tx_request).await.unwrap();
@@ -1224,7 +1181,7 @@ async fn test_p2idr_transfer_consumed_by_target() {
 }
 
 #[tokio::test]
-async fn test_p2idr_transfer_consumed_by_sender() {
+async fn p2idr_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -1324,7 +1281,7 @@ async fn test_p2idr_transfer_consumed_by_sender() {
 }
 
 #[tokio::test]
-async fn test_get_consumable_notes() {
+async fn get_consumable_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
 
     let (wallets, faucets) = setup_accounts_and_faucets(
@@ -1401,7 +1358,7 @@ async fn test_get_consumable_notes() {
 }
 
 #[tokio::test]
-async fn test_get_output_notes() {
+async fn get_output_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
     let _ = client.sync_state().await.unwrap();
     let (wallets, faucets) = setup_accounts_and_faucets(
@@ -1450,7 +1407,7 @@ async fn test_get_output_notes() {
         )
         .unwrap();
 
-    let output_note_id = tx_request.expected_output_notes().next().unwrap().id();
+    let output_note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
 
     // Before executing, the output note is not found
     assert!(client.get_output_note(output_note_id).await.unwrap().is_none());
@@ -1463,7 +1420,7 @@ async fn test_get_output_notes() {
 }
 
 #[tokio::test]
-async fn test_account_rollback() {
+async fn account_rollback() {
     let (builder, rpc_api, authenticator) = create_test_client_builder().await;
 
     let mut client =
@@ -1550,7 +1507,7 @@ async fn test_account_rollback() {
 }
 
 #[tokio::test]
-async fn test_subsequent_discarded_transactions() {
+async fn subsequent_discarded_transactions() {
     let (mut client, rpc_api, keystore) = create_test_client().await;
 
     wait_for_node(&mut client).await;

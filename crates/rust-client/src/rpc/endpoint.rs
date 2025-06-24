@@ -148,7 +148,7 @@ mod test {
     use crate::rpc::Endpoint;
 
     #[test]
-    fn test_endpoint_parsing_with_hostname_only() {
+    fn endpoint_parsing_with_hostname_only() {
         let endpoint = Endpoint::try_from("some.test.domain").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "https".to_string(),
@@ -160,7 +160,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_ip() {
+    fn endpoint_parsing_with_ip() {
         let endpoint = Endpoint::try_from("192.168.0.1").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "https".to_string(),
@@ -172,7 +172,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_port() {
+    fn endpoint_parsing_with_port() {
         let endpoint = Endpoint::try_from("some.test.domain:8000").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "https".to_string(),
@@ -184,7 +184,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_ip_and_port() {
+    fn endpoint_parsing_with_ip_and_port() {
         let endpoint = Endpoint::try_from("192.168.0.1:8000").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "https".to_string(),
@@ -196,7 +196,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_protocol() {
+    fn endpoint_parsing_with_protocol() {
         let endpoint = Endpoint::try_from("hkttp://some.test.domain").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "hkttp".to_string(),
@@ -208,7 +208,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_protocol_and_ip() {
+    fn endpoint_parsing_with_protocol_and_ip() {
         let endpoint = Endpoint::try_from("http://192.168.0.1").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "http".to_string(),
@@ -220,7 +220,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_both_protocol_and_port() {
+    fn endpoint_parsing_with_both_protocol_and_port() {
         let endpoint = Endpoint::try_from("http://some.test.domain:8080").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "http".to_string(),
@@ -232,7 +232,7 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_with_ip_and_protocol_and_port() {
+    fn endpoint_parsing_with_ip_and_protocol_and_port() {
         let endpoint = Endpoint::try_from("http://192.168.0.1:8080").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "http".to_string(),
@@ -244,13 +244,13 @@ mod test {
     }
 
     #[test]
-    fn test_endpoint_parsing_should_fail_for_invalid_port() {
+    fn endpoint_parsing_should_fail_for_invalid_port() {
         let endpoint = Endpoint::try_from("some.test.domain:8000/hello");
         assert!(endpoint.is_err());
     }
 
     #[test]
-    fn test_endpoint_parsing_with_final_forward_slash() {
+    fn endpoint_parsing_with_final_forward_slash() {
         let endpoint = Endpoint::try_from("https://some.test.domain:8000/").unwrap();
         let expected_endpoint = Endpoint {
             protocol: "https".to_string(),

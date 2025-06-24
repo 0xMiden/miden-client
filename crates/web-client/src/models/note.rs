@@ -1,7 +1,7 @@
 use miden_client::note::{
-    NoteExecutionHint as NativeNoteExecutionHint, NoteExecutionMode as NativeNoteExecutionMode,
-    NoteInputs as NativeNoteInputs, NoteMetadata as NativeNoteMetadata,
-    NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag, WellKnownNote,
+    NoteExecutionHint as NativeNoteExecutionHint, NoteInputs as NativeNoteInputs,
+    NoteMetadata as NativeNoteMetadata, NoteRecipient as NativeNoteRecipient,
+    NoteTag as NativeNoteTag, WellKnownNote,
 };
 use miden_lib::note::utils;
 use miden_objects::note::Note as NativeNote;
@@ -53,11 +53,7 @@ impl Note {
         aux: &Felt,
     ) -> Self {
         let recipient = utils::build_p2id_recipient(target.into(), serial_num.into()).unwrap();
-        let tag = NativeNoteTag::from_account_id(
-            target.into(),
-            miden_client::note::NoteExecutionMode::Local,
-        )
-        .unwrap();
+        let tag = NativeNoteTag::from_account_id(target.into());
 
         let metadata = NativeNoteMetadata::new(
             sender.into(),
@@ -92,8 +88,7 @@ impl Note {
 
         let recipient = NativeNoteRecipient::new(serial_num.into(), note_script, inputs);
 
-        let tag =
-            NativeNoteTag::from_account_id(target.into(), NativeNoteExecutionMode::Local).unwrap();
+        let tag = NativeNoteTag::from_account_id(target.into());
 
         let metadata = NativeNoteMetadata::new(
             sender.into(),
@@ -132,37 +127,5 @@ impl From<Note> for NativeNote {
 impl From<&Note> for NativeNote {
     fn from(note: &Note) -> Self {
         note.0.clone()
-    }
-}
-
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NotesArray(Vec<Note>);
-
-#[wasm_bindgen]
-impl NotesArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(notes_array: Option<Vec<Note>>) -> NotesArray {
-        let notes = notes_array.unwrap_or_default();
-        NotesArray(notes)
-    }
-
-    pub fn push(&mut self, note: &Note) {
-        self.0.push(note.clone());
-    }
-}
-
-// CONVERSIONS
-// ================================================================================================
-
-impl From<NotesArray> for Vec<NativeNote> {
-    fn from(notes_array: NotesArray) -> Self {
-        notes_array.0.into_iter().map(Into::into).collect()
-    }
-}
-
-impl From<&NotesArray> for Vec<NativeNote> {
-    fn from(notes_array: &NotesArray) -> Self {
-        notes_array.0.iter().map(Into::into).collect()
     }
 }

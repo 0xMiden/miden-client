@@ -77,7 +77,9 @@ async fn import_account(
         .map_err(ClientError::DataDeserializationError)?;
     let account_id = account_data.account.id();
 
-    keystore.add_key(&account_data.auth_secret_key).map_err(CliError::KeyStore)?;
+    for key in account_data.auth_secret_keys {
+        keystore.add_key(&key).map_err(CliError::KeyStore)?;
+    }
 
     client
         .add_account(&account_data.account, account_data.account_seed, overwrite)

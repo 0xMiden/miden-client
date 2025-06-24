@@ -13,8 +13,8 @@ use miden_client::{
     account::{AccountId, AccountStorageMode},
     crypto::{FeltRng, RpoRandomCoin},
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId, NoteInputs,
-        NoteMetadata, NoteRecipient, NoteTag, NoteType,
+        Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata,
+        NoteRecipient, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
     store::sqlite_store::SqliteStore,
@@ -51,7 +51,7 @@ use uuid::Uuid;
 // ================================================================================================
 
 #[test]
-fn test_init_without_params() {
+fn init_without_params() {
     let temp_dir = init_cli().1;
 
     // Trying to init twice should result in an error
@@ -61,7 +61,7 @@ fn test_init_without_params() {
 }
 
 #[test]
-fn test_init_with_params() {
+fn init_with_params() {
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path("devnet", &store_path);
 
@@ -86,7 +86,7 @@ fn test_init_with_params() {
 
 /// This test tries to run a mint TX using the CLI for an account that isn't tracked.
 #[tokio::test]
-async fn test_mint_with_untracked_account() {
+async fn mint_with_untracked_account() {
     let temp_dir = init_cli().1;
 
     // Create faucet account
@@ -107,7 +107,7 @@ async fn test_mint_with_untracked_account() {
 
 /// This test tries to run a mint TX using the CLI for an account that isn't tracked.
 #[tokio::test]
-async fn test_token_symbol_mapping() {
+async fn token_symbol_mapping() {
     let (store_path, temp_dir) = init_cli();
 
     // Create faucet account
@@ -171,7 +171,7 @@ const GENESIS_ACCOUNTS_FILENAMES: [&str; 1] = ["account.mac"];
 // 4. Runs a mint tx and syncs until the transaction and note are committed
 #[tokio::test]
 #[ignore = "import genesis test gets ignored by default so integration tests can be ran with dockerized and remote nodes where we might not have the genesis data"]
-async fn test_import_genesis_accounts_can_be_used_for_transactions() {
+async fn import_genesis_accounts_can_be_used_for_transactions() {
     let (store_path, temp_dir) = init_cli();
 
     for genesis_account_filename in GENESIS_ACCOUNTS_FILENAMES {
@@ -232,7 +232,7 @@ async fn test_import_genesis_accounts_can_be_used_for_transactions() {
 // 3. On client A runs a mint transaction, and exports the output note
 // 4. On client B imports the note and consumes it
 #[tokio::test]
-async fn test_cli_export_import_note() {
+async fn cli_export_import_note() {
     const NOTE_FILENAME: &str = "test_note.mno";
 
     let temp_dir_1 = init_cli().1;
@@ -297,7 +297,7 @@ async fn test_cli_export_import_note() {
 }
 
 #[tokio::test]
-async fn test_cli_export_import_account() {
+async fn cli_export_import_account() {
     const FAUCET_FILENAME: &str = "test_faucet.mac";
     const WALLET_FILENAME: &str = "test_wallet.wal";
 
@@ -362,7 +362,7 @@ async fn test_cli_export_import_account() {
 }
 
 #[test]
-fn test_cli_empty_commands() {
+fn cli_empty_commands() {
     let temp_dir = init_cli().1;
 
     let mut create_faucet_cmd = Command::cargo_bin("miden-client").unwrap();
@@ -384,7 +384,7 @@ fn test_cli_empty_commands() {
 }
 
 #[tokio::test]
-async fn test_consume_unauthenticated_note() {
+async fn consume_unauthenticated_note() {
     let temp_dir = init_cli().1;
 
     // Create wallet account
@@ -406,7 +406,7 @@ async fn test_consume_unauthenticated_note() {
 // ================================================================================================
 
 #[tokio::test]
-async fn test_init_with_devnet() {
+async fn init_with_devnet() {
     let temp_dir = init_cli_with_store_path("devnet", &create_test_store_path());
 
     // Check in the config file that the network is devnet
@@ -420,7 +420,7 @@ async fn test_init_with_devnet() {
 }
 
 #[tokio::test]
-async fn test_init_with_testnet() {
+async fn init_with_testnet() {
     let temp_dir = init_cli_with_store_path("testnet", &create_test_store_path());
 
     // Check in the config file that the network is testnet
@@ -466,7 +466,7 @@ async fn debug_mode_outputs_logs() {
     let note_metadata = NoteMetadata::new(
         account.id(),
         NoteType::Private,
-        NoteTag::from_account_id(account.id(), NoteExecutionMode::Local).unwrap(),
+        NoteTag::from_account_id(account.id()),
         NoteExecutionHint::None,
         Felt::default(),
     )
@@ -791,7 +791,7 @@ fn assert_command_fails_but_does_not_panic(command: &mut Command) {
 // ================================================================================================
 
 #[test]
-fn test_exec_parse() {
+fn exec_parse() {
     let failure_script =
         fs::canonicalize("tests/files/test_cli_advice_inputs_expect_failure.masm").unwrap();
     let success_script =

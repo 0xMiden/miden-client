@@ -66,8 +66,8 @@ pub async fn execute_tx_and_consume_output_notes(
     consumer: AccountId,
 ) -> Result<(), ClientError> {
     let output_notes = tx_request
-        .expected_output_notes()
-        .cloned()
+        .expected_output_own_notes()
+        .into_iter()
         .map(|note| (note, None::<NoteArgs>))
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 

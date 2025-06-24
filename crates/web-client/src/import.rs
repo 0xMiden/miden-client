@@ -34,11 +34,10 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
-            keystore
-                .expect("KeyStore should be initialized")
-                .add_key(&account_data.auth_secret_key)
-                .await
-                .map_err(|err| err.to_string())?;
+            let keystore = keystore.expect("KeyStore should be initialized");
+            for key in account_data.auth_secret_keys {
+                keystore.add_key(&key).await.map_err(|err| err.to_string())?;
+            }
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
         } else {

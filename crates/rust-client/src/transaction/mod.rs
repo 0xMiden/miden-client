@@ -76,7 +76,7 @@ use miden_objects::{
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteTag},
+    note::{Note, NoteDetails, NoteId, NoteTag, compute_note_commitment},
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
@@ -589,8 +589,7 @@ impl Client {
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
         };
 
-        let output_notes: Vec<Note> =
-            transaction_request.expected_output_notes().cloned().collect();
+        let output_notes: Vec<Note> = transaction_request.expected_output_own_notes();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
@@ -623,7 +622,7 @@ impl Client {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
-        self.mast_store.load_transaction_code(account.code(), &notes, &tx_args);
+        self.mast_store.load_account_code(account.code());
 
         if ignore_invalid_notes {
             // Remove invalid notes
@@ -654,19 +653,19 @@ impl Client {
 
         let missing_note_ids: Vec<NoteId> = output_notes
             .iter()
-            .filter_map(|n| (!tx_note_auth_commitments.contains(&n.commitment())).then_some(n.id()))
+            .filter_map(|n| {
+                (!tx_note_auth_commitments.contains(&compute_note_commitment(n.id(), n.metadata())))
+                    .then_some(n.id())
+            })
             .collect();
 
         if !missing_note_ids.is_empty() {
             return Err(ClientError::MissingOutputNotes(missing_note_ids));
         }
 
-        let screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
-
         TransactionResult::new(
             executed_transaction,
-            screener,
+            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone()),
             future_notes,
             self.get_sync_height().await?,
             self.store.get_current_timestamp(),
@@ -839,15 +838,17 @@ impl Client {
     ) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
         // Get own notes assets
         let mut own_notes_assets = match transaction_request.script_template() {
-            Some(TransactionScriptTemplate::SendNotes(notes)) => {
-                notes.iter().map(|note| (note.id(), note.assets())).collect::<BTreeMap<_, _>>()
-            },
+            Some(TransactionScriptTemplate::SendNotes(notes)) => notes
+                .iter()
+                .map(|note| (note.id(), note.assets().clone()))
+                .collect::<BTreeMap<_, _>>(),
             _ => BTreeMap::default(),
         };
         // Get transaction output notes assets
         let mut output_notes_assets = transaction_request
-            .expected_output_notes()
-            .map(|note| (note.id(), note.assets()))
+            .expected_output_own_notes()
+            .into_iter()
+            .map(|note| (note.id(), note.assets().clone()))
             .collect::<BTreeMap<_, _>>();
 
         // Merge with own notes assets and delete duplicates
@@ -1255,7 +1256,7 @@ mod test {
     };
 
     #[tokio::test]
-    async fn test_transaction_creates_two_notes() {
+    async fn transaction_creates_two_notes() {
         let (mut client, _, keystore) = create_test_client().await;
         let asset_1: Asset =
             FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)

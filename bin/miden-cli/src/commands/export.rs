@@ -1,14 +1,13 @@
 use std::{fs::File, io::Write, path::PathBuf};
 
 use miden_client::{
-    Client, ClientError, Word,
+    Client, Word,
     account::{Account, AccountFile},
     store::NoteExportType,
     transaction::AccountInterface,
     utils::Serializable,
 };
 use miden_lib::AuthScheme;
-use miden_objects::AccountError;
 use tracing::info;
 
 use crate::{
@@ -90,12 +89,18 @@ async fn export_account(
 
     let account: Account = account.into();
 
-    let auth = keystore
-        .get_key(get_public_key_from_account(&account)?)
-        .map_err(CliError::KeyStore)?
-        .ok_or(CliError::Export("Auth not found for account".to_string()))?;
+    let mut key_pairs = vec![];
 
-    let account_data = AccountFile::new(account, account_seed, auth);
+    for pub_key in get_public_keys_from_account(&account) {
+        key_pairs.push(
+            keystore
+                .get_key(pub_key)
+                .map_err(CliError::KeyStore)?
+                .ok_or(CliError::Export("Auth not found for account".to_string()))?,
+        );
+    }
+
+    let account_data = AccountFile::new(account, account_seed, key_pairs);
 
     let file_path = if let Some(filename) = filename {
         filename
@@ -153,13 +158,15 @@ async fn export_note(
 
 /// Gets the public key from the storage of an account. This will only work if the account is
 /// created by the CLI as it expects the account to have the `RpoFalcon512` authentication scheme.
-pub fn get_public_key_from_account(account: &Account) -> Result<Word, ClientError> {
+pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
+    let mut pub_keys = vec![];
     let interface: AccountInterface = account.into();
-    let auth = interface.auth().first().ok_or(ClientError::AccountError(
-        AccountError::AssumptionViolated("Account should have an auth scheme".to_string()),
-    ))?;
 
-    match auth {
-        AuthScheme::RpoFalcon512 { pub_key } => Ok(Word::from(*pub_key)),
+    for auth in interface.auth() {
+        match auth {
+            AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
+        }
     }
+
+    pub_keys
 }
