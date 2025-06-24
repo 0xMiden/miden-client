@@ -5,13 +5,11 @@ use miden_client::{
     account::{Account, AccountBuilder, AccountStorageMode, StorageSlot},
     note::NoteTag,
     testing::{
-        common::{
-            TestClient, create_test_client, execute_tx_and_sync, insert_new_wallet,
-            wait_for_blocks, wait_for_tx,
-        },
+        common::{TestClient, create_test_client, wait_for_tx},
         note::NoteBuilder,
     },
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
+    utils::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks},
 };
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
@@ -178,9 +176,9 @@ async fn counter_contract_ntx() {
         .build()
         .unwrap();
 
-    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await.unwrap();
 
-    wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await.unwrap();
 
     let a = client
         .test_rpc_api()
@@ -215,8 +213,6 @@ async fn recall_note_before_ntx_consumes_it() {
         .unwrap()
         .0;
 
-    println!("A");
-
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
         .with_library(library)
@@ -238,19 +234,17 @@ async fn recall_note_before_ntx_consumes_it() {
         .build()
         .unwrap();
 
-    println!("B");
-
     // Create the note directed to the network account
-    execute_tx_and_sync(&mut client, wallet.id(), tx_request).await;
+    execute_tx_and_sync(&mut client, wallet.id(), tx_request).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![network_note.id()])
         .unwrap();
 
     // Consume the note before the network transaction
-    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await.unwrap();
 
-    wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await.unwrap();
 
     // The network account should have original value
     assert_eq!(
