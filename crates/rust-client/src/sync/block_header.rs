@@ -7,6 +7,8 @@ use miden_objects::{
     crypto::{self, merkle::MerklePath},
 };
 use tracing::warn;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsValue;
 
 use crate::{
     Client, ClientError,
@@ -59,6 +61,20 @@ impl Client {
             self.store.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
         let current_peaks =
             self.store.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&JsValue::from_str(&format!(
+            "Fetched nodes for {}: {:?}",
+            current_block_num,
+            tracked_nodes.keys().map(|i| i.inner()).collect::<Vec<_>>()
+        )));
+
+        #[cfg(not(target_arch = "wasm32"))]
+        std::println!(
+            "Fetched nodes for {}: {:?}",
+            current_block_num,
+            tracked_nodes.keys().map(|i| i.inner()).collect::<Vec<_>>()
+        );
 
         let track_latest = if current_block_num.as_u32() != 0 {
             match self

@@ -12,7 +12,6 @@ use miden_objects::{
     transaction::{OutputNote, TransactionScript},
     vm::AdviceMap,
 };
-use wasm_bindgen::JsValue;
 
 use super::{
     ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,

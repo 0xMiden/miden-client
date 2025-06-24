@@ -1225,7 +1225,7 @@ async fn test_ignore_invalid_notes() {
 
 #[tokio::test]
 async fn wallet_bug_test() -> Result<(), ClientError> {
-    use miden_objects::{note::NoteType, asset::FungibleAsset};
+    use miden_objects::{asset::FungibleAsset, note::NoteType};
 
     let (mut client, keystore) = create_test_client().await;
     wait_for_node(&mut client).await;
@@ -1233,21 +1233,20 @@ async fn wallet_bug_test() -> Result<(), ClientError> {
     let (target_wallet, faucet_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
 
-    let target_id  = target_wallet.id();
-    let faucet_id  = faucet_header.id();
-    let mint_amt   = 1_000u64;
+    let target_id = target_wallet.id();
+    let faucet_id = faucet_header.id();
+    let mint_amt = 1_000u64;
 
     let mut minted_note_ids = Vec::with_capacity(3);
 
     for _ in 0..3 {
         println!("minting");
-        let mint_req = TransactionRequestBuilder::new()
-            .build_mint_fungible_asset(
-                FungibleAsset::new(faucet_id, mint_amt)?,
-                target_id,
-                NoteType::Public,
-                client.rng(),
-            )?;
+        let mint_req = TransactionRequestBuilder::new().build_mint_fungible_asset(
+            FungibleAsset::new(faucet_id, mint_amt)?,
+            target_id,
+            NoteType::Public,
+            client.rng(),
+        )?;
 
         let note_id = mint_req.expected_output_notes().next().unwrap().id();
         let mint_tx = client.new_transaction(faucet_id, mint_req).await?;
@@ -1260,8 +1259,7 @@ async fn wallet_bug_test() -> Result<(), ClientError> {
     for note_id in &minted_note_ids {
         println!("consuming");
 
-        let consume_req = TransactionRequestBuilder::new()
-            .build_consume_notes(vec![*note_id])?;
+        let consume_req = TransactionRequestBuilder::new().build_consume_notes(vec![*note_id])?;
         let consume_tx = client.new_transaction(target_id, consume_req).await?;
         client.submit_transaction(consume_tx.clone()).await?;
         std::thread::sleep(Duration::from_secs(1));

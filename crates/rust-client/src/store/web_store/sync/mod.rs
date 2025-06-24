@@ -135,7 +135,6 @@ impl WebStore {
         let mut block_nums_as_str = vec![];
         let mut block_has_relevant_notes = vec![];
 
-
         // Tags to remove
         let note_tags_to_remove_as_str: Vec<String> = note_updates
             .updated_input_notes()
@@ -185,12 +184,9 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
         })?;
 
-
-
         // TODO: LOP INTO idxdb_apply_state_sync call
         // Update notes
         apply_note_updates_tx(&note_updates).await?;
-
 
         // Upsert updated transactions
         for transaction_record in transaction_updates

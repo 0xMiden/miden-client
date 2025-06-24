@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::time::Duration;
 use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 
 // TESTS
@@ -523,7 +522,6 @@ async fn test_sync_state_tags() {
     // tip should be stored in the database
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
-
 
 #[tokio::test]
 async fn test_mint_transaction() {

@@ -48,9 +48,9 @@ pub(crate) async fn generate_wallet(
     rng.fill_bytes(&mut init_seed);
 
     let anchor_block = client
-        .ensure_genesis_in_place()
+        .get_latest_epoch_block()
         .await
-        .map_err(|err| js_error_with_context(err, "failed to ensure genesis block is in place"))?;
+        .map_err(|err| js_error_with_context(err, "failed to get latest epoch block"))?;
 
     let (new_account, account_seed) = AccountBuilder::new(init_seed)
         .anchor(

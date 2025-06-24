@@ -208,6 +208,7 @@ export async function getPartialBlockchainNodes(ids) {
 
 export async function pruneIrrelevantBlocks() {
   try {
+    return;
     const syncHeight = await stateSync.get(1).blockNum;
     const allMatchingRecords = await blockHeaders
       .where("hasClientNotes")

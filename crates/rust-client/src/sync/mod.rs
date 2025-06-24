@@ -64,7 +64,6 @@ use miden_objects::{
     transaction::{PartialBlockchain, TransactionId},
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
-use wasm_bindgen::JsValue;
 
 use crate::{
     Client, ClientError,
@@ -185,10 +184,16 @@ impl Client {
             .await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
-        #[cfg(target_arch="wasm32")]
+        #[cfg(target_arch = "wasm32")]
         web_sys::console::log_1(&JsValue::from_str(&format!(
-            "Block Num: {}, New nodes: {:?}, New notes: {:?}",
+            "Block Num: {}, New blocks: {:?}, New nodes: {:?}, New notes: {:?}",
             state_sync_update.block_num,
+            state_sync_update
+                .block_updates
+                .block_headers()
+                .iter()
+                .map(|(header, ..)| header.block_num().as_u32())
+                .collect::<Vec<_>>(),
             state_sync_update
                 .block_updates
                 .new_authentication_nodes()
@@ -202,10 +207,16 @@ impl Client {
                 .collect::<Vec<_>>(),
         )));
 
-        #[cfg(not(target_arch="wasm32"))]
+        #[cfg(not(target_arch = "wasm32"))]
         std::println!(
-            "Block Num: {}, New nodes: {:?}, New notes: {:?}",
+            "Block Num: {}, Block nums {:?}, New nodes: {:?}, New notes: {:?}",
             state_sync_update.block_num,
+            state_sync_update
+                .block_updates
+                .block_headers()
+                .iter()
+                .map(|(header, ..)| header.block_num().as_u32())
+                .collect::<Vec<_>>(),
             state_sync_update
                 .block_updates
                 .new_authentication_nodes()
