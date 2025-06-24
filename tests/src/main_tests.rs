@@ -1240,6 +1240,7 @@ async fn wallet_bug_test() -> Result<(), ClientError> {
     let mut minted_note_ids = Vec::with_capacity(3);
 
     for _ in 0..3 {
+        println!("minting");
         let mint_req = TransactionRequestBuilder::new()
             .build_mint_fungible_asset(
                 FungibleAsset::new(faucet_id, mint_amt)?,
@@ -1257,10 +1258,13 @@ async fn wallet_bug_test() -> Result<(), ClientError> {
     }
 
     for note_id in &minted_note_ids {
+        println!("consuming");
+
         let consume_req = TransactionRequestBuilder::new()
             .build_consume_notes(vec![*note_id])?;
         let consume_tx = client.new_transaction(target_id, consume_req).await?;
         client.submit_transaction(consume_tx.clone()).await?;
+        std::thread::sleep(Duration::from_secs(1));
         wait_for_tx(&mut client, consume_tx.executed_transaction().id()).await;
     }
 

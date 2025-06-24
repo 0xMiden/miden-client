@@ -135,26 +135,6 @@ impl WebStore {
         let mut block_nums_as_str = vec![];
         let mut block_has_relevant_notes = vec![];
 
-        for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
-            block_headers_as_bytes.push(block_header.to_bytes());
-            new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
-            block_nums_as_str.push(block_header.block_num().to_string());
-            block_has_relevant_notes.push(u8::from(*has_client_notes));
-        }
-
-        // Serialize data for updating partial blockchain nodes
-        let mut serialized_node_ids = Vec::new();
-        let mut serialized_nodes = Vec::new();
-        for (id, node) in block_updates.new_authentication_nodes() {
-            let SerializedPartialBlockchainNodeData { id, node } =
-                serialize_partial_blockchain_node(*id, *node)?;
-            serialized_node_ids.push(id);
-            serialized_nodes.push(node);
-        }
-
-        // TODO: LOP INTO idxdb_apply_state_sync call
-        // Update notes
-        apply_note_updates_tx(&note_updates).await?;
 
         // Tags to remove
         let note_tags_to_remove_as_str: Vec<String> = note_updates
@@ -173,6 +153,44 @@ impl WebStore {
                 }
             })
             .collect();
+
+        for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
+            block_headers_as_bytes.push(block_header.to_bytes());
+            new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
+            block_nums_as_str.push(block_header.block_num().to_string());
+            block_has_relevant_notes.push(u8::from(*has_client_notes));
+        }
+
+        // Serialize data for updating partial blockchain nodes
+        let mut serialized_node_ids = Vec::new();
+        let mut serialized_nodes = Vec::new();
+        for (id, node) in block_updates.new_authentication_nodes() {
+            let SerializedPartialBlockchainNodeData { id, node } =
+                serialize_partial_blockchain_node(*id, *node)?;
+            serialized_node_ids.push(id);
+            serialized_nodes.push(node);
+        }
+
+        let promise = idxdb_apply_state_sync(
+            block_num.to_string(),
+            flatten_nested_u8_vec(block_headers_as_bytes),
+            block_nums_as_str,
+            flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
+            block_has_relevant_notes,
+            serialized_node_ids,
+            serialized_nodes,
+            note_tags_to_remove_as_str,
+        );
+        JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
+        })?;
+
+
+
+        // TODO: LOP INTO idxdb_apply_state_sync call
+        // Update notes
+        apply_note_updates_tx(&note_updates).await?;
+
 
         // Upsert updated transactions
         for transaction_record in transaction_updates
@@ -205,20 +223,6 @@ impl WebStore {
 
         // Remove the account states that are originated from the discarded transactions
         self.undo_account_states(&account_states_to_rollback).await?;
-
-        let promise = idxdb_apply_state_sync(
-            block_num.to_string(),
-            flatten_nested_u8_vec(block_headers_as_bytes),
-            block_nums_as_str,
-            flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
-            block_has_relevant_notes,
-            serialized_node_ids,
-            serialized_nodes,
-            note_tags_to_remove_as_str,
-        );
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
-        })?;
 
         Ok(())
     }

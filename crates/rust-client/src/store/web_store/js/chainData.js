@@ -193,9 +193,9 @@ export async function getPartialBlockchainNodesAll() {
 
 export async function getPartialBlockchainNodes(ids) {
   try {
-    ids.forEach((id) => {
-      console.log("(3) Getting nodes with id:", id);
-    });
+    // ids.forEach((id) => {
+    //   console.log("(3) Getting nodes with id:", id);
+    // });
 
     const results = await partialBlockchainNodes.bulkGet(ids);
 

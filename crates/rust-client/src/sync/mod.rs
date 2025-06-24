@@ -202,6 +202,23 @@ impl Client {
                 .collect::<Vec<_>>(),
         )));
 
+        #[cfg(not(target_arch="wasm32"))]
+        std::println!(
+            "Block Num: {}, New nodes: {:?}, New notes: {:?}",
+            state_sync_update.block_num,
+            state_sync_update
+                .block_updates
+                .new_authentication_nodes()
+                .iter()
+                .map(|(idx, _)| idx.inner())
+                .collect::<Vec<_>>(),
+            sync_summary
+                .new_public_notes
+                .iter()
+                .map(|note_id| note_id.to_hex())
+                .collect::<Vec<_>>(),
+        );
+
         // Apply received and computed updates to the store
         self.store
             .apply_state_sync(state_sync_update)
