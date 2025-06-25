@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.9.3 (TBD) - `miden-client-web` crate only
+
+* Fixed a bug where some partial MMR nodes were missing and causing problems with note consumption (#995).
+
 ## 0.9.2 (2025-06-11)
 
 * Refresh dependencies (#972).
