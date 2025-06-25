@@ -1239,7 +1239,7 @@ export const walletBugTest = async (
 };
 
 describe("wallet bug tests", () => {
-  it.only("wallet bug test", async () => {
+  it("wallet bug test", async () => {
     const { accountId: targetAccount, faucetId: faucetAccount } =
       await setupWalletAndFaucet();
     const result = await walletBugTest(targetAccount, faucetAccount);

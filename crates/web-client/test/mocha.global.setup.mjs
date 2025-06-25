@@ -111,7 +111,7 @@ before(async () => {
         Word,
         WebClient,
       } = await import("./index.js");
-      let rpcUrl = `https://rpc.testnet.miden.io`;
+      let rpcUrl = `http://localhost:${rpcPort}`;
       let proverUrl = null;
       if (remoteProverPort) {
         proverUrl = `http://localhost:${remoteProverPort}`;
@@ -183,8 +183,8 @@ before(async () => {
 
       window.helpers.waitForTransaction = async (
         transactionId,
-        maxWaitTime = 100000,
-        delayInterval = 5000
+        maxWaitTime = 10000,
+        delayInterval = 1000
       ) => {
         const client = window.client;
         let timeWaited = 0;

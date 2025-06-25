@@ -21,7 +21,7 @@ workspace = true
 [features]
 concurrent = ["miden-tx/concurrent", "std"]
 default = ["std", "tonic/channel"]
-idxdb = ["dep:base64",  "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
+idxdb = ["dep:base64", "dep:serde-wasm-bindgen", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
 sqlite = ["dep:rusqlite", "dep:deadpool", "dep:deadpool-sync", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-proving-service-client/std", "concurrent"]
 testing = ["miden-objects/testing", "miden-lib/testing", "miden-tx/testing", "dep:miden-testing", "dep:uuid", "dep:toml"]
@@ -45,17 +45,16 @@ rand = { workspace = true }
 rusqlite = { version = "0.35", features = ["vtab", "array", "bundled"], optional = true }
 rusqlite_migration = { version = "2.1", optional = true }
 serde = { workspace = true, optional = true }
-serde-wasm-bindgen = { version = "0.6" }
+serde-wasm-bindgen = { version = "0.6", optional = true }
 thiserror = { workspace = true }
 tonic = { version = "0.13", default-features = false, features = ["prost", "codegen"] }
 tonic-web-wasm-client = { version = "0.7.1", optional = true, default-features = false }
 tracing = { workspace = true }
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 uuid = { version = "1.10", features = ["serde", "v4", "js"], optional = true }
 toml = { version = "0.8", optional = true }
-web-sys = { version = "0.3", features = ["console"]}
 
 [package.metadata.cargo-machete]
 ignored = ["getrandom"]
