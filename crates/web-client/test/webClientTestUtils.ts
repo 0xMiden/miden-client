@@ -540,9 +540,6 @@ export const setupWalletAndFaucet =
   async (): Promise<SetupWalletFaucetResult> => {
     return await testingPage.evaluate(async () => {
       const client = window.client;
-
-      await client.syncState(); //TODO: This shouldn't be necessary, but I add it so that both the rust and web tests are the same.
-
       const account = await client.newWallet(
         window.AccountStorageMode.private(),
         true
