@@ -586,22 +586,6 @@ impl Client {
                 input_notes.push(note.try_into().map_err(ClientError::NoteRecordConversionError)?);
             }
 
-            if let Some(input_note) = input_notes.first() {
-                #[cfg(target_arch = "wasm32")]
-                web_sys::console::log_1(&JsValue::from_str(&format!(
-                    "Consuming note with block num: {} against block {}",
-                    input_note.location().unwrap().block_num(),
-                    self.store.get_sync_height().await?
-                )));
-
-                #[cfg(not(target_arch = "wasm32"))]
-                std::println!(
-                    "Consuming note with block num: {} against block {}",
-                    input_note.location().unwrap().block_num(),
-                    self.store.get_sync_height().await?
-                );
-            }
-
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
         };
 

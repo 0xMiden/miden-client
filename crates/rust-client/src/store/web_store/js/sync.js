@@ -95,7 +95,7 @@ export async function applyStateSync(
     partialBlockchainPeaksAsFlattenedVec
   );
 
-  return db.transaction(
+  return await db.transaction(
     "rw",
     stateSync,
     inputNotes,
@@ -112,7 +112,7 @@ export async function applyStateSync(
           newBlockNums[i],
           newBlockHeaders[i],
           partialBlockchainPeaks[i],
-          hasClientNotes[i]
+          hasClientNotes[i] == 1 // hasClientNotes is a u8 array, so we convert it to boolean
         );
       }
       await updatePartialBlockchainNodes(tx, nodeIndexes, nodes);
@@ -159,10 +159,6 @@ async function updateBlockHeader(
 
 async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
   try {
-    // nodeIndexes.forEach((id) => {
-    //   console.log("(1) Inserting nodes with id:", id);
-    // });
-
     // Check if the arrays are not of the same length
     if (nodeIndexes.length !== nodes.length) {
       throw new Error(

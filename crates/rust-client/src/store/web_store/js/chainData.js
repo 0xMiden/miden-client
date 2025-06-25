@@ -45,10 +45,6 @@ export async function insertBlockHeader(
 
 export async function insertPartialBlockchainNodes(ids, nodes) {
   try {
-    ids.forEach((id) => {
-      console.log("(2) Inserting nodes with id:", id);
-    });
-
     // Check if the arrays are not of the same length
     if (ids.length !== nodes.length) {
       throw new Error("ids and nodes arrays must be of the same length");
@@ -180,10 +176,6 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
 export async function getPartialBlockchainNodesAll() {
   try {
     const partialBlockchainNodesAll = await partialBlockchainNodes.toArray();
-    // partialBlockchainNodesAll.forEach((node) => {
-    //   console.log("Getting all nodes:", node.id, node.node);
-    // });
-
     return partialBlockchainNodesAll;
   } catch (err) {
     console.error("Failed to get partial blockchain nodes: ", err.toString());
@@ -193,10 +185,6 @@ export async function getPartialBlockchainNodesAll() {
 
 export async function getPartialBlockchainNodes(ids) {
   try {
-    // ids.forEach((id) => {
-    //   console.log("(3) Getting nodes with id:", id);
-    // });
-
     const results = await partialBlockchainNodes.bulkGet(ids);
 
     return results;
@@ -208,19 +196,16 @@ export async function getPartialBlockchainNodes(ids) {
 
 export async function pruneIrrelevantBlocks() {
   try {
-    return;
-    const syncHeight = await stateSync.get(1).blockNum;
+    const syncHeight = await stateSync.get(1);
+
     const allMatchingRecords = await blockHeaders
       .where("hasClientNotes")
       .equals("false")
-      .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight)
+      .and(
+        (record) =>
+          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
+      )
       .toArray();
-
-    if (allMatchingRecords.length != 0) {
-      throw new Error(
-        `There are ${allMatchingRecords.length} irrelevant blocks that need to be pruned.`
-      );
-    }
 
     await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
   } catch (err) {
