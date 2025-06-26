@@ -250,11 +250,10 @@ impl Client {
     ///
     /// - `api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect to
     ///   the Miden node.
+    /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
+    ///   serial numbers, etc. This can be any RNG that implements the [`FeltRng`] trait.
     /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
     ///   provide persistence.
-    /// - `executor_store`: An instance of [`Store`] that provides a way for [`TransactionExecutor`]
-    ///   to retrieve relevant inputs at the moment of transaction execution. It should be the same
-    ///   store as the one for `store`, but it doesn't have to be the **same instance**.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
     ///   transaction executor whenever a signature is requested from within the VM.
     /// - `in_debug_mode`: Instantiates the transaction executor (and in turn, its compiler) in

@@ -607,6 +607,11 @@ impl Client {
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
+        let data_store = ClientDataStore::new(self.store.clone());
+        for fpi_account in &foreign_account_inputs {
+            data_store.mast_store().insert(fpi_account.code().mast());
+        }
+
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -622,7 +627,6 @@ impl Client {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
-        let data_store = ClientDataStore::new(self.store.clone());
         data_store.mast_store().load_account_code(account.code());
 
         if ignore_invalid_notes {
@@ -630,10 +634,9 @@ impl Client {
             notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
         }
 
-        let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
-
         // Execute the transaction and get the witness
-        let executed_transaction = tx_executor
+        let executed_transaction = self
+            .build_executor(&data_store)
             .execute_transaction(
                 account_id,
                 block_num,
@@ -643,27 +646,7 @@ impl Client {
             )
             .await?;
 
-        // Check that the expected output notes matches the transaction outcome.
-        // We compare authentication commitments where possible since that involves note IDs +
-        // metadata (as opposed to just note ID which remains the same regardless of
-        // metadata) We also do the check for partial output notes
-
-        let tx_note_auth_commitments: BTreeSet<Digest> =
-            notes_from_output(executed_transaction.output_notes())
-                .map(Note::commitment)
-                .collect();
-
-        let missing_note_ids: Vec<NoteId> = output_notes
-            .iter()
-            .filter_map(|n| {
-                (!tx_note_auth_commitments.contains(&compute_note_commitment(n.id(), n.metadata())))
-                    .then_some(n.id())
-            })
-            .collect();
-
-        if !missing_note_ids.is_empty() {
-            return Err(ClientError::MissingOutputNotes(missing_note_ids));
-        }
+        validate_executed_transaction(&executed_transaction, &output_notes)?;
 
         TransactionResult::new(
             executed_transaction,
@@ -999,9 +982,8 @@ impl Client {
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
-            let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
 
-            let execution = NoteConsumptionChecker::new(&tx_executor)
+            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store))
                 .check_notes_consumability(
                     account_id,
                     self.store.get_sync_height().await?,
@@ -1154,9 +1136,8 @@ impl Client {
             data_store.mast_store().insert(fpi_account.code().mast());
         }
 
-        let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
-
-        Ok(tx_executor
+        Ok(self
+            .build_executor(&data_store)
             .execute_tx_view_script(
                 account_id,
                 block_ref,
@@ -1166,6 +1147,19 @@ impl Client {
                 Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
+    }
+
+    pub(crate) fn build_executor<'store, 'auth>(
+        &'auth self,
+        data_store: &'store ClientDataStore,
+    ) -> TransactionExecutor<'store, 'auth> {
+        let mut tx_executor = TransactionExecutor::new(data_store, self.authenticator.as_deref());
+
+        if self.in_debug_mode {
+            tx_executor = tx_executor.with_debug_mode();
+        }
+
+        tx_executor
     }
 }
 
@@ -1236,6 +1230,36 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
                 todo!("For now, all details should be held in OutputNote::Fulls")
             },
         })
+}
+
+/// Validates that the executed transaction's output notes match what was expected in the
+/// transaction request.
+fn validate_executed_transaction(
+    executed_transaction: &ExecutedTransaction,
+    expected_output_own_notes: &[Note],
+) -> Result<(), ClientError> {
+    // Checks that the expected output notes matches the transaction outcome.
+    // We compare authentication commitments where possible since that involves note IDs +
+    // metadata (as opposed to just note ID which remains the same regardless of
+    // metadata) We also do the check for partial output notes
+    let tx_note_auth_commitments: BTreeSet<Digest> =
+        notes_from_output(executed_transaction.output_notes())
+            .map(Note::commitment)
+            .collect();
+
+    let missing_note_ids: Vec<NoteId> = expected_output_own_notes
+        .iter()
+        .filter_map(|n| {
+            (!tx_note_auth_commitments.contains(&compute_note_commitment(n.id(), n.metadata())))
+                .then_some(n.id())
+        })
+        .collect();
+
+    if !missing_note_ids.is_empty() {
+        return Err(ClientError::MissingOutputNotes(missing_note_ids));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
