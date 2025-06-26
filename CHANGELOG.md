@@ -12,6 +12,10 @@
 
 * Added support for FPI in Web Client (#958).
 
+### Fixes
+
+* Fixed Intermittent Block Header Error During Sync in Web Client (#997).
+
 ## 0.9.2 (2025-06-11)
 
 * Refresh dependencies (#972).
