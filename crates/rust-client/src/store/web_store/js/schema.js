@@ -62,28 +62,6 @@ db.version(1).stores({
   [Table.ForeignAccountCode]: indexes("accountId"),
 });
 
-// 6-17-25 Migrate to Bech32 Account IDs in wallet - wipe all tables
-db.version(1.1).upgrade(async (tx) => {
-  await tx.table(Table.AccountCode).clear();
-  await tx.table(Table.AccountStorage).clear();
-  await tx.table(Table.AccountVaults).clear();
-  await tx.table(Table.AccountAuth).clear();
-  await tx.table(Table.Accounts).clear();
-  await tx.table(Table.Transactions).clear();
-  await tx.table(Table.TransactionScripts).clear();
-  await tx.table(Table.InputNotes).clear();
-  await tx.table(Table.OutputNotes).clear();
-  await tx.table(Table.NotesScripts).clear();
-  await tx.table(Table.StateSync).clear();
-  await tx.table(Table.BlockHeaders).clear();
-  await tx.table(Table.PartialBlockchainNodes).clear();
-  await tx.table(Table.Tags).clear();
-  await tx.table(Table.ForeignAccountCode).clear();
-  
-  // Re-populate the stateSync table with default values after clearing
-  await tx.table(Table.StateSync).put({ id: 1, blockNum: "0" });
-});
-
 function indexes(...items) {
   return items.join(",");
 }

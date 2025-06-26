@@ -42,7 +42,7 @@ impl AccountId {
 
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self) -> String {
-        let network_id = NetworkId::new("mtst").unwrap();
+        let network_id = NetworkId::Testnet;
         self.0.to_bech32(network_id)
     }
 
