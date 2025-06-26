@@ -549,24 +549,6 @@ impl Client {
             .get_input_notes(NoteFilter::List(authenticated_input_note_ids))
             .await?;
 
-        for authenticated_note_record in authenticated_note_records {
-            if !authenticated_note_record.is_authenticated() {
-                return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteNotAuthenticated(
-                        authenticated_note_record.id(),
-                    ),
-                ));
-            }
-
-            if authenticated_note_record.is_consumed() {
-                return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(
-                        authenticated_note_record.id(),
-                    ),
-                ));
-            }
-        }
-
         // If tx request contains unauthenticated_input_notes we should insert them
         let unauthenticated_input_notes = transaction_request
             .unauthenticated_input_notes()
@@ -577,17 +559,7 @@ impl Client {
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = {
-            let note_ids = transaction_request.get_input_note_ids();
-
-            let mut input_notes: Vec<InputNote> = Vec::new();
-
-            for note in self.store.get_input_notes(NoteFilter::List(note_ids)).await? {
-                input_notes.push(note.try_into().map_err(ClientError::NoteRecordConversionError)?);
-            }
-
-            InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
-        };
+        let mut notes = transaction_request.get_input_notes(authenticated_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();

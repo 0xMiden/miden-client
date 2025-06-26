@@ -9,6 +9,8 @@
 * [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
 * [BREAKING] Merged `concurrent` feature with `std` (#974).
 * [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
+* Enforced input note order in `TransactionRequest` (#1001).
+* Added check for duplicate input notes in `TransactionRequest` (#1001).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
 
 ### Features

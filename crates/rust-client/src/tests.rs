@@ -58,13 +58,13 @@ use crate::{
             ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT,
             assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
             execute_failing_tx, execute_tx, execute_tx_and_sync, mint_and_consume, mint_note,
-            setup_two_wallets_and_faucet, setup_wallet_and_faucet, wait_for_node, wait_for_tx,
+            setup_two_wallets_and_faucet, setup_wallet_and_faucet, wait_for_tx,
         },
         mock::{MockClient, MockRpcApi},
     },
     transaction::{
-        DiscardCause, PaymentTransactionData, TransactionRequestBuilder, TransactionRequestError,
-        TransactionStatus,
+        DiscardCause, PaymentTransactionData, SwapTransactionData, TransactionRequestBuilder,
+        TransactionRequestError, TransactionStatus,
     },
 };
 
@@ -104,7 +104,8 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
 
 pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = create_test_client_builder().await;
-    let client = builder.build().await.unwrap();
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
 
     (client, rpc_api, keystore)
 }
@@ -878,7 +879,6 @@ async fn real_note_roundtrip() {
 #[tokio::test]
 async fn added_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
-    wait_for_node(&mut client).await;
 
     let faucet_account_header =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -909,7 +909,6 @@ async fn added_notes() {
 #[tokio::test]
 async fn p2id_transfer() {
     let (mut client, _, authenticator) = create_test_client().await;
-    wait_for_node(&mut client).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1012,7 +1011,6 @@ async fn p2id_transfer() {
 #[tokio::test]
 async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, _, authenticator) = create_test_client().await;
-    wait_for_node(&mut client).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1055,7 +1053,6 @@ async fn p2id_transfer_failing_not_enough_balance() {
 #[tokio::test]
 async fn p2idr_transfer_consumed_by_target() {
     let (mut client, _, authenticator) = create_test_client().await;
-    wait_for_node(&mut client).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1169,7 +1166,6 @@ async fn p2idr_transfer_consumed_by_target() {
 #[tokio::test]
 async fn p2idr_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
-    wait_for_node(&mut client).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1484,8 +1480,6 @@ async fn subsequent_discarded_transactions() {
     let (regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await;
 
-    wait_for_node(&mut client).await;
-
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
@@ -1603,4 +1597,110 @@ async fn missing_recipient_digest() {
     if let ClientError::MissingOutputRecipients(digests) = error {
         assert!(digests == vec![dummy_recipient_digest]);
     }
+}
+
+#[tokio::test]
+async fn input_note_checks() {
+    let (mut client, _, authenticator) = create_test_client().await;
+
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+
+    let mut mint_notes = vec![];
+    for _ in 0..10 {
+        mint_notes.push(mint_note(&mut client, wallet.id(), faucet.id(), NoteType::Public).await);
+    }
+
+    let duplicate_note_tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![mint_notes[0].id(), mint_notes[0].id()]);
+
+    assert!(matches!(
+        duplicate_note_tx_request,
+        Err(TransactionRequestError::DuplicateInputNote(note_id)) if note_id == mint_notes[0].id()
+    ));
+
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(mint_notes.iter().map(InputNote::id).collect())
+        .unwrap();
+
+    let transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
+
+    let input_notes = transaction.executed_transaction().input_notes().iter();
+
+    // Check that the input notes have the same order as the original notes
+    for (i, input_note) in input_notes.enumerate() {
+        assert_eq!(input_note.id(), mint_notes[i].id());
+    }
+}
+
+#[tokio::test]
+async fn swap_chain_test() {
+    // This test simulates a "swap chain" scenario with multiple wallets and fungible assets.
+    // 1. It creates a number wallet/faucet pairs, each wallet holding an asset minted by its paired
+    //    faucet.
+    // 2. For each consecutive pair, it creates a swap transaction where wallet N offers its asset
+    //    and requests the asset of wallet N+1.
+    // 3. The last wallet, which didn't generate any swaps, holds the asset that the wallet N-1
+    //    requested, which in turn was the asset requested by wallet N-2, and so on.
+    // 4. The test then consumes all swap notes (in reverse order) in a single transaction against
+    //    the last wallet.
+    // 5. Although the last wallet doesn't contain any of the intermediate requested assets, it
+    //    should be able to consume the swap notes because it will hold the requested asset for each
+    //    step and gain the needed asset for the next. This can only happen if the notes are
+    //    consumed in the specified order.
+    // 6. Finally, it asserts that the last wallet now owns the asset originally held by the first
+    //    wallet, verifying that the whole swap chain was successful.
+
+    let (mut client, _, keystore) = create_test_client().await;
+
+    // Generate a few account pairs with a fungible asset that can be used for swaps.
+    let mut account_pairs = vec![];
+    for _ in 0..10 {
+        let (wallet, faucet) =
+            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
+        mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
+        account_pairs.push((wallet, faucet));
+    }
+
+    // Generate swap notes.
+    // Execpt for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
+    // asset.
+    let mut swap_notes = vec![];
+    for pairs in account_pairs.windows(2) {
+        let tx_request = TransactionRequestBuilder::new()
+            .build_swap(
+                &SwapTransactionData::new(
+                    pairs[0].0.id(),
+                    Asset::Fungible(FungibleAsset::new(pairs[0].1.id(), 1).unwrap()),
+                    Asset::Fungible(FungibleAsset::new(pairs[1].1.id(), 1).unwrap()),
+                ),
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
+
+        // The notes are inserted in reverse order because the first note to be consumed will be the
+        // last one generated.
+        swap_notes.insert(0, tx_request.expected_output_own_notes()[0].id());
+        execute_tx_and_sync(&mut client, pairs[0].0.id(), tx_request).await;
+    }
+
+    // The last wallet didn't generate any swap notes and has the asset needed to start the swap
+    // chain.
+    let last_wallet = account_pairs.last().unwrap().0.id();
+
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
+
+    execute_tx(&mut client, last_wallet, tx_request).await;
+
+    // At the end, the last wallet should have the asset of the first wallet.
+    let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();
+    assert_eq!(
+        last_wallet_account
+            .account()
+            .vault()
+            .get_balance(account_pairs[0].1.id())
+            .unwrap(),
+        1
+    );
 }
