@@ -123,8 +123,7 @@ impl Client {
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let commited_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in commited_notes {
@@ -154,8 +153,7 @@ impl Client {
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await

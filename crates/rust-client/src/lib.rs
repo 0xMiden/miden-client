@@ -200,14 +200,10 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_objects::crypto::rand::FeltRng;
-use miden_tx::{
-    LocalTransactionProver, TransactionExecutor, TransactionMastStore,
-    auth::TransactionAuthenticator,
-};
+use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
 use rand::RngCore;
 use rpc::NodeRpcClient;
-use store::{Store, data_store::ClientDataStore};
-use tracing::info;
+use store::Store;
 
 // MIDEN CLIENT
 // ================================================================================================
@@ -231,10 +227,9 @@ pub struct Client {
     /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
     /// client.
     tx_prover: Arc<LocalTransactionProver>,
-    /// An instance of a [`TransactionExecutor`] that will be used to execute transactions.
-    tx_executor: TransactionExecutor,
-    /// A MAST store, used to provide code inputs to the VM.
-    mast_store: Arc<TransactionMastStore>,
+    /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
+    /// executor whenever a signature is requested from within the VM.
+    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
     /// Flag to enable the debug mode for scripts compilation and execution.
     in_debug_mode: bool,
     /// The number of blocks that are considered old enough to discard pending transactions.
@@ -282,28 +277,18 @@ impl Client {
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Self {
-        let client_data_store = Arc::new(ClientDataStore::new(store.clone()));
-        let mast_store = client_data_store.mast_store();
-
         let authenticator = Some(authenticator);
-        let mut tx_executor = TransactionExecutor::new(client_data_store, authenticator);
         let tx_prover = Arc::new(LocalTransactionProver::default());
-
-        if in_debug_mode {
-            info!("Creating the Client in debug mode.");
-            tx_executor = tx_executor.with_debug_mode();
-        }
 
         Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
             tx_prover,
-            tx_executor,
+            authenticator,
             in_debug_mode,
             tx_graceful_blocks,
             max_block_number_delta,
-            mast_store,
         }
     }
 

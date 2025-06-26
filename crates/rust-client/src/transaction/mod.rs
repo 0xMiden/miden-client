@@ -80,7 +80,7 @@ use miden_objects::{
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker,
+    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
@@ -92,7 +92,7 @@ use crate::{
     rpc::domain::account::AccountProof,
     store::{
         InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
-        TransactionFilter, input_note_states::ExpectedNoteState,
+        TransactionFilter, data_store::ClientDataStore, input_note_states::ExpectedNoteState,
     },
     sync::NoteTagRecord,
 };
@@ -142,7 +142,7 @@ impl TransactionResult {
     /// [`TransactionResult`].
     pub async fn new(
         transaction: ExecutedTransaction,
-        note_screener: NoteScreener<'_>,
+        note_screener: NoteScreener,
         partial_notes: Vec<(NoteDetails, NoteTag)>,
         current_block_num: BlockNumber,
         current_timestamp: Option<u64>,
@@ -622,16 +622,18 @@ impl Client {
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
-        self.mast_store.load_account_code(account.code());
+        let data_store = ClientDataStore::new(self.store.clone());
+        data_store.mast_store().load_account_code(account.code());
 
         if ignore_invalid_notes {
             // Remove invalid notes
             notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
         }
 
+        let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+
         // Execute the transaction and get the witness
-        let executed_transaction = self
-            .tx_executor
+        let executed_transaction = tx_executor
             .execute_transaction(
                 account_id,
                 block_num,
@@ -665,7 +667,7 @@ impl Client {
 
         TransactionResult::new(
             executed_transaction,
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone()),
+            NoteScreener::new(self.store.clone(), self.authenticator.clone()),
             future_notes,
             self.get_sync_height().await?,
             self.store.get_current_timestamp(),
@@ -996,7 +998,10 @@ impl Client {
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let execution = NoteConsumptionChecker::new(&self.tx_executor)
+            let data_store = ClientDataStore::new(self.store.clone());
+            let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+
+            let execution = NoteConsumptionChecker::new(&tx_executor)
                 .check_notes_consumability(
                     account_id,
                     self.store.get_sync_height().await?,
@@ -1140,15 +1145,18 @@ impl Client {
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
 
+        let data_store = ClientDataStore::new(self.store.clone());
+
         // Ensure code is loaded on MAST store
-        self.mast_store.insert(tx_script.mast());
-        self.mast_store.insert(account.code().mast());
+        data_store.mast_store().insert(tx_script.mast());
+        data_store.mast_store().insert(account.code().mast());
         for fpi_account in &foreign_account_inputs {
-            self.mast_store.insert(fpi_account.code().mast());
+            data_store.mast_store().insert(fpi_account.code().mast());
         }
 
-        Ok(self
-            .tx_executor
+        let tx_executor = TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+
+        Ok(tx_executor
             .execute_tx_view_script(
                 account_id,
                 block_ref,

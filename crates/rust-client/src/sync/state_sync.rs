@@ -35,12 +35,12 @@ use crate::{
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived<'a> = Box<
+pub type OnNoteReceived = Box<
     dyn Fn(
         CommittedNote,
         Option<InputNoteRecord>,
-        Arc<NoteScreener<'a>>,
-    ) -> Pin<Box<(dyn Future<Output = Result<bool, ClientError>> + 'a)>>,
+        Arc<NoteScreener>,
+    ) -> Pin<Box<(dyn Future<Output = Result<bool, ClientError>>)>>,
 >;
 
 // STATE SYNC
@@ -52,27 +52,32 @@ pub type OnNoteReceived<'a> = Box<
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
-pub struct StateSync<'a> {
+pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
     /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived<'a>,
+    on_note_received: OnNoteReceived,
+    /// The number of blocks that are considered old enough to discard pending transactions. If
+    /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
-    note_screener: Arc<NoteScreener<'a>>,
+    /// The note screener used to check the relevance of notes.
+    note_screener: Arc<NoteScreener>,
 }
 
-impl<'a> StateSync<'a> {
+impl StateSync {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments
     ///
     /// * `rpc_api` - The RPC client used to communicate with the node.
     /// * `on_note_received` - A callback to be executed when a new note inclusion is received.
+    /// * `tx_graceful_blocks` - The number of blocks that are considered old enough to discard.
+    /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived<'a>,
+        on_note_received: OnNoteReceived,
         tx_graceful_blocks: Option<u32>,
-        note_screener: NoteScreener<'a>,
+        note_screener: NoteScreener,
     ) -> Self {
         Self {
             rpc_api,
@@ -454,7 +459,7 @@ pub async fn on_note_received(
     store: Arc<dyn Store>,
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
-    note_screener: Arc<NoteScreener<'_>>,
+    note_screener: Arc<NoteScreener>,
 ) -> Result<bool, ClientError> {
     let note_id = *committed_note.note_id();
 
