@@ -76,7 +76,7 @@ use miden_objects::{
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteTag, compute_note_commitment},
+    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
@@ -589,7 +589,8 @@ impl Client {
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
         };
 
-        let output_notes: Vec<Note> = transaction_request.expected_output_own_notes();
+        let output_recipients =
+            transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
@@ -609,7 +610,7 @@ impl Client {
 
         let data_store = ClientDataStore::new(self.store.clone());
         for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().insert(fpi_account.code().mast());
+            data_store.mast_store().load_account_code(fpi_account.code());
         }
 
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
@@ -646,7 +647,7 @@ impl Client {
             )
             .await?;
 
-        validate_executed_transaction(&executed_transaction, &output_notes)?;
+        validate_executed_transaction(&executed_transaction, &output_recipients)?;
 
         TransactionResult::new(
             executed_transaction,
@@ -1130,10 +1131,9 @@ impl Client {
         let data_store = ClientDataStore::new(self.store.clone());
 
         // Ensure code is loaded on MAST store
-        data_store.mast_store().insert(tx_script.mast());
-        data_store.mast_store().insert(account.code().mast());
+        data_store.mast_store().load_account_code(account.code());
         for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().insert(fpi_account.code().mast());
+            data_store.mast_store().load_account_code(fpi_account.code());
         }
 
         Ok(self
@@ -1232,31 +1232,28 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
         })
 }
 
-/// Validates that the executed transaction's output notes match what was expected in the
+/// Validates that the executed transaction's output recipients match what was expected in the
 /// transaction request.
 fn validate_executed_transaction(
     executed_transaction: &ExecutedTransaction,
-    expected_output_own_notes: &[Note],
+    expected_output_recipients: &[NoteRecipient],
 ) -> Result<(), ClientError> {
-    // Checks that the expected output notes matches the transaction outcome.
-    // We compare authentication commitments where possible since that involves note IDs +
-    // metadata (as opposed to just note ID which remains the same regardless of
-    // metadata) We also do the check for partial output notes
-    let tx_note_auth_commitments: BTreeSet<Digest> =
-        notes_from_output(executed_transaction.output_notes())
-            .map(Note::commitment)
-            .collect();
-
-    let missing_note_ids: Vec<NoteId> = expected_output_own_notes
+    let tx_output_recipient_digests = executed_transaction
+        .output_notes()
         .iter()
-        .filter_map(|n| {
-            (!tx_note_auth_commitments.contains(&compute_note_commitment(n.id(), n.metadata())))
-                .then_some(n.id())
+        .filter_map(|n| n.recipient().map(NoteRecipient::digest))
+        .collect::<Vec<_>>();
+
+    let missing_recipient_digest: Vec<Digest> = expected_output_recipients
+        .iter()
+        .filter_map(|recipient| {
+            (!tx_output_recipient_digests.contains(&recipient.digest()))
+                .then_some(recipient.digest())
         })
         .collect();
 
-    if !missing_note_ids.is_empty() {
-        return Err(ClientError::MissingOutputNotes(missing_note_ids));
+    if !missing_recipient_digest.is_empty() {
+        return Err(ClientError::MissingOutputRecipient(missing_recipient_digest));
     }
 
     Ok(())
