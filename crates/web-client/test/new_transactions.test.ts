@@ -13,12 +13,25 @@ import { Account, TransactionRecord } from "../dist/crates/miden_client_web";
 // NEW_MINT_TRANSACTION TESTS
 // =======================================================================================================
 
+interface MultipleMintsTransactionResult {
+  transactionIds: string[];
+  createdNoteIds: string[];
+  numOutputNotesCreated: number;
+  nonce: string | undefined;
+  finalBalance: string | undefined;
+}
+
 const multipleMintsTest = async (
   targetAccount: string,
-  faucetAccount: string
-): Promise<SendTransactionResult> => {
+  faucetAccount: string,
+  withRemoteProver: boolean = false
+): Promise<MultipleMintsTransactionResult> => {
   return await testingPage.evaluate(
-    async (_targetAccount: string, _faucetAccount: string) => {
+    async (
+      _targetAccount: string,
+      _faucetAccount: string,
+      _withRemoteProver: boolean
+    ) => {
       const client = window.client;
 
       const targetAccountId = window.AccountId.fromHex(_targetAccount);
@@ -26,7 +39,16 @@ const multipleMintsTest = async (
       await client.syncState();
 
       // Mint 3 notes
-      let mintedNoteIds = [];
+      let result: {
+        transactionIds: string[];
+        createdNoteIds: string[];
+        numOutputNotesCreated: number;
+      } = {
+        transactionIds: [],
+        createdNoteIds: [],
+        numOutputNotesCreated: 0,
+      };
+
       for (let i = 0; i < 3; i++) {
         const mintTransactionRequest = await client.newMintTransactionRequest(
           targetAccountId,
@@ -39,27 +61,50 @@ const multipleMintsTest = async (
           faucetAccountId,
           mintTransactionRequest
         );
-        await client.submitTransaction(mintTransactionResult);
+
+        if (_withRemoteProver && window.remoteProverUrl != null) {
+          await client.submitTransaction(
+            mintTransactionResult,
+            window.remoteProverInstance
+          );
+        } else {
+          await client.submitTransaction(mintTransactionResult);
+        }
 
         await window.helpers.waitForTransaction(
           mintTransactionResult.executedTransaction().id().toHex()
         );
 
-        mintedNoteIds.push(
+        result.createdNoteIds.push(
           mintTransactionResult.createdNotes().notes()[0].id().toString()
         );
+        result.transactionIds.push(
+          mintTransactionResult.executedTransaction().id().toHex()
+        );
+        result.numOutputNotesCreated += mintTransactionResult
+          .createdNotes()
+          .numNotes();
       }
 
       // Consume the minted notes
-      for (let i = 0; i < mintedNoteIds.length; i++) {
+      for (let i = 0; i < result.createdNoteIds.length; i++) {
         const consumeTransactionRequest = client.newConsumeTransactionRequest([
-          mintedNoteIds[i],
+          result.createdNoteIds[i],
         ]);
         const consumeTransactionResult = await client.newTransaction(
           targetAccountId,
           consumeTransactionRequest
         );
-        await client.submitTransaction(consumeTransactionResult);
+
+        if (_withRemoteProver && window.remoteProverUrl != null) {
+          await client.submitTransaction(
+            consumeTransactionResult,
+            window.remoteProverInstance
+          );
+        } else {
+          await client.submitTransaction(consumeTransactionResult);
+        }
+
         await window.helpers.waitForTransaction(
           consumeTransactionResult.executedTransaction().id().toHex()
         );
@@ -67,13 +112,18 @@ const multipleMintsTest = async (
 
       const changedTargetAccount = await client.getAccount(targetAccountId);
 
-      return changedTargetAccount
-        .vault()
-        .getBalance(faucetAccountId)
-        .toString();
+      return {
+        ...result,
+        nonce: changedTargetAccount.nonce()?.toString(),
+        finalBalance: changedTargetAccount
+          .vault()
+          .getBalance(faucetAccountId)
+          .toString(),
+      };
     },
     targetAccount,
-    faucetAccount
+    faucetAccount,
+    withRemoteProver
   );
 };
 
@@ -88,25 +138,19 @@ describe("mint transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     it(description, async () => {
+      // This test was added in #995 to reproduce an issue in the web wallet.
+      // It is useful because most tests consume the note right on the latest client block,
+      // but this test mints 3 notes and consumes them after the fact. This ensures the
+      // MMR data for old blocks is available and valid so that the notes can be consumed.
       const { faucetId, accountId } = await setupWalletAndFaucet();
-      const result = await mintTransaction(accountId, faucetId, flag);
+      const result = await multipleMintsTest(accountId, faucetId, flag);
 
-      expect(result.transactionId).to.not.be.empty;
-      expect(result.numOutputNotesCreated).to.equal(1);
-      expect(result.nonce).to.equal("1");
+      expect(result.transactionIds.length).to.equal(3);
+      expect(result.numOutputNotesCreated).to.equal(3);
+      expect(result.nonce).to.equal("3");
+      expect(result.finalBalance).to.equal("3000");
+      expect(result.createdNoteIds.length).to.equal(3);
     });
-  });
-
-  it.only("multiple mints", async () => {
-    // This test was added in #995 to reproduce an issue in the web wallet.
-    // It is useful because most tests consume the note right on the latest client block,
-    // but this test mints 3 notes and consumes them after the fact. This ensures the
-    // MMR data for old blocks is available and valid so that the notes can be consumed.
-    const { accountId: targetAccount, faucetId: faucetAccount } =
-      await setupWalletAndFaucet();
-    const result = await multipleMintsTest(targetAccount, faucetAccount);
-
-    expect(result).to.equal("3000");
   });
 });
 
