@@ -32,7 +32,7 @@ pub struct TransactionRequestBuilder {
     unauthenticated_input_notes: Vec<Note>,
     /// Notes to be consumed by the transaction together with their (optional) arguments. This
     /// includes both authenticated and unauthenticated notes.
-    input_notes: BTreeMap<NoteId, Option<NoteArgs>>,
+    input_notes: Vec<(NoteId, Option<NoteArgs>)>,
     /// Notes to be created by the transaction. This includes both full and partial output notes.
     /// The transaction script will be generated based on these notes.
     own_output_notes: Vec<OutputNote>,
@@ -70,7 +70,7 @@ impl TransactionRequestBuilder {
     pub fn new() -> Self {
         Self {
             unauthenticated_input_notes: vec![],
-            input_notes: BTreeMap::new(),
+            input_notes: vec![],
             own_output_notes: Vec::new(),
             expected_output_recipients: BTreeMap::new(),
             expected_future_notes: BTreeMap::new(),
@@ -90,7 +90,7 @@ impl TransactionRequestBuilder {
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
         for (note, argument) in notes {
-            self.input_notes.insert(note.id(), argument);
+            self.input_notes.push((note.id(), argument));
             self.unauthenticated_input_notes.push(note);
         }
         self
@@ -103,7 +103,7 @@ impl TransactionRequestBuilder {
         notes: impl IntoIterator<Item = (NoteId, Option<NoteArgs>)>,
     ) -> Self {
         for (note_id, argument) in notes {
-            self.input_notes.insert(note_id, argument);
+            self.input_notes.push((note_id, argument));
         }
         self
     }
