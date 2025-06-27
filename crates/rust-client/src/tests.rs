@@ -1564,3 +1564,31 @@ async fn subsequent_discarded_transactions() {
         account_before_tx.account().commitment(),
     );
 }
+
+#[tokio::test]
+async fn input_note_order() {
+    let (mut client, _, authenticator) = create_test_client().await;
+
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+
+    wait_for_node(&mut client).await;
+
+    let mut mint_notes = vec![];
+    for _ in 0..10 {
+        mint_notes.push(mint_note(&mut client, wallet.id(), faucet.id(), NoteType::Public).await);
+    }
+
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(mint_notes.iter().map(InputNote::id).collect())
+        .unwrap();
+
+    let transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
+
+    let input_notes = transaction.executed_transaction().input_notes().iter();
+
+    // Check that the input notes have the same order as the original notes
+    for (i, input_note) in input_notes.enumerate() {
+        assert_eq!(input_note.id(), mint_notes[i].id());
+    }
+}
