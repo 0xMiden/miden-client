@@ -11,12 +11,12 @@ use miden_objects::{
 };
 use miden_tx::{
     NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
-    TransactionMastStore,
+    auth::TransactionAuthenticator,
 };
 use thiserror::Error;
 
 use crate::{
-    store::{Store, StoreError},
+    store::{Store, StoreError, data_store::ClientDataStore},
     transaction::{TransactionRequestBuilder, TransactionRequestError},
 };
 
@@ -50,26 +50,19 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
-pub struct NoteScreener<'a> {
+pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A consumption checker, used to check whether a note can be consumed by an account.
-    consumption_checker: NoteConsumptionChecker<'a>,
-    /// A MAST store, used to provide code inputs to the VM.
-    mast_store: Arc<TransactionMastStore>,
+    /// A reference to the transaction authenticator
+    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
 }
 
-impl<'a> NoteScreener<'a> {
+impl NoteScreener {
     pub fn new(
         store: Arc<dyn Store>,
-        tx_executor: &'a TransactionExecutor,
-        mast_store: Arc<TransactionMastStore>,
+        authenticator: Option<Arc<dyn TransactionAuthenticator>>,
     ) -> Self {
-        Self {
-            store,
-            consumption_checker: NoteConsumptionChecker::new(tx_executor),
-            mast_store,
-        }
+        Self { store, authenticator }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -134,10 +127,14 @@ impl<'a> NoteScreener<'a> {
         let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
             .expect("Single note should be valid");
 
-        self.mast_store.load_account_code(account.code());
+        let data_store = ClientDataStore::new(self.store.clone());
+        let transaction_executor =
+            TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
-        if let NoteAccountExecution::Success = self
-            .consumption_checker
+        data_store.mast_store().load_account_code(account.code());
+
+        if let NoteAccountExecution::Success = consumption_checker
             .check_notes_consumability(
                 account.id(),
                 self.store.get_sync_height().await?,
