@@ -2,6 +2,8 @@
 
 ## 0.10.0 (TBD)
 
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
+
 ### Changes
 
 * [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
@@ -29,7 +31,6 @@
 * Added `NoteUpdate` type to the note update tracker to distinguish between different types of updates (#821).
 * Updated `TonicRpcClient` and `Store` traits to be subtraits of `Send` and `Sync` (#926).
 * Updated `TonicRpcClient` and `Store` trait functions to return futures which are `Send` (#926).
-* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
 
 ### Changes
 
