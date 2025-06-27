@@ -393,6 +393,10 @@ impl Default for TransactionRequestBuilder {
 // Errors related to a [TransactionRequest]
 #[derive(Debug, Error)]
 pub enum TransactionRequestError {
+    #[error("account interface error")]
+    AccountInterfaceError(#[from] AccountInterfaceError),
+    #[error("duplicate input note with IDs: {0}")]
+    DuplicateInputNote(NoteId),
     #[error("foreign account data missing in the account proof")]
     ForeignAccountDataMissing,
     #[error("foreign account storage slot {0} is not a map type")]
@@ -425,8 +429,6 @@ pub enum TransactionRequestError {
     StorageSlotNotFound(u8, AccountId),
     #[error("error while building the input notes: {0}")]
     TransactionInputError(#[from] TransactionInputError),
-    #[error("account interface error")]
-    AccountInterfaceError(#[from] AccountInterfaceError),
 }
 
 // TESTS

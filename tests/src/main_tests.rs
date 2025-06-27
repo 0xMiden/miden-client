@@ -617,14 +617,14 @@ async fn consume_multiple_expected_notes() {
     // Create and execute transactions
     let tx_request_1 = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
-        .build_consume_notes(client_owned_notes.iter().map(|note| note.id()).collect())
+        .build()
         .unwrap();
 
     let tx_request_2 = TransactionRequestBuilder::new()
         .with_unauthenticated_input_notes(
             unauth_owned_notes.iter().map(|note| ((*note).clone(), None)),
         )
-        .build_consume_notes(unauth_owned_notes.iter().map(|note| note.id()).collect())
+        .build()
         .unwrap();
 
     let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;

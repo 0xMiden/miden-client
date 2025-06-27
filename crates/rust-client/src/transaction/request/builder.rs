@@ -1,5 +1,9 @@
 //! Contains structures and functions related to transaction creation.
-use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::ToString,
+    vec::Vec,
+};
 
 use miden_lib::note::{create_p2id_note, create_p2idr_note, create_swap_note};
 use miden_objects::{
@@ -369,6 +373,13 @@ impl TransactionRequestBuilder {
     /// - If an expiration delta is set when a custom script is set.
     /// - If an invalid note variant is encountered in the own output notes.
     pub fn build(self) -> Result<TransactionRequest, TransactionRequestError> {
+        let mut seen_input_notes = BTreeSet::new();
+        for (note_id, _) in &self.input_notes {
+            if !seen_input_notes.insert(note_id) {
+                return Err(TransactionRequestError::DuplicateInputNote(*note_id));
+            }
+        }
+
         let script_template = match (self.custom_script, self.own_output_notes.is_empty()) {
             (Some(_), false) => {
                 return Err(TransactionRequestError::ScriptTemplateError(
