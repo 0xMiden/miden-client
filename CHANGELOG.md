@@ -2,6 +2,8 @@
 
 ## 0.10.0 (TBD)
 
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
+
 ### Changes
 
 * [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
