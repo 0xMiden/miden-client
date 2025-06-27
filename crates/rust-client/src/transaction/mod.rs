@@ -527,8 +527,8 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// - Returns [`ClientError::MissingOutputNotes`] if the [`TransactionRequest`] ouput notes are
-    ///   not a subset of executor's output notes.
+    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] ouput notes
+    ///   are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
     pub async fn new_transaction(
@@ -1253,7 +1253,7 @@ fn validate_executed_transaction(
         .collect();
 
     if !missing_recipient_digest.is_empty() {
-        return Err(ClientError::MissingOutputRecipient(missing_recipient_digest));
+        return Err(ClientError::MissingOutputRecipients(missing_recipient_digest));
     }
 
     Ok(())

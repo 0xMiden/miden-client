@@ -59,7 +59,7 @@ pub enum ClientError {
     #[error("error with merkle path")]
     MerkleError(#[from] MerkleError),
     #[error("the transaction didn't produce the expected recipients corresponding to digests")]
-    MissingOutputRecipient(Vec<Digest>),
+    MissingOutputRecipients(Vec<Digest>),
     #[error("note error")]
     NoteError(#[from] NoteError),
     #[error("note import error: {0}")]
