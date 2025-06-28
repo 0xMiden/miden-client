@@ -1,50 +1,114 @@
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 
-use miden_lib::utils::{Deserializable, Serializable};
-use rand::Rng;
-
 use super::KeyStoreError;
+use crate::keystore::common::hash_pub_key;
 use crate::{
     AuthenticationError, Felt, Word,
     account::AccountDelta,
     auth::{AuthSecretKey, TransactionAuthenticator},
     crypto::Digest,
-    store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth},
     utils::RwLock,
 };
+use js_sys::{ArrayBuffer, AsyncIterator, Uint8Array};
+use miden_lib::utils::{Deserializable, Serializable};
+use rand::Rng;
+use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{
+    FileSystemCreateWritableOptions, FileSystemDirectoryHandle, FileSystemFileHandle,
+    FileSystemGetDirectoryOptions, FileSystemGetFileOptions, FileSystemWritableFileStream,
+};
 
-/// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
+/// A web-based keystore that stores keys in [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system)
 /// and provides transaction authentication functionality.
 #[derive(Clone)]
 pub struct WebKeyStore<R: Rng> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
+    /// OPFS directory handle
+    keys_directory: FileSystemDirectoryHandle,
+}
+
+impl From<JsValue> for KeyStoreError {
+    fn from(js: JsValue) -> KeyStoreError {
+        KeyStoreError::StorageError(format!("{js:#?}"))
+    }
 }
 
 impl<R: Rng> WebKeyStore<R> {
     /// Creates a new instance of the web keystore with the provided RNG.
-    pub fn new(rng: R) -> Self {
-        WebKeyStore { rng: Arc::new(RwLock::new(rng)) }
+    pub async fn with_rng(rng: R) -> Result<Self, KeyStoreError> {
+        // TODO(Maks) extend with user provided path?
+        let window = web_sys::window()
+            .ok_or_else(|| KeyStoreError::StorageError("No window object".to_string()))?;
+        let navigator = window.navigator();
+
+        let root_directory = FileSystemDirectoryHandle::from(
+            JsFuture::from(navigator.storage().get_directory()).await?,
+        );
+        let fs_options = FileSystemGetDirectoryOptions::new();
+        fs_options.set_create(true);
+        let keys_directory = FileSystemDirectoryHandle::from(
+            JsFuture::from(
+                root_directory.get_directory_handle_with_options("keystore", &fs_options),
+            )
+            .await?,
+        );
+        Ok(WebKeyStore {
+            rng: Arc::new(RwLock::new(rng)),
+            keys_directory,
+        })
     }
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match &key {
-            AuthSecretKey::RpoFalcon512(k) => Digest::from(Word::from(k.public_key())).to_hex(),
+            AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()),
         };
+        let filename = hash_pub_key(pub_key);
         let secret_key_hex = hex::encode(key.to_bytes());
 
-        insert_account_auth(pub_key, secret_key_hex).await.map_err(|_| {
-            KeyStoreError::StorageError("Failed to insert item into local storage".to_string())
-        })?;
+        let fs_options = FileSystemGetFileOptions::new();
+        fs_options.set_create(true);
+        let file_handle = FileSystemFileHandle::from(
+            JsFuture::from(
+                self.keys_directory.get_file_handle_with_options(&filename, &fs_options),
+            )
+            .await?,
+        );
 
-        Ok(())
+        let file_stream = FileSystemWritableFileStream::from(
+            JsFuture::from(file_handle.create_writable()).await?,
+        );
+        let slice = secret_key_hex.as_bytes();
+        let expected_num_bytes = slice.len();
+        let num_bytes: f64 = JsFuture::from(file_stream.write_with_u8_array(slice)?)
+            .await?
+            .as_f64()
+            .ok_or_else(|| KeyStoreError::StorageError("Cannot save key".to_string()))?;
+
+        JsFuture::from(file_stream.close()).await?;
+        if expected_num_bytes != num_bytes as usize {
+            JsFuture::from(self.keys_directory.remove_entry(&filename)).await?;
+            Err(KeyStoreError::StorageError("Cannot save key - corrupted".to_string()))
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let pub_key_str = Digest::from(pub_key).to_hex();
-        let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).map_err(|_| {
-            KeyStoreError::StorageError("Failed to get item from local storage".to_string())
-        })?;
+    pub async fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+        let filename = hash_pub_key(pub_key);
+
+        let file: JsValue = JsFuture::from(self.keys_directory.get_file_handle(&filename)).await?;
+        if file.is_null() {
+            return Ok(None);
+        }
+        let file_handle = FileSystemFileHandle::from(file);
+        let blob: web_sys::Blob = JsFuture::from(file_handle.get_file()).await?.into();
+
+        let buffer = ArrayBuffer::unchecked_from_js(JsFuture::from(blob.array_buffer()).await?);
+        let uint8_array = Uint8Array::new(&buffer);
+        let mut secret_key_hex = vec![0; blob.size() as usize];
+        uint8_array.copy_to(&mut secret_key_hex);
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
             KeyStoreError::DecodingError(format!("error decoding secret key hex: {err:?}"))
@@ -58,26 +122,27 @@ impl<R: Rng> WebKeyStore<R> {
     }
 }
 
-impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
-    /// Gets a signature over a message, given a public key.
-    ///
-    /// The public key should correspond to one of the keys tracked by the keystore.
-    ///
-    /// # Errors
-    /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
-    /// returned.
-    fn get_signature(
-        &self,
-        pub_key: Word,
-        message: Word,
-        _account_delta: &AccountDelta,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
-        let mut rng = self.rng.write();
-        let secret_key = self
-            .get_key(pub_key)
-            .map_err(|err| AuthenticationError::other(err.to_string()))?;
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
-        miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
-    }
-}
+// TODO(Maks) make async?
+// impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
+//     /// Gets a signature over a message, given a public key.
+//     ///
+//     /// The public key should correspond to one of the keys tracked by the keystore.
+//     ///
+//     /// # Errors
+//     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
+//     /// returned.
+//     fn get_signature(
+//         &self,
+//         pub_key: Word,
+//         message: Word,
+//         _account_delta: &AccountDelta,
+//     ) -> Result<Vec<Felt>, AuthenticationError> {
+//         let mut rng = self.rng.write();
+//         let secret_key = self
+//             .get_key(pub_key)
+//             .map_err(|err| AuthenticationError::other(err.to_string()))?;
+//         let AuthSecretKey::RpoFalcon512(k) = secret_key
+//             .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
+//         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
+//     }
+// }

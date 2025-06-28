@@ -22,6 +22,7 @@ workspace = true
 default = ["std", "tonic/channel"]
 idxdb = ["dep:base64", "dep:serde-wasm-bindgen", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
 sqlite = ["dep:rusqlite", "dep:deadpool", "dep:deadpool-sync", "dep:rusqlite_migration", "std"]
+web = ["dep:rusqlite", "dep:rusqlite_migration", "dep:sqlite-wasm-rs", "dep:base64", "dep:serde-wasm-bindgen", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde", "dep:getrandom"]
 std = ["miden-objects/std", "miden-proving-service-client/std", "miden-tx/concurrent"]
 testing = ["miden-objects/testing", "miden-lib/testing", "miden-tx/testing", "dep:miden-testing", "dep:uuid", "dep:toml"]
 tonic = ["std", "tonic/transport", "tonic/tls-ring", "tonic/tls-native-roots"]
@@ -35,8 +36,8 @@ deadpool = { version = "0.12", features = ["managed", "rt_tokio_1"], default-fea
 deadpool-sync = { version = "0.1", optional = true }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 hex = { version = "0.4" }
+miden-lib = { workspace = true, features = ["testing"] }
 miden-proving-service-client = { workspace = true, default-features = false, features = ["tx-prover"] }
-miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 miden-testing = { workspace = true, optional = true }
 miden-tx = { workspace = true, features = ["async"] }
@@ -59,11 +60,22 @@ toml = { version = "0.8", optional = true }
 ignored = ["getrandom"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3", features = ["console", "Window", "Storage"] }
+js-sys = "0.3"
+sqlite-wasm-rs = { version = "0.3", default-features = false, features = ["bundled"], optional = true}
+web-sys = { version = "0.3", features = ["console", "Window", "Storage", "FileSystemDirectoryHandle",
+    "FileSystemFileHandle",
+    "FileSystemWritableFileStream",
+    "FileSystemGetDirectoryOptions",
+    "FileSystemGetFileOptions",
+    "FileSystemCreateWritableOptions",
+    "Blob",
+    "Navigator",
+    "StorageManager",
+    "FileSystemGetDirectoryOptions",
+    "File",] }
 
 [dev-dependencies]
 miden-client = { path = ".", features = ["testing", "sqlite", "tonic"] }
-miden-lib = { workspace = true, features = ["testing"] }
 miden-objects = { workspace = true, default-features = false, features = ["testing"] }
 miden-testing = { workspace = true, default-features = false, features = ["async"] }
 tokio = { workspace = true }

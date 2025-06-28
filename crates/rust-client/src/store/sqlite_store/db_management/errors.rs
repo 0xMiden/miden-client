@@ -1,4 +1,4 @@
-use std::string::{String, ToString};
+use alloc::string::{String, ToString};
 
 use rusqlite::Error as RusqliteError;
 use rusqlite_migration::Error as MigrationError;

@@ -1,10 +1,11 @@
 #![allow(clippy::items_after_statements)]
 
 use alloc::{
+    collections::BTreeMap,
+    rc::Rc,
     string::{String, ToString},
     vec::Vec,
 };
-use std::{collections::BTreeMap, rc::Rc};
 
 use miden_objects::{
     AccountError, Digest, Felt, Word,

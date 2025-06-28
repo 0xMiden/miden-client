@@ -9,6 +9,7 @@ use std::{
     vec::Vec,
 };
 
+use crate::keystore::common::hash_pub_key;
 use miden_objects::{
     Digest, Felt, Word,
     account::{AccountDelta, AuthSecretKey},
@@ -146,12 +147,4 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
 
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
     }
-}
-
-/// Hashes a public key to a string representation.
-fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = Digest::from(pub_key).to_hex();
-    let mut hasher = DefaultHasher::new();
-    pub_key.hash(&mut hasher);
-    hasher.finish().to_string()
 }

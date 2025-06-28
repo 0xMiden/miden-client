@@ -10,12 +10,13 @@ pub enum KeyStoreError {
     DecodingError(String),
 }
 
+mod common;
 #[cfg(feature = "std")]
 mod fs_keystore;
 #[cfg(feature = "std")]
 pub use fs_keystore::FilesystemKeyStore;
 
-#[cfg(feature = "idxdb")]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 mod web_keystore;
-#[cfg(feature = "idxdb")]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub use web_keystore::WebKeyStore;
