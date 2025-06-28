@@ -6,6 +6,7 @@ import {
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
+  swapTransaction,
 } from "./webClientTestUtils";
 import { setupConsumedNote } from "./notes.test";
 import { Account, TransactionRecord } from "../dist/crates/miden_client_web";
@@ -143,6 +144,62 @@ describe("send transaction tests", () => {
 
       expect(result.senderAccountBalance).to.equal("900");
       expect(result.changedTargetBalance).to.equal("100");
+    });
+  });
+});
+
+// SWAP_TRANSACTION TEST
+// =======================================================================================================
+
+describe.only("swap transaction tests", () => {
+  const testCases = [
+    { flag: false, description: "swap transaction completes successfully" },
+    {
+      flag: true,
+      description: "swap transaction with remote prover completes successfully",
+    },
+  ];
+
+  testCases.forEach(({ flag, description }) => {
+    it(description, async () => {
+      const { accountId: accountA, faucetId: faucetA } =
+        await setupWalletAndFaucet();
+      const { accountId: accountB, faucetId: faucetB } =
+        await setupWalletAndFaucet();
+
+      const assetAAmount = BigInt(1);
+      const assetBAmount = BigInt(25);
+
+      await mintAndConsumeTransaction(accountA, faucetA, flag);
+      await mintAndConsumeTransaction(accountB, faucetB, flag);
+
+      const { accountAAssets, accountBAssets } = await swapTransaction(
+        accountA,
+        accountB,
+        faucetA,
+        assetAAmount,
+        faucetB,
+        assetBAmount,
+        flag
+      );
+
+      // --- assertions for Account A ---
+      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
+      expect(aA, `Expected to find asset ${faucetA} on Account A`).to.exist;
+      expect(BigInt(aA!.amount)).to.equal(999n);
+
+      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
+      expect(aB, `Expected to find asset ${faucetB} on Account A`).to.exist;
+      expect(BigInt(aB!.amount)).to.equal(25n);
+
+      // --- assertions for Account B ---
+      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
+      expect(bA, `Expected to find asset ${faucetA} on Account B`).to.exist;
+      expect(BigInt(bA!.amount)).to.equal(1n);
+
+      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
+      expect(bB, `Expected to find asset ${faucetB} on Account B`).to.exist;
+      expect(BigInt(bB!.amount)).to.equal(975n);
     });
   });
 });

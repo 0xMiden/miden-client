@@ -48,6 +48,16 @@
 
 ***
 
+### id()
+
+> **id**(): [`NoteId`](NoteId.md)
+
+#### Returns
+
+[`NoteId`](NoteId.md)
+
+***
+
 ### recipient()
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)

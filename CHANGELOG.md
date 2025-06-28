@@ -22,6 +22,7 @@
 ### Fixes
 
 * Fixed Intermittent Block Header Error During Sync in Web Client (#997).
+* Fixed Swap Transaction Request in Web Client (#1002)
 
 ## 0.9.2 (2025-06-11)
 

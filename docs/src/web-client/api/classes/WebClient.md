@@ -508,31 +508,31 @@ Meant to be used in conjunction with the force_import_store method
 
 ***
 
-### newSwapTransaction()
+### newSwapTransactionRequest()
 
-> **newSwapTransaction**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`): `Promise`\<[`NewSwapTransactionResult`](NewSwapTransactionResult.md)\>
+> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
 ##### sender\_account\_id
 
-`string`
+[`AccountId`](AccountId.md)
 
 ##### offered\_asset\_faucet\_id
 
-`string`
+[`AccountId`](AccountId.md)
 
 ##### offered\_asset\_amount
 
-`string`
+`bigint`
 
 ##### requested\_asset\_faucet\_id
 
-`string`
+[`AccountId`](AccountId.md)
 
 ##### requested\_asset\_amount
 
-`string`
+`bigint`
 
 ##### note\_type
 
@@ -540,7 +540,7 @@ Meant to be used in conjunction with the force_import_store method
 
 #### Returns
 
-`Promise`\<[`NewSwapTransactionResult`](NewSwapTransactionResult.md)\>
+[`TransactionRequest`](TransactionRequest.md)
 
 ***
 
@@ -647,3 +647,35 @@ Meant to be used in conjunction with the force_import_store method
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### buildSwapTag()
+
+> `static` **buildSwapTag**(`note_type`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`): [`NoteTag`](NoteTag.md)
+
+#### Parameters
+
+##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+##### offered\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### offered\_asset\_amount
+
+`bigint`
+
+##### requested\_asset\_faucet\_id
+
+[`AccountId`](AccountId.md)
+
+##### requested\_asset\_amount
+
+`bigint`
+
+#### Returns
+
+[`NoteTag`](NoteTag.md)
