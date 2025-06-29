@@ -15,7 +15,7 @@ use pollster::FutureExt as _;
 use rand::Rng;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
+use web_sys::{ WorkerGlobalScope,
     FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemGetDirectoryOptions,
     FileSystemGetFileOptions, FileSystemWritableFileStream,
 };
@@ -34,11 +34,16 @@ impl<R: Rng> WebKeyStore<R> {
     /// Creates a new instance of the web keystore with the provided RNG.
     pub async fn with_rng(rng: R) -> Result<Self, JsValue> {
         // TODO(Maks) extend with user provided path?
-        let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window object"))?;
-        let navigator = window.navigator();
+        let storage = if let Ok(worker_scope) = js_sys::global().dyn_into::<WorkerGlobalScope>() {
+            worker_scope.navigator().storage()
+        } else if let Some(window) = web_sys::window() {
+            window.navigator().storage()
+        } else {
+            return Err(JsValue::from_str("cannot get the browser storage"));
+        };
 
         let root_directory = FileSystemDirectoryHandle::from(
-            JsFuture::from(navigator.storage().get_directory()).await?,
+            JsFuture::from(storage.get_directory()).await?,
         );
         let fs_options = FileSystemGetDirectoryOptions::new();
         fs_options.set_create(true);

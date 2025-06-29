@@ -8,7 +8,8 @@ use sqlite_wasm_rs::{self as ffi, sahpool_vfs::install as install_opfs_vfs};
 // TODO(Maks) - this dummy pool implementation with interior mutability only for POC!!
 // It blocks JS event loop with sync calls in the async context
 // Necessary to implement web workers based pooling
-// E.g. https://github.com/w3reality/wasm-mt
+// E.g. https://github.com/w3reality/wasm-mt, https://rustwasm.github.io/wasm-bindgen/examples/wasm-in-web-worker.html 
+// see also crates/web-client/js/index.js 
 pub struct SqlitePool {
     connection: Arc<Mutex<Connection>>,
 }
