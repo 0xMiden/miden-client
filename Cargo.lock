@@ -1779,6 +1779,7 @@ dependencies = [
  "hex",
  "js-sys",
  "miden-client",
+ "miden-crypto",
  "miden-lib",
  "miden-node-proto-build",
  "miden-objects",
@@ -1795,6 +1796,7 @@ dependencies = [
  "rusqlite_migration",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "sqlite-wasm-rs",
  "thiserror 2.0.12",
  "tokio",
@@ -1893,6 +1895,7 @@ dependencies = [
  "num-complex",
  "rand 0.9.1",
  "rand_core 0.9.3",
+ "serde",
  "sha3",
  "thiserror 2.0.12",
  "winter-crypto",
@@ -4761,6 +4764,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "326dfe4bfa4072b7c909133a88f8807820d3e49e5dfd246f67981771f74a0ed3"
 dependencies = [
+ "serde",
  "winter-utils",
 ]
 

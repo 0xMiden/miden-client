@@ -89,6 +89,26 @@ export default [
       }),
     ],
   },
+  // Build the worker file
+  {
+    input: "./js/workers/web-client-sqlite-worker.js",
+    output: {
+      dir: `dist/workers`,
+      format: "es",
+      sourcemap: true,
+    },
+    plugins: [
+      resolve(),
+      commonjs(),
+      copy({
+        targets: [
+          // Copy WASM to `dist/workers/assets` for worker accessibility
+          { src: "dist/assets/*.wasm", dest: "dist/workers/assets" },
+        ],
+        verbose: true,
+      }),
+    ],
+  },
   // Build the main entry point
   {
     input: "./js/index.js",

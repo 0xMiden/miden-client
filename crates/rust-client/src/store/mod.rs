@@ -31,10 +31,10 @@ use miden_objects::{
     Digest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
     note::{NoteId, NoteTag, Nullifier},
     transaction::TransactionId,
 };
+use miden_crypto::merkle::{InOrderIndex, MmrPeaks};
 
 use crate::{
     sync::{NoteTagRecord, StateSyncUpdate},

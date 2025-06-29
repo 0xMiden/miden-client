@@ -11,6 +11,7 @@ use miden_client::{
 use miden_objects::{Felt, crypto::rand::RpoRandomCoin};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 pub mod account;
 pub mod export;
@@ -70,19 +71,25 @@ impl WebClient {
         let coin_seed: [u64; 4] = rng.random();
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
-        let web_store: SqliteStore = SqliteStore::new("store.sqlite3")
-            .await
-            .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?;
+        console::log_1(&"== before sqlite".into());
+        let web_store: SqliteStore = SqliteStore::new("store.sqlite3".to_string()).await.map_err(|e| {
+            JsValue::from_str(format!("Failed to initialize WebStore: {e}").as_str())
+        })?;
         let web_store = Arc::new(web_store);
+        console::log_1(&"== after sqlite".into());
 
+        console::log_1(&"== before keystore".into());
         let keystore = WebKeyStore::with_rng(rng).await?;
+        console::log_1(&"== after keystore".into());
 
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
-            Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
+            Endpoint::try_from(url.as_str())
+                .map_err(|_| JsValue::from_str(format!("Invalid node URL {url}").as_str()))
         })?;
 
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
+        console::log_1(&"== before client".into());
         self.inner = Some(Client::new(
             web_rpc_client,
             Box::new(rng),
@@ -94,6 +101,7 @@ impl WebClient {
         ));
         self.store = Some(web_store);
         self.keystore = Some(keystore);
+        console::log_1(&"== after client".into());
 
         Ok(JsValue::from_str("Client created successfully"))
     }

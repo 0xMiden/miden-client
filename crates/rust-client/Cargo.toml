@@ -36,6 +36,7 @@ deadpool = { version = "0.12", features = ["managed", "rt_tokio_1"], default-fea
 deadpool-sync = { version = "0.1", optional = true }
 getrandom = { version = "0.3", optional = true, features = ["wasm_js"] }
 hex = { version = "0.4" }
+miden-crypto = { workspace = true } # TODO(Maks) MmrPeaks workaround for POC only, to be removed
 miden-lib = { workspace = true, features = ["testing"] }
 miden-proving-service-client = { workspace = true, default-features = false, features = ["tx-prover"] }
 miden-objects = { workspace = true }
@@ -63,6 +64,7 @@ ignored = ["getrandom"]
 async-lock = { version = "3.4.0", default-features = false } # TODO(Maks) for POC only, to be removed
 js-sys = "0.3"
 pollster = { version = "0.4.0", default-features = false }
+serde_json = { version = "1.0", default-features = false } # TODO(Maks) MmrPeaks workaround for POC only, to be removed
 sqlite-wasm-rs = { version = "0.3", default-features = false, features = ["bundled"], optional = true}
 web-sys = { version = "0.3", features = ["console", "Window", "Storage", "FileSystemDirectoryHandle",
     "FileSystemFileHandle",
@@ -70,9 +72,15 @@ web-sys = { version = "0.3", features = ["console", "Window", "Storage", "FileSy
     "FileSystemGetDirectoryOptions",
     "FileSystemGetFileOptions",
     "Blob",
+    "BlobPropertyBag",
+    "MessageEvent",
     "Navigator",
     "StorageManager",
     "DedicatedWorkerGlobalScope",
+    "Worker",
+    "Url",
+    "WorkerOptions",
+    "WorkerType",
     "File",] }
 
 [dev-dependencies]

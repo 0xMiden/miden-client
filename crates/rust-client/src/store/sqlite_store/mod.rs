@@ -15,7 +15,7 @@ mod transaction;
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, BTreeSet},
-    string::ToString,
+    string::{String, ToString},
     vec::Vec,
 };
 
@@ -23,16 +23,17 @@ use alloc::{
 use std::path::PathBuf;
 
 #[cfg(target_arch = "wasm32")]
-type PathBuf = &'static str;
+type PathBuf = String;
 
 use crate::store::sqlite_store::db_management::{SqlitePool, utils::apply_migrations};
 use miden_objects::{
     Digest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
     note::{NoteTag, Nullifier},
+    utils::Deserializable,
 };
+use miden_crypto::merkle::{InOrderIndex, MmrPeaks};
 use rusqlite::{Connection, types::Value};
 
 #[cfg(any(feature = "tonic", feature = "web-tonic"))]
@@ -87,9 +88,15 @@ impl SqliteStore {
                 .await
                 .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
-            pool.interact(apply_migrations)
-                .await
-                .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
+            web_sys::console::log_1(&"sqlite pool created, applying migrations".into());
+
+            pool.interact(|conn| {
+                apply_migrations(conn).map_err(|e| StoreError::DatabaseError(e.to_string()))
+            })
+            .await
+            .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
+
+            web_sys::console::log_1(&"migrations are applied".into());
 
             pool
         };
@@ -107,7 +114,7 @@ impl SqliteStore {
     async fn interact_with_connection<F, R>(&self, f: F) -> Result<R, StoreError>
     where
         F: FnOnce(&mut Connection) -> Result<R, StoreError> + Send + 'static,
-        R: Send + 'static,
+        R: Send + 'static + Deserializable,
     {
         self.pool
             .interact(f)
@@ -151,9 +158,22 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::get_unique_note_tags).await
     }
 
+    // TODO(Maks) boolean flag doesn't implement Ser/Der
+    // Deserializable for it would require a wrapper - so a workaround for wasm for POC
     async fn add_note_tag(&self, tag: NoteTagRecord) -> Result<bool, StoreError> {
-        self.interact_with_connection(move |conn| SqliteStore::add_note_tag(conn, tag))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.interact_with_connection(move |conn| SqliteStore::add_note_tag(conn, tag))
+                .await
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.interact_with_connection(move |conn| {
+                SqliteStore::add_note_tag(conn, tag).map(|flag| flag as u8)
+            })
             .await
+            .map(|num| num > 0u8)
+        }
     }
 
     async fn remove_note_tag(&self, tag: NoteTagRecord) -> Result<usize, StoreError> {
@@ -231,15 +251,30 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    // TODO(Maks) boolean flag doesn't implement Ser/Der
+    // Deserializable for it would require a wrapper - so a workaround for wasm for POC
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
     ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
         let block_numbers = block_numbers.clone();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_block_headers(conn, &block_numbers)
-        })
-        .await
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.interact_with_connection(move |conn| {
+                SqliteStore::get_block_headers(conn, &block_numbers)
+            })
+            .await
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.interact_with_connection(move |conn| {
+                SqliteStore::get_block_headers(conn, &block_numbers).map(|v: Vec<(BlockHeader, bool)>| {
+                    v.into_iter().map(|(block_header, flag)| (block_header, flag as u8)).collect()
+                })
+            })
+            .await
+            .map(|v: Vec<(BlockHeader, u8)>| v.into_iter().map(|(block_header, num)| (block_header, num > 0u8)).collect())
+        }
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
@@ -267,14 +302,28 @@ impl Store for SqliteStore {
         .await
     }
 
+    // TODO(Maks) MmrPeaks doesn't implement Winterfell Derializable
+    // but implements serde traits - so a workaround for the POC
     async fn get_partial_blockchain_peaks_by_block_num(
         &self,
         block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_partial_blockchain_peaks_by_block_num(conn, block_num)
-        })
-        .await
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+                self.interact_with_connection(move |conn| {
+                SqliteStore::get_partial_blockchain_peaks_by_block_num(conn, block_num)
+            })
+            .await
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.interact_with_connection(move |conn| {
+                SqliteStore::get_partial_blockchain_peaks_by_block_num(conn, block_num).map(|peaks| serde_json::to_string(&peaks).unwrap())
+            })
+            .await
+            .map(|peaks| serde_json::from_str(&peaks).unwrap())
+        }
     }
 
     async fn insert_account(

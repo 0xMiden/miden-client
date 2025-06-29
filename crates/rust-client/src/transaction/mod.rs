@@ -296,6 +296,26 @@ impl TransactionRecord {
     }
 }
 
+impl Serializable for TransactionRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.id.write_into(target);
+        self.details.write_into(target);
+        self.script.write_into(target);
+        self.status.write_into(target);
+    }
+}
+
+impl Deserializable for TransactionRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let id = TransactionId::read_from(source)?;
+        let details = TransactionDetails::read_from(source)?;
+        let script = Option::<TransactionScript>::read_from(source)?;
+        let status = TransactionStatus::read_from(source)?;
+
+        Ok(Self { id, details, script, status })
+    }
+}
+
 /// Describes the details associated with a transaction.
 #[derive(Debug, Clone)]
 pub struct TransactionDetails {
@@ -428,6 +448,39 @@ impl fmt::Display for TransactionStatus {
                 write!(f, "Committed (Block: {block_number})")
             },
             TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
+        }
+    }
+}
+
+impl Serializable for TransactionStatus {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            TransactionStatus::Pending => target.write_u8(0),
+            TransactionStatus::Committed(block_number) => {
+                target.write_u8(1);
+                block_number.write_into(target)
+            },
+            TransactionStatus::Discarded(cause) => {
+                target.write_u8(2);
+                cause.write_into(target)
+            },
+        }
+    }
+}
+
+impl Deserializable for TransactionStatus {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(TransactionStatus::Pending),
+            1 => {
+                let block_number = BlockNumber::read_from(source)?;
+                Ok(TransactionStatus::Committed(block_number))
+            },
+            2 => {
+                let cause = DiscardCause::read_from(source)?;
+                Ok(TransactionStatus::Discarded(cause))
+            },
+            _ => Err(DeserializationError::InvalidValue("Invalid transaction status".to_string())),
         }
     }
 }
