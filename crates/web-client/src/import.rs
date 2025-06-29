@@ -36,7 +36,7 @@ impl WebClient {
 
             let keystore = keystore.expect("KeyStore should be initialized");
             for key in account_data.auth_secret_keys {
-                keystore.add_key(&key).await.map_err(|err| err.to_string())?;
+                keystore.add_key(&key).await.map_err(|err| format!("{err:#?}"))?;
             }
 
             Ok(JsValue::from_str(&format!("Imported account with ID: {account_id}")))
@@ -67,7 +67,7 @@ impl WebClient {
             .expect("KeyStore should be initialized")
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
             .await
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| format!("{err:#?}"))?;
 
         Ok(Account::from(generated_acct))
     }
@@ -113,10 +113,11 @@ impl WebClient {
     #[wasm_bindgen(js_name = "forceImportStore")]
     pub async fn force_import_store(&mut self, store_dump: JsValue) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;
-        store
-            .force_import_store(store_dump)
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to force import store"))?;
+        // TODO(Maks) implement import OPFS
+        // store
+        //     .force_import_store(store_dump)
+        //     .await
+        //     .map_err(|err| js_error_with_context(err, "failed to force import store"))?;
 
         Ok(JsValue::from_str("Store imported successfully"))
     }

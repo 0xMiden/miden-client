@@ -6,7 +6,7 @@ use miden_client::{
     Client,
     keystore::WebKeyStore,
     rpc::{Endpoint, TonicRpcClient},
-    store::sqlite_store::WebStore,
+    store::sqlite_store::SqliteStore,
 };
 use miden_objects::{Felt, crypto::rand::RpoRandomCoin};
 use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -27,7 +27,7 @@ pub mod utils;
 
 #[wasm_bindgen]
 pub struct WebClient {
-    store: Option<Arc<WebStore>>,
+    store: Option<Arc<SqliteStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client>,
 }
@@ -70,12 +70,12 @@ impl WebClient {
         let coin_seed: [u64; 4] = rng.random();
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
-        let web_store: WebStore = WebStore::new()
+        let web_store: SqliteStore = SqliteStore::new("store.sqlite3")
             .await
             .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?;
         let web_store = Arc::new(web_store);
 
-        let keystore = WebKeyStore::with_rng(rng);
+        let keystore = WebKeyStore::with_rng(rng).await?;
 
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))

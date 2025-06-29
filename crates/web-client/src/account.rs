@@ -1,4 +1,5 @@
 use miden_client::store::AccountRecord;
+use miden_client::utils::Serializable;
 use miden_objects::account::Account as NativeAccount;
 use wasm_bindgen::prelude::*;
 
@@ -68,14 +69,16 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get item"))?
         };
 
-        let store =
-            self.store.as_ref().ok_or_else(|| JsValue::from_str("Store not initialized"))?;
+        let keystore = self
+            .keystore
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Keystore not initialized"))?;
 
-        let native_auth_secret_key = store
-            .fetch_and_cache_account_auth_by_pub_key(account_pub_key.to_hex())
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to fetch and cache account auth"))?;
-
-        Ok(native_auth_secret_key)
+        // TODO(Maks) caching?, check trait bounds for js_error_with_context
+        let native_auth_secret_key = keystore.get_key(*account_pub_key).await.map_err(|err| {
+            JsValue::from_str(format!("failed to fetch and cache account auth: {err:#?}").as_str())
+        })?;
+        // Unnecessary hex encoding but for backwards compatibility
+        Ok(native_auth_secret_key.map(|k| hex::encode(k.to_bytes())))
     }
 }

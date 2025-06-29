@@ -4,7 +4,7 @@ pub(crate) mod pool_manager_native;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use pool_manager_native::SqlitePool;
 #[cfg(target_arch = "wasm32")]
-pub(crate) mod connection_web;
+pub(crate) mod pool_manager_web;
 #[cfg(target_arch = "wasm32")]
-pub(crate) use connection_web::connect;
+pub(crate) use pool_manager_web::SqlitePool;
 pub(crate) mod utils;
