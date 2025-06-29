@@ -72,7 +72,7 @@ web-sys = { version = "0.3", features = ["console", "Window", "Storage", "FileSy
     "Blob",
     "Navigator",
     "StorageManager",
-    "WorkerGlobalScope",
+    "DedicatedWorkerGlobalScope",
     "File",] }
 
 [dev-dependencies]

@@ -22,6 +22,8 @@ pub enum SqliteStoreError {
     MigrationHashMismatch,
     #[error("Failed to decode hex string: {0}")]
     HexDecodeError(String),
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
 }
 
 impl From<RusqliteError> for SqliteStoreError {
