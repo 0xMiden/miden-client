@@ -1,10 +1,10 @@
 #![allow(clippy::items_after_statements)]
 
 use alloc::{
+    rc::Rc,
     string::{String, ToString},
     vec::Vec,
 };
-use std::rc::Rc;
 
 use miden_objects::{
     Digest,

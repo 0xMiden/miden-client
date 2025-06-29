@@ -1,6 +1,5 @@
-use std::{
+use alloc::{
     string::{String, ToString},
-    sync::LazyLock,
     vec::Vec,
 };
 
@@ -59,8 +58,6 @@ macro_rules! insert_sql {
 type Hash = Blake3Digest<20>;
 
 const MIGRATION_SCRIPTS: [&str; 1] = [include_str!("../store.sql")];
-static MIGRATION_HASHES: LazyLock<Vec<Hash>> = LazyLock::new(compute_migration_hashes);
-static MIGRATIONS: LazyLock<Migrations> = LazyLock::new(prepare_migrations);
 
 fn up(s: &'static str) -> M<'static> {
     M::up(s).foreign_key_check()
@@ -71,7 +68,9 @@ const DB_SCHEMA_VERSION_FIELD: &str = "db-schema-version";
 
 /// Applies the migrations to the database.
 pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
-    let version_before = MIGRATIONS.current_version(conn)?;
+    let migrations = prepare_migrations();
+    let migration_hashes = compute_migration_hashes();
+    let version_before = migrations.current_version(conn)?;
 
     if let SchemaVersion::Inside(ver) = version_before {
         if !table_exists(&conn.transaction()?, "settings")? {
@@ -89,7 +88,7 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
             return Err(SqliteStoreError::SchemaVersionMismatch);
         }
 
-        let expected_hash = &*MIGRATION_HASHES[ver.get() - 1];
+        let expected_hash = &*migration_hashes[ver.get() - 1];
         let actual_hash =
             hex::decode(get_settings_value::<String>(conn, DB_MIGRATION_HASH_FIELD)?.ok_or_else(
                 || SqliteStoreError::DatabaseError("Migration hash not found".to_string()),
@@ -101,12 +100,12 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
         }
     }
 
-    MIGRATIONS.to_latest(conn)?;
+    migrations.to_latest(conn)?;
 
-    let version_after = MIGRATIONS.current_version(conn)?;
+    let version_after = migrations.current_version(conn)?;
 
     if version_before != version_after {
-        let new_hash = hex::encode(&*MIGRATION_HASHES[MIGRATION_HASHES.len() - 1]);
+        let new_hash = hex::encode(&*migration_hashes[migration_hashes.len() - 1]);
         set_settings_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
     }
 

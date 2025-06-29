@@ -1,11 +1,12 @@
 // ACCOUNT RECORD
 // ================================================================================================
-use alloc::vec::Vec;
+use alloc::{string::ToString, vec::Vec};
 use core::fmt::Display;
 
 use miden_objects::{
     Digest, Word,
     account::{Account, AccountId},
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 
 /// Represents a stored account state along with its status.
@@ -49,6 +50,22 @@ impl From<AccountRecord> for Account {
     }
 }
 
+impl Serializable for AccountRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.account.write_into(target);
+        self.status.write_into(target);
+    }
+}
+
+impl Deserializable for AccountRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let account = Account::read_from(source)?;
+        let status = AccountStatus::read_from(source)?;
+
+        Ok(Self { account, status })
+    }
+}
+
 // ACCOUNT STATUS
 // ================================================================================================
 
@@ -86,6 +103,33 @@ impl Display for AccountStatus {
             AccountStatus::New { .. } => write!(f, "New"),
             AccountStatus::Tracked => write!(f, "Tracked"),
             AccountStatus::Locked => write!(f, "Locked"),
+        }
+    }
+}
+
+impl Serializable for AccountStatus {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            AccountStatus::New { seed } => {
+                target.write_u8(0);
+                seed.write_into(target)
+            },
+            AccountStatus::Tracked => target.write_u8(1),
+            AccountStatus::Locked => target.write_u8(2),
+        }
+    }
+}
+
+impl Deserializable for AccountStatus {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => {
+                let seed = Word::read_from(source)?;
+                Ok(AccountStatus::New { seed })
+            },
+            1 => Ok(AccountStatus::Tracked),
+            2 => Ok(AccountStatus::Locked),
+            _ => Err(DeserializationError::InvalidValue("Invalid account status".to_string())),
         }
     }
 }

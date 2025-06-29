@@ -1,5 +1,7 @@
+use alloc::string::ToString;
 use std::path::PathBuf;
 
+use core::ops::Deref;
 use deadpool::{
     Runtime,
     managed::{Manager, Metrics, RecycleResult},
@@ -58,5 +60,25 @@ impl Manager for SqlitePoolManager {
 
     async fn recycle(&self, _: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
         Ok(())
+    }
+}
+
+pub struct SqlitePool(Pool);
+
+impl Deref for SqlitePool {
+    type Target = Pool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl SqlitePool {
+    pub async fn connect(database_path: PathBuf) -> Result<SqlitePool, SqliteStoreError> {
+        let sqlite_pool_manager = SqlitePoolManager::new(database_path);
+        let pool = Pool::builder(sqlite_pool_manager)
+            .build()
+            .map_err(|e| SqliteStoreError::DatabaseError(e.to_string()))?;
+        Ok(SqlitePool(pool))
     }
 }

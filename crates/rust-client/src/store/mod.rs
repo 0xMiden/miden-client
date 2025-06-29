@@ -31,10 +31,10 @@ use miden_objects::{
     Digest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
     note::{NoteId, NoteTag, Nullifier},
     transaction::TransactionId,
 };
+use miden_crypto::merkle::{InOrderIndex, MmrPeaks};
 
 use crate::{
     sync::{NoteTagRecord, StateSyncUpdate},
@@ -52,14 +52,11 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
-#[cfg(all(feature = "sqlite", feature = "idxdb"))]
-compile_error!("features `sqlite` and `idxdb` are mutually exclusive");
+#[cfg(all(feature = "sqlite", feature = "web"))]
+compile_error!("features `sqlite` and `web` are mutually exclusive");
 
-#[cfg(feature = "sqlite")]
+#[cfg(any(feature = "sqlite", feature = "web"))]
 pub mod sqlite_store;
-
-#[cfg(feature = "idxdb")]
-pub mod web_store;
 
 mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};

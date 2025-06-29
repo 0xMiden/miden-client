@@ -1,7 +1,12 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{collections::BTreeMap, rc::Rc, string::String, vec::Vec};
-use std::{collections::BTreeSet, num::NonZeroUsize};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+    string::String,
+    vec::Vec,
+};
+use core::num::NonZeroUsize;
 
 use miden_objects::{
     Digest,

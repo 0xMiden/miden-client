@@ -70,6 +70,21 @@ pub struct NoteTagRecord {
     pub source: NoteTagSource,
 }
 
+impl Serializable for NoteTagRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.tag.write_into(target);
+        self.source.write_into(target);
+    }
+}
+
+impl Deserializable for NoteTagRecord {
+    fn read_from<R: ByteReader>(reader: &mut R) -> Result<Self, DeserializationError> {
+        let tag = NoteTag::read_from(reader)?;
+        let source = NoteTagSource::read_from(reader)?;
+        Ok(Self { tag, source })
+    }
+}
+
 /// Represents the source of the tag. This is used to differentiate between tags that are added by
 /// the user and tags that are added automatically by the client to track notes .
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
