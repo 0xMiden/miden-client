@@ -8,8 +8,8 @@
 //! - Build transaction requests using the [`TransactionRequestBuilder`].
 //!   - [`TransactionRequestBuilder`] contains simple builders for standard transaction types, such
 //!     as `p2id` (pay-to-id)
-//! - Execute transactions via the local transaction executor and generate a [`TransactionResult`]
-//!   that includes execution details and relevant notes for state tracking.
+//! - Execute transactions via the local transaction executor and generate an
+//!   [`ExecutedTransaction`] that includes execution details.
 //! - Prove transactions (locally or remotely) using a [`TransactionProver`] and submit the proven
 //!   transactions to the network.
 //! - Track and update the state of transactions, including their status (e.g., `Pending`,
@@ -23,7 +23,7 @@
 //! use miden_client::{
 //!     Client,
 //!     crypto::FeltRng,
-//!     transaction::{PaymentTransactionData, TransactionRequestBuilder, TransactionResult},
+//!     transaction::{ExecutedTransaction, PaymentTransactionData, TransactionRequestBuilder},
 //! };
 //! use miden_objects::{account::AccountId, asset::FungibleAsset, note::NoteType};
 //! # use std::error::Error;
@@ -49,11 +49,12 @@
 //!         client.rng(),
 //!     )?;
 //!
-//!     // Execute the transaction. This returns a TransactionResult.
-//!     let tx_result: TransactionResult = client.new_transaction(sender_id, tx_request).await?;
+//!     // Execute the transaction. This returns an ExecutedTransaction.
+//!     let executed_tx: ExecutedTransaction =
+//!         client.new_transaction(sender_id, tx_request).await?;
 //!
 //!     // Prove and submit the transaction, persisting its details to the local store.
-//!     client.submit_transaction(tx_result).await?;
+//!     client.submit_transaction(executed_tx).await?;
 //!
 //!     Ok(())
 //! }
@@ -72,11 +73,11 @@ use core::fmt::{self};
 
 use miden_objects::{
     AssetError, Digest, Felt,
-    account::{Account, AccountCode, AccountDelta, AccountId},
+    account::{Account, AccountCode, AccountId},
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
+    note::{Note, NoteId, NoteRecipient},
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
@@ -121,127 +122,6 @@ pub use request::{
     ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
     TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
-
-// TRANSACTION RESULT
-// ================================================================================================
-
-/// Represents the result of executing a transaction by the client.
-///
-/// It contains an [`ExecutedTransaction`], and a list of `relevant_notes` that contains the
-/// `output_notes` that the client has to store as input notes, based on the `NoteScreener`
-/// output from filtering the transaction's output notes or some partial note we expect to receive
-/// in the future (you can check at swap notes for an example of this).
-#[derive(Clone, Debug, PartialEq)]
-pub struct TransactionResult {
-    transaction: ExecutedTransaction,
-    relevant_notes: Vec<InputNoteRecord>,
-}
-
-impl TransactionResult {
-    /// Screens the output notes to store and track the relevant ones, and instantiates a
-    /// [`TransactionResult`].
-    pub async fn new(
-        transaction: ExecutedTransaction,
-        note_screener: NoteScreener,
-        partial_notes: Vec<(NoteDetails, NoteTag)>,
-        current_block_num: BlockNumber,
-        current_timestamp: Option<u64>,
-    ) -> Result<Self, ClientError> {
-        let mut relevant_notes = vec![];
-
-        for note in notes_from_output(transaction.output_notes()) {
-            let account_relevance = note_screener.check_relevance(note).await?;
-            if !account_relevance.is_empty() {
-                let metadata = *note.metadata();
-                relevant_notes.push(InputNoteRecord::new(
-                    note.into(),
-                    current_timestamp,
-                    ExpectedNoteState {
-                        metadata: Some(metadata),
-                        after_block_num: current_block_num,
-                        tag: Some(metadata.tag()),
-                    }
-                    .into(),
-                ));
-            }
-        }
-
-        // Include partial output notes into the relevant notes
-        relevant_notes.extend(partial_notes.iter().map(|(note_details, tag)| {
-            InputNoteRecord::new(
-                note_details.clone(),
-                None,
-                ExpectedNoteState {
-                    metadata: None,
-                    after_block_num: current_block_num,
-                    tag: Some(*tag),
-                }
-                .into(),
-            )
-        }));
-
-        let tx_result = Self { transaction, relevant_notes };
-
-        Ok(tx_result)
-    }
-
-    /// Returns the [`ExecutedTransaction`].
-    pub fn executed_transaction(&self) -> &ExecutedTransaction {
-        &self.transaction
-    }
-
-    /// Returns the output notes that were generated as a result of the transaction execution.
-    pub fn created_notes(&self) -> &OutputNotes {
-        self.transaction.output_notes()
-    }
-
-    /// Returns the list of notes that are relevant to the client, based on [`NoteScreener`].
-    pub fn relevant_notes(&self) -> &[InputNoteRecord] {
-        &self.relevant_notes
-    }
-
-    /// Returns the block against which the transaction was executed.
-    pub fn block_num(&self) -> BlockNumber {
-        self.transaction.block_header().block_num()
-    }
-
-    /// Returns transaction's [`TransactionArgs`].
-    pub fn transaction_arguments(&self) -> &TransactionArgs {
-        self.transaction.tx_args()
-    }
-
-    /// Returns the [`AccountDelta`] that describes the change of state for the executing [Account].
-    pub fn account_delta(&self) -> &AccountDelta {
-        self.transaction.account_delta()
-    }
-
-    /// Returns input notes that were consumed as part of the transaction.
-    pub fn consumed_notes(&self) -> &InputNotes<InputNote> {
-        self.transaction.tx_inputs().input_notes()
-    }
-}
-
-impl From<TransactionResult> for ExecutedTransaction {
-    fn from(tx_result: TransactionResult) -> ExecutedTransaction {
-        tx_result.transaction
-    }
-}
-
-impl Serializable for TransactionResult {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.transaction.write_into(target);
-        self.relevant_notes.write_into(target);
-    }
-}
-
-impl Deserializable for TransactionResult {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let transaction = ExecutedTransaction::read_from(source)?;
-        let relevant_notes = Vec::<InputNoteRecord>::read_from(source)?;
-
-        Ok(Self { transaction, relevant_notes })
-    }
-}
 
 // TRANSACTION RECORD
 // ================================================================================================
@@ -535,7 +415,7 @@ impl Client {
         &mut self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
-    ) -> Result<TransactionResult, ClientError> {
+    ) -> Result<ExecutedTransaction, ClientError> {
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
 
@@ -592,8 +472,26 @@ impl Client {
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
 
-        let future_notes: Vec<(NoteDetails, NoteTag)> =
-            transaction_request.expected_future_notes().cloned().collect();
+        let current_block_num = self.get_sync_height().await?;
+        let current_timestamp = self.store.get_current_timestamp();
+        let future_notes: Vec<InputNoteRecord> = transaction_request
+            .expected_future_notes()
+            .map(|(note_details, tag)| {
+                InputNoteRecord::new(
+                    note_details.clone(),
+                    current_timestamp,
+                    ExpectedNoteState {
+                        metadata: None,
+                        after_block_num: current_block_num,
+                        tag: Some(*tag),
+                    }
+                    .into(),
+                )
+            })
+            .collect();
+
+        // TODO: This should be moved out of `new_transaction` but that requires a bigger refactor.
+        self.store.upsert_input_notes(&future_notes).await?;
 
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
@@ -649,47 +547,39 @@ impl Client {
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
 
-        TransactionResult::new(
-            executed_transaction,
-            NoteScreener::new(self.store.clone(), self.authenticator.clone()),
-            future_notes,
-            self.get_sync_height().await?,
-            self.store.get_current_timestamp(),
-        )
-        .await
+        Ok(executed_transaction)
     }
 
     /// Proves the specified transaction using a local prover, submits it to the network, and saves
     /// the transaction into the local database for tracking.
     pub async fn submit_transaction(
         &mut self,
-        tx_result: TransactionResult,
+        executed_tx: ExecutedTransaction,
     ) -> Result<(), ClientError> {
-        self.submit_transaction_with_prover(tx_result, self.tx_prover.clone()).await
+        self.submit_transaction_with_prover(executed_tx, self.tx_prover.clone()).await
     }
 
     /// Proves the specified transaction using the provided prover, submits it to the network, and
     /// saves the transaction into the local database for tracking.
     pub async fn submit_transaction_with_prover(
         &mut self,
-        tx_result: TransactionResult,
+        executed_tx: ExecutedTransaction,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<(), ClientError> {
-        let proven_transaction = self.prove_transaction(&tx_result, tx_prover).await?;
+        let proven_transaction = self.prove_transaction(executed_tx.clone(), tx_prover).await?;
         let block_num = self.submit_proven_transaction(proven_transaction).await?;
-        self.apply_transaction(block_num, tx_result).await
+        self.apply_transaction(block_num, executed_tx).await
     }
 
     /// Proves the specified transaction result using the provided prover.
     async fn prove_transaction(
         &mut self,
-        tx_result: &TransactionResult,
+        executed_tx: ExecutedTransaction,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<ProvenTransaction, ClientError> {
         info!("Proving transaction...");
 
-        let proven_transaction =
-            tx_prover.prove(tx_result.executed_transaction().clone().into()).await?;
+        let proven_transaction = tx_prover.prove(executed_tx.into()).await?;
 
         info!("Transaction proven.");
 
@@ -710,16 +600,14 @@ impl Client {
     async fn apply_transaction(
         &self,
         submission_height: BlockNumber,
-        tx_result: TransactionResult,
+        executed_tx: ExecutedTransaction,
     ) -> Result<(), ClientError> {
-        let transaction_id = tx_result.executed_transaction().id();
-
         // Transaction was proven and submitted to the node correctly, persist note details and
         // update account
         info!("Applying transaction to the local store...");
 
-        let account_id = tx_result.executed_transaction().account_id();
-        let account_delta = tx_result.account_delta();
+        let account_id = executed_tx.account_id();
+        let account_delta = executed_tx.account_delta();
         let account_record = self.try_get_account(account_id).await?;
 
         if account_record.is_locked() {
@@ -740,11 +628,12 @@ impl Client {
             )));
         }
 
-        // Save only input notes that we care for (based on the note screener assessment)
-        let created_input_notes = tx_result.relevant_notes().to_vec();
-        let new_tags = created_input_notes
-            .iter()
+        let note_updates = self.get_note_updates(submission_height, &executed_tx).await?;
+
+        let new_tags = note_updates
+            .updated_input_notes()
             .filter_map(|note| {
+                let note = note.inner();
                 if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
                     note.state()
                 {
@@ -755,38 +644,8 @@ impl Client {
             })
             .collect();
 
-        // Save all output notes
-        let created_output_notes = tx_result
-            .created_notes()
-            .iter()
-            .cloned()
-            .filter_map(|output_note| {
-                OutputNoteRecord::try_from_output_note(output_note, submission_height).ok()
-            })
-            .collect::<Vec<_>>();
-
-        let consumed_note_ids = tx_result.consumed_notes().iter().map(InputNote::id).collect();
-        let consumed_notes = self.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
-
-        let mut updated_input_notes = vec![];
-        for mut input_note_record in consumed_notes {
-            if input_note_record.consumed_locally(
-                account_id,
-                transaction_id,
-                self.store.get_current_timestamp(),
-            )? {
-                updated_input_notes.push(input_note_record);
-            }
-        }
-
-        let note_updates = NoteUpdateTracker::for_transaction_updates(
-            created_input_notes,
-            updated_input_notes,
-            created_output_notes,
-        );
-
         let tx_update = TransactionStoreUpdate::new(
-            tx_result.into(),
+            executed_tx,
             submission_height,
             account,
             note_updates,
@@ -802,6 +661,53 @@ impl Client {
     pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
         let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
         TransactionScript::compile(program, assembler).map_err(ClientError::TransactionScriptError)
+    }
+
+    /// Executes the provided transaction script against the specified account, and returns the
+    /// resulting stack. Advice inputs and foreign accounts can be provided for the execution.
+    ///
+    /// The transaction will use the current sync height as the block reference.
+    pub async fn execute_program(
+        &mut self,
+        account_id: AccountId,
+        tx_script: TransactionScript,
+        advice_inputs: AdviceInputs,
+        foreign_accounts: BTreeSet<ForeignAccount>,
+    ) -> Result<[Felt; 16], ClientError> {
+        let (fpi_block_number, foreign_account_inputs) =
+            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
+        let block_ref = if let Some(block_number) = fpi_block_number {
+            block_number
+        } else {
+            self.get_sync_height().await?
+        };
+
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        let account: Account = account_record.into();
+
+        let data_store = ClientDataStore::new(self.store.clone());
+
+        // Ensure code is loaded on MAST store
+        data_store.mast_store().load_account_code(account.code());
+        for fpi_account in &foreign_account_inputs {
+            data_store.mast_store().load_account_code(fpi_account.code());
+        }
+
+        Ok(self
+            .build_executor(&data_store)?
+            .execute_tx_view_script(
+                account_id,
+                block_ref,
+                tx_script,
+                advice_inputs,
+                foreign_account_inputs,
+                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
+            )
+            .await?)
     }
 
     // HELPERS
@@ -1094,51 +1000,64 @@ impl Client {
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
-    /// Executes the provided transaction script against the specified account, and returns the
-    /// resulting stack. Advice inputs and foreign accounts can be provided for the execution.
-    ///
-    /// The transaction will use the current sync height as the block reference.
-    pub async fn execute_program(
-        &mut self,
-        account_id: AccountId,
-        tx_script: TransactionScript,
-        advice_inputs: AdviceInputs,
-        foreign_accounts: BTreeSet<ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
-        let (fpi_block_number, foreign_account_inputs) =
-            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
-        let block_ref = if let Some(block_number) = fpi_block_number {
-            block_number
-        } else {
-            self.get_sync_height().await?
-        };
+    async fn get_note_updates(
+        &self,
+        submission_height: BlockNumber,
+        executed_tx: &ExecutedTransaction,
+    ) -> Result<NoteUpdateTracker, ClientError> {
+        // New output notes
+        let new_output_notes = executed_tx
+            .output_notes()
+            .iter()
+            .cloned()
+            .filter_map(|output_note| {
+                OutputNoteRecord::try_from_output_note(output_note, submission_height).ok()
+            })
+            .collect::<Vec<_>>();
 
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
+        // New relevant input notes
+        let mut new_input_notes = vec![];
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let current_timestamp = self.store.get_current_timestamp();
 
-        let data_store = ClientDataStore::new(self.store.clone());
-
-        // Ensure code is loaded on MAST store
-        data_store.mast_store().load_account_code(account.code());
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
+        for note in notes_from_output(executed_tx.output_notes()) {
+            let account_relevance = note_screener.check_relevance(note).await?;
+            if !account_relevance.is_empty() {
+                let metadata = *note.metadata();
+                new_input_notes.push(InputNoteRecord::new(
+                    note.into(),
+                    current_timestamp,
+                    ExpectedNoteState {
+                        metadata: Some(metadata),
+                        after_block_num: submission_height,
+                        tag: Some(metadata.tag()),
+                    }
+                    .into(),
+                ));
+            }
         }
 
-        Ok(self
-            .build_executor(&data_store)?
-            .execute_tx_view_script(
-                account_id,
-                block_ref,
-                tx_script,
-                advice_inputs,
-                foreign_account_inputs,
-                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
-            )
-            .await?)
+        // Locally consumed notes
+        let consumed_note_ids =
+            executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
+        let consumed_notes = self.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+
+        let mut updated_input_notes = vec![];
+        for mut input_note_record in consumed_notes {
+            if input_note_record.consumed_locally(
+                executed_tx.account_id(),
+                executed_tx.id(),
+                self.store.get_current_timestamp(),
+            )? {
+                updated_input_notes.push(input_note_record);
+            }
+        }
+
+        Ok(NoteUpdateTracker::for_transaction_updates(
+            new_input_notes,
+            updated_input_notes,
+            new_output_notes,
+        ))
     }
 
     pub(crate) fn build_executor<'store, 'auth>(
@@ -1160,9 +1079,9 @@ impl Client {
 impl Client {
     pub async fn testing_prove_transaction(
         &mut self,
-        tx_result: &TransactionResult,
+        executed_tx: ExecutedTransaction,
     ) -> Result<ProvenTransaction, ClientError> {
-        self.prove_transaction(tx_result, self.tx_prover.clone()).await
+        self.prove_transaction(executed_tx, self.tx_prover.clone()).await
     }
 
     pub async fn testing_submit_proven_transaction(
@@ -1174,9 +1093,9 @@ impl Client {
 
     pub async fn testing_apply_transaction(
         &self,
-        tx_result: TransactionResult,
+        executed_tx: ExecutedTransaction,
     ) -> Result<(), ClientError> {
-        self.apply_transaction(self.get_sync_height().await.unwrap(), tx_result).await
+        self.apply_transaction(self.get_sync_height().await.unwrap(), executed_tx).await
     }
 }
 
@@ -1266,13 +1185,9 @@ mod test {
             },
         },
     };
-    use miden_tx::utils::{Deserializable, Serializable};
 
     use super::PaymentTransactionData;
-    use crate::{
-        tests::create_test_client,
-        transaction::{TransactionRequestBuilder, TransactionResult},
-    };
+    use crate::{tests::create_test_client, transaction::TransactionRequestBuilder};
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {
@@ -1320,21 +1235,24 @@ mod test {
             )
             .unwrap();
 
-        let tx_result = client.new_transaction(account.id(), tx_request).await.unwrap();
+        let executed_tx = client.new_transaction(account.id(), tx_request).await.unwrap();
         assert!(
-            tx_result
-                .created_notes()
+            executed_tx
+                .output_notes()
                 .get_note(0)
                 .assets()
                 .is_some_and(|assets| assets.num_assets() == 2)
         );
+
         // Prove and apply transaction
-        client.testing_apply_transaction(tx_result.clone()).await.unwrap();
+        client.testing_apply_transaction(executed_tx.clone()).await.unwrap();
 
-        // Test serialization
-        let bytes: std::vec::Vec<u8> = tx_result.to_bytes();
-        let decoded = TransactionResult::read_from_bytes(&bytes).unwrap();
+        let stored_note = client
+            .get_output_note(executed_tx.output_notes().get_note(0).id())
+            .await
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(tx_result, decoded);
+        assert_eq!(stored_note.assets().num_assets(), 2);
     }
 }

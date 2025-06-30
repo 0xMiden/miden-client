@@ -105,19 +105,15 @@ async fn multiple_tx_on_same_block() {
     println!("Running P2ID tx...");
 
     // Create transactions
-    let transaction_execution_result_1 =
-        client.new_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
-    let tx_prove_1 =
-        client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_1).await.unwrap();
+    let executed_tx_1 = client.new_transaction(from_account_id, tx_request_1).await.unwrap();
+    let transaction_id_1 = executed_tx_1.id();
+    let tx_prove_1 = client.testing_prove_transaction(executed_tx_1.clone()).await.unwrap();
+    client.testing_apply_transaction(executed_tx_1).await.unwrap();
 
-    let transaction_execution_result_2 =
-        client.new_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
-    let tx_prove_2 =
-        client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_2).await.unwrap();
+    let executed_tx_2 = client.new_transaction(from_account_id, tx_request_2).await.unwrap();
+    let transaction_id_2 = executed_tx_2.id();
+    let tx_prove_2 = client.testing_prove_transaction(executed_tx_2.clone()).await.unwrap();
+    client.testing_apply_transaction(executed_tx_2).await.unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -453,13 +449,13 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
             .unwrap();
 
         println!("Executing transaction...");
-        let transaction_execution_result =
+        let executed_tx =
             client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_id = executed_tx.id();
 
         println!("Sending transaction to node");
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        client.submit_transaction(executed_tx).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -480,9 +476,9 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
             .unwrap();
 
         println!("Executing transaction...");
-        let transaction_execution_result =
+        let executed_tx =
             client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_id = executed_tx.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -496,7 +492,7 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        client.submit_transaction(executed_tx).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -517,9 +513,9 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
             .unwrap();
 
         println!("Executing transaction...");
-        let transaction_execution_result =
+        let executed_tx =
             client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_id = executed_tx.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -533,7 +529,7 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        client.submit_transaction(executed_tx).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -898,16 +894,16 @@ async fn discarded_transaction() {
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
-    let tx_result = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client_1.testing_prove_transaction(&tx_result).await.unwrap();
+    let executed_tx = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
+    let tx_id = executed_tx.id();
+    client_1.testing_prove_transaction(executed_tx.clone()).await.unwrap();
 
     // Store the account state before applying the transaction
     let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
     let account_hash_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
-    client_1.testing_apply_transaction(tx_result).await.unwrap();
+    client_1.testing_apply_transaction(executed_tx).await.unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();

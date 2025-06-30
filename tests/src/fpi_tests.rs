@@ -211,9 +211,9 @@ async fn nested_fpi_calls() {
     ];
 
     let tx_request = builder.with_foreign_accounts(foreign_accounts).build().unwrap();
-    let tx_result = client.new_transaction(native_account.id(), tx_request).await.unwrap();
+    let executed_tx = client.new_transaction(native_account.id(), tx_request).await.unwrap();
 
-    client.submit_transaction(tx_result).await.unwrap();
+    client.submit_transaction(executed_tx).await.unwrap();
 }
 
 /// Tests the standard FPI functionality for the given storage mode.
@@ -308,9 +308,9 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     };
 
     let tx_request = builder.with_foreign_accounts([foreign_account.unwrap()]).build().unwrap();
-    let tx_result = client.new_transaction(native_account.id(), tx_request).await.unwrap();
+    let executed_tx = client.new_transaction(native_account.id(), tx_request).await.unwrap();
 
-    client.submit_transaction(tx_result).await.unwrap();
+    client.submit_transaction(executed_tx).await.unwrap();
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -402,7 +402,7 @@ async fn deploy_foreign_account(
         )
         .await
         .unwrap();
-    let tx_id = tx.executed_transaction().id();
+    let tx_id = tx.id();
     client.submit_transaction(tx).await.unwrap();
     wait_for_tx(client, tx_id).await;
 

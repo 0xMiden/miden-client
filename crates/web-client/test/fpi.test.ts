@@ -79,11 +79,11 @@ export const testStandardFpi = async (): Promise<void> => {
       .withCustomScript(deploymentTxScript)
       .build();
 
-    let txResult = await client.newTransaction(foreignAccountId, txRequest);
+    let executedTx = await client.newTransaction(foreignAccountId, txRequest);
 
-    let txId = txResult.executedTransaction().id();
+    let txId = executedTx.id();
 
-    await client.submitTransaction(txResult);
+    await client.submitTransaction(executedTx);
 
     await window.helpers.waitForTransaction(txId.toHex());
 
@@ -143,9 +143,9 @@ export const testStandardFpi = async (): Promise<void> => {
       .withForeignAccounts([foreignAccount])
       .build();
 
-    let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);
+    let executedTx2 = await client.newTransaction(newAccount.id(), txRequest2);
 
-    await client.submitTransaction(txResult2);
+    await client.submitTransaction(executedTx2);
   });
 };
 

@@ -55,7 +55,6 @@ export {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,

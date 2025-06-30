@@ -127,7 +127,7 @@ impl SqliteStore {
         }
     }
 
-    /// Inserts a transaction and updates the current state based on the `tx_result` changes.
+    /// Inserts a transaction and updates the current state based on the `tx_update` changes.
     pub fn apply_transaction(
         conn: &mut Connection,
         tx_update: &TransactionStoreUpdate,
