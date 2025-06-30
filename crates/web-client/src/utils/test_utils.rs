@@ -1,13 +1,12 @@
-use miden_client::{
-    testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-    transaction::TransactionResult as NativeTransactionResult,
-};
+use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+#[cfg(feature = "testing")]
+use miden_client::transaction::ExecutedTransaction as NativeExecutedTransaction;
 use miden_objects::account::AccountId as NativeAccountId;
 use wasm_bindgen::prelude::*;
 
 use crate::{
     WebClient, js_error_with_context,
-    models::{account_id::AccountId, transaction_result::TransactionResult},
+    models::{account_id::AccountId, executed_transaction::ExecutedTransaction},
 };
 
 #[wasm_bindgen]
@@ -31,13 +30,13 @@ impl WebClient {
     #[wasm_bindgen(js_name = "testingApplyTransaction")]
     pub async fn testing_apply_transaction(
         &mut self,
-        tx_result: TransactionResult,
+        executed_tx: ExecutedTransaction,
     ) -> Result<(), JsValue> {
-        let native_transaction_result: NativeTransactionResult = tx_result.into();
+        let native_executed_tx: NativeExecutedTransaction = executed_tx.into();
 
         if let Some(client) = self.get_mut_inner() {
             client
-                .testing_apply_transaction(native_transaction_result)
+                .testing_apply_transaction(native_executed_tx)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to apply transaction"))?;
             Ok(())

@@ -98,6 +98,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### txArgs()
 
 > **txArgs**(): [`TransactionArgs`](TransactionArgs.md)
@@ -105,3 +115,19 @@
 #### Returns
 
 [`TransactionArgs`](TransactionArgs.md)
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `ExecutedTransaction`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`ExecutedTransaction`

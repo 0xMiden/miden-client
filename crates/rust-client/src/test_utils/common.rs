@@ -231,12 +231,11 @@ pub async fn execute_tx(
     tx_request: TransactionRequest,
 ) -> TransactionId {
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(account_id, tx_request).await.unwrap();
-    let transaction_id = transaction_execution_result.executed_transaction().id();
+    let executed_tx = client.new_transaction(account_id, tx_request).await.unwrap();
+    let transaction_id = executed_tx.id();
 
     println!("Sending transaction to node");
-    client.submit_transaction(transaction_execution_result).await.unwrap();
+    client.submit_transaction(executed_tx).await.unwrap();
 
     transaction_id
 }

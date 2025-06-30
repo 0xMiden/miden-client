@@ -82,9 +82,9 @@ async fn deploy_counter_contract(
         TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
 
     // Execute the transaction locally
-    let tx_result = client.new_transaction(acc.id(), tx_increment_request).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client.submit_transaction(tx_result).await.unwrap();
+    let executed_tx = client.new_transaction(acc.id(), tx_increment_request).await.unwrap();
+    let tx_id = executed_tx.id();
+    client.submit_transaction(executed_tx).await.unwrap();
     wait_for_tx(client, tx_id).await;
 
     Ok((acc, library))
@@ -258,8 +258,9 @@ async fn recall_note_before_ntx_consumes_it() {
     let consume_transaction =
         client.new_transaction(native_account.id(), tx_request).await.unwrap();
 
-    let bump_proof = client.testing_prove_transaction(&bump_transaction).await.unwrap();
-    let consume_proof = client.testing_prove_transaction(&consume_transaction).await.unwrap();
+    let bump_proof = client.testing_prove_transaction(bump_transaction).await.unwrap();
+    let consume_proof =
+        client.testing_prove_transaction(consume_transaction.clone()).await.unwrap();
 
     // Submit both transactions
     client.testing_submit_proven_transaction(bump_proof).await.unwrap();

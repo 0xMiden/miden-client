@@ -92,7 +92,6 @@
 - [TransactionRecord](classes/TransactionRecord.md)
 - [TransactionRequest](classes/TransactionRequest.md)
 - [TransactionRequestBuilder](classes/TransactionRequestBuilder.md)
-- [TransactionResult](classes/TransactionResult.md)
 - [TransactionScript](classes/TransactionScript.md)
 - [TransactionScriptInputPair](classes/TransactionScriptInputPair.md)
 - [TransactionScriptInputPairArray](classes/TransactionScriptInputPairArray.md)
