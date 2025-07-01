@@ -58,7 +58,7 @@ pub enum ClientError {
     AddNewAccountWithoutSeed,
     #[error("error with merkle path")]
     MerkleError(#[from] MerkleError),
-    #[error("the transaction didn't produce the expected recipients corresponding to digests")]
+    #[error("the transaction didn't produce the expected output note recipient digests ({0:?})")]
     MissingOutputRecipients(Vec<Digest>),
     #[error("note error")]
     NoteError(#[from] NoteError),
