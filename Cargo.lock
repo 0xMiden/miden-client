@@ -904,9 +904,9 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
 name = "h2"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9421a676d1b147b16b82c9225157dc629087ef8ec4d5e2960f9437a90dac0a5"
+checksum = "17da50a276f1e01e0ba6c029e47b7100754904ee8a278f886546e98575380785"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1199,9 +1199,9 @@ checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
 
 [[package]]
 name = "indexmap"
-version = "2.9.0"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
+checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "equivalent",
  "hashbrown",
@@ -1541,7 +1541,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -1563,7 +1563,7 @@ dependencies = [
  "miden-lib",
  "miden-node-proto-build",
  "miden-objects",
- "miden-proving-service-client",
+ "miden-remote-prover-client",
  "miden-testing",
  "miden-tx",
  "miette",
@@ -1690,7 +1690,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -1745,7 +1745,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "futures",
@@ -1756,7 +1756,7 @@ dependencies = [
  "miden-node-proto-build",
  "miden-node-utils",
  "miden-objects",
- "miden-proving-service-client",
+ "miden-remote-prover-client",
  "miden-tx",
  "miden-tx-batch-prover",
  "rand 0.9.1",
@@ -1773,7 +1773,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1784,7 +1784,7 @@ dependencies = [
  "miden-node-proto-build",
  "miden-node-utils",
  "miden-objects",
- "miden-proving-service-client",
+ "miden-remote-prover-client",
  "miden-tx",
  "rand 0.9.1",
  "thiserror 2.0.12",
@@ -1800,7 +1800,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "hex",
@@ -1819,7 +1819,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "prost",
@@ -1830,7 +1830,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "futures",
@@ -1856,7 +1856,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -1881,7 +1881,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "anyhow",
  "figment",
@@ -1905,7 +1905,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -1951,9 +1951,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-proving-service-client"
+name = "miden-remote-prover-client"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-map-entries#7d6206387751a1c7c9a3a6ac542f616450406537"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -1984,7 +1984,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2002,7 +2002,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "async-trait",
  "miden-lib",
@@ -2018,7 +2018,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#2daf42f0ed56d74cb45ceaca19bb82269d15839c"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
 dependencies = [
  "miden-objects",
  "miden-tx",

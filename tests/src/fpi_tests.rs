@@ -80,7 +80,7 @@ async fn fpi_execute_program() {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.compile_tx_script(vec![], &code).unwrap();
+    let tx_script = client.compile_tx_script(&code).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -192,8 +192,7 @@ async fn nested_fpi_calls() {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script =
-        TransactionScript::compile(tx_script, vec![], TransactionKernel::assembler()).unwrap();
+    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -278,8 +277,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script =
-        TransactionScript::compile(tx_script, vec![], TransactionKernel::assembler()).unwrap();
+    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -388,7 +386,6 @@ async fn deploy_foreign_account(
         "begin 
                 call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
             end",
-        vec![],
         TransactionKernel::assembler(),
     )
     .unwrap();

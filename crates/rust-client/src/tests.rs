@@ -809,7 +809,7 @@ async fn execute_program() {
         end
         ";
 
-    let tx_script = client.compile_tx_script(vec![], code).unwrap();
+    let tx_script = client.compile_tx_script(code).unwrap();
 
     let output_stack = client
         .execute_program(wallet.id(), tx_script, AdviceInputs::default(), BTreeSet::new())

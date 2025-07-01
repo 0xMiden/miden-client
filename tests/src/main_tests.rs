@@ -37,7 +37,7 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
         .build()
         .await?;
 
-    assert!(client.is_in_debug_mode());
+    assert!(client.in_debug_mode());
 
     let sync_summary = client.sync_state().await.expect("Sync state failed");
 

@@ -175,7 +175,7 @@ pub mod crypto {
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
 pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
-pub use miden_proving_service_client::proving_service::tx_prover::RemoteTransactionProver;
+pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 
 /// Provides various utilities that are commonly used throughout the Miden
 /// client library.
@@ -230,7 +230,6 @@ pub struct Client {
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    /// Flag to enable the debug mode for scripts compilation and execution.
     in_debug_mode: bool,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
@@ -292,7 +291,7 @@ impl Client {
     }
 
     /// Returns true if the client is in debug mode.
-    pub fn is_in_debug_mode(&self) -> bool {
+    pub fn in_debug_mode(&self) -> bool {
         self.in_debug_mode
     }
 

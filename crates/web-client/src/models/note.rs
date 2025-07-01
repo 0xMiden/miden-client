@@ -67,8 +67,8 @@ impl Note {
         NativeNote::new(assets.into(), metadata, recipient).into()
     }
 
-    #[wasm_bindgen(js_name = "createP2IDRNote")]
-    pub fn create_p2idr_note(
+    #[wasm_bindgen(js_name = "createP2IDENote")]
+    pub fn create_p2ide_note(
         sender: &AccountId,
         target: &AccountId,
         assets: &NoteAssets,
@@ -77,7 +77,7 @@ impl Note {
         recall_height: u32,
         aux: &Felt,
     ) -> Self {
-        let note_script = WellKnownNote::P2IDR.script();
+        let note_script = WellKnownNote::P2IDE.script();
 
         let inputs = NativeNoteInputs::new(vec![
             target.suffix().into(),

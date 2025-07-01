@@ -94,8 +94,8 @@ impl NoteScreener {
                     // p2idr
                     let script_root = note.script().root();
 
-                    if script_root == WellKnownNote::P2IDR.script_root() {
-                        if let Some(relevance) = Self::check_p2idr_recall_consumability(note, &id)?
+                    if script_root == WellKnownNote::P2IDE.script_root() {
+                        if let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
                         {
                             note_relevances.push((id, relevance));
                         }
@@ -152,13 +152,13 @@ impl NoteScreener {
 
     /// Special relevance check for P2IDR notes. It checks if the sender account can consume and
     /// recall the note.
-    fn check_p2idr_recall_consumability(
+    fn check_p2ide_recall_consumability(
         note: &Note,
         account_id: &AccountId,
     ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
         let note_inputs = note.inputs().values();
-        if note_inputs.len() != 3 {
-            return Err(InvalidNoteInputsError::WrongNumInputs(note.id(), 3).into());
+        if note_inputs.len() != 4 {
+            return Err(InvalidNoteInputsError::WrongNumInputs(note.id(), 4).into());
         }
 
         let recall_height_felt = note_inputs[2];

@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, path::PathBuf};
 
 use clap::Parser;
-use miden_client::{Client, Felt, Word};
+use miden_client::{Client, Felt};
 use miden_objects::{Digest, vm::AdviceInputs};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -76,10 +76,13 @@ impl ExecCmd {
             None => vec![],
         };
 
-        let tx_script = client.compile_tx_script(inputs, &program)?;
+        let mut advice_inputs = AdviceInputs::default();
+        advice_inputs.extend_map(inputs);
+
+        let tx_script = client.compile_tx_script(&program)?;
 
         let result = client
-            .execute_program(account_id, tx_script, AdviceInputs::default(), BTreeSet::new())
+            .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
             .await;
 
         match result {
@@ -169,7 +172,7 @@ where
         })
 }
 
-fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Word, Vec<Felt>)>, CliError> {
+fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Digest, Vec<Felt>)>, CliError> {
     let cli_inputs: CliTxInputs = toml::from_str(serialized).map_err(|err| {
         CliError::Exec(
             "error deserializing transaction inputs".into(),
@@ -179,7 +182,7 @@ fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Word, Vec<Felt>)>, Cli
     cli_inputs
         .into_iter()
         .map(|input| {
-            let word = Digest::try_from(input.key).map_err(|err| err.to_string())?.into();
+            let word = Digest::try_from(input.key).map_err(|err| err.to_string())?;
             let felts = input.values.into_iter().map(Felt::new).collect();
             Ok((word, felts))
         })

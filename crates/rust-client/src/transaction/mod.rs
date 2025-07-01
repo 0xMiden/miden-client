@@ -71,7 +71,7 @@ use alloc::{
 use core::fmt::{self};
 
 use miden_objects::{
-    AssetError, Digest, Felt, Word,
+    AssetError, Digest, Felt,
     account::{Account, AccountCode, AccountDelta, AccountId},
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
@@ -597,7 +597,7 @@ impl Client {
 
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
-            self.in_debug_mode,
+            self.in_debug_mode(),
         )?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
@@ -799,17 +799,9 @@ impl Client {
     }
 
     /// Compiles the provided transaction script source and inputs into a [`TransactionScript`].
-    pub fn compile_tx_script<T>(
-        &self,
-        inputs: T,
-        program: &str,
-    ) -> Result<TransactionScript, ClientError>
-    where
-        T: IntoIterator<Item = (Word, Vec<Felt>)>,
-    {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode);
-        TransactionScript::compile(program, inputs, assembler)
-            .map_err(ClientError::TransactionScriptError)
+    pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
+        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
+        TransactionScript::compile(program, assembler).map_err(ClientError::TransactionScriptError)
     }
 
     // HELPERS
@@ -1153,13 +1145,13 @@ impl Client {
         &'auth self,
         data_store: &'store ClientDataStore,
     ) -> TransactionExecutor<'store, 'auth> {
-        let mut tx_executor = TransactionExecutor::new(data_store, self.authenticator.as_deref());
+        let tx_executor = TransactionExecutor::new(data_store, self.authenticator.as_deref());
 
-        if self.in_debug_mode {
-            tx_executor = tx_executor.with_debug_mode();
+        if self.in_debug_mode() {
+            tx_executor.with_debug_mode()
+        } else {
+            tx_executor
         }
-
-        tx_executor
     }
 }
 

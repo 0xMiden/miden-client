@@ -68,7 +68,6 @@ async fn deploy_counter_contract(
         begin
             call.counter_contract::increment_count
         end",
-        [],
         assembler.with_library(&library).unwrap(),
     )
     .unwrap();
