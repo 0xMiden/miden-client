@@ -1145,13 +1145,12 @@ impl Client {
         &'auth self,
         data_store: &'store ClientDataStore,
     ) -> TransactionExecutor<'store, 'auth> {
-        let tx_executor = TransactionExecutor::new(data_store, self.authenticator.as_deref());
-
-        if self.in_debug_mode() {
-            tx_executor.with_debug_mode()
-        } else {
-            tx_executor
-        }
+        TransactionExecutor::with_options(
+            data_store,
+            self.authenticator.as_deref(),
+            self.exec_options,
+        )
+        .unwrap()
     }
 }
 

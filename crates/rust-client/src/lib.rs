@@ -54,13 +54,13 @@
 //! use std::sync::Arc;
 //!
 //! use miden_client::{
-//!     Client, Felt,
+//!     Client, ExecutionOptions, Felt,
 //!     crypto::RpoRandomCoin,
 //!     keystore::FilesystemKeyStore,
 //!     rpc::{Endpoint, TonicRpcClient},
 //!     store::{Store, sqlite_store::SqliteStore},
 //! };
-//! use miden_objects::crypto::rand::FeltRng;
+//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::FeltRng};
 //! use rand::{Rng, rngs::StdRng};
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
@@ -90,7 +90,13 @@
 //!     Box::new(rng),
 //!     store,
 //!     Arc::new(keystore),
-//!     false, // Set to true for debug mode, if needed.
+//!     ExecutionOptions::new(
+//!         Some(MAX_TX_EXECUTION_CYCLES),
+//!         MIN_TX_EXECUTION_CYCLES,
+//!         false,
+//!         false, // Set to true for debug mode, if needed.
+//!     )
+//!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
 //! );
@@ -176,6 +182,7 @@ pub mod crypto {
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
 pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
+pub use miden_tx::ExecutionOptions;
 
 /// Provides various utilities that are commonly used throughout the Miden
 /// client library.
@@ -230,7 +237,8 @@ pub struct Client {
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    in_debug_mode: bool,
+    /// Execution options for the transaction executor.
+    exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
@@ -255,9 +263,8 @@ impl Client {
     ///   provide persistence.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
     ///   transaction executor whenever a signature is requested from within the VM.
-    /// - `in_debug_mode`: Instantiates the transaction executor (and in turn, its compiler) in
-    ///   debug mode, which will enable debug logs for scripts compiled with this mode for easier
-    ///   MASM debugging.
+    /// - `exec_options`: Execution options for the transaction executor, which can be used to
+    ///   configure the execution environment, such as whether to enable debug mode.
     /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
     ///   pending transactions.
     /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
@@ -271,7 +278,7 @@ impl Client {
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
         authenticator: Arc<dyn TransactionAuthenticator>,
-        in_debug_mode: bool,
+        exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Self {
@@ -284,7 +291,7 @@ impl Client {
             rpc_api,
             tx_prover,
             authenticator,
-            in_debug_mode,
+            exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
         }
@@ -292,7 +299,7 @@ impl Client {
 
     /// Returns true if the client is in debug mode.
     pub fn in_debug_mode(&self) -> bool {
-        self.in_debug_mode
+        self.exec_options.enable_debugging()
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

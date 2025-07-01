@@ -30,17 +30,13 @@
 
 ### compile()
 
-> `static` **compile**(`script_code`, `inputs`, `assembler`): `TransactionScript`
+> `static` **compile**(`script_code`, `assembler`): `TransactionScript`
 
 #### Parameters
 
 ##### script\_code
 
 `string`
-
-##### inputs
-
-[`TransactionScriptInputPairArray`](TransactionScriptInputPairArray.md)
 
 ##### assembler
 

@@ -5,10 +5,10 @@ use alloc::{
 use std::boxed::Box;
 
 use miden_objects::{
-    Felt,
+    Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
     crypto::rand::{FeltRng, RpoRandomCoin},
 };
-use miden_tx::auth::TransactionAuthenticator;
+use miden_tx::{ExecutionOptions, auth::TransactionAuthenticator};
 use rand::Rng;
 
 #[cfg(feature = "tonic")]
@@ -236,7 +236,13 @@ impl ClientBuilder {
             rng,
             arc_store,
             authenticator,
-            self.in_debug_mode,
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                self.in_debug_mode,
+            )
+            .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
         ))

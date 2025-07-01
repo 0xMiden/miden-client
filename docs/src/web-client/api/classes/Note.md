@@ -82,45 +82,9 @@
 
 ***
 
-### createP2IDNote()
+### createP2IDENote()
 
-> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `aux`): `Note`
-
-#### Parameters
-
-##### sender
-
-[`AccountId`](AccountId.md)
-
-##### target
-
-[`AccountId`](AccountId.md)
-
-##### assets
-
-[`NoteAssets`](NoteAssets.md)
-
-##### note\_type
-
-[`NoteType`](../enumerations/NoteType.md)
-
-##### serial\_num
-
-[`Word`](Word.md)
-
-##### aux
-
-[`Felt`](Felt.md)
-
-#### Returns
-
-`Note`
-
-***
-
-### createP2IDRNote()
-
-> `static` **createP2IDRNote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `recall_height`, `aux`): `Note`
+> `static` **createP2IDENote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `recall_height`, `aux`): `Note`
 
 #### Parameters
 
@@ -147,6 +111,42 @@
 ##### recall\_height
 
 `number`
+
+##### aux
+
+[`Felt`](Felt.md)
+
+#### Returns
+
+`Note`
+
+***
+
+### createP2IDNote()
+
+> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `aux`): `Note`
+
+#### Parameters
+
+##### sender
+
+[`AccountId`](AccountId.md)
+
+##### target
+
+[`AccountId`](AccountId.md)
+
+##### assets
+
+[`NoteAssets`](NoteAssets.md)
+
+##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+##### serial\_num
+
+[`Word`](Word.md)
 
 ##### aux
 

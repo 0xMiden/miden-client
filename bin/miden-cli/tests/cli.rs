@@ -9,7 +9,7 @@ use std::{
 
 use assert_cmd::Command;
 use miden_client::{
-    self, Client, Felt,
+    self, Client, ExecutionOptions, Felt,
     account::{AccountId, AccountStorageMode},
     crypto::{FeltRng, RpoRandomCoin},
     note::{
@@ -28,6 +28,7 @@ use miden_client::{
     utils::Serializable,
 };
 use miden_client_cli::CliKeyStore;
+use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
 use toml::Table;
@@ -771,7 +772,13 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
             rng,
             store,
             std::sync::Arc::new(keystore.clone()),
-            true,
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                true,
+            )
+            .expect("Default executor's options should always be valid"),
             None,
             None,
         ),

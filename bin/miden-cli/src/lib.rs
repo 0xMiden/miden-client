@@ -4,14 +4,13 @@ use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::{
-    Client, ClientError, Felt, IdPrefixFetchError,
+    Client, IdPrefixFetchError,
     account::AccountHeader,
-    crypto::RpoRandomCoin,
+    builder::ClientBuilder,
     keystore::FilesystemKeyStore,
-    rpc::TonicRpcClient,
-    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord, Store, sqlite_store::SqliteStore},
+    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
 };
-use rand::{Rng, rngs::StdRng};
+use rand::rngs::StdRng;
 mod commands;
 use commands::{
     account::AccountCmd,
@@ -111,30 +110,27 @@ impl Cli {
 
         // Create the client
         let (cli_config, _config_path) = load_config_file()?;
-        let store = SqliteStore::new(cli_config.store_filepath.clone())
-            .await
-            .map_err(ClientError::StoreError)?;
-        let store = Arc::new(store);
 
-        let mut rng = rand::rng();
-        let coin_seed: [u64; 4] = rng.random();
-
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
-        let client = Client::new(
-            Arc::new(TonicRpcClient::new(
+        let mut builder = ClientBuilder::new()
+            .with_sqlite_store(
+                cli_config.store_filepath.to_str().expect("Store path should be valid"),
+            )
+            .with_tonic_rpc_client(
                 &cli_config.rpc.endpoint.clone().into(),
-                cli_config.rpc.timeout_ms,
-            )),
-            Box::new(rng),
-            store as Arc<dyn Store>,
-            Arc::new(keystore.clone()),
-            in_debug_mode,
-            Some(TX_GRACEFUL_BLOCK_DELTA),
-            cli_config.max_block_number_delta,
-        );
+                Some(cli_config.rpc.timeout_ms),
+            )
+            .with_authenticator(Arc::new(keystore.clone()))
+            .in_debug_mode(in_debug_mode)
+            .with_tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
+
+        if let Some(delta) = cli_config.max_block_number_delta {
+            builder = builder.with_max_block_number_delta(delta);
+        }
+
+        let client = builder.build().await?;
 
         // Execute CLI command
         match &self.action {
