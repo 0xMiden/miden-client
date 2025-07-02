@@ -214,8 +214,6 @@ async fn recall_note_before_ntx_consumes_it() {
         .unwrap()
         .0;
 
-    println!("A");
-
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
         .with_library(library)
@@ -232,22 +230,31 @@ async fn recall_note_before_ntx_consumes_it() {
         .build(&assembler)
         .unwrap();
 
+    // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .with_own_output_notes(vec![OutputNote::Full(network_note.clone())])
         .build()
         .unwrap();
 
-    println!("B");
-
-    // Create the note directed to the network account
-    execute_tx_and_sync(&mut client, wallet.id(), tx_request).await;
+    let bump_transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
+    client.testing_apply_transaction(bump_transaction.clone()).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![network_note.id()])
+        .with_unauthenticated_input_notes(vec![(network_note, None)])
+        .build()
         .unwrap();
 
-    // Consume the note before the network transaction
-    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+    let consume_transaction =
+        client.new_transaction(native_account.id(), tx_request).await.unwrap();
+
+    let bump_proof = client.testing_prove_transaction(&bump_transaction).await.unwrap();
+    let consume_proof = client.testing_prove_transaction(&consume_transaction).await.unwrap();
+
+    // Submit both transactions
+    client.testing_submit_proven_transaction(bump_proof).await.unwrap();
+    client.testing_submit_proven_transaction(consume_proof).await.unwrap();
+
+    client.testing_apply_transaction(consume_transaction).await.unwrap();
 
     wait_for_blocks(&mut client, 2).await;
 
