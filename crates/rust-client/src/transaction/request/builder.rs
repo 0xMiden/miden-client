@@ -20,7 +20,6 @@ use super::{
     ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
     TransactionScriptTemplate,
 };
-use crate::ClientRng;
 
 // TRANSACTION REQUEST BUILDER
 // ================================================================================================
@@ -258,7 +257,7 @@ impl TransactionRequestBuilder {
         asset: FungibleAsset,
         target_id: AccountId,
         note_type: NoteType,
-        rng: &mut ClientRng<R>,
+        rng: &mut R,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let created_note = create_p2id_note(
             asset.faucet_id(),
@@ -289,7 +288,7 @@ impl TransactionRequestBuilder {
         payment_data: PaymentTransactionData,
         recall_height: Option<BlockNumber>,
         note_type: NoteType,
-        rng: &mut ClientRng<R>,
+        rng: &mut R,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let PaymentTransactionData {
             assets,
@@ -343,7 +342,7 @@ impl TransactionRequestBuilder {
         self,
         swap_data: &SwapTransactionData,
         note_type: NoteType,
-        rng: &mut ClientRng<R>,
+        rng: &mut R,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // The created note is the one that we need as the output of the tx, the other one is the
         // one that we expect to receive and consume eventually.

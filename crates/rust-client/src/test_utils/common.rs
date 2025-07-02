@@ -1,5 +1,4 @@
 use std::{
-    boxed::Box,
     env::temp_dir,
     fs::OpenOptions,
     io::Write,
@@ -19,7 +18,7 @@ use miden_objects::{
     note::{NoteId, NoteType},
     transaction::{InputNote, OutputNote, TransactionId},
 };
-use rand::{Rng, RngCore, rngs::StdRng};
+use rand::{Rng, rngs::StdRng};
 use toml::Table;
 use uuid::Uuid;
 

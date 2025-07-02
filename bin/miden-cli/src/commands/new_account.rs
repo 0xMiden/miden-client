@@ -20,7 +20,6 @@ use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
 use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
-use rand::RngCore;
 
 use crate::{
     CLIENT_BINARY_NAME, CliKeyStore, commands::account::maybe_set_default_account,

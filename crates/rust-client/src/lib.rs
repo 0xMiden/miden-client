@@ -207,7 +207,6 @@ use alloc::sync::Arc;
 
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
-use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
@@ -226,7 +225,7 @@ pub struct Client<R: FeltRng = RpoRandomCoin> {
     store: Arc<dyn Store>,
     /// An instance of [`FeltRng`] which provides randomness tools for generating new keys,
     /// serial numbers, etc.
-    rng: ClientRng<R>,
+    rng: R,
     /// An instance of [`NodeRpcClient`] which provides a way for the client to connect to the
     /// Miden node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
@@ -286,7 +285,7 @@ impl<R: FeltRng> Client<R> {
 
         Self {
             store,
-            rng: ClientRng::new(rng),
+            rng,
             rpc_api,
             tx_prover,
             authenticator,
@@ -303,7 +302,7 @@ impl<R: FeltRng> Client<R> {
 
     /// Returns a reference to the client's random number generator. This can be used to generate
     /// randomness for various purposes such as serial numbers, keys, etc.
-    pub fn rng(&mut self) -> &mut ClientRng<R> {
+    pub fn rng(&mut self) -> &mut R {
         &mut self.rng
     }
 
@@ -318,46 +317,5 @@ impl<R: FeltRng> Client<R> {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_store(&mut self) -> &mut Arc<dyn Store> {
         &mut self.store
-    }
-}
-
-// CLIENT RNG
-// ================================================================================================
-
-/// A wrapper around a [`FeltRng`] that implements the [`RngCore`] trait.
-/// This allows the user to pass their own generic RNG so that it's used by the client.
-pub struct ClientRng<R: FeltRng>(R);
-
-impl<R: FeltRng> ClientRng<R> {
-    pub fn new(rng: R) -> Self {
-        Self(rng)
-    }
-
-    pub fn inner_mut(&mut self) -> &mut R {
-        &mut self.0
-    }
-}
-
-impl<R: FeltRng> RngCore for ClientRng<R> {
-    fn next_u32(&mut self) -> u32 {
-        self.0.next_u32()
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        self.0.next_u64()
-    }
-
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest);
-    }
-}
-
-impl<R: FeltRng> FeltRng for ClientRng<R> {
-    fn draw_element(&mut self) -> Felt {
-        self.0.draw_element()
-    }
-
-    fn draw_word(&mut self) -> Word {
-        self.0.draw_word()
     }
 }
