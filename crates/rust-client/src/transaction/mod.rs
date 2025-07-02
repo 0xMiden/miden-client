@@ -637,7 +637,7 @@ impl Client {
 
         // Execute the transaction and get the witness
         let executed_transaction = self
-            .build_executor(&data_store)
+            .build_executor(&data_store)?
             .execute_transaction(
                 account_id,
                 block_num,
@@ -976,7 +976,7 @@ impl Client {
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
 
-            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store))
+            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
                 .check_notes_consumability(
                     account_id,
                     self.store.get_sync_height().await?,
@@ -1129,7 +1129,7 @@ impl Client {
         }
 
         Ok(self
-            .build_executor(&data_store)
+            .build_executor(&data_store)?
             .execute_tx_view_script(
                 account_id,
                 block_ref,
@@ -1144,13 +1144,12 @@ impl Client {
     pub(crate) fn build_executor<'store, 'auth>(
         &'auth self,
         data_store: &'store ClientDataStore,
-    ) -> TransactionExecutor<'store, 'auth> {
+    ) -> Result<TransactionExecutor<'store, 'auth>, TransactionExecutorError> {
         TransactionExecutor::with_options(
             data_store,
             self.authenticator.as_deref(),
             self.exec_options,
         )
-        .unwrap()
     }
 }
 

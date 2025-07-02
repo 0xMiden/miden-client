@@ -237,7 +237,7 @@ pub struct Client {
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    /// Execution options for the transaction executor.
+    /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
@@ -263,8 +263,8 @@ impl Client {
     ///   provide persistence.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
     ///   transaction executor whenever a signature is requested from within the VM.
-    /// - `exec_options`: Execution options for the transaction executor, which can be used to
-    ///   configure the execution environment, such as whether to enable debug mode.
+    /// - `exec_options`: Options that control the transaction executor’s runtime behaviour (e.g.
+    ///   debug mode).
     /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
     ///   pending transactions.
     /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
