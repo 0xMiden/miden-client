@@ -10,6 +10,7 @@
 * [BREAKING] Merged `concurrent` feature with `std` (#974).
 * [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
+* [BREAKING] Replace `FeltRng` trait object in `ClientBuilder` and `Client` with generic and remove `ClientRng` (#1015).
 
 ### Features
 
