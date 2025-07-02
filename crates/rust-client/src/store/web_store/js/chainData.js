@@ -196,11 +196,15 @@ export async function getPartialBlockchainNodes(ids) {
 
 export async function pruneIrrelevantBlocks() {
   try {
-    const syncHeight = await stateSync.get(1).blockNum;
+    const syncHeight = await stateSync.get(1);
+
     const allMatchingRecords = await blockHeaders
       .where("hasClientNotes")
       .equals("false")
-      .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight)
+      .and(
+        (record) =>
+          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
+      )
       .toArray();
 
     await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
