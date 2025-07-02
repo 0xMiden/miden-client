@@ -1214,6 +1214,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8fae54786f62fb2918dcfae3d568594e50eb9b5c25bf04371af6fe7516452fb"
 
 [[package]]
+name = "io-uring"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b86e202f00093dcba4275d4636b93ef9dd75d025ae560d2521b45ea28ab49013"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "is_ci"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1541,7 +1552,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -1690,7 +1701,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -1745,7 +1756,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "futures",
@@ -1773,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1800,7 +1811,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "hex",
@@ -1819,7 +1830,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "prost",
@@ -1830,7 +1841,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "futures",
@@ -1856,7 +1867,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -1881,7 +1892,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "anyhow",
  "figment",
@@ -1905,7 +1916,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -1953,7 +1964,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5130f7512558334d20e1d14c82cf96bd01c0c424"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#35acee5d6f23e40d791da2cdb3df5283d372a084"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -1984,7 +1995,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1995,6 +2006,7 @@ dependencies = [
  "miden-tx",
  "rand 0.9.1",
  "rand_chacha 0.9.0",
+ "thiserror 2.0.12",
  "winter-maybe-async",
  "winterfell",
 ]
@@ -2002,7 +2014,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "async-trait",
  "miden-lib",
@@ -2018,7 +2030,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#d6ce850950d20bef72a55f73136b45a9f683daf2"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#a57860a99430dbfbae6b04860637b2af7e70bed9"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -3452,17 +3464,19 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.45.1"
+version = "1.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ef51a33ef1da925cea3e4eb122833cb377c61439ca401b770f54902b806779"
+checksum = "1140bb80481756a8cbe10541f37433b459c5aa1e727b4c020fbfebdc25bf3ec4"
 dependencies = [
  "backtrace",
  "bytes",
+ "io-uring",
  "libc",
  "mio",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
+ "slab",
  "socket2",
  "tokio-macros",
  "windows-sys 0.52.0",

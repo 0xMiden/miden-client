@@ -94,7 +94,7 @@ impl MockRpcApi {
             mock_chain.add_pending_nullifier(nullifier);
         }
 
-        mock_chain.prove_next_block();
+        mock_chain.prove_next_block().unwrap();
     }
 
     /// Returns the current MMR of the blockchain.
