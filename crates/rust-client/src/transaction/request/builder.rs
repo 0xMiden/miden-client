@@ -7,7 +7,10 @@ use miden_objects::{
     account::AccountId,
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
-    crypto::merkle::{InnerNodeInfo, MerkleStore},
+    crypto::{
+        merkle::{InnerNodeInfo, MerkleStore},
+        rand::FeltRng,
+    },
     note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, NoteType, PartialNote},
     transaction::{OutputNote, TransactionScript},
     vm::AdviceMap,
@@ -250,12 +253,12 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
-    pub fn build_mint_fungible_asset(
+    pub fn build_mint_fungible_asset<R: FeltRng>(
         self,
         asset: FungibleAsset,
         target_id: AccountId,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut ClientRng<R>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let created_note = create_p2id_note(
             asset.faucet_id(),
@@ -281,12 +284,12 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
-    pub fn build_pay_to_id(
+    pub fn build_pay_to_id<R: FeltRng>(
         self,
         payment_data: PaymentTransactionData,
         recall_height: Option<BlockNumber>,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut ClientRng<R>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let PaymentTransactionData {
             assets,
@@ -336,11 +339,11 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
-    pub fn build_swap(
+    pub fn build_swap<R: FeltRng>(
         self,
         swap_data: &SwapTransactionData,
         note_type: NoteType,
-        rng: &mut ClientRng,
+        rng: &mut ClientRng<R>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // The created note is the one that we need as the output of the tx, the other one is the
         // one that we expect to receive and consume eventually.
