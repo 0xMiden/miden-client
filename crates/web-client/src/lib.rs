@@ -87,7 +87,7 @@ impl WebClient {
 
         self.inner = Some(Client::new(
             web_rpc_client,
-            Box::new(rng),
+            rng,
             web_store.clone(),
             Arc::new(keystore.clone()),
             ExecutionOptions::new(
