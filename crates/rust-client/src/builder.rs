@@ -50,7 +50,7 @@ pub struct ClientBuilder<R: FeltRng = RpoRandomCoin> {
     rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
     /// An optional store provided by the user.
     store: Option<Arc<dyn Store>>,
-    /// An optional RNG provided by the user.
+    /// RNG provided by the user.
     rng: R,
     /// The store path to use when no store is directly provided via `with_store()`.
     #[cfg(feature = "sqlite")]
@@ -90,7 +90,7 @@ impl Default for ClientBuilder {
 }
 
 impl<R: FeltRng> ClientBuilder<R> {
-    /// Optionally provide a custom RNG.
+    /// Provide a custom RNG.
     #[must_use]
     pub fn with_rng(mut self, rng: R) -> Self {
         self.rng = rng;
