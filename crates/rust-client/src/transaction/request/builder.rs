@@ -8,7 +8,7 @@ use miden_objects::{
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
     crypto::merkle::{InnerNodeInfo, MerkleStore},
-    note::{Note, NoteDetails, NoteId, NoteTag, NoteType, PartialNote},
+    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, NoteType, PartialNote},
     transaction::{OutputNote, TransactionScript},
     vm::AdviceMap,
 };

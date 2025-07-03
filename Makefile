@@ -46,7 +46,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix clippy fix-wasm clippy-wasm fix-prover clippy-prover ## Run all linting tasks at once (clippy, fixing, formatting)
+lint: format fix clippy fix-wasm clippy-wasm ## Run all linting tasks at once (clippy, fixing, formatting)
 
 # --- Documentation --------------------------------------------------------------------------
 
@@ -104,7 +104,7 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
 	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude testing-proving-service --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-proving-service --release --test=integration --run-ignored ignored-only -- test_import_genesis_accounts_can_be_used_for_transactions
+	cargo nextest run --workspace --exclude miden-client-web --exclude testing-proving-service --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: start-prover
 start-prover: ## Start the prover service

@@ -20,7 +20,7 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::{crypto::get_rpo_random_coin, grpc::UrlExt};
 use miden_objects::{
     Felt, ONE,
-    account::{AccountFile, AuthSecretKey},
+    account::{Account, AccountFile, AuthSecretKey},
     asset::TokenSymbol,
     crypto::dsa::rpo_falcon512::SecretKey,
 };
@@ -330,7 +330,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = SecretKey::with_rng(&mut get_rpo_random_coin(&mut rng));
 
-    let (mut account, account_seed) = create_basic_fungible_faucet(
+    let (account, account_seed) = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
@@ -347,10 +347,11 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     //
     // The genesis block is special in that accounts are "deplyed" without transactions and
     // therefore we need bump the nonce manually to uphold this invariant.
-    account.set_nonce(ONE).context("failed to set account nonce to 1")?;
+    let (id, vault, storage, code, _) = account.into_parts();
+    let updated_account = Account::from_parts(id, vault, storage, code, ONE);
 
     Ok(AccountFile::new(
-        account,
+        updated_account,
         Some(account_seed),
         vec![AuthSecretKey::RpoFalcon512(secret)],
     ))

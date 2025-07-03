@@ -1,6 +1,8 @@
-use miden_proving_service::api::{ProverType, RpcListener};
+use miden_node_utils::cors::cors_for_grpc_web_layer;
+use miden_remote_prover::api::{ProofType, RpcListener};
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
+use tonic_web::GrpcWebLayer;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
 const DEFAULT_PROVER_PORT: u16 = 50051;
@@ -14,14 +16,16 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let addr = format!("127.0.0.1:{DEFAULT_PROVER_PORT}");
-    let rpc = RpcListener::new(TcpListener::bind(&addr).await?, ProverType::Transaction);
+    let rpc = RpcListener::new(TcpListener::bind(&addr).await?, ProofType::Transaction);
 
     println!("Proving service listening on {}", rpc.listener.local_addr()?);
 
     tonic::transport::Server::builder()
         .accept_http1(true)
-        .add_service(tonic_web::enable(rpc.api_service))
-        .add_service(tonic_web::enable(rpc.status_service))
+        .layer(cors_for_grpc_web_layer())
+        .layer(GrpcWebLayer::new())
+        .add_service(rpc.api_service)
+        .add_service(rpc.status_service)
         .serve_with_incoming(TcpListenerStream::new(rpc.listener))
         .await?;
 

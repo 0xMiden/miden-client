@@ -1300,7 +1300,7 @@ mod test {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(wallet_component)
-            .with_component(RpoFalcon512::new(pub_key))
+            .with_auth_component(RpoFalcon512::new(pub_key))
             .with_assets([asset_1, asset_2])
             .build_existing()
             .unwrap();

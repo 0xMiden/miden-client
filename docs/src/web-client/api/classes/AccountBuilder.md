@@ -76,6 +76,22 @@
 
 ***
 
+### withAuthComponent()
+
+> **withAuthComponent**(`account_component`): `AccountBuilder`
+
+#### Parameters
+
+##### account\_component
+
+[`AccountComponent`](AccountComponent.md)
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
 ### withComponent()
 
 > **withComponent**(`account_component`): `AccountBuilder`

@@ -241,38 +241,11 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "axum"
-version = "0.7.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
-dependencies = [
- "async-trait",
- "axum-core 0.4.5",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "itoa",
- "matchit 0.7.3",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "rustversion",
- "serde",
- "sync_wrapper",
- "tower 0.5.2",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "axum"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "021e862c184ae977658b36c4500f7feac3221ca5da43e3f25bd04ab6c79a29b5"
 dependencies = [
- "axum-core 0.5.2",
+ "axum-core",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -282,7 +255,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "itoa",
- "matchit 0.8.4",
+ "matchit",
  "memchr",
  "mime",
  "percent-encoding",
@@ -294,30 +267,10 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
- "tower 0.5.2",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09f2bd6146b97ae3359fa0cc6d6b376d9539582c7b4220f041a33ec24c226199"
-dependencies = [
- "async-trait",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "sync_wrapper",
- "tower-layer",
- "tower-service",
 ]
 
 [[package]]
@@ -1963,12 +1916,6 @@ dependencies = [
 
 [[package]]
 name = "matchit"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
-
-[[package]]
-name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
@@ -2021,7 +1968,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2058,7 +2005,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "toml",
- "tonic 0.13.1",
+ "tonic",
  "tonic-build",
  "tonic-web-wasm-client",
  "tracing",
@@ -2170,7 +2117,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2225,7 +2172,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "futures",
@@ -2243,9 +2190,9 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tonic-reflection",
- "tower-http 0.6.6",
+ "tower-http",
  "tracing",
  "url",
 ]
@@ -2253,7 +2200,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2270,9 +2217,9 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tonic-reflection",
- "tower-http 0.6.6",
+ "tower-http",
  "tracing",
  "url",
 ]
@@ -2280,7 +2227,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "hex",
@@ -2292,14 +2239,14 @@ dependencies = [
  "prost-build",
  "protox 0.8.0",
  "thiserror 2.0.12",
- "tonic 0.13.1",
+ "tonic",
  "tonic-build",
 ]
 
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "prost",
@@ -2310,7 +2257,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "futures",
@@ -2324,11 +2271,11 @@ dependencies = [
  "semver 1.0.26",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tonic-reflection",
- "tonic-web 0.13.1",
- "tower 0.5.2",
- "tower-http 0.6.6",
+ "tonic-web",
+ "tower",
+ "tower-http",
  "tracing",
  "url",
 ]
@@ -2336,7 +2283,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2352,16 +2299,16 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tonic-reflection",
- "tower-http 0.6.6",
+ "tower-http",
  "tracing",
 ]
 
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "anyhow",
  "figment",
@@ -2374,8 +2321,8 @@ dependencies = [
  "rand 0.9.1",
  "serde",
  "tokio",
- "tonic 0.13.1",
- "tower-http 0.6.6",
+ "tonic",
+ "tower-http",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -2385,7 +2332,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2433,10 +2380,10 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "async-trait",
- "axum 0.8.4",
+ "axum",
  "bytes",
  "clap 4.5.40",
  "humantime",
@@ -2463,10 +2410,10 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tonic-build",
  "tonic-health",
- "tonic-web 0.13.1",
+ "tonic-web",
  "tracing",
  "uuid",
 ]
@@ -2474,7 +2421,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#e2fc3fdc627b63e0dd731442a5ddab1c0a09db14"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -2487,7 +2434,7 @@ dependencies = [
  "protox 0.8.0",
  "thiserror 2.0.12",
  "tokio",
- "tonic 0.13.1",
+ "tonic",
  "tonic-build",
  "tonic-web-wasm-client",
 ]
@@ -2505,7 +2452,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2524,7 +2471,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "async-trait",
  "miden-lib",
@@ -2540,7 +2487,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#b6e08dbb64282f31718f1e5400887ed69db4c599"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#998d9d80595c221b6d5158edfc598e7a9807705d"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -2928,7 +2875,7 @@ dependencies = [
  "prost",
  "thiserror 2.0.12",
  "tokio",
- "tonic 0.13.1",
+ "tonic",
 ]
 
 [[package]]
@@ -2940,7 +2887,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
  "prost",
- "tonic 0.13.1",
+ "tonic",
 ]
 
 [[package]]
@@ -3842,8 +3789,8 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
- "tower 0.5.2",
- "tower-http 0.6.6",
+ "tower",
+ "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -4529,11 +4476,12 @@ name = "testing-proving-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "miden-node-utils",
  "miden-remote-prover",
  "tokio",
  "tokio-stream",
- "tonic 0.12.3",
- "tonic-web 0.12.3",
+ "tonic",
+ "tonic-web",
  "tracing",
  "tracing-subscriber",
 ]
@@ -4759,40 +4707,12 @@ checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "tonic"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877c5b330756d856ffcc4553ab34a5684481ade925ecc54bcd1bf02b1d0d4d52"
-dependencies = [
- "async-stream",
- "axum 0.7.9",
- "base64",
- "bytes",
- "h2",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-timeout",
- "hyper-util",
- "percent-encoding",
- "pin-project",
- "socket2",
- "tokio",
- "tokio-stream",
- "tower 0.4.13",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "tonic"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e581ba15a835f4d9ea06c55ab1bd4dce26fc53752c69a04aac00703bfb49ba9"
 dependencies = [
  "async-trait",
- "axum 0.8.4",
+ "axum",
  "base64",
  "bytes",
  "h2",
@@ -4810,7 +4730,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tower 0.5.2",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4839,7 +4759,7 @@ dependencies = [
  "prost",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
 ]
 
 [[package]]
@@ -4852,27 +4772,7 @@ dependencies = [
  "prost-types",
  "tokio",
  "tokio-stream",
- "tonic 0.13.1",
-]
-
-[[package]]
-name = "tonic-web"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5299dd20801ad736dccb4a5ea0da7376e59cd98f213bf1c3d478cf53f4834b58"
-dependencies = [
- "base64",
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "pin-project",
- "tokio-stream",
- "tonic 0.12.3",
- "tower-http 0.5.2",
- "tower-layer",
- "tower-service",
- "tracing",
+ "tonic",
 ]
 
 [[package]]
@@ -4887,7 +4787,7 @@ dependencies = [
  "http-body",
  "pin-project",
  "tokio-stream",
- "tonic 0.13.1",
+ "tonic",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4910,32 +4810,12 @@ dependencies = [
  "js-sys",
  "pin-project",
  "thiserror 2.0.12",
- "tonic 0.13.1",
+ "tonic",
  "tower-service",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
-]
-
-[[package]]
-name = "tower"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
-dependencies = [
- "futures-core",
- "futures-util",
- "indexmap 1.9.3",
- "pin-project",
- "pin-project-lite",
- "rand 0.8.5",
- "slab",
- "tokio",
- "tokio-util",
- "tower-layer",
- "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -4959,22 +4839,6 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
-dependencies = [
- "bitflags 2.9.1",
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "pin-project-lite",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "tower-http"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
@@ -4986,7 +4850,7 @@ dependencies = [
  "http-body",
  "iri-string",
  "pin-project-lite",
- "tower 0.5.2",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",

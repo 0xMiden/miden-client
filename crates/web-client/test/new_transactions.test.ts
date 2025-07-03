@@ -389,7 +389,7 @@ export const customTransaction = async (
                 # => [0, ${_assertedValue}]
                 assert_eq
 
-                call.auth_tx::auth_tx_rpo_falcon512
+                call.auth_tx::auth__tx_rpo_falcon512
             end
         `;
 
@@ -594,10 +594,6 @@ export const customAccountComponent = async (): Promise<void> => {
 
             dropw dropw dropw dropw
             # => []
-
-            # Incrementing the nonce by 1
-            push.1 exec.account::incr_nonce
-            # => []
         end
 
         # Inputs: [KEY]
@@ -664,12 +660,17 @@ export const customAccountComponent = async (): Promise<void> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
+    let secretKey = window.SecretKey.withRng(walletSeed);
+    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .accountType(window.AccountType.RegularAccountImmutableCode)
       .storageMode(window.AccountStorageMode.public())
+      .withAuthComponent(authComponent)
       .withComponent(mappingAccountComponent)
       .build();
 
+    await client.addAccountSecretKeyToWebStore(secretKey);
     await client.newAccount(
       accountBuilderResult.account,
       accountBuilderResult.seed,
