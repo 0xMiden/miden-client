@@ -89,22 +89,15 @@ impl Default for ClientBuilder {
     }
 }
 
-impl<R: FeltRng> ClientBuilder<R> {
-    /// Provide a custom RNG.
-    #[must_use]
-    pub fn with_rng(mut self, rng: R) -> Self {
-        self.rng = rng;
-        self
-    }
-}
-
 impl ClientBuilder {
     /// Create a new `ClientBuilder` with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<R: FeltRng> ClientBuilder<R> {
     /// Enable or disable debug mode.
     #[must_use]
     pub fn in_debug_mode(mut self, debug: bool) -> Self {
@@ -139,6 +132,13 @@ impl ClientBuilder {
     #[must_use]
     pub fn with_store(mut self, store: Arc<dyn Store>) -> Self {
         self.store = Some(store);
+        self
+    }
+
+    /// Provide a custom RNG.
+    #[must_use]
+    pub fn with_rng(mut self, rng: R) -> Self {
+        self.rng = rng;
         self
     }
 
@@ -184,7 +184,7 @@ impl ClientBuilder {
     /// - Returns an error if the store cannot be instantiated.
     /// - Returns an error if the keystore is not specified or fails to initialize.
     #[allow(clippy::unused_async, unused_mut)]
-    pub async fn build(mut self) -> Result<Client, ClientError> {
+    pub async fn build(mut self) -> Result<Client<R>, ClientError> {
         // Determine the RPC client to use.
         let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
             client
