@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0"
-miden-proving-service = { git = "https://github.com/0xMiden/miden-node", branch = "tomyrd-proving-service-lib", features = ["concurrent"] }
+miden-remote-prover = { git = "https://github.com/0xMiden/miden-node", branch = "tomyrd-update-lexicographic-words", features = ["concurrent"] }
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.12", default-features = false, features = ["transport"] }

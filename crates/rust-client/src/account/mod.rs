@@ -320,7 +320,7 @@ pub mod tests {
         AccountFile::new(
             account.clone(),
             Some(Word::default()),
-            AuthSecretKey::RpoFalcon512(SecretKey::new()),
+            vec![AuthSecretKey::RpoFalcon512(SecretKey::new())],
         )
     }
 

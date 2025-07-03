@@ -51,6 +51,8 @@ impl From<RpcConversionError> for RpcError {
 
 #[derive(Debug, Error)]
 pub enum RpcConversionError {
+    #[error("failed to deserialize: {0}")]
+    DeserializationError(#[from] DeserializationError),
     #[error("value is not in the range 0..modulus")]
     NotAValidFelt,
     #[error("invalid note type value")]

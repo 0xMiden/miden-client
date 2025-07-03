@@ -2,13 +2,23 @@
 
 ## 0.10.0 (TBD)
 
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
+
 ### Changes
 
 * [BREAKING] Renamed `miden-cli` crate to `miden-client-cli`, and the `miden` executable to `miden-client` (#960).
+* [BREAKING] Merged `concurrent` feature with `std` (#974).
+* [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
+* [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
 
 ### Features
 
 * Added support for FPI in Web Client (#958).
+* Exposed `bech32` account IDs in Web Client (#978).
+
+### Fixes
+
+* Fixed Intermittent Block Header Error During Sync in Web Client (#997).
 
 ## 0.9.2 (2025-06-11)
 

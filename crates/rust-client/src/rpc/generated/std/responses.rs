@@ -196,7 +196,7 @@ pub struct SubmitProvenTransactionResponse {
 pub struct GetNotesByIdResponse {
     /// Lists Note's returned by the database.
     #[prost(message, repeated, tag = "1")]
-    pub notes: ::prost::alloc::vec::Vec<super::note::Note>,
+    pub notes: ::prost::alloc::vec::Vec<super::note::CommittedNote>,
 }
 /// Represents the result of getting account details.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -275,7 +275,7 @@ pub struct AccountStateHeader {
     #[prost(message, repeated, tag = "4")]
     pub storage_maps: ::prost::alloc::vec::Vec<StorageSlotMapProof>,
 }
-/// Represents a single storage slot with the reuqested keys and their respective values.
+/// Represents a single storage slot with the requested keys and their respective values.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StorageSlotMapProof {
     /// The storage slot index (\[0..255\]).

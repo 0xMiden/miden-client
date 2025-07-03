@@ -18,13 +18,13 @@ use crate::{
 };
 
 #[derive(Debug, Parser, Clone)]
-#[clap(about = "Import notes or accounts")]
+#[command(about = "Import notes or accounts")]
 pub struct ImportCmd {
     /// Paths to the files that contains the account/note data.
     #[arg()]
     filenames: Vec<PathBuf>,
     /// Only relevant for accounts. If set, the account will be overwritten if it already exists.
-    #[clap(short, long, default_value_t = false)]
+    #[arg(short, long, default_value_t = false)]
     overwrite: bool,
 }
 
@@ -77,7 +77,9 @@ async fn import_account(
         .map_err(ClientError::DataDeserializationError)?;
     let account_id = account_data.account.id();
 
-    keystore.add_key(&account_data.auth_secret_key).map_err(CliError::KeyStore)?;
+    for key in account_data.auth_secret_keys {
+        keystore.add_key(&key).map_err(CliError::KeyStore)?;
+    }
 
     client
         .add_account(&account_data.account, account_data.account_seed, overwrite)

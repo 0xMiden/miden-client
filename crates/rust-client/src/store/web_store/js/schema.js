@@ -29,6 +29,7 @@ const Table = {
   BlockHeaders: "blockHeaders",
   PartialBlockchainNodes: "partialBlockchainNodes",
   Tags: "tags",
+  ForeignAccountCode: "foreignAccountCode",
 };
 
 const db = new Dexie(DATABASE_NAME);

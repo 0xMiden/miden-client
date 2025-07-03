@@ -22,17 +22,17 @@ const FPI_STORAGE_VALUE: Word =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 #[tokio::test]
-async fn test_standard_fpi_public() {
-    test_standard_fpi(AccountStorageMode::Public).await;
+async fn standard_fpi_public() {
+    standard_fpi(AccountStorageMode::Public).await;
 }
 
 #[tokio::test]
-async fn test_standard_fpi_private() {
-    test_standard_fpi(AccountStorageMode::Private).await;
+async fn standard_fpi_private() {
+    standard_fpi(AccountStorageMode::Private).await;
 }
 
 #[tokio::test]
-async fn test_fpi_execute_program() {
+async fn fpi_execute_program() {
     let (mut client, mut keystore) = create_test_client().await;
     client.sync_state().await.unwrap();
 
@@ -80,7 +80,7 @@ async fn test_fpi_execute_program() {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.compile_tx_script(vec![], &code).unwrap();
+    let tx_script = client.compile_tx_script(&code).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -109,7 +109,7 @@ async fn test_fpi_execute_program() {
 }
 
 #[tokio::test]
-async fn test_nested_fpi_calls() {
+async fn nested_fpi_calls() {
     let (mut client, mut keystore) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -192,8 +192,7 @@ async fn test_nested_fpi_calls() {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script =
-        TransactionScript::compile(tx_script, vec![], TransactionKernel::assembler()).unwrap();
+    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -223,7 +222,7 @@ async fn test_nested_fpi_calls() {
 /// storage. It then deploys the foreign account and creates a native account to execute a
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
-async fn test_standard_fpi(storage_mode: AccountStorageMode) {
+async fn standard_fpi(storage_mode: AccountStorageMode) {
     let (mut client, mut keystore) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -278,8 +277,7 @@ async fn test_standard_fpi(storage_mode: AccountStorageMode) {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script =
-        TransactionScript::compile(tx_script, vec![], TransactionKernel::assembler()).unwrap();
+    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -388,7 +386,6 @@ async fn deploy_foreign_account(
         "begin 
                 call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
             end",
-        vec![],
         TransactionKernel::assembler(),
     )
     .unwrap();

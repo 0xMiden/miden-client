@@ -1,14 +1,8 @@
-use miden_objects::{
-    Felt as NativeFelt, Word as NativeWord,
-    transaction::TransactionScript as NativeTransactionScript,
-};
+use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
 use super::rpo_digest::RpoDigest;
-use crate::{
-    js_error_with_context,
-    models::{assembler::Assembler, transaction_script_inputs::TransactionScriptInputPairArray},
-};
+use crate::{js_error_with_context, models::assembler::Assembler};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -20,18 +14,9 @@ impl TransactionScript {
         self.0.root().into()
     }
 
-    pub fn compile(
-        script_code: &str,
-        inputs: TransactionScriptInputPairArray,
-        assembler: &Assembler,
-    ) -> Result<TransactionScript, JsValue> {
-        let native_inputs: Vec<(NativeWord, Vec<NativeFelt>)> = inputs.into();
-
-        let native_tx_script =
-            NativeTransactionScript::compile(script_code, native_inputs, assembler.into())
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to compile transaction script")
-                })?;
+    pub fn compile(script_code: &str, assembler: &Assembler) -> Result<TransactionScript, JsValue> {
+        let native_tx_script = NativeTransactionScript::compile(script_code, assembler.into())
+            .map_err(|err| js_error_with_context(err, "failed to compile transaction script"))?;
 
         Ok(TransactionScript(native_tx_script))
     }
