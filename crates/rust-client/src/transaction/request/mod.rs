@@ -205,12 +205,9 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args = TransactionArgs::new(
-            Some(tx_script),
-            note_args.into(),
-            advice_map,
-            foreign_account_inputs,
-        );
+        let mut tx_args = TransactionArgs::new(advice_map, foreign_account_inputs)
+            .with_tx_script(tx_script)
+            .with_note_args(note_args);
 
         tx_args
             .extend_output_note_recipients(expected_output_recipients.into_values().map(Box::new));
@@ -238,7 +235,6 @@ impl TransactionRequest {
                 if account_interface.auth().is_empty() {
                     let empty_script = TransactionScript::compile(
                         "begin nop end",
-                        [],
                         TransactionKernel::assembler(),
                     )?;
 

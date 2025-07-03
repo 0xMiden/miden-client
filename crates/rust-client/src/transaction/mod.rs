@@ -71,16 +71,16 @@ use alloc::{
 use core::fmt::{self};
 
 use miden_objects::{
-    AssetError, Digest, Felt, Word,
+    AssetError, Digest, Felt,
     account::{Account, AccountCode, AccountDelta, AccountId},
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteTag, compute_note_commitment},
+    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker,
+    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
@@ -142,7 +142,7 @@ impl TransactionResult {
     /// [`TransactionResult`].
     pub async fn new(
         transaction: ExecutedTransaction,
-        note_screener: NoteScreener<'_>,
+        note_screener: NoteScreener,
         partial_notes: Vec<(NoteDetails, NoteTag)>,
         current_block_num: BlockNumber,
         current_timestamp: Option<u64>,
@@ -527,8 +527,8 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// - Returns [`ClientError::MissingOutputNotes`] if the [`TransactionRequest`] ouput notes are
-    ///   not a subset of executor's output notes.
+    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] ouput notes
+    ///   are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
     pub async fn new_transaction(
@@ -589,14 +589,15 @@ impl Client {
             InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
         };
 
-        let output_notes: Vec<Note> = transaction_request.expected_output_own_notes();
+        let output_recipients =
+            transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
-            self.in_debug_mode,
+            self.in_debug_mode(),
         )?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
@@ -622,7 +623,7 @@ impl Client {
 
         // Execute the transaction and get the witness
         let executed_transaction = self
-            .tx_executor
+            .build_executor()?
             .execute_transaction(
                 account_id,
                 block_num,
@@ -632,31 +633,11 @@ impl Client {
             )
             .await?;
 
-        // Check that the expected output notes matches the transaction outcome.
-        // We compare authentication commitments where possible since that involves note IDs +
-        // metadata (as opposed to just note ID which remains the same regardless of
-        // metadata) We also do the check for partial output notes
-
-        let tx_note_auth_commitments: BTreeSet<Digest> =
-            notes_from_output(executed_transaction.output_notes())
-                .map(Note::commitment)
-                .collect();
-
-        let missing_note_ids: Vec<NoteId> = output_notes
-            .iter()
-            .filter_map(|n| {
-                (!tx_note_auth_commitments.contains(&compute_note_commitment(n.id(), n.metadata())))
-                    .then_some(n.id())
-            })
-            .collect();
-
-        if !missing_note_ids.is_empty() {
-            return Err(ClientError::MissingOutputNotes(missing_note_ids));
-        }
+        validate_executed_transaction(&executed_transaction, &output_recipients)?;
 
         TransactionResult::new(
             executed_transaction,
-            NoteScreener::new(self.store.clone(), &self.tx_executor),
+            NoteScreener::new(self.store.clone(), self.authenticator.clone()),
             future_notes,
             self.get_sync_height().await?,
             self.store.get_current_timestamp(),
@@ -804,17 +785,9 @@ impl Client {
     }
 
     /// Compiles the provided transaction script source and inputs into a [`TransactionScript`].
-    pub fn compile_tx_script<T>(
-        &self,
-        inputs: T,
-        program: &str,
-    ) -> Result<TransactionScript, ClientError>
-    where
-        T: IntoIterator<Item = (Word, Vec<Felt>)>,
-    {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode);
-        TransactionScript::compile(program, inputs, assembler)
-            .map_err(ClientError::TransactionScriptError)
+    pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
+        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
+        TransactionScript::compile(program, assembler).map_err(ClientError::TransactionScriptError)
     }
 
     // HELPERS
@@ -987,7 +960,7 @@ impl Client {
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let execution = NoteConsumptionChecker::new(&self.tx_executor)
+            let execution = NoteConsumptionChecker::new(&self.build_executor()?)
                 .check_notes_consumability(
                     account_id,
                     self.store.get_sync_height().await?,
@@ -1125,7 +1098,7 @@ impl Client {
         };
 
         Ok(self
-            .tx_executor
+            .build_executor()?
             .execute_tx_view_script(
                 account_id,
                 block_ref,
@@ -1135,6 +1108,16 @@ impl Client {
                 Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
+    }
+
+    pub(crate) fn build_executor(
+        &self,
+    ) -> Result<TransactionExecutor<'_, '_>, TransactionExecutorError> {
+        TransactionExecutor::with_options(
+            &self.data_store,
+            self.authenticator.as_deref(),
+            self.exec_options,
+        )
     }
 }
 
@@ -1205,6 +1188,33 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
                 todo!("For now, all details should be held in OutputNote::Fulls")
             },
         })
+}
+
+/// Validates that the executed transaction's output recipients match what was expected in the
+/// transaction request.
+fn validate_executed_transaction(
+    executed_transaction: &ExecutedTransaction,
+    expected_output_recipients: &[NoteRecipient],
+) -> Result<(), ClientError> {
+    let tx_output_recipient_digests = executed_transaction
+        .output_notes()
+        .iter()
+        .filter_map(|n| n.recipient().map(NoteRecipient::digest))
+        .collect::<Vec<_>>();
+
+    let missing_recipient_digest: Vec<Digest> = expected_output_recipients
+        .iter()
+        .filter_map(|recipient| {
+            (!tx_output_recipient_digests.contains(&recipient.digest()))
+                .then_some(recipient.digest())
+        })
+        .collect();
+
+    if !missing_recipient_digest.is_empty() {
+        return Err(ClientError::MissingOutputRecipients(missing_recipient_digest));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

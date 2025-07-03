@@ -1,7 +1,7 @@
 //! Contains structures and functions related to transaction creation.
 use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
 
-use miden_lib::note::{create_p2id_note, create_p2idr_note, create_swap_note};
+use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 use miden_objects::{
     Digest, Felt, FieldElement,
     account::AccountId,
@@ -302,13 +302,14 @@ impl TransactionRequestBuilder {
         }
 
         let created_note = if let Some(recall_height) = recall_height {
-            create_p2idr_note(
+            create_p2ide_note(
                 sender_account_id,
                 target_account_id,
                 assets,
+                Some(recall_height),
+                None, //TODO: Add support for timelock P2IDE notes
                 note_type,
                 Felt::ZERO,
-                recall_height,
                 rng,
             )?
         } else {

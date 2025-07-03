@@ -3,12 +3,14 @@ use alloc::sync::Arc;
 use std::fmt::Write;
 
 use miden_client::{
-    Client,
+    Client, ExecutionOptions,
     keystore::WebKeyStore,
     rpc::{Endpoint, TonicRpcClient},
     store::web_store::WebStore,
 };
-use miden_objects::{Felt, crypto::rand::RpoRandomCoin};
+use miden_objects::{
+    Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::RpoRandomCoin,
+};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
 
@@ -88,7 +90,13 @@ impl WebClient {
             Box::new(rng),
             web_store.clone(),
             Arc::new(keystore.clone()),
-            false,
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                false,
+            )
+            .expect("Default executor's options should always be valid"),
             None,
             None,
         ));

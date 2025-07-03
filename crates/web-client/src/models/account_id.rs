@@ -1,4 +1,7 @@
-use miden_objects::{Felt as NativeFelt, account::AccountId as NativeAccountId};
+use miden_objects::{
+    Felt as NativeFelt,
+    account::{AccountId as NativeAccountId, NetworkId},
+};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -12,6 +15,12 @@ impl AccountId {
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> AccountId {
         let native_account_id = NativeAccountId::from_hex(hex).unwrap();
+        AccountId(native_account_id)
+    }
+
+    #[wasm_bindgen(js_name = "fromBech32")]
+    pub fn from_bech32(bech32: &str) -> AccountId {
+        let (_, native_account_id) = NativeAccountId::from_bech32(bech32).unwrap();
         AccountId(native_account_id)
     }
 
@@ -29,6 +38,12 @@ impl AccountId {
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_string()
+    }
+
+    #[wasm_bindgen(js_name = "toBech32")]
+    pub fn to_bech32(&self) -> String {
+        let network_id = NetworkId::Testnet;
+        self.0.to_bech32(network_id)
     }
 
     pub fn prefix(&self) -> Felt {

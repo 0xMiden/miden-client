@@ -4,13 +4,23 @@ use miden_objects::{
     Digest, Felt,
     block::BlockHeader,
     crypto::merkle::MerklePath,
-    note::{Note, NoteExecutionHint, NoteId, NoteInclusionProof, NoteMetadata, NoteTag, NoteType},
+    note::{
+        Note, NoteDetails, NoteExecutionHint, NoteId, NoteInclusionProof, NoteMetadata, NoteTag,
+        NoteType,
+    },
 };
+use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
 use crate::rpc::{
     RpcError,
-    generated::{note::NoteMetadata as ProtoNoteMetadata, responses::SyncNoteResponse},
+    generated::{
+        note::{
+            CommittedNote as ProtoCommittedNote, NoteInclusionInBlockProof as ProtoInclusionProof,
+            NoteMetadata as ProtoNoteMetadata,
+        },
+        responses::SyncNoteResponse,
+    },
 };
 
 impl TryFrom<ProtoNoteMetadata> for NoteMetadata {
@@ -43,6 +53,22 @@ impl From<NoteMetadata> for ProtoNoteMetadata {
             execution_hint: value.execution_hint().into(),
             aux: value.aux().into(),
         }
+    }
+}
+
+impl TryFrom<ProtoInclusionProof> for NoteInclusionProof {
+    type Error = RpcConversionError;
+
+    fn try_from(value: ProtoInclusionProof) -> Result<Self, Self::Error> {
+        Ok(NoteInclusionProof::new(
+            value.block_num.into(),
+            u16::try_from(value.note_index_in_block)
+                .map_err(|_| RpcConversionError::InvalidField("NoteIndexInBlock".into()))?,
+            value
+                .merkle_path
+                .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
+                .try_into()?,
+        )?)
     }
 }
 
@@ -201,6 +227,39 @@ impl FetchedNote {
         match self {
             FetchedNote::Private(id, ..) => *id,
             FetchedNote::Public(note, _) => note.id(),
+        }
+    }
+}
+
+impl TryFrom<ProtoCommittedNote> for FetchedNote {
+    type Error = RpcConversionError;
+
+    fn try_from(value: ProtoCommittedNote) -> Result<Self, Self::Error> {
+        let inclusion_proof = value
+            .inclusion_proof
+            .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof"))?;
+
+        let note_id: Digest = inclusion_proof
+            .note_id
+            .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof.NoteId"))?
+            .try_into()?;
+
+        let inclusion_proof = NoteInclusionProof::try_from(inclusion_proof)?;
+
+        let note = value.note.ok_or_else(|| ProtoCommittedNote::missing_field("Note"))?;
+
+        let metadata = note
+            .metadata
+            .ok_or_else(|| ProtoCommittedNote::missing_field("Note.Metadata"))?
+            .try_into()?;
+
+        if let Some(detail_bytes) = note.details {
+            let details = NoteDetails::read_from_bytes(&detail_bytes)?;
+            let (assets, recipient) = details.into_parts();
+
+            Ok(FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_proof))
+        } else {
+            Ok(FetchedNote::Private(NoteId::from(note_id), metadata, inclusion_proof))
         }
     }
 }

@@ -12,7 +12,7 @@ impl NoteScript {
     }
 
     pub fn p2idr() -> Self {
-        WellKnownNote::P2IDR.script().into()
+        WellKnownNote::P2IDE.script().into()
     }
 
     pub fn swap() -> Self {

@@ -109,7 +109,7 @@ integration-test-full: ## Run the integration test binary with ignored tests inc
 
 .PHONY: clean-prover
 clean-prover: ## Uninstall prover
-	cargo uninstall miden-proving-service || echo 'prover not installed'
+	cargo uninstall miden-remote-prover || echo 'prover not installed'
 
 .PHONY: prover
 prover: setup-miden-base update-prover-branch build-prover ## Setup prover directory
@@ -124,11 +124,11 @@ update-prover-branch: setup-miden-base ## Checkout and update the specified bran
 
 .PHONY: build-prover
 build-prover: update-prover-branch ## Build the prover binary with specified features
-	cd $(PROVER_DIR) && cargo update && cargo build -p miden-proving-service --locked --release
+	cd $(PROVER_DIR) && cargo update && cargo build -p miden-remote-prover --locked --release
 
 .PHONY: start-prover
 start-prover: ## Run prover. This requires the base repo to be present at `miden-base`
-	cd $(PROVER_DIR) && RUST_LOG=info cargo run -p miden-proving-service --release --locked -- start-worker --port $(PROVER_PORT) --prover-type transaction
+	cd $(PROVER_DIR) && RUST_LOG=info cargo run -p miden-remote-prover --release --locked -- start-worker --port $(PROVER_PORT) --proof-type transaction
 
 .PHONY: kill-prover
 kill-prover: ## Kill prover process

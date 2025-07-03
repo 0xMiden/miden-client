@@ -436,7 +436,7 @@ export const mintAndConsumeTransaction = async (
 
       let mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
-        window.AccountId.fromHex(_faucetAccountId),
+        faucetAccountId,
         window.NoteType.Private,
         BigInt(1000)
       );

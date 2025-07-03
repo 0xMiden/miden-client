@@ -72,7 +72,6 @@ export const testStandardFpi = async (): Promise<void> => {
                     call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
                 end
             `,
-      new window.TransactionScriptInputPairArray(),
       window.TransactionKernel.assembler()
     );
 
@@ -123,7 +122,6 @@ export const testStandardFpi = async (): Promise<void> => {
 
     let compiledTxScript = window.TransactionScript.compile(
       txScript,
-      new window.TransactionScriptInputPairArray(),
       window.TransactionKernel.assembler()
     );
 
