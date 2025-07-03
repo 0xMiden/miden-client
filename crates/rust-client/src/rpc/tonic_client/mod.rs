@@ -10,7 +10,7 @@ use miden_objects::{
     account::{Account, AccountCode, AccountDelta, AccountId},
     block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock},
     crypto::merkle::{MerklePath, MmrProof, SmtProof},
-    note::{Note, NoteDetails, NoteId, NoteInclusionProof, NoteTag, Nullifier},
+    note::{NoteId, NoteTag, Nullifier},
     transaction::ProvenTransaction,
     utils::Deserializable,
 };
@@ -32,7 +32,10 @@ use super::{
         get_account_proofs_request::{self},
     },
 };
-use crate::{rpc::generated::requests::GetBlockHeaderByNumberRequest, transaction::ForeignAccount};
+use crate::{
+    rpc::{errors::RpcConversionError, generated::requests::GetBlockHeaderByNumberRequest},
+    transaction::ForeignAccount,
+};
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -166,40 +169,13 @@ impl NodeRpcClient for TonicRpcClient {
             )
         })?;
 
-        let rpc_notes = api_response.into_inner().notes;
-        let mut response_notes = Vec::with_capacity(rpc_notes.len());
-        for note in rpc_notes {
-            let inclusion_details = {
-                let merkle_path = note
-                    .merkle_path
-                    .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
-                    .try_into()?;
+        let response_notes = api_response
+            .into_inner()
+            .notes
+            .into_iter()
+            .map(FetchedNote::try_from)
+            .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-                NoteInclusionProof::new(
-                    note.block_num.into(),
-                    u16::try_from(note.note_index).expect("note index out of range"),
-                    merkle_path,
-                )?
-            };
-            let metadata = note
-                .metadata
-                .ok_or(RpcError::ExpectedDataMissing("Notes.Metadata".into()))?
-                .try_into()?;
-
-            let note = if let Some(details) = note.details {
-                let (assets, recipient) = NoteDetails::read_from_bytes(&details)?.into_parts();
-
-                FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_details)
-            } else {
-                let note_id: Digest = note
-                    .note_id
-                    .ok_or(RpcError::ExpectedDataMissing("Notes.NoteId".into()))?
-                    .try_into()?;
-
-                FetchedNote::Private(NoteId::from(note_id), metadata, inclusion_details)
-            };
-            response_notes.push(note);
-        }
         Ok(response_notes)
     }
 

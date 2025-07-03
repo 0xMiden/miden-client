@@ -58,6 +58,16 @@
 
 ***
 
+### toBech32()
+
+> **toBech32**(): `string`
+
+#### Returns
+
+`string`
+
+***
+
 ### toString()
 
 > **toString**(): `string`
@@ -65,6 +75,22 @@
 #### Returns
 
 `string`
+
+***
+
+### fromBech32()
+
+> `static` **fromBech32**(`bech32`): `AccountId`
+
+#### Parameters
+
+##### bech32
+
+`string`
+
+#### Returns
+
+`AccountId`
 
 ***
 

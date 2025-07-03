@@ -74,7 +74,7 @@ mod note_update_tracker;
 // ================================================================================================
 
 pub use miden_lib::note::{
-    create_p2id_note, create_p2idr_note, create_swap_note,
+    create_p2id_note, create_swap_note,
     utils::{build_p2id_recipient, build_swap_tag},
     well_known_note::WellKnownNote,
 };
@@ -123,8 +123,7 @@ impl Client {
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let commited_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in commited_notes {
@@ -154,8 +153,7 @@ impl Client {
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await
@@ -193,7 +191,7 @@ impl Client {
     ///
     /// The assembler uses the debug mode if the client was instantiated with debug mode on.
     pub fn compile_note_script(&self, note_script: &str) -> Result<NoteScript, ClientError> {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode);
+        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
         NoteScript::compile(note_script, assembler).map_err(ClientError::NoteError)
     }
 }

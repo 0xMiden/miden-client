@@ -54,13 +54,13 @@
 //! use std::sync::Arc;
 //!
 //! use miden_client::{
-//!     Client, Felt,
+//!     Client, ExecutionOptions, Felt,
 //!     crypto::RpoRandomCoin,
 //!     keystore::FilesystemKeyStore,
 //!     rpc::{Endpoint, TonicRpcClient},
 //!     store::{Store, sqlite_store::SqliteStore},
 //! };
-//! use miden_objects::crypto::rand::FeltRng;
+//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::FeltRng};
 //! use rand::{Rng, rngs::StdRng};
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
@@ -90,7 +90,13 @@
 //!     Box::new(rng),
 //!     store,
 //!     Arc::new(keystore),
-//!     false, // Set to true for debug mode, if needed.
+//!     ExecutionOptions::new(
+//!         Some(MAX_TX_EXECUTION_CYCLES),
+//!         MIN_TX_EXECUTION_CYCLES,
+//!         false,
+//!         false, // Set to true for debug mode, if needed.
+//!     )
+//!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
 //! );
@@ -178,7 +184,8 @@ pub mod crypto {
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
 pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
-pub use miden_proving_service_client::proving_service::tx_prover::RemoteTransactionProver;
+pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
+pub use miden_tx::ExecutionOptions;
 
 /// Provides various utilities that are commonly used throughout the Miden
 /// client library.
@@ -206,14 +213,10 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_objects::crypto::rand::FeltRng;
-use miden_tx::{
-    LocalTransactionProver, TransactionExecutor, TransactionMastStore,
-    auth::TransactionAuthenticator,
-};
+use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
 use rand::RngCore;
 use rpc::NodeRpcClient;
-use store::{Store, data_store::ClientDataStore};
-use tracing::info;
+use store::Store;
 
 // MIDEN CLIENT
 // ================================================================================================
@@ -237,12 +240,11 @@ pub struct Client {
     /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
     /// client.
     tx_prover: Arc<LocalTransactionProver>,
-    /// An instance of a [`TransactionExecutor`] that will be used to execute transactions.
-    tx_executor: TransactionExecutor,
-    /// A MAST store, used to provide code inputs to the VM.
-    mast_store: Arc<TransactionMastStore>,
-    /// Flag to enable the debug mode for scripts compilation and execution.
-    in_debug_mode: bool,
+    /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
+    /// executor whenever a signature is requested from within the VM.
+    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
+    exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
     tx_graceful_blocks: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
@@ -261,16 +263,14 @@ impl Client {
     ///
     /// - `api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect to
     ///   the Miden node.
+    /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
+    ///   serial numbers, etc. This can be any RNG that implements the [`FeltRng`] trait.
     /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
     ///   provide persistence.
-    /// - `executor_store`: An instance of [`Store`] that provides a way for [`TransactionExecutor`]
-    ///   to retrieve relevant inputs at the moment of transaction execution. It should be the same
-    ///   store as the one for `store`, but it doesn't have to be the **same instance**.
     /// - `authenticator`: Defines the transaction authenticator that will be used by the
     ///   transaction executor whenever a signature is requested from within the VM.
-    /// - `in_debug_mode`: Instantiates the transaction executor (and in turn, its compiler) in
-    ///   debug mode, which will enable debug logs for scripts compiled with this mode for easier
-    ///   MASM debugging.
+    /// - `exec_options`: Options that control the transaction executor’s runtime behaviour (e.g.
+    ///   debug mode).
     /// - `tx_graceful_blocks`: The number of blocks that are considered old enough to discard
     ///   pending transactions.
     /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
@@ -284,38 +284,28 @@ impl Client {
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
         authenticator: Arc<dyn TransactionAuthenticator>,
-        in_debug_mode: bool,
+        exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Self {
-        let client_data_store = Arc::new(ClientDataStore::new(store.clone()));
-        let mast_store = client_data_store.mast_store();
-
         let authenticator = Some(authenticator);
-        let mut tx_executor = TransactionExecutor::new(client_data_store, authenticator);
         let tx_prover = Arc::new(LocalTransactionProver::default());
-
-        if in_debug_mode {
-            info!("Creating the Client in debug mode.");
-            tx_executor = tx_executor.with_debug_mode();
-        }
 
         Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
             tx_prover,
-            tx_executor,
-            in_debug_mode,
+            authenticator,
+            exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
-            mast_store,
         }
     }
 
     /// Returns true if the client is in debug mode.
-    pub fn is_in_debug_mode(&self) -> bool {
-        self.in_debug_mode
+    pub fn in_debug_mode(&self) -> bool {
+        self.exec_options.enable_debugging()
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

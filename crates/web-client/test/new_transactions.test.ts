@@ -685,11 +685,8 @@ export const customAccountComponent = async (): Promise<void> => {
         accountCode
       );
 
-    const inputs = new window.TransactionScriptInputPairArray();
-
     let txScript = window.TransactionScript.compile(
       scriptCode,
-      inputs,
       assembler.withLibrary(accountComponentLib)
     );
 

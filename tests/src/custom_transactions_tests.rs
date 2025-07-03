@@ -96,7 +96,7 @@ async fn transaction_request() {
 
     let failure_code = code.replace("{asserted_value}", "1");
 
-    let tx_script = client.compile_tx_script(vec![], &failure_code).unwrap();
+    let tx_script = client.compile_tx_script(&failure_code).unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map.clone())
@@ -112,7 +112,7 @@ async fn transaction_request() {
 
     let success_code = code.replace("{asserted_value}", "0");
 
-    let tx_script = client.compile_tx_script(vec![], &success_code).unwrap();
+    let tx_script = client.compile_tx_script(&success_code).unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map)
@@ -211,7 +211,7 @@ async fn merkle_store() {
     code += "call.auth_tx::auth_tx_rpo_falcon512 end";
 
     // Build the transaction
-    let tx_script = client.compile_tx_script(vec![], &code).unwrap();
+    let tx_script = client.compile_tx_script(&code).unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map)

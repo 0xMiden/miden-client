@@ -115,8 +115,7 @@ impl Client {
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
-        let note_screener =
-            NoteScreener::new(self.store.clone(), &self.tx_executor, self.mast_store.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let state_sync = StateSync::new(
             self.rpc_api.clone(),
