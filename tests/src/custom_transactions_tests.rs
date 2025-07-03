@@ -82,22 +82,21 @@ async fn transaction_request() {
         use.miden::contracts::auth::basic->auth_tx
 
         begin
-            push.0 push.{asserted_value}
-            # => [0, {asserted_value}]
-            assert_eq
+            # We use the script argument to store the expected value to be compared
+            push.1.2.3.4
+            # => [[1,2,3,4], TX_SCRIPT_ARG]
+            assert_eqw
 
             call.auth_tx::auth_tx_rpo_falcon512
         end
         ";
+    let tx_script = client.compile_tx_script(&code).unwrap();
+
     // FAILURE ATTEMPT
-
-    let failure_code = code.replace("{asserted_value}", "1");
-
-    let tx_script = client.compile_tx_script(&failure_code).unwrap();
-
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map.clone())
-        .with_custom_script(tx_script)
+        .with_custom_script(tx_script.clone())
+        .with_script_arg([ZERO, ZERO, ZERO, ZERO])
         .extend_advice_map(advice_map.clone())
         .build()
         .unwrap();
@@ -106,13 +105,9 @@ async fn transaction_request() {
     assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
 
     // SUCCESS EXECUTION
-
-    let success_code = code.replace("{asserted_value}", "0");
-
-    let tx_script = client.compile_tx_script(&success_code).unwrap();
-
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map)
+        .with_script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
         .with_custom_script(tx_script)
         .extend_advice_map(advice_map)
         .build()

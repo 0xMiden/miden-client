@@ -85,6 +85,9 @@ pub struct TransactionRequest {
     /// transaction. This will allow the transaction to be executed even if some input notes
     /// are invalid.
     ignore_invalid_input_notes: bool,
+    /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
+    /// execution.
+    script_arg: Option<Word>,
 }
 
 impl TransactionRequest {
@@ -205,9 +208,14 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args = TransactionArgs::new(advice_map, foreign_account_inputs)
-            .with_tx_script(tx_script)
-            .with_note_args(note_args);
+        let mut tx_args =
+            TransactionArgs::new(advice_map, foreign_account_inputs).with_note_args(note_args);
+
+        tx_args = if let Some(argument) = self.script_arg {
+            tx_args.with_tx_script_and_arg(tx_script, argument)
+        } else {
+            tx_args.with_tx_script(tx_script)
+        };
 
         tx_args
             .extend_output_note_recipients(expected_output_recipients.into_values().map(Box::new));
@@ -272,6 +280,7 @@ impl Serializable for TransactionRequest {
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
+        self.script_arg.write_into(target);
     }
 }
 
@@ -307,6 +316,7 @@ impl Deserializable for TransactionRequest {
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
+        let script_arg = Option::<Word>::read_from(source)?;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -319,6 +329,7 @@ impl Deserializable for TransactionRequest {
             foreign_accounts,
             expiration_delta,
             ignore_invalid_input_notes,
+            script_arg,
         })
     }
 }
