@@ -88,7 +88,7 @@ async fn fpi_execute_program() {
     wait_for_blocks(&mut client, 2).await.unwrap();
 
     let storage_requirements =
-        AccountStorageRequirements::new([(0u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
     let output_stack = client
         .execute_program(
@@ -185,7 +185,7 @@ async fn nested_fpi_calls() {
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
 
-            call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
+            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE),
@@ -204,7 +204,7 @@ async fn nested_fpi_calls() {
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let storage_requirements =
-        AccountStorageRequirements::new([(0u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
     let foreign_accounts = [
         ForeignAccount::public(inner_foreign_account_id, storage_requirements.clone()).unwrap(),
@@ -270,7 +270,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
     
-            call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
+            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE),
@@ -297,7 +297,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let storage_requirements =
-        AccountStorageRequirements::new([(0u8, &[StorageMapKey::from(MAP_KEY)])]);
+        AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
     let foreign_account = if storage_mode == AccountStorageMode::Public {
         ForeignAccount::public(foreign_account_id, storage_requirements)
@@ -353,7 +353,7 @@ fn foreign_account_with_code(
 
     let (account, seed) = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
-        .with_component(auth_component)
+        .with_auth_component(auth_component)
         .storage_mode(storage_mode)
         .build()
         .unwrap();
@@ -385,7 +385,7 @@ async fn deploy_foreign_account(
 
     let deployment_tx_script = TransactionScript::compile(
         "begin 
-                call.::miden::contracts::auth::basic::auth_tx_rpo_falcon512 
+                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
             end",
         TransactionKernel::assembler(),
     )

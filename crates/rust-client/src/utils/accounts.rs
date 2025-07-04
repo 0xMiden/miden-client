@@ -42,7 +42,7 @@ pub async fn insert_new_wallet_with_seed(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(RpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()?;
 
@@ -73,7 +73,7 @@ pub async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(RpoFalcon512::new(pub_key))
         .with_component(
             BasicFungibleFaucet::new(symbol, 10, max_supply)
                 .expect("Faucet component should be valid"),

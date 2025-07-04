@@ -95,19 +95,17 @@ jobs:
           node-version: "20"
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
-      - run: make clean-prover
-      - run: make prover
       - name: Add Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Start test node
         run: make start-node-background
       - name: Start prover
-        run: make start-prover > /dev/null &
+        run: make start-prover-background
       - name: Run remote prover tests
         run: make integration-test-remote-prover-web-client
       - name: Stop test node
         if: always()
         run: make stop-node
-      - name: Kill miden-prover
+      - name: Stop miden-prover
         if: always()
-        run: make kill-prover
+        run: make stop-prover

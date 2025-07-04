@@ -12,14 +12,14 @@ use miden_lib::{
     transaction::TransactionKernel,
 };
 use miden_objects::{
-    Felt, FieldElement, Word, ZERO,
+    EMPTY_WORD, Felt, FieldElement, ONE, Word, ZERO,
     account::{
         Account, AccountBuilder, AccountCode, AccountHeader, AccountId, AccountStorageMode,
         AccountType, AuthSecretKey,
     },
     asset::{Asset, FungibleAsset, TokenSymbol},
     crypto::{
-        dsa::rpo_falcon512::SecretKey,
+        dsa::rpo_falcon512::{PublicKey, SecretKey},
         rand::{FeltRng, RpoRandomCoin},
     },
     note::{
@@ -131,7 +131,7 @@ async fn insert_new_wallet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(RpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -162,7 +162,7 @@ async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(RpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -311,6 +311,7 @@ async fn insert_same_account_twice_fails() {
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
         Felt::new(2),
+        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -326,6 +327,7 @@ async fn account_code() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
         Felt::ZERO,
+        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -349,6 +351,7 @@ async fn get_account_by_id() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
         Felt::new(10),
+        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::assembler(),
     );
 
@@ -577,7 +580,7 @@ async fn mint_transaction() {
 
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
 
-    assert!(transaction.executed_transaction().account_delta().nonce().is_some());
+    assert_eq!(transaction.executed_transaction().account_delta().nonce_increment(), ONE);
 }
 
 #[tokio::test]

@@ -42,7 +42,7 @@ pub struct InitCmd {
     #[arg(long)]
     store_path: Option<String>,
 
-    /// RPC endpoint for the proving service. Required if proving mode is set to remote.
+    /// RPC endpoint for the remote prover. Required if proving mode is set to remote.
     /// The endpoint must be in the form of "{protocol}://{hostname}:{port}", being the protocol
     /// and port optional.
     /// If the proving RPC isn't set, the proving mode will be set to local.

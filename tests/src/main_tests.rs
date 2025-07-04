@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use miden_client::{
-    ClientError, Felt,
+    ClientError, ONE,
     builder::ClientBuilder,
     rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
@@ -1195,8 +1195,7 @@ async fn unused_rpc_api() {
         .await
         .unwrap();
 
-    // The nonce is 2 because `setup_wallet_and_faucet` also creates a note.
-    assert_eq!(account_delta.nonce(), Some(Felt::new(2)));
+    assert_eq!(account_delta.nonce_increment(), ONE);
     assert_eq!(*account_delta.vault().fungible().iter().next().unwrap().1, MINT_AMOUNT as i64);
 }
 

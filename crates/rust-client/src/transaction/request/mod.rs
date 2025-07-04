@@ -232,16 +232,10 @@ impl TransactionRequest {
                     return Err(TransactionRequestError::NoInputNotes);
                 }
 
-                if account_interface.auth().is_empty() {
-                    let empty_script = TransactionScript::compile(
-                        "begin nop end",
-                        TransactionKernel::assembler(),
-                    )?;
+                let empty_script =
+                    TransactionScript::compile("begin nop end", TransactionKernel::assembler())?;
 
-                    Ok(empty_script)
-                } else {
-                    Ok(account_interface.build_auth_script(in_debug_mode)?)
-                }
+                Ok(empty_script)
             },
         }
     }
@@ -376,12 +370,17 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_lib::{note::create_p2id_note, transaction::TransactionKernel};
+    use miden_lib::{
+        account::auth::RpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
+    };
     use miden_objects::{
-        Digest, Felt, ZERO,
+        Digest, EMPTY_WORD, Felt, ZERO,
         account::{AccountBuilder, AccountId, AccountType},
         asset::FungibleAsset,
-        crypto::rand::{FeltRng, RpoRandomCoin},
+        crypto::{
+            dsa::rpo_falcon512::PublicKey,
+            rand::{FeltRng, RpoRandomCoin},
+        },
         note::{NoteTag, NoteType},
         testing::{
             account_component::AccountMockComponent,
@@ -428,6 +427,7 @@ mod tests {
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap(),
             )
+            .with_auth_component(RpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()

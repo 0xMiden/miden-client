@@ -27,7 +27,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - clippy
         run: make clippy
-  
+
   clippy-wasm:
     name: Clippy WASM
     runs-on: ubuntu-latest

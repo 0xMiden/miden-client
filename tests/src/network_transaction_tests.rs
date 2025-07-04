@@ -45,11 +45,16 @@ const COUNTER_CONTRACT: &str = "
             # [index, count+1]
             exec.account::set_item
             # => []
-            push.1 exec.account::incr_nonce
-            # => []
             exec.sys::truncate_stack
             # => []
         end";
+
+const INCR_NONCE_AUTH_CODE: &str = "
+    use.miden::account
+    export.auth__basic
+        push.1 exec.account::incr_nonce
+    end
+";
 
 /// Deploys a counter contract as a network account
 async fn deploy_counter_contract(
@@ -95,12 +100,18 @@ async fn get_counter_contract_account(
     .unwrap()
     .with_supports_all_types();
 
+    let incr_nonce_auth =
+        AccountComponent::compile(INCR_NONCE_AUTH_CODE, TransactionKernel::assembler(), vec![])
+            .unwrap()
+            .with_supports_all_types();
+
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
     let (account, seed) = AccountBuilder::new(init_seed)
         .storage_mode(storage_mode)
         .with_component(counter_component)
+        .with_auth_component(incr_nonce_auth)
         .build()
         .unwrap();
 
