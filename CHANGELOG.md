@@ -10,7 +10,7 @@
 * [BREAKING] Merged `concurrent` feature with `std` (#974).
 * [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
-* [BREAKING] Renamed P2IDR to P2IDE (#).
+* [BREAKING] Renamed P2IDR to P2IDE (#1016).
 
 ### Features
 
