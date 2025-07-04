@@ -53,7 +53,7 @@ impl fmt::Display for NoteRelevance {
 pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A reference to the transaction authenticator
+    /// An optional authenticator used to verify transactions.
     authenticator: Option<Arc<dyn TransactionAuthenticator>>,
 }
 
@@ -131,8 +131,6 @@ impl NoteScreener {
         let transaction_executor =
             TransactionExecutor::new(&data_store, self.authenticator.as_deref());
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
-
-        data_store.mast_store().load_account_code(account.code());
 
         if let NoteAccountExecution::Success = consumption_checker
             .check_notes_consumability(

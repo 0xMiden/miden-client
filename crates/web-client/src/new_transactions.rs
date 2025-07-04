@@ -30,6 +30,7 @@ impl WebClient {
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionResult, JsValue> {
         self.fetch_and_cache_account_auth_by_account_id(account_id).await?;
+        self.fetch_and_cache_mast_forests().await?;
 
         if let Some(client) = self.get_mut_inner() {
             let native_transaction_execution_result: NativeTransactionResult = client
@@ -222,6 +223,7 @@ impl WebClient {
         // TODO: Leaving this alone for now because new_swap_transaction needs a rework anyway
         self.fetch_and_cache_account_auth_by_account_id(&sender_account_id.into())
             .await?;
+        self.fetch_and_cache_mast_forests().await?;
 
         if let Some(client) = self.get_mut_inner() {
             let swap_transaction_request = NativeTransactionRequestBuilder::new()

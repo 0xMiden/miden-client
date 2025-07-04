@@ -78,4 +78,16 @@ impl WebClient {
 
         Ok(native_auth_secret_key)
     }
+
+    pub(crate) async fn fetch_and_cache_mast_forests(&mut self) -> Result<(), JsValue> {
+        let store =
+            self.store.as_ref().ok_or_else(|| JsValue::from_str("Store not initialized"))?;
+
+        store
+            .fetch_and_cache_mast_forests()
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to fetch and cache MAST forests"))?;
+
+        Ok(())
+    }
 }

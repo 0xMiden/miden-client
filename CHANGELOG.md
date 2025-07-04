@@ -10,6 +10,7 @@
 * [BREAKING] Merged `concurrent` feature with `std` (#974).
 * [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
+* [BREAKING] Refactored the `ClientDataStore` to use the `Store` to retrieve account code (#982).
 
 ### Features
 
