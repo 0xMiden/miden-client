@@ -20,7 +20,7 @@ PROVER_DIR="crates/testing/prover"
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
-clippy: ## Run Clippy with configs
+clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
 	cargo clippy --workspace --exclude miden-client-web --exclude testing-remote-prover --all-targets -- -D warnings
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
@@ -29,7 +29,7 @@ clippy-wasm: ## Run Clippy for the miden-client-web package
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets $(FEATURES_WEB_CLIENT) -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs
+fix: ## Run Fix with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
 	cargo +nightly fix --workspace --exclude miden-client-web --exclude testing-remote-prover --allow-staged --allow-dirty --all-targets
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
