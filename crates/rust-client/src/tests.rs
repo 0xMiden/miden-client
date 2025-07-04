@@ -1604,3 +1604,39 @@ async fn missing_recipient_digest() {
         assert!(digests == vec![dummy_recipient_digest]);
     }
 }
+
+#[tokio::test]
+async fn input_note_checks() {
+    let (mut client, _, authenticator) = create_test_client().await;
+
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+
+    wait_for_node(&mut client).await;
+
+    let mut mint_notes = vec![];
+    for _ in 0..10 {
+        mint_notes.push(mint_note(&mut client, wallet.id(), faucet.id(), NoteType::Public).await);
+    }
+
+    let duplicate_note_tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![mint_notes[0].id(), mint_notes[0].id()]);
+
+    assert!(matches!(
+        duplicate_note_tx_request,
+        Err(TransactionRequestError::DuplicateInputNote(note_id)) if note_id == mint_notes[0].id()
+    ));
+
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(mint_notes.iter().map(InputNote::id).collect())
+        .unwrap();
+
+    let transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
+
+    let input_notes = transaction.executed_transaction().input_notes().iter();
+
+    // Check that the input notes have the same order as the original notes
+    for (i, input_note) in input_notes.enumerate() {
+        assert_eq!(input_note.id(), mint_notes[i].id());
+    }
+}
