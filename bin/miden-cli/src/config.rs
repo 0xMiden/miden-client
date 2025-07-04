@@ -32,7 +32,7 @@ pub struct CliConfig {
     pub default_account_id: Option<String>,
     /// Path to the file containing the token symbol map.
     pub token_symbol_map_filepath: PathBuf,
-    /// RPC endpoint for the proving service. If this isn't present, a local prover will be used.
+    /// RPC endpoint for the remote prover. If this isn't present, a local prover will be used.
     pub remote_prover_endpoint: Option<CliEndpoint>,
     /// Path to the directory from where account component template files will be loaded.
     pub component_template_directory: PathBuf,

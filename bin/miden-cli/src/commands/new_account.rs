@@ -113,7 +113,8 @@ impl NewWalletCmd {
             &mut client,
             account_type,
             self.storage_mode.into(),
-            &[RpoFalcon512::new(key_pair.public_key()).into(), BasicWallet.into()],
+            RpoFalcon512::new(key_pair.public_key()).into(),
+            &[BasicWallet.into()],
             &extra_components,
             &init_storage_data,
         )?;
@@ -185,8 +186,8 @@ impl NewAccountCmd {
             &mut client,
             self.account_type.into(),
             self.storage_mode.into(),
-            // TODO: Forcing an auth component for simplicity for now
-            &[RpoFalcon512::new(key_pair.public_key()).into()],
+            RpoFalcon512::new(key_pair.public_key()).into(),
+            &[],
             &component_templates,
             &init_storage_data,
         )?;
@@ -256,6 +257,7 @@ fn build_account(
     client: &mut Client,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
+    auth_component: AccountComponent,
     account_components: &[AccountComponent],
     component_templates: &[AccountComponentTemplate],
     init_storage_data: &InitStorageData,
@@ -265,7 +267,8 @@ fn build_account(
 
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
-        .storage_mode(storage_mode);
+        .storage_mode(storage_mode)
+        .with_auth_component(auth_component);
 
     // Process component templates and add all components together
     let extra_components = process_component_templates(component_templates, init_storage_data)?;

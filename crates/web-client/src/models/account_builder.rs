@@ -60,6 +60,12 @@ impl AccountBuilder {
         self
     }
 
+    #[wasm_bindgen(js_name = "withAuthComponent")]
+    pub fn with_auth_component(mut self, account_component: &AccountComponent) -> Self {
+        self.0 = self.0.with_auth_component(account_component);
+        self
+    }
+
     pub fn build(self) -> Result<AccountBuilderResult, JsValue> {
         let (account, seed) = self
             .0

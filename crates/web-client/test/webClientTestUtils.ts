@@ -59,7 +59,7 @@ export const mintTransaction = async (
       return {
         transactionId: mintTransactionResult.executedTransaction().id().toHex(),
         numOutputNotesCreated: mintTransactionResult.createdNotes().numNotes(),
-        nonce: mintTransactionResult.accountDelta().nonce()?.toString(),
+        nonce: mintTransactionResult.accountDelta().nonceIncrement().toString(),
         createdNoteId: mintTransactionResult
           .createdNotes()
           .notes()[0]
@@ -399,7 +399,10 @@ export const consumeTransaction = async (
           .executedTransaction()
           .id()
           .toHex(),
-        nonce: consumeTransactionResult.accountDelta().nonce()?.toString(),
+        nonce: consumeTransactionResult
+          .accountDelta()
+          .nonceIncrement()
+          .toString(),
         numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
         targetAccountBalanace: changedTargetAccount
           .vault()
@@ -502,7 +505,10 @@ export const mintAndConsumeTransaction = async (
           numOutputNotesCreated: mintTransactionResult
             .createdNotes()
             .numNotes(),
-          nonce: mintTransactionResult.accountDelta().nonce()?.toString(),
+          nonce: mintTransactionResult
+            .accountDelta()
+            .nonceIncrement()
+            .toString(),
           createdNoteId: mintTransactionResult
             .createdNotes()
             .notes()[0]
@@ -514,7 +520,10 @@ export const mintAndConsumeTransaction = async (
             .executedTransaction()
             .id()
             .toHex(),
-          nonce: consumeTransactionResult.accountDelta().nonce()?.toString(),
+          nonce: consumeTransactionResult
+            .accountDelta()
+            .nonceIncrement()
+            .toString(),
           numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
           targetAccountBalanace: changedTargetAccount
             .vault()

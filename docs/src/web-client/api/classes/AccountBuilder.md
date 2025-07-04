@@ -40,22 +40,6 @@
 
 ***
 
-### anchor()
-
-> **anchor**(`anchor`): `AccountBuilder`
-
-#### Parameters
-
-##### anchor
-
-[`BlockHeader`](BlockHeader.md)
-
-#### Returns
-
-`AccountBuilder`
-
-***
-
 ### build()
 
 > **build**(): [`AccountBuilderResult`](AccountBuilderResult.md)
@@ -85,6 +69,22 @@
 ##### storage\_mode
 
 [`AccountStorageMode`](AccountStorageMode.md)
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
+### withAuthComponent()
+
+> **withAuthComponent**(`account_component`): `AccountBuilder`
+
+#### Parameters
+
+##### account\_component
+
+[`AccountComponent`](AccountComponent.md)
 
 #### Returns
 

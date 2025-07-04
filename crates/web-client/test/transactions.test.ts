@@ -119,7 +119,7 @@ describe("compile_tx_script tests", () => {
                 # => [0, 0]
                 assert_eq
 
-                call.auth_tx::auth_tx_rpo_falcon512
+                call.auth_tx::auth__tx_rpo_falcon512
             end
         `;
     const result = await compileTxScript(script);

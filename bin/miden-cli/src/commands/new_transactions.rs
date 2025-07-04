@@ -495,11 +495,7 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
         println!("{table}");
     }
 
-    if let Some(new_nonce) = account_delta.nonce() {
-        println!("New nonce: {new_nonce}.");
-    } else {
-        println!("No nonce changes.");
-    }
+    println!("Nonce incremented by: {}.", account_delta.nonce_increment());
 
     Ok(())
 }

@@ -287,7 +287,7 @@ pub fn build_wallet_id(
     let (account, _) = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_component(RpoFalcon512::new(public_key))
+        .with_auth_component(RpoFalcon512::new(public_key))
         .with_component(BasicWallet)
         .build()?;
 
@@ -301,11 +301,11 @@ pub fn build_wallet_id(
 pub mod tests {
     use alloc::vec::Vec;
 
-    use miden_lib::transaction::TransactionKernel;
+    use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
     use miden_objects::{
-        Felt, Word,
+        EMPTY_WORD, Felt, Word,
         account::{Account, AccountFile, AuthSecretKey},
-        crypto::dsa::rpo_falcon512::SecretKey,
+        crypto::dsa::rpo_falcon512::{PublicKey, SecretKey},
         testing::account_id::{
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         },
@@ -314,8 +314,12 @@ pub mod tests {
     use crate::tests::create_test_client;
 
     fn create_account_data(account_id: u128) -> AccountFile {
-        let account =
-            Account::mock(account_id, Felt::new(2), TransactionKernel::testing_assembler());
+        let account = Account::mock(
+            account_id,
+            Felt::new(2),
+            RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+            TransactionKernel::testing_assembler(),
+        );
 
         AccountFile::new(
             account.clone(),
@@ -343,6 +347,7 @@ pub mod tests {
         let account = Account::mock(
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
             Felt::new(0),
+            RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
             TransactionKernel::testing_assembler(),
         );
 
