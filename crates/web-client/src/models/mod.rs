@@ -88,7 +88,6 @@ pub mod transaction_id;
 pub mod transaction_kernel;
 pub mod transaction_record;
 pub mod transaction_request;
-pub mod transaction_result;
 pub mod transaction_script;
 pub mod transaction_script_inputs;
 pub mod transaction_status;

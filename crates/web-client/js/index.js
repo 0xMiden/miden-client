@@ -54,7 +54,6 @@ const {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
@@ -116,7 +115,6 @@ export {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
@@ -350,13 +348,14 @@ export class WebClient {
       }
       const serializedAccountId = accountId.toString();
       const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedTransactionResultBytes = await this.callMethodWithWorker(
-        MethodName.NEW_TRANSACTION,
-        serializedAccountId,
-        serializedTransactionRequest
-      );
-      return wasm.TransactionResult.deserialize(
-        new Uint8Array(serializedTransactionResultBytes)
+      const serializedExecutedTransactionBytes =
+        await this.callMethodWithWorker(
+          MethodName.NEW_TRANSACTION,
+          serializedAccountId,
+          serializedTransactionRequest
+        );
+      return wasm.ExecutedTransaction.deserialize(
+        new Uint8Array(serializedExecutedTransactionBytes)
       );
     } catch (error) {
       console.error("INDEX.JS: Error in newTransaction:", error.toString());
@@ -364,16 +363,16 @@ export class WebClient {
     }
   }
 
-  async submitTransaction(transactionResult, prover = undefined) {
+  async submitTransaction(executedTransaction, prover = undefined) {
     try {
       if (!this.worker) {
         return await this.wasmWebClient.submitTransaction(
-          transactionResult,
+          executedTransaction,
           prover
         );
       }
-      const serializedTransactionResult = transactionResult.serialize();
-      const args = [serializedTransactionResult];
+      const serializedExecutedTransaction = executedTransaction.serialize();
+      const args = [serializedExecutedTransaction];
 
       // If a prover is provided, serialize it and add it to the args.
       if (prover) {

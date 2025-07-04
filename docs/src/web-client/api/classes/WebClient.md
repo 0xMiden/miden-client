@@ -546,7 +546,7 @@ Meant to be used in conjunction with the force_import_store method
 
 ### newTransaction()
 
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`ExecutedTransaction`](ExecutedTransaction.md)\>
 
 #### Parameters
 
@@ -560,7 +560,7 @@ Meant to be used in conjunction with the force_import_store method
 
 #### Returns
 
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
+`Promise`\<[`ExecutedTransaction`](ExecutedTransaction.md)\>
 
 ***
 
@@ -606,13 +606,13 @@ Meant to be used in conjunction with the force_import_store method
 
 ### submitTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover`?): `Promise`\<`void`\>
+> **submitTransaction**(`executed_tx`, `prover`?): `Promise`\<`void`\>
 
 #### Parameters
 
-##### transaction\_result
+##### executed\_tx
 
-[`TransactionResult`](TransactionResult.md)
+[`ExecutedTransaction`](ExecutedTransaction.md)
 
 ##### prover?
 
@@ -636,13 +636,13 @@ Meant to be used in conjunction with the force_import_store method
 
 ### testingApplyTransaction()
 
-> **testingApplyTransaction**(`tx_result`): `Promise`\<`void`\>
+> **testingApplyTransaction**(`executed_tx`): `Promise`\<`void`\>
 
 #### Parameters
 
-##### tx\_result
+##### executed\_tx
 
-[`TransactionResult`](TransactionResult.md)
+[`ExecutedTransaction`](ExecutedTransaction.md)
 
 #### Returns
 

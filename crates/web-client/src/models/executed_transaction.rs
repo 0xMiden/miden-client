@@ -1,11 +1,13 @@
 use miden_objects::transaction::ExecutedTransaction as NativeExecutedTransaction;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::{
     account::Account, account_delta::AccountDelta, account_header::AccountHeader,
     account_id::AccountId, block_header::BlockHeader, input_notes::InputNotes,
     output_notes::OutputNotes, transaction_args::TransactionArgs, transaction_id::TransactionId,
 };
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -60,6 +62,14 @@ impl ExecutedTransaction {
     // TODO: tx_inputs
 
     // TODO: advice_witness
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<ExecutedTransaction, JsValue> {
+        deserialize_from_uint8array::<NativeExecutedTransaction>(bytes).map(ExecutedTransaction)
+    }
 }
 
 // CONVERSIONS
@@ -74,5 +84,17 @@ impl From<NativeExecutedTransaction> for ExecutedTransaction {
 impl From<&NativeExecutedTransaction> for ExecutedTransaction {
     fn from(native_executed_transaction: &NativeExecutedTransaction) -> Self {
         ExecutedTransaction(native_executed_transaction.clone())
+    }
+}
+
+impl From<ExecutedTransaction> for NativeExecutedTransaction {
+    fn from(executed_transaction: ExecutedTransaction) -> Self {
+        executed_transaction.0
+    }
+}
+
+impl From<&ExecutedTransaction> for NativeExecutedTransaction {
+    fn from(executed_transaction: &ExecutedTransaction) -> Self {
+        executed_transaction.0.clone()
     }
 }

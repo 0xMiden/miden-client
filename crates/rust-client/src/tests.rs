@@ -580,7 +580,7 @@ async fn mint_transaction() {
 
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
 
-    assert_eq!(transaction.executed_transaction().account_delta().nonce_increment(), ONE);
+    assert_eq!(transaction.account_delta().nonce_increment(), ONE);
 }
 
 #[tokio::test]
@@ -648,7 +648,7 @@ async fn transaction_request_expiration() {
 
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
 
-    let (_, tx_outputs, ..) = transaction.executed_transaction().clone().into_parts();
+    let (_, tx_outputs, ..) = transaction.into_parts();
 
     assert_eq!(tx_outputs.expiration_block_num, current_height + 5);
 }
@@ -1418,16 +1418,16 @@ async fn account_rollback() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = client.new_transaction(account_id, tx_request).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
+    let executed_tx = client.new_transaction(account_id, tx_request).await.unwrap();
+    let tx_id = executed_tx.id();
+    client.testing_prove_transaction(executed_tx.clone()).await.unwrap();
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
     let account_commitment_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
-    client.testing_apply_transaction(tx_result).await.unwrap();
+    client.testing_apply_transaction(executed_tx).await.unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
@@ -1505,13 +1505,13 @@ async fn subsequent_discarded_transactions() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = client.new_transaction(account_id, tx_request).await.unwrap();
-    let first_tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
+    let executed_tx = client.new_transaction(account_id, tx_request).await.unwrap();
+    let first_tx_id = executed_tx.id();
+    client.testing_prove_transaction(executed_tx.clone()).await.unwrap();
 
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
 
-    client.testing_apply_transaction(tx_result).await.unwrap();
+    client.testing_apply_transaction(executed_tx).await.unwrap();
 
     // Create a second transaction that will not expire
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -1525,10 +1525,10 @@ async fn subsequent_discarded_transactions() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = client.new_transaction(account_id, tx_request).await.unwrap();
-    let second_tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
-    client.testing_apply_transaction(tx_result).await.unwrap();
+    let executed_tx = client.new_transaction(account_id, tx_request).await.unwrap();
+    let second_tx_id = executed_tx.id();
+    client.testing_prove_transaction(executed_tx.clone()).await.unwrap();
+    client.testing_apply_transaction(executed_tx).await.unwrap();
 
     // Sync the state, which should discard the first transaction
     rpc_api.advance_blocks(3);

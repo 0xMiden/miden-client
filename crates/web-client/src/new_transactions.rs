@@ -1,9 +1,8 @@
 use miden_client::{
     note::BlockNumber,
     transaction::{
-        PaymentTransactionData, SwapTransactionData,
-        TransactionRequestBuilder as NativeTransactionRequestBuilder,
-        TransactionResult as NativeTransactionResult,
+        ExecutedTransaction as NativeExecutedTransaction, PaymentTransactionData,
+        SwapTransactionData, TransactionRequestBuilder as NativeTransactionRequestBuilder,
     },
 };
 use miden_lib::note::utils::build_swap_tag;
@@ -15,8 +14,8 @@ use wasm_bindgen::prelude::*;
 use crate::{
     WebClient, js_error_with_context,
     models::{
-        account_id::AccountId, note_type::NoteType, provers::TransactionProver,
-        transaction_request::TransactionRequest, transaction_result::TransactionResult,
+        account_id::AccountId, executed_transaction::ExecutedTransaction, note_type::NoteType,
+        provers::TransactionProver, transaction_request::TransactionRequest,
         transactions::NewSwapTransactionResult,
     },
 };
@@ -28,16 +27,16 @@ impl WebClient {
         &mut self,
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
-    ) -> Result<TransactionResult, JsValue> {
+    ) -> Result<ExecutedTransaction, JsValue> {
         self.fetch_and_cache_account_auth_by_account_id(account_id).await?;
 
         if let Some(client) = self.get_mut_inner() {
-            let native_transaction_execution_result: NativeTransactionResult = client
+            let native_executed_transaction: NativeExecutedTransaction = client
                 .new_transaction(account_id.into(), transaction_request.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to create new transaction"))?;
 
-            Ok(native_transaction_execution_result.into())
+            Ok(native_executed_transaction.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
@@ -46,23 +45,23 @@ impl WebClient {
     #[wasm_bindgen(js_name = "submitTransaction")]
     pub async fn submit_transaction(
         &mut self,
-        transaction_result: &TransactionResult,
+        executed_tx: &ExecutedTransaction,
         prover: Option<TransactionProver>,
     ) -> Result<(), JsValue> {
-        let native_transaction_result: NativeTransactionResult = transaction_result.into();
+        let native_executed_tx: NativeExecutedTransaction = executed_tx.into();
 
         if let Some(client) = self.get_mut_inner() {
             match prover {
                 Some(p) => {
                     client
-                        .submit_transaction_with_prover(native_transaction_result, p.get_prover())
+                        .submit_transaction_with_prover(native_executed_tx, p.get_prover())
                         .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to submit transaction with prover")
                         })?;
                 },
                 None => {
-                    client.submit_transaction(native_transaction_result).await.map_err(|err| {
+                    client.submit_transaction(native_executed_tx).await.map_err(|err| {
                         js_error_with_context(err, "failed to submit transaction")
                     })?;
                 },
@@ -230,14 +229,14 @@ impl WebClient {
                     js_error_with_context(err, "failed to create swap transaction request")
                 })?;
 
-            let swap_transaction_execution_result = client
+            let swap_transaction_executed_transaction = client
                 .new_transaction(sender_account_id, swap_transaction_request.clone())
                 .await
                 .map_err(|err| {
                     JsValue::from_str(&format!("failed to execute swap transaction: {err:?}"))
                 })?;
             let mut result = NewSwapTransactionResult::new(
-                swap_transaction_execution_result.executed_transaction().id().to_string(),
+                swap_transaction_executed_transaction.id().to_string(),
                 swap_transaction_request
                     .expected_output_own_notes()
                     .into_iter()
@@ -251,7 +250,7 @@ impl WebClient {
             );
 
             client
-                .submit_transaction(swap_transaction_execution_result)
+                .submit_transaction(swap_transaction_executed_transaction)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to submit swap transaction"))?;
 

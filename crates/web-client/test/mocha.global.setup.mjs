@@ -110,7 +110,6 @@ before(async () => {
         TransactionKernel,
         TransactionProver,
         TransactionRequest,
-        TransactionResult,
         TransactionRequestBuilder,
         TransactionScript,
         TransactionScriptInputPair,
@@ -176,7 +175,6 @@ before(async () => {
       window.TransactionKernel = TransactionKernel;
       window.TransactionProver = TransactionProver;
       window.TransactionRequest = TransactionRequest;
-      window.TransactionResult = TransactionResult;
       window.TransactionRequestBuilder = TransactionRequestBuilder;
       window.TransactionScript = TransactionScript;
       window.TransactionScriptInputPair = TransactionScriptInputPair;
