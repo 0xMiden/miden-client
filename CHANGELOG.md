@@ -15,6 +15,7 @@
 
 * Added support for FPI in Web Client (#958).
 * Exposed `bech32` account IDs in Web Client (#978).
+* [BREAKING] Added `utils` module to `miden-client` for common utilities (#971).
 
 ### Fixes
 

@@ -4,12 +4,15 @@ use miden_client::{
     store::{InputNoteState, NoteFilter},
     testing::common::*,
     transaction::{PaymentTransactionData, TransactionRequestBuilder},
+    utils::{
+        execute_tx_and_sync, insert_new_fungible_faucet, insert_new_wallet,
+        insert_new_wallet_with_seed,
+    },
 };
 use miden_objects::{
     account::AccountStorageMode,
     asset::{Asset, FungibleAsset},
-    note::{NoteFile, NoteType},
-    transaction::InputNote,
+    note::{NoteFile, NoteType, compute_note_commitment},
 };
 use rand::RngCore;
 
@@ -56,16 +59,19 @@ async fn onchain_notes_flow() {
         )
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
-    execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
+    execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request)
+        .await
+        .unwrap();
 
     // Client 2's account should receive the note here:
     client_2.sync_state().await.unwrap();
 
     // Assert that the note is the same
-    let received_note: InputNote =
-        client_2.get_input_note(note.id()).await.unwrap().unwrap().try_into().unwrap();
-    assert_eq!(received_note.note().commitment(), note.commitment());
-    assert_eq!(received_note.note(), &note);
+    let received_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    assert_eq!(
+        compute_note_commitment(received_note.id(), received_note.metadata().unwrap()),
+        note.commitment()
+    );
 
     // consume the note
     consume_notes(&mut client_2, basic_wallet_1.id(), &[received_note]).await;
@@ -90,7 +96,9 @@ async fn onchain_notes_flow() {
             client_2.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
+    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
+        .await
+        .unwrap();
 
     // Create a note for client 3 that is already consumed before syncing
     let tx_request = TransactionRequestBuilder::new()
@@ -106,10 +114,14 @@ async fn onchain_notes_flow() {
         )
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
+    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
+        .await
+        .unwrap();
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
+    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
+        .await
+        .unwrap();
 
     // sync client 3 (basic account 2)
     client_3.sync_state().await.unwrap();
@@ -125,9 +137,7 @@ async fn onchain_notes_flow() {
         .unwrap()
         .first()
         .unwrap()
-        .clone()
-        .try_into()
-        .unwrap();
+        .clone();
 
     consume_notes(&mut client_3, basic_wallet_2.id(), &[note]).await;
     assert_account_has_single_asset(
@@ -272,7 +282,7 @@ async fn onchain_accounts() {
             client_1.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
+    execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await.unwrap();
 
     // sync on second client until we receive the note
     println!("Syncing on second client...");
@@ -287,7 +297,7 @@ async fn onchain_accounts() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await;
+    execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await.unwrap();
 
     // sync on first client
     println!("Syncing on first client...");

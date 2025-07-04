@@ -18,6 +18,7 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::{
+    keystore::KeyStoreError,
     note::NoteScreenerError,
     rpc::RpcError,
     store::{NoteRecordError, StoreError},
@@ -92,6 +93,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("key store error")]
+    KeyStoreError(#[from] KeyStoreError),
 }
 
 // CONVERSIONS
