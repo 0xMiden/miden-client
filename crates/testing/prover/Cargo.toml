@@ -1,5 +1,5 @@
 [package]
-name = "testing-proving-service"
+name = "testing-remote-prover"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -9,8 +9,8 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0"
-miden-remote-prover = { git = "https://github.com/0xMiden/miden-node", branch = "tomyrd-update-lexicographic-words", features = ["concurrent"] }
-miden-node-utils = { git = "https://github.com/0xMiden/miden-node", branch = "tomyrd-update-lexicographic-words" }
+miden-remote-prover = { git = "https://github.com/0xMiden/miden-node", branch = "next", features = ["concurrent"] }
+miden-node-utils = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.13", default-features = false, features = ["transport"] }

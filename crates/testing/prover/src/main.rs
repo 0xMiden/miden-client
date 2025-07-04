@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{DEFAULT_PROVER_PORT}");
     let rpc = RpcListener::new(TcpListener::bind(&addr).await?, ProofType::Transaction);
 
-    println!("Proving service listening on {}", rpc.listener.local_addr()?);
+    println!("Remote prover listening on {}", rpc.listener.local_addr()?);
 
     tonic::transport::Server::builder()
         .accept_http1(true)

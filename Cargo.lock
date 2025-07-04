@@ -470,9 +470,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.27"
+version = "1.2.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d487aa071b5f64da6f19a3e848e3578944b726ee5a4854b82172f02aa876bfdc"
+checksum = "4ad45f4f74e4e20eaa392913b7b33a7091c87e59628f4dd27888205ad888843c"
 dependencies = [
  "jobserver",
  "libc",
@@ -2172,7 +2172,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "futures",
@@ -2200,7 +2200,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2227,7 +2227,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "hex",
@@ -2246,7 +2246,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "prost",
@@ -2257,7 +2257,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "futures",
@@ -2283,7 +2283,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2308,7 +2308,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "anyhow",
  "figment",
@@ -2320,6 +2320,7 @@ dependencies = [
  "opentelemetry_sdk",
  "rand 0.9.1",
  "serde",
+ "thiserror 2.0.12",
  "tokio",
  "tonic",
  "tower-http",
@@ -2380,8 +2381,9 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
+ "anyhow",
  "async-trait",
  "axum",
  "bytes",
@@ -2421,7 +2423,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.10.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-update-lexicographic-words#bec848bddf956205f925ccf8f0455a4a51311288"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#de0aa6bfccead97cc15c3ea918c5b4b0337a46ca"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -4472,7 +4474,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
-name = "testing-proving-service"
+name = "testing-remote-prover"
 version = "0.1.0"
 dependencies = [
  "anyhow",
