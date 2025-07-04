@@ -270,12 +270,12 @@ impl TransactionRequestBuilder {
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a P2ID
-    /// or P2IDR note. This request must be executed against the wallet sender account.
+    /// or P2IDE note. This request must be executed against the wallet sender account.
     ///
     /// - `payment_data` is the data for the payment transaction that contains the asset to be
     ///   transferred, the sender account ID, and the target account ID.
     /// - `recall_height` is the block height after which the sender can recall the assets. If None,
-    ///   a P2ID note is created. If `Some()`, a P2IDR note is created.
+    ///   a P2ID note is created. If `Some()`, a P2IDE note is created.
     /// - `note_type` determines the visibility of the note to be created.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.

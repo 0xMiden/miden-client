@@ -1053,7 +1053,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
 }
 
 #[tokio::test]
-async fn p2idr_transfer_consumed_by_target() {
+async fn p2ide_transfer_consumed_by_target() {
     let (mut client, _, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -1114,7 +1114,7 @@ async fn p2idr_transfer_consumed_by_target() {
         .unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -1134,7 +1134,7 @@ async fn p2idr_transfer_consumed_by_target() {
     let notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(!notes.is_empty());
 
-    // Make the `to_account_id` consume P2IDR note
+    // Make the `to_account_id` consume P2IDE note
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
@@ -1167,7 +1167,7 @@ async fn p2idr_transfer_consumed_by_target() {
 }
 
 #[tokio::test]
-async fn p2idr_transfer_consumed_by_sender() {
+async fn p2ide_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
     wait_for_node(&mut client).await;
 
@@ -1195,7 +1195,7 @@ async fn p2idr_transfer_consumed_by_sender() {
         .unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -1292,7 +1292,7 @@ async fn get_consumable_notes() {
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
