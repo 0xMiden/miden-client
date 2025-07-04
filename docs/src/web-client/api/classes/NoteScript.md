@@ -28,9 +28,9 @@
 
 ***
 
-### p2ide()
+### p2idr()
 
-> `static` **p2ide**(): `NoteScript`
+> `static` **p2idr**(): `NoteScript`
 
 #### Returns
 
