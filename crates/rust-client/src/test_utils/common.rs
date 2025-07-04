@@ -1,5 +1,4 @@
 use std::{
-    boxed::Box,
     env::temp_dir,
     fs::OpenOptions,
     io::Write,
@@ -19,7 +18,7 @@ use miden_objects::{
     note::{NoteId, NoteType},
     transaction::{InputNote, OutputNote, TransactionId},
 };
-use rand::{Rng, RngCore, rngs::StdRng};
+use rand::{Rng, rngs::StdRng};
 use toml::Table;
 use uuid::Uuid;
 
@@ -83,7 +82,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
 
     let builder = ClientBuilder::new()
         .with_rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-        .with_rng(Box::new(rng))
+        .with_rng(rng)
         .with_store(store)
         .with_filesystem_keystore(auth_path.to_str().unwrap())
         .in_debug_mode(true)

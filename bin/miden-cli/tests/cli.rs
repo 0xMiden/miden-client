@@ -762,7 +762,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new)));
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 
     let keystore = CliKeyStore::new(temp_dir()).unwrap();
 

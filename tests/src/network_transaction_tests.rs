@@ -19,7 +19,6 @@ use miden_objects::{
     account::AccountComponent,
     assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
 };
-use rand::RngCore;
 
 // HELPERS
 // ================================================================================================

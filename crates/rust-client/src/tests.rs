@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
+use std::{collections::BTreeSet, env::temp_dir, println, sync::Arc};
 
 // TESTS
 // ================================================================================================
@@ -39,7 +39,7 @@ use miden_tx::{
     TransactionExecutorError,
     utils::{Deserializable, Serializable},
 };
-use rand::{Rng, RngCore, rngs::StdRng};
+use rand::{Rng, rngs::StdRng};
 use uuid::Uuid;
 
 use crate::{
@@ -93,7 +93,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
 
     let builder = ClientBuilder::new()
         .with_rpc(arc_rpc_api)
-        .with_rng(Box::new(rng))
+        .with_rng(rng)
         .with_store(store)
         .with_filesystem_keystore(keystore_path.to_str().unwrap())
         .in_debug_mode(true)

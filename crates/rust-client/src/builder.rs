@@ -2,7 +2,6 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use std::boxed::Box;
 
 use miden_objects::{
     Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
@@ -46,13 +45,13 @@ enum AuthenticatorConfig {
 /// This builder allows you to configure the various components required by the client, such as the
 /// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
 /// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
-pub struct ClientBuilder {
+pub struct ClientBuilder<R: FeltRng = RpoRandomCoin> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
     /// An optional store provided by the user.
     store: Option<Arc<dyn Store>>,
-    /// An optional RNG provided by the user.
-    rng: Option<Box<dyn FeltRng>>,
+    /// RNG provided by the user.
+    rng: R,
     /// The store path to use when no store is directly provided via `with_store()`.
     #[cfg(feature = "sqlite")]
     store_path: String,
@@ -70,10 +69,16 @@ pub struct ClientBuilder {
 
 impl Default for ClientBuilder {
     fn default() -> Self {
+        let rng = {
+            let mut seed_rng = rand::rng();
+            let coin_seed: [u64; 4] = seed_rng.random();
+            RpoRandomCoin::new(coin_seed.map(Felt::new))
+        };
+
         Self {
             rpc_api: None,
             store: None,
-            rng: None,
+            rng,
             #[cfg(feature = "sqlite")]
             store_path: "store.sqlite3".to_string(),
             keystore: None,
@@ -90,7 +95,9 @@ impl ClientBuilder {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<R: FeltRng> ClientBuilder<R> {
     /// Enable or disable debug mode.
     #[must_use]
     pub fn in_debug_mode(mut self, debug: bool) -> Self {
@@ -128,10 +135,10 @@ impl ClientBuilder {
         self
     }
 
-    /// Optionally provide a custom RNG.
+    /// Provide a custom RNG.
     #[must_use]
-    pub fn with_rng(mut self, rng: Box<dyn FeltRng>) -> Self {
-        self.rng = Some(rng);
+    pub fn with_rng(mut self, rng: R) -> Self {
+        self.rng = rng;
         self
     }
 
@@ -177,7 +184,7 @@ impl ClientBuilder {
     /// - Returns an error if the store cannot be instantiated.
     /// - Returns an error if the keystore is not specified or fails to initialize.
     #[allow(clippy::unused_async, unused_mut)]
-    pub async fn build(mut self) -> Result<Client, ClientError> {
+    pub async fn build(mut self) -> Result<Client<R>, ClientError> {
         // Determine the RPC client to use.
         let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
             client
@@ -206,15 +213,6 @@ impl ClientBuilder {
             ));
         };
 
-        // Use the provided RNG, or create a default one.
-        let rng = if let Some(user_rng) = self.rng {
-            user_rng
-        } else {
-            let mut seed_rng = rand::rng();
-            let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new)))
-        };
-
         // Initialize the authenticator.
         let authenticator = match self.keystore {
             Some(AuthenticatorConfig::Instance(authenticator)) => authenticator,
@@ -233,7 +231,7 @@ impl ClientBuilder {
 
         Ok(Client::new(
             rpc_api,
-            rng,
+            self.rng,
             arc_store,
             authenticator,
             ExecutionOptions::new(

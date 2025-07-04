@@ -11,7 +11,6 @@ use miden_objects::{
     note::{NoteFile, NoteType},
     transaction::InputNote,
 };
-use rand::RngCore;
 
 // TESTS
 // ================================================================================================
