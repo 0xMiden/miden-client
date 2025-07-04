@@ -687,7 +687,7 @@ async fn import_consumed_note_with_proof() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -748,7 +748,7 @@ async fn import_consumed_note_with_id() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -807,7 +807,7 @@ async fn import_note_with_proof() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -870,7 +870,7 @@ async fn discarded_transaction() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(

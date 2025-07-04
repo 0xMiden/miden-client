@@ -60,6 +60,11 @@ doc: ## Generate & check rust documentation. You'll need `jq` in order for this 
 book: ## Builds the book & serves documentation site
 	mdbook serve --open docs
 
+.PHONY: typedoc
+typedoc: ## Generate web client package documentation. Requires building the package first.
+	@cd crates/web-client && \
+	yarn typedoc
+
 # --- Testing -------------------------------------------------------------------------------------
 
 .PHONY: test

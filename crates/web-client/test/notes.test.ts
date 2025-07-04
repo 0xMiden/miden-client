@@ -135,7 +135,7 @@ describe("get_consumable_notes", () => {
     });
   });
 
-  it("p2idr consume after block", async () => {
+  it("p2ide consume after block", async () => {
     const { accountId: senderAccountId, faucetId } =
       await setupWalletAndFaucet();
     const { accountId: targetAccountId } = await setupWalletAndFaucet();

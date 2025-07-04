@@ -53,7 +53,7 @@ pub const ACCOUNT_ID_REGULAR: u128 = ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABL
 
 pub const TEST_CLIENT_RPC_CONFIG_FILE: &str = include_str!("./config/miden-client-rpc.toml");
 
-/// Constant that represents the number of blocks until the p2idr can be recalled. If this value is
+/// Constant that represents the number of blocks until the p2ide can be recalled. If this value is
 /// too low, some tests might fail due to expected recall failures not happening.
 pub const RECALL_HEIGHT_DELTA: u32 = 50;
 
