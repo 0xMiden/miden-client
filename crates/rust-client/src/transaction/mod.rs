@@ -559,7 +559,7 @@ impl Client {
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.get_input_notes(authenticated_note_records)?;
+        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();

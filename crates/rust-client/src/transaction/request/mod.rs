@@ -195,12 +195,17 @@ impl TransactionRequest {
         self.ignore_invalid_input_notes
     }
 
-    pub(crate) fn get_input_notes(
+    /// Builds the [`InputNotes`] needed for the transaction execution. Full valid notes for the
+    /// specified authenticated notes need to be provided, otherwise an error will be returned.
+    /// The transaction input notes will include both authenticated and unauthenticated notes in the
+    /// order they were provided in the transaction request.
+    pub(crate) fn build_input_notes(
         &self,
         authenticated_note_records: Vec<InputNoteRecord>,
     ) -> Result<InputNotes<InputNote>, TransactionRequestError> {
         let mut input_notes: BTreeMap<NoteId, InputNote> = BTreeMap::new();
 
+        // Add provided authenticated input notes to the input notes map.
         for authenticated_note_record in authenticated_note_records {
             if !authenticated_note_record.is_authenticated() {
                 return Err(TransactionRequestError::InputNoteNotAuthenticated(
@@ -222,14 +227,18 @@ impl TransactionRequest {
             );
         }
 
-        for unauthenticated_input_notes in &self.unauthenticated_input_notes {
-            let note_id = unauthenticated_input_notes.id();
-            if input_notes.contains_key(&note_id) {
-                return Err(TransactionRequestError::InputNotesMapMissingUnauthenticatedNotes);
+        // Ensure that all authenticated input notes are present in the input notes map before
+        // continuing.
+        for id in self.authenticated_input_note_ids() {
+            if !input_notes.contains_key(&id) {
+                return Err(TransactionRequestError::MissingAuthenticatedInputNote(id));
             }
+        }
 
+        // Add unauthenticated input notes to the input notes map.
+        for unauthenticated_input_notes in &self.unauthenticated_input_notes {
             input_notes.insert(
-                note_id,
+                unauthenticated_input_notes.id(),
                 InputNote::Unauthenticated {
                     note: unauthenticated_input_notes.clone(),
                 },
@@ -239,7 +248,11 @@ impl TransactionRequest {
         Ok(InputNotes::new(
             self.get_input_note_ids()
                 .iter()
-                .filter_map(|note_id| input_notes.remove(note_id))
+                .map(|note_id| {
+                    input_notes
+                        .remove(note_id)
+                        .expect("The input note map was checked to contain all input notes")
+                })
                 .collect(),
         )?)
     }
@@ -397,14 +410,14 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("the input notes map should include keys for all provided unauthenticated input notes")]
-    InputNotesMapMissingUnauthenticatedNotes,
     #[error("own notes shouldn't be of the header variant")]
     InvalidNoteVariant,
     #[error("invalid sender account id: {0}")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
     InvalidTransactionScript(#[from] TransactionScriptError),
+    #[error("specified authenticated input note with id {0} is missing")]
+    MissingAuthenticatedInputNote(NoteId),
     #[error("a transaction without output notes must have at least one input note")]
     NoInputNotes,
     #[error("note not found: {0}")]

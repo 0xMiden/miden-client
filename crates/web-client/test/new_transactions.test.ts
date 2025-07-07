@@ -396,19 +396,18 @@ export const customTransaction = async (
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
       let transactionScript = await client.compileTxScript(txScript);
-      let noteId = note.id();
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
-      let noteIdAndArgs = new window.NoteIdAndArgs(
-        noteId,
+      let noteAndArgs = new window.NoteAndArgs(
+        note,
         noteArgsCommitment.toWord()
       );
-      let noteIdAndArgsArray = new window.NoteIdAndArgsArray([noteIdAndArgs]);
+      let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
-        .withAuthenticatedInputNotes(noteIdAndArgsArray)
+        .withUnauthenticatedInputNotes(noteAndArgsArray)
         .withCustomScript(transactionScript)
         .extendAdviceMap(adviceMap)
         .build();
