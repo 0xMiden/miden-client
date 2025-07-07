@@ -30,9 +30,9 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
     let (_, _, store_config, auth_path) = get_client_config();
 
     let mut client = ClientBuilder::new()
-        .with_tonic_rpc_client(&Endpoint::default(), Some(10_000))
-        .with_filesystem_keystore(auth_path.to_str().unwrap())
-        .with_sqlite_store(store_config.to_str().unwrap())
+        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
+        .filesystem_keystore(auth_path.to_str().unwrap())
+        .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(true)
         .build()
         .await?;
@@ -50,8 +50,8 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
 async fn client_builder_fails_without_keystore() {
     let (_, _, store_config, _) = get_client_config();
     let result = ClientBuilder::new()
-        .with_tonic_rpc_client(&Endpoint::default(), Some(10_000))
-        .with_sqlite_store(store_config.to_str().unwrap())
+        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
+        .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(true)
         .build()
         .await;
@@ -616,14 +616,12 @@ async fn consume_multiple_expected_notes() {
 
     // Create and execute transactions
     let tx_request_1 = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
         .build_consume_notes(client_owned_notes.iter().map(|note| note.id()).collect())
         .unwrap();
 
     let tx_request_2 = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(
-            unauth_owned_notes.iter().map(|note| ((*note).clone(), None)),
-        )
+        .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build_consume_notes(unauth_owned_notes.iter().map(|note| note.id()).collect())
         .unwrap();
 
@@ -1087,7 +1085,7 @@ async fn expired_transaction_fails() {
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
     let tx_request = TransactionRequestBuilder::new()
-        .with_expiration_delta(expiration_delta)
+        .expiration_delta(expiration_delta)
         .build_mint_fungible_asset(fungible_asset, from_account_id, NoteType::Public, client.rng())
         .unwrap();
 

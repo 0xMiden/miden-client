@@ -481,7 +481,7 @@ async fn debug_mode_outputs_logs() {
     // Send transaction and wait for it to be committed
     client.sync_state().await.unwrap();
     let transaction_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await;
