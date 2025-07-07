@@ -3,7 +3,7 @@ use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
 
 use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 use miden_objects::{
-    Digest, Felt, FieldElement,
+    Digest, Felt, FieldElement, Word,
     account::AccountId,
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
@@ -60,6 +60,10 @@ pub struct TransactionRequestBuilder {
     /// transaction. This will allow the transaction to be executed even if some input notes
     /// are invalid.
     ignore_invalid_input_notes: bool,
+    /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
+    /// execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    script_arg: Option<Word>,
 }
 
 impl TransactionRequestBuilder {
@@ -80,6 +84,7 @@ impl TransactionRequestBuilder {
             expiration_delta: None,
             foreign_accounts: BTreeMap::default(),
             ignore_invalid_input_notes: false,
+            script_arg: None,
         }
     }
 
@@ -222,6 +227,15 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn ignore_invalid_input_notes(mut self) -> Self {
         self.ignore_invalid_input_notes = true;
+        self
+    }
+
+    /// Sets an optional [`Word`] that will be pushed to the operand stack before the transaction
+    /// script execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    #[must_use]
+    pub fn script_arg(mut self, script_arg: Word) -> Self {
+        self.script_arg = Some(script_arg);
         self
     }
 
@@ -412,6 +426,7 @@ impl TransactionRequestBuilder {
             foreign_accounts: self.foreign_accounts.into_values().collect(),
             expiration_delta: self.expiration_delta,
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
+            script_arg: self.script_arg,
         })
     }
 }
