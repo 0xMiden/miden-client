@@ -44,7 +44,6 @@
 //!     // Build a transaction request for a pay-to-id transaction.
 //!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
 //!         PaymentTransactionData::new(vec![asset.into()], sender_id, target_id),
-//!         None, // No recall height
 //!         NoteType::Private,
 //!         client.rng(),
 //!     )?;
@@ -1314,7 +1313,6 @@ mod test {
                     account.id(),
                     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
                 ),
-                None,
                 NoteType::Private,
                 client.rng(),
             )

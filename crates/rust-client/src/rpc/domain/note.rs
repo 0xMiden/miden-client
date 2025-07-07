@@ -4,10 +4,7 @@ use miden_objects::{
     Digest, Felt,
     block::BlockHeader,
     crypto::merkle::MerklePath,
-    note::{
-        Note, NoteDetails, NoteExecutionHint, NoteId, NoteInclusionProof, NoteMetadata, NoteTag,
-        NoteType,
-    },
+    note::{Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteTag, NoteType},
 };
 use miden_tx::utils::Deserializable;
 
@@ -33,10 +30,7 @@ impl TryFrom<ProtoNoteMetadata> for NoteMetadata {
             .try_into()?;
         let note_type = NoteType::try_from(u64::from(value.note_type))?;
         let tag = NoteTag::from(value.tag);
-        let execution_hint_tag = (value.execution_hint & 0xff) as u8;
-        let execution_hint_payload = ((value.execution_hint >> 8) & 0x00ff_ffff) as u32;
-        let execution_hint =
-            NoteExecutionHint::from_parts(execution_hint_tag, execution_hint_payload)?;
+        let execution_hint = value.execution_hint.try_into()?;
 
         let aux = Felt::try_from(value.aux).map_err(|_| RpcConversionError::NotAValidFelt)?;
 

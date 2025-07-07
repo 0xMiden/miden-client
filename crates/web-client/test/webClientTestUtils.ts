@@ -161,7 +161,8 @@ export const sendTransaction = async (
         faucetAccountId,
         window.NoteType.Public,
         BigInt(100),
-        _recallHeight
+        _recallHeight,
+        null
       );
       let sendTransactionResult = await client.newTransaction(
         senderAccountId,

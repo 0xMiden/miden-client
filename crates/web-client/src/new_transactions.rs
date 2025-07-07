@@ -113,43 +113,36 @@ impl WebClient {
         note_type: NoteType,
         amount: u64,
         recall_height: Option<u32>,
+        timelock_height: Option<u32>,
     ) -> Result<TransactionRequest, JsValue> {
+        let client = self.get_mut_inner().ok_or_else(|| {
+            JsValue::from_str("Client not initialized while generating transaction request")
+        })?;
+
         let fungible_asset = FungibleAsset::new(faucet_id.into(), amount)
             .map_err(|err| js_error_with_context(err, "failed to create fungible asset"))?;
 
-        let payment_transaction = PaymentTransactionData::new(
+        let mut payment_transaction = PaymentTransactionData::new(
             vec![fungible_asset.into()],
             sender_account_id.into(),
             target_account_id.into(),
         );
 
-        let send_transaction_request = {
-            let client = self.get_mut_inner().ok_or_else(|| {
-                JsValue::from_str("Client not initialized while generating transaction request")
-            })?;
+        if let Some(recall_height) = recall_height {
+            payment_transaction =
+                payment_transaction.with_reclaim_height(BlockNumber::from(recall_height));
+        }
 
-            if let Some(recall_height) = recall_height {
-                NativeTransactionRequestBuilder::new()
-                    .build_pay_to_id(
-                        payment_transaction,
-                        Some(BlockNumber::from(recall_height)),
-                        note_type.into(),
-                        client.rng(),
-                    )
-                    .map_err(|err| {
-                        js_error_with_context(
-                            err,
-                            "failed to create send transaction request with recall height",
-                        )
-                    })?
-            } else {
-                NativeTransactionRequestBuilder::new()
-                    .build_pay_to_id(payment_transaction, None, note_type.into(), client.rng())
-                    .map_err(|err| {
-                        js_error_with_context(err, "failed to create send transaction request")
-                    })?
-            }
-        };
+        if let Some(height) = timelock_height {
+            payment_transaction =
+                payment_transaction.with_timelock_height(BlockNumber::from(height));
+        }
+
+        let send_transaction_request = NativeTransactionRequestBuilder::new()
+            .build_pay_to_id(payment_transaction, note_type.into(), client.rng())
+            .map_err(|err| {
+                js_error_with_context(err, "failed to create send transaction request")
+            })?;
 
         Ok(send_transaction_request.into())
     }

@@ -17,6 +17,7 @@
 * Added support for FPI in Web Client (#958).
 * Exposed `bech32` account IDs in Web Client (#978).
 * Added transaction script argument support to `TransactionRequest` (#1017).
+* [BREAKING] Added support for timelock P2IDE notes (#1020).
 
 ### Fixes
 

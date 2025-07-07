@@ -3,7 +3,7 @@ use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
 
 use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 use miden_objects::{
-    Digest, Felt, FieldElement, Word,
+    Digest, Felt, FieldElement, NoteError, Word,
     account::AccountId,
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
@@ -287,9 +287,8 @@ impl TransactionRequestBuilder {
     /// or P2IDE note. This request must be executed against the wallet sender account.
     ///
     /// - `payment_data` is the data for the payment transaction that contains the asset to be
-    ///   transferred, the sender account ID, and the target account ID.
-    /// - `recall_height` is the block height after which the sender can recall the assets. If None,
-    ///   a P2ID note is created. If `Some()`, a P2IDE note is created.
+    ///   transferred, the sender account ID, and the target account ID. If the recall or timelock
+    ///   heights are set, a P2IDE note will be created; otherwise, a P2ID note will be created.
     /// - `note_type` determines the visibility of the note to be created.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
@@ -298,44 +297,18 @@ impl TransactionRequestBuilder {
     pub fn build_pay_to_id(
         self,
         payment_data: PaymentTransactionData,
-        recall_height: Option<BlockNumber>,
         note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let PaymentTransactionData {
-            assets,
-            sender_account_id,
-            target_account_id,
-        } = payment_data;
-
-        if assets
+        if payment_data
+            .assets()
             .iter()
             .all(|asset| asset.is_fungible() && asset.unwrap_fungible().amount() == 0)
         {
             return Err(TransactionRequestError::P2IDNoteWithoutAsset);
         }
 
-        let created_note = if let Some(recall_height) = recall_height {
-            create_p2ide_note(
-                sender_account_id,
-                target_account_id,
-                assets,
-                Some(recall_height),
-                None, //TODO: Add support for timelock P2IDE notes
-                note_type,
-                Felt::ZERO,
-                rng,
-            )?
-        } else {
-            create_p2id_note(
-                sender_account_id,
-                target_account_id,
-                assets,
-                note_type,
-                Felt::ZERO,
-                rng,
-            )?
-        };
+        let created_note = payment_data.into_note(note_type, rng)?;
 
         self.with_own_output_notes(vec![OutputNote::Full(created_note)]).build()
     }
@@ -443,6 +416,12 @@ pub struct PaymentTransactionData {
     sender_account_id: AccountId,
     /// Account ID of the receiver account.
     target_account_id: AccountId,
+    /// Optional reclaim height for the P2IDE note. It allows the possibility for the sender to
+    /// reclaim the assets if the note has not been consumed by the target before this height.
+    reclaim_height: Option<BlockNumber>,
+    /// Optional timelock height for the P2IDE note. It allows the possibility to add a timelock to
+    /// the asset transfer, meaning that the note can only be consumed after this height.
+    timelock_height: Option<BlockNumber>,
 }
 
 impl PaymentTransactionData {
@@ -459,7 +438,23 @@ impl PaymentTransactionData {
             assets,
             sender_account_id,
             target_account_id,
+            reclaim_height: None,
+            timelock_height: None,
         }
+    }
+
+    /// Modifies the [`PaymentTransactionData`] to set a reclaim height for payment note.
+    #[must_use]
+    pub fn with_reclaim_height(mut self, reclaim_height: BlockNumber) -> PaymentTransactionData {
+        self.reclaim_height = Some(reclaim_height);
+        self
+    }
+
+    /// Modifies the [`PaymentTransactionData`] to set a timelock height for payment note.
+    #[must_use]
+    pub fn with_timelock_height(mut self, timelock_height: BlockNumber) -> PaymentTransactionData {
+        self.timelock_height = Some(timelock_height);
+        self
     }
 
     /// Returns the executor [`AccountId`].
@@ -475,6 +470,52 @@ impl PaymentTransactionData {
     /// Returns the transaction's list of [`Asset`].
     pub fn assets(&self) -> &Vec<Asset> {
         &self.assets
+    }
+
+    /// Returns the reclaim height for the P2IDE note, if set.
+    pub fn reclaim_height(&self) -> Option<BlockNumber> {
+        self.reclaim_height
+    }
+
+    /// Returns the timelock height for the P2IDE note, if set.
+    pub fn timelock_height(&self) -> Option<BlockNumber> {
+        self.timelock_height
+    }
+
+    // CONVERSION
+    // --------------------------------------------------------------------------------------------
+
+    /// Converts the payment transaction data into a [`Note`] based on the specified fields. If the
+    /// reclaim and timelock heights are not set, a P2ID note is created; otherwise, a P2IDE note is
+    /// created.
+    pub(crate) fn into_note(
+        self,
+        note_type: NoteType,
+        rng: &mut ClientRng,
+    ) -> Result<Note, NoteError> {
+        if self.reclaim_height.is_none() && self.timelock_height.is_none() {
+            // Create a P2ID note
+            create_p2id_note(
+                self.sender_account_id,
+                self.target_account_id,
+                self.assets,
+                note_type,
+                Felt::ZERO,
+                rng,
+            )
+        } else {
+            // Create a P2IDE note
+            create_p2ide_note(
+                self.sender_account_id,
+                self.target_account_id,
+                self.assets,
+                self.reclaim_height,
+                self.timelock_height,
+                note_type,
+                Felt::ZERO,
+                rng,
+            )
+        }
     }
 }
 

@@ -474,7 +474,7 @@ Meant to be used in conjunction with the force_import_store method
 
 ### newSendTransactionRequest()
 
-> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height`?): [`TransactionRequest`](TransactionRequest.md)
+> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height`?, `timelock_height`?): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
@@ -499,6 +499,10 @@ Meant to be used in conjunction with the force_import_store method
 `bigint`
 
 ##### recall\_height?
+
+`number`
+
+##### timelock\_height?
 
 `number`
 

@@ -119,6 +119,11 @@ pub struct SendCmd {
     #[arg(short, long)]
     recall_height: Option<u32>,
 
+    /// Set the timelock height for the transaction. The note will not be consumable until this
+    /// height is reached.
+    #[arg(short = 'i', long)]
+    timelock_height: Option<u32>,
+
     /// Flag to delegate proving to the remote prover specified in the config file
     #[arg(long, default_value_t = false)]
     delegate_proving: bool,
@@ -137,19 +142,24 @@ impl SendCmd {
             get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
         let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
 
-        let payment_transaction = PaymentTransactionData::new(
+        let mut payment_transaction = PaymentTransactionData::new(
             vec![fungible_asset.into()],
             sender_account_id,
             target_account_id,
         );
 
+        if let Some(recall_height) = self.recall_height {
+            payment_transaction =
+                payment_transaction.with_reclaim_height(BlockNumber::from(recall_height));
+        }
+
+        if let Some(timelock_height) = self.timelock_height {
+            payment_transaction =
+                payment_transaction.with_timelock_height(BlockNumber::from(timelock_height));
+        }
+
         let transaction_request = TransactionRequestBuilder::new()
-            .build_pay_to_id(
-                payment_transaction,
-                self.recall_height.map(BlockNumber::from),
-                (&self.note_type).into(),
-                client.rng(),
-            )
+            .build_pay_to_id(payment_transaction, (&self.note_type).into(), client.rng())
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build payment transaction".to_string())
             })?;

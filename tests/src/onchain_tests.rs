@@ -85,7 +85,6 @@ async fn onchain_notes_flow() {
                 basic_wallet_1.id(),
                 basic_wallet_2.id(),
             ),
-            None,
             NoteType::Public,
             client_2.rng(),
         )
@@ -99,8 +98,8 @@ async fn onchain_notes_flow() {
                 vec![p2id_asset.into()],
                 basic_wallet_1.id(),
                 basic_wallet_2.id(),
-            ),
-            Some(1.into()),
+            )
+            .with_reclaim_height(1.into()),
             NoteType::Public,
             client_2.rng(),
         )
@@ -267,7 +266,6 @@ async fn onchain_accounts() {
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Public,
             client_1.rng(),
         )

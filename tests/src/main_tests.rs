@@ -84,7 +84,6 @@ async fn multiple_tx_on_same_block() {
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
@@ -96,7 +95,6 @@ async fn multiple_tx_on_same_block() {
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
@@ -399,8 +397,8 @@ async fn sync_detail_values() {
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(new_details.block_num + 5),
+            )
+            .with_reclaim_height(new_details.block_num + 5),
             NoteType::Public,
             client1.rng(),
         )
@@ -694,8 +692,8 @@ async fn import_consumed_note_with_proof() {
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -755,8 +753,8 @@ async fn import_consumed_note_with_id() {
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
@@ -814,8 +812,8 @@ async fn import_note_with_proof() {
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -877,8 +875,8 @@ async fn discarded_transaction() {
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
