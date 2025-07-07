@@ -61,8 +61,9 @@ book: ## Builds the book & serves documentation site
 	mdbook serve --open docs
 
 .PHONY: typedoc
-typedoc: ## Generate web client package documentation. Requires building the package first.
+typedoc: ## Generate web client package documentation.
 	@cd crates/web-client && \
+	npm run build && \
 	yarn typedoc
 
 # --- Testing -------------------------------------------------------------------------------------
