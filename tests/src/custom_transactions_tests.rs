@@ -95,7 +95,7 @@ async fn transaction_request() {
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
         .authenticated_input_notes(note_args_map.clone())
-        .custom_script(tx_script)
+        .custom_script(tx_script.clone())
         .script_arg([ZERO, ZERO, ZERO, ZERO])
         .extend_advice_map(advice_map.clone())
         .build()
