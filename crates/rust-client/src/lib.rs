@@ -212,6 +212,8 @@ use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
+use crate::store::data_store::ClientDataStore;
+
 // MIDEN CLIENT
 // ================================================================================================
 
@@ -234,6 +236,9 @@ pub struct Client {
     /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
     /// client.
     tx_prover: Arc<LocalTransactionProver>,
+    /// An instance of a [`ClientDataStore`] which the executor will use to access the
+    /// underlying store with a caching mechanism.
+    data_store: ClientDataStore,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<dyn TransactionAuthenticator>>,
@@ -282,6 +287,8 @@ impl Client {
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Self {
+        let data_store = ClientDataStore::new(store.clone());
+
         let authenticator = Some(authenticator);
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
@@ -290,6 +297,7 @@ impl Client {
             rng: ClientRng::new(rng),
             rpc_api,
             tx_prover,
+            data_store,
             authenticator,
             exec_options,
             tx_graceful_blocks,

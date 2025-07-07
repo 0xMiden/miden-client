@@ -26,9 +26,15 @@ use crate::store::{AccountStatus, StoreError};
 
 pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
-    let code = account_code.to_bytes();
+    let mast_forest = account_code.mast().to_bytes();
+    let procedure_info = account_code.procedures().to_vec().to_bytes();
+    let procedure_roots = account_code
+        .procedures()
+        .iter()
+        .map(|proc| proc.mast_root().to_hex())
+        .collect::<Vec<String>>();
 
-    let promise = idxdb_insert_account_code(root, code);
+    let promise = idxdb_insert_account_code(root, mast_forest, procedure_info, procedure_roots);
     JsFuture::from(promise).await?;
 
     Ok(())

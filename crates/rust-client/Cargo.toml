@@ -40,6 +40,7 @@ miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 miden-testing = { workspace = true, optional = true }
 miden-tx = { workspace = true, features = ["async"] }
+pollster = { version = "0.4" }
 prost = { version = "0.13", default-features = false, features = ["derive"] }
 rand = { workspace = true }
 rusqlite = { version = "0.36", features = ["vtab", "array", "bundled"], optional = true }
