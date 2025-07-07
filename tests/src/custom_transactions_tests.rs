@@ -90,13 +90,13 @@ async fn transaction_request() {
             call.auth_tx::auth_tx_rpo_falcon512
         end
         ";
-    let tx_script = client.compile_tx_script(&code).unwrap();
+    let tx_script = client.compile_tx_script(code).unwrap();
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map.clone())
         .with_custom_script(tx_script.clone())
-        .with_script_arg([ZERO, ZERO, ZERO, ZERO])
+        .script_arg([ZERO, ZERO, ZERO, ZERO])
         .extend_advice_map(advice_map.clone())
         .build()
         .unwrap();
@@ -107,7 +107,7 @@ async fn transaction_request() {
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
         .with_authenticated_input_notes(note_args_map)
-        .with_script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
+        .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
         .with_custom_script(tx_script)
         .extend_advice_map(advice_map)
         .build()

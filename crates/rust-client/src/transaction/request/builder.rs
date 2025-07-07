@@ -61,7 +61,8 @@ pub struct TransactionRequestBuilder {
     /// are invalid.
     ignore_invalid_input_notes: bool,
     /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
-    /// execution.
+    /// execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
     script_arg: Option<Word>,
 }
 
@@ -230,9 +231,10 @@ impl TransactionRequestBuilder {
     }
 
     /// Sets an optional [`Word`] that will be pushed to the operand stack before the transaction
-    /// script execution.
+    /// script execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
     #[must_use]
-    pub fn with_script_arg(mut self, script_arg: Word) -> Self {
+    pub fn script_arg(mut self, script_arg: Word) -> Self {
         self.script_arg = Some(script_arg);
         self
     }

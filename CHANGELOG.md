@@ -2,7 +2,6 @@
 
 ## 0.10.0 (TBD)
 
-* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
 
 ### Changes
 
@@ -10,11 +9,13 @@
 * [BREAKING] Merged `concurrent` feature with `std` (#974).
 * [BREAKING] Changed `TransactionRequest` to use expected output recipients instead of output notes (#976).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897).
 
 ### Features
 
 * Added support for FPI in Web Client (#958).
 * Exposed `bech32` account IDs in Web Client (#978).
+* Added transaction script argument support to `TransactionRequest` (#1017).
 
 ### Fixes
 
