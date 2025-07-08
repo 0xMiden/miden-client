@@ -1631,6 +1631,38 @@ async fn input_note_checks() {
     for (i, input_note) in input_notes.enumerate() {
         assert_eq!(input_note.id(), mint_notes[i].id());
     }
+
+    let tx_id = transaction.executed_transaction().id();
+    client.submit_transaction(transaction).await.unwrap();
+    wait_for_tx(&mut client, tx_id).await;
+
+    // Check that using consumed notes will return an error
+    let consumed_note_tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![mint_notes[0].id()])
+        .unwrap();
+    let error = client.new_transaction(wallet.id(), consumed_note_tx_request).await.unwrap_err();
+
+    assert!(matches!(
+        error,
+        ClientError::TransactionRequestError(TransactionRequestError::InputNoteAlreadyConsumed(_))
+    ));
+
+    // Check that adding an authenticated note that is not tracked by the client will return an
+    // error
+    let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![EMPTY_WORD.into()])
+        .unwrap();
+    let error = client
+        .new_transaction(wallet.id(), missing_authenticated_note_tx_request)
+        .await
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        ClientError::TransactionRequestError(
+            TransactionRequestError::MissingAuthenticatedInputNote(_)
+        )
+    ));
 }
 
 #[tokio::test]
