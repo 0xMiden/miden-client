@@ -7,7 +7,7 @@ use alloc::{
 
 use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 use miden_objects::{
-    Digest, Felt, FieldElement,
+    Digest, Felt, FieldElement, Word,
     account::AccountId,
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
@@ -64,6 +64,10 @@ pub struct TransactionRequestBuilder {
     /// transaction. This will allow the transaction to be executed even if some input notes
     /// are invalid.
     ignore_invalid_input_notes: bool,
+    /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
+    /// execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    script_arg: Option<Word>,
 }
 
 impl TransactionRequestBuilder {
@@ -84,12 +88,13 @@ impl TransactionRequestBuilder {
             expiration_delta: None,
             foreign_accounts: BTreeMap::default(),
             ignore_invalid_input_notes: false,
+            script_arg: None,
         }
     }
 
     /// Adds the specified notes as unauthenticated input notes to the transaction request.
     #[must_use]
-    pub fn with_unauthenticated_input_notes(
+    pub fn unauthenticated_input_notes(
         mut self,
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
@@ -102,7 +107,7 @@ impl TransactionRequestBuilder {
 
     /// Adds the specified notes as authenticated input notes to the transaction request.
     #[must_use]
-    pub fn with_authenticated_input_notes(
+    pub fn authenticated_input_notes(
         mut self,
         notes: impl IntoIterator<Item = (NoteId, Option<NoteArgs>)>,
     ) -> Self {
@@ -119,7 +124,7 @@ impl TransactionRequestBuilder {
     /// If a transaction script template is already set (e.g. by calling `with_custom_script`), the
     /// [`TransactionRequestBuilder::build`] method will return an error.
     #[must_use]
-    pub fn with_own_output_notes(mut self, notes: impl IntoIterator<Item = OutputNote>) -> Self {
+    pub fn own_output_notes(mut self, notes: impl IntoIterator<Item = OutputNote>) -> Self {
         for note in notes {
             if let OutputNote::Full(note) = &note {
                 self.expected_output_recipients
@@ -137,7 +142,7 @@ impl TransactionRequestBuilder {
     /// If a script template is already set (e.g. by calling `with_own_output_notes`), the
     /// [`TransactionRequestBuilder::build`] method will return an error.
     #[must_use]
-    pub fn with_custom_script(mut self, script: TransactionScript) -> Self {
+    pub fn custom_script(mut self, script: TransactionScript) -> Self {
         self.custom_script = Some(script);
         self
     }
@@ -153,7 +158,7 @@ impl TransactionRequestBuilder {
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
     ///   that as advice inputs.
     #[must_use]
-    pub fn with_foreign_accounts(
+    pub fn foreign_accounts(
         mut self,
         foreign_accounts: impl IntoIterator<Item = impl Into<ForeignAccount>>,
     ) -> Self {
@@ -172,7 +177,7 @@ impl TransactionRequestBuilder {
     /// specified expected recipients, but it may also create notes for other recipients not
     /// included in this set.
     #[must_use]
-    pub fn with_expected_output_recipients(mut self, recipients: Vec<NoteRecipient>) -> Self {
+    pub fn expected_output_recipients(mut self, recipients: Vec<NoteRecipient>) -> Self {
         self.expected_output_recipients = recipients
             .into_iter()
             .map(|recipient| (recipient.digest(), recipient))
@@ -186,7 +191,7 @@ impl TransactionRequestBuilder {
     /// For example, after a SWAP note is consumed, a payback note is expected to be created. This
     /// allows the client to track this note accordingly.
     #[must_use]
-    pub fn with_expected_future_notes(mut self, notes: Vec<(NoteDetails, NoteTag)>) -> Self {
+    pub fn expected_future_notes(mut self, notes: Vec<(NoteDetails, NoteTag)>) -> Self {
         self.expected_future_notes =
             notes.into_iter().map(|note| (note.0.id(), note)).collect::<BTreeMap<_, _>>();
         self
@@ -216,7 +221,7 @@ impl TransactionRequestBuilder {
     /// but other code executed during the transaction may impose an even smaller transaction
     /// expiration delta.
     #[must_use]
-    pub fn with_expiration_delta(mut self, expiration_delta: u16) -> Self {
+    pub fn expiration_delta(mut self, expiration_delta: u16) -> Self {
         self.expiration_delta = Some(expiration_delta);
         self
     }
@@ -226,6 +231,15 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn ignore_invalid_input_notes(mut self) -> Self {
         self.ignore_invalid_input_notes = true;
+        self
+    }
+
+    /// Sets an optional [`Word`] that will be pushed to the operand stack before the transaction
+    /// script execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    #[must_use]
+    pub fn script_arg(mut self, script_arg: Word) -> Self {
+        self.script_arg = Some(script_arg);
         self
     }
 
@@ -241,7 +255,7 @@ impl TransactionRequestBuilder {
         note_ids: Vec<NoteId>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let input_notes = note_ids.into_iter().map(|id| (id, None));
-        self.with_authenticated_input_notes(input_notes).build()
+        self.authenticated_input_notes(input_notes).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to mint fungible
@@ -270,16 +284,16 @@ impl TransactionRequestBuilder {
             rng,
         )?;
 
-        self.with_own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a P2ID
-    /// or P2IDR note. This request must be executed against the wallet sender account.
+    /// or P2IDE note. This request must be executed against the wallet sender account.
     ///
     /// - `payment_data` is the data for the payment transaction that contains the asset to be
     ///   transferred, the sender account ID, and the target account ID.
     /// - `recall_height` is the block height after which the sender can recall the assets. If None,
-    ///   a P2ID note is created. If `Some()`, a P2IDR note is created.
+    ///   a P2ID note is created. If `Some()`, a P2IDE note is created.
     /// - `note_type` determines the visibility of the note to be created.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
@@ -327,7 +341,7 @@ impl TransactionRequestBuilder {
             )?
         };
 
-        self.with_own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a SWAP
@@ -359,8 +373,8 @@ impl TransactionRequestBuilder {
 
         let payback_tag = NoteTag::from_account_id(swap_data.account_id());
 
-        self.with_expected_future_notes(vec![(payback_note_details, payback_tag)])
-            .with_own_output_notes(vec![OutputNote::Full(created_note)])
+        self.expected_future_notes(vec![(payback_note_details, payback_tag)])
+            .own_output_notes(vec![OutputNote::Full(created_note)])
             .build()
     }
 
@@ -423,6 +437,7 @@ impl TransactionRequestBuilder {
             foreign_accounts: self.foreign_accounts.into_values().collect(),
             expiration_delta: self.expiration_delta,
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
+            script_arg: self.script_arg,
         })
     }
 }

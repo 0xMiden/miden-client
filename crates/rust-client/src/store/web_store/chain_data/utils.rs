@@ -45,7 +45,7 @@ pub fn serialize_partial_blockchain_node(
     id: InOrderIndex,
     node: Digest,
 ) -> Result<SerializedPartialBlockchainNodeData, StoreError> {
-    let id: u64 = id.into();
+    let id: u64 = id.inner();
     let id_as_str = id.to_string();
     let node = node.to_string();
     Ok(SerializedPartialBlockchainNodeData { id: id_as_str, node })

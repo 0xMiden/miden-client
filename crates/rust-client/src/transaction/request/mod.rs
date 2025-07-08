@@ -87,6 +87,9 @@ pub struct TransactionRequest {
     /// transaction. This will allow the transaction to be executed even if some input notes
     /// are invalid.
     ignore_invalid_input_notes: bool,
+    /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
+    /// execution.
+    script_arg: Option<Word>,
 }
 
 impl TransactionRequest {
@@ -272,9 +275,14 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args = TransactionArgs::new(advice_map, foreign_account_inputs)
-            .with_tx_script(tx_script)
-            .with_note_args(note_args);
+        let mut tx_args =
+            TransactionArgs::new(advice_map, foreign_account_inputs).with_note_args(note_args);
+
+        tx_args = if let Some(argument) = self.script_arg {
+            tx_args.with_tx_script_and_arg(tx_script, argument)
+        } else {
+            tx_args.with_tx_script(tx_script)
+        };
 
         tx_args
             .extend_output_note_recipients(expected_output_recipients.into_values().map(Box::new));
@@ -333,6 +341,7 @@ impl Serializable for TransactionRequest {
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
+        self.script_arg.write_into(target);
     }
 }
 
@@ -368,6 +377,7 @@ impl Deserializable for TransactionRequest {
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
+        let script_arg = Option::<Word>::read_from(source)?;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -380,6 +390,7 @@ impl Deserializable for TransactionRequest {
             foreign_accounts,
             expiration_delta,
             ignore_invalid_input_notes,
+            script_arg,
         })
     }
 }
@@ -506,15 +517,15 @@ mod tests {
 
         // This transaction request wouldn't be valid in a real scenario, it's intended for testing
         let tx_request = TransactionRequestBuilder::new()
-            .with_authenticated_input_notes(vec![(notes.pop().unwrap().id(), None)])
-            .with_unauthenticated_input_notes(vec![(notes.pop().unwrap(), None)])
-            .with_expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
-            .with_expected_future_notes(vec![(
+            .authenticated_input_notes(vec![(notes.pop().unwrap().id(), None)])
+            .unauthenticated_input_notes(vec![(notes.pop().unwrap(), None)])
+            .expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
+            .expected_future_notes(vec![(
                 notes.pop().unwrap().into(),
                 NoteTag::from_account_id(sender_id),
             )])
             .extend_advice_map(advice_vec)
-            .with_foreign_accounts([
+            .foreign_accounts([
                 ForeignAccount::public(
                     target_id,
                     AccountStorageRequirements::new([(5u8, &[Digest::default()])]),
@@ -522,7 +533,7 @@ mod tests {
                 .unwrap(),
                 ForeignAccount::private(account).unwrap(),
             ])
-            .with_own_output_notes(vec![
+            .own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),
                 OutputNote::Partial(notes.pop().unwrap().into()),
             ])

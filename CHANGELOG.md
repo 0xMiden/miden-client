@@ -2,7 +2,6 @@
 
 ## 0.10.0 (TBD)
 
-* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897)
 
 ### Changes
 
@@ -12,23 +11,43 @@
 * Enforced input note order in `TransactionRequest` (#1001).
 * Added check for duplicate input notes in `TransactionRequest` (#1001).
 * [BREAKING] Removed `TransactionExecutor` from `Client` and `NoteScreener` (#998).
+* [BREAKING] Renamed P2IDR to P2IDE (#1016).
+* Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897).
+* [BREAKING] Removed `with_` prefix from builder functions (#1018).
 
 ### Features
 
 * Added support for FPI in Web Client (#958).
 * Exposed `bech32` account IDs in Web Client (#978).
+* Added transaction script argument support to `TransactionRequest` (#1017).
 
 ### Fixes
 
 * Fixed Intermittent Block Header Error During Sync in Web Client (#997).
 
+## v0.9.4 (2025-07-01)
+
+* Support Operations From Counter Contract FPI Example in Web Client (#958).
+
+## v0.9.3 (2025-06-28)
+
+* Fixed a bug where some partial MMR nodes were missing and causing problems with note consumption (#995).
+
 ## 0.9.2 (2025-06-11)
 
 * Refresh dependencies (#972).
 
+### Features
+
+* Added necessary methods to support network transactions in the Web Client (#955).
+
 ### Changes
 
 * Fixed wasm-opt options to improve performance of generated wasm (#961).
+
+### Fixes
+
+* Fixed bug where network accounts were not being updated correctly in the client (#955).
 
 ## 0.9.0 (2025-05-30)
 

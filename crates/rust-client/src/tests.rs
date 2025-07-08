@@ -92,12 +92,12 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let builder = ClientBuilder::new()
-        .with_rpc(arc_rpc_api)
-        .with_rng(Box::new(rng))
-        .with_store(store)
-        .with_filesystem_keystore(keystore_path.to_str().unwrap())
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .store(store)
+        .filesystem_keystore(keystore_path.to_str().unwrap())
         .in_debug_mode(true)
-        .with_tx_graceful_blocks(None);
+        .tx_graceful_blocks(None);
 
     (builder, rpc_api, keystore)
 }
@@ -638,7 +638,7 @@ async fn transaction_request_expiration() {
             .unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
-        .with_expiration_delta(5)
+        .expiration_delta(5)
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap(),
@@ -689,7 +689,7 @@ async fn import_processing_note_returns_error() {
 
     let input = [(note.try_into().unwrap(), None)];
     let consume_note_request = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(input)
+        .unauthenticated_input_notes(input)
         .build()
         .unwrap();
     let transaction = client
@@ -737,7 +737,7 @@ async fn note_without_asset() {
 
     // Create and execute transaction
     let transaction_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note)])
+        .own_output_notes(vec![OutputNote::Full(note)])
         .build()
         .unwrap();
 
@@ -752,7 +752,7 @@ async fn note_without_asset() {
     let note = Note::new(vault, metadata, recipient);
 
     let transaction_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note)])
+        .own_output_notes(vec![OutputNote::Full(note)])
         .build()
         .unwrap();
 
@@ -1051,7 +1051,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
 }
 
 #[tokio::test]
-async fn p2idr_transfer_consumed_by_target() {
+async fn p2ide_transfer_consumed_by_target() {
     let (mut client, _, authenticator) = create_test_client().await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
@@ -1111,7 +1111,7 @@ async fn p2idr_transfer_consumed_by_target() {
         .unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -1131,7 +1131,7 @@ async fn p2idr_transfer_consumed_by_target() {
     let notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(!notes.is_empty());
 
-    // Make the `to_account_id` consume P2IDR note
+    // Make the `to_account_id` consume P2IDE note
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
@@ -1164,7 +1164,7 @@ async fn p2idr_transfer_consumed_by_target() {
 }
 
 #[tokio::test]
-async fn p2idr_transfer_consumed_by_sender() {
+async fn p2ide_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
@@ -1191,7 +1191,7 @@ async fn p2idr_transfer_consumed_by_sender() {
         .unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -1288,7 +1288,7 @@ async fn get_consumable_notes() {
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
             PaymentTransactionData::new(
@@ -1386,8 +1386,7 @@ async fn get_output_notes() {
 async fn account_rollback() {
     let (builder, rpc_api, authenticator) = create_test_client_builder().await;
 
-    let mut client =
-        builder.with_tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
+    let mut client = builder.tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -1489,7 +1488,7 @@ async fn subsequent_discarded_transactions() {
     // Create a transaction that will expire in 2 blocks
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
-        .with_expiration_delta(2)
+        .expiration_delta(2)
         .build_pay_to_id(
             PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
             None,
@@ -1583,7 +1582,7 @@ async fn missing_recipient_digest() {
     let dummy_recipient_digest = dummy_recipient.digest();
 
     let tx_request = TransactionRequestBuilder::new()
-        .with_expected_output_recipients(vec![dummy_recipient])
+        .expected_output_recipients(vec![dummy_recipient])
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet.id(), 5u64).unwrap(),
             AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap(),
@@ -1723,7 +1722,7 @@ async fn swap_chain_test() {
 
     // Trying to consume the notes in another order will fail.
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(swap_notes.iter().rev().cloned().collect())
+        .build_consume_notes(swap_notes.iter().rev().copied().collect())
         .unwrap();
     let error = client.new_transaction(last_wallet, tx_request).await.unwrap_err();
     assert!(matches!(

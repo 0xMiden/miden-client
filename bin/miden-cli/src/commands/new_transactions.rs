@@ -308,8 +308,8 @@ impl ConsumeNotesCmd {
         }
 
         let transaction_request = TransactionRequestBuilder::new()
-            .with_authenticated_input_notes(authenticated_notes.into_iter().map(|id| (id, None)))
-            .with_unauthenticated_input_notes(unauthenticated_notes)
+            .authenticated_input_notes(authenticated_notes.into_iter().map(|id| (id, None)))
+            .unauthenticated_input_notes(unauthenticated_notes)
             .build()
             .map_err(|err| {
                 CliError::Transaction(
