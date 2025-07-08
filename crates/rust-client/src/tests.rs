@@ -1687,7 +1687,7 @@ async fn swap_chain_test() {
 
     // Generate a few account pairs with a fungible asset that can be used for swaps.
     let mut account_pairs = vec![];
-    for _ in 0..10 {
+    for _ in 0..5 {
         let (wallet, faucet) =
             setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
         mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
@@ -1721,8 +1721,19 @@ async fn swap_chain_test() {
     // chain.
     let last_wallet = account_pairs.last().unwrap().0.id();
 
-    let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
+    // Trying to consume the notes in another order will fail.
+    let tx_request = TransactionRequestBuilder::new()
+        .build_consume_notes(swap_notes.iter().rev().cloned().collect())
+        .unwrap();
+    let error = client.new_transaction(last_wallet, tx_request).await.unwrap_err();
+    assert!(matches!(
+        error,
+        ClientError::TransactionExecutorError(
+            TransactionExecutorError::TransactionProgramExecutionFailed(_)
+        )
+    ));
 
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
     execute_tx(&mut client, last_wallet, tx_request).await;
 
     // At the end, the last wallet should have the asset of the first wallet.

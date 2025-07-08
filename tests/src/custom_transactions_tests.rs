@@ -326,21 +326,6 @@ async fn mint_custom_note(
         .build()
         .unwrap();
 
-    // client
-    //     .test_store()
-    //     .upsert_input_notes(&[InputNoteRecord::new(
-    //         note.clone().into(),
-    //         None,
-    //         ExpectedNoteState {
-    //             metadata: Some(*note.metadata()),
-    //             after_block_num: 0.into(),
-    //             tag: Some(NoteTag::from_account_id(target_account_id)),
-    //         }
-    //         .into(),
-    //     )])
-    //     .await
-    //     .unwrap();
-
     execute_tx_and_sync(client, faucet_account_id, transaction_request).await;
     note
 }
