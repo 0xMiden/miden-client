@@ -3,11 +3,12 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     path::PathBuf,
+    vec,
 };
 
 use clap::{Parser, ValueEnum};
 use miden_client::{
-    Client, Word,
+    Client,
     account::{
         Account, AccountBuilder, AccountStorageMode, AccountType,
         component::COMPONENT_TEMPLATE_EXTENSION,
@@ -16,7 +17,7 @@ use miden_client::{
     crypto::SecretKey,
     utils::Deserializable,
 };
-use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_lib::account::auth::RpoFalcon512;
 use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
@@ -95,12 +96,8 @@ pub struct NewWalletCmd {
 
 impl NewWalletCmd {
     pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
-        // Load extra component templates using the helper.
-        let extra_components = load_component_templates(&self.extra_components)?;
-
-        let init_storage_data = load_init_storage_data(self.init_storage_data_path.clone())?;
-
-        let key_pair = SecretKey::with_rng(client.rng());
+        let mut component_template_paths = vec![PathBuf::from("basic-wallet")];
+        component_template_paths.extend(self.extra_components.iter().cloned());
 
         // Choose account type based on mutability.
         let account_type = if self.mutable {
@@ -109,21 +106,15 @@ impl NewWalletCmd {
             AccountType::RegularAccountImmutableCode
         };
 
-        let (new_account, seed) = build_account(
+        let new_account = create_client_account(
             &mut client,
+            &keystore,
             account_type,
             self.storage_mode.into(),
-            RpoFalcon512::new(key_pair.public_key()).into(),
-            &[BasicWallet.into()],
-            &extra_components,
-            &init_storage_data,
-        )?;
-
-        keystore
-            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
-            .map_err(CliError::KeyStore)?;
-
-        client.add_account(&new_account, Some(seed), false).await?;
+            &component_template_paths,
+            self.init_storage_data_path.clone(),
+        )
+        .await?;
 
         let (mut current_config, _) = load_config_file()?;
         let account_address =
@@ -169,40 +160,21 @@ pub struct NewAccountCmd {
 
 impl NewAccountCmd {
     pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
-        // Load component templates using the helper.
-        let component_templates = load_component_templates(&self.component_templates)?;
-
-        if component_templates.is_empty() {
-            return Err(CliError::InvalidArgument(
-                "account must contain one or more components".into(),
-            ));
-        }
-
-        let init_storage_data = load_init_storage_data(self.init_storage_data_path.clone())?;
-
-        let key_pair = SecretKey::with_rng(client.rng());
-
-        let (new_account, seed) = build_account(
+        let new_account = create_client_account(
             &mut client,
+            &keystore,
             self.account_type.into(),
             self.storage_mode.into(),
-            RpoFalcon512::new(key_pair.public_key()).into(),
-            &[],
-            &component_templates,
-            &init_storage_data,
-        )?;
-
-        keystore
-            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
-            .map_err(CliError::KeyStore)?;
-
-        client.add_account(&new_account, Some(seed), false).await?;
+            &self.component_templates,
+            self.init_storage_data_path.clone(),
+        )
+        .await?;
 
         let (current_config, _) = load_config_file()?;
         let account_address =
             new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
 
-        println!("Successfully created new wallet.");
+        println!("Successfully created new account.");
         println!(
             "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
         );
@@ -253,32 +225,55 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
-fn build_account(
+async fn create_client_account(
     client: &mut Client,
+    keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
-    auth_component: AccountComponent,
-    account_components: &[AccountComponent],
-    component_templates: &[AccountComponentTemplate],
-    init_storage_data: &InitStorageData,
-) -> Result<(Account, Word), CliError> {
+    component_template_paths: &[PathBuf],
+    init_storage_data_path: Option<PathBuf>,
+) -> Result<Account, CliError> {
+    if component_template_paths.is_empty() {
+        return Err(CliError::InvalidArgument(
+            "account must contain one or more components".into(),
+        ));
+    }
+
+    // Load the component templates and initialization storage data.
+    println!("Loading component templates...");
+    let component_templates = load_component_templates(component_template_paths)?;
+    println!("Loaded {} component templates", component_templates.len());
+    println!("Loading initialization storage data...");
+    let init_storage_data = load_init_storage_data(init_storage_data_path)?;
+    println!("Loaded initialization storage data");
+
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
 
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(auth_component);
+        .with_auth_component(RpoFalcon512::new(key_pair.public_key()));
 
-    // Process component templates and add all components together
-    let extra_components = process_component_templates(component_templates, init_storage_data)?;
-    for component in account_components.iter().chain(extra_components.iter()) {
-        builder = builder.with_component(component.clone());
+    // Process component templates and add them to the account builder.
+    let account_components = process_component_templates(&component_templates, &init_storage_data)?;
+    for component in account_components {
+        builder = builder.with_component(component);
     }
 
-    builder
+    let (account, seed) = builder
         .build()
-        .map_err(|err| CliError::Account(err, "failed to build account".into()))
+        .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
+
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+        .map_err(CliError::KeyStore)?;
+
+    client.add_account(&account, Some(seed), false).await?;
+
+    Ok(account)
 }
 
 /// Helper function to process extra component templates.

@@ -7,12 +7,16 @@ use miden_client::account::component::{
     AccountComponentMetadata, AccountComponentTemplate, COMPONENT_TEMPLATE_EXTENSION,
 };
 use miden_lib::{
-    account::components::{basic_fungible_faucet_library, rpo_falcon_512_library},
+    account::components::{
+        basic_fungible_faucet_library, basic_wallet_library, rpo_falcon_512_library,
+    },
     utils::Serializable,
 };
 use miden_objects::assembly::Library;
 
 fn main() {
+    build_component_template(&PathBuf::from("templates/basic-wallet.toml"), basic_wallet_library());
+
     build_component_template(
         &PathBuf::from("templates/basic-fungible-faucet.toml"),
         basic_fungible_faucet_library(),

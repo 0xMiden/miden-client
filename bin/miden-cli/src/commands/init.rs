@@ -13,6 +13,11 @@ use crate::{
     errors::CliError,
 };
 
+/// Contains the account component template file generated on build.rs, corresponding to the basic
+/// wallet component.
+const BASIC_WALLET_TEMPLATE_FILE: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/templates/", "basic-wallet.mct"));
+
 /// Contains the account component template file generated on build.rs, corresponding to the
 /// fungible faucet component.
 const FAUCET_TEMPLATE_FILE: &[u8] =
@@ -114,6 +119,10 @@ fn write_template_files(cli_config: &CliConfig) -> Result<(), CliError> {
             "failed to create account component templates directory".into(),
         )
     })?;
+
+    let wallet_template_path = cli_config.component_template_directory.join("basic-wallet.mct");
+    let mut wallet_file = File::create(&wallet_template_path)?;
+    wallet_file.write_all(BASIC_WALLET_TEMPLATE_FILE)?;
 
     // Write the faucet template file.
     // TODO: io errors should probably have their own context.
