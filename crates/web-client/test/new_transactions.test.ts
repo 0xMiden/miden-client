@@ -151,7 +151,7 @@ describe("send transaction tests", () => {
 // SWAP_TRANSACTION TEST
 // =======================================================================================================
 
-describe.only("swap transaction tests", () => {
+describe("swap transaction tests", () => {
   const testCases = [
     { flag: false, description: "swap transaction completes successfully" },
     // {
