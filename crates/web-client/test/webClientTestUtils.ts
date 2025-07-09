@@ -257,18 +257,6 @@ export const swapTransaction = async (
         await client.submitTransaction(swapTransactionResult);
       }
 
-      // Creating a swap note tag
-
-      let swapNoteTag = window.WebClient.buildSwapTag(
-        window.NoteType.Public,
-        assetAFaucetId,
-        _assetAAmount,
-        assetBFaucetId,
-        _assetBAmount
-      );
-
-      await client.addTag(swapNoteTag.asU32().toString());
-
       await window.helpers.waitForTransaction(
         swapTransactionResult.executedTransaction().id().toHex()
       );

@@ -216,7 +216,7 @@ impl WebClient {
             NativeTransactionRequestBuilder::new()
                 .build_swap(&swap_transaction_data, note_type.into(), client.rng())
                 .map_err(|err| {
-                    js_error_with_context(err, "failed to create mint transaction request")
+                    js_error_with_context(err, "failed to create swap transaction request")
                 })?
         };
 

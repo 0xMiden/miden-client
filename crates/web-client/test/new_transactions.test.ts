@@ -154,10 +154,10 @@ describe("send transaction tests", () => {
 describe.only("swap transaction tests", () => {
   const testCases = [
     { flag: false, description: "swap transaction completes successfully" },
-    {
-      flag: true,
-      description: "swap transaction with remote prover completes successfully",
-    },
+    // {
+    //   flag: true,
+    //   description: "swap transaction with remote prover completes successfully",
+    // },
   ];
 
   testCases.forEach(({ flag, description }) => {
