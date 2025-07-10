@@ -28,9 +28,9 @@ impl AccountDelta {
     //     self.0.vault().into()
     // }
 
-    #[wasm_bindgen(js_name = "nonceIncrement")]
-    pub fn nonce_increment(&self) -> Felt {
-        self.0.nonce_increment().into()
+    #[wasm_bindgen(js_name = "nonceDelta")]
+    pub fn nonce_delta(&self) -> Felt {
+        self.0.nonce_delta().into()
     }
 
     // TODO: into parts

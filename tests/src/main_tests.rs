@@ -1159,7 +1159,7 @@ async fn unused_rpc_api() {
         .await
         .unwrap();
 
-    assert_eq!(account_delta.nonce_increment(), ONE);
+    assert_eq!(account_delta.nonce_delta(), ONE);
     assert_eq!(*account_delta.vault().fungible().iter().next().unwrap().1, MINT_AMOUNT as i64);
 }
 

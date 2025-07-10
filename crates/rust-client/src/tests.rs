@@ -581,7 +581,7 @@ async fn mint_transaction() {
 
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
 
-    assert_eq!(transaction.executed_transaction().account_delta().nonce_increment(), ONE);
+    assert_eq!(transaction.executed_transaction().account_delta().nonce_delta(), ONE);
 }
 
 #[tokio::test]

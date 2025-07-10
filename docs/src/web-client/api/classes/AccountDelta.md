@@ -28,9 +28,9 @@
 
 ***
 
-### nonceIncrement()
+### nonceDelta()
 
-> **nonceIncrement**(): [`Felt`](Felt.md)
+> **nonceDelta**(): [`Felt`](Felt.md)
 
 #### Returns
 
