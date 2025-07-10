@@ -16,6 +16,7 @@ FEATURES_CLIENT=--features "testing, std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
+WEB_CLIENT_DIR  := crates/web-client
 
 # --- Linting -------------------------------------------------------------------------------------
 
@@ -60,7 +61,7 @@ toml-check: ## Runs Format for all TOML files but only in check mode
 typos-check: ## Run typos to check for spelling mistakes
 	@typos --config ./.typos.toml
 
-# --- Documentation --------------------------------------------------------------------------
+# --- Documentation -------------------------------------------------------------------------------
 
 .PHONY: doc
 doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
@@ -160,3 +161,30 @@ check: ## Build the CLI binary and client library in release mode
 .PHONY: check-wasm
 check-wasm: ## Build the client library for wasm32
 	cargo check --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
+
+## --- Setup --------------------------------------------------------------------------------------
+
+.PHONY: check-tools
+check-tools: ## Checks if development tools are installed
+	@echo "Checking development tools..."
+	@command -v mdbook  >/dev/null 2>&1 && echo "[OK] mdbook is installed"  || echo "[MISSING] mdbook (make install-tools)"
+	@command -v typos   >/dev/null 2>&1 && echo "[OK] typos is installed"   || echo "[MISSING] typos  (make install-tools)"
+	@command -v nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest(make install-tools)"
+	@command -v taplo   >/dev/null 2>&1 && echo "[OK] taplo is installed"   || echo "[MISSING] taplo  (make install-tools)"
+	@command -v yarn    >/dev/null 2>&1 && echo "[OK] yarn is installed"    || echo "[MISSING] yarn   (make install-tools)"
+	$(call check_node_bin,prettier)
+	$(call check_node_bin,eslint)
+	$(call check_node_bin,typedoc)
+
+.PHONY: install-tools
+install-tools: ## Installs Rust + Node tools required by the Makefile
+	@echo "Installing development tools..."
+	# Rust-related
+	cargo install mdbook --locked
+	cargo install typos-cli --locked
+	cargo install cargo-nextest --locked
+	cargo install taplo-cli --locked
+	# Web-related
+	command -v yarn >/dev/null 2>&1 || npm install -g yarn
+	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
+	@echo "Development tools installation complete!"
