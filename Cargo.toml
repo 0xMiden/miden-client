@@ -20,20 +20,18 @@ repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.87"
 
 [workspace.dependencies]
-async-trait = "0.1"
-miden-lib = { default-features = false, version = "0.10" }
-miden-objects = { default-features = false, version = "0.10" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { default-features = false, features = ["async"], version = "0.10" }
-miden-tx = { default-features = false, features = ["async"], version = "0.10" }
-miette = { features = ["fancy"], version = "7.2" }
-rand = { version = "0.9" }
-serde = { features = ["derive"], version = "1.0" }
-thiserror = { default-features = false, version = "2.0" }
-tokio = { features = ["macros", "net", "rt-multi-thread"], version = "1.40" }
-tracing = { version = "0.1" }
+async-trait                = "0.1"
+miden-lib                  = { default-features = false, version = "0.10" }
+miden-objects              = { default-features = false, version = "0.10" }
+miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.10" }
+miden-testing              = { default-features = false, features = ["async"], version = "0.10" }
+miden-tx                   = { default-features = false, features = ["async"], version = "0.10" }
+miette                     = { features = ["fancy"], version = "7.2" }
+rand                       = { version = "0.9" }
+serde                      = { features = ["derive"], version = "1.0" }
+thiserror                  = { default-features = false, version = "2.0" }
+tokio                      = { features = ["macros", "net", "rt-multi-thread"], version = "1.40" }
+tracing                    = { version = "0.1" }
 
 # Lints are set to warn for development, which are promoted to errors in CI.
 [workspace.lints.clippy]

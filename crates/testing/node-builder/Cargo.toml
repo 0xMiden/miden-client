@@ -20,11 +20,11 @@ workspace = true
 [dependencies]
 anyhow                    = "1.0"
 miden-lib                 = { workspace = true }
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder    = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc            = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store          = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils          = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { version = "0.10" }
+miden-node-ntx-builder    = { version = "0.10" }
+miden-node-rpc            = { version = "0.10" }
+miden-node-store          = { version = "0.10" }
+miden-node-utils          = { version = "0.10" }
 miden-objects             = { workspace = true }
 rand                      = { workspace = true }
 rand_chacha               = { version = "0.9" }

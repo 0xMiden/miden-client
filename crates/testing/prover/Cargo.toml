@@ -9,8 +9,8 @@ version                = "0.1.0"
 
 [dependencies]
 anyhow              = "1.0"
-miden-node-utils    = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils    = { version = "0.10" }
+miden-remote-prover = { features = ["concurrent"], version = "0.10" }
 tokio               = { features = ["full"], version = "1.0" }
 tokio-stream        = { features = ["net"], version = "0.1" }
 tonic               = { default-features = false, features = ["transport"], version = "0.13" }

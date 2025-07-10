@@ -172,9 +172,6 @@ check-tools: ## Checks if development tools are installed
 	@command -v nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest(make install-tools)"
 	@command -v taplo   >/dev/null 2>&1 && echo "[OK] taplo is installed"   || echo "[MISSING] taplo  (make install-tools)"
 	@command -v yarn    >/dev/null 2>&1 && echo "[OK] yarn is installed"    || echo "[MISSING] yarn   (make install-tools)"
-	$(call check_node_bin,prettier)
-	$(call check_node_bin,eslint)
-	$(call check_node_bin,typedoc)
 
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile
