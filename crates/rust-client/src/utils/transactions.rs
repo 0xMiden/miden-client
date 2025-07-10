@@ -74,7 +74,7 @@ pub async fn execute_tx_and_consume_output_notes(
     execute_tx(client, executor, tx_request).await?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(output_notes)
+        .unauthenticated_input_notes(output_notes)
         .build()?;
     let transaction_id = execute_tx(client, consumer, tx_request).await?;
     wait_for_tx(client, transaction_id).await

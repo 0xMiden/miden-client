@@ -53,7 +53,7 @@ pub struct ClientBuilder {
     store: Option<Arc<dyn Store>>,
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
-    /// The store path to use when no store is directly provided via `with_store()`.
+    /// The store path to use when no store is directly provided via `store()`.
     #[cfg(feature = "sqlite")]
     store_path: String,
     /// The keystore configuration provided by the user.
@@ -100,7 +100,7 @@ impl ClientBuilder {
 
     /// Sets a custom RPC client directly.
     #[must_use]
-    pub fn with_rpc(mut self, client: Arc<dyn NodeRpcClient + Send>) -> Self {
+    pub fn rpc(mut self, client: Arc<dyn NodeRpcClient + Send>) -> Self {
         self.rpc_api = Some(client);
         self
     }
@@ -108,7 +108,7 @@ impl ClientBuilder {
     /// Sets the a tonic RPC client from the endpoint and optional timeout.
     #[cfg(feature = "tonic")]
     #[must_use]
-    pub fn with_tonic_rpc_client(mut self, endpoint: &Endpoint, timeout_ms: Option<u64>) -> Self {
+    pub fn tonic_rpc_client(mut self, endpoint: &Endpoint, timeout_ms: Option<u64>) -> Self {
         self.rpc_api = Some(Arc::new(TonicRpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
         self
     }
@@ -116,28 +116,28 @@ impl ClientBuilder {
     /// Optionally set a custom store path.
     #[cfg(feature = "sqlite")]
     #[must_use]
-    pub fn with_sqlite_store(mut self, path: &str) -> Self {
+    pub fn sqlite_store(mut self, path: &str) -> Self {
         self.store_path = path.to_string();
         self
     }
 
     /// Optionally provide a store directly.
     #[must_use]
-    pub fn with_store(mut self, store: Arc<dyn Store>) -> Self {
+    pub fn store(mut self, store: Arc<dyn Store>) -> Self {
         self.store = Some(store);
         self
     }
 
     /// Optionally provide a custom RNG.
     #[must_use]
-    pub fn with_rng(mut self, rng: Box<dyn FeltRng>) -> Self {
+    pub fn rng(mut self, rng: Box<dyn FeltRng>) -> Self {
         self.rng = Some(rng);
         self
     }
 
     /// Optionally provide a custom authenticator instance.
     #[must_use]
-    pub fn with_authenticator(mut self, authenticator: Arc<dyn TransactionAuthenticator>) -> Self {
+    pub fn authenticator(mut self, authenticator: Arc<dyn TransactionAuthenticator>) -> Self {
         self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
         self
     }
@@ -145,7 +145,7 @@ impl ClientBuilder {
     /// Optionally set a maximum number of blocks that the client can be behind the network.
     /// By default, there's no maximum.
     #[must_use]
-    pub fn with_max_block_number_delta(mut self, delta: u32) -> Self {
+    pub fn max_block_number_delta(mut self, delta: u32) -> Self {
         self.max_block_number_delta = Some(delta);
         self
     }
@@ -154,7 +154,7 @@ impl ClientBuilder {
     /// `None`, there is no limit and transactions will be kept indefinitely.
     /// By default, the maximum is set to `TX_GRACEFUL_BLOCKS`.
     #[must_use]
-    pub fn with_tx_graceful_blocks(mut self, delta: Option<u32>) -> Self {
+    pub fn tx_graceful_blocks(mut self, delta: Option<u32>) -> Self {
         self.tx_graceful_blocks = delta;
         self
     }
@@ -164,7 +164,7 @@ impl ClientBuilder {
     /// This stores the keystore path as a configuration option so that actual keystore
     /// initialization is deferred until `build()`. This avoids panicking during builder chaining.
     #[must_use]
-    pub fn with_filesystem_keystore(mut self, keystore_path: &str) -> Self {
+    pub fn filesystem_keystore(mut self, keystore_path: &str) -> Self {
         self.keystore = Some(AuthenticatorConfig::Path(keystore_path.to_string()));
         self
     }
@@ -183,7 +183,7 @@ impl ClientBuilder {
             client
         } else {
             return Err(ClientError::ClientInitializationError(
-                "RPC client or endpoint is required. Call `.with_rpc(...)` or `.with_tonic_rpc_client(...)` if `tonic` is enabled."
+                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)` if `tonic` is enabled."
                     .into(),
             ));
         };
@@ -201,7 +201,7 @@ impl ClientBuilder {
             store
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.with_store(...)` or `.with_sqlite_store(...)` with a store path if `sqlite` is enabled."
+                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path if `sqlite` is enabled."
                     .into(),
             ));
         };
@@ -225,7 +225,7 @@ impl ClientBuilder {
             },
             None => {
                 return Err(ClientError::ClientInitializationError(
-                    "Keystore must be specified. Call `.with_keystore(...)` or `.with_filesystem_keystore(...)` with a keystore path."
+                    "Keystore must be specified. Call `.keystore(...)` or `.filesystem_keystore(...)` with a keystore path."
                         .into(),
                 ))
             }

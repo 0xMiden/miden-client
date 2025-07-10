@@ -200,7 +200,7 @@ async fn nested_fpi_calls() {
     wait_for_blocks(&mut client, 2).await.unwrap();
 
     // Create transaction request with FPI
-    let builder = TransactionRequestBuilder::new().with_custom_script(tx_script);
+    let builder = TransactionRequestBuilder::new().custom_script(tx_script);
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let storage_requirements =
@@ -211,7 +211,7 @@ async fn nested_fpi_calls() {
         ForeignAccount::public(outer_foreign_account_id, storage_requirements).unwrap(),
     ];
 
-    let tx_request = builder.with_foreign_accounts(foreign_accounts).build().unwrap();
+    let tx_request = builder.foreign_accounts(foreign_accounts).build().unwrap();
     let tx_result = client.new_transaction(native_account.id(), tx_request).await.unwrap();
 
     client.submit_transaction(tx_result).await.unwrap();
@@ -293,7 +293,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     assert!(foreign_accounts.is_empty());
 
     // Create transaction request with FPI
-    let builder = TransactionRequestBuilder::new().with_custom_script(tx_script);
+    let builder = TransactionRequestBuilder::new().custom_script(tx_script);
 
     // We will require slot 0, key `MAP_KEY` as well as account proof
     let storage_requirements =
@@ -308,7 +308,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
         ForeignAccount::private(foreign_account)
     };
 
-    let tx_request = builder.with_foreign_accounts([foreign_account.unwrap()]).build().unwrap();
+    let tx_request = builder.foreign_accounts([foreign_account.unwrap()]).build().unwrap();
     let tx_result = client.new_transaction(native_account.id(), tx_request).await.unwrap();
 
     client.submit_transaction(tx_result).await.unwrap();
@@ -397,7 +397,7 @@ async fn deploy_foreign_account(
         .new_transaction(
             foreign_account_id,
             TransactionRequestBuilder::new()
-                .with_custom_script(deployment_tx_script)
+                .custom_script(deployment_tx_script)
                 .build()
                 .unwrap(),
         )

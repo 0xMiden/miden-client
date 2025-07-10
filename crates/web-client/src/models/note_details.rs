@@ -1,7 +1,7 @@
 use miden_objects::note::NoteDetails as NativeNoteDetails;
 use wasm_bindgen::prelude::*;
 
-use super::{note_assets::NoteAssets, note_recipient::NoteRecipient};
+use super::{note_assets::NoteAssets, note_id::NoteId, note_recipient::NoteRecipient};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -12,6 +12,10 @@ impl NoteDetails {
     #[wasm_bindgen(constructor)]
     pub fn new(note_assets: &NoteAssets, note_recipient: &NoteRecipient) -> NoteDetails {
         NoteDetails(NativeNoteDetails::new(note_assets.into(), note_recipient.into()))
+    }
+
+    pub fn id(&self) -> NoteId {
+        self.0.id().into()
     }
 
     pub fn assets(&self) -> NoteAssets {

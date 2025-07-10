@@ -26,6 +26,18 @@
 
 `NoteDetailsAndTag`
 
+## Properties
+
+### noteDetails
+
+> `readonly` **noteDetails**: [`NoteDetails`](NoteDetails.md)
+
+***
+
+### tag
+
+> `readonly` **tag**: [`NoteTag`](NoteTag.md)
+
 ## Methods
 
 ### free()

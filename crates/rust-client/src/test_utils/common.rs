@@ -30,7 +30,7 @@ use crate::{
     keystore::FilesystemKeyStore,
     note::create_p2id_note,
     rpc::{Endpoint, RpcError, TonicRpcClient},
-    store::{InputNoteRecord, NoteFilter, TransactionFilter, sqlite_store::SqliteStore},
+    store::{InputNoteRecord, sqlite_store::SqliteStore},
     testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     transaction::{TransactionRequest, TransactionRequestBuilder, TransactionRequestError},
     utils::{
@@ -48,7 +48,7 @@ pub const ACCOUNT_ID_REGULAR: u128 = ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABL
 
 pub const TEST_CLIENT_RPC_CONFIG_FILE: &str = include_str!("./config/miden-client-rpc.toml");
 
-/// Constant that represents the number of blocks until the p2idr can be recalled. If this value is
+/// Constant that represents the number of blocks until the p2ide can be recalled. If this value is
 /// too low, some tests might fail due to expected recall failures not happening.
 pub const RECALL_HEIGHT_DELTA: u32 = 50;
 
@@ -77,12 +77,12 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
     let keystore = FilesystemKeyStore::new(auth_path.clone()).unwrap();
 
     let builder = ClientBuilder::new()
-        .with_rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-        .with_rng(Box::new(rng))
-        .with_store(store)
-        .with_filesystem_keystore(auth_path.to_str().unwrap())
+        .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
+        .rng(Box::new(rng))
+        .store(store)
+        .filesystem_keystore(auth_path.to_str().unwrap())
         .in_debug_mode(true)
-        .with_tx_graceful_blocks(None);
+        .tx_graceful_blocks(None);
 
     (builder, keystore)
 }
@@ -217,11 +217,6 @@ pub async fn setup_wallet_and_faucet(
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> (Account, Account) {
-    // Enusre clean state
-    assert!(client.get_account_headers().await.unwrap().is_empty());
-    assert!(client.get_transactions(TransactionFilter::All).await.unwrap().is_empty());
-    assert!(client.get_input_notes(NoteFilter::All).await.unwrap().is_empty());
-
     let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
         .unwrap();
@@ -339,7 +334,7 @@ pub fn mint_multiple_fungible_asset(
         })
         .collect::<Vec<OutputNote>>();
 
-    TransactionRequestBuilder::new().with_own_output_notes(notes).build().unwrap()
+    TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }
 
 /// Mint assets for the target account and consume them inmediately without waiting for the first
