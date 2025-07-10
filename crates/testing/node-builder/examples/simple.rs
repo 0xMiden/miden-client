@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
 
     // Start the node
     let handle = node.start().await?;
-    println!("Node started at {}", handle.rpc_url());
+    println!("Node started at {}", handle.rpc_url);
 
     // Wait for 10 seconds
     tokio::time::sleep(Duration::from_secs(10)).await;
