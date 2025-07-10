@@ -15,6 +15,7 @@ use miden_client::{
     },
     auth::AuthSecretKey,
     crypto::SecretKey,
+    transaction::TransactionRequestBuilder,
     utils::Deserializable,
 };
 use miden_lib::account::auth::RpoFalcon512;
@@ -92,6 +93,10 @@ pub struct NewWalletCmd {
     /// present in the init storage data file.
     #[arg(short, long)]
     pub init_storage_data_path: Option<PathBuf>,
+    /// If set, the newly created wallet will be deployed to the network by submitting an
+    /// authentication transaction.
+    #[arg(long, default_value_t = false)]
+    pub deploy: bool,
 }
 
 impl NewWalletCmd {
@@ -113,6 +118,7 @@ impl NewWalletCmd {
             self.storage_mode.into(),
             &component_template_paths,
             self.init_storage_data_path.clone(),
+            self.deploy,
         )
         .await?;
 
@@ -156,6 +162,10 @@ pub struct NewAccountCmd {
     /// present in the init storage data file.
     #[arg(short, long)]
     pub init_storage_data_path: Option<PathBuf>,
+    /// If set, the newly created account will be deployed to the network by submitting an
+    /// authentication transaction.
+    #[arg(long, default_value_t = false)]
+    pub deploy: bool,
 }
 
 impl NewAccountCmd {
@@ -167,6 +177,7 @@ impl NewAccountCmd {
             self.storage_mode.into(),
             &self.component_templates,
             self.init_storage_data_path.clone(),
+            self.deploy,
         )
         .await?;
 
@@ -232,6 +243,7 @@ async fn create_client_account(
     storage_mode: AccountStorageMode,
     component_template_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
+    deploy: bool,
 ) -> Result<Account, CliError> {
     if component_template_paths.is_empty() {
         return Err(CliError::InvalidArgument(
@@ -272,6 +284,36 @@ async fn create_client_account(
         .map_err(CliError::KeyStore)?;
 
     client.add_account(&account, Some(seed), false).await?;
+
+    if deploy {
+        // Retrieve the auth procedure mast root pointer and call it in the transaction script.
+        // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
+        // use different auth components in the future.
+        let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
+
+        let auth_script = client
+            .compile_tx_script(
+                "
+                    begin
+                        # [AUTH_PROCEDURE_MAST_ROOT]
+                        mem_storew.4000 push.4000
+                        # [auth_procedure_mast_root_ptr]
+                        dyncall
+                    end",
+            )
+            .expect("Auth script should compile");
+
+        let tx_request = TransactionRequestBuilder::new()
+            .script_arg(auth_procedure_mast_root.into())
+            .custom_script(auth_script)
+            .build()
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
+            })?;
+
+        let tx = client.new_transaction(account.id(), tx_request).await?;
+        client.submit_transaction(tx).await?;
+    }
 
     Ok(account)
 }
