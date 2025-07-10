@@ -21,11 +21,11 @@ workspace = true
 anyhow                    = "1.0"
 miden-objects             = { workspace = true }
 miden-lib                 = { workspace = true }
-miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-rpc            = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-store          = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-utils          = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-ntx-builder    = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
+miden-node-block-producer = { version = "0.10" }
+miden-node-rpc            = { version = "0.10" }
+miden-node-store          = { version = "0.10" }
+miden-node-utils          = { version = "0.10" }
+miden-node-ntx-builder    = { version = "0.10" }
 rand_chacha               = { version = "0.9" }
 rand                      = { workspace = true }
 tokio                     = { version = "1.0", features = ["full"] }

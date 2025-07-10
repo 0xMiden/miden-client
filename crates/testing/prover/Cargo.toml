@@ -9,8 +9,8 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1.0"
-miden-remote-prover = { git = "https://github.com/0xMiden/miden-node", branch = "next", features = ["concurrent"] }
-miden-node-utils = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
+miden-remote-prover = { version = "0.10", features = ["concurrent"] }
+miden-node-utils = { version = "0.10" }
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.13", default-features = false, features = ["transport"] }
