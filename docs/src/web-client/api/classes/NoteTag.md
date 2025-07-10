@@ -8,6 +8,16 @@
 
 ## Methods
 
+### asU32()
+
+> **asU32**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
 ### executionMode()
 
 > **executionMode**(): [`NoteExecutionMode`](NoteExecutionMode.md)

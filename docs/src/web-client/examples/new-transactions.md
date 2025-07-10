@@ -104,7 +104,8 @@ try {
         faucetId,        // Faucet account ID
         NoteType.Private, // Note type
         100,             // Amount to send
-        100             // Optional recall height
+        100,             // Optional recall height
+        90               // Optional timelock height
     );
 
     const executedTransaction = await webClient.newTransaction(

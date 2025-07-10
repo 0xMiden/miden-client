@@ -23,7 +23,7 @@
 //! use miden_client::{
 //!     Client,
 //!     crypto::FeltRng,
-//!     transaction::{ExecutedTransaction, PaymentTransactionData, TransactionRequestBuilder},
+//!     transaction::{ExecutedTransaction, PaymentNoteDescription, TransactionRequestBuilder},
 //! };
 //! use miden_objects::{account::AccountId, asset::FungibleAsset, note::NoteType};
 //! # use std::error::Error;
@@ -43,8 +43,7 @@
 //!
 //!     // Build a transaction request for a pay-to-id transaction.
 //!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
-//!         PaymentTransactionData::new(vec![asset.into()], sender_id, target_id),
-//!         None, // No recall height
+//!         PaymentNoteDescription::new(vec![asset.into()], sender_id, target_id),
 //!         NoteType::Private,
 //!         client.rng(),
 //!     )?;
@@ -119,7 +118,7 @@ pub use miden_tx::{
     TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
     TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
@@ -429,24 +428,6 @@ impl Client {
             .get_input_notes(NoteFilter::List(authenticated_input_note_ids))
             .await?;
 
-        for authenticated_note_record in authenticated_note_records {
-            if !authenticated_note_record.is_authenticated() {
-                return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteNotAuthenticated(
-                        authenticated_note_record.id(),
-                    ),
-                ));
-            }
-
-            if authenticated_note_record.is_consumed() {
-                return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(
-                        authenticated_note_record.id(),
-                    ),
-                ));
-            }
-        }
-
         // If tx request contains unauthenticated_input_notes we should insert them
         let unauthenticated_input_notes = transaction_request
             .unauthenticated_input_notes()
@@ -457,17 +438,7 @@ impl Client {
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = {
-            let note_ids = transaction_request.get_input_note_ids();
-
-            let mut input_notes: Vec<InputNote> = Vec::new();
-
-            for note in self.store.get_input_notes(NoteFilter::List(note_ids)).await? {
-                input_notes.push(note.try_into().map_err(ClientError::NoteRecordConversionError)?);
-            }
-
-            InputNotes::new(input_notes).map_err(ClientError::TransactionInputError)?
-        };
+        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
@@ -1186,7 +1157,7 @@ mod test {
         },
     };
 
-    use super::PaymentTransactionData;
+    use super::PaymentNoteDescription;
     use crate::{tests::create_test_client, transaction::TransactionRequestBuilder};
 
     #[tokio::test]
@@ -1224,12 +1195,11 @@ mod test {
         client.sync_state().await.unwrap();
         let tx_request = TransactionRequestBuilder::new()
             .build_pay_to_id(
-                PaymentTransactionData::new(
+                PaymentNoteDescription::new(
                     vec![asset_1, asset_2],
                     account.id(),
                     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
                 ),
-                None,
                 NoteType::Private,
                 client.rng(),
             )

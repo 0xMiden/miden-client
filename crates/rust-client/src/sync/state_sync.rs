@@ -233,6 +233,7 @@ impl StateSync {
     ///
     /// The account updates might include:
     /// * Public accounts that have been updated in the node.
+    /// * Network accounts that have been updated in the node and are being tracked by the client.
     /// * Private accounts that have been marked as mismatched because the current commitment
     ///   doesn't match the one received from the node. The client will need to handle these cases
     ///   as they could be a stale account state or a reason to lock the account.
@@ -243,7 +244,7 @@ impl StateSync {
         account_commitment_updates: &[(AccountId, Digest)],
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
-            accounts.iter().partition(|account_header| account_header.id().is_public());
+            accounts.iter().partition(|account_header| !account_header.id().is_private());
 
         let updated_public_accounts = self
             .get_updated_public_accounts(account_commitment_updates, &public_accounts)

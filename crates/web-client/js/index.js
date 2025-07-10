@@ -408,3 +408,14 @@ export class WebClient {
     this.worker.terminate();
   }
 }
+
+// This copies static methods from WasmWebClient to WebClient
+Object.getOwnPropertyNames(WasmWebClient).forEach((prop) => {
+  if (
+    typeof WasmWebClient[prop] === "function" &&
+    prop !== "constructor" &&
+    prop !== "prototype"
+  ) {
+    WebClient[prop] = WasmWebClient[prop];
+  }
+});

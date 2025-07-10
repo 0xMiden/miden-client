@@ -55,7 +55,7 @@ pub enum RpcConversionError {
     DeserializationError(#[from] DeserializationError),
     #[error("value is not in the range 0..modulus")]
     NotAValidFelt,
-    #[error("invalid note type value")]
+    #[error("note error")]
     NoteTypeError(#[from] NoteError),
     #[error("failed to convert rpc data: {0}")]
     InvalidField(String),

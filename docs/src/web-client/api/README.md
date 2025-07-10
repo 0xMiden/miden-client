@@ -46,7 +46,6 @@
 - [IntoUnderlyingSource](classes/IntoUnderlyingSource.md)
 - [Library](classes/Library.md)
 - [MerklePath](classes/MerklePath.md)
-- [NewSwapTransactionResult](classes/NewSwapTransactionResult.md)
 - [Note](classes/Note.md)
 - [NoteAndArgs](classes/NoteAndArgs.md)
 - [NoteAndArgsArray](classes/NoteAndArgsArray.md)

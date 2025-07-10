@@ -1,14 +1,11 @@
 use miden_client::{
     note::BlockNumber,
     transaction::{
-        ExecutedTransaction as NativeExecutedTransaction, PaymentTransactionData,
+        ExecutedTransaction as NativeExecutedTransaction, PaymentNoteDescription,
         SwapTransactionData, TransactionRequestBuilder as NativeTransactionRequestBuilder,
     },
 };
-use miden_lib::note::utils::build_swap_tag;
-use miden_objects::{
-    account::AccountId as NativeAccountId, asset::FungibleAsset, note::NoteId as NativeNoteId,
-};
+use miden_objects::{asset::FungibleAsset, note::NoteId as NativeNoteId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -16,7 +13,6 @@ use crate::{
     models::{
         account_id::AccountId, executed_transaction::ExecutedTransaction, note_type::NoteType,
         provers::TransactionProver, transaction_request::TransactionRequest,
-        transactions::NewSwapTransactionResult,
     },
 };
 
@@ -112,43 +108,36 @@ impl WebClient {
         note_type: NoteType,
         amount: u64,
         recall_height: Option<u32>,
+        timelock_height: Option<u32>,
     ) -> Result<TransactionRequest, JsValue> {
+        let client = self.get_mut_inner().ok_or_else(|| {
+            JsValue::from_str("Client not initialized while generating transaction request")
+        })?;
+
         let fungible_asset = FungibleAsset::new(faucet_id.into(), amount)
             .map_err(|err| js_error_with_context(err, "failed to create fungible asset"))?;
 
-        let payment_transaction = PaymentTransactionData::new(
+        let mut payment_description = PaymentNoteDescription::new(
             vec![fungible_asset.into()],
             sender_account_id.into(),
             target_account_id.into(),
         );
 
-        let send_transaction_request = {
-            let client = self.get_mut_inner().ok_or_else(|| {
-                JsValue::from_str("Client not initialized while generating transaction request")
-            })?;
+        if let Some(recall_height) = recall_height {
+            payment_description =
+                payment_description.with_reclaim_height(BlockNumber::from(recall_height));
+        }
 
-            if let Some(recall_height) = recall_height {
-                NativeTransactionRequestBuilder::new()
-                    .build_pay_to_id(
-                        payment_transaction,
-                        Some(BlockNumber::from(recall_height)),
-                        note_type.into(),
-                        client.rng(),
-                    )
-                    .map_err(|err| {
-                        js_error_with_context(
-                            err,
-                            "failed to create send transaction request with recall height",
-                        )
-                    })?
-            } else {
-                NativeTransactionRequestBuilder::new()
-                    .build_pay_to_id(payment_transaction, None, note_type.into(), client.rng())
-                    .map_err(|err| {
-                        js_error_with_context(err, "failed to create send transaction request")
-                    })?
-            }
-        };
+        if let Some(height) = timelock_height {
+            payment_description =
+                payment_description.with_timelock_height(BlockNumber::from(height));
+        }
+
+        let send_transaction_request = NativeTransactionRequestBuilder::new()
+            .build_pay_to_id(payment_description, note_type.into(), client.rng())
+            .map_err(|err| {
+                js_error_with_context(err, "failed to create send transaction request")
+            })?;
 
         Ok(send_transaction_request.into())
     }
@@ -181,92 +170,48 @@ impl WebClient {
         Ok(consume_transaction_request.into())
     }
 
-    // TODO: Needs work
-    #[wasm_bindgen(js_name = "newSwapTransaction")]
-    pub async fn new_swap_transaction(
+    #[wasm_bindgen(js_name = "newSwapTransactionRequest")]
+    pub fn new_swap_transaction_request(
         &mut self,
-        sender_account_id: String,
-        offered_asset_faucet_id: String,
-        offered_asset_amount: String,
-        requested_asset_faucet_id: String,
-        requested_asset_amount: String,
+        sender_account_id: &AccountId,
+        offered_asset_faucet_id: &AccountId,
+        offered_asset_amount: u64,
+        requested_asset_faucet_id: &AccountId,
+        requested_asset_amount: u64,
         note_type: NoteType,
-    ) -> Result<NewSwapTransactionResult, JsValue> {
-        let sender_account_id =
-            NativeAccountId::from_hex(&sender_account_id).map_err(|err| err.to_string())?;
-        let offered_asset_faucet_id =
-            NativeAccountId::from_hex(&offered_asset_faucet_id).map_err(|err| err.to_string())?;
-        let offered_asset_amount_as_u64: u64 =
-            offered_asset_amount.parse::<u64>().map_err(|err| err.to_string())?;
+    ) -> Result<TransactionRequest, JsValue> {
         let offered_fungible_asset =
-            FungibleAsset::new(offered_asset_faucet_id, offered_asset_amount_as_u64)
-                .map_err(|err| err.to_string())?
+            FungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to create offered fungible asset")
+                })?
                 .into();
 
-        let requested_asset_faucet_id =
-            NativeAccountId::from_hex(&requested_asset_faucet_id).map_err(|err| err.to_string())?;
-        let requested_asset_amount_as_u64: u64 =
-            requested_asset_amount.parse::<u64>().map_err(|err| err.to_string())?;
         let requested_fungible_asset =
-            FungibleAsset::new(requested_asset_faucet_id, requested_asset_amount_as_u64)
-                .map_err(|err| err.to_string())?
+            FungibleAsset::new(requested_asset_faucet_id.into(), requested_asset_amount)
+                .map_err(|err| {
+                    js_error_with_context(err, "failed to create requested fungible asset")
+                })?
                 .into();
 
-        let swap_transaction = SwapTransactionData::new(
-            sender_account_id,
+        let swap_transaction_data = SwapTransactionData::new(
+            sender_account_id.into(),
             offered_fungible_asset,
             requested_fungible_asset,
         );
 
-        // TODO: Leaving this alone for now because new_swap_transaction needs a rework anyway
-        self.fetch_and_cache_account_auth_by_account_id(&sender_account_id.into())
-            .await?;
+        let swap_transaction_request = {
+            let client = self.get_mut_inner().ok_or_else(|| {
+                JsValue::from_str("Client not initialized while generating transaction request")
+            })?;
 
-        if let Some(client) = self.get_mut_inner() {
-            let swap_transaction_request = NativeTransactionRequestBuilder::new()
-                .build_swap(&swap_transaction, note_type.into(), client.rng())
+            NativeTransactionRequestBuilder::new()
+                .build_swap(&swap_transaction_data, note_type.into(), client.rng())
                 .map_err(|err| {
                     js_error_with_context(err, "failed to create swap transaction request")
-                })?;
+                })?
+        };
 
-            let swap_transaction_executed_transaction = client
-                .new_transaction(sender_account_id, swap_transaction_request.clone())
-                .await
-                .map_err(|err| {
-                    JsValue::from_str(&format!("failed to execute swap transaction: {err:?}"))
-                })?;
-            let mut result = NewSwapTransactionResult::new(
-                swap_transaction_executed_transaction.id().to_string(),
-                swap_transaction_request
-                    .expected_output_own_notes()
-                    .into_iter()
-                    .map(|note| note.id().to_string())
-                    .collect(),
-                swap_transaction_request
-                    .expected_future_notes()
-                    .map(|note| note.0.id().to_string())
-                    .collect(),
-                None,
-            );
-
-            client
-                .submit_transaction(swap_transaction_executed_transaction)
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to submit swap transaction"))?;
-
-            let payback_note_tag_u32: u32 = build_swap_tag(
-                note_type.into(),
-                &swap_transaction.offered_asset(),
-                &swap_transaction.requested_asset(),
-            )
-            .map_err(|err| err.to_string())?
-            .into();
-
-            result.set_note_tag(payback_note_tag_u32.to_string());
-
-            Ok(result)
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(swap_transaction_request.into())
     }
 }

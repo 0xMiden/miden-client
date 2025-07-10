@@ -7,7 +7,7 @@ use miden_client::{
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
-        DiscardCause, PaymentTransactionData, TransactionProver, TransactionProverError,
+        DiscardCause, PaymentNoteDescription, TransactionProver, TransactionProverError,
         TransactionRequestBuilder, TransactionStatus,
     },
 };
@@ -30,9 +30,9 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
     let (_, _, store_config, auth_path) = get_client_config();
 
     let mut client = ClientBuilder::new()
-        .with_tonic_rpc_client(&Endpoint::default(), Some(10_000))
-        .with_filesystem_keystore(auth_path.to_str().unwrap())
-        .with_sqlite_store(store_config.to_str().unwrap())
+        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
+        .filesystem_keystore(auth_path.to_str().unwrap())
+        .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(true)
         .build()
         .await?;
@@ -50,8 +50,8 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
 async fn client_builder_fails_without_keystore() {
     let (_, _, store_config, _) = get_client_config();
     let result = ClientBuilder::new()
-        .with_tonic_rpc_client(&Endpoint::default(), Some(10_000))
-        .with_sqlite_store(store_config.to_str().unwrap())
+        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
+        .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(true)
         .build()
         .await;
@@ -79,24 +79,22 @@ async fn multiple_tx_on_same_block() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request_1 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
         .unwrap();
     let tx_request_2 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
@@ -391,12 +389,12 @@ async fn sync_detail_values() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(new_details.block_num + 5),
+            )
+            .with_reclaim_height(new_details.block_num + 5),
             NoteType::Public,
             client1.rng(),
         )
@@ -612,15 +610,13 @@ async fn consume_multiple_expected_notes() {
 
     // Create and execute transactions
     let tx_request_1 = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
-        .build_consume_notes(client_owned_notes.iter().map(|note| note.id()).collect())
+        .authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .build()
         .unwrap();
 
     let tx_request_2 = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(
-            unauth_owned_notes.iter().map(|note| ((*note).clone(), None)),
-        )
-        .build_consume_notes(unauth_owned_notes.iter().map(|note| note.id()).collect())
+        .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
+        .build()
         .unwrap();
 
     let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
@@ -683,15 +679,15 @@ async fn import_consumed_note_with_proof() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -744,15 +740,15 @@ async fn import_consumed_note_with_id() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
@@ -803,15 +799,15 @@ async fn import_note_with_proof() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -866,15 +862,15 @@ async fn discarded_transaction() {
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDR tx...");
+    println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
@@ -1083,7 +1079,7 @@ async fn expired_transaction_fails() {
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
     let tx_request = TransactionRequestBuilder::new()
-        .with_expiration_delta(expiration_delta)
+        .expiration_delta(expiration_delta)
         .build_mint_fungible_asset(fungible_asset, from_account_id, NoteType::Public, client.rng())
         .unwrap();
 

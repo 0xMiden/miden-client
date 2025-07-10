@@ -91,5 +91,4 @@ pub mod transaction_request;
 pub mod transaction_script;
 pub mod transaction_script_inputs;
 pub mod transaction_status;
-pub mod transactions;
 pub mod word;

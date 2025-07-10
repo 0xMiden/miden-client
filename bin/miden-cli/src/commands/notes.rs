@@ -181,7 +181,7 @@ async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(
         ref p2id_root if p2id_root == &WellKnownNote::P2ID.script_root().to_string() => {
             script_root += " (P2ID)";
         },
-        ref p2idr_root if p2idr_root == &WellKnownNote::P2IDE.script_root().to_string() => {
+        ref p2ide_root if p2ide_root == &WellKnownNote::P2IDE.script_root().to_string() => {
             script_root += " (P2IDE)";
         },
         ref swap_root if swap_root == &WellKnownNote::SWAP.script_root().to_string() => {

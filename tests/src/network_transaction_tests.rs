@@ -79,7 +79,7 @@ async fn deploy_counter_contract(
 
     // Build a transaction request with the custom script
     let tx_increment_request =
-        TransactionRequestBuilder::new().with_custom_script(tx_script).build().unwrap();
+        TransactionRequestBuilder::new().custom_script(tx_script).build().unwrap();
 
     // Execute the transaction locally
     let executed_tx = client.new_transaction(acc.id(), tx_increment_request).await.unwrap();
@@ -184,7 +184,7 @@ async fn counter_contract_ntx() {
     }
 
     let tx_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(network_notes)
+        .own_output_notes(network_notes)
         .build()
         .unwrap();
 
@@ -243,7 +243,7 @@ async fn recall_note_before_ntx_consumes_it() {
 
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(network_note.clone())])
+        .own_output_notes(vec![OutputNote::Full(network_note.clone())])
         .build()
         .unwrap();
 
@@ -251,7 +251,7 @@ async fn recall_note_before_ntx_consumes_it() {
     client.testing_apply_transaction(bump_transaction.clone()).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(vec![(network_note, None)])
+        .unauthenticated_input_notes(vec![(network_note, None)])
         .build()
         .unwrap();
 

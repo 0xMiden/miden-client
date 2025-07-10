@@ -1,9 +1,13 @@
 //! Contains structures and functions related to transaction creation.
-use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::ToString,
+    vec::Vec,
+};
 
 use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 use miden_objects::{
-    Digest, Felt, FieldElement,
+    Digest, Felt, FieldElement, NoteError, Word,
     account::AccountId,
     asset::{Asset, FungibleAsset},
     block::BlockNumber,
@@ -32,7 +36,7 @@ pub struct TransactionRequestBuilder {
     unauthenticated_input_notes: Vec<Note>,
     /// Notes to be consumed by the transaction together with their (optional) arguments. This
     /// includes both authenticated and unauthenticated notes.
-    input_notes: BTreeMap<NoteId, Option<NoteArgs>>,
+    input_notes: Vec<(NoteId, Option<NoteArgs>)>,
     /// Notes to be created by the transaction. This includes both full and partial output notes.
     /// The transaction script will be generated based on these notes.
     own_output_notes: Vec<OutputNote>,
@@ -60,6 +64,10 @@ pub struct TransactionRequestBuilder {
     /// transaction. This will allow the transaction to be executed even if some input notes
     /// are invalid.
     ignore_invalid_input_notes: bool,
+    /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
+    /// execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    script_arg: Option<Word>,
 }
 
 impl TransactionRequestBuilder {
@@ -70,7 +78,7 @@ impl TransactionRequestBuilder {
     pub fn new() -> Self {
         Self {
             unauthenticated_input_notes: vec![],
-            input_notes: BTreeMap::new(),
+            input_notes: vec![],
             own_output_notes: Vec::new(),
             expected_output_recipients: BTreeMap::new(),
             expected_future_notes: BTreeMap::new(),
@@ -80,17 +88,18 @@ impl TransactionRequestBuilder {
             expiration_delta: None,
             foreign_accounts: BTreeMap::default(),
             ignore_invalid_input_notes: false,
+            script_arg: None,
         }
     }
 
     /// Adds the specified notes as unauthenticated input notes to the transaction request.
     #[must_use]
-    pub fn with_unauthenticated_input_notes(
+    pub fn unauthenticated_input_notes(
         mut self,
         notes: impl IntoIterator<Item = (Note, Option<NoteArgs>)>,
     ) -> Self {
         for (note, argument) in notes {
-            self.input_notes.insert(note.id(), argument);
+            self.input_notes.push((note.id(), argument));
             self.unauthenticated_input_notes.push(note);
         }
         self
@@ -98,12 +107,12 @@ impl TransactionRequestBuilder {
 
     /// Adds the specified notes as authenticated input notes to the transaction request.
     #[must_use]
-    pub fn with_authenticated_input_notes(
+    pub fn authenticated_input_notes(
         mut self,
         notes: impl IntoIterator<Item = (NoteId, Option<NoteArgs>)>,
     ) -> Self {
         for (note_id, argument) in notes {
-            self.input_notes.insert(note_id, argument);
+            self.input_notes.push((note_id, argument));
         }
         self
     }
@@ -115,7 +124,7 @@ impl TransactionRequestBuilder {
     /// If a transaction script template is already set (e.g. by calling `with_custom_script`), the
     /// [`TransactionRequestBuilder::build`] method will return an error.
     #[must_use]
-    pub fn with_own_output_notes(mut self, notes: impl IntoIterator<Item = OutputNote>) -> Self {
+    pub fn own_output_notes(mut self, notes: impl IntoIterator<Item = OutputNote>) -> Self {
         for note in notes {
             if let OutputNote::Full(note) = &note {
                 self.expected_output_recipients
@@ -133,7 +142,7 @@ impl TransactionRequestBuilder {
     /// If a script template is already set (e.g. by calling `with_own_output_notes`), the
     /// [`TransactionRequestBuilder::build`] method will return an error.
     #[must_use]
-    pub fn with_custom_script(mut self, script: TransactionScript) -> Self {
+    pub fn custom_script(mut self, script: TransactionScript) -> Self {
         self.custom_script = Some(script);
         self
     }
@@ -149,7 +158,7 @@ impl TransactionRequestBuilder {
     /// - **Private accounts**: the node retrieves a proof of the account's existence and injects
     ///   that as advice inputs.
     #[must_use]
-    pub fn with_foreign_accounts(
+    pub fn foreign_accounts(
         mut self,
         foreign_accounts: impl IntoIterator<Item = impl Into<ForeignAccount>>,
     ) -> Self {
@@ -168,7 +177,7 @@ impl TransactionRequestBuilder {
     /// specified expected recipients, but it may also create notes for other recipients not
     /// included in this set.
     #[must_use]
-    pub fn with_expected_output_recipients(mut self, recipients: Vec<NoteRecipient>) -> Self {
+    pub fn expected_output_recipients(mut self, recipients: Vec<NoteRecipient>) -> Self {
         self.expected_output_recipients = recipients
             .into_iter()
             .map(|recipient| (recipient.digest(), recipient))
@@ -182,7 +191,7 @@ impl TransactionRequestBuilder {
     /// For example, after a SWAP note is consumed, a payback note is expected to be created. This
     /// allows the client to track this note accordingly.
     #[must_use]
-    pub fn with_expected_future_notes(mut self, notes: Vec<(NoteDetails, NoteTag)>) -> Self {
+    pub fn expected_future_notes(mut self, notes: Vec<(NoteDetails, NoteTag)>) -> Self {
         self.expected_future_notes =
             notes.into_iter().map(|note| (note.0.id(), note)).collect::<BTreeMap<_, _>>();
         self
@@ -212,7 +221,7 @@ impl TransactionRequestBuilder {
     /// but other code executed during the transaction may impose an even smaller transaction
     /// expiration delta.
     #[must_use]
-    pub fn with_expiration_delta(mut self, expiration_delta: u16) -> Self {
+    pub fn expiration_delta(mut self, expiration_delta: u16) -> Self {
         self.expiration_delta = Some(expiration_delta);
         self
     }
@@ -222,6 +231,15 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn ignore_invalid_input_notes(mut self) -> Self {
         self.ignore_invalid_input_notes = true;
+        self
+    }
+
+    /// Sets an optional [`Word`] that will be pushed to the operand stack before the transaction
+    /// script execution. If the advice map is extended with some user defined entires, this script
+    /// argument could be used as a key to access the corresponding value.
+    #[must_use]
+    pub fn script_arg(mut self, script_arg: Word) -> Self {
+        self.script_arg = Some(script_arg);
         self
     }
 
@@ -237,7 +255,7 @@ impl TransactionRequestBuilder {
         note_ids: Vec<NoteId>,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let input_notes = note_ids.into_iter().map(|id| (id, None));
-        self.with_authenticated_input_notes(input_notes).build()
+        self.authenticated_input_notes(input_notes).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to mint fungible
@@ -266,16 +284,15 @@ impl TransactionRequestBuilder {
             rng,
         )?;
 
-        self.with_own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a P2ID
-    /// or P2IDR note. This request must be executed against the wallet sender account.
+    /// or P2IDE note. This request must be executed against the wallet sender account.
     ///
     /// - `payment_data` is the data for the payment transaction that contains the asset to be
-    ///   transferred, the sender account ID, and the target account ID.
-    /// - `recall_height` is the block height after which the sender can recall the assets. If None,
-    ///   a P2ID note is created. If `Some()`, a P2IDR note is created.
+    ///   transferred, the sender account ID, and the target account ID. If the recall or timelock
+    ///   heights are set, a P2IDE note will be created; otherwise, a P2ID note will be created.
     /// - `note_type` determines the visibility of the note to be created.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
@@ -283,47 +300,21 @@ impl TransactionRequestBuilder {
     /// This function cannot be used with a previously set custom script.
     pub fn build_pay_to_id(
         self,
-        payment_data: PaymentTransactionData,
-        recall_height: Option<BlockNumber>,
+        payment_data: PaymentNoteDescription,
         note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let PaymentTransactionData {
-            assets,
-            sender_account_id,
-            target_account_id,
-        } = payment_data;
-
-        if assets
+        if payment_data
+            .assets()
             .iter()
             .all(|asset| asset.is_fungible() && asset.unwrap_fungible().amount() == 0)
         {
             return Err(TransactionRequestError::P2IDNoteWithoutAsset);
         }
 
-        let created_note = if let Some(recall_height) = recall_height {
-            create_p2ide_note(
-                sender_account_id,
-                target_account_id,
-                assets,
-                Some(recall_height),
-                None, //TODO: Add support for timelock P2IDE notes
-                note_type,
-                Felt::ZERO,
-                rng,
-            )?
-        } else {
-            create_p2id_note(
-                sender_account_id,
-                target_account_id,
-                assets,
-                note_type,
-                Felt::ZERO,
-                rng,
-            )?
-        };
+        let created_note = payment_data.into_note(note_type, rng)?;
 
-        self.with_own_output_notes(vec![OutputNote::Full(created_note)]).build()
+        self.own_output_notes(vec![OutputNote::Full(created_note)]).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction to send a SWAP
@@ -355,8 +346,8 @@ impl TransactionRequestBuilder {
 
         let payback_tag = NoteTag::from_account_id(swap_data.account_id());
 
-        self.with_expected_future_notes(vec![(payback_note_details, payback_tag)])
-            .with_own_output_notes(vec![OutputNote::Full(created_note)])
+        self.expected_future_notes(vec![(payback_note_details, payback_tag)])
+            .own_output_notes(vec![OutputNote::Full(created_note)])
             .build()
     }
 
@@ -370,6 +361,13 @@ impl TransactionRequestBuilder {
     /// - If an expiration delta is set when a custom script is set.
     /// - If an invalid note variant is encountered in the own output notes.
     pub fn build(self) -> Result<TransactionRequest, TransactionRequestError> {
+        let mut seen_input_notes = BTreeSet::new();
+        for (note_id, _) in &self.input_notes {
+            if !seen_input_notes.insert(note_id) {
+                return Err(TransactionRequestError::DuplicateInputNote(*note_id));
+            }
+        }
+
         let script_template = match (self.custom_script, self.own_output_notes.is_empty()) {
             (Some(_), false) => {
                 return Err(TransactionRequestError::ScriptTemplateError(
@@ -412,39 +410,62 @@ impl TransactionRequestBuilder {
             foreign_accounts: self.foreign_accounts.into_values().collect(),
             expiration_delta: self.expiration_delta,
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
+            script_arg: self.script_arg,
         })
     }
 }
 
-// PAYMENT TRANSACTION DATA
+// PAYMENT NOTE DESCRIPTION
 // ================================================================================================
 
-/// Contains information about a payment transaction.
+/// Contains information needed to create a payment note.
 #[derive(Clone, Debug)]
-pub struct PaymentTransactionData {
+pub struct PaymentNoteDescription {
     /// Assets that are meant to be sent to the target account.
     assets: Vec<Asset>,
     /// Account ID of the sender account.
     sender_account_id: AccountId,
     /// Account ID of the receiver account.
     target_account_id: AccountId,
+    /// Optional reclaim height for the P2IDE note. It allows the possibility for the sender to
+    /// reclaim the assets if the note has not been consumed by the target before this height.
+    reclaim_height: Option<BlockNumber>,
+    /// Optional timelock height for the P2IDE note. It allows the possibility to add a timelock to
+    /// the asset transfer, meaning that the note can only be consumed after this height.
+    timelock_height: Option<BlockNumber>,
 }
 
-impl PaymentTransactionData {
+impl PaymentNoteDescription {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Creates a new [`PaymentTransactionData`].
+    /// Creates a new [`PaymentNoteDescription`].
     pub fn new(
         assets: Vec<Asset>,
         sender_account_id: AccountId,
         target_account_id: AccountId,
-    ) -> PaymentTransactionData {
-        PaymentTransactionData {
+    ) -> PaymentNoteDescription {
+        PaymentNoteDescription {
             assets,
             sender_account_id,
             target_account_id,
+            reclaim_height: None,
+            timelock_height: None,
         }
+    }
+
+    /// Modifies the [`PaymentNoteDescription`] to set a reclaim height for payment note.
+    #[must_use]
+    pub fn with_reclaim_height(mut self, reclaim_height: BlockNumber) -> PaymentNoteDescription {
+        self.reclaim_height = Some(reclaim_height);
+        self
+    }
+
+    /// Modifies the [`PaymentNoteDescription`] to set a timelock height for payment note.
+    #[must_use]
+    pub fn with_timelock_height(mut self, timelock_height: BlockNumber) -> PaymentNoteDescription {
+        self.timelock_height = Some(timelock_height);
+        self
     }
 
     /// Returns the executor [`AccountId`].
@@ -460,6 +481,52 @@ impl PaymentTransactionData {
     /// Returns the transaction's list of [`Asset`].
     pub fn assets(&self) -> &Vec<Asset> {
         &self.assets
+    }
+
+    /// Returns the reclaim height for the P2IDE note, if set.
+    pub fn reclaim_height(&self) -> Option<BlockNumber> {
+        self.reclaim_height
+    }
+
+    /// Returns the timelock height for the P2IDE note, if set.
+    pub fn timelock_height(&self) -> Option<BlockNumber> {
+        self.timelock_height
+    }
+
+    // CONVERSION
+    // --------------------------------------------------------------------------------------------
+
+    /// Converts the payment transaction data into a [`Note`] based on the specified fields. If the
+    /// reclaim and timelock heights are not set, a P2ID note is created; otherwise, a P2IDE note is
+    /// created.
+    pub(crate) fn into_note(
+        self,
+        note_type: NoteType,
+        rng: &mut ClientRng,
+    ) -> Result<Note, NoteError> {
+        if self.reclaim_height.is_none() && self.timelock_height.is_none() {
+            // Create a P2ID note
+            create_p2id_note(
+                self.sender_account_id,
+                self.target_account_id,
+                self.assets,
+                note_type,
+                Felt::ZERO,
+                rng,
+            )
+        } else {
+            // Create a P2IDE note
+            create_p2ide_note(
+                self.sender_account_id,
+                self.target_account_id,
+                self.assets,
+                self.reclaim_height,
+                self.timelock_height,
+                note_type,
+                Felt::ZERO,
+                rng,
+            )
+        }
     }
 }
 
