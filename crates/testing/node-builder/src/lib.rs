@@ -242,6 +242,8 @@ impl NodeBuilder {
         ))
     }
 
+    /// Start block-producer and return the tokio task ID. The block-producer's endpoint is
+    /// available after loading completes.
     fn start_block_producer(
         &self,
         block_producer_address: SocketAddr,
@@ -271,6 +273,7 @@ impl NodeBuilder {
             .id()
     }
 
+    /// Start ntx-builder and return the tokio task ID. 
     fn start_ntx_builder(
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
@@ -340,6 +343,14 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         AuthScheme::RpoFalcon512 { pub_key: secret.public_key() },
     )?;
 
+    // Force the account nonce to 1.
+    //
+    // By convention, a nonce of zero indicates a freshly generated local account that has yet
+    // to be deployed. An account is deployed onchain along with its first transaction which
+    // results in a non-zero nonce onchain.
+    //
+    // The genesis block is special in that accounts are "deplyed" without transactions and
+    // therefore we need bump the nonce manually to uphold this invariant.
     let (id, vault, storage, code, _) = account.into_parts();
     let updated_account = Account::from_parts(id, vault, storage, code, ONE);
 
