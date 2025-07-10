@@ -68,7 +68,7 @@ impl NoteScreener {
     /// Returns a vector of tuples describing the relevance of the provided note to the
     /// accounts monitored by this screener.
     ///
-    /// Does a fast check for known scripts (P2ID, P2IDR, SWAP). We're currently
+    /// Does a fast check for known scripts (P2ID, P2IDE, SWAP). We're currently
     /// unable to execute notes that aren't committed so a slow check for other scripts is
     /// currently not available.
     ///
@@ -91,7 +91,7 @@ impl NoteScreener {
                 },
                 Ok(None) => {
                     // The note might be consumable after a certain block height if the note is
-                    // p2idr
+                    // p2ide
                     let script_root = note.script().root();
 
                     if script_root == WellKnownNote::P2IDE.script_root() {
@@ -148,7 +148,7 @@ impl NoteScreener {
         Ok(None)
     }
 
-    /// Special relevance check for P2IDR notes. It checks if the sender account can consume and
+    /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
     /// recall the note.
     fn check_p2ide_recall_consumability(
         note: &Note,

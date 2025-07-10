@@ -8,6 +8,22 @@
 
 ## Methods
 
+### compileNoteScript()
+
+> **compileNoteScript**(`note_script`): [`NoteScript`](NoteScript.md)
+
+#### Parameters
+
+##### note\_script
+
+`string`
+
+#### Returns
+
+[`NoteScript`](NoteScript.md)
+
+***
+
 ### free()
 
 > **free**(): `void`

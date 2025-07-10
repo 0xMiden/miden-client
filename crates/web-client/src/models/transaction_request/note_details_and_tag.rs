@@ -16,6 +16,17 @@ impl NoteDetailsAndTag {
     pub fn new(note_details: NoteDetails, tag: NoteTag) -> NoteDetailsAndTag {
         NoteDetailsAndTag { note_details, tag }
     }
+
+    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "noteDetails")]
+    pub fn note_details(&self) -> NoteDetails {
+        self.note_details.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn tag(&self) -> NoteTag {
+        self.tag
+    }
 }
 
 impl From<NoteDetailsAndTag> for (NativeNoteDetails, NativeNoteTag) {

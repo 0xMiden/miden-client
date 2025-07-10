@@ -115,19 +115,17 @@ impl Cli {
             .map_err(CliError::KeyStore)?;
 
         let mut builder = ClientBuilder::new()
-            .with_sqlite_store(
-                cli_config.store_filepath.to_str().expect("Store path should be valid"),
-            )
-            .with_tonic_rpc_client(
+            .sqlite_store(cli_config.store_filepath.to_str().expect("Store path should be valid"))
+            .tonic_rpc_client(
                 &cli_config.rpc.endpoint.clone().into(),
                 Some(cli_config.rpc.timeout_ms),
             )
-            .with_authenticator(Arc::new(keystore.clone()))
+            .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(in_debug_mode)
-            .with_tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
+            .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
 
         if let Some(delta) = cli_config.max_block_number_delta {
-            builder = builder.with_max_block_number_delta(delta);
+            builder = builder.max_block_number_delta(delta);
         }
 
         let client = builder.build().await?;
