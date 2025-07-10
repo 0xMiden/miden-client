@@ -1,15 +1,15 @@
-name = "basic_fungible_faucet"
-description = ""
-version = "0.1.0"
+description     = ""
+name            = "basic_fungible_faucet"
 supported-types = ["FungibleFaucet"]
+version         = "0.1.0"
 
 [[storage]]
-name = "token_metadata"
 description = "Contains metadata about the token associated to the faucet account"
+name = "token_metadata"
 slot = 0
 value = [
-    { name = "max_supply", type = "felt", description = "Maximum supply of the token in base units" },
-    { name = "decimals",type = "u8", description = "Number of decimal places" },
-    { name = "ticker", type = "token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." }, 
-    { value = "0" },
+  { description = "Maximum supply of the token in base units", name = "max_supply", type = "felt" },
+  { description = "Number of decimal places", name = "decimals", type = "u8" },
+  { description = "Token symbol of the faucet's asset, limited to 4 characters.", name = "ticker", type = "token_symbol" },
+  { value = "0" },
 ]

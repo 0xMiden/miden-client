@@ -169,7 +169,7 @@ async fn onchain_accounts() {
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
     client_2.add_account(&faucet_account_header, faucet_seed, false).await.unwrap();
 
-    // First Mint necesary token
+    // First Mint necessary token
     println!("First client consuming note");
     client_1.sync_state().await.unwrap();
     let note =

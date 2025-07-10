@@ -47,7 +47,7 @@ impl AccountBuilder {
         self
     }
 
-    // TODO: AccontStorageMode as Enum
+    // TODO: AccountStorageMode as Enum
     #[wasm_bindgen(js_name = "storageMode")]
     pub fn storage_mode(mut self, storage_mode: &AccountStorageMode) -> Self {
         self.0 = self.0.storage_mode(storage_mode.into());

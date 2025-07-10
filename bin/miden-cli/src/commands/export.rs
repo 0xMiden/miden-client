@@ -113,7 +113,7 @@ async fn export_account(
     let mut file = File::create(file_path)?;
     account_data.write_into(&mut file);
 
-    println!("Succesfully exported account {account_id}");
+    println!("Successfully exported account {account_id}");
     Ok(file)
 }
 
@@ -152,7 +152,7 @@ async fn export_note(
     let mut file = File::create(file_path)?;
     file.write_all(&note_file.to_bytes()).map_err(CliError::IO)?;
 
-    println!("Succesfully exported note {note_id}");
+    println!("Successfully exported note {note_id}");
     Ok(file)
 }
 

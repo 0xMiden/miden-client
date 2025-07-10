@@ -129,7 +129,7 @@ impl NewWalletCmd {
         let account_address =
             new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
 
-        println!("Succesfully created new wallet.");
+        println!("Successfully created new wallet.");
         println!(
             "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}",
         );
@@ -202,7 +202,7 @@ impl NewAccountCmd {
         let account_address =
             new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
 
-        println!("Succesfully created new wallet.");
+        println!("Successfully created new wallet.");
         println!(
             "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
         );

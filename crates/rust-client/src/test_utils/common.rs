@@ -355,7 +355,7 @@ pub async fn setup_two_wallets_and_faucet(
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> (Account, Account, Account) {
-    // Enusre clean state
+    // Ensure clean state
     assert!(client.get_account_headers().await.unwrap().is_empty());
     assert!(client.get_transactions(TransactionFilter::All).await.unwrap().is_empty());
     assert!(client.get_input_notes(NoteFilter::All).await.unwrap().is_empty());
@@ -503,7 +503,7 @@ pub fn mint_multiple_fungible_asset(
     TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }
 
-/// Executes a transaction and consumes the resulting unauthenticated notes inmediately without
+/// Executes a transaction and consumes the resulting unauthenticated notes immediately without
 /// waiting for the first transaction to be committed.
 pub async fn execute_tx_and_consume_output_notes(
     tx_request: TransactionRequest,
@@ -527,7 +527,7 @@ pub async fn execute_tx_and_consume_output_notes(
     wait_for_tx(client, transaction_id).await;
 }
 
-/// Mint assets for the target account and consume them inmediately without waiting for the first
+/// Mint assets for the target account and consume them immediately without waiting for the first
 /// transaction to be committed.
 pub async fn mint_and_consume(
     client: &mut TestClient,

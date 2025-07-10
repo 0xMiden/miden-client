@@ -526,8 +526,8 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] ouput notes
-    ///   are not a subset of executor's output notes.
+    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] output
+    ///   notes are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
     pub async fn new_transaction(
@@ -985,7 +985,7 @@ impl Client {
     /// Returns foreign account inputs for the required foreign accounts specified by the
     /// transaction request.
     ///
-    /// For any [`ForeignAccount::Public`] in `foreing_accounts`, these pieces of data are retrieved
+    /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
     /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
     /// a proof of the account's existence on the network is fetched.
     ///

@@ -985,7 +985,7 @@ async fn p2id_transfer() {
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), MINT_AMOUNT - TRANSFER_AMOUNT);
     } else {
@@ -1139,7 +1139,7 @@ async fn p2ide_transfer_consumed_by_target() {
     assert_eq!(regular_account.account().vault().assets().count(), 1);
     let asset = regular_account.account().vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), from_account_balance - TRANSFER_AMOUNT);
     } else {

@@ -108,7 +108,7 @@ Committed notes: 1
 Tracked notes consumed: 0
 Tracked accounts updated: 0
 Locked accounts: 0
-Commited transactions: 0
+Committed transactions: 0
 ```
 
 ## Consume the note & receive the funds

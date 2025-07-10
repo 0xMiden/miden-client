@@ -46,7 +46,7 @@ pub type OnNoteReceived = Box<
 // STATE SYNC
 // ================================================================================================
 
-/// The state sync components encompasses the client's sync logic. It is then used to requset
+/// The state sync components encompasses the client's sync logic. It is then used to request
 /// updates from the node and apply them to the relevant elements. The updates are then returned and
 /// can be applied to the store to persist the changes.
 ///

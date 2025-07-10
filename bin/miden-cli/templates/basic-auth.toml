@@ -1,10 +1,10 @@
-name = "basic_auth"
-description = "Basic authentication component, for verifying RPO Falcon signatures."
-version = "0.1.0"
-supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
+description     = "Basic authentication component, for verifying RPO Falcon signatures."
+name            = "basic_auth"
+supported-types = ["FungibleFaucet", "NonFungibleFaucet", "RegularAccountImmutableCode", "RegularAccountUpdatableCode"]
+version         = "0.1.0"
 
 [[storage]]
-name = "falcon_pubkey"
 description = "Falcon public key"
-slot = 0
-type = "auth::rpo_falcon512::pub_key"
+name        = "falcon_pubkey"
+slot        = 0
+type        = "auth::rpo_falcon512::pub_key"

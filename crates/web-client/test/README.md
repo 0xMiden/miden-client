@@ -70,7 +70,7 @@ This will forward logs from the server to your terminal logs
 
 ## Troubleshooting
 
-1. When trying to run the tests, if you receieve the following error:
+1. When trying to run the tests, if you receive the following error:
 
 ```
      Error: Could not find Chrome (ver. 128.0.6613.119). This can occur if either

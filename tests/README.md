@@ -33,7 +33,7 @@ Before running the tests though, there is a setup we need to perform to have a n
 - Delete previously existing data
 - Uses the `NodeBuilder` to create a running node in `localhost:57291`.
 
-Killing the node process after running the test is also the user's responsibilty. This can be done by using `ctrl + c` in the terminal where the node is running, or by using the `make stop-node` command if it's running in the background.
+Killing the node process after running the test is also the user's responsibility. This can be done by using `ctrl + c` in the terminal where the node is running, or by using the `make stop-node` command if it's running in the background.
 
 ### Test Run
 

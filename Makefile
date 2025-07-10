@@ -46,7 +46,23 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix clippy fix-wasm clippy-wasm ## Run all linting tasks at once (clippy, fixing, formatting)
+lint: format fix toml clippy fix-wasm clippy-wasm typos ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+
+.PHONY: toml
+toml: ## Runs Format for all TOML files
+	taplo fmt
+
+.PHONY: toml-check
+toml-check: ## Runs Format for all TOML files but only in check mode
+	taplo fmt --check --verbose
+
+.PHONY: typos-check
+typos-check: ## Run typos to check for spelling mistakes
+	@if ! command -v typos &> /dev/null; then \
+		echo "typos-cli is not installed. Please install it by running 'cargo install typos-cli'"; \
+		exit 1; \
+	fi
+	@typos --config ./.typos.toml
 
 # --- Documentation --------------------------------------------------------------------------
 

@@ -4,5 +4,5 @@
 # - timeout: timeout in ms for the rpc requests against the node.
 
 # endpoint = { protocol = "https", host = "rpc.devnet.miden.io" }
-endpoint = { protocol = "http", host = "localhost", port = 57291 }
-timeout = 10000
+endpoint = { host = "localhost", port = 57291, protocol = "http" }
+timeout  = 10000

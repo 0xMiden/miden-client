@@ -1,5 +1,4 @@
 [package]
-version                = "0.10.0"
 authors.workspace      = true
 description            = "A minimal node implementation for running integration tests of the Miden client. NOT for production use."
 edition.workspace      = true
@@ -9,6 +8,7 @@ name                   = "node-builder"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
+version                = "0.10.0"
 
 [[bin]]
 name = "testing-node-builder"
@@ -19,17 +19,17 @@ workspace = true
 
 [dependencies]
 anyhow                    = "1.0"
-miden-objects             = { workspace = true }
 miden-lib                 = { workspace = true }
-miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-rpc            = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-store          = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-utils          = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-miden-node-ntx-builder    = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-rand_chacha               = { version = "0.9" }
+miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder    = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc            = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store          = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils          = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-objects             = { workspace = true }
 rand                      = { workspace = true }
-tokio                     = { version = "1.0", features = ["full"] }
-url                       = { version = "2.5", features = ["serde"] }
+rand_chacha               = { version = "0.9" }
+tokio                     = { features = ["full"], version = "1.0" }
+url                       = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]
 tempfile = "3.0"
