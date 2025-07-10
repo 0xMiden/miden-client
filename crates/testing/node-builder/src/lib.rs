@@ -273,7 +273,7 @@ impl NodeBuilder {
             .id()
     }
 
-    /// Start ntx-builder and return the tokio task ID. 
+    /// Start ntx-builder and return the tokio task ID.
     fn start_ntx_builder(
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
