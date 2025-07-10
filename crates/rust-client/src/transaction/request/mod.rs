@@ -23,7 +23,7 @@ use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationErr
 use thiserror::Error;
 
 mod builder;
-pub use builder::{PaymentTransactionData, SwapTransactionData, TransactionRequestBuilder};
+pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
 pub use foreign::ForeignAccount;

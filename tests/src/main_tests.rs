@@ -7,7 +7,7 @@ use miden_client::{
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
-        DiscardCause, PaymentTransactionData, TransactionProver, TransactionProverError,
+        DiscardCause, PaymentNoteDescription, TransactionProver, TransactionProverError,
         TransactionRequestBuilder, TransactionStatus,
     },
 };
@@ -79,7 +79,7 @@ async fn multiple_tx_on_same_block() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request_1 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -90,7 +90,7 @@ async fn multiple_tx_on_same_block() {
         .unwrap();
     let tx_request_2 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -393,7 +393,7 @@ async fn sync_detail_values() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -688,7 +688,7 @@ async fn import_consumed_note_with_proof() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -749,7 +749,7 @@ async fn import_consumed_note_with_id() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -808,7 +808,7 @@ async fn import_note_with_proof() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -871,7 +871,7 @@ async fn discarded_transaction() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,

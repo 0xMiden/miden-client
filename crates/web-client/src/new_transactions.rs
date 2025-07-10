@@ -1,7 +1,7 @@
 use miden_client::{
     note::BlockNumber,
     transaction::{
-        PaymentTransactionData, SwapTransactionData,
+        PaymentNoteDescription, SwapTransactionData,
         TransactionRequestBuilder as NativeTransactionRequestBuilder,
         TransactionResult as NativeTransactionResult,
     },
@@ -122,24 +122,24 @@ impl WebClient {
         let fungible_asset = FungibleAsset::new(faucet_id.into(), amount)
             .map_err(|err| js_error_with_context(err, "failed to create fungible asset"))?;
 
-        let mut payment_transaction = PaymentTransactionData::new(
+        let mut payment_description = PaymentNoteDescription::new(
             vec![fungible_asset.into()],
             sender_account_id.into(),
             target_account_id.into(),
         );
 
         if let Some(recall_height) = recall_height {
-            payment_transaction =
-                payment_transaction.with_reclaim_height(BlockNumber::from(recall_height));
+            payment_description =
+                payment_description.with_reclaim_height(BlockNumber::from(recall_height));
         }
 
         if let Some(height) = timelock_height {
-            payment_transaction =
-                payment_transaction.with_timelock_height(BlockNumber::from(height));
+            payment_description =
+                payment_description.with_timelock_height(BlockNumber::from(height));
         }
 
         let send_transaction_request = NativeTransactionRequestBuilder::new()
-            .build_pay_to_id(payment_transaction, note_type.into(), client.rng())
+            .build_pay_to_id(payment_description, note_type.into(), client.rng())
             .map_err(|err| {
                 js_error_with_context(err, "failed to create send transaction request")
             })?;

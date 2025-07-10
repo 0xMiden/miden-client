@@ -63,7 +63,7 @@ use crate::{
         mock::{MockClient, MockRpcApi},
     },
     transaction::{
-        DiscardCause, PaymentTransactionData, TransactionRequestBuilder, TransactionRequestError,
+        DiscardCause, PaymentNoteDescription, TransactionRequestBuilder, TransactionRequestError,
         TransactionStatus,
     },
 };
@@ -766,7 +766,7 @@ async fn note_without_asset() {
 
     let error = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(vec![], faucet.id(), wallet.id()),
+            PaymentNoteDescription::new(vec![], faucet.id(), wallet.id()),
             NoteType::Public,
             client.rng(),
         )
@@ -776,7 +776,7 @@ async fn note_without_asset() {
 
     let error = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(FungibleAsset::new(faucet.id(), 0).unwrap())],
                 faucet.id(),
                 wallet.id(),
@@ -926,7 +926,7 @@ async fn p2id_transfer() {
     println!("Running P2ID tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1027,7 +1027,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
     println!("Running P2ID tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1113,7 +1113,7 @@ async fn p2ide_transfer_consumed_by_target() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1194,7 +1194,7 @@ async fn p2ide_transfer_consumed_by_sender() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1278,7 +1278,7 @@ async fn p2ide_timelocked() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1355,7 +1355,7 @@ async fn get_consumable_notes() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
@@ -1423,7 +1423,7 @@ async fn get_output_notes() {
     println!("Running P2ID tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 random_account_id,
@@ -1469,7 +1469,7 @@ async fn account_rollback() {
 
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
             client.rng(),
         )
@@ -1555,7 +1555,7 @@ async fn subsequent_discarded_transactions() {
     let tx_request = TransactionRequestBuilder::new()
         .with_expiration_delta(2)
         .build_pay_to_id(
-            PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
             client.rng(),
         )
@@ -1574,7 +1574,7 @@ async fn subsequent_discarded_transactions() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
             NoteType::Public,
             client.rng(),
         )

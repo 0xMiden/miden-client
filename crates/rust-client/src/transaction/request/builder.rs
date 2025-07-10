@@ -296,7 +296,7 @@ impl TransactionRequestBuilder {
     /// This function cannot be used with a previously set custom script.
     pub fn build_pay_to_id(
         self,
-        payment_data: PaymentTransactionData,
+        payment_data: PaymentNoteDescription,
         note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
@@ -404,12 +404,12 @@ impl TransactionRequestBuilder {
     }
 }
 
-// PAYMENT TRANSACTION DATA
+// PAYMENT NOTE DESCRIPTION
 // ================================================================================================
 
-/// Contains information about a payment transaction.
+/// Contains information needed to create a payment note.
 #[derive(Clone, Debug)]
-pub struct PaymentTransactionData {
+pub struct PaymentNoteDescription {
     /// Assets that are meant to be sent to the target account.
     assets: Vec<Asset>,
     /// Account ID of the sender account.
@@ -424,17 +424,17 @@ pub struct PaymentTransactionData {
     timelock_height: Option<BlockNumber>,
 }
 
-impl PaymentTransactionData {
+impl PaymentNoteDescription {
     // CONSTRUCTORS
     // --------------------------------------------------------------------------------------------
 
-    /// Creates a new [`PaymentTransactionData`].
+    /// Creates a new [`PaymentNoteDescription`].
     pub fn new(
         assets: Vec<Asset>,
         sender_account_id: AccountId,
         target_account_id: AccountId,
-    ) -> PaymentTransactionData {
-        PaymentTransactionData {
+    ) -> PaymentNoteDescription {
+        PaymentNoteDescription {
             assets,
             sender_account_id,
             target_account_id,
@@ -443,16 +443,16 @@ impl PaymentTransactionData {
         }
     }
 
-    /// Modifies the [`PaymentTransactionData`] to set a reclaim height for payment note.
+    /// Modifies the [`PaymentNoteDescription`] to set a reclaim height for payment note.
     #[must_use]
-    pub fn with_reclaim_height(mut self, reclaim_height: BlockNumber) -> PaymentTransactionData {
+    pub fn with_reclaim_height(mut self, reclaim_height: BlockNumber) -> PaymentNoteDescription {
         self.reclaim_height = Some(reclaim_height);
         self
     }
 
-    /// Modifies the [`PaymentTransactionData`] to set a timelock height for payment note.
+    /// Modifies the [`PaymentNoteDescription`] to set a timelock height for payment note.
     #[must_use]
-    pub fn with_timelock_height(mut self, timelock_height: BlockNumber) -> PaymentTransactionData {
+    pub fn with_timelock_height(mut self, timelock_height: BlockNumber) -> PaymentNoteDescription {
         self.timelock_height = Some(timelock_height);
         self
     }

@@ -23,7 +23,7 @@
 //! use miden_client::{
 //!     Client,
 //!     crypto::FeltRng,
-//!     transaction::{PaymentTransactionData, TransactionRequestBuilder, TransactionResult},
+//!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
 //! };
 //! use miden_objects::{account::AccountId, asset::FungibleAsset, note::NoteType};
 //! # use std::error::Error;
@@ -43,7 +43,7 @@
 //!
 //!     // Build a transaction request for a pay-to-id transaction.
 //!     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
-//!         PaymentTransactionData::new(vec![asset.into()], sender_id, target_id),
+//!         PaymentNoteDescription::new(vec![asset.into()], sender_id, target_id),
 //!         NoteType::Private,
 //!         client.rng(),
 //!     )?;
@@ -117,7 +117,7 @@ pub use miden_tx::{
     TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentTransactionData, SwapTransactionData, TransactionRequest,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
     TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
@@ -1267,7 +1267,7 @@ mod test {
     };
     use miden_tx::utils::{Deserializable, Serializable};
 
-    use super::PaymentTransactionData;
+    use super::PaymentNoteDescription;
     use crate::{
         tests::create_test_client,
         transaction::{TransactionRequestBuilder, TransactionResult},
@@ -1308,7 +1308,7 @@ mod test {
         client.sync_state().await.unwrap();
         let tx_request = TransactionRequestBuilder::new()
             .build_pay_to_id(
-                PaymentTransactionData::new(
+                PaymentNoteDescription::new(
                     vec![asset_1, asset_2],
                     account.id(),
                     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
