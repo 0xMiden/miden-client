@@ -16,7 +16,7 @@ FEATURES_CLIENT=--features "testing, std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
-WEB_CLIENT_DIR  := crates/web-client
+WEB_CLIENT_DIR=crates/web-client
 
 # --- Linting -------------------------------------------------------------------------------------
 
