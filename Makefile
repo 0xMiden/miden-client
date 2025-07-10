@@ -58,10 +58,6 @@ toml-check: ## Runs Format for all TOML files but only in check mode
 
 .PHONY: typos-check
 typos-check: ## Run typos to check for spelling mistakes
-	@if ! command -v typos &> /dev/null; then \
-		echo "typos-cli is not installed. Please install it by running 'cargo install typos-cli'"; \
-		exit 1; \
-	fi
 	@typos --config ./.typos.toml
 
 # --- Documentation --------------------------------------------------------------------------
