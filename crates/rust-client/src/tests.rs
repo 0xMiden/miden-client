@@ -1750,7 +1750,7 @@ async fn swap_chain_test() {
     }
 
     // Generate swap notes.
-    // Execpt for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
+    // Except for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
     // asset.
     let mut swap_notes = vec![];
     for pairs in account_pairs.windows(2) {
