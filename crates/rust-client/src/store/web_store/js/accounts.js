@@ -1,10 +1,11 @@
 import {
-  accountCodes,
   accountStorages,
   accountVaults,
   accountAuths,
   accounts,
+  mastForests,
   foreignAccountCode,
+  accountProcedures,
 } from "./schema.js";
 
 // GET FUNCTIONS
@@ -171,7 +172,7 @@ export async function getAccountHeaderByCommitment(accountCommitment) {
 export async function getAccountCode(codeRoot) {
   try {
     // Fetch all records matching the given root
-    const allMatchingRecords = await accountCodes
+    const allMatchingRecords = await mastForests
       .where("root")
       .equals(codeRoot)
       .toArray();
@@ -182,20 +183,25 @@ export async function getAccountCode(codeRoot) {
     }
 
     // The first record is the only one due to the uniqueness constraint
-    const codeRecord = allMatchingRecords[0];
+    const mastRecord = allMatchingRecords[0];
 
-    // Convert the code Blob to an ArrayBuffer
-    const codeArrayBuffer = await codeRecord.code.arrayBuffer();
-    const codeArray = new Uint8Array(codeArrayBuffer);
-    const codeBase64 = uint8ArrayToBase64(codeArray);
+    const mastArrayBuffer = await mastRecord.mast.arrayBuffer();
+    const mastArray = new Uint8Array(mastArrayBuffer);
+    const mastBase64 = uint8ArrayToBase64(mastArray);
+
+    const procedureInfoArrayBuffer =
+      await mastRecord.procedureInfo.arrayBuffer();
+    const procedureInfoArray = new Uint8Array(procedureInfoArrayBuffer);
+    const procedureInfoBase64 = uint8ArrayToBase64(procedureInfoArray);
 
     return {
-      root: codeRecord.root,
-      code: codeBase64,
+      root: mastRecord.root,
+      mast: mastBase64,
+      procedureInfo: procedureInfoBase64,
     };
   } catch (error) {
     console.error(
-      `Error fetching account code for root ${codeRoot}:`,
+      `Error fetching mast forests for root ${codeRoot}:`,
       error.toString()
     );
     throw error;
@@ -319,19 +325,32 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey) {
 
 // INSERT FUNCTIONS
 
-export async function insertAccountCode(codeRoot, code) {
+export async function insertAccountCode(
+  codeRoot,
+  mast,
+  procedureInfo,
+  procedureRoots
+) {
   try {
-    // Create a Blob from the ArrayBuffer
-    const codeBlob = new Blob([new Uint8Array(code)]);
+    const mastBlob = new Blob([new Uint8Array(mast)]);
+    const procedureInfoBlob = new Blob([new Uint8Array(procedureInfo)]);
 
-    // Prepare the data object to insert
     const data = {
-      root: codeRoot, // Using codeRoot as the key
-      code: codeBlob,
+      root: codeRoot,
+      mast: mastBlob,
+      procedureInfo: procedureInfoBlob,
     };
 
-    // Perform the insert using Dexie
-    await accountCodes.put(data);
+    await mastForests.put(data);
+
+    for (const procedureRoot of procedureRoots) {
+      const procedureData = {
+        mastForestRoot: codeRoot,
+        procedureRoot: procedureRoot,
+      };
+
+      await accountProcedures.put(procedureData);
+    }
   } catch (error) {
     console.error(
       `Error inserting code with root: ${codeRoot}:`,
@@ -439,9 +458,15 @@ export async function insertAccountAuth(pubKey, secretKey) {
   }
 }
 
-export async function upsertForeignAccountCode(accountId, code, codeRoot) {
+export async function upsertForeignAccountCode(
+  accountId,
+  codeRoot,
+  mast,
+  procedureInfo,
+  procedureRoots
+) {
   try {
-    await insertAccountCode(codeRoot, code);
+    await insertAccountCode(codeRoot, mast, procedureInfo, procedureRoots);
 
     const data = {
       accountId,
@@ -472,24 +497,29 @@ export async function getForeignAccountCode(accountIds) {
 
     let codeRoots = foreignAccounts.map((account) => account.codeRoot);
 
-    const accountCode = await accountCodes
+    const mastForest = await mastForests
       .where("root")
       .anyOf(codeRoots)
       .toArray();
 
     const processedCode = foreignAccounts.map(async (foreignAccount) => {
-      const matchingCode = accountCode.find(
+      const matchingCode = mastForest.find(
         (code) => code.root === foreignAccount.codeRoot
       );
 
-      // Convert the code Blob to an ArrayBuffer
-      const codeArrayBuffer = await matchingCode.code.arrayBuffer();
-      const codeArray = new Uint8Array(codeArrayBuffer);
-      const codeBase64 = uint8ArrayToBase64(codeArray);
+      const mastArrayBuffer = await matchingCode.mast.arrayBuffer();
+      const mastArray = new Uint8Array(mastArrayBuffer);
+      const mastBase64 = uint8ArrayToBase64(mastArray);
+
+      const procedureInfoArrayBuffer =
+        await matchingCode.procedureInfo.arrayBuffer();
+      const procedureInfoArray = new Uint8Array(procedureInfoArrayBuffer);
+      const procedureInfoBase64 = uint8ArrayToBase64(procedureInfoArray);
 
       return {
         accountId: foreignAccount.accountId,
-        code: codeBase64,
+        mast: mastBase64,
+        procedureInfo: procedureInfoBase64,
       };
     });
     return processedCode;
@@ -497,6 +527,76 @@ export async function getForeignAccountCode(accountIds) {
     console.error("Error fetching foreign account code:", error.toString());
     throw error;
   }
+}
+
+export function getMastForest(procedureRoot) {
+  let cachedMastForest = MAST_FOREST_MAP.get(procedureRoot);
+
+  if (!cachedMastForest) {
+    throw new Error("Mast forest not found in cache.");
+  }
+
+  let data = {
+    mast: cachedMastForest,
+  };
+
+  return data;
+}
+
+var MAST_FOREST_MAP = new Map();
+export async function fetchAndCacheMastForests() {
+  // Parse `accountProcedures` to mastForestRoot->[procedureRoot1, procedureRoot2, ...] mapping
+  const normalizedRecordsMap = new Map();
+
+  await accountProcedures.each((record) => {
+    if (MAST_FOREST_MAP.has(record.procedureRoot)) {
+      // If the procedureRoot is already cached, skip it
+      return;
+    }
+
+    const mappedProcedureRoots = normalizedRecordsMap.get(
+      record.mastForestRoot
+    );
+
+    if (mappedProcedureRoots) {
+      // If the mastForestRoot is tracked, push the procedureRoot to the array
+      mappedProcedureRoots.push(record.procedureRoot);
+    } else {
+      // If the mastForestRoot is not tracked, create a new entry with the procedureRoot
+      normalizedRecordsMap.set(record.mastForestRoot, [record.procedureRoot]);
+    }
+  });
+
+  const normalizedRecords = Array.from(normalizedRecordsMap.entries());
+
+  // Cache the mast forest for each procedure root
+  await Promise.all(
+    normalizedRecords.map(async (record) => {
+      let mastForestRoot = record[0];
+      let procedureRoots = record[1];
+
+      // Fetch the mast forest record for the given root
+      const allMatchingRecords = await mastForests
+        .where("root")
+        .equals(mastForestRoot)
+        .toArray();
+
+      if (allMatchingRecords.length === 0) {
+        throw new Error(`No mast forest found for root: ${mastForestRoot}`);
+      }
+
+      const mastForestRecord = allMatchingRecords[0];
+
+      const mastArrayBuffer = await mastForestRecord.mast.arrayBuffer();
+      const mastArray = new Uint8Array(mastArrayBuffer);
+      const mastBase64 = uint8ArrayToBase64(mastArray);
+
+      for (const procedureRoot of procedureRoots) {
+        // Cache the mast forest for each procedure root
+        MAST_FOREST_MAP.set(procedureRoot, mastBase64);
+      }
+    })
+  );
 }
 
 export async function lockAccount(accountId) {

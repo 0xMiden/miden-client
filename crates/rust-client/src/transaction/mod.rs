@@ -91,7 +91,7 @@ use crate::{
     rpc::domain::account::AccountProof,
     store::{
         InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
-        TransactionFilter, data_store::ClientDataStore, input_note_states::ExpectedNoteState,
+        TransactionFilter, input_note_states::ExpectedNoteState,
     },
     sync::NoteTagRecord,
 };
@@ -579,11 +579,6 @@ impl Client {
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone());
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
-
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -592,15 +587,6 @@ impl Client {
             self.store.get_sync_height().await?
         };
 
-        // TODO: Refactor this to get account code only?
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
-        data_store.mast_store().load_account_code(account.code());
-
         if ignore_invalid_notes {
             // Remove invalid notes
             notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
@@ -608,7 +594,7 @@ impl Client {
 
         // Execute the transaction and get the witness
         let executed_transaction = self
-            .build_executor(&data_store)?
+            .build_executor()?
             .execute_transaction(
                 account_id,
                 block_num,
@@ -945,9 +931,7 @@ impl Client {
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let data_store = ClientDataStore::new(self.store.clone());
-
-            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
+            let execution = NoteConsumptionChecker::new(&self.build_executor()?)
                 .check_notes_consumability(
                     account_id,
                     self.store.get_sync_height().await?,
@@ -1084,23 +1068,8 @@ impl Client {
             self.get_sync_height().await?
         };
 
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
-
-        let data_store = ClientDataStore::new(self.store.clone());
-
-        // Ensure code is loaded on MAST store
-        data_store.mast_store().load_account_code(account.code());
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
-
         Ok(self
-            .build_executor(&data_store)?
+            .build_executor()?
             .execute_tx_view_script(
                 account_id,
                 block_ref,
@@ -1112,12 +1081,11 @@ impl Client {
             .await?)
     }
 
-    pub(crate) fn build_executor<'store, 'auth>(
-        &'auth self,
-        data_store: &'store ClientDataStore,
-    ) -> Result<TransactionExecutor<'store, 'auth>, TransactionExecutorError> {
+    pub(crate) fn build_executor(
+        &self,
+    ) -> Result<TransactionExecutor<'_, '_>, TransactionExecutorError> {
         TransactionExecutor::with_options(
-            data_store,
+            &self.data_store,
             self.authenticator.as_deref(),
             self.exec_options,
         )

@@ -14,7 +14,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest, Word,
+    Digest, MastForest, Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -229,6 +229,13 @@ impl Store for WebStore {
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         self.get_foreign_account_code(account_ids).await
+    }
+
+    async fn get_mast_forest(
+        &self,
+        procedure_root: Digest,
+    ) -> Result<Option<MastForest>, StoreError> {
+        self.get_mast_forest(procedure_root)
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

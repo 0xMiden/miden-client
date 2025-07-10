@@ -132,8 +132,6 @@ impl NoteScreener {
             TransactionExecutor::new(&data_store, self.authenticator.as_deref());
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
-        data_store.mast_store().load_account_code(account.code());
-
         if let NoteAccountExecution::Success = consumption_checker
             .check_notes_consumability(
                 account.id(),

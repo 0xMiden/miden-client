@@ -14,6 +14,7 @@
 * [BREAKING] Renamed P2IDR to P2IDE (#1016).
 * Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897).
 * [BREAKING] Removed `with_` prefix from builder functions (#1018).
+* [BREAKING] Refactored the `ClientDataStore` to use the `Store` to retrieve account code (#982).
 
 ### Features
 
