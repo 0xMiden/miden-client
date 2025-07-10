@@ -20,10 +20,12 @@
 * Added support for FPI in Web Client (#958).
 * Exposed `bech32` account IDs in Web Client (#978).
 * Added transaction script argument support to `TransactionRequest` (#1017).
+* [BREAKING] Added support for timelock P2IDE notes (#1020).
 
 ### Fixes
 
 * Fixed Intermittent Block Header Error During Sync in Web Client (#997).
+* Fixed Swap Transaction Request in Web Client (#1002)
 
 ## v0.9.4 (2025-07-01)
 

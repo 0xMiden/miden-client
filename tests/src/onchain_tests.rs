@@ -3,7 +3,7 @@ use miden_client::{
     auth::AuthSecretKey,
     store::{InputNoteState, NoteFilter},
     testing::common::*,
-    transaction::{PaymentTransactionData, TransactionRequestBuilder},
+    transaction::{PaymentNoteDescription, TransactionRequestBuilder},
 };
 use miden_objects::{
     account::AccountStorageMode,
@@ -80,12 +80,11 @@ async fn onchain_notes_flow() {
     let p2id_asset = FungibleAsset::new(faucet_account.id(), TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![p2id_asset.into()],
                 basic_wallet_1.id(),
                 basic_wallet_2.id(),
             ),
-            None,
             NoteType::Public,
             client_2.rng(),
         )
@@ -95,12 +94,12 @@ async fn onchain_notes_flow() {
     // Create a note for client 3 that is already consumed before syncing
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![p2id_asset.into()],
                 basic_wallet_1.id(),
                 basic_wallet_2.id(),
-            ),
-            Some(1.into()),
+            )
+            .with_reclaim_height(1.into()),
             NoteType::Public,
             client_2.rng(),
         )
@@ -262,12 +261,11 @@ async fn onchain_accounts() {
     println!("Running P2ID tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Public,
             client_1.rng(),
         )

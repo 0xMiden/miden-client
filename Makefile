@@ -63,7 +63,7 @@ book: ## Builds the book & serves documentation site
 .PHONY: typedoc
 typedoc: ## Generate web client package documentation.
 	@cd crates/web-client && \
-	npm run build && \
+	npm run build-dev && \
 	yarn typedoc
 
 # --- Testing -------------------------------------------------------------------------------------

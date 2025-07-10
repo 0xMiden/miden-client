@@ -46,6 +46,11 @@ impl NoteTag {
     pub fn execution_mode(&self) -> NoteExecutionMode {
         self.0.execution_mode().into()
     }
+
+    #[wasm_bindgen(js_name = "asU32")]
+    pub fn as_u32(&self) -> u32 {
+        self.0.as_u32()
+    }
 }
 
 // CONVERSIONS

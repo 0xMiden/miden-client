@@ -91,14 +91,14 @@ let fungible_asset = FungibleAsset::new(faucet_id, *amount)?.into();
 
 let sender_account_id = AccountId::from_hex(bob_account_id)?;
 let target_account_id = AccountId::from_hex(alice_account_id)?;
-let payment_transaction = PaymentTransactionData::new(
+let payment_description = PaymentNoteDescription::new(
     vec![fungible_asset.into()],
     sender_account_id,
     target_account_id,
 );
 
 let transaction_request = TransactionRequestBuilder::new().build_pay_to_id(
-    payment_transaction,
+    payment_description,
     None,
     NoteType::Private,
     client.rng(),

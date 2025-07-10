@@ -8,6 +8,26 @@
 
 ## Methods
 
+### expectedFutureNotes()
+
+> **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+***
+
+### expectedOutputOwnNotes()
+
+> **expectedOutputOwnNotes**(): [`Note`](Note.md)[]
+
+#### Returns
+
+[`Note`](Note.md)[]
+
+***
+
 ### free()
 
 > **free**(): `void`

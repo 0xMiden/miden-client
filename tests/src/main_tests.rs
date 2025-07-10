@@ -7,7 +7,7 @@ use miden_client::{
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
-        DiscardCause, PaymentTransactionData, TransactionProver, TransactionProverError,
+        DiscardCause, PaymentNoteDescription, TransactionProver, TransactionProverError,
         TransactionRequestBuilder, TransactionStatus,
     },
 };
@@ -79,24 +79,22 @@ async fn multiple_tx_on_same_block() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request_1 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
         .unwrap();
     let tx_request_2 = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
             ),
-            None,
             NoteType::Private,
             client.rng(),
         )
@@ -395,12 +393,12 @@ async fn sync_detail_values() {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(new_details.block_num + 5),
+            )
+            .with_reclaim_height(new_details.block_num + 5),
             NoteType::Public,
             client1.rng(),
         )
@@ -688,12 +686,12 @@ async fn import_consumed_note_with_proof() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -749,12 +747,12 @@ async fn import_consumed_note_with_id() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
@@ -808,12 +806,12 @@ async fn import_note_with_proof() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Private,
             client_1.rng(),
         )
@@ -871,12 +869,12 @@ async fn discarded_transaction() {
     println!("Running P2IDE tx...");
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
-            PaymentTransactionData::new(
+            PaymentNoteDescription::new(
                 vec![Asset::Fungible(asset)],
                 from_account_id,
                 to_account_id,
-            ),
-            Some(current_block_num),
+            )
+            .with_reclaim_height(current_block_num),
             NoteType::Public,
             client_1.rng(),
         )
