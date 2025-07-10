@@ -82,12 +82,12 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
     let keystore = FilesystemKeyStore::new(auth_path.clone()).unwrap();
 
     let builder = ClientBuilder::new()
-        .with_rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-        .with_rng(Box::new(rng))
-        .with_store(store)
-        .with_filesystem_keystore(auth_path.to_str().unwrap())
+        .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
+        .rng(Box::new(rng))
+        .store(store)
+        .filesystem_keystore(auth_path.to_str().unwrap())
         .in_debug_mode(true)
-        .with_tx_graceful_blocks(None);
+        .tx_graceful_blocks(None);
 
     (builder, keystore)
 }
@@ -268,11 +268,12 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             .unwrap();
 
         match tracked_transaction.status {
-            TransactionStatus::Committed(_) => {
+            TransactionStatus::Committed(n) => {
+                println!("tx committed in {n}");
                 break;
             },
             TransactionStatus::Pending => {
-                std::thread::sleep(Duration::from_millis(100));
+                std::thread::sleep(Duration::from_secs(1));
             },
             TransactionStatus::Discarded(cause) => {
                 panic!("Transaction was discarded with cause: {:?}", cause);
@@ -312,7 +313,7 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
             return summary;
         }
 
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_secs(3));
     }
 }
 
@@ -504,7 +505,7 @@ pub fn mint_multiple_fungible_asset(
         })
         .collect::<Vec<OutputNote>>();
 
-    TransactionRequestBuilder::new().with_own_output_notes(notes).build().unwrap()
+    TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }
 
 /// Executes a transaction and consumes the resulting unauthenticated notes inmediately without
@@ -524,7 +525,7 @@ pub async fn execute_tx_and_consume_output_notes(
     execute_tx(client, executor, tx_request).await;
 
     let tx_request = TransactionRequestBuilder::new()
-        .with_unauthenticated_input_notes(output_notes)
+        .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
     let transaction_id = execute_tx(client, consumer, tx_request).await;

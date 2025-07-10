@@ -94,8 +94,8 @@ async fn transaction_request() {
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes(note_args_map.clone())
-        .with_custom_script(tx_script.clone())
+        .authenticated_input_notes(note_args_map.clone())
+        .custom_script(tx_script.clone())
         .script_arg([ZERO, ZERO, ZERO, ZERO])
         .extend_advice_map(advice_map.clone())
         .build()
@@ -106,9 +106,9 @@ async fn transaction_request() {
 
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes(note_args_map)
+        .authenticated_input_notes(note_args_map)
+        .custom_script(tx_script)
         .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
-        .with_custom_script(tx_script)
         .extend_advice_map(advice_map)
         .build()
         .unwrap();
@@ -204,8 +204,8 @@ async fn merkle_store() {
     let tx_script = client.compile_tx_script(&code).unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes(note_args_map)
-        .with_custom_script(tx_script)
+        .authenticated_input_notes(note_args_map)
+        .custom_script(tx_script)
         .extend_advice_map(advice_map)
         .extend_merkle_store(merkle_store.inner_nodes())
         .build()
@@ -266,7 +266,7 @@ async fn onchain_notes_sync_with_tag() {
 
     // Send transaction and wait for it to be committed
     let tx_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
 
@@ -301,7 +301,7 @@ async fn mint_custom_note(
     let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin);
 
     let transaction_request = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
 

@@ -446,15 +446,15 @@ mod tests {
 
         // This transaction request wouldn't be valid in a real scenario, it's intended for testing
         let tx_request = TransactionRequestBuilder::new()
-            .with_authenticated_input_notes(vec![(notes.pop().unwrap().id(), None)])
-            .with_unauthenticated_input_notes(vec![(notes.pop().unwrap(), None)])
-            .with_expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
-            .with_expected_future_notes(vec![(
+            .authenticated_input_notes(vec![(notes.pop().unwrap().id(), None)])
+            .unauthenticated_input_notes(vec![(notes.pop().unwrap(), None)])
+            .expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
+            .expected_future_notes(vec![(
                 notes.pop().unwrap().into(),
                 NoteTag::from_account_id(sender_id),
             )])
             .extend_advice_map(advice_vec)
-            .with_foreign_accounts([
+            .foreign_accounts([
                 ForeignAccount::public(
                     target_id,
                     AccountStorageRequirements::new([(5u8, &[Digest::default()])]),
@@ -462,7 +462,7 @@ mod tests {
                 .unwrap(),
                 ForeignAccount::private(account).unwrap(),
             ])
-            .with_own_output_notes(vec![
+            .own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),
                 OutputNote::Partial(notes.pop().unwrap().into()),
             ])
