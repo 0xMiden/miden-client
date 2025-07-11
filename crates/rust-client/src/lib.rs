@@ -212,6 +212,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_lib::utils::ScriptBuilder;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
 use rand::RngCore;
@@ -306,6 +307,11 @@ impl Client {
     /// Returns true if the client is in debug mode.
     pub fn in_debug_mode(&self) -> bool {
         self.exec_options.enable_debugging()
+    }
+
+    /// Returns an instance of the `ScriptBuilder`
+    pub fn script_builder(&self) -> ScriptBuilder {
+        ScriptBuilder::new(self.in_debug_mode())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

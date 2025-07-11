@@ -462,7 +462,7 @@ async fn debug_mode_outputs_logs() {
                 assert_eq
             end
             ";
-    let note_script = client.compile_note_script(note_script).unwrap();
+    let note_script = client.script_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(
