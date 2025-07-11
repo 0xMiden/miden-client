@@ -77,7 +77,7 @@ web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [build-dependencies]
 miden-lib              = { workspace = true }
-miden-node-proto-build = { default-features = false, version = "0.10" }
+miden-node-proto-build = { workspace = true }
 miden-objects          = { workspace = true }
 miette                 = { workspace = true }
 prost                  = { default-features = false, features = ["derive"], version = "0.13" }

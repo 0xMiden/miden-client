@@ -22,7 +22,14 @@ rust-version = "1.87"
 [workspace.dependencies]
 # Miden dependencies
 miden-lib                  = { default-features = false, version = "0.10" }
+miden-node-block-producer  = { version = "0.10" }
+miden-node-ntx-builder     = { version = "0.10" }
+miden-node-proto-build     = { default-features = false, version = "0.10" }
+miden-node-rpc             = { version = "0.10" }
+miden-node-store           = { version = "0.10" }
+miden-node-utils           = { version = "0.10" }
 miden-objects              = { default-features = false, version = "0.10" }
+miden-remote-prover        = { features = ["concurrent"], version = "0.10" }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.10" }
 miden-testing              = { default-features = false, features = ["async"], version = "0.10" }
 miden-tx                   = { default-features = false, features = ["async"], version = "0.10" }

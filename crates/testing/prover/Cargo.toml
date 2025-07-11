@@ -9,8 +9,8 @@ version                = "0.1.0"
 
 [dependencies]
 # Miden dependencies
-miden-node-utils    = { version = "0.10" }
-miden-remote-prover = { features = ["concurrent"], version = "0.10" }
+miden-node-utils    = { workspace = true }
+miden-remote-prover = { features = ["concurrent"], workspace = true }
 
 # External dependencies
 anyhow             = "1.0"
