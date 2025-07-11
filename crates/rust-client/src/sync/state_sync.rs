@@ -489,7 +489,7 @@ pub async fn on_note_received(
         if let Some(metadata) = public_note.metadata()
             && note_tags.contains(&metadata.tag())
         {
-            return Ok(note_tags.contains(&metadata.tag()));
+            return Ok(true);
         }
 
         // The note is not being tracked by the client and is public so we can screen it
