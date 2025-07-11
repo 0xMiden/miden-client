@@ -36,10 +36,10 @@ use crate::{
 /// Callback that gets executed when a new note is received as part of the sync response.
 ///
 /// It receives:
-/// 
+///
 /// - The committed note received from the network.
 /// - An optional note record that corresponds to the state of the note in the network (only if the
-///  note is public).
+///   note is public).
 /// - A note screener that can be used to test whether notes are consumable.
 /// - A set of [`NoteTag`]s that contains all tags tracked in the store.
 ///
@@ -173,7 +173,7 @@ impl StateSync {
     ///
     /// The `sync_state_update` field of the struct will be updated with the new changes from this
     /// step.
-    /// 
+    ///
     /// This function returns whether the state sync process must continue, depending on whether
     /// the chain tip was reached already.
     async fn sync_state_step(
