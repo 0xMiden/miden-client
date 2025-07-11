@@ -28,7 +28,9 @@ pub enum CliError {
     #[error("config error: {1}")]
     #[diagnostic(
         code(cli::config_error),
-        help("Check if the configuration file exists and is well-formed.")
+        help(
+            "Check if the configuration file exists and is well-formed. If it does not exist, run the `init` command to create it."
+        )
     )]
     Config(#[source] SourceError, String),
     #[error("execute program error: {1}")]

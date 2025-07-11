@@ -23,6 +23,7 @@ use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
 use rand::RngCore;
+use tracing::debug;
 
 use crate::{
     CLIENT_BINARY_NAME, CliKeyStore, commands::account::maybe_set_default_account,
@@ -236,6 +237,9 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
+///
+/// The created account will have a Falcon-based auth component, additional to any specified
+/// component.
 async fn create_client_account(
     client: &mut Client,
     keystore: &CliKeyStore,
@@ -247,17 +251,17 @@ async fn create_client_account(
 ) -> Result<Account, CliError> {
     if component_template_paths.is_empty() {
         return Err(CliError::InvalidArgument(
-            "account must contain one or more components".into(),
+            "account must contain at least one component".into(),
         ));
     }
 
     // Load the component templates and initialization storage data.
-    println!("Loading component templates...");
+    debug!("Loading component templates...");
     let component_templates = load_component_templates(component_template_paths)?;
-    println!("Loaded {} component templates", component_templates.len());
-    println!("Loading initialization storage data...");
+    debug!("Loaded {} component templates", component_templates.len());
+    debug!("Loading initialization storage data...");
     let init_storage_data = load_init_storage_data(init_storage_data_path)?;
-    println!("Loaded initialization storage data");
+    debug!("Loaded initialization storage data");
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -286,37 +290,43 @@ async fn create_client_account(
     client.add_account(&account, Some(seed), false).await?;
 
     if deploy {
-        // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-        // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
-        // use different auth components in the future.
-        let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
+        deploy_account(client, &account).await?;
+    }
 
-        let auth_script = client
-            .script_builder()
-            .compile_tx_script(
-                "
+    Ok(account)
+}
+
+/// Submits a deploy transaction to the node for the specified account.
+async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), CliError> {
+    // Retrieve the auth procedure mast root pointer and call it in the transaction script.
+    // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
+    // use different auth components in the future.
+    let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
+
+    let auth_script = client
+        .script_builder()
+        .compile_tx_script(
+            "
                     begin
                         # [AUTH_PROCEDURE_MAST_ROOT]
                         mem_storew.4000 push.4000
                         # [auth_procedure_mast_root_ptr]
                         dyncall
                     end",
-            )
-            .expect("Auth script should compile");
+        )
+        .expect("Auth script should compile");
 
-        let tx_request = TransactionRequestBuilder::new()
-            .script_arg(auth_procedure_mast_root.into())
-            .custom_script(auth_script)
-            .build()
-            .map_err(|err| {
-                CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
-            })?;
+    let tx_request = TransactionRequestBuilder::new()
+        .script_arg(auth_procedure_mast_root.into())
+        .custom_script(auth_script)
+        .build()
+        .map_err(|err| {
+            CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
+        })?;
 
-        let tx = client.new_transaction(account.id(), tx_request).await?;
-        client.submit_transaction(tx).await?;
-    }
-
-    Ok(account)
+    let tx = client.new_transaction(account.id(), tx_request).await?;
+    client.submit_transaction(tx).await?;
+    Ok(())
 }
 
 /// Helper function to process extra component templates.
