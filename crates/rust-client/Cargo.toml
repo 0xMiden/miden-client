@@ -12,11 +12,11 @@ repository.workspace   = true
 rust-version.workspace = true
 version                = "0.10.0"
 
+[package.metadata.cargo-machete]
+ignored = ["getrandom"]
+
 [lib]
 crate-type = ["lib"]
-
-[lints]
-workspace = true
 
 [features]
 default = ["std", "tonic/channel"]
@@ -69,19 +69,8 @@ uuid                       = { features = ["js", "serde", "v4"], optional = true
 wasm-bindgen               = { features = ["serde-serialize"], optional = true, version = "0.2" }
 wasm-bindgen-futures       = { optional = true, version = "0.4" }
 
-[package.metadata.cargo-machete]
-ignored = ["getrandom"]
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
-
-[dev-dependencies]
-miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
-miden-lib     = { features = ["testing"], workspace = true }
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
-miden-testing = { default-features = false, features = ["async"], workspace = true }
-tokio         = { workspace = true }
-web-sys       = { features = ["console"], version = "0.3" }
 
 [build-dependencies]
 miden-lib              = { workspace = true }
@@ -92,3 +81,14 @@ prost                  = { default-features = false, features = ["derive"], vers
 prost-build            = { default-features = false, version = "0.13" }
 protox                 = { version = "0.7" }
 tonic-build            = { version = "0.13" }
+
+[dev-dependencies]
+miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
+miden-lib     = { features = ["testing"], workspace = true }
+miden-objects = { default-features = false, features = ["testing"], workspace = true }
+miden-testing = { default-features = false, features = ["async"], workspace = true }
+tokio         = { workspace = true }
+web-sys       = { features = ["console"], version = "0.3" }
+
+[lints]
+workspace = true

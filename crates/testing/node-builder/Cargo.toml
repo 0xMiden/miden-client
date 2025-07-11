@@ -14,9 +14,6 @@ version                = "0.10.0"
 name = "testing-node-builder"
 path = "src/main.rs"
 
-[lints]
-workspace = true
-
 [dependencies]
 anyhow                    = "1.0"
 miden-lib                 = { workspace = true }
@@ -33,3 +30,6 @@ url                       = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]
 tempfile = "3.0"
+
+[lints]
+workspace = true

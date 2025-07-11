@@ -12,11 +12,11 @@ repository.workspace   = true
 rust-version.workspace = true
 version                = "0.10.0"
 
+[package.metadata.cargo-machete]
+ignored = ["wasm-bindgen-futures"]
+
 [lib]
 crate-type = ["cdylib"]
-
-[lints]
-workspace = true
 
 [features]
 testing = ["miden-client/testing"]
@@ -39,5 +39,5 @@ miden-lib     = { default-features = false, features = ["testing"], workspace = 
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
 
-[package.metadata.cargo-machete]
-ignored = ["wasm-bindgen-futures"]
+[lints]
+workspace = true

@@ -16,20 +16,8 @@ version                = "0.10.0"
 name = "miden-client"
 path = "src/main.rs"
 
-[lints]
-workspace = true
-
 [features]
 default = []
-
-[[test]]
-name = "integration"
-path = "tests/cli.rs"
-
-[dev-dependencies]
-assert_cmd = { version = "2.0" }
-predicates = { version = "3.0" }
-uuid       = { features = ["serde", "v4"], version = "1.10" }
 
 [dependencies]
 clap               = { features = ["derive"], version = "4.5" }
@@ -51,3 +39,15 @@ tracing-subscriber = { version = "0.3" }
 miden-client  = { path = "../../crates/rust-client", version = "0.10" }
 miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { version = "2.0" }
+predicates = { version = "3.0" }
+uuid       = { features = ["serde", "v4"], version = "1.10" }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "integration"
+path = "tests/cli.rs"
