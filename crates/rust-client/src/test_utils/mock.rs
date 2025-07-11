@@ -1,5 +1,3 @@
-use std::print;
-
 use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 
 use miden_lib::transaction::TransactionKernel;

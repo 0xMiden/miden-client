@@ -5,7 +5,6 @@ use alloc::{
     vec::Vec,
 };
 use core::{future::Future, pin::Pin};
-use std::println;
 
 use miden_objects::{
     Digest,
@@ -498,7 +497,6 @@ pub async fn on_note_received(
         if let Some(metadata) = public_note.metadata()
             && note_tags.contains(&metadata.tag())
         {
-            println!("tags are {:?}", note_tags);
             return Ok(true);
         }
 
