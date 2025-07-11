@@ -14,6 +14,7 @@
 * Replaced deprecated #[clap(...)] with #[command(...)] and #[arg(...)] (#897).
 * [BREAKING] Removed `with_` prefix from builder functions (#1018).
 * Changed sync to store notes regardless of consumption checks if it matched a tracked tag (#1031).
+* Added a way to instantiate a `ScriptBuilder` from `Client` (#1022).
 
 ### Features
 
@@ -27,7 +28,7 @@
 * Fixed Intermittent Block Header Error During Sync in Web Client (#997).
 * Fixed Swap Transaction Request in Web Client (#1002)
 
-## v0.9.4 (2025-07-01)
+## v0.9.4 (2025-07-02)
 
 * Support Operations From Counter Contract FPI Example in Web Client (#958).
 

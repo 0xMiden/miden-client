@@ -32,7 +32,7 @@ impl WebClient {
     pub fn compile_tx_script(&mut self, script: &str) -> Result<TransactionScript, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let native_tx_script: NativeTransactionScript =
-                client.compile_tx_script(script).map_err(|err| {
+                client.script_builder().compile_tx_script(script).map_err(|err| {
                     js_error_with_context(err, "failed to compile transaction script")
                 })?;
             Ok(native_tx_script.into())
