@@ -262,7 +262,8 @@ impl Client {
                 return Ok(None);
             }
 
-            let sync_notes = self.rpc_api.sync_notes(request_block_num, &[tag]).await?;
+            let sync_notes =
+                self.rpc_api.sync_notes(request_block_num, &[tag].into_iter().collect()).await?;
 
             if sync_notes.block_header.block_num() == sync_notes.chain_tip.into() {
                 return Ok(None);

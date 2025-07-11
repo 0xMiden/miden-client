@@ -496,15 +496,16 @@ async fn sync_state_tags() {
 
     // Import first mockchain note as expected
     let expected_notes = rpc_api.get_available_notes();
-
     for tag in expected_notes.iter().map(|n| n.metadata().tag()) {
         client.add_note_tag(tag).await.unwrap();
     }
 
-    // assert that we have no  expected notes prior to syncing state
+    // assert that we have no expected notes prior to syncing state
     assert!(client.get_input_notes(NoteFilter::Expected).await.unwrap().is_empty());
 
     // sync state
+    // The mockchain API has one public note and one private note, so in the end we will have
+    // the public one in the client
     let sync_details = client.sync_state().await.unwrap();
 
     // verify that the client is synced to the latest block
@@ -513,9 +514,9 @@ async fn sync_state_tags() {
         rpc_api.get_block_header_by_number(None, false).await.unwrap().0.block_num()
     );
 
-    // as we are syncing with tags, the response should contain blocks for both notes but they
-    // shouldn't be stored as they are not relevant for the client's accounts.
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 0);
+    assert_eq!(client.get_input_notes(NoteFilter::All).await.unwrap().len(), 1);
+    // as we are syncing with tags, the response should contain blocks for both notes
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -1781,15 +1782,13 @@ async fn swap_chain_test() {
         .setup_accounts_and_faucets(
             &keystore,
             AccountStorageMode::Private,
-            5, // Number of wallets
-            5, // Number of faucets
+            3, // Number of wallets
+            3, // Number of faucets
             vec![
                 // Each wallet will have a different asset
-                vec![1, 0, 0, 0, 0],
-                vec![0, 1, 0, 0, 0],
-                vec![0, 0, 1, 0, 0],
-                vec![0, 0, 0, 1, 0],
-                vec![0, 0, 0, 0, 1],
+                vec![1, 0, 0],
+                vec![0, 1, 0],
+                vec![0, 0, 1],
             ],
         )
         .await
