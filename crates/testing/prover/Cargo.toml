@@ -1,22 +1,22 @@
 [package]
-name = "testing-remote-prover"
-version = "0.1.0"
-edition.workspace = true
+authors.workspace      = true
+edition.workspace      = true
+license.workspace      = true
+name                   = "testing-remote-prover"
+repository.workspace   = true
 rust-version.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+version                = "0.1.0"
 
 [dependencies]
-anyhow = "1.0"
-miden-remote-prover = { git = "https://github.com/0xMiden/miden-node", branch = "next", features = ["concurrent"] }
-miden-node-utils = { git = "https://github.com/0xMiden/miden-node", branch = "next" }
-tokio = { version = "1.0", features = ["full"] }
-tokio-stream = { version = "0.1", features = ["net"] }
-tonic = { version = "0.13", default-features = false, features = ["transport"] }
-tonic-web = { version = "0.13" }
-tracing = { version = "0.1" }
-tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
+anyhow              = "1.0"
+miden-node-utils    = { version = "0.10" }
+miden-remote-prover = { features = ["concurrent"], version = "0.10" }
+tokio               = { features = ["full"], version = "1.0" }
+tokio-stream        = { features = ["net"], version = "0.1" }
+tonic               = { default-features = false, features = ["transport"], version = "0.13" }
+tonic-web           = { version = "0.13" }
+tracing             = { version = "0.1" }
+tracing-subscriber  = { features = ["env-filter", "fmt", "json"], version = "0.3" }
 
 [lints]
 workspace = true

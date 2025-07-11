@@ -505,7 +505,7 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
         println!("{table}");
     }
 
-    println!("Nonce incremented by: {}.", account_delta.nonce_increment());
+    println!("Nonce incremented by: {}.", account_delta.nonce_delta());
 
     Ok(())
 }

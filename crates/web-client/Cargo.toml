@@ -1,16 +1,16 @@
 [package]
-name = "miden-client-web"
-version = "0.10.0"
-description = "Web Client library that facilitates interaction with the Miden rollup"
-readme = "README.md"
-categories = ["no-std"]
-documentation = "https://docs.rs/miden-client-web/0.10.0"
-keywords = ["miden", "client", "web", "wasm"]
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+authors.workspace      = true
+categories             = ["no-std"]
+description            = "Web Client library that facilitates interaction with the Miden rollup"
+documentation          = "https://docs.rs/miden-client-web/0.10.0"
+edition.workspace      = true
+keywords               = ["client", "miden", "wasm", "web"]
+license.workspace      = true
+name                   = "miden-client-web"
+readme                 = "README.md"
+repository.workspace   = true
 rust-version.workspace = true
-edition.workspace = true
+version                = "0.10.0"
 
 [lib]
 crate-type = ["cdylib"]
@@ -22,19 +22,22 @@ workspace = true
 testing = ["miden-client/testing"]
 
 [dependencies]
-miden-client = { version = "0.10", path = "../rust-client", default-features = false, features = ["idxdb", "web-tonic"] }
+miden-client = { default-features = false, features = [
+  "idxdb",
+  "web-tonic",
+], path = "../rust-client", version = "0.10" }
 miden-lib = { workspace = true }
 miden-objects = { workspace = true }
 rand = { workspace = true }
 serde-wasm-bindgen = { version = "0.6" }
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
-miden-client = { path = "../rust-client", default-features = false, features = ["idxdb", "web-tonic", "testing"] }
-miden-lib = { workspace = true, default-features = false, features = ["testing"] }
-miden-objects = { workspace = true, default-features = false, features = ["testing"] }
-web-sys = { version = "0.3", features = ["console"]}
+miden-client  = { default-features = false, features = ["idxdb", "testing", "web-tonic"], path = "../rust-client" }
+miden-lib     = { default-features = false, features = ["testing"], workspace = true }
+miden-objects = { default-features = false, features = ["testing"], workspace = true }
+web-sys       = { features = ["console"], version = "0.3" }
 
 [package.metadata.cargo-machete]
 ignored = ["wasm-bindgen-futures"]

@@ -48,7 +48,7 @@ pub struct AccountRecordIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ForeignAcountCodeIdxdbObject {
+pub struct ForeignAccountCodeIdxdbObject {
     pub account_id: String,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub code: Vec<u8>,

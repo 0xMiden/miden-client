@@ -1,10 +1,10 @@
 [profile.default]
-retries = { backoff = "exponential", count = 2, delay = "1s", jitter = true, max-delay = "10s"}
-status-level = "skip"
+fail-fast      = false
 failure-output = "immediate-final"
-fail-fast = false
-slow-timeout = { period = "3m", terminate-after = 2}
+retries        = { backoff = "exponential", count = 2, delay = "1s", jitter = true, max-delay = "10s" }
+slow-timeout   = { period = "3m", terminate-after = 2 }
+status-level   = "skip"
 
 [[profile.default.overrides]]
-filter = "test(import_genesis_accounts_can_be_used_for_transactions)"
+filter  = "test(import_genesis_accounts_can_be_used_for_transactions)"
 retries = 0

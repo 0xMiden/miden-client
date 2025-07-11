@@ -101,7 +101,7 @@ async fn swap_fully_onchain() {
     client2.add_note_tag(swap_note_tag).await.unwrap();
 
     // sync on client 2, we should get the swap note
-    // consume swap note with accountB, and check that the vault changed appropiately
+    // consume swap note with accountB, and check that the vault changed appropriately
     client2.sync_state().await.unwrap();
     println!("Consuming swap note on second client...");
 
@@ -272,7 +272,7 @@ async fn swap_private() {
     // Sync so we get the inclusion proof info
     client2.sync_state().await.unwrap();
 
-    // consume swap note with accountB, and check that the vault changed appropiately
+    // consume swap note with accountB, and check that the vault changed appropriately
     println!("Consuming swap note on second client...");
 
     let tx_request = TransactionRequestBuilder::new()

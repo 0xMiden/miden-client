@@ -104,7 +104,7 @@ async fn transaction_request() {
         .build()
         .unwrap();
 
-    // This fails becuase of {asserted_value} having the incorrect number passed in
+    // This fails because of {asserted_value} having the incorrect number passed in
     assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
 
     // SUCCESS EXECUTION

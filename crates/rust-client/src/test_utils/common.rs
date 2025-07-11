@@ -337,7 +337,7 @@ pub fn mint_multiple_fungible_asset(
     TransactionRequestBuilder::new().own_output_notes(notes).build().unwrap()
 }
 
-/// Mint assets for the target account and consume them inmediately without waiting for the first
+/// Mint assets for the target account and consume them immediately without waiting for the first
 /// transaction to be committed.
 pub async fn mint_and_consume(
     client: &mut TestClient,

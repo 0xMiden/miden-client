@@ -5,8 +5,8 @@ use std::{
     fs::File,
     io::Write,
     net::SocketAddr,
-    num::NonZeroUsize,
     path::PathBuf,
+    sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -19,7 +19,7 @@ use miden_node_block_producer::{
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
-use miden_node_utils::{crypto::get_rpo_random_coin, grpc::UrlExt};
+use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_objects::{
     Felt, ONE,
     account::{Account, AccountFile, AuthSecretKey},
@@ -29,23 +29,15 @@ use miden_objects::{
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
 use tokio::{
     net::TcpListener,
+    sync::Barrier,
     task::{Id, JoinSet},
 };
 use url::Url;
 
-// CONSTANTS
-// --------------------------------------------------------------------------------------------
-
-pub const DEFAULT_BLOCK_INTERVAL: u64 = 5000;
-pub const DEFAULT_BATCH_INTERVAL: u64 = 2000;
-pub const DEFAULT_RPC_PORT: u16 = 57291;
-pub const DEFAULT_STORE_PORT: u16 = 50051;
-pub const DEFAULT_BLOCK_PRODUCER_PORT: u16 = 50052;
-pub const LOCALHOST: &str = "127.0.0.1";
+pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
+pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
+pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
-
-// NODE BUILDER
-// ================================================================================================
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -69,16 +61,12 @@ impl NodeBuilder {
         }
     }
 
-    // CONFIGURATION
-    // --------------------------------------------------------------------------------------------
-
     /// Sets the block production interval.
     #[must_use]
     pub fn with_block_interval(mut self, interval: Duration) -> Self {
         self.block_interval = interval;
         self
     }
-
     /// Sets the batch production interval.
     #[must_use]
     pub fn with_batch_interval(mut self, interval: Duration) -> Self {
@@ -92,7 +80,6 @@ impl NodeBuilder {
         self.rpc_port = port;
         self
     }
-
     // START
     // --------------------------------------------------------------------------------------------
 
@@ -102,7 +89,6 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        // Generate the genesis accounts.
         let account_file =
             generate_genesis_account().context("failed to create genesis account")?;
 
@@ -117,7 +103,6 @@ impl NodeBuilder {
                 format!("failed to write data for genesis account to file {}", filepath.display())
             })?;
 
-        // Bootstrap the store database.
         let version = 1;
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -127,54 +112,72 @@ impl NodeBuilder {
             .expect("timestamp should fit into u32");
         let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
 
+        // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)
             .context("failed to bootstrap store")?;
 
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
-        //
-        // This is required because `tonic` does not handle retries nor reconnections and our
-        // services expect to be able to connect on startup.
-        let rpc_url = Url::parse(&format!("http://{LOCALHOST}:{}", self.rpc_port)).unwrap();
-        let grpc_rpc = rpc_url.to_socket().context("Failed to to RPC gRPC socket")?;
-        let grpc_rpc = TcpListener::bind(grpc_rpc)
+        let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
             .context("Failed to bind to RPC gRPC endpoint")?;
+        let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("Failed to bind to store RPC gRPC endpoint")?;
+        let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("Failed to bind to store ntx-builder gRPC endpoint")?;
+        let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("Failed to bind to store block-producer gRPC endpoint")?;
 
-        // Define the block producer and ntx builder addresses.
+        let store_rpc_address = store_rpc_listener
+            .local_addr()
+            .context("Failed to retrieve the store's RPC gRPC address")?;
+        let store_block_producer_address = store_block_producer_listener
+            .local_addr()
+            .context("Failed to retrieve the store's block-producer gRPC address")?;
+        let store_ntx_builder_address = store_ntx_builder_listener
+            .local_addr()
+            .context("Failed to retrieve the store's ntx-builder gRPC address")?;
+
         let block_producer_address = available_socket_addr()
             .await
             .context("Failed to bind to block-producer gRPC endpoint")?;
 
-        let ntx_builder_address = available_socket_addr()
-            .await
-            .context("Failed to bind to ntx-builder gRPC endpoint")?;
+        // Start components
 
         let mut join_set = JoinSet::new();
+        let (store_id, _) = Self::start_store(
+            self.data_directory.clone(),
+            &mut join_set,
+            store_rpc_listener,
+            store_ntx_builder_listener,
+            store_block_producer_listener,
+        )
+        .context("failed to start store")?;
 
-        let (store_id, store_address) =
-            self.start_store(&mut join_set).await.context("failed to start store")?;
+        let checkpoint = Arc::new(Barrier::new(2));
 
-        let ntx_builder_id = NodeBuilder::start_ntx_builder(
-            ntx_builder_address,
+        let ntx_builder_id = Self::start_ntx_builder(
             block_producer_address,
-            store_address,
+            store_ntx_builder_address,
+            checkpoint.clone(),
             &mut join_set,
         );
 
         let block_producer_id = self.start_block_producer(
             block_producer_address,
-            store_address,
-            ntx_builder_address,
+            store_block_producer_address,
+            checkpoint,
             &mut join_set,
         );
 
-        // Start RPC component.
         let rpc_id = join_set
             .spawn(async move {
                 Rpc {
                     listener: grpc_rpc,
-                    store: store_address,
+                    store: store_rpc_address,
                     block_producer: Some(block_producer_address),
                 }
                 .serve()
@@ -183,7 +186,6 @@ impl NodeBuilder {
             })
             .id();
 
-        // Lookup table so we can identify the failed component.
         let component_ids = HashMap::from([
             (store_id, "store"),
             (block_producer_id, "block-producer"),
@@ -212,34 +214,41 @@ impl NodeBuilder {
 
     // Start store and return the tokio task ID plus the store's gRPC address. The store endpoint is
     // available after loading completes.
-    async fn start_store(&self, join_set: &mut JoinSet<Result<()>>) -> Result<(Id, SocketAddr)> {
-        let grpc_store = TcpListener::bind("127.0.0.1:0")
-            .await
-            .context("Failed to bind to store gRPC endpoint")?;
-        let store_address =
-            grpc_store.local_addr().context("Failed to retrieve the store's gRPC address")?;
-
-        let data_directory = self.data_directory.clone();
+    fn start_store(
+        data_directory: PathBuf,
+        join_set: &mut JoinSet<Result<()>>,
+        rpc_listener: TcpListener,
+        ntx_builder_listener: TcpListener,
+        block_producer_listener: TcpListener,
+    ) -> Result<(Id, SocketAddr)> {
+        let store_address = rpc_listener
+            .local_addr()
+            .context("Failed to retrieve the store's gRPC address")?;
         Ok((
             join_set
                 .spawn(async move {
-                    Store { listener: grpc_store, data_directory }
-                        .serve()
-                        .await
-                        .context("failed while serving store component")
+                    Store {
+                        data_directory,
+                        rpc_listener,
+                        block_producer_listener,
+                        ntx_builder_listener,
+                    }
+                    .serve()
+                    .await
+                    .context("failed while serving store component")
                 })
                 .id(),
             store_address,
         ))
     }
 
-    // Start block-producer and return the tokio task ID. The block-producer's endpoint is available
-    // after loading completes.
+    /// Start block-producer and return the tokio task ID. The block-producer's endpoint is
+    /// available after loading completes.
     fn start_block_producer(
         &self,
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
-        ntx_builder_address: SocketAddr,
+        checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let batch_interval = self.batch_interval;
@@ -249,13 +258,13 @@ impl NodeBuilder {
                 BlockProducer {
                     block_producer_address,
                     store_address,
-                    ntx_builder_address: Some(ntx_builder_address),
                     batch_prover_url: None,
                     block_prover_url: None,
                     batch_interval,
                     block_interval,
                     max_txs_per_batch: SERVER_MAX_TXS_PER_BATCH,
                     max_batches_per_block: SERVER_MAX_BATCHES_PER_BLOCK,
+                    production_checkpoint: checkpoint,
                 }
                 .serve()
                 .await
@@ -264,15 +273,13 @@ impl NodeBuilder {
             .id()
     }
 
-    // Start ntx-builder and return the tokio task ID. The ntx-builder's endpoint is available after
-    // loading completes.
+    /// Start ntx-builder and return the tokio task ID.
     fn start_ntx_builder(
-        ntx_builder_address: SocketAddr,
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
+        production_checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
-        // SAFETY: socket addr yields valid URLs
         let store_url =
             Url::parse(&format!("http://{}:{}/", store_address.ip(), store_address.port()))
                 .unwrap();
@@ -280,14 +287,13 @@ impl NodeBuilder {
         join_set
             .spawn(async move {
                 NetworkTransactionBuilder {
-                    ntx_builder_address,
                     store_url,
                     block_producer_address,
                     tx_prover_url: None,
                     ticker_interval: Duration::from_millis(200),
-                    account_cache_capacity: NonZeroUsize::new(128).expect("non-zero"),
+                    bp_checkpoint: production_checkpoint,
                 }
-                .serve_resilient()
+                .serve_new()
                 .await
                 .context("failed while serving ntx builder component")
             })
@@ -298,20 +304,14 @@ impl NodeBuilder {
 // NODE HANDLE
 // ================================================================================================
 
-/// Handle to manage running node components.
 pub struct NodeHandle {
-    rpc_url: String,
-    rpc_handle: tokio::task::JoinHandle<()>,
-    block_producer_handle: tokio::task::JoinHandle<()>,
-    store_handle: tokio::task::JoinHandle<()>,
+    pub rpc_url: String,
+    pub rpc_handle: tokio::task::JoinHandle<()>,
+    pub block_producer_handle: tokio::task::JoinHandle<()>,
+    pub store_handle: tokio::task::JoinHandle<()>,
 }
 
 impl NodeHandle {
-    /// Returns the URL where the RPC server is listening.
-    pub fn rpc_url(&self) -> &str {
-        &self.rpc_url
-    }
-
     /// Stops all node components.
     pub async fn stop(self) -> Result<()> {
         self.rpc_handle.abort();

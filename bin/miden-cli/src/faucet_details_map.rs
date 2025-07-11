@@ -258,7 +258,7 @@ fn parsing_number_as_base_units() {
 }
 
 #[test]
-fn formating_amount_from_faucet_units() {
+fn formatting_amount_from_faucet_units() {
     assert_eq!(format_amount_from_faucet_units(u64::MAX, 12), "18446744.073709551615");
     assert_eq!(format_amount_from_faucet_units(753_124_680_000, 8), "7531.24680000");
     assert_eq!(format_amount_from_faucet_units(75_312_468, 4), "7531.2468");

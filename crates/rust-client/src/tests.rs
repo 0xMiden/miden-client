@@ -581,7 +581,7 @@ async fn mint_transaction() {
 
     let transaction = client.new_transaction(faucet.id(), transaction_request).await.unwrap();
 
-    assert_eq!(transaction.executed_transaction().account_delta().nonce_increment(), ONE);
+    assert_eq!(transaction.executed_transaction().account_delta().nonce_delta(), ONE);
 }
 
 #[tokio::test]
@@ -992,7 +992,7 @@ async fn p2id_transfer() {
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), MINT_AMOUNT - TRANSFER_AMOUNT);
     } else {
@@ -1159,7 +1159,7 @@ async fn p2ide_transfer_consumed_by_target() {
     assert_eq!(regular_account.account().vault().assets().count(), 1);
     let asset = regular_account.account().vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), from_account_balance - TRANSFER_AMOUNT);
     } else {
@@ -1798,7 +1798,7 @@ async fn swap_chain_test() {
     .unwrap();
 
     // Generate swap notes.
-    // Execpt for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
+    // Except for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
     // asset.
     let account_pairs: Vec<_> = wallets.into_iter().zip(faucets.into_iter()).collect();
     let mut swap_notes = vec![];

@@ -121,12 +121,12 @@ impl Client {
         &self,
         account_id: Option<AccountId>,
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
-        let commited_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
+        let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
-        for input_note in commited_notes {
+        for input_note in committed_notes {
             let mut account_relevance =
                 note_screener.check_relevance(&input_note.clone().try_into()?).await?;
 
