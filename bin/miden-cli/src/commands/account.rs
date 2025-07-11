@@ -149,12 +149,11 @@ pub async fn show_account(
             ))
         })?;
 
-        fetched_account
-            .account()
-            .ok_or(CliError::Input(format!(
-                "Account {bech32_id} is private and not tracked by the client",
-            )))?
-            .clone()
+        let account: Option<Account> = fetched_account.into();
+        
+        account.ok_or(CliError::Input(format!(
+            "Account {bech32_id} is private and not tracked by the client",
+        )))?
     };
 
     print_summary_table(&account, cli_config)?;

@@ -60,6 +60,15 @@ impl FetchedAccount {
     }
 }
 
+impl From<FetchedAccount> for Option<Account> {
+    fn from(acc: FetchedAccount) -> Self {
+        match acc {
+            FetchedAccount::Private(..) => None,
+            FetchedAccount::Public(account, _) => Some(account),
+        }
+    }
+}
+
 // ACCOUNT UPDATE SUMMARY
 // ================================================================================================
 
