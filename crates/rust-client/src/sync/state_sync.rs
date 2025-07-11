@@ -5,6 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{future::Future, pin::Pin};
+use std::println;
 
 use miden_objects::{
     Digest,
@@ -173,6 +174,9 @@ impl StateSync {
     ///
     /// The `sync_state_update` field of the struct will be updated with the new changes from this
     /// step.
+    /// 
+    /// This function returns whether the state sync process must continue, depending on whether
+    /// the chain tip was reached already.
     async fn sync_state_step(
         &self,
         state_sync_update: &mut StateSyncUpdate,
@@ -494,6 +498,7 @@ pub async fn on_note_received(
         if let Some(metadata) = public_note.metadata()
             && note_tags.contains(&metadata.tag())
         {
+            println!("tags are {:?}", note_tags);
             return Ok(true);
         }
 
