@@ -150,7 +150,7 @@ pub async fn show_account(
         })?;
 
         let account: Option<Account> = fetched_account.into();
-        
+
         account.ok_or(CliError::Input(format!(
             "Account {bech32_id} is private and not tracked by the client",
         )))?
