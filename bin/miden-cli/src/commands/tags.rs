@@ -4,7 +4,7 @@ use miden_client::{
 };
 use tracing::info;
 
-use crate::{Parser, errors::CliError};
+use crate::{Parser, create_dynamic_table, errors::CliError, load_config_file};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]
@@ -42,8 +42,26 @@ impl TagsCmd {
 // HELPERS
 // ================================================================================================
 async fn list_tags(client: Client) -> Result<(), CliError> {
+    let (cli_config, _) = load_config_file()?;
+    let mut table = create_dynamic_table(&["Tag", "Source"]);
+
     let tags = client.get_note_tags().await?;
-    println!("Tags: {tags:?}");
+
+    for tag in tags {
+        let source = match tag.source {
+            miden_client::sync::NoteTagSource::Account(account_id) => format!(
+                "Account({})",
+                account_id.to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
+            ),
+            miden_client::sync::NoteTagSource::Note(note_id) => format!("Note({note_id})"),
+            miden_client::sync::NoteTagSource::User => "User".to_string(),
+        };
+
+        table.add_row(vec![tag.tag.to_string(), source]);
+    }
+
+    println!("\n{table}");
+
     Ok(())
 }
 
