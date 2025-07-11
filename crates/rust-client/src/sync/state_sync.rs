@@ -464,14 +464,18 @@ pub async fn on_note_received(
 ) -> Result<bool, ClientError> {
     let note_id = *committed_note.note_id();
 
-    let tags = store.get_unique_note_tags().await?;
-
     if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
         || !store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()
     {
         // The note is being tracked by the client so it is relevant
         Ok(true)
     } else if let Some(public_note) = public_note {
+        let tags = store.get_unique_note_tags().await?;
+
+        if let Some(metadata) = public_note.metadata() {
+            return Ok(tags.contains(&metadata.tag()));
+        }
+
         // The note is not being tracked by the client and is public so we can screen it
         let new_note_relevance = note_screener
             .check_relevance(
@@ -479,13 +483,8 @@ pub async fn on_note_received(
             )
             .await?;
 
-        if !new_note_relevance.is_empty() {
-            Ok(true)
-        } else if let Some(metadata) = public_note.metadata() {
-            Ok(tags.contains(&metadata.tag()))
-        } else {
-            Ok(false)
-        }
+        let is_relevant = !new_note_relevance.is_empty();
+        Ok(is_relevant)
     } else {
         // The note is not being tracked by the client and is private so we can't determine if it
         // is relevant
