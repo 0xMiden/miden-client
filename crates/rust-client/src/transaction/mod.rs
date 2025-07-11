@@ -755,7 +755,7 @@ impl Client {
     /// These updates include:
     /// - New output notes.
     /// - New input notes (only if they are relevant to the client).
-    /// - New possible future notes to be tracked.
+    /// - Input notes that could be created as outputs of future transactions (e.g., a SWAP payback note).
     /// - Updated input notes that were consumed locally.
     async fn get_note_updates(
         &self,
