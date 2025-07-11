@@ -3,7 +3,6 @@ use miden_client::{
     note::{Note, build_swap_tag},
     testing::common::*,
     transaction::{SwapTransactionData, TransactionRequestBuilder},
-    utils::{execute_tx_and_sync, insert_new_fungible_faucet, insert_new_wallet},
 };
 use miden_objects::{
     account::AccountStorageMode,
@@ -26,28 +25,28 @@ async fn swap_fully_onchain() {
     client2.sync_state().await.unwrap();
 
     // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    let (account_a, ..) = client1
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator_1)
+        .await
+        .unwrap();
 
     // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let (account_b, ..) = client2
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator_2)
+        .await
+        .unwrap();
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    let (btc_faucet_account, ..) = client1
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator_1)
+        .await
+        .unwrap();
 
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let (eth_faucet_account, ..) = client2
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator_2)
+        .await
+        .unwrap();
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
@@ -85,7 +84,7 @@ async fn swap_fully_onchain() {
     assert_eq!(expected_output_notes.len(), 1);
     assert_eq!(expected_payback_note_details.len(), 1);
 
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
+    client1.execute_tx_and_sync(account_a.id(), tx_request).await.unwrap();
 
     let swap_note_tag = build_swap_tag(
         NoteType::Public,
@@ -108,7 +107,7 @@ async fn swap_fully_onchain() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_output_notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await.unwrap();
+    client2.execute_tx_and_sync(account_b.id(), tx_request).await.unwrap();
 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
@@ -118,7 +117,7 @@ async fn swap_fully_onchain() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_payback_note_details[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
+    client1.execute_tx_and_sync(account_a.id(), tx_request).await.unwrap();
 
     // At the end we should end up with
     //
@@ -191,27 +190,27 @@ async fn swap_private() {
     client2.sync_state().await.unwrap();
 
     // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    let (account_a, ..) = client1
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator_1)
+        .await
+        .unwrap();
 
     // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let (account_b, ..) = client2
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator_2)
+        .await
+        .unwrap();
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    let (btc_faucet_account, ..) = client1
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator_1)
+        .await
+        .unwrap();
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let (eth_faucet_account, ..) = client2
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator_2)
+        .await
+        .unwrap();
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
@@ -247,7 +246,7 @@ async fn swap_private() {
     assert_eq!(expected_output_notes.len(), 1);
     assert_eq!(expected_payback_note_details.len(), 1);
 
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
+    client1.execute_tx_and_sync(account_a.id(), tx_request).await.unwrap();
 
     // Export note from client 1 to client 2
     let output_note =
@@ -278,7 +277,7 @@ async fn swap_private() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_output_notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await.unwrap();
+    client2.execute_tx_and_sync(account_b.id(), tx_request).await.unwrap();
 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
@@ -288,7 +287,7 @@ async fn swap_private() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![expected_payback_note_details[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await.unwrap();
+    client1.execute_tx_and_sync(account_a.id(), tx_request).await.unwrap();
 
     // At the end we should end up with
     //

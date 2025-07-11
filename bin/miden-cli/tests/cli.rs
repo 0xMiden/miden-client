@@ -23,7 +23,7 @@ use miden_client::{
         common::{ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE},
     },
     transaction::{OutputNote, TransactionRequestBuilder},
-    utils::{Serializable, execute_tx_and_sync, insert_new_wallet},
+    utils::Serializable,
 };
 use miden_client_cli::CliKeyStore;
 use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
@@ -450,7 +450,8 @@ async fn debug_mode_outputs_logs() {
     // Create a Client and a custom note
     let store_path = create_test_store_path();
     let (mut client, authenticator) = create_rust_client_with_store_path(&store_path).await;
-    let (account, ..) = insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
+    let (account, ..) = client
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator)
         .await
         .unwrap();
 
@@ -482,9 +483,7 @@ async fn debug_mode_outputs_logs() {
         .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    execute_tx_and_sync(&mut client, account.id(), transaction_request)
-        .await
-        .unwrap();
+    client.execute_tx_and_sync(account.id(), transaction_request).await.unwrap();
 
     // Export the note
     let note_file: NoteFile = NoteFile::NoteDetails {

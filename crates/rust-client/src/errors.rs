@@ -63,6 +63,8 @@ pub enum ClientError {
         "the transaction didn't produce the output notes with the expected recipient digests ({0:?})"
     )]
     MissingOutputRecipients(Vec<Digest>),
+    #[error("the wait time for the condition to be met has been exceeded")]
+    MaxWaitTimeExceeded,
     #[error("note error")]
     NoteError(#[from] NoteError),
     #[error("note import error: {0}")]

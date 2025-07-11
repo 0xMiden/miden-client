@@ -4,10 +4,6 @@ use miden_client::{
     store::{InputNoteState, NoteFilter},
     testing::common::*,
     transaction::{PaymentNoteDescription, TransactionRequestBuilder},
-    utils::{
-        execute_tx_and_sync, insert_new_fungible_faucet, insert_new_wallet,
-        insert_new_wallet_with_seed,
-    },
 };
 use miden_objects::{
     account::AccountStorageMode,
@@ -30,22 +26,22 @@ async fn onchain_notes_flow() {
     wait_for_node(&mut client_3).await;
 
     // Create faucet account
-    let (faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            .unwrap();
+    let (faucet_account, ..) = client_1
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &keystore_1)
+        .await
+        .unwrap();
 
     // Create regular accounts
-    let (basic_wallet_1, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
-            .await
-            .unwrap();
+    let (basic_wallet_1, ..) = client_2
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_2)
+        .await
+        .unwrap();
 
     // Create regular accounts
-    let (basic_wallet_2, ..) =
-        insert_new_wallet(&mut client_3, AccountStorageMode::Private, &keystore_3)
-            .await
-            .unwrap();
+    let (basic_wallet_2, ..) = client_3
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_3)
+        .await
+        .unwrap();
 
     client_1.sync_state().await.unwrap();
     client_2.sync_state().await.unwrap();
@@ -59,9 +55,7 @@ async fn onchain_notes_flow() {
         )
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
-    execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request)
-        .await
-        .unwrap();
+    client_1.execute_tx_and_sync(faucet_account.id(), tx_request).await.unwrap();
 
     // Client 2's account should receive the note here:
     client_2.sync_state().await.unwrap();
@@ -95,9 +89,7 @@ async fn onchain_notes_flow() {
             client_2.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
-        .await
-        .unwrap();
+    client_2.execute_tx_and_sync(basic_wallet_1.id(), tx_request).await.unwrap();
 
     // Create a note for client 3 that is already consumed before syncing
     let tx_request = TransactionRequestBuilder::new()
@@ -113,14 +105,10 @@ async fn onchain_notes_flow() {
         )
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
-        .await
-        .unwrap();
+    client_2.execute_tx_and_sync(basic_wallet_1.id(), tx_request).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
-    execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request)
-        .await
-        .unwrap();
+    client_2.execute_tx_and_sync(basic_wallet_1.id(), tx_request).await.unwrap();
 
     // sync client 3 (basic account 2)
     client_3.sync_state().await.unwrap();
@@ -154,20 +142,20 @@ async fn onchain_accounts() {
     let (mut client_2, keystore_2) = create_test_client().await;
     wait_for_node(&mut client_2).await;
 
-    let (faucet_account_header, _, secret_key) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1)
-            .await
-            .unwrap();
+    let (faucet_account_header, _, secret_key) = client_1
+        .insert_new_fungible_faucet(AccountStorageMode::Public, &keystore_1)
+        .await
+        .unwrap();
 
-    let (first_regular_account, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            .unwrap();
+    let (first_regular_account, ..) = client_1
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_1)
+        .await
+        .unwrap();
 
-    let (second_client_first_regular_account, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
-            .await
-            .unwrap();
+    let (second_client_first_regular_account, ..) = client_2
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_2)
+        .await
+        .unwrap();
 
     let target_account_id = first_regular_account.id();
     let second_client_target_account_id = second_client_first_regular_account.id();
@@ -280,7 +268,7 @@ async fn onchain_accounts() {
             client_1.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await.unwrap();
+    client_1.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     // sync on second client until we receive the note
     println!("Syncing on second client...");
@@ -295,7 +283,7 @@ async fn onchain_accounts() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await.unwrap();
+    client_2.execute_tx_and_sync(to_account_id, tx_request).await.unwrap();
 
     // sync on first client
     println!("Syncing on first client...");
@@ -337,19 +325,15 @@ async fn import_account_by_id() {
     let mut user_seed = [0u8; 32];
     client_1.rng().fill_bytes(&mut user_seed);
 
-    let (faucet_account_header, ..) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1)
-            .await
-            .unwrap();
+    let (faucet_account_header, ..) = client_1
+        .insert_new_fungible_faucet(AccountStorageMode::Public, &keystore_1)
+        .await
+        .unwrap();
 
-    let (first_regular_account, _, secret_key) = insert_new_wallet_with_seed(
-        &mut client_1,
-        AccountStorageMode::Public,
-        &keystore_1,
-        user_seed,
-    )
-    .await
-    .unwrap();
+    let (first_regular_account, _, secret_key) = client_1
+        .insert_new_wallet_with_seed(AccountStorageMode::Public, &keystore_1, user_seed)
+        .await
+        .unwrap();
 
     let target_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();

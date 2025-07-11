@@ -118,7 +118,7 @@ use alloc::boxed::Box;
 extern crate std;
 
 pub mod account;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "testing", feature = "std"))]
 #[path = "utils/mod.rs"]
 mod internal_utils;
 pub mod keystore;
@@ -196,7 +196,7 @@ pub mod utils {
         sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "testing", feature = "std"))]
     pub use crate::internal_utils::*;
 }
 

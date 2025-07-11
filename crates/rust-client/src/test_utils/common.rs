@@ -33,10 +33,6 @@ use crate::{
     store::{InputNoteRecord, sqlite_store::SqliteStore},
     testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     transaction::{TransactionRequest, TransactionRequestBuilder, TransactionRequestError},
-    utils::{
-        self, execute_tx_and_consume_output_notes, execute_tx_and_sync, insert_new_fungible_faucet,
-        insert_new_wallet,
-    },
 };
 
 pub type TestClient = Client;
@@ -158,7 +154,7 @@ pub async fn wait_for_tx(client: &mut Client, transaction_id: TransactionId) {
     // wait until tx is committed
     let now = Instant::now();
 
-    utils::wait_for_tx(client, transaction_id).await.unwrap();
+    client.wait_for_tx(transaction_id).await.unwrap();
 
     // Log wait time in a file if the env var is set
     // This allows us to aggregate and measure how long the tests are waiting for transactions
@@ -217,12 +213,13 @@ pub async fn setup_wallet_and_faucet(
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> (Account, Account) {
-    let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
+    let (faucet_account, ..) = client
+        .insert_new_fungible_faucet(accounts_storage_mode, keystore)
         .await
         .unwrap();
 
     let (basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore).await.unwrap();
+        client.insert_new_wallet(accounts_storage_mode, keystore).await.unwrap();
 
     mint_and_consume(client, basic_account.id(), faucet_account.id(), NoteType::Public).await;
 
@@ -243,7 +240,8 @@ pub async fn mint_note(
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    execute_tx_and_sync(client, fungible_asset.faucet_id(), tx_request.clone())
+    client
+        .execute_tx_and_sync(fungible_asset.faucet_id(), tx_request.clone())
         .await
         .unwrap();
 
@@ -264,7 +262,7 @@ pub async fn consume_notes(
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(input_notes.iter().map(InputNoteRecord::id).collect())
         .unwrap();
-    execute_tx_and_sync(client, account_id, tx_request).await.unwrap();
+    client.execute_tx_and_sync(account_id, tx_request).await.unwrap();
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -354,7 +352,8 @@ pub async fn mint_and_consume(
         )
         .unwrap();
 
-    execute_tx_and_consume_output_notes(tx_request, client, faucet_account_id, basic_account_id)
+    client
+        .execute_tx_and_consume_output_notes(tx_request, faucet_account_id, basic_account_id)
         .await
         .unwrap();
 }

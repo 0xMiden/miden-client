@@ -5,7 +5,6 @@ use miden_client::{
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
     testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
-    utils::{insert_new_wallet, wait_for_blocks},
 };
 use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
 use miden_objects::{
@@ -58,9 +57,8 @@ async fn fpi_execute_program() {
     .unwrap();
     let foreign_account_id = foreign_account.id();
 
-    let (wallet, ..) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (wallet, ..) =
+        client.insert_new_wallet(AccountStorageMode::Private, &keystore).await.unwrap();
 
     let code = format!(
         "
@@ -85,7 +83,7 @@ async fn fpi_execute_program() {
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await.unwrap();
+    client.wait_for_blocks(2).await.unwrap();
 
     let storage_requirements =
         AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
@@ -166,9 +164,7 @@ async fn nested_fpi_calls() {
     println!("Calling FPI function inside a FPI function with new account");
 
     let (native_account, _native_seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
+        client.insert_new_wallet(AccountStorageMode::Public, &keystore).await.unwrap();
 
     let tx_script = format!(
         "
@@ -197,7 +193,7 @@ async fn nested_fpi_calls() {
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
-    wait_for_blocks(&mut client, 2).await.unwrap();
+    client.wait_for_blocks(2).await.unwrap();
 
     // Create transaction request with FPI
     let builder = TransactionRequestBuilder::new().custom_script(tx_script);
@@ -251,9 +247,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     println!("Calling FPI functions with new account");
 
     let (native_account, _native_seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
+        client.insert_new_wallet(AccountStorageMode::Public, &keystore).await.unwrap();
 
     let tx_script = format!(
         "
@@ -279,10 +273,10 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     );
 
     let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
-    _ = client.sync_state().await.unwrap();
+    client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
-    _ = wait_for_blocks(&mut client, 2).await;
+    client.wait_for_blocks(2).await.unwrap();
 
     // Before the transaction there are no cached foreign accounts
     let foreign_accounts = client
