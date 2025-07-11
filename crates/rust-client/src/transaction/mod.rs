@@ -798,7 +798,7 @@ impl Client {
             }
         }
 
-        // Track future notes
+        // Track future input notes described in the transaction result. 
         new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
             InputNoteRecord::new(
                 note_details.clone(),
