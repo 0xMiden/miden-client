@@ -15,7 +15,7 @@ name = "testing-node-builder"
 path = "src/main.rs"
 
 [dependencies]
-anyhow                    = "1.0"
+# Miden dependencies
 miden-lib                 = { workspace = true }
 miden-node-block-producer = { version = "0.10" }
 miden-node-ntx-builder    = { version = "0.10" }
@@ -23,10 +23,13 @@ miden-node-rpc            = { version = "0.10" }
 miden-node-store          = { version = "0.10" }
 miden-node-utils          = { version = "0.10" }
 miden-objects             = { workspace = true }
-rand                      = { workspace = true }
-rand_chacha               = { version = "0.9" }
-tokio                     = { features = ["full"], version = "1.0" }
-url                       = { features = ["serde"], version = "2.5" }
+
+# External dependencies
+anyhow      = "1.0"
+rand        = { workspace = true }
+rand_chacha = { version = "0.9" }
+tokio       = { features = ["full"], version = "1.0" }
+url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]
 tempfile = "3.0"

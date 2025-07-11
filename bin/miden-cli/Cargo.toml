@@ -20,12 +20,17 @@ path = "src/main.rs"
 default = []
 
 [dependencies]
+# Workspace dependencies
+miden-client = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.10" }
+
+# Miden dependencies
+miden-lib     = { workspace = true }
+miden-objects = { workspace = true }
+
+# External dependencies
 clap               = { features = ["derive"], version = "4.5" }
 comfy-table        = { version = "7.1" }
 figment            = { features = ["env", "toml"], version = "0.10" }
-miden-client       = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.10" }
-miden-lib          = { workspace = true }
-miden-objects      = { workspace = true }
 miette             = { workspace = true }
 rand               = { workspace = true }
 serde              = { features = ["derive"], version = "1.0" }

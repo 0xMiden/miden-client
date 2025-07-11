@@ -11,9 +11,14 @@ rust-version.workspace = true
 version                = "0.10.0"
 
 [dependencies]
-miden-client  = { features = ["sqlite", "std", "testing", "tonic"], path = "../crates/rust-client" }
+# Workspace dependencies
+miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../crates/rust-client" }
+
+# Miden dependencies
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
-rand          = { workspace = true }
+
+# External dependencies
+rand = { workspace = true }
 
 [dev-dependencies]
 async-trait        = { version = "0.1" }
