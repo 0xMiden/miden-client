@@ -27,10 +27,10 @@ mod swap_transactions_tests;
 
 #[tokio::test]
 async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientError> {
-    let (_, _, store_config, auth_path) = get_client_config();
+    let (endpoint, _, store_config, auth_path) = get_client_config();
 
     let mut client = ClientBuilder::new()
-        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
+        .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().unwrap())
         .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(true)
