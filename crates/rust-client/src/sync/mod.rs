@@ -116,17 +116,17 @@ impl Client {
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
-
         let state_sync = StateSync::new(
             self.rpc_api.clone(),
             Box::new({
                 let store_clone = self.store.clone();
-                move |committed_note, public_note, note_screener| {
+                move |committed_note, public_note, note_screener, note_tags| {
                     Box::pin(on_note_received(
                         store_clone.clone(),
                         committed_note,
                         public_note,
                         note_screener,
+                        note_tags,
                     ))
                 }
             }),
@@ -143,8 +143,7 @@ impl Client {
             .map(|(acc_header, _)| acc_header)
             .collect();
 
-        let note_tags: Vec<NoteTag> =
-            self.store.get_unique_note_tags().await?.into_iter().collect();
+        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
         let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;

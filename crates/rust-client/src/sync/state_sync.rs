@@ -1,4 +1,9 @@
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{future::Future, pin::Pin};
 
 use miden_objects::{
@@ -40,6 +45,7 @@ pub type OnNoteReceived = Box<
         CommittedNote,
         Option<InputNoteRecord>,
         Arc<NoteScreener>,
+        Arc<BTreeSet<NoteTag>>,
     ) -> Pin<Box<(dyn Future<Output = Result<bool, ClientError>>)>>,
 >;
 
@@ -117,7 +123,7 @@ impl StateSync {
         self,
         current_partial_blockchain: PartialBlockchain,
         accounts: Vec<AccountHeader>,
-        note_tags: Vec<NoteTag>,
+        note_tags: BTreeSet<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
         unspent_output_notes: Vec<OutputNoteRecord>,
         uncommitted_transactions: Vec<TransactionRecord>,
@@ -133,10 +139,15 @@ impl StateSync {
         };
 
         let mut partial_mmr = current_partial_blockchain.mmr().clone();
-
+        let note_tags = Arc::new(note_tags);
         loop {
             if !self
-                .sync_state_step(&mut state_sync_update, &mut partial_mmr, &accounts, &note_tags)
+                .sync_state_step(
+                    &mut state_sync_update,
+                    &mut partial_mmr,
+                    &accounts,
+                    note_tags.clone(),
+                )
                 .await?
             {
                 break;
@@ -162,13 +173,13 @@ impl StateSync {
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
         accounts: &[AccountHeader],
-        note_tags: &[NoteTag],
+        note_tags: Arc<BTreeSet<NoteTag>>,
     ) -> Result<bool, ClientError> {
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
 
         let response = self
             .rpc_api
-            .sync_state(state_sync_update.block_num, &account_ids, note_tags)
+            .sync_state(state_sync_update.block_num, &account_ids, note_tags.as_ref())
             .await?;
 
         // We don't need to continue if the chain has not advanced, there are no new changes
@@ -197,6 +208,7 @@ impl StateSync {
                 &mut state_sync_update.note_updates,
                 response.note_inclusions,
                 &response.block_header,
+                note_tags.clone(),
             )
             .await?;
 
@@ -307,6 +319,7 @@ impl StateSync {
         note_updates: &mut NoteUpdateTracker,
         note_inclusions: Vec<CommittedNote>,
         block_header: &BlockHeader,
+        note_tags: Arc<BTreeSet<NoteTag>>,
     ) -> Result<bool, ClientError> {
         let public_note_ids: Vec<NoteId> = note_inclusions
             .iter()
@@ -324,6 +337,7 @@ impl StateSync {
                 committed_note.clone(),
                 public_note.clone(),
                 self.note_screener.clone(),
+                note_tags.clone(),
             )
             .await?
             {
@@ -461,6 +475,7 @@ pub async fn on_note_received(
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
     note_screener: Arc<NoteScreener>,
+    note_tags: Arc<BTreeSet<NoteTag>>,
 ) -> Result<bool, ClientError> {
     let note_id = *committed_note.note_id();
 
@@ -470,10 +485,11 @@ pub async fn on_note_received(
         // The note is being tracked by the client so it is relevant
         Ok(true)
     } else if let Some(public_note) = public_note {
-        let tags = store.get_unique_note_tags().await?;
-
-        if let Some(metadata) = public_note.metadata() {
-            return Ok(tags.contains(&metadata.tag()));
+        // If tracked by the user, keep note regardless of inputs and extra checks
+        if let Some(metadata) = public_note.metadata()
+            && note_tags.contains(&metadata.tag())
+        {
+            return Ok(note_tags.contains(&metadata.tag()));
         }
 
         // The note is not being tracked by the client and is public so we can screen it
