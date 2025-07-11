@@ -769,12 +769,6 @@ impl Client {
         Ok(())
     }
 
-    /// Compiles the provided transaction script source and inputs into a [`TransactionScript`].
-    pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
-        TransactionScript::compile(program, assembler).map_err(ClientError::TransactionScriptError)
-    }
-
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
