@@ -292,6 +292,7 @@ async fn create_client_account(
         let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
 
         let auth_script = client
+            .script_builder()
             .compile_tx_script(
                 "
                     begin

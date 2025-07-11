@@ -138,23 +138,21 @@ pub async fn show_account(
         account.into()
     } else {
         let bech32_id = account_id.to_bech32(cli_config.rpc.endpoint.0.to_network_id()?);
-        println!(
-            "Account with ID {bech32_id} is not tracked by the client. Fetching from the network...",
-        );
+        println!("Account {bech32_id} is not tracked by the client. Fetching from the network...",);
 
         let rpc_client =
             TonicRpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);
 
         let fetched_account = rpc_client.get_account_details(account_id).await.map_err(|_| {
             CliError::Input(format!(
-                "Unable to fetch account with ID {bech32_id} from the network. It may not exist.",
+                "Unable to fetch account {bech32_id} from the network. It may not exist.",
             ))
         })?;
 
         fetched_account
             .account()
             .ok_or(CliError::Input(format!(
-                "Account with ID {bech32_id} is private and not tracked by the client",
+                "Account {bech32_id} is private and not tracked by the client",
             )))?
             .clone()
     };

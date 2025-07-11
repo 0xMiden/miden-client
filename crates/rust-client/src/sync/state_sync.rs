@@ -51,7 +51,7 @@ pub type OnNoteReceived = Box<
         Option<InputNoteRecord>,
         Arc<NoteScreener>,
         Arc<BTreeSet<NoteTag>>,
-    ) -> Pin<Box<(dyn Future<Output = Result<bool, ClientError>>)>>,
+    ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
 >;
 
 // STATE SYNC
