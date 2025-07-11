@@ -57,8 +57,7 @@ use crate::{
         common::{
             ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT,
             assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
-            execute_failing_tx, execute_tx, execute_tx_and_sync, mint_and_consume, mint_note,
-            setup_two_wallets_and_faucet, setup_wallet_and_faucet, wait_for_tx,
+            execute_failing_tx, mint_note, setup_wallet_and_faucet, wait_for_node, wait_for_tx,
         },
         mock::{MockClient, MockRpcApi},
     },
@@ -897,7 +896,10 @@ async fn added_notes() {
         )
         .unwrap();
     println!("Running Mint tx...");
-    execute_tx_and_sync(&mut client, faucet_account_header.id(), tx_request).await;
+    client
+        .execute_tx_and_sync(faucet_account_header.id(), tx_request)
+        .await
+        .unwrap();
 
     // Check that no new notes were added
     println!("Fetching Committed Notes...");
@@ -909,16 +911,21 @@ async fn added_notes() {
 async fn p2id_transfer() {
     let (mut client, _, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![MINT_AMOUNT, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
-    // First Mint necessary token
-    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
     assert_account_has_single_asset(&client, from_account_id, faucet_account_id, MINT_AMOUNT).await;
 
     // Do a transfer from first account to second account
@@ -937,7 +944,7 @@ async fn p2id_transfer() {
         .unwrap();
 
     let note = tx_request.expected_output_own_notes().pop().unwrap();
-    let transaction_id = execute_tx(&mut client, from_account_id, tx_request).await;
+    let transaction_id = client.execute_tx(from_account_id, tx_request).await.unwrap();
 
     // Check that a note tag started being tracked for this note.
     assert!(
@@ -949,7 +956,7 @@ async fn p2id_transfer() {
             .any(|tag| tag.source == NoteTagSource::Note(note.id()))
     );
 
-    wait_for_tx(&mut client, transaction_id).await;
+    client.wait_for_tx(transaction_id).await.unwrap();
 
     // Check that the tag is not longer being tracked
     assert!(
@@ -971,7 +978,7 @@ async fn p2id_transfer() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client, to_account_id, tx_request).await;
+    client.execute_tx_and_sync(to_account_id, tx_request).await.unwrap();
 
     // Ensure we have nothing else to consume
     let current_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
@@ -1010,16 +1017,20 @@ async fn p2id_transfer() {
 async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, _, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![MINT_AMOUNT, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
-
-    // First Mint necessary token
-    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT + 1).unwrap();
@@ -1051,13 +1062,20 @@ async fn p2id_transfer_failing_not_enough_balance() {
 async fn p2ide_transfer_consumed_by_target() {
     let (mut client, _, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![0, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
     // First Mint necessary token
     let note = mint_note(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
@@ -1121,7 +1139,7 @@ async fn p2ide_transfer_consumed_by_target() {
             client.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client, from_account_id, tx_request.clone()).await;
+    client.execute_tx_and_sync(from_account_id, tx_request.clone()).await.unwrap();
 
     // Check that note is committed for the second account to consume
     println!("Fetching Committed Notes...");
@@ -1132,7 +1150,7 @@ async fn p2ide_transfer_consumed_by_target() {
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
-    execute_tx_and_sync(&mut client, to_account_id, tx_request).await;
+    client.execute_tx_and_sync(to_account_id, tx_request).await.unwrap();
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
 
     // The seed should not be retrieved due to the account not being new
@@ -1164,16 +1182,20 @@ async fn p2ide_transfer_consumed_by_target() {
 async fn p2ide_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![MINT_AMOUNT, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
-
-    // First Mint necessary token
-    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
     // Do a transfer from first account to second account with Recall. In this situation we'll do
     // the happy path where the `to_account_id` consumes the note
@@ -1201,7 +1223,7 @@ async fn p2ide_transfer_consumed_by_sender() {
             client.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client, from_account_id, tx_request).await;
+    client.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     // Check that note is committed
     println!("Fetching Committed Notes...");
@@ -1233,7 +1255,7 @@ async fn p2ide_transfer_consumed_by_sender() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx_and_sync(&mut client, from_account_id, tx_request).await;
+    client.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
     // The seed should not be retrieved due to the account not being new
@@ -1259,16 +1281,20 @@ async fn p2ide_transfer_consumed_by_sender() {
 async fn p2ide_timelocked() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![MINT_AMOUNT, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
-
-    // First Mint necessary token
-    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Public).await;
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
     let current_block_num = client.get_sync_height().await.unwrap();
 
@@ -1288,7 +1314,7 @@ async fn p2ide_timelocked() {
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap();
 
-    execute_tx_and_sync(&mut client, from_account_id, tx_request).await;
+    client.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     // Check that it's still too early to consume by both accounts
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
@@ -1313,7 +1339,7 @@ async fn p2ide_timelocked() {
 
     // Consume the note with the target account
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
-    execute_tx_and_sync(&mut client, to_account_id, tx_request).await;
+    client.execute_tx_and_sync(to_account_id, tx_request).await.unwrap();
 
     let target_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
     assert_eq!(target_account.vault().get_balance(faucet_account_id).unwrap(), TRANSFER_AMOUNT);
@@ -1323,13 +1349,20 @@ async fn p2ide_timelocked() {
 async fn get_consumable_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
 
-    let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            2,
+            1,
+            vec![vec![0, 0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let to_account_id = second_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
+    let from_account_id = wallets[0].id();
+    let to_account_id = wallets[1].id();
+    let faucet_account_id = faucets[0].id();
 
     //No consumable notes initially
     assert!(client.get_consumable_notes(None).await.unwrap().is_empty());
@@ -1362,7 +1395,7 @@ async fn get_consumable_notes() {
             client.rng(),
         )
         .unwrap();
-    execute_tx_and_sync(&mut client, from_account_id, tx_request).await;
+    client.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     // Check that note is consumable by both accounts
     let consumable_notes = client.get_consumable_notes(None).await.unwrap();
@@ -1393,11 +1426,19 @@ async fn get_consumable_notes() {
 async fn get_output_notes() {
     let (mut client, _, authenticator) = create_test_client().await;
     let _ = client.sync_state().await.unwrap();
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &authenticator,
+            AccountStorageMode::Private,
+            1,
+            1,
+            vec![vec![0]],
+        )
+        .await
+        .unwrap();
 
-    let from_account_id = first_regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
+    let from_account_id = wallets[0].id();
+    let faucet_account_id = faucets[0].id();
     let random_account_id = AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap();
 
     // No output notes initially
@@ -1435,7 +1476,7 @@ async fn get_output_notes() {
     // Before executing, the output note is not found
     assert!(client.get_output_note(output_note_id).await.unwrap().is_none());
 
-    execute_tx_and_sync(&mut client, from_account_id, tx_request).await;
+    client.execute_tx_and_sync(from_account_id, tx_request).await.unwrap();
 
     // After executing, the note is only found in output notes
     assert!(client.get_output_note(output_note_id).await.unwrap().is_some());
@@ -1455,10 +1496,6 @@ async fn account_rollback() {
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
-
-    // Mint a note
-    let note = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
-    consume_notes(&mut client, account_id, &[note]).await;
 
     // Create a transaction but don't submit it to the node
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -1535,14 +1572,13 @@ async fn account_rollback() {
 async fn subsequent_discarded_transactions() {
     let (mut client, rpc_api, keystore) = create_test_client().await;
 
+    wait_for_node(&mut client).await;
+
     let (regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await;
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
-
-    let note = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await;
-    consume_notes(&mut client, account_id, &[note]).await;
 
     // Create a transaction that will expire in 2 blocks
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -1676,7 +1712,7 @@ async fn input_note_checks() {
     ));
 
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(mint_notes.iter().map(InputNote::id).collect())
+        .build_consume_notes(mint_notes.iter().map(InputNoteRecord::id).collect())
         .unwrap();
 
     let transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
@@ -1742,17 +1778,26 @@ async fn swap_chain_test() {
     let (mut client, _, keystore) = create_test_client().await;
 
     // Generate a few account pairs with a fungible asset that can be used for swaps.
-    let mut account_pairs = vec![];
-    for _ in 0..3 {
-        let (wallet, faucet) =
-            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
-        mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
-        account_pairs.push((wallet, faucet));
-    }
+    let (wallets, faucets) = client
+        .setup_accounts_and_faucets(
+            &keystore,
+            AccountStorageMode::Private,
+            3, // Number of wallets
+            3, // Number of faucets
+            vec![
+                // Each wallet will have a different asset
+                vec![1, 0, 0],
+                vec![0, 1, 0],
+                vec![0, 0, 1],
+            ],
+        )
+        .await
+        .unwrap();
 
     // Generate swap notes.
     // Except for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
     // asset.
+    let account_pairs: Vec<_> = wallets.into_iter().zip(faucets.into_iter()).collect();
     let mut swap_notes = vec![];
     for pairs in account_pairs.windows(2) {
         let tx_request = TransactionRequestBuilder::new()
@@ -1770,7 +1815,7 @@ async fn swap_chain_test() {
         // The notes are inserted in reverse order because the first note to be consumed will be the
         // last one generated.
         swap_notes.insert(0, tx_request.expected_output_own_notes()[0].id());
-        execute_tx_and_sync(&mut client, pairs[0].0.id(), tx_request).await;
+        client.execute_tx_and_sync(pairs[0].0.id(), tx_request).await.unwrap();
     }
 
     // The last wallet didn't generate any swap notes and has the asset needed to start the swap
@@ -1790,7 +1835,7 @@ async fn swap_chain_test() {
     ));
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
-    execute_tx(&mut client, last_wallet, tx_request).await;
+    client.execute_tx(last_wallet, tx_request).await.unwrap();
 
     // At the end, the last wallet should have the asset of the first wallet.
     let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();

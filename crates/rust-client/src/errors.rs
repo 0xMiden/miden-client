@@ -18,6 +18,7 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::{
+    keystore::KeyStoreError,
     note::NoteScreenerError,
     rpc::RpcError,
     store::{NoteRecordError, StoreError},
@@ -62,6 +63,8 @@ pub enum ClientError {
         "the transaction didn't produce the output notes with the expected recipient digests ({0:?})"
     )]
     MissingOutputRecipients(Vec<Digest>),
+    #[error("the wait time for the condition to be met has been exceeded")]
+    MaxWaitTimeExceeded,
     #[error("note error")]
     NoteError(#[from] NoteError),
     #[error("note import error: {0}")]
@@ -92,6 +95,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("key store error")]
+    KeyStoreError(#[from] KeyStoreError),
 }
 
 // CONVERSIONS
