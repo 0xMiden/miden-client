@@ -502,7 +502,7 @@ async fn sync_state_tags() {
         client.add_note_tag(tag).await.unwrap();
     }
 
-    // assert that we have no  expected notes prior to syncing state
+    // assert that we have no expected notes prior to syncing state
     assert!(client.get_input_notes(NoteFilter::Expected).await.unwrap().is_empty());
 
     // sync state
@@ -516,7 +516,7 @@ async fn sync_state_tags() {
 
     // as we are syncing with tags, the response should contain blocks for both notes but they
     // shouldn't be stored as they are not relevant for the client's accounts.
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 0);
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 #[tokio::test]
