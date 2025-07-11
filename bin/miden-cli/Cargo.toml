@@ -1,16 +1,16 @@
 [package]
-name = "miden-client-cli"
-version = "0.10.0"
-description = "The official command line client for interacting with the Miden rollup"
-readme = "README.md"
-documentation = "https://docs.rs/miden-client-cli/0.10.0"
-categories = ["command-line-utilities"]
-keywords = ["miden", "client", "cli"]
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+authors.workspace      = true
+categories             = ["command-line-utilities"]
+description            = "The official command line client for interacting with the Miden rollup"
+documentation          = "https://docs.rs/miden-client-cli/0.10.0"
+edition.workspace      = true
+keywords               = ["cli", "client", "miden"]
+license.workspace      = true
+name                   = "miden-client-cli"
+readme                 = "README.md"
+repository.workspace   = true
 rust-version.workspace = true
-edition.workspace = true
+version                = "0.10.0"
 
 [[bin]]
 name = "miden-client"
@@ -29,28 +29,25 @@ path = "tests/cli.rs"
 [dev-dependencies]
 assert_cmd = { version = "2.0" }
 predicates = { version = "3.0" }
-uuid = { version = "1.10", features = ["serde", "v4"] }
+uuid       = { features = ["serde", "v4"], version = "1.10" }
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-comfy-table = { version = "7.1" }
-figment = { version = "0.10", features = ["toml", "env"] }
-miden-client = { version = "0.10", path = "../../crates/rust-client", features = [
-    "sqlite",
-    "tonic",
-] }
-miden-lib = { workspace = true }
-miden-objects = { workspace = true }
-miette = { workspace = true }
-rand = { workspace = true }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = { workspace = true }
-tokio = { workspace = true }
-toml = { version = "0.8" }
-tracing = { workspace = true }
+clap               = { features = ["derive"], version = "4.5" }
+comfy-table        = { version = "7.1" }
+figment            = { features = ["env", "toml"], version = "0.10" }
+miden-client       = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.10" }
+miden-lib          = { workspace = true }
+miden-objects      = { workspace = true }
+miette             = { workspace = true }
+rand               = { workspace = true }
+serde              = { features = ["derive"], version = "1.0" }
+thiserror          = { workspace = true }
+tokio              = { workspace = true }
+toml               = { version = "0.8" }
+tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client = { version = "0.10", path = "../../crates/rust-client" }
+miden-client  = { path = "../../crates/rust-client", version = "0.10" }
+miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
-miden-lib = { workspace = true }

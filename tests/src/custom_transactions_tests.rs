@@ -90,7 +90,7 @@ async fn transaction_request() {
             call.auth_tx::auth__tx_rpo_falcon512
         end
         ";
-    let tx_script = client.compile_tx_script(code).unwrap();
+    let tx_script = client.script_builder().compile_tx_script(code).unwrap();
 
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
@@ -101,7 +101,7 @@ async fn transaction_request() {
         .build()
         .unwrap();
 
-    // This fails becuase of {asserted_value} having the incorrect number passed in
+    // This fails because of {asserted_value} having the incorrect number passed in
     assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
 
     // SUCCESS EXECUTION
@@ -217,7 +217,7 @@ async fn merkle_store() {
     code += "call.auth_tx::auth__tx_rpo_falcon512 end";
 
     // Build the transaction
-    let tx_script = client.compile_tx_script(&code).unwrap();
+    let tx_script = client.script_builder().compile_tx_script(&code).unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(note_args_map)
@@ -265,7 +265,7 @@ async fn onchain_notes_sync_with_tag() {
                 assert_eq
             end
             ";
-    let note_script = client_1.compile_note_script(note_script).unwrap();
+    let note_script = client_1.script_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client_1.rng().draw_word();
     let note_metadata = NoteMetadata::new(
@@ -340,7 +340,7 @@ fn create_custom_note(
         .replace("{expected_note_arg_2}", &expected_note_args[4..=7].join("."))
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
-    let note_script = client.compile_note_script(&note_script).unwrap();
+    let note_script = client.script_builder().compile_note_script(&note_script).unwrap();
 
     let inputs =
         NoteInputs::new(vec![target_account_id.prefix().as_felt(), target_account_id.suffix()])

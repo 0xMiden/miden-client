@@ -811,7 +811,7 @@ async fn execute_program() {
         end
         ";
 
-    let tx_script = client.compile_tx_script(code).unwrap();
+    let tx_script = client.script_builder().compile_tx_script(code).unwrap();
 
     let output_stack = client
         .execute_program(wallet.id(), tx_script, AdviceInputs::default(), BTreeSet::new())
@@ -985,7 +985,7 @@ async fn p2id_transfer() {
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), MINT_AMOUNT - TRANSFER_AMOUNT);
     } else {
@@ -1139,7 +1139,7 @@ async fn p2ide_transfer_consumed_by_target() {
     assert_eq!(regular_account.account().vault().assets().count(), 1);
     let asset = regular_account.account().vault().assets().next().unwrap();
 
-    // Validate the transfered amounts
+    // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
         assert_eq!(fungible_asset.amount(), from_account_balance - TRANSFER_AMOUNT);
     } else {
@@ -1750,7 +1750,7 @@ async fn swap_chain_test() {
     }
 
     // Generate swap notes.
-    // Execpt for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
+    // Except for the last, each wallet N will offer it's faucet N asset and request a faucet N+1
     // asset.
     let mut swap_notes = vec![];
     for pairs in account_pairs.windows(2) {

@@ -487,8 +487,8 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] ouput notes
-    ///   are not a subset of executor's output notes.
+    /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] output
+    ///   notes are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
     pub async fn new_transaction(
@@ -693,12 +693,6 @@ impl Client {
         Ok(())
     }
 
-    /// Compiles the provided transaction script source and inputs into a [`TransactionScript`].
-    pub fn compile_tx_script(&self, program: &str) -> Result<TransactionScript, ClientError> {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
-        TransactionScript::compile(program, assembler).map_err(ClientError::TransactionScriptError)
-    }
-
     /// Executes the provided transaction script against the specified account, and returns the
     /// resulting stack. Advice inputs and foreign accounts can be provided for the execution.
     ///
@@ -712,6 +706,7 @@ impl Client {
     ) -> Result<[Felt; 16], ClientError> {
         let (fpi_block_number, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
+
         let block_ref = if let Some(block_number) = fpi_block_number {
             block_number
         } else {
@@ -723,12 +718,14 @@ impl Client {
             .get_account(account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
+
         let account: Account = account_record.into();
 
         let data_store = ClientDataStore::new(self.store.clone());
 
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
+
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
@@ -755,7 +752,8 @@ impl Client {
     /// These updates include:
     /// - New output notes.
     /// - New input notes (only if they are relevant to the client).
-    /// - Input notes that could be created as outputs of future transactions (e.g., a SWAP payback note).
+    /// - Input notes that could be created as outputs of future transactions (e.g., a SWAP payback
+    ///   note).
     /// - Updated input notes that were consumed locally.
     async fn get_note_updates(
         &self,
@@ -798,7 +796,7 @@ impl Client {
             }
         }
 
-        // Track future input notes described in the transaction result. 
+        // Track future input notes described in the transaction result.
         new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
             InputNoteRecord::new(
                 note_details.clone(),
@@ -1044,7 +1042,7 @@ impl Client {
     /// Returns foreign account inputs for the required foreign accounts specified by the
     /// transaction request.
     ///
-    /// For any [`ForeignAccount::Public`] in `foreing_accounts`, these pieces of data are retrieved
+    /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
     /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
     /// a proof of the account's existence on the network is fetched.
     ///

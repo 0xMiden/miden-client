@@ -1,4 +1,6 @@
 name: Lint
+permissions:
+  contents: read
 on:
   push:
     branches: [main, next]
@@ -13,7 +15,29 @@ jobs:
       - uses: actions/checkout@main
       - name: machete
         uses: bnjbvr/cargo-machete@main
+        
+  typos:
+    name: spellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: typos
+      - run: make typos-check
 
+  toml:
+    name: toml formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+      - run: make toml-check
+      
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
@@ -70,3 +94,4 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: make - doc
         run: make doc
+        

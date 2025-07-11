@@ -57,7 +57,7 @@ try {
     const webClient = await WebClient.createClient();
 
     // Get uncommitted transactions
-    const uncommittedTransactions = await webClient.getTransactions(TransactionFilter.uncomitted());
+    const uncommittedTransactions = await webClient.getTransactions(TransactionFilter.uncommitted());
 
     // Process transactions as needed
     for (const tx of uncommittedTransactions) {

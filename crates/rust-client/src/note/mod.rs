@@ -46,7 +46,7 @@
 //!
 //! // Compile the note script
 //! let script_src = "begin push.9 push.12 add end";
-//! let note_script = client.compile_note_script(script_src)?;
+//! let note_script = client.script_builder().compile_note_script(script_src)?;
 //! println!("Compiled note script successfully.");
 //!
 //! # Ok(())
@@ -58,7 +58,6 @@
 
 use alloc::{string::ToString, vec::Vec};
 
-use miden_lib::transaction::TransactionKernel;
 use miden_objects::account::AccountId;
 
 use crate::{
@@ -121,12 +120,12 @@ impl Client {
         &self,
         account_id: Option<AccountId>,
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
-        let commited_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
+        let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         let mut relevant_notes = Vec::new();
-        for input_note in commited_notes {
+        for input_note in committed_notes {
             let mut account_relevance =
                 note_screener.check_relevance(&input_note.clone().try_into()?).await?;
 
@@ -185,14 +184,6 @@ impl Client {
         note_id: NoteId,
     ) -> Result<Option<OutputNoteRecord>, ClientError> {
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
-    }
-
-    /// Compiles the provided program into a [`NoteScript`].
-    ///
-    /// The assembler uses the debug mode if the client was instantiated with debug mode on.
-    pub fn compile_note_script(&self, note_script: &str) -> Result<NoteScript, ClientError> {
-        let assembler = TransactionKernel::assembler().with_debug_mode(self.in_debug_mode());
-        NoteScript::compile(note_script, assembler).map_err(ClientError::NoteError)
     }
 }
 

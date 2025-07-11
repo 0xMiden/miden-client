@@ -198,7 +198,7 @@ async fn import_expected_notes() {
     // If imported after execution and syncing then the inclusion proof should be Some
     assert!(input_note.inclusion_proof().is_some());
 
-    // If client 2 succesfully consumes the note, we confirm we have MMR and block header data
+    // If client 2 successfully consumes the note, we confirm we have MMR and block header data
     consume_notes(&mut client_2, client_2_account.id(), &[input_note.try_into().unwrap()]).await;
 
     let tx_request = TransactionRequestBuilder::new()
@@ -212,7 +212,7 @@ async fn import_expected_notes() {
     let note: InputNoteRecord =
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
 
-    // Import an uncommited note without verification
+    // Import an uncommitted note without verification
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
         .import_note(NoteFile::NoteDetails {
@@ -536,7 +536,7 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
         (note_id, transaction_id)
     };
 
-    // Wait until the note gets comitted in the node (without syncing)
+    // Wait until the note gets committed in the node (without syncing)
     while client
         .test_rpc_api()
         .get_notes_by_id(&[third_note_id])
@@ -1095,9 +1095,9 @@ async fn expired_transaction_fails() {
     wait_for_blocks(&mut client, (expiration_delta + 1).into()).await;
 
     println!("Sending transaction to node");
-    let submited_tx_result = client.submit_transaction(transaction_execution_result).await;
+    let submitted_tx_result = client.submit_transaction(transaction_execution_result).await;
 
-    assert!(submited_tx_result.is_err());
+    assert!(submitted_tx_result.is_err());
 }
 
 /// Tests that RPC methods that are not directly related to the client logic

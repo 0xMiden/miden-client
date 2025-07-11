@@ -28,7 +28,7 @@ use js_bindings::{
 mod models;
 use models::{
     AccountAuthIdxdbObject, AccountCodeIdxdbObject, AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject, AccountVaultIdxdbObject, ForeignAcountCodeIdxdbObject,
+    AccountStorageIdxdbObject, AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
 };
 
 pub(crate) mod utils;
@@ -298,8 +298,10 @@ impl WebStore {
             return Ok(BTreeMap::new());
         }
 
-        let foreign_account_code_idxdb: Vec<ForeignAcountCodeIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let foreign_account_code_idxdb: Vec<ForeignAccountCodeIdxdbObject> = from_value(js_value)
+            .map_err(|err| {
+            StoreError::DatabaseError(format!("failed to deserialize {err:?}"))
+        })?;
 
         let foreign_account_code: BTreeMap<AccountId, AccountCode> = foreign_account_code_idxdb
             .into_iter()
