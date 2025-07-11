@@ -35,8 +35,13 @@ use crate::{
 
 /// Callback that gets executed when a new note is received as part of the sync response.
 ///
-/// It receives the committed note received from the network and an optional note record that
-/// corresponds to the state of the note in the network (only if the note is public).
+/// It receives:
+/// 
+/// - The committed note received from the network.
+/// - An optional note record that corresponds to the state of the note in the network (only if the
+///  note is public).
+/// - A note screener that can be used to test whether notes are consumable.
+/// - A set of [`NoteTag`]s that contains all tags tracked in the store.
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
@@ -495,7 +500,7 @@ pub async fn on_note_received(
         // The note is not being tracked by the client and is public so we can screen it
         let new_note_relevance = note_screener
             .check_relevance(
-                &public_note.clone().try_into().map_err(ClientError::NoteRecordConversionError)?,
+                &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
             )
             .await?;
 
