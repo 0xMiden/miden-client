@@ -11,7 +11,7 @@ impl NoteScript {
         WellKnownNote::P2ID.script().into()
     }
 
-    pub fn p2idr() -> Self {
+    pub fn p2ide() -> Self {
         WellKnownNote::P2IDE.script().into()
     }
 

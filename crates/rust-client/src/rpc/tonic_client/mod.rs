@@ -185,7 +185,7 @@ impl NodeRpcClient for TonicRpcClient {
         &self,
         block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: &[NoteTag],
+        note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
         let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
 
@@ -349,7 +349,7 @@ impl NodeRpcClient for TonicRpcClient {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
-        note_tags: &[NoteTag],
+        note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 

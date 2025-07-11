@@ -90,6 +90,7 @@ impl WebClient {
     pub fn compile_note_script(&mut self, script: &str) -> Result<NoteScript, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let native_note_script: NativeNoteScript = client
+                .script_builder()
                 .compile_note_script(script)
                 .map_err(|err| js_error_with_context(err, "failed to compile note script"))?;
 

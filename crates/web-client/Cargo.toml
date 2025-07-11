@@ -12,25 +12,30 @@ repository.workspace   = true
 rust-version.workspace = true
 version                = "0.10.0"
 
+[package.metadata.cargo-machete]
+ignored = ["wasm-bindgen-futures"]
+
 [lib]
 crate-type = ["cdylib"]
-
-[lints]
-workspace = true
 
 [features]
 testing = ["miden-client/testing"]
 
 [dependencies]
+# Workspace dependencies
 miden-client = { default-features = false, features = [
   "idxdb",
   "web-tonic",
 ], path = "../rust-client", version = "0.10" }
-miden-lib = { workspace = true }
+
+# Miden dependencies
+miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
-rand = { workspace = true }
-serde-wasm-bindgen = { version = "0.6" }
-wasm-bindgen = { features = ["serde-serialize"], version = "0.2" }
+
+# External dependencies
+rand                 = { workspace = true }
+serde-wasm-bindgen   = { version = "0.6" }
+wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
@@ -39,5 +44,5 @@ miden-lib     = { default-features = false, features = ["testing"], workspace = 
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
 
-[package.metadata.cargo-machete]
-ignored = ["wasm-bindgen-futures"]
+[lints]
+workspace = true

@@ -141,7 +141,7 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: &[NoteTag],
+        note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
@@ -157,7 +157,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
-        note_tags: &[NoteTag],
+        note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError>;
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
