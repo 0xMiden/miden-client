@@ -5,10 +5,7 @@ use miden_client::{
     account::{Account, AccountBuilder, AccountStorageMode, StorageSlot},
     note::NoteTag,
     testing::{
-        common::{
-            TestClient, create_test_client, execute_tx_and_sync, insert_new_wallet,
-            wait_for_blocks, wait_for_tx,
-        },
+        common::{TestClient, create_test_client, wait_for_tx},
         note::NoteBuilder,
     },
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
@@ -157,9 +154,7 @@ async fn counter_contract_ntx() {
     );
 
     let (native_account, _native_seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
+        client.insert_new_wallet(AccountStorageMode::Public, &keystore).await.unwrap();
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
@@ -188,9 +183,9 @@ async fn counter_contract_ntx() {
         .build()
         .unwrap();
 
-    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+    client.execute_tx_and_sync(native_account.id(), tx_request).await.unwrap();
 
-    wait_for_blocks(&mut client, 2).await;
+    client.wait_for_blocks(2).await.unwrap();
 
     let a = client
         .test_rpc_api()
@@ -220,10 +215,7 @@ async fn recall_note_before_ntx_consumes_it() {
         .unwrap()
         .0;
 
-    let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
-        .await
-        .unwrap()
-        .0;
+    let wallet = client.insert_new_wallet(AccountStorageMode::Public, &keystore).await.unwrap().0;
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
@@ -267,7 +259,7 @@ async fn recall_note_before_ntx_consumes_it() {
 
     client.testing_apply_transaction(consume_transaction).await.unwrap();
 
-    wait_for_blocks(&mut client, 2).await;
+    client.wait_for_blocks(2).await.unwrap();
 
     // The network account should have original value
     assert_eq!(

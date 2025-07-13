@@ -12,6 +12,7 @@
 * Exposed `bech32` account IDs in Web Client (#978).
 * Added transaction script argument support to `TransactionRequest` (#1017).
 * [BREAKING] Added support for timelock P2IDE notes (#1020).
+* [BREAKING] Added `utils` module to `miden-client` for common utilities (#971).
 
 ### Changes
 

@@ -54,15 +54,15 @@ async fn transaction_request() {
 
     client.sync_state().await.unwrap();
     // Insert Account
-    let (regular_account, _seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (regular_account, _seed, _) = client
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator)
+        .await
+        .unwrap();
 
-    let (fungible_faucet, _seed, _) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (fungible_faucet, _seed, _) = client
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator)
+        .await
+        .unwrap();
 
     // Execute mint transaction in order to create custom note
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await;
@@ -148,15 +148,15 @@ async fn merkle_store() {
 
     client.sync_state().await.unwrap();
     // Insert Account
-    let (regular_account, _seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (regular_account, _seed, _) = client
+        .insert_new_wallet(AccountStorageMode::Private, &authenticator)
+        .await
+        .unwrap();
 
-    let (fungible_faucet, _seed, _) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (fungible_faucet, _seed, _) = client
+        .insert_new_fungible_faucet(AccountStorageMode::Private, &authenticator)
+        .await
+        .unwrap();
 
     // Execute mint transaction in order to increase nonce
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await;
@@ -227,7 +227,10 @@ async fn merkle_store() {
         .build()
         .unwrap();
 
-    execute_tx_and_sync(&mut client, regular_account.id(), transaction_request).await;
+    client
+        .execute_tx_and_sync(regular_account.id(), transaction_request)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 }
@@ -245,12 +248,13 @@ async fn onchain_notes_sync_with_tag() {
     wait_for_node(&mut client_3).await;
 
     // Create accounts
-    let (basic_account_1, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            .unwrap();
+    let (basic_account_1, ..) = client_1
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_1)
+        .await
+        .unwrap();
 
-    insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
+    client_2
+        .insert_new_wallet(AccountStorageMode::Private, &keystore_2)
         .await
         .unwrap();
 
@@ -287,7 +291,7 @@ async fn onchain_notes_sync_with_tag() {
         .unwrap();
 
     let note = tx_request.expected_output_own_notes().pop().unwrap().clone();
-    execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await;
+    client_1.execute_tx_and_sync(basic_account_1.id(), tx_request).await.unwrap();
 
     // Load tag into client 2
     client_2
@@ -321,7 +325,10 @@ async fn mint_custom_note(
         .build()
         .unwrap();
 
-    execute_tx_and_sync(client, faucet_account_id, transaction_request).await;
+    client
+        .execute_tx_and_sync(faucet_account_id, transaction_request)
+        .await
+        .unwrap();
     note
 }
 
