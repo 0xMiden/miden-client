@@ -1,7 +1,7 @@
 use miden_objects::crypto::merkle::MerklePath as NativeMerklePath;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -13,16 +13,16 @@ impl MerklePath {
         self.0.depth()
     }
 
-    pub fn nodes(&self) -> Vec<RpoDigest> {
+    pub fn nodes(&self) -> Vec<Word> {
         self.0.nodes().iter().map(Into::into).collect()
     }
 
     #[wasm_bindgen(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: u64, node: &RpoDigest) -> RpoDigest {
+    pub fn compute_root(&self, index: u64, node: &Word) -> Word {
         self.0.compute_root(index, node.clone().into()).unwrap().into()
     }
 
-    pub fn verify(&self, index: u64, node: &RpoDigest, root: &RpoDigest) -> bool {
+    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
         self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
     }
 }

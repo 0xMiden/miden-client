@@ -14,7 +14,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -150,13 +150,13 @@ impl Store for WebStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.get_partial_blockchain_nodes(filter).await
     }
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         self.insert_partial_blockchain_nodes(nodes).await
     }
@@ -204,7 +204,7 @@ impl Store for WebStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.get_account_header_by_commitment(account_commitment).await
     }

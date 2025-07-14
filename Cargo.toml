@@ -22,18 +22,26 @@ version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib                  = { default-features = false, version = "0.10" }
-miden-node-block-producer  = { version = "0.10" }
-miden-node-ntx-builder     = { version = "0.10" }
-miden-node-proto-build     = { default-features = false, version = "0.10" }
-miden-node-rpc             = { version = "0.10" }
-miden-node-store           = { version = "0.10" }
-miden-node-utils           = { version = "0.10" }
-miden-objects              = { default-features = false, version = "0.10" }
-miden-remote-prover        = { features = ["concurrent"], version = "0.10" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.10" }
-miden-testing              = { default-features = false, features = ["async"], version = "0.10" }
-miden-tx                   = { default-features = false, features = ["async"], version = "0.10" }
+miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-node-block-producer = { branch = "tomyrd-cargo-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "tomyrd-cargo-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "tomyrd-cargo-update", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "tomyrd-cargo-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "tomyrd-cargo-update", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "tomyrd-cargo-update", git = "https://github.com/0xMiden/miden-node" }
+miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-remote-prover = { branch = "tomyrd-cargo-update", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "tomyrd-cargo-update", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-testing = { branch = "next", default-features = false, features = [
+  "async",
+], git = "https://github.com/0xMiden/miden-base" }
+miden-tx = { branch = "next", default-features = false, features = [
+  "async",
+], git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 async-trait = "0.1"

@@ -138,7 +138,6 @@ For more detailed information about the classes and methods used in these exampl
 - [TransactionFilter](docs/src/web-client/api/classes/TransactionFilter.md) - Transaction filtering options
 - [TransactionId](docs/src/web-client/api/classes/TransactionId.md) - Transaction identifier class
 - [AccountId](docs/src/web-client/api/classes/AccountId.md) - Account identifier class
-- [RpoDigest](docs/src/web-client/api/classes/RpoDigest.md) - Commitment hash class used for various transaction properties
 - [OutputNotes](docs/src/web-client/api/classes/OutputNotes.md) - Output notes associated with transactions
 - [TransactionStatus](docs/src/web-client/api/classes/TransactionStatus.md) - Transaction status information and methods
 

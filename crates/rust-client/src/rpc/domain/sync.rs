@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use miden_objects::{
-    Digest,
+    Word,
     account::AccountId,
     block::{BlockHeader, BlockNumber},
     crypto::merkle::MmrDelta,
@@ -24,7 +24,7 @@ pub struct StateSyncInfo {
     /// MMR delta that contains data for (`current_block.num`, `incoming_block_header.num-1`).
     pub mmr_delta: MmrDelta,
     /// Tuples of `AccountId` alongside their new account commitments.
-    pub account_commitment_updates: Vec<(AccountId, Digest)>,
+    pub account_commitment_updates: Vec<(AccountId, Word)>,
     /// List of tuples of Note ID, Note Index and Merkle Path for all new notes.
     pub note_inclusions: Vec<CommittedNote>,
     /// List of transaction IDs of transaction that were included in (`request.block_num`,
@@ -54,7 +54,7 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
             .ok_or(RpcError::ExpectedDataMissing("MmrDelta".into()))?
             .try_into()?;
 
-        // Validate and convert account commitment updates into an (AccountId, Digest) tuple
+        // Validate and convert account commitment updates into an (AccountId, Word) tuple
         let mut account_commitment_updates = vec![];
         for update in value.accounts {
             let account_id = update
@@ -70,10 +70,10 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
             account_commitment_updates.push((account_id, account_commitment));
         }
 
-        // Validate and convert account note inclusions into an (AccountId, Digest) tuple
+        // Validate and convert account note inclusions into an (AccountId, Word) tuple
         let mut note_inclusions = vec![];
         for note in value.notes {
-            let note_id: Digest = note
+            let note_id: Word = note
                 .note_id
                 .ok_or(RpcError::ExpectedDataMissing("Notes.Id".into()))?
                 .try_into()?;

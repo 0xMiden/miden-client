@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use core::fmt::{self, Display};
 
 use miden_objects::{
-    Digest,
+    Word,
     block::BlockNumber,
     note::{
         Note, NoteAssets, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata,
@@ -33,7 +33,7 @@ pub struct OutputNoteRecord {
     /// information.
     metadata: NoteMetadata,
     /// A commitment to the note's serial number, script and inputs.
-    recipient_digest: Digest,
+    recipient_digest: Word,
     /// The state of the note, with specific fields for each one.
     state: OutputNoteState,
     /// The expected block height at which the note should be included in the chain.
@@ -42,7 +42,7 @@ pub struct OutputNoteRecord {
 
 impl OutputNoteRecord {
     pub fn new(
-        recipient_digest: Digest,
+        recipient_digest: Word,
         assets: NoteAssets,
         metadata: NoteMetadata,
         state: OutputNoteState,
@@ -61,7 +61,7 @@ impl OutputNoteRecord {
         NoteId::new(self.recipient_digest, self.assets.commitment())
     }
 
-    pub fn recipient_digest(&self) -> Digest {
+    pub fn recipient_digest(&self) -> Word {
         self.recipient_digest
     }
 

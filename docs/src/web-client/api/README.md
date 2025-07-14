@@ -76,7 +76,6 @@
 - [PublicKey](classes/PublicKey.md)
 - [RecipientArray](classes/RecipientArray.md)
 - [Rpo256](classes/Rpo256.md)
-- [RpoDigest](classes/RpoDigest.md)
 - [SecretKey](classes/SecretKey.md)
 - [SlotAndKeys](classes/SlotAndKeys.md)
 - [StorageMap](classes/StorageMap.md)

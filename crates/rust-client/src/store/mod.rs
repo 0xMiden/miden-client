@@ -28,7 +28,7 @@ use alloc::{
 use core::fmt::Debug;
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -179,7 +179,7 @@ pub trait Store: Send + Sync {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError>;
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError>;
 
     /// Inserts blockchain MMR authentication nodes.
     ///
@@ -187,7 +187,7 @@ pub trait Store: Send + Sync {
     /// ignored.
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
     /// Returns peaks information from the blockchain by a specific block number.
@@ -241,7 +241,7 @@ pub trait Store: Send + Sync {
     /// given commitment. If no account state matches the provided commitment, `None` is returned.
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError>;
 
     /// Retrieves a full [`AccountRecord`] object, this contains the account's latest state along

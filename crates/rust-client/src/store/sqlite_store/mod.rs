@@ -16,7 +16,7 @@ use db_management::{
     utils::apply_migrations,
 };
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -213,7 +213,7 @@ impl Store for SqliteStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_partial_blockchain_nodes(conn, &filter)
         })
@@ -222,7 +222,7 @@ impl Store for SqliteStore {
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let nodes = nodes.to_vec();
         self.interact_with_connection(move |conn| {
@@ -279,7 +279,7 @@ impl Store for SqliteStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_header_by_commitment(conn, account_commitment)

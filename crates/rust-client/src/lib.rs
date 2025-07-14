@@ -73,7 +73,7 @@
 //! let coin_seed: [u64; 4] = rng.random();
 //!
 //! // Initialize the random coin using the generated seed.
-//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
 //! // Determine the number of blocks to consider a transaction stale.
@@ -166,16 +166,12 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::{
-        Digest,
-        crypto::{
-            dsa::rpo_falcon512::SecretKey,
-            merkle::{
-                InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf,
-                SmtProof,
-            },
-            rand::{FeltRng, RpoRandomCoin},
+    pub use miden_objects::crypto::{
+        dsa::rpo_falcon512::SecretKey,
+        merkle::{
+            InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf, SmtProof,
         },
+        rand::{FeltRng, RpoRandomCoin},
     };
 }
 

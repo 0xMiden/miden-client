@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
 use miden_objects::{
-    Digest,
+    Word,
     account::AccountId,
     block::{BlockHeader, BlockNumber},
     note::{Note, NoteAssets, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, Nullifier},
@@ -62,7 +62,7 @@ impl InputNoteRecord {
     }
 
     /// Returns the note's recipient.
-    pub fn recipient(&self) -> Digest {
+    pub fn recipient(&self) -> Word {
         self.details.recipient().digest()
     }
 

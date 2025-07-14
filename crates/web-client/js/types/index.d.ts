@@ -42,7 +42,6 @@ export {
   OutputNote,
   OutputNotesArray,
   PublicKey,
-  RpoDigest,
   Rpo256,
   SecretKey,
   SerializedAccountHeader,

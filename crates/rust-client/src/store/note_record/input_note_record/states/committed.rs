@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
 use miden_objects::{
-    Digest,
+    Word,
     block::BlockHeader,
     note::{NoteId, NoteInclusionProof, NoteMetadata},
     transaction::TransactionId,
@@ -22,7 +22,7 @@ pub struct CommittedNoteState {
     /// Inclusion proof for the note inside the chain block.
     pub inclusion_proof: NoteInclusionProof,
     /// Root of the note tree inside the block that verifies the note inclusion proof.
-    pub block_note_root: Digest,
+    pub block_note_root: Word,
 }
 
 impl NoteStateHandler for CommittedNoteState {
@@ -119,7 +119,7 @@ impl miden_tx::utils::Deserializable for CommittedNoteState {
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let inclusion_proof = NoteInclusionProof::read_from(source)?;
-        let block_note_root = Digest::read_from(source)?;
+        let block_note_root = Word::read_from(source)?;
         Ok(CommittedNoteState {
             metadata,
             inclusion_proof,

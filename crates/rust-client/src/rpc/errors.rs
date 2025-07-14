@@ -4,7 +4,10 @@ use alloc::{
 };
 use core::error::Error;
 
-use miden_objects::{NoteError, account::AccountId, note::NoteId, utils::DeserializationError};
+use miden_objects::{
+    NoteError, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
+    utils::DeserializationError,
+};
 use thiserror::Error;
 
 // RPC ERROR
@@ -57,6 +60,8 @@ pub enum RpcConversionError {
     NotAValidFelt,
     #[error("note error")]
     NoteTypeError(#[from] NoteError),
+    #[error("merkle error")]
+    MerkleError(#[from] MerkleError),
     #[error("failed to convert rpc data: {0}")]
     InvalidField(String),
     #[error("field `{field_name}` expected to be present in protobuf representation of {entity}")]

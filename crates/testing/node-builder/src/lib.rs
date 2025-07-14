@@ -14,7 +14,7 @@ use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_lib::{AuthScheme, account::faucets::create_basic_fungible_faucet, utils::Serializable};
 use miden_node_block_producer::{
-    BlockProducer, SERVER_MAX_BATCHES_PER_BLOCK, SERVER_MAX_TXS_PER_BATCH,
+    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
@@ -262,8 +262,8 @@ impl NodeBuilder {
                     block_prover_url: None,
                     batch_interval,
                     block_interval,
-                    max_txs_per_batch: SERVER_MAX_TXS_PER_BATCH,
-                    max_batches_per_block: SERVER_MAX_BATCHES_PER_BLOCK,
+                    max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
+                    max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
                     production_checkpoint: checkpoint,
                 }
                 .serve()

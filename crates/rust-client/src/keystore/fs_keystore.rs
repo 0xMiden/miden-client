@@ -10,7 +10,7 @@ use std::{
 };
 
 use miden_objects::{
-    Digest, Felt, Word,
+    Felt, Word,
     account::{AccountDelta, AuthSecretKey},
 };
 use miden_tx::{
@@ -141,8 +141,8 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
             .get_key(pub_key)
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
+        let AuthSecretKey::RpoFalcon512(k) =
+            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
 
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
     }
@@ -150,7 +150,7 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
 
 /// Hashes a public key to a string representation.
 fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = Digest::from(pub_key).to_hex();
+    let pub_key = pub_key.to_hex();
     let mut hasher = DefaultHasher::new();
     pub_key.hash(&mut hasher);
     hasher.finish().to_string()

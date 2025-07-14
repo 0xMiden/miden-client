@@ -4,13 +4,13 @@ use super::errors::RpcConversionError;
 
 pub mod account;
 pub mod block;
-pub mod digest;
 pub mod merkle;
 pub mod note;
 pub mod nullifier;
 pub mod smt;
 pub mod sync;
 pub mod transaction;
+pub mod word;
 
 // UTILITIES
 // ================================================================================================

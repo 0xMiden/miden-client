@@ -4,7 +4,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest,
+    Word,
     block::BlockNumber,
     transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript},
 };
@@ -39,10 +39,10 @@ pub async fn insert_proven_transaction_data(
     submission_height: BlockNumber,
 ) -> Result<(), StoreError> {
     // Build transaction record
-    let nullifiers: Vec<Digest> = executed_transaction
+    let nullifiers: Vec<Word> = executed_transaction
         .input_notes()
         .iter()
-        .map(|x| x.nullifier().inner())
+        .map(|x| x.nullifier().as_word())
         .collect();
 
     let output_notes = executed_transaction.output_notes();
@@ -74,7 +74,7 @@ pub async fn insert_proven_transaction_data(
 pub(super) fn serialize_transaction_record(
     transaction_record: &TransactionRecord,
 ) -> SerializedTransactionData {
-    let transaction_id: String = transaction_record.id.inner().into();
+    let transaction_id: String = transaction_record.id.as_word().to_hex();
 
     let script_root = transaction_record.script.as_ref().map(|script| script.root().to_bytes());
     let tx_script = transaction_record.script.as_ref().map(TransactionScript::to_bytes);

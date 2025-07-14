@@ -154,7 +154,7 @@ impl Client {
         // Build current partial MMR
         let current_partial_mmr = self.build_current_partial_mmr().await?;
 
-        let all_block_numbers = (0..current_partial_mmr.forest())
+        let all_block_numbers = (0..current_partial_mmr.forest().num_leaves())
             .filter_map(|block_num| {
                 current_partial_mmr.is_tracked(block_num).then_some(BlockNumber::from(
                     u32::try_from(block_num).expect("block number should be less than u32::MAX"),

@@ -2,8 +2,8 @@ use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
 use wasm_bindgen::prelude::*;
 
 use super::{
-    account_id::AccountId, output_notes::OutputNotes, rpo_digest::RpoDigest,
-    transaction_id::TransactionId, transaction_status::TransactionStatus,
+    account_id::AccountId, output_notes::OutputNotes, transaction_id::TransactionId,
+    transaction_status::TransactionStatus, word::Word,
 };
 
 #[derive(Clone)]
@@ -22,17 +22,17 @@ impl TransactionRecord {
     }
 
     #[wasm_bindgen(js_name = "initAccountState")]
-    pub fn init_account_state(&self) -> RpoDigest {
+    pub fn init_account_state(&self) -> Word {
         self.0.details.init_account_state.into()
     }
 
     #[wasm_bindgen(js_name = "finalAccountState")]
-    pub fn final_account_state(&self) -> RpoDigest {
+    pub fn final_account_state(&self) -> Word {
         self.0.details.final_account_state.into()
     }
 
     #[wasm_bindgen(js_name = "inputNoteNullifiers")]
-    pub fn input_note_nullifiers(&self) -> Vec<RpoDigest> {
+    pub fn input_note_nullifiers(&self) -> Vec<Word> {
         self.0.details.input_note_nullifiers.iter().map(Into::into).collect()
     }
 

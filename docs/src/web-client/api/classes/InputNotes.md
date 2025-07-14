@@ -10,11 +10,11 @@
 
 ### commitment()
 
-> **commitment**(): [`RpoDigest`](RpoDigest.md)
+> **commitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
