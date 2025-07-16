@@ -1,7 +1,7 @@
 use miden_objects::{Word, note::Nullifier};
 
 use super::MissingFieldHelper;
-use crate::rpc::{self, errors::RpcConversionError, generated::word::Word as ProtoWord};
+use crate::rpc::{self, errors::RpcConversionError, generated::digest::Digest as ProtoWord};
 
 // NULLIFIER UPDATE
 // ================================================================================================

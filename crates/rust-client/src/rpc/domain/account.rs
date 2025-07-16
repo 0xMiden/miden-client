@@ -397,7 +397,7 @@ impl From<AccountStorageRequirements> for Vec<get_account_proofs_request::Storag
                 storage_slot_index: u32::from(slot_index),
                 map_keys: map_keys
                     .into_iter()
-                    .map(crate::rpc::generated::word::Word::from)
+                    .map(crate::rpc::generated::digest::Digest::from)
                     .collect(),
             });
         }

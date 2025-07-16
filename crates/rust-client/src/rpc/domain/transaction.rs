@@ -2,16 +2,16 @@ use miden_objects::{Word, account::AccountId, transaction::TransactionId};
 
 use crate::rpc::{
     errors::RpcConversionError,
-    generated::{transaction::TransactionId as ProtoTransactionId, word::Word as ProtoWord},
+    generated::{digest::Digest as ProtoDigest, transaction::TransactionId as ProtoTransactionId},
 };
 
 // INTO TRANSACTION ID
 // ================================================================================================
 
-impl TryFrom<ProtoWord> for TransactionId {
+impl TryFrom<ProtoDigest> for TransactionId {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoWord) -> Result<Self, Self::Error> {
+    fn try_from(value: ProtoDigest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
         Ok(word.into())
     }

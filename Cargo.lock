@@ -2002,7 +2002,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2164,7 +2164,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2230,7 +2230,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "futures",
@@ -2258,7 +2258,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2280,7 +2280,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "hex",
@@ -2299,7 +2299,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "prost",
@@ -2310,7 +2310,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "futures",
@@ -2336,7 +2336,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2365,7 +2365,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "figment",
@@ -2390,7 +2390,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2442,7 +2442,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2485,7 +2485,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bc4004bc2f8d2fea83f76ab8551275749996c088"
+source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-cargo-update#bfe1fba7ad2cde83810072c03d11497476703a9c"
 dependencies = [
  "async-trait",
  "getrandom 0.3.3",
@@ -2518,7 +2518,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2537,7 +2537,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "async-trait",
  "miden-lib",
@@ -2553,7 +2553,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#6ff9c25022f8372cb00ce03920399cef17fcc7c3"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#9bb5110b174c293df02df0e05126b2943aa1d205"
 dependencies = [
  "miden-objects",
  "miden-tx",

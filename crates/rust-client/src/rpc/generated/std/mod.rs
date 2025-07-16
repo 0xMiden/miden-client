@@ -5,6 +5,7 @@
 )]
 pub mod account;
 pub mod block;
+pub mod digest;
 pub mod merkle;
 pub mod mmr;
 pub mod note;
@@ -13,4 +14,3 @@ pub mod responses;
 pub mod rpc;
 pub mod smt;
 pub mod transaction;
-pub mod word;

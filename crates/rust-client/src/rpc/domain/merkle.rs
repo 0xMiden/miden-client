@@ -18,7 +18,7 @@ impl From<MerklePath> for generated::merkle::MerklePath {
 
 impl From<&MerklePath> for generated::merkle::MerklePath {
     fn from(value: &MerklePath) -> Self {
-        let siblings = value.nodes().iter().map(generated::word::Word::from).collect();
+        let siblings = value.nodes().iter().map(generated::digest::Digest::from).collect();
         generated::merkle::MerklePath { siblings }
     }
 }
@@ -46,7 +46,7 @@ impl TryFrom<MmrDelta> for generated::mmr::MmrDelta {
     type Error = RpcConversionError;
 
     fn try_from(value: MmrDelta) -> Result<Self, Self::Error> {
-        let data = value.data.into_iter().map(generated::word::Word::from).collect();
+        let data = value.data.into_iter().map(generated::digest::Digest::from).collect();
         Ok(generated::mmr::MmrDelta {
             forest: u64::try_from(value.forest.num_leaves())?,
             data,
