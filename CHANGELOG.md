@@ -4,6 +4,10 @@
 
 - [BREAKING] Incremented MSRV to 1.88.
 
+### Features
+
+* Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
+
 ## 0.10.0 (2025-07-12)
 
 ### Features

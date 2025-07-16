@@ -50,8 +50,8 @@
 
 ### recipientDigest()
 
-> **recipientDigest**(): [`Word`](Word.md)
+> **recipientDigest**(): [`RpoDigest`](RpoDigest.md)
 
 #### Returns
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
