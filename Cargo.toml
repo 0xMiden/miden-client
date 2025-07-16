@@ -22,18 +22,22 @@ version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib                  = { default-features = false, version = "0.10" }
-miden-node-block-producer  = { version = "0.10" }
-miden-node-ntx-builder     = { version = "0.10" }
-miden-node-proto-build     = { default-features = false, version = "0.10" }
-miden-node-rpc             = { version = "0.10" }
-miden-node-store           = { version = "0.10" }
-miden-node-utils           = { version = "0.10" }
-miden-objects              = { default-features = false, version = "0.10" }
-miden-remote-prover        = { features = ["concurrent"], version = "0.10" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.10" }
-miden-testing              = { default-features = false, features = ["async"], version = "0.10" }
-miden-tx                   = { default-features = false, features = ["async"], version = "0.10" }
+miden-lib = { default-features = false, version = "0.10" }
+miden-node-block-producer = { branch = "mirko/rpc-verify-network", git = "https://github.com/0xMiden/miden-node/" }
+miden-node-ntx-builder = { branch = "mirko/rpc-verify-network", git = "https://github.com/0xMiden/miden-node/" }
+miden-node-proto-build = { branch = "mirko/rpc-verify-network", default-features = false, git = "https://github.com/0xMiden/miden-node/" }
+miden-node-rpc = { branch = "mirko/rpc-verify-network", git = "https://github.com/0xMiden/miden-node/" }
+miden-node-store = { branch = "mirko/rpc-verify-network", git = "https://github.com/0xMiden/miden-node/" }
+miden-node-utils = { branch = "mirko/rpc-verify-network", git = "https://github.com/0xMiden/miden-node/" }
+miden-objects = { default-features = false, version = "0.10" }
+miden-remote-prover = { branch = "mirko/rpc-verify-network", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node/" }
+miden-remote-prover-client = { branch = "mirko/rpc-verify-network", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/miden-node/" }
+miden-testing = { default-features = false, features = ["async"], version = "0.10" }
+miden-tx = { default-features = false, features = ["async"], version = "0.10" }
 
 # External dependencies
 async-trait = "0.1"
