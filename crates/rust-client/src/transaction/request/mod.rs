@@ -28,7 +28,7 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::ForeignAccount;
 
-use crate::store::InputNoteRecord;
+use crate::{builder::DebugMode, store::InputNoteRecord};
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -296,12 +296,12 @@ impl TransactionRequest {
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
-        in_debug_mode: bool,
+        in_debug_mode: DebugMode,
     ) -> Result<TransactionScript, TransactionRequestError> {
         match &self.script_template {
             Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
-                .build_send_notes_script(notes, self.expiration_delta, in_debug_mode)?),
+                .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
                 if self.input_notes.is_empty() {
                     return Err(TransactionRequestError::NoInputNotes);

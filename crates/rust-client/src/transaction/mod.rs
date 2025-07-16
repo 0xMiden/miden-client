@@ -529,7 +529,7 @@ impl Client {
 
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
-            self.in_debug_mode(),
+            self.in_debug_mode().into(),
         )?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();

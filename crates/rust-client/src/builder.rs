@@ -38,6 +38,30 @@ enum AuthenticatorConfig {
     Instance(Arc<dyn TransactionAuthenticator>),
 }
 
+/// Represents if the client is in Debug Mode.
+pub enum DebugMode {
+    Enabled,
+    Disabled,
+}
+
+impl From<DebugMode> for bool {
+    fn from(debug_mode: DebugMode) -> Self {
+        match debug_mode {
+            DebugMode::Enabled => true,
+            DebugMode::Disabled => false,
+        }
+    }
+}
+
+impl From<bool> for DebugMode {
+    fn from(debug_mode: bool) -> DebugMode {
+        match debug_mode {
+            true => DebugMode::Enabled,
+            false => DebugMode::Disabled,
+        }
+    }
+}
+
 // CLIENT BUILDER
 // ================================================================================================
 
@@ -59,7 +83,7 @@ pub struct ClientBuilder {
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig>,
     /// A flag to enable debug mode.
-    in_debug_mode: bool,
+    in_debug_mode: DebugMode,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
@@ -77,7 +101,7 @@ impl Default for ClientBuilder {
             #[cfg(feature = "sqlite")]
             store_path: "store.sqlite3".to_string(),
             keystore: None,
-            in_debug_mode: false,
+            in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
         }
@@ -93,7 +117,7 @@ impl ClientBuilder {
 
     /// Enable or disable debug mode.
     #[must_use]
-    pub fn in_debug_mode(mut self, debug: bool) -> Self {
+    pub fn in_debug_mode(mut self, debug: DebugMode) -> Self {
         self.in_debug_mode = debug;
         self
     }
@@ -240,7 +264,7 @@ impl ClientBuilder {
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
-                self.in_debug_mode,
+                self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,

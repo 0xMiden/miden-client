@@ -30,7 +30,7 @@ use crate::{
         component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
     },
     auth::AuthSecretKey,
-    builder::ClientBuilder,
+    builder::{ClientBuilder, DebugMode},
     crypto::FeltRng,
     keystore::FilesystemKeyStore,
     note::{Note, create_p2id_note},
@@ -86,7 +86,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
         .rng(Box::new(rng))
         .store(store)
         .filesystem_keystore(auth_path.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 
     (builder, keystore)

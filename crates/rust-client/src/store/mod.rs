@@ -394,7 +394,8 @@ pub enum NoteFilter {
 pub enum BlockRelevance {
     /// The block header includes notes that the client may consume.
     HasNotes,
-    /// The block header did not include notes and was inserted because it was the current chain tip.
+    /// The block header did not include notes and was inserted because it was the current chain
+    /// tip.
     ChainTip,
 }
 

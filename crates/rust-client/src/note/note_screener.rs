@@ -16,6 +16,7 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::{
+    builder::DebugMode,
     store::{Store, StoreError, data_store::ClientDataStore},
     transaction::{TransactionRequestBuilder, TransactionRequestError},
 };
@@ -120,8 +121,8 @@ impl NoteScreener {
         let transaction_request =
             TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
-        let tx_script =
-            transaction_request.build_transaction_script(&AccountInterface::from(account), true)?;
+        let tx_script = transaction_request
+            .build_transaction_script(&AccountInterface::from(account), DebugMode::Enabled)?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
         let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
