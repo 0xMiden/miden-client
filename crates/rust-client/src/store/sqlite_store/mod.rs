@@ -26,7 +26,7 @@ use rusqlite::{Connection, types::Value};
 use tonic::async_trait;
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
     PartialBlockchainFilter, Store, TransactionFilter,
 };
 use crate::{
@@ -198,12 +198,16 @@ impl Store for SqliteStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_numbers = block_numbers.clone();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_block_headers(conn, &block_numbers)
-        })
-        .await
+        Ok(self
+            .interact_with_connection(move |conn| {
+                SqliteStore::get_block_headers(conn, &block_numbers)
+            })
+            .await?
+            .into_iter()
+            .map(|(header, is_relevant)| (header, is_relevant.into()))
+            .collect())
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {

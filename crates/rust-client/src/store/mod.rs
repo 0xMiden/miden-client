@@ -156,7 +156,7 @@ pub trait Store: Send + Sync {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError>;
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError>;
 
     /// Retrieves a [`BlockHeader`] corresponding to the provided block number and a boolean value
     /// that represents whether the block contains notes relevant to the client. Returns `None` if
@@ -166,7 +166,7 @@ pub trait Store: Send + Sync {
     async fn get_block_header_by_num(
         &self,
         block_number: BlockNumber,
-    ) -> Result<Option<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Option<(BlockHeader, BlockRelevance)>, StoreError> {
         self.get_block_headers(&[block_number].into_iter().collect())
             .await
             .map(|mut block_headers_list| block_headers_list.pop())
@@ -384,4 +384,35 @@ pub enum NoteFilter {
     /// Return a list containing notes with unverified inclusion proofs. This filter doesn't apply
     /// to output notes.
     Unverified,
+}
+
+// BLOCK RELEVANCE
+// ================================================================================================
+
+/// Expresses metadata about the block header.
+#[derive(Debug, Clone)]
+pub enum BlockRelevance {
+    /// The block header includes notes that the client may consume.
+    HasNotes,
+    /// The block header did not include notes and was inserted because it was the current chain tip.
+    ChainTip,
+}
+
+impl From<BlockRelevance> for bool {
+    fn from(val: BlockRelevance) -> Self {
+        match val {
+            BlockRelevance::HasNotes => true,
+            BlockRelevance::ChainTip => false,
+        }
+    }
+}
+
+impl From<bool> for BlockRelevance {
+    fn from(has_notes: bool) -> Self {
+        if has_notes {
+            BlockRelevance::HasNotes
+        } else {
+            BlockRelevance::ChainTip
+        }
+    }
 }
