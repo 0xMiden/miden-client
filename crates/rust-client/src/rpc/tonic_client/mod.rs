@@ -144,7 +144,7 @@ impl NodeRpcClient for TonicRpcClient {
                 .try_into()?;
 
             Some(MmrProof {
-                forest: Forest::new(forest as usize),
+                forest: Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
                 position: block_header.block_num().as_usize(),
                 merkle_path,
             })

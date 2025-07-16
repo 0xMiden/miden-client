@@ -42,13 +42,15 @@ impl TryFrom<generated::merkle::MerklePath> for MerklePath {
 // MMR DELTA
 // ================================================================================================
 
-impl From<MmrDelta> for generated::mmr::MmrDelta {
-    fn from(value: MmrDelta) -> Self {
+impl TryFrom<MmrDelta> for generated::mmr::MmrDelta {
+    type Error = RpcConversionError;
+
+    fn try_from(value: MmrDelta) -> Result<Self, Self::Error> {
         let data = value.data.into_iter().map(generated::word::Word::from).collect();
-        generated::mmr::MmrDelta {
-            forest: value.forest.num_leaves() as u64,
+        Ok(generated::mmr::MmrDelta {
+            forest: u64::try_from(value.forest.num_leaves())?,
             data,
-        }
+        })
     }
 }
 
@@ -60,9 +62,7 @@ impl TryFrom<generated::mmr::MmrDelta> for MmrDelta {
             value.data.into_iter().map(Word::try_from).collect();
 
         Ok(MmrDelta {
-            forest: Forest::new(
-                usize::try_from(value.forest).expect("forest is limited to usize size"),
-            ),
+            forest: Forest::new(usize::try_from(value.forest).expect("u64 should fit in usize")),
             data: data?,
         })
     }

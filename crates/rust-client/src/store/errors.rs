@@ -1,4 +1,5 @@
 use alloc::string::String;
+use core::num::TryFromIntError;
 
 use miden_objects::{
     AccountError, AccountIdError, AssetVaultError, NoteError, TransactionScriptError, Word,
@@ -45,6 +46,8 @@ pub enum StoreError {
     DatabaseError(String),
     #[error("error parsing hex")]
     HexParseError(#[from] HexParseError),
+    #[error("failed to convert int")]
+    InvalidInt(#[from] TryFromIntError),
     #[error("note record error")]
     NoteRecordError(#[from] NoteRecordError),
     #[error("error constructing mmr")]

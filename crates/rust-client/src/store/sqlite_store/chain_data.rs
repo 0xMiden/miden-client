@@ -253,7 +253,11 @@ fn insert_partial_blockchain_node(
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
-    MmrPeaks::new(Forest::new(forest as usize), mmr_peaks_nodes).map_err(StoreError::MmrError)
+    MmrPeaks::new(
+        Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
+        mmr_peaks_nodes,
+    )
+    .map_err(StoreError::MmrError)
 }
 
 fn serialize_block_header(

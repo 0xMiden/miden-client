@@ -2,7 +2,7 @@ use alloc::{
     boxed::Box,
     string::{String, ToString},
 };
-use core::error::Error;
+use core::{error::Error, num::TryFromIntError};
 
 use miden_objects::{
     NoteError, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
@@ -64,6 +64,8 @@ pub enum RpcConversionError {
     MerkleError(#[from] MerkleError),
     #[error("failed to convert rpc data: {0}")]
     InvalidField(String),
+    #[error("failed to convert int")]
+    InvalidInt(#[from] TryFromIntError),
     #[error("field `{field_name}` expected to be present in protobuf representation of {entity}")]
     MissingFieldInProtobufRepresentation {
         entity: &'static str,

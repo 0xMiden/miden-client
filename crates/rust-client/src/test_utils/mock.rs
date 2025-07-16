@@ -121,7 +121,7 @@ impl MockRpcApi {
         &self,
         request_block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> SyncStateResponse {
+    ) -> Result<SyncStateResponse, RpcError> {
         // Determine the next block number to sync
         let next_block_num = self
             .mock_chain
@@ -165,14 +165,14 @@ impl MockRpcApi {
             .cloned()
             .collect::<Vec<_>>();
 
-        SyncStateResponse {
+        Ok(SyncStateResponse {
             chain_tip: self.get_chain_tip_block_num().as_u32(),
             block_header: Some(next_block.into()),
-            mmr_delta: Some(mmr_delta.into()),
+            mmr_delta: Some(mmr_delta.try_into()?),
             accounts: vec![],
             transactions,
             notes,
-        }
+        })
     }
 
     /// Retrieves notes that are included in the specified block number.
@@ -225,7 +225,7 @@ impl NodeRpcClient for MockRpcApi {
         block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags);
+        let response = self.get_sync_state_request(block_num, note_tags)?;
 
         let response = NoteSyncInfo {
             chain_tip: response.chain_tip,
@@ -256,7 +256,7 @@ impl NodeRpcClient for MockRpcApi {
         _account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags);
+        let response = self.get_sync_state_request(block_num, note_tags)?;
 
         Ok(response.try_into().unwrap())
     }
