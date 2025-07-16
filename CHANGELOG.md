@@ -2,7 +2,8 @@
 
 ## 0.11.0 (TBD)
 
-- [BREAKING] Incremented MSRV to 1.88.
+* [BREAKING] Incremented MSRV to 1.88.
+* Added genesis commitment header to `TonicRpcClient` requests (#1045).
 
 ## 0.10.0 (2025-07-12)
 
