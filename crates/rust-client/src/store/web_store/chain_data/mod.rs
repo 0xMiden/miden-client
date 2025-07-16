@@ -14,7 +14,7 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
-use crate::store::{PartialBlockchainFilter, StoreError};
+use crate::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 
 mod js_bindings;
 use js_bindings::{
@@ -67,7 +67,7 @@ impl WebStore {
     pub(crate) async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let formatted_block_numbers_list: Vec<String> = block_numbers
             .iter()
             .map(|block_number| i64::from(block_number.as_u32()).to_string())
@@ -81,13 +81,13 @@ impl WebStore {
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
         // Transform the list of Option<BlockHeaderIdxdbObject> to a list of results
-        let results: Result<Vec<(BlockHeader, bool)>, StoreError> = block_headers_idxdb
+        let results: Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> = block_headers_idxdb
             .into_iter()
             .filter_map(|record_option| record_option.map(Ok))
             .map(|record_result: Result<BlockHeaderIdxdbObject, StoreError>| {
                 let record = record_result?;
                 let block_header = BlockHeader::read_from_bytes(&record.header)?;
-                let has_client_notes = record.has_client_notes;
+                let has_client_notes = record.has_client_notes.into();
 
                 Ok((block_header, has_client_notes))
             })

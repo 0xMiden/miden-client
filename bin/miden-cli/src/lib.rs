@@ -4,9 +4,9 @@ use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::{
-    Client, IdPrefixFetchError,
+    Client, DebugMode, IdPrefixFetchError,
     account::AccountHeader,
-    builder::{ClientBuilder, DebugMode},
+    builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
 };

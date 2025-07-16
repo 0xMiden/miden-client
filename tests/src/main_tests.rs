@@ -33,7 +33,7 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
         .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().unwrap())
         .sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;
 
@@ -52,7 +52,7 @@ async fn client_builder_fails_without_keystore() {
     let result = ClientBuilder::new()
         .tonic_rpc_client(&Endpoint::default(), Some(10_000))
         .sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await;
 

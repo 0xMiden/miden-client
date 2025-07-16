@@ -24,13 +24,13 @@ use toml::Table;
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, Word,
+    Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
         component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
     },
     auth::AuthSecretKey,
-    builder::{ClientBuilder, DebugMode},
+    builder::ClientBuilder,
     crypto::FeltRng,
     keystore::FilesystemKeyStore,
     note::{Note, create_p2id_note},

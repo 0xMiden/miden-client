@@ -25,7 +25,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
     PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use crate::{
@@ -139,7 +139,7 @@ impl Store for WebStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         self.get_block_headers(block_numbers).await
     }
 

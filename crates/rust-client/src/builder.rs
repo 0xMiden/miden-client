@@ -15,7 +15,9 @@ use rand::Rng;
 use crate::rpc::{Endpoint, TonicRpcClient};
 #[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
-use crate::{Client, ClientError, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store};
+use crate::{
+    Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store,
+};
 
 // CONSTANTS
 // ================================================================================================
@@ -36,30 +38,6 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 enum AuthenticatorConfig {
     Path(String),
     Instance(Arc<dyn TransactionAuthenticator>),
-}
-
-/// Represents if the client is in Debug Mode.
-pub enum DebugMode {
-    Enabled,
-    Disabled,
-}
-
-impl From<DebugMode> for bool {
-    fn from(debug_mode: DebugMode) -> Self {
-        match debug_mode {
-            DebugMode::Enabled => true,
-            DebugMode::Disabled => false,
-        }
-    }
-}
-
-impl From<bool> for DebugMode {
-    fn from(debug_mode: bool) -> DebugMode {
-        match debug_mode {
-            true => DebugMode::Enabled,
-            false => DebugMode::Disabled,
-        }
-    }
 }
 
 // CLIENT BUILDER

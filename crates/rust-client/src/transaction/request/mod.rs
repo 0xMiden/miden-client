@@ -28,7 +28,7 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::ForeignAccount;
 
-use crate::{builder::DebugMode, store::InputNoteRecord};
+use crate::{DebugMode, store::InputNoteRecord};
 
 // TRANSACTION REQUEST
 // ================================================================================================

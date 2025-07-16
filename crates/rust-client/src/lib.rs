@@ -368,3 +368,28 @@ impl FeltRng for ClientRng {
         self.0.draw_word()
     }
 }
+
+/// Represents if the client is in Debug Mode.
+pub enum DebugMode {
+    Enabled,
+    Disabled,
+}
+
+impl From<DebugMode> for bool {
+    fn from(debug_mode: DebugMode) -> Self {
+        match debug_mode {
+            DebugMode::Enabled => true,
+            DebugMode::Disabled => false,
+        }
+    }
+}
+
+impl From<bool> for DebugMode {
+    fn from(debug_mode: bool) -> DebugMode {
+        if debug_mode {
+            DebugMode::Enabled
+        } else {
+            DebugMode::Disabled
+        }
+    }
+}
