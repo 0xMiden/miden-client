@@ -13,7 +13,7 @@ export const testStandardFpi = async (): Promise<void> => {
     let felt2 = new window.Felt(15n);
     let felt3 = new window.Felt(15n);
     let felt4 = new window.Felt(15n);
-    const MAP_KEY = new window.RpoDigest([felt1, felt2, felt3, felt4]);
+    const MAP_KEY = window.Word.newFromFelts([felt1, felt2, felt3, felt4]);
     const FPI_STORAGE_VALUE = window.Word.newFromU64s(
       new BigUint64Array([9n, 12n, 18n, 30n])
     );

@@ -212,7 +212,7 @@ impl ClientBuilder {
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new)))
+            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
         // Initialize the authenticator.

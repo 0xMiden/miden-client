@@ -7,7 +7,7 @@ use alloc::{
 use core::{future::Future, pin::Pin};
 
 use miden_objects::{
-    Digest,
+    Word,
     account::{Account, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr},
@@ -261,7 +261,7 @@ impl StateSync {
         &self,
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
-        account_commitment_updates: &[(AccountId, Digest)],
+        account_commitment_updates: &[(AccountId, Word)],
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
@@ -290,7 +290,7 @@ impl StateSync {
     /// state of the client.
     async fn get_updated_public_accounts(
         &self,
-        account_updates: &[(AccountId, Digest)],
+        account_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
     ) -> Result<Vec<Account>, ClientError> {
         let mut mismatched_public_accounts = vec![];
@@ -458,9 +458,9 @@ fn apply_mmr_changes(
     new_block_has_relevant_notes: bool,
     current_partial_mmr: &mut PartialMmr,
     mmr_delta: MmrDelta,
-) -> Result<(MmrPeaks, Vec<(InOrderIndex, Digest)>), ClientError> {
+) -> Result<(MmrPeaks, Vec<(InOrderIndex, Word)>), ClientError> {
     // Apply the MMR delta to bring MMR to forest equal to chain tip
-    let mut new_authentication_nodes: Vec<(InOrderIndex, Digest)> =
+    let mut new_authentication_nodes: Vec<(InOrderIndex, Word)> =
         current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
 
     let new_peaks = current_partial_mmr.peaks();

@@ -1,7 +1,7 @@
 use miden_objects::transaction::OutputNotes as NativeOutputNotes;
 use wasm_bindgen::prelude::*;
 
-use super::{output_note::OutputNote, rpo_digest::RpoDigest};
+use super::{output_note::OutputNote, word::Word};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -9,7 +9,7 @@ pub struct OutputNotes(NativeOutputNotes);
 
 #[wasm_bindgen]
 impl OutputNotes {
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 

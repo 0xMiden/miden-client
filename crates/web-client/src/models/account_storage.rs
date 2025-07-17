@@ -1,7 +1,7 @@
 use miden_objects::account::AccountStorage as NativeAccountStorage;
 use wasm_bindgen::prelude::*;
 
-use crate::models::rpo_digest::RpoDigest;
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -9,12 +9,12 @@ pub struct AccountStorage(NativeAccountStorage);
 
 #[wasm_bindgen]
 impl AccountStorage {
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
     #[wasm_bindgen(js_name = "getItem")]
-    pub fn get_item(&self, index: u8) -> Option<RpoDigest> {
+    pub fn get_item(&self, index: u8) -> Option<Word> {
         self.0.get_item(index).ok().map(Into::into)
     }
 }

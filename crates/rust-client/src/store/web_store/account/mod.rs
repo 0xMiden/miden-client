@@ -5,7 +5,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    AccountIdError, Digest, Word,
+    AccountIdError, Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
     asset::{Asset, AssetVault},
 };
@@ -100,7 +100,7 @@ impl WebStore {
 
     pub(crate) async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str = account_commitment.to_string();
 
@@ -149,7 +149,7 @@ impl WebStore {
         Ok(Some(AccountRecord::new(account, status)))
     }
 
-    pub(super) async fn get_account_code(&self, root: Digest) -> Result<AccountCode, StoreError> {
+    pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
         let root_serialized = root.to_string();
 
         let promise = idxdb_get_account_code(root_serialized);
@@ -168,7 +168,7 @@ impl WebStore {
 
     pub(super) async fn get_account_storage(
         &self,
-        commitment: Digest,
+        commitment: Word,
     ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
@@ -185,7 +185,7 @@ impl WebStore {
 
     pub(super) async fn get_vault_assets(
         &self,
-        commitment: Digest,
+        commitment: Word,
     ) -> Result<Vec<Asset>, StoreError> {
         let commitment_serialized = commitment.to_string();
 
@@ -320,7 +320,7 @@ impl WebStore {
 
     pub(crate) async fn undo_account_states(
         &self,
-        account_states: &[Digest],
+        account_states: &[Word],
     ) -> Result<(), StoreError> {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
@@ -337,7 +337,7 @@ impl WebStore {
     pub(crate) async fn lock_account_on_unexpected_commitment(
         &self,
         account_id: &AccountId,
-        mismatched_digest: &Digest,
+        mismatched_digest: &Word,
     ) -> Result<(), StoreError> {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we

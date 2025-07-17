@@ -5,7 +5,6 @@ use miden_client::{
     Client, RemoteTransactionProver,
     account::AccountId,
     asset::{FungibleAsset, NonFungibleDeltaAction},
-    crypto::Digest,
     note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
     store::NoteRecordError,
     transaction::{
@@ -451,10 +450,9 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
         let mut table = create_dynamic_table(&["Storage Slot", "Effect"]);
 
         for (updated_item_slot, new_value) in account_delta.storage().values() {
-            let value_digest: Digest = new_value.into();
             table.add_row(vec![
                 updated_item_slot.to_string(),
-                format!("Updated ({})", value_digest.to_hex()),
+                format!("Updated ({})", new_value.to_hex()),
             ]);
         }
 

@@ -50,5 +50,5 @@ pub(crate) async fn generate_wallet(
         .build()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
 
-    Ok((new_account, account_seed, key_pair))
+    Ok((new_account, *account_seed, key_pair))
 }

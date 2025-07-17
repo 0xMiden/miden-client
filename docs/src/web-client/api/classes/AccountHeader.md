@@ -10,21 +10,21 @@
 
 ### codeCommitment()
 
-> **codeCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **codeCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### commitment()
 
-> **commitment**(): [`RpoDigest`](RpoDigest.md)
+> **commitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
@@ -60,18 +60,18 @@
 
 ### storageCommitment()
 
-> **storageCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **storageCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### vaultCommitment()
 
-> **vaultCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **vaultCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)

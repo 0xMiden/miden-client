@@ -1,19 +1,19 @@
-use miden_objects::{account::AccountId, crypto::hash::rpo::RpoDigest, transaction::TransactionId};
+use miden_objects::{Word, account::AccountId, transaction::TransactionId};
 
 use crate::rpc::{
     errors::RpcConversionError,
-    generated::{digest::Digest, transaction::TransactionId as ProtoTransactionId},
+    generated::{digest::Digest as ProtoDigest, transaction::TransactionId as ProtoTransactionId},
 };
 
 // INTO TRANSACTION ID
 // ================================================================================================
 
-impl TryFrom<Digest> for TransactionId {
+impl TryFrom<ProtoDigest> for TransactionId {
     type Error = RpcConversionError;
 
-    fn try_from(value: Digest) -> Result<Self, Self::Error> {
-        let digest: RpoDigest = value.try_into()?;
-        Ok(digest.into())
+    fn try_from(value: ProtoDigest) -> Result<Self, Self::Error> {
+        let word: Word = value.try_into()?;
+        Ok(word.into())
     }
 }
 
@@ -33,7 +33,7 @@ impl TryFrom<ProtoTransactionId> for TransactionId {
 
 impl From<TransactionId> for ProtoTransactionId {
     fn from(value: TransactionId) -> Self {
-        Self { id: Some(value.inner().into()) }
+        Self { id: Some(value.as_word().into()) }
     }
 }
 

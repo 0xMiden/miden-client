@@ -1,3 +1,4 @@
+use miden_client::crypto::MerklePath as NativeMerklePath;
 use miden_objects::note::NoteInclusionProof as NativeNoteInclusionProof;
 use wasm_bindgen::prelude::*;
 
@@ -15,7 +16,7 @@ impl NoteInclusionProof {
 
     #[wasm_bindgen(js_name = "notePath")]
     pub fn note_path(&self) -> MerklePath {
-        self.0.note_path().into()
+        NativeMerklePath::from(self.0.note_path().clone()).into()
     }
 }
 

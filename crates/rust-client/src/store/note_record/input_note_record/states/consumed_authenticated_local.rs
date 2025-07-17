@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
 use miden_objects::{
-    Digest,
+    Word,
     block::BlockHeader,
     note::{NoteId, NoteInclusionProof, NoteMetadata},
     transaction::TransactionId,
@@ -19,7 +19,7 @@ pub struct ConsumedAuthenticatedLocalNoteState {
     /// Inclusion proof for the note inside the chain block.
     pub inclusion_proof: NoteInclusionProof,
     /// Root of the note tree inside the block that verifies the note inclusion proof.
-    pub block_note_root: Digest,
+    pub block_note_root: Word,
     /// Block height at which the note was nullified.
     pub nullifier_block_height: u32,
     /// Information about the submission of the note.
@@ -98,7 +98,7 @@ impl miden_tx::utils::Deserializable for ConsumedAuthenticatedLocalNoteState {
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let inclusion_proof = NoteInclusionProof::read_from(source)?;
-        let block_note_root = Digest::read_from(source)?;
+        let block_note_root = Word::read_from(source)?;
         let nullifier_block_height = u32::read_from(source)?;
         let submission_data = NoteSubmissionData::read_from(source)?;
         Ok(ConsumedAuthenticatedLocalNoteState {

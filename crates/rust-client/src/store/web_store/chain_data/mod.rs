@@ -5,9 +5,9 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest,
+    Word,
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
+    crypto::merkle::{Forest, InOrderIndex, MmrPeaks},
 };
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
@@ -119,7 +119,7 @@ impl WebStore {
     pub(crate) async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         match filter {
             PartialBlockchainFilter::All => {
                 let promise = idxdb_get_partial_blockchain_nodes_all();
@@ -132,7 +132,7 @@ impl WebStore {
             },
             PartialBlockchainFilter::List(ids) => {
                 let formatted_list: Vec<String> =
-                    ids.iter().map(|id| (Into::<u64>::into(*id)).to_string()).collect();
+                    ids.iter().map(|id| (Into::<usize>::into(*id)).to_string()).collect();
 
                 let promise = idxdb_get_partial_blockchain_nodes(formatted_list);
                 let js_value = JsFuture::from(promise).await.map_err(|js_error| {
@@ -161,18 +161,18 @@ impl WebStore {
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
         if let Some(peaks) = mmr_peaks_idxdb.peaks {
-            let mmr_peaks_nodes: Vec<Digest> = Vec::<Digest>::read_from_bytes(&peaks)?;
+            let mmr_peaks_nodes: Vec<Word> = Vec::<Word>::read_from_bytes(&peaks)?;
 
-            return MmrPeaks::new(block_num.as_usize(), mmr_peaks_nodes)
+            return MmrPeaks::new(Forest::new(block_num.as_usize()), mmr_peaks_nodes)
                 .map_err(StoreError::MmrError);
         }
 
-        Ok(MmrPeaks::new(0, vec![])?)
+        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
     pub(crate) async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let mut serialized_node_ids = Vec::new();
         let mut serialized_nodes = Vec::new();

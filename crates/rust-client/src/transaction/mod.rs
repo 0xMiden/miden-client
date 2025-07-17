@@ -70,7 +70,7 @@ use alloc::{
 use core::fmt::{self};
 
 use miden_objects::{
-    AssetError, Digest, Felt,
+    AssetError, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
@@ -262,11 +262,11 @@ pub struct TransactionDetails {
     /// ID of the account that executed the transaction.
     pub account_id: AccountId,
     /// Initial state of the account before the transaction was executed.
-    pub init_account_state: Digest,
+    pub init_account_state: Word,
     /// Final state of the account after the transaction was executed.
-    pub final_account_state: Digest,
+    pub final_account_state: Word,
     /// Nullifiers of the input notes consumed in the transaction.
-    pub input_note_nullifiers: Vec<Digest>,
+    pub input_note_nullifiers: Vec<Word>,
     /// Output notes generated as a result of the transaction.
     pub output_notes: OutputNotes,
     /// Block number for the block against which the transaction was executed.
@@ -293,9 +293,9 @@ impl Serializable for TransactionDetails {
 impl Deserializable for TransactionDetails {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let account_id = AccountId::read_from(source)?;
-        let init_account_state = Digest::read_from(source)?;
-        let final_account_state = Digest::read_from(source)?;
-        let input_note_nullifiers = Vec::<Digest>::read_from(source)?;
+        let init_account_state = Word::read_from(source)?;
+        let final_account_state = Word::read_from(source)?;
+        let input_note_nullifiers = Vec::<Word>::read_from(source)?;
         let output_notes = OutputNotes::read_from(source)?;
         let block_num = BlockNumber::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
@@ -1215,7 +1215,7 @@ fn validate_executed_transaction(
         .filter_map(|n| n.recipient().map(NoteRecipient::digest))
         .collect::<Vec<_>>();
 
-    let missing_recipient_digest: Vec<Digest> = expected_output_recipients
+    let missing_recipient_digest: Vec<Word> = expected_output_recipients
         .iter()
         .filter_map(|recipient| {
             (!tx_output_recipient_digests.contains(&recipient.digest()))

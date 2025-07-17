@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Display;
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountId},
 };
 
@@ -99,14 +99,14 @@ pub struct AccountUpdates {
     updated_public_accounts: Vec<Account>,
     /// Network account commitments that don't match the current tracked state for private
     /// accounts.
-    mismatched_private_accounts: Vec<(AccountId, Digest)>,
+    mismatched_private_accounts: Vec<(AccountId, Word)>,
 }
 
 impl AccountUpdates {
     /// Creates a new instance of `AccountUpdates`.
     pub fn new(
         updated_public_accounts: Vec<Account>,
-        mismatched_private_accounts: Vec<(AccountId, Digest)>,
+        mismatched_private_accounts: Vec<(AccountId, Word)>,
     ) -> Self {
         Self {
             updated_public_accounts,
@@ -120,7 +120,7 @@ impl AccountUpdates {
     }
 
     /// Returns the mismatched private accounts.
-    pub fn mismatched_private_accounts(&self) -> &[(AccountId, Digest)] {
+    pub fn mismatched_private_accounts(&self) -> &[(AccountId, Word)] {
         &self.mismatched_private_accounts
     }
 }

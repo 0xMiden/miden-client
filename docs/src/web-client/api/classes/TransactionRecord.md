@@ -30,11 +30,11 @@
 
 ### finalAccountState()
 
-> **finalAccountState**(): [`RpoDigest`](RpoDigest.md)
+> **finalAccountState**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
@@ -60,21 +60,21 @@
 
 ### initAccountState()
 
-> **initAccountState**(): [`RpoDigest`](RpoDigest.md)
+> **initAccountState**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### inputNoteNullifiers()
 
-> **inputNoteNullifiers**(): [`RpoDigest`](RpoDigest.md)[]
+> **inputNoteNullifiers**(): [`Word`](Word.md)[]
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)[]
+[`Word`](Word.md)[]
 
 ***
 
