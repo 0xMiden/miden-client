@@ -44,6 +44,16 @@
 
 ***
 
+### toHex()
+
+> **toHex**(): `string`
+
+#### Returns
+
+`string`
+
+***
+
 ### toU64s()
 
 > **toU64s**(): `BigUint64Array`

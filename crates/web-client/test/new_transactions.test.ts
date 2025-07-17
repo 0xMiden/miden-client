@@ -1179,9 +1179,7 @@ export const counterAccountComponent = async (): Promise<
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
-    let serialNum = new window.Word(
-      new BigUint64Array(randomInts.map(BigInt))
-    );
+    let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
