@@ -33,6 +33,17 @@ use crate::{
 // SYNC CALLBACKS
 // ================================================================================================
 
+/// The action to be taken when a note update is received as part of the sync response.
+#[allow(clippy::large_enum_variant)]
+pub enum NoteUpdateAction {
+    /// The note commit update is relevant and should be applied to the store.
+    Commit(CommittedNote),
+    /// The public note is relevant and should be inserted into the store.
+    Insert(InputNoteRecord),
+    /// The note update is not relevant and should be discarded.
+    Discard,
+}
+
 /// Callback that gets executed when a new note is received as part of the sync response.
 ///
 /// It receives:
@@ -51,7 +62,7 @@ pub type OnNoteReceived = Box<
         Option<InputNoteRecord>,
         Arc<NoteScreener>,
         Arc<BTreeSet<NoteTag>>,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
+    ) -> Pin<Box<dyn Future<Output = Result<NoteUpdateAction, ClientError>>>>,
 >;
 
 // STATE SYNC
@@ -341,21 +352,26 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            if (self.on_note_received)(
-                committed_note.clone(),
-                public_note.clone(),
+            match (self.on_note_received)(
+                committed_note,
+                public_note,
                 self.note_screener.clone(),
                 note_tags.clone(),
             )
             .await?
             {
-                found_relevant_note = true;
+                NoteUpdateAction::Commit(committed_note) => {
+                    found_relevant_note = true;
 
-                note_updates.apply_committed_note_state_transitions(
-                    &committed_note,
-                    public_note,
-                    block_header,
-                )?;
+                    note_updates
+                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
+                },
+                NoteUpdateAction::Insert(public_note) => {
+                    found_relevant_note = true;
+
+                    note_updates.apply_new_public_note(public_note, block_header)?;
+                },
+                NoteUpdateAction::Discard => {},
             }
         }
 
@@ -484,34 +500,38 @@ pub async fn on_note_received(
     public_note: Option<InputNoteRecord>,
     note_screener: Arc<NoteScreener>,
     note_tags: Arc<BTreeSet<NoteTag>>,
-) -> Result<bool, ClientError> {
+) -> Result<NoteUpdateAction, ClientError> {
     let note_id = *committed_note.note_id();
 
     if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
         || !store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()
     {
         // The note is being tracked by the client so it is relevant
-        Ok(true)
+        Ok(NoteUpdateAction::Commit(committed_note))
     } else if let Some(public_note) = public_note {
         // If tracked by the user, keep note regardless of inputs and extra checks
         if let Some(metadata) = public_note.metadata()
             && note_tags.contains(&metadata.tag())
         {
-            return Ok(true);
+            return Ok(NoteUpdateAction::Insert(public_note));
         }
 
         // The note is not being tracked by the client and is public so we can screen it
         let new_note_relevance = note_screener
             .check_relevance(
-                &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
+                &public_note.clone().try_into().map_err(ClientError::NoteRecordConversionError)?,
             )
             .await?;
 
         let is_relevant = !new_note_relevance.is_empty();
-        Ok(is_relevant)
+        if is_relevant {
+            Ok(NoteUpdateAction::Insert(public_note))
+        } else {
+            Ok(NoteUpdateAction::Discard)
+        }
     } else {
         // The note is not being tracked by the client and is private so we can't determine if it
         // is relevant
-        Ok(false)
+        Ok(NoteUpdateAction::Discard)
     }
 }
