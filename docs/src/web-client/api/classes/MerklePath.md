@@ -10,7 +10,7 @@
 
 ### computeRoot()
 
-> **computeRoot**(`index`, `node`): [`Word`](Word.md)
+> **computeRoot**(`index`, `node`): [`RpoDigest`](RpoDigest.md)
 
 #### Parameters
 
@@ -20,11 +20,11 @@
 
 ##### node
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 #### Returns
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 ***
 
@@ -50,11 +50,11 @@
 
 ### nodes()
 
-> **nodes**(): [`Word`](Word.md)[]
+> **nodes**(): [`RpoDigest`](RpoDigest.md)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`RpoDigest`](RpoDigest.md)[]
 
 ***
 
@@ -70,11 +70,11 @@
 
 ##### node
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 ##### root
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 #### Returns
 

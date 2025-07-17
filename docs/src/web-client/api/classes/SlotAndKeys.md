@@ -20,7 +20,7 @@
 
 ##### storage\_map\_keys
 
-[`Word`](Word.md)[]
+[`RpoDigest`](RpoDigest.md)[]
 
 #### Returns
 
@@ -40,11 +40,11 @@
 
 ### storage\_map\_keys()
 
-> **storage\_map\_keys**(): [`Word`](Word.md)[]
+> **storage\_map\_keys**(): [`RpoDigest`](RpoDigest.md)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`RpoDigest`](RpoDigest.md)[]
 
 ***
 

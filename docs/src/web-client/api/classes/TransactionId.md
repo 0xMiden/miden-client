@@ -40,11 +40,11 @@
 
 ### inner()
 
-> **inner**(): [`Word`](Word.md)
+> **inner**(): [`RpoDigest`](RpoDigest.md)
 
 #### Returns
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 ***
 

@@ -36,7 +36,7 @@
 
 ##### key
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 ##### value
 

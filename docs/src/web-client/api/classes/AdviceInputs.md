@@ -26,7 +26,7 @@
 
 ##### key
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 #### Returns
 
