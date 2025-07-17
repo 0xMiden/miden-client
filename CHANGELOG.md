@@ -4,6 +4,10 @@
 
 - [BREAKING] Incremented MSRV to 1.88.
 
+### Features
+
+* Added TokenSymbol Type to Web Client (#1046).
+
 ## 0.10.0 (2025-07-12)
 
 ### Features

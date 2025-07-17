@@ -82,6 +82,7 @@
 - [StorageSlot](classes/StorageSlot.md)
 - [SyncSummary](classes/SyncSummary.md)
 - [TestUtils](classes/TestUtils.md)
+- [TokenSymbol](classes/TokenSymbol.md)
 - [TransactionArgs](classes/TransactionArgs.md)
 - [TransactionFilter](classes/TransactionFilter.md)
 - [TransactionId](classes/TransactionId.md)
