@@ -176,7 +176,9 @@ pub mod crypto {
 }
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
+pub use miden_objects::{
+    AccountIdError, Felt, NetworkIdError, ONE, StarkField, Word, ZERO, account::NetworkId,
+};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
