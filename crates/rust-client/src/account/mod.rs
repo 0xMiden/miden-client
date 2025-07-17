@@ -52,9 +52,12 @@ pub mod procedure_roots;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_objects::account::{
-    Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-    AccountStorage, AccountStorageMode, AccountType, StorageMap, StorageSlot,
+pub use miden_objects::{
+    AccountIdError, NetworkIdError,
+    account::{
+        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
+        AccountStorage, AccountStorageMode, AccountType, NetworkId, StorageMap, StorageSlot,
+    },
 };
 
 pub mod component {
