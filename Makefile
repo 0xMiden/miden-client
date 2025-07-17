@@ -184,5 +184,5 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
-	yarn
+	yarn --silent
 	@echo "Development tools installation complete!"
