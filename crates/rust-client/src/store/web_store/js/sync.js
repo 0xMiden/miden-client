@@ -9,6 +9,14 @@ import {
   tags,
 } from "./schema.js";
 
+import { upsertTransactionRecord } from "./transactions.js";
+
+import {
+  insertAccountStorage,
+  insertAccountAssetVault,
+  insertAccountRecord,
+} from "./accounts.js";
+
 export async function getNoteTags() {
   try {
     let records = await tags.toArray();
@@ -78,22 +86,92 @@ export async function removeNoteTag(tag, sourceNoteId, sourceAccountId) {
   }
 }
 
-export async function applyStateSync(
-  blockNum,
-  newBlockHeadersAsFlattenedVec,
-  newBlockNums,
-  partialBlockchainPeaksAsFlattenedVec,
-  hasClientNotes,
-  nodeIndexes,
-  nodes,
-  inputNoteIds
-) {
-  const newBlockHeaders = reconstructFlattenedVec(
-    newBlockHeadersAsFlattenedVec
-  );
+export async function receiveStateSync(stateSync) {}
+
+export async function applyStateSync(stateUpdate) {
+  const {
+    blockNum,
+    flattenedNewBlockHeaders,
+    newBlockNums,
+    blockHasRelevantNotes,
+    serializedNodeIds,
+    serializedNodes,
+    noteTagsToRemove,
+    serializedInputNotes,
+    serializedOutputNotes,
+    accountUpdates,
+    transactionUpdates,
+  } = stateUpdate;
+  const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
   const partialBlockchainPeaks = reconstructFlattenedVec(
-    partialBlockchainPeaksAsFlattenedVec
+    flattenedPartialBlockchainPeaks
   );
+  let inputNotesUpsertOp = serializedInputNotes.map((note) => {
+    upsertInputNote(
+      note.noteId,
+      note.assets,
+      note.serialNumber,
+      note.inputs,
+      note.noteScriptRoot,
+      note.serializedNoteScript,
+      note.nullifier,
+      note.serializedCreatedAt,
+      note.stateDiscriminant,
+      note.state
+    );
+  });
+
+  let outputNotesUpsertOp = serializedOutputNotes.map((note) => {
+    outputNotesUpsertOp(
+      note.noteId,
+      note.assets,
+      note.recipientDigest,
+      note.metaData,
+      note.nullifier,
+      note.expectedHeight,
+      note.stateDiscriminant,
+      note.state
+    );
+  });
+
+  let transactionWriteOp = transactionUpdates.map((transactionRecord) => {
+    Promise.all([
+      insertTransactionScript(
+        transactionRecord.scriptRoot,
+        transactionRecord.txScript
+      ),
+      upsertTransactionRecord(
+        transactionRecord.Id,
+        transactionRecord.details,
+        transactionRecord.scriptRoot,
+        transactionRecord.blockNum,
+        transactionRecord.commitHeight,
+        transactionRecord.discardCause
+      ),
+    ]);
+  });
+
+  let accountUpdatesWriteOp = accountUpdates.map((accountUpdate) => {
+    Promise.all([
+      insertAccountStorage(
+        accountUpdate.storageRoot,
+        accountUpdate.storageSlots
+      ),
+      insertAccountAssetVault(
+        accountUpdate.assetVaultRoot,
+        accountUpdate.assetBytes
+      ),
+      insertAccountRecord(
+        accountUpdate.accountId,
+        account.codeRoot,
+        account.assetVaultRoot,
+        account.nonce,
+        account.commited,
+        account.accountSeed,
+        account.account_commitment
+      ),
+    ]);
+  });
 
   return await db.transaction(
     "rw",
@@ -105,6 +183,10 @@ export async function applyStateSync(
     partialBlockchainNodes,
     tags,
     async (tx) => {
+      await inputNotesUpsertOp;
+      await outputNotesUpsertOp;
+      await transactionWriteOp;
+      await accountUpdatesWriteOp;
       await updateSyncHeight(tx, blockNum);
       for (let i = 0; i < newBlockHeaders.length; i++) {
         await updateBlockHeader(
@@ -112,11 +194,15 @@ export async function applyStateSync(
           newBlockNums[i],
           newBlockHeaders[i],
           partialBlockchainPeaks[i],
-          hasClientNotes[i] == 1 // hasClientNotes is a u8 array, so we convert it to boolean
+          blockHasRelevantNotes[i] == 1 // blockHasRelevantNotes is a u8 array, so we convert it to boolean
         );
       }
-      await updatePartialBlockchainNodes(tx, nodeIndexes, nodes);
-      await updateCommittedNoteTags(tx, inputNoteIds);
+      await updatePartialBlockchainNodes(
+        tx,
+        serializedNodeIds,
+        serializedNodes
+      );
+      await updateCommittedNoteTags(tx, noteTagsToRemove);
     }
   );
 }

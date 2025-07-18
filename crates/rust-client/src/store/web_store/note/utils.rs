@@ -10,6 +10,7 @@ use miden_objects::{
     utils::Deserializable,
 };
 use miden_tx::utils::Serializable;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
 use super::{
@@ -24,6 +25,9 @@ use crate::{
 // TYPES
 // ================================================================================================
 
+// FIXME: See if we can avoid poluting the struct
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedInputNoteData {
     pub note_id: String,
     pub note_assets: Vec<u8>,
@@ -37,6 +41,9 @@ pub struct SerializedInputNoteData {
     pub created_at: String,
 }
 
+// FIXME: See if we can avoid poluting the struct
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedOutputNoteData {
     pub note_id: String,
     pub note_assets: Vec<u8>,
