@@ -204,10 +204,7 @@ impl Store for SqliteStore {
             .interact_with_connection(move |conn| {
                 SqliteStore::get_block_headers(conn, &block_numbers)
             })
-            .await?
-            .into_iter()
-            .map(|(header, is_relevant)| (header, is_relevant.into()))
-            .collect())
+            .await?)
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {

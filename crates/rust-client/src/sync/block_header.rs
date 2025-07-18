@@ -65,10 +65,10 @@ impl Client {
                 .await?
             {
                 Some((_, previous_block_had_notes)) => previous_block_had_notes,
-                None => BlockRelevance::ChainTip,
+                None => BlockRelevance::Irrelevant,
             }
         } else {
-            BlockRelevance::ChainTip
+            BlockRelevance::Irrelevant
         };
 
         let mut current_partial_mmr =

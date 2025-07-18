@@ -16,7 +16,7 @@ use rusqlite::{
 use super::SqliteStore;
 use crate::{
     insert_sql,
-    store::{PartialBlockchainFilter, StoreError},
+    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
     subst,
 };
 
@@ -80,7 +80,7 @@ impl SqliteStore {
     pub(crate) fn get_block_headers(
         conn: &mut Connection,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_number_list = block_numbers
             .iter()
             .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
@@ -291,10 +291,10 @@ fn parse_block_headers_columns(
 
 fn parse_block_header(
     serialized_block_header_parts: &SerializedBlockHeaderParts,
-) -> Result<(BlockHeader, bool), StoreError> {
+) -> Result<(BlockHeader, BlockRelevance), StoreError> {
     Ok((
         BlockHeader::read_from_bytes(&serialized_block_header_parts.header)?,
-        serialized_block_header_parts.has_client_notes,
+        serialized_block_header_parts.has_client_notes.into(),
     ))
 }
 

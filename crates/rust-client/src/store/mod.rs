@@ -396,14 +396,14 @@ pub enum BlockRelevance {
     HasNotes,
     /// The block header did not include notes and was inserted because it was the current chain
     /// tip.
-    ChainTip,
+    Irrelevant,
 }
 
 impl From<BlockRelevance> for bool {
     fn from(val: BlockRelevance) -> Self {
         match val {
             BlockRelevance::HasNotes => true,
-            BlockRelevance::ChainTip => false,
+            BlockRelevance::Irrelevant => false,
         }
     }
 }
@@ -413,7 +413,7 @@ impl From<bool> for BlockRelevance {
         if has_notes {
             BlockRelevance::HasNotes
         } else {
-            BlockRelevance::ChainTip
+            BlockRelevance::Irrelevant
         }
     }
 }

@@ -369,7 +369,7 @@ impl FeltRng for ClientRng {
     }
 }
 
-/// Represents if the client is in Debug Mode.
+/// Indicates whether the client is operating in debug mode.
 pub enum DebugMode {
     Enabled,
     Disabled,
