@@ -105,6 +105,7 @@ before(async () => {
         StorageMap,
         StorageSlot,
         TestUtils,
+        TokenSymbol,
         TransactionFilter,
         TransactionKernel,
         TransactionProver,
@@ -170,6 +171,7 @@ before(async () => {
       window.StorageMap = StorageMap;
       window.StorageSlot = StorageSlot;
       window.TestUtils = TestUtils;
+      window.TokenSymbol = TokenSymbol;
       window.TransactionFilter = TransactionFilter;
       window.TransactionKernel = TransactionKernel;
       window.TransactionProver = TransactionProver;

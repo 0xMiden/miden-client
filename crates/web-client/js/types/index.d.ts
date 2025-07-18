@@ -50,6 +50,7 @@ export {
   StorageMap,
   StorageSlot,
   TestUtils,
+  TokenSymbol,
   TransactionFilter,
   TransactionKernel,
   TransactionProver,

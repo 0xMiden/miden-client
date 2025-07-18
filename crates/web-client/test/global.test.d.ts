@@ -42,6 +42,7 @@ import {
   StorageMap,
   StorageSlot,
   TestUtils,
+  TokenSymbol,
   TransactionFilter,
   TransactionKernel,
   TransactionProver,
@@ -107,6 +108,7 @@ declare global {
     StorageMap: typeof StorageMap;
     StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
+    TokenSymbol: typeof TokenSymbol;
     TransactionFilter: typeof TransactionFilter;
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
