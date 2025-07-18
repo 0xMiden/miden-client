@@ -100,4 +100,5 @@
 
 ## Type Aliases
 
+- [NetworkId](type-aliases/NetworkId.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
