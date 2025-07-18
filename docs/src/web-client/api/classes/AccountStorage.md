@@ -10,11 +10,11 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`RpoDigest`](RpoDigest.md)
 
 #### Returns
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)
 
 ***
 
@@ -30,7 +30,7 @@
 
 ### getItem()
 
-> **getItem**(`index`): [`Word`](Word.md)
+> **getItem**(`index`): [`RpoDigest`](RpoDigest.md)
 
 #### Parameters
 
@@ -40,4 +40,4 @@
 
 #### Returns
 
-[`Word`](Word.md)
+[`RpoDigest`](RpoDigest.md)

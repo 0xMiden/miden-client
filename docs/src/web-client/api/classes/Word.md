@@ -18,16 +18,6 @@
 
 ***
 
-### toHex()
-
-> **toHex**(): `string`
-
-#### Returns
-
-`string`
-
-***
-
 ### newFromFelts()
 
 > `static` **newFromFelts**(`felt_vec`): `Word`
