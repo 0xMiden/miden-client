@@ -71,7 +71,7 @@ impl WebClient {
         };
         let coin_seed: [u64; 4] = rng.random();
 
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
         let web_store: WebStore = WebStore::new()
             .await
             .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?;

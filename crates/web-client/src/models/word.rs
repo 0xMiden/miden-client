@@ -20,7 +20,7 @@ impl Word {
             .try_into()
             .unwrap();
 
-        let native_word: NativeWord = native_felt_vec;
+        let native_word: NativeWord = native_felt_vec.into();
 
         Word(native_word)
     }
@@ -35,9 +35,14 @@ impl Word {
             .try_into()
             .unwrap();
 
-        let native_word: NativeWord = native_felt_vec;
+        let native_word: NativeWord = native_felt_vec.into();
 
         Word(native_word)
+    }
+
+    #[wasm_bindgen(js_name = "toHex")]
+    pub fn to_hex(&self) -> String {
+        self.0.to_hex()
     }
 }
 

@@ -2,7 +2,7 @@
 
 use alloc::{collections::BTreeSet, vec::Vec};
 
-use miden_objects::{Digest, block::BlockNumber, note::NoteTag};
+use miden_objects::{Word, block::BlockNumber, note::NoteTag};
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
@@ -162,7 +162,7 @@ impl SqliteStore {
         }
 
         // Remove the accounts that are originated from the discarded transactions
-        let account_hashes_to_delete: Vec<Digest> = transaction_updates
+        let account_hashes_to_delete: Vec<Word> = transaction_updates
             .discarded_transactions()
             .map(|tx| tx.details.final_account_state)
             .collect();

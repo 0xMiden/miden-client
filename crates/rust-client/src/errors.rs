@@ -5,8 +5,8 @@ use alloc::{
 
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_objects::{
-    AccountError, AssetError, Digest, NoteError, PartialBlockchainError, TransactionInputError,
-    TransactionScriptError, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
+    AccountError, AssetError, NoteError, PartialBlockchainError, TransactionInputError,
+    TransactionScriptError, Word, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
 };
 // RE-EXPORTS
 // ================================================================================================
@@ -37,7 +37,7 @@ pub enum ClientError {
     #[error("account with id {0} is locked")]
     AccountLocked(AccountId),
     #[error("network account commitment {0} doesn't match the imported account commitment")]
-    AccountCommitmentMismatch(Digest),
+    AccountCommitmentMismatch(Word),
     #[error("account with id {0} is private")]
     AccountIsPrivate(AccountId),
     #[error("account nonce is too low to import")]
@@ -61,7 +61,7 @@ pub enum ClientError {
     #[error(
         "the transaction didn't produce the output notes with the expected recipient digests ({0:?})"
     )]
-    MissingOutputRecipients(Vec<Digest>),
+    MissingOutputRecipients(Vec<Word>),
     #[error("note error")]
     NoteError(#[from] NoteError),
     #[error("note import error: {0}")]

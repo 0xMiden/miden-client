@@ -8,7 +8,6 @@ use crate::{
     AuthenticationError, Felt, Word,
     account::AccountDelta,
     auth::{AuthSecretKey, TransactionAuthenticator},
-    crypto::Digest,
     store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth},
     utils::RwLock,
 };
@@ -29,7 +28,7 @@ impl<R: Rng> WebKeyStore<R> {
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match &key {
-            AuthSecretKey::RpoFalcon512(k) => Digest::from(Word::from(k.public_key())).to_hex(),
+            AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()).to_hex(),
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
@@ -41,7 +40,7 @@ impl<R: Rng> WebKeyStore<R> {
     }
 
     pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let pub_key_str = Digest::from(pub_key).to_hex();
+        let pub_key_str = pub_key.to_hex();
         let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).map_err(|_| {
             KeyStoreError::StorageError("Failed to get item from local storage".to_string())
         })?;
@@ -76,8 +75,8 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let secret_key = self
             .get_key(pub_key)
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
+        let AuthSecretKey::RpoFalcon512(k) =
+            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
     }
 }

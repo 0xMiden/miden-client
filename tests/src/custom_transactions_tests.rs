@@ -74,7 +74,7 @@ async fn transaction_request() {
     // these exact arguments
     let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
 
-    let note_args_map = vec![(note.clone(), Some(note_args_commitment.into()))];
+    let note_args_map = vec![(note.clone(), Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
@@ -96,7 +96,7 @@ async fn transaction_request() {
     let transaction_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(note_args_map.clone())
         .custom_script(tx_script.clone())
-        .script_arg([ZERO, ZERO, ZERO, ZERO])
+        .script_arg(Word::empty())
         .extend_advice_map(advice_map.clone())
         .build()
         .unwrap();
@@ -108,7 +108,7 @@ async fn transaction_request() {
     let transaction_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(note_args_map)
         .custom_script(tx_script)
-        .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
+        .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into())
         .extend_advice_map(advice_map)
         .build()
         .unwrap();
@@ -168,13 +168,13 @@ async fn merkle_store() {
     // these exact arguments
     let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
 
-    let note_args_map = vec![(note, Some(note_args_commitment.into()))];
+    let note_args_map = vec![(note, Some(note_args_commitment))];
     let mut advice_map = AdviceMap::new();
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
     // Build merkle store and advice stack with merkle root
     let leaves: Vec<Word> =
-        [1, 2, 3, 4].iter().map(|&v| [Felt::new(v), ZERO, ZERO, ZERO]).collect();
+        [1, 2, 3, 4].iter().map(|&v| [Felt::new(v), ZERO, ZERO, ZERO].into()).collect();
     let num_leaves = leaves.len();
     let merkle_tree = MerkleTree::new(leaves).unwrap();
     let merkle_root = merkle_tree.root();

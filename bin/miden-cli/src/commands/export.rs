@@ -145,7 +145,7 @@ async fn export_note(
         filename
     } else {
         let current_dir = std::env::current_dir()?;
-        current_dir.join(format!("{}.mno", note_id.inner()))
+        current_dir.join(format!("{}.mno", note_id.to_hex()))
     };
 
     info!("Writing file to {}", file_path.to_string_lossy());

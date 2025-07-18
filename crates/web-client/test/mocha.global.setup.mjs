@@ -98,7 +98,6 @@ before(async () => {
         OutputNote,
         OutputNotesArray,
         PublicKey,
-        RpoDigest,
         Rpo256,
         SecretKey,
         SlotAndKeys,
@@ -164,7 +163,6 @@ before(async () => {
       window.OutputNote = OutputNote;
       window.OutputNotesArray = OutputNotesArray;
       window.PublicKey = PublicKey;
-      window.RpoDigest = RpoDigest;
       window.Rpo256 = Rpo256;
       window.SecretKey = SecretKey;
       window.SlotAndKeys = SlotAndKeys;

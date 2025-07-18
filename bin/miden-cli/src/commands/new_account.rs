@@ -317,7 +317,7 @@ async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), Cl
         .expect("Auth script should compile");
 
     let tx_request = TransactionRequestBuilder::new()
-        .script_arg(auth_procedure_mast_root.into())
+        .script_arg(*auth_procedure_mast_root)
         .custom_script(auth_script)
         .build()
         .map_err(|err| {

@@ -8,7 +8,7 @@ publish                = false
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.10.0"
+version.workspace      = true
 
 [dependencies]
 # Workspace dependencies

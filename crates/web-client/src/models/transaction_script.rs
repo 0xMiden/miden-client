@@ -1,8 +1,10 @@
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
-use crate::{js_error_with_context, models::assembler::Assembler};
+use crate::{
+    js_error_with_context,
+    models::{assembler::Assembler, word::Word},
+};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -10,7 +12,7 @@ pub struct TransactionScript(NativeTransactionScript);
 
 #[wasm_bindgen]
 impl TransactionScript {
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.0.root().into()
     }
 

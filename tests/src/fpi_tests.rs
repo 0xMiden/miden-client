@@ -8,7 +8,6 @@ use miden_client::{
 };
 use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
 use miden_objects::{
-    Digest,
     account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap},
     crypto::dsa::rpo_falcon512::SecretKey,
     transaction::TransactionScript,
@@ -18,7 +17,7 @@ use miden_objects::{
 // FPI TESTS
 // ================================================================================================
 const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
-const FPI_STORAGE_VALUE: Word =
+const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 #[tokio::test]
@@ -50,7 +49,7 @@ async fn fpi_execute_program() {
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY)
+            map_key = word_to_masm_push_string(&MAP_KEY.into())
         ),
     )
     .await
@@ -126,7 +125,7 @@ async fn nested_fpi_calls() {
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY)
+            map_key = word_to_masm_push_string(&MAP_KEY.into())
         ),
     )
     .await
@@ -187,7 +186,7 @@ async fn nested_fpi_calls() {
             call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
-        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE),
+        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
         account_id_prefix = outer_foreign_account_id.prefix().as_u64(),
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
@@ -239,7 +238,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY)
+            map_key = word_to_masm_push_string(&MAP_KEY.into())
         ),
     )
     .await
@@ -272,7 +271,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
             call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
-        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE),
+        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
     );
@@ -330,14 +329,15 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
 /// A tuple containing:
 /// - `Account` - The constructed foreign account.
 /// - `Word` - The seed used to initialize the account.
-/// - `Digest` - The procedure root of the custom component's procedure.
+/// - `Word` - The procedure root of the custom component's procedure.
+/// - `SecretKey` - The secret key used for authentication.
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
-) -> (Account, Word, Digest, SecretKey) {
+) -> (Account, Word, Word, SecretKey) {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE);
+    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
 
     let get_item_component = AccountComponent::compile(
         code,
@@ -368,13 +368,13 @@ fn foreign_account_with_code(
 ///
 /// A tuple containing:
 /// - `Account` - The deployed foreign account.
-/// - `Digest` - The procedure root of the foreign account.
+/// - `Word` - The procedure root of the foreign account.
 async fn deploy_foreign_account(
     client: &mut TestClient,
     keystore: &mut TestClientKeyStore,
     storage_mode: AccountStorageMode,
     code: String,
-) -> Result<(Account, Digest), String> {
+) -> Result<(Account, Word), String> {
     let (foreign_account, foreign_seed, proc_root, secret_key) =
         foreign_account_with_code(storage_mode, code);
     let foreign_account_id = foreign_account.id();

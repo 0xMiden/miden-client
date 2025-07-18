@@ -4,7 +4,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest, Felt, Word,
+    Felt, Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
     asset::{Asset, AssetVault},
     utils::Deserializable,
@@ -117,9 +117,9 @@ pub fn parse_account_record_idxdb_object(
     let account_header = AccountHeader::new(
         native_account_id,
         Felt::new(native_nonce),
-        Digest::try_from(&account_header_idxdb.vault_root)?,
-        Digest::try_from(&account_header_idxdb.storage_root)?,
-        Digest::try_from(&account_header_idxdb.code_root)?,
+        Word::try_from(&account_header_idxdb.vault_root)?,
+        Word::try_from(&account_header_idxdb.storage_root)?,
+        Word::try_from(&account_header_idxdb.code_root)?,
     );
 
     let status = match (account_seed, account_header_idxdb.locked) {

@@ -7,7 +7,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     block::BlockNumber,
     crypto::utils::{Deserializable, Serializable},
     note::{
@@ -121,14 +121,14 @@ impl NoteFilter {
             },
             NoteFilter::Processing | NoteFilter::Unverified => "1 = 0".to_string(), /* There are no processing or unverified output notes */
             NoteFilter::Unique(note_id) => {
-                let note_ids_list = vec![Value::Text(note_id.inner().to_string())];
+                let note_ids_list = vec![Value::Text(note_id.as_word().to_string())];
                 params.push(Rc::new(note_ids_list));
                 "note.note_id IN rarray(?)".to_string()
             },
             NoteFilter::List(note_ids) => {
                 let note_ids_list = note_ids
                     .iter()
-                    .map(|note_id| Value::Text(note_id.inner().to_string()))
+                    .map(|note_id| Value::Text(note_id.as_word().to_string()))
                     .collect::<Vec<Value>>();
 
                 params.push(Rc::new(note_ids_list));
@@ -203,14 +203,14 @@ impl NoteFilter {
                 )
             },
             NoteFilter::Unique(note_id) => {
-                let note_ids_list = vec![Value::Text(note_id.inner().to_string())];
+                let note_ids_list = vec![Value::Text(note_id.as_word().to_string())];
                 params.push(Rc::new(note_ids_list));
                 "(note.note_id IN rarray(?))".to_string()
             },
             NoteFilter::List(note_ids) => {
                 let note_ids_list = note_ids
                     .iter()
-                    .map(|note_id| Value::Text(note_id.inner().to_string()))
+                    .map(|note_id| Value::Text(note_id.as_word().to_string()))
                     .collect::<Vec<Value>>();
 
                 params.push(Rc::new(note_ids_list));
@@ -315,11 +315,9 @@ impl SqliteStore {
             .query_map([unspent_filters], |row| row.get(0))
             .expect("no binding parameters used in query")
             .map(|result| {
-                result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
-                    |v: String| {
-                        Digest::try_from(v).map(Nullifier::from).map_err(StoreError::HexParseError)
-                    },
-                )
+                result
+                    .map_err(|err| StoreError::ParsingError(err.to_string()))
+                    .and_then(|v: String| Ok(Word::try_from(v).map(Nullifier::from)?))
             })
             .collect::<Result<Vec<Nullifier>, _>>()
     }
@@ -479,7 +477,7 @@ fn parse_input_note(
 
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let id = note.id().inner().to_string();
+    let id = note.id().as_word().to_string();
     let nullifier = note.nullifier().to_hex();
     let created_at = note.created_at().unwrap_or(0);
 
@@ -541,7 +539,7 @@ fn parse_output_note(
         state,
     } = serialized_output_note_parts;
 
-    let recipient_digest = Digest::try_from(recipient_digest)?;
+    let recipient_digest = Word::try_from(recipient_digest)?;
     let assets = NoteAssets::read_from_bytes(&assets)?;
     let metadata = NoteMetadata::read_from_bytes(&metadata)?;
     let state = OutputNoteState::read_from_bytes(&state)?;
@@ -557,7 +555,7 @@ fn parse_output_note(
 
 /// Serialize the provided output note into database compatible types.
 fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
-    let id = note.id().inner().to_string();
+    let id = note.id().as_word().to_string();
     let assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
     let metadata = note.metadata().to_bytes();

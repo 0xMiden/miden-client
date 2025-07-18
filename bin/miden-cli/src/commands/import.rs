@@ -37,7 +37,7 @@ impl ImportCmd {
 
             if let Ok(note_file) = note_file {
                 let note_id = client.import_note(note_file).await?;
-                println!("Successfully imported note {}", note_id.inner());
+                println!("Successfully imported note {}", note_id.to_hex());
             } else {
                 info!(
                     "Attempting to import account data from {}...",

@@ -77,7 +77,6 @@ pub mod partial_note;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
-pub mod rpo_digest;
 pub mod secret_key;
 pub mod storage_map;
 pub mod storage_slot;

@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use miden_objects::{
-    Digest, Felt,
+    Felt, Word,
     block::BlockHeader,
     crypto::merkle::MerklePath,
     note::{Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteTag, NoteType},
@@ -54,14 +54,15 @@ impl TryFrom<ProtoInclusionProof> for NoteInclusionProof {
     type Error = RpcConversionError;
 
     fn try_from(value: ProtoInclusionProof) -> Result<Self, Self::Error> {
+        let merkle_path: MerklePath = value
+            .merkle_path
+            .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
+            .try_into()?;
         Ok(NoteInclusionProof::new(
             value.block_num.into(),
             u16::try_from(value.note_index_in_block)
                 .map_err(|_| RpcConversionError::InvalidField("NoteIndexInBlock".into()))?,
-            value
-                .merkle_path
-                .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
-                .try_into()?,
+            merkle_path.try_into()?,
         )?)
     }
 }
@@ -104,10 +105,10 @@ impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
             .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
             .try_into()?;
 
-        // Validate and convert account note inclusions into an (AccountId, Digest) tuple
+        // Validate and convert account note inclusions into an (AccountId, Word) tuple
         let mut notes = vec![];
         for note in value.notes {
-            let note_id: Digest = note
+            let note_id: Word = note
                 .note_id
                 .ok_or(RpcError::ExpectedDataMissing("Notes.Id".into()))?
                 .try_into()?;
@@ -233,7 +234,7 @@ impl TryFrom<ProtoCommittedNote> for FetchedNote {
             .inclusion_proof
             .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof"))?;
 
-        let note_id: Digest = inclusion_proof
+        let note_id: Word = inclusion_proof
             .note_id
             .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof.NoteId"))?
             .try_into()?;

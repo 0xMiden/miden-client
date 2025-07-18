@@ -4,7 +4,7 @@ use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::{
-    Client, IdPrefixFetchError,
+    Client, DebugMode, IdPrefixFetchError,
     account::AccountHeader,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
@@ -104,8 +104,8 @@ impl Cli {
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {
-            Ok(value) if value.to_lowercase() == "true" => true,
-            _ => self.debug,
+            Ok(value) if value.to_lowercase() == "true" => DebugMode::Enabled,
+            _ => DebugMode::Disabled,
         };
 
         // Create the client

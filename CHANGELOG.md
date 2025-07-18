@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.0 (TBD)
+
+- [BREAKING] Incremented MSRV to 1.88.
+- Introduced enums instead of booleans for public APIs (#1042).
+
 ## 0.10.0 (2025-07-12)
 
 ### Features

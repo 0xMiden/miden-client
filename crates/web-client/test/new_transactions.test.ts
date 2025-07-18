@@ -571,10 +571,7 @@ export const customTransaction = async (
       // with Invalid/Valid Transaction Script
       let transactionScript = await client.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
-      let noteAndArgs = new window.NoteAndArgs(
-        note,
-        noteArgsCommitment.toWord()
-      );
+      let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);

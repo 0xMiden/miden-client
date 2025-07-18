@@ -35,7 +35,6 @@ import {
   OutputNote,
   OutputNotesArray,
   PublicKey,
-  RpoDigest,
   Rpo256,
   SecretKey,
   SlotAndKeys,
@@ -101,7 +100,6 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     PublicKey: typeof PublicKey;
-    RpoDigest: typeof RpoDigest;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
     SlotAndKeys: typeof SlotAndKeys;

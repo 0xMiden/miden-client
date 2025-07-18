@@ -3,7 +3,6 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use miden_client::{
     Client, ClientError, IdPrefixFetchError,
     asset::Asset,
-    crypto::Digest,
     note::{
         NoteConsumability, NoteInputs, NoteMetadata, WellKnownNote, get_input_note_with_id_prefix,
     },
@@ -372,7 +371,7 @@ fn note_summary(
                 let details = record.details();
                 (
                     details.inputs().commitment().to_string(),
-                    Digest::new(details.serial_num()).to_string(),
+                    details.serial_num().to_string(),
                     details.script().root().to_string(),
                 )
             },
@@ -380,7 +379,7 @@ fn note_summary(
                 let recipient = record.recipient().expect("output record should have recipient");
                 (
                     recipient.inputs().commitment().to_string(),
-                    Digest::new(recipient.serial_num()).to_string(),
+                    recipient.serial_num().to_string(),
                     recipient.script().root().to_string(),
                 )
             },
@@ -410,7 +409,7 @@ fn note_summary(
         note_metadata.map_or("-".to_string(), |metadata| metadata.tag().to_string());
 
     CliNoteSummary {
-        id: note_id.inner().to_string(),
+        id: note_id.to_hex(),
         script_root: script_root_str,
         assets_commitment: assets_commitment_str,
         inputs_commitment: inputs_commitment_str,

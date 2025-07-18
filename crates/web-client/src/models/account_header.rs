@@ -1,7 +1,7 @@
 use miden_objects::account::AccountHeader as NativeAccountHeader;
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, felt::Felt, rpo_digest::RpoDigest};
+use super::{account_id::AccountId, felt::Felt, word::Word};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -9,7 +9,7 @@ pub struct AccountHeader(NativeAccountHeader);
 
 #[wasm_bindgen]
 impl AccountHeader {
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
@@ -22,17 +22,17 @@ impl AccountHeader {
     }
 
     #[wasm_bindgen(js_name = "vaultCommitment")]
-    pub fn vault_commitment(&self) -> RpoDigest {
+    pub fn vault_commitment(&self) -> Word {
         self.0.vault_root().into()
     }
 
     #[wasm_bindgen(js_name = "storageCommitment")]
-    pub fn storage_commitment(&self) -> RpoDigest {
+    pub fn storage_commitment(&self) -> Word {
         self.0.storage_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "codeCommitment")]
-    pub fn code_commitment(&self) -> RpoDigest {
+    pub fn code_commitment(&self) -> Word {
         self.0.code_commitment().into()
     }
 }
