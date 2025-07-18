@@ -23,5 +23,3 @@ More information about the CLI can be found in the [CLI section](./cli-reference
 ### Miden web client
 
 The Miden web client is a web-based interface that allows users to interact with the Miden rollup through a browser. It wraps most of the functionality of the Rust library and provides a user-friendly interface for managing accounts, submitting transactions, and monitoring activity on the network.
-
-<!-- More information about the web client can be found in the [web client section](./web-client/index.md). -->
