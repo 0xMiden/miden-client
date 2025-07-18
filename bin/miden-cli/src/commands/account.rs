@@ -1,7 +1,7 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::{
-    Client, ZERO,
+    ZERO,
     account::{Account, AccountId, AccountType, StorageSlot},
     asset::Asset,
     rpc::{NodeRpcClient, TonicRpcClient},
@@ -9,7 +9,7 @@ use miden_client::{
 use miden_objects::PrettyPrint;
 
 use crate::{
-    CLIENT_BINARY_NAME,
+    CLIENT_BINARY_NAME, CliClient,
     config::CliConfig,
     create_dynamic_table,
     errors::CliError,
@@ -42,7 +42,7 @@ pub struct AccountCmd {
 }
 
 impl AccountCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, client: CliClient) -> Result<(), CliError> {
         let (cli_config, _) = load_config_file()?;
         match self {
             AccountCmd {
@@ -98,7 +98,7 @@ impl AccountCmd {
 // LIST ACCOUNTS
 // ================================================================================================
 
-async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), CliError> {
+async fn list_accounts(client: CliClient, cli_config: &CliConfig) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
     let mut table =
@@ -129,7 +129,7 @@ async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), Cli
 // ================================================================================================
 
 pub async fn show_account(
-    client: Client,
+    client: CliClient,
     account_id: AccountId,
     cli_config: &CliConfig,
     with_code: bool,

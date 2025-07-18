@@ -14,16 +14,17 @@ use miden_objects::{
     block::BlockNumber,
     note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag},
 };
+use miden_tx::auth::TransactionAuthenticator;
 
 use crate::{
     Client, ClientError,
     rpc::{RpcError, domain::note::FetchedNote},
-    store::{InputNoteRecord, InputNoteState, input_note_states::ExpectedNoteState},
+    store::{InputNoteRecord, InputNoteState, Store, input_note_states::ExpectedNoteState},
     sync::NoteTagRecord,
 };
 
 /// Note importing methods.
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
 

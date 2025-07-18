@@ -3,11 +3,11 @@ use std::{
     path::PathBuf,
 };
 
-use miden_client::{Client, account::AccountId, asset::FungibleAsset};
+use miden_client::{account::AccountId, asset::FungibleAsset};
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::CliError, load_config_file, utils::parse_account_id};
+use crate::{CliClient, errors::CliError, load_config_file, utils::parse_account_id};
 
 /// Stores the detail information of a faucet to be stored in the token symbol map file.
 #[derive(Debug, Serialize, Deserialize)]
@@ -94,7 +94,7 @@ impl FaucetDetailsMap {
     /// - The token symbol isn't present in the token symbol map file.
     pub async fn parse_fungible_asset(
         &self,
-        client: &Client,
+        client: &CliClient,
         arg: &str,
     ) -> Result<FungibleAsset, CliError> {
         let (amount, asset) = arg.split_once("::").ok_or(CliError::Parse(

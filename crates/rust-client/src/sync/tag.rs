@@ -4,17 +4,20 @@ use miden_objects::{
     account::{Account, AccountId},
     note::{NoteId, NoteTag},
 };
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::{
+    auth::TransactionAuthenticator,
+    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
+};
 use tracing::warn;
 
 use crate::{
     Client,
     errors::ClientError,
-    store::{InputNoteRecord, NoteRecordError},
+    store::{InputNoteRecord, NoteRecordError, Store},
 };
 
 /// Tag management methods
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     /// Returns the list of note tags tracked by the client along with their source.
     ///
     /// When syncing the state with the node, these tags will be added to the sync request and

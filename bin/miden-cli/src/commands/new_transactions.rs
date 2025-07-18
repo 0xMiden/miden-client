@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use clap::{Parser, ValueEnum};
 use miden_client::{
-    Client, RemoteTransactionProver,
+    RemoteTransactionProver,
     account::AccountId,
     asset::{FungibleAsset, NonFungibleDeltaAction},
     note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
@@ -15,7 +15,7 @@ use miden_client::{
 use tracing::info;
 
 use crate::{
-    create_dynamic_table,
+    CliClient, create_dynamic_table,
     errors::CliError,
     utils::{
         SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_config_file,
@@ -61,7 +61,7 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, mut client: CliClient) -> Result<(), CliError> {
         let force = self.force;
         let faucet_details_map = load_faucet_details_map()?;
 
@@ -129,7 +129,7 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, mut client: CliClient) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -202,7 +202,7 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, mut client: CliClient) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -273,7 +273,7 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, mut client: CliClient) -> Result<(), CliError> {
         let force = self.force;
 
         let mut authenticated_notes = Vec::new();
@@ -342,7 +342,7 @@ impl ConsumeNotesCmd {
 // ================================================================================================
 
 async fn execute_transaction(
-    client: &mut Client,
+    client: &mut CliClient,
     account_id: AccountId,
     transaction_request: TransactionRequest,
     force: bool,

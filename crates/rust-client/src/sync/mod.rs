@@ -63,12 +63,15 @@ use miden_objects::{
     note::{NoteId, NoteTag},
     transaction::{PartialBlockchain, TransactionId},
 };
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::{
+    auth::TransactionAuthenticator,
+    utils::{Deserializable, DeserializationError, Serializable},
+};
 
 use crate::{
     Client, ClientError,
     note::NoteScreener,
-    store::{NoteFilter, TransactionFilter},
+    store::{NoteFilter, Store, TransactionFilter},
 };
 mod block_header;
 
@@ -84,7 +87,7 @@ pub use state_sync_update::{
 };
 
 /// Client synchronization methods.
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
 

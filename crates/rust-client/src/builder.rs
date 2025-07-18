@@ -8,16 +8,14 @@ use miden_objects::{
     Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
     crypto::rand::{FeltRng, RpoRandomCoin},
 };
-use miden_tx::{ExecutionOptions, auth::TransactionAuthenticator};
-use rand::Rng;
+use miden_tx::ExecutionOptions;
+use rand::{Rng, rngs::StdRng};
 
 #[cfg(feature = "tonic")]
 use crate::rpc::{Endpoint, TonicRpcClient};
 #[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
-use crate::{
-    Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store,
-};
+use crate::{Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient};
 
 // CONSTANTS
 // ================================================================================================
@@ -37,7 +35,7 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 /// - A keystore path as a string which is then used as an authenticator.
 enum AuthenticatorConfig {
     Path(String),
-    Instance(Arc<dyn TransactionAuthenticator>),
+    Instance(Arc<FilesystemKeyStore<StdRng>>),
 }
 
 // CLIENT BUILDER
@@ -52,7 +50,7 @@ pub struct ClientBuilder {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
     /// An optional store provided by the user.
-    store: Option<Arc<dyn Store>>,
+    store: Option<Arc<SqliteStore>>,
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
     /// The store path to use when no store is directly provided via `store()`.
@@ -125,7 +123,7 @@ impl ClientBuilder {
 
     /// Optionally provide a store directly.
     #[must_use]
-    pub fn store(mut self, store: Arc<dyn Store>) -> Self {
+    pub fn store(mut self, store: Arc<SqliteStore>) -> Self {
         self.store = Some(store);
         self
     }
@@ -137,9 +135,10 @@ impl ClientBuilder {
         self
     }
 
+    // TODO: Re-enable this method
     /// Optionally provide a custom authenticator instance.
     #[must_use]
-    pub fn authenticator(mut self, authenticator: Arc<dyn TransactionAuthenticator>) -> Self {
+    pub fn authenticator(mut self, authenticator: Arc<FilesystemKeyStore<StdRng>>) -> Self {
         self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
         self
     }
@@ -179,7 +178,9 @@ impl ClientBuilder {
     /// - Returns an error if the store cannot be instantiated.
     /// - Returns an error if the keystore is not specified or fails to initialize.
     #[allow(clippy::unused_async, unused_mut)]
-    pub async fn build(mut self) -> Result<Client, ClientError> {
+    pub async fn build(
+        mut self,
+    ) -> Result<Client<SqliteStore, FilesystemKeyStore<StdRng>>, ClientError> {
         // Determine the RPC client to use.
         let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
             client
@@ -199,7 +200,7 @@ impl ClientBuilder {
         }
 
         // If no store was provided, create a SQLite store from the given path.
-        let arc_store: Arc<dyn Store> = if let Some(store) = self.store {
+        let arc_store: Arc<SqliteStore> = if let Some(store) = self.store {
             store
         } else {
             return Err(ClientError::ClientInitializationError(

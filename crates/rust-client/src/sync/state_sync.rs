@@ -14,6 +14,7 @@ use miden_objects::{
     note::{NoteId, NoteTag},
     transaction::PartialBlockchain,
 };
+use miden_tx::auth::TransactionAuthenticator;
 use tracing::info;
 
 use super::{
@@ -45,11 +46,11 @@ use crate::{
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived = Box<
+pub type OnNoteReceived<STORE, AUTH> = Box<
     dyn Fn(
         CommittedNote,
         Option<InputNoteRecord>,
-        Arc<NoteScreener>,
+        Arc<NoteScreener<STORE, AUTH>>,
         Arc<BTreeSet<NoteTag>>,
     ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
 >;
@@ -63,19 +64,19 @@ pub type OnNoteReceived = Box<
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
-pub struct StateSync {
+pub struct StateSync<STORE: Store, AUTH: TransactionAuthenticator> {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
     /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived,
+    on_note_received: OnNoteReceived<STORE, AUTH>,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
     /// The note screener used to check the relevance of notes.
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<STORE, AUTH>>,
 }
 
-impl StateSync {
+impl<STORE: Store, AUTH: TransactionAuthenticator> StateSync<STORE, AUTH> {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments
@@ -86,9 +87,9 @@ impl StateSync {
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived,
+        on_note_received: OnNoteReceived<STORE, AUTH>,
         tx_graceful_blocks: Option<u32>,
-        note_screener: NoteScreener,
+        note_screener: NoteScreener<STORE, AUTH>,
     ) -> Self {
         Self {
             rpc_api,
@@ -478,11 +479,11 @@ fn apply_mmr_changes(
 /// committed note to check if it's relevant. If the note wasn't being tracked but it came in the
 /// sync response it may be a new public note, in that case we use the [`NoteScreener`] to check its
 /// relevance.
-pub async fn on_note_received(
+pub async fn on_note_received<STORE: Store, AUTH: TransactionAuthenticator>(
     store: Arc<dyn Store>,
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<STORE, AUTH>>,
     note_tags: Arc<BTreeSet<NoteTag>>,
 ) -> Result<bool, ClientError> {
     let note_id = *committed_note.note_id();

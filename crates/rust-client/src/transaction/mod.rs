@@ -90,7 +90,7 @@ use crate::{
     note::{NoteScreener, NoteUpdateTracker},
     rpc::domain::account::AccountProof,
     store::{
-        InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
+        InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, Store, StoreError,
         TransactionFilter, data_store::ClientDataStore, input_note_states::ExpectedNoteState,
     },
     sync::NoteTagRecord,
@@ -463,7 +463,7 @@ impl TransactionStoreUpdate {
 }
 
 /// Transaction management methods
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -913,7 +913,7 @@ impl Client {
     ) -> Result<(), ClientError> {
         // Get outgoing assets
         let (fungible_balance_map, non_fungible_set) =
-            Client::get_outgoing_assets(transaction_request);
+            Client::<STORE, AUTH>::get_outgoing_assets(transaction_request);
 
         // Get incoming assets
         let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
@@ -1124,8 +1124,11 @@ impl Client {
 
     pub(crate) fn build_executor<'store, 'auth>(
         &'auth self,
-        data_store: &'store ClientDataStore,
-    ) -> Result<TransactionExecutor<'store, 'auth>, TransactionExecutorError> {
+        data_store: &'store ClientDataStore<STORE>,
+    ) -> Result<
+        TransactionExecutor<'store, 'auth, ClientDataStore<STORE>, AUTH>,
+        TransactionExecutorError,
+    > {
         TransactionExecutor::with_options(
             data_store,
             self.authenticator.as_deref(),
@@ -1138,7 +1141,7 @@ impl Client {
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,

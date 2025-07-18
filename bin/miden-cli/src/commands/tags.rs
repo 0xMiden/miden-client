@@ -1,10 +1,7 @@
-use miden_client::{
-    Client,
-    note::{NoteExecutionMode, NoteTag},
-};
+use miden_client::note::{NoteExecutionMode, NoteTag};
 use tracing::info;
 
-use crate::{Parser, create_dynamic_table, errors::CliError, load_config_file};
+use crate::{CliClient, Parser, create_dynamic_table, errors::CliError, load_config_file};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]
@@ -23,7 +20,7 @@ pub struct TagsCmd {
 }
 
 impl TagsCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute(&self, client: CliClient) -> Result<(), CliError> {
         match self {
             TagsCmd { add: Some(tag), .. } => {
                 add_tag(client, *tag).await?;
@@ -41,7 +38,7 @@ impl TagsCmd {
 
 // HELPERS
 // ================================================================================================
-async fn list_tags(client: Client) -> Result<(), CliError> {
+async fn list_tags(client: CliClient) -> Result<(), CliError> {
     let (cli_config, _) = load_config_file()?;
     let mut table = create_dynamic_table(&["Tag", "Source"]);
 
@@ -65,7 +62,7 @@ async fn list_tags(client: Client) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn add_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
+async fn add_tag(mut client: CliClient, tag: u32) -> Result<(), CliError> {
     let tag: NoteTag = tag.into();
     let execution_mode = match tag.execution_mode() {
         NoteExecutionMode::Local => "Local",
@@ -81,7 +78,7 @@ async fn add_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn remove_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
+async fn remove_tag(mut client: CliClient, tag: u32) -> Result<(), CliError> {
     client.remove_note_tag(tag.into()).await?;
     println!("Tag {tag} removed");
     Ok(())

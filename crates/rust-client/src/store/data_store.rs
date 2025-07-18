@@ -16,15 +16,15 @@ use crate::store::StoreError;
 // ================================================================================================
 
 /// Wrapper structure that implements [`DataStore`] over any [`Store`].
-pub(crate) struct ClientDataStore {
+pub(crate) struct ClientDataStore<STORE: Store> {
     /// Local database containing information about the accounts managed by this client.
-    store: alloc::sync::Arc<dyn Store>,
+    store: alloc::sync::Arc<STORE>,
     /// Store used to provide MAST nodes to the transaction executor.
     transaction_mast_store: Arc<TransactionMastStore>,
 }
 
-impl ClientDataStore {
-    pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
+impl<STORE: Store> ClientDataStore<STORE> {
+    pub fn new(store: alloc::sync::Arc<STORE>) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
@@ -37,7 +37,7 @@ impl ClientDataStore {
 }
 
 #[async_trait::async_trait(?Send)]
-impl DataStore for ClientDataStore {
+impl<STORE: Store> DataStore for ClientDataStore<STORE> {
     async fn get_transaction_inputs(
         &self,
         account_id: AccountId,
@@ -88,7 +88,7 @@ impl DataStore for ClientDataStore {
 // MAST FOREST STORE
 // ================================================================================================
 
-impl MastForestStore for ClientDataStore {
+impl<STORE: Store> MastForestStore for ClientDataStore<STORE> {
     fn get(&self, procedure_hash: &Word) -> Option<Arc<MastForest>> {
         self.transaction_mast_store.get(procedure_hash)
     }
@@ -102,8 +102,8 @@ impl MastForestStore for ClientDataStore {
 ///
 /// `authenticated_blocks` cannot contain `forest`. For authenticating the last block we have,
 /// the kernel extends the MMR which is why it's not needed here.
-async fn build_partial_mmr_with_paths(
-    store: &alloc::sync::Arc<dyn Store>,
+async fn build_partial_mmr_with_paths<STORE: Store>(
+    store: &alloc::sync::Arc<STORE>,
     forest: u32,
     authenticated_blocks: &[BlockHeader],
 ) -> Result<PartialMmr, DataStoreError> {
@@ -136,8 +136,8 @@ async fn build_partial_mmr_with_paths(
 ///
 /// This function assumes `block_nums` doesn't contain values above or equal to `forest`.
 /// If there are any such values, the function will panic when calling `mmr_merkle_path_len()`.
-async fn get_authentication_path_for_blocks(
-    store: &alloc::sync::Arc<dyn Store>,
+async fn get_authentication_path_for_blocks<STORE: Store>(
+    store: &alloc::sync::Arc<STORE>,
     block_nums: &[BlockNumber],
     forest: usize,
 ) -> Result<Vec<MerklePath>, StoreError> {

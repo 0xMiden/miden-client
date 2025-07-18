@@ -1,7 +1,7 @@
 use std::{fs::File, io::Write, path::PathBuf};
 
 use miden_client::{
-    Client, Word,
+    Word,
     account::{Account, AccountFile},
     store::NoteExportType,
     transaction::AccountInterface,
@@ -11,7 +11,8 @@ use miden_lib::AuthScheme;
 use tracing::info;
 
 use crate::{
-    CliKeyStore, Parser, errors::CliError, get_output_note_with_id_prefix, utils::parse_account_id,
+    CliClient, CliKeyStore, Parser, errors::CliError, get_output_note_with_id_prefix,
+    utils::parse_account_id,
 };
 
 #[derive(Debug, Parser, Clone)]
@@ -56,7 +57,11 @@ impl From<&ExportType> for NoteExportType {
 }
 
 impl ExportCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute(
+        &self,
+        mut client: CliClient,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         if self.account {
             export_account(&client, &keystore, self.id.as_str(), self.filename.clone()).await?;
         } else if let Some(export_type) = &self.export_type {
@@ -74,7 +79,7 @@ impl ExportCmd {
 // ================================================================================================
 
 async fn export_account(
-    client: &Client,
+    client: &CliClient,
     keystore: &CliKeyStore,
     account_id: &str,
     filename: Option<PathBuf>,
@@ -121,7 +126,7 @@ async fn export_account(
 // ================================================================================================
 
 async fn export_note(
-    client: &mut Client,
+    client: &mut CliClient,
     note_id: &str,
     filename: Option<PathBuf>,
     export_type: &ExportType,

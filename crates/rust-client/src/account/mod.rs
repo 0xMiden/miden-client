@@ -39,12 +39,13 @@ use alloc::vec::Vec;
 
 use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
 use miden_objects::{Word, crypto::dsa::rpo_falcon512::PublicKey};
+use miden_tx::auth::TransactionAuthenticator;
 
 use super::Client;
 use crate::{
     errors::ClientError,
     rpc::domain::account::FetchedAccount,
-    store::{AccountRecord, AccountStatus},
+    store::{AccountRecord, AccountStatus, Store},
 };
 
 pub mod procedure_roots;
@@ -87,7 +88,7 @@ pub mod component {
 ///   with the network.
 ///
 /// - **Data retrieval:** The module also provides methods to fetch account-related data.
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 

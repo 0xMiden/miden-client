@@ -8,7 +8,7 @@ use miden_client::{
     account::AccountHeader,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
-    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
+    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord, sqlite_store::SqliteStore},
 };
 use rand::rngs::StdRng;
 mod commands;
@@ -29,6 +29,7 @@ use commands::{
 use self::utils::load_config_file;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
+pub type CliClient = Client<SqliteStore, CliKeyStore>;
 
 mod config;
 mod errors;
@@ -178,7 +179,7 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
 pub(crate) async fn get_output_note_with_id_prefix(
-    client: &Client,
+    client: &CliClient,
     note_id_prefix: &str,
 ) -> Result<OutputNoteRecord, IdPrefixFetchError> {
     let mut output_note_records = client
@@ -224,7 +225,7 @@ pub(crate) async fn get_output_note_with_id_prefix(
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one account found
 ///   where `account_id_prefix` is a prefix of its ID.
 async fn get_account_with_id_prefix(
-    client: &Client,
+    client: &CliClient,
     account_id_prefix: &str,
 ) -> Result<AccountHeader, IdPrefixFetchError> {
     let mut accounts = client

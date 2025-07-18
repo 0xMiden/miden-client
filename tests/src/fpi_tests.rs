@@ -3,6 +3,7 @@ use miden_client::{
     account::{Account, StorageSlot},
     auth::AuthSecretKey,
     rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
+    store::Store,
     testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
 };

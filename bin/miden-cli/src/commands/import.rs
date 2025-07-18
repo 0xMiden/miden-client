@@ -5,7 +5,7 @@ use std::{
 };
 
 use miden_client::{
-    Client, ClientError,
+    ClientError,
     account::{AccountFile, AccountId},
     note::NoteFile,
     utils::Deserializable,
@@ -13,7 +13,7 @@ use miden_client::{
 use tracing::info;
 
 use crate::{
-    CliKeyStore, Parser, commands::account::maybe_set_default_account, errors::CliError,
+    CliClient, CliKeyStore, Parser, commands::account::maybe_set_default_account, errors::CliError,
     utils::load_config_file,
 };
 
@@ -29,7 +29,11 @@ pub struct ImportCmd {
 }
 
 impl ImportCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute(
+        &self,
+        mut client: CliClient,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         validate_paths(&self.filenames)?;
         let (mut current_config, _) = load_config_file()?;
         for filename in &self.filenames {
@@ -68,7 +72,7 @@ impl ImportCmd {
 // ================================================================================================
 
 async fn import_account(
-    client: &mut Client,
+    client: &mut CliClient,
     keystore: &CliKeyStore,
     account_data_file_contents: &[u8],
     overwrite: bool,

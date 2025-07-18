@@ -9,16 +9,17 @@ use miden_objects::{
         merkle::{Forest, MerklePath},
     },
 };
+use miden_tx::auth::TransactionAuthenticator;
 use tracing::warn;
 
 use crate::{
     Client, ClientError,
     rpc::NodeRpcClient,
-    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
+    store::{BlockRelevance, PartialBlockchainFilter, Store, StoreError},
 };
 
 /// Network information management methods.
-impl Client {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {

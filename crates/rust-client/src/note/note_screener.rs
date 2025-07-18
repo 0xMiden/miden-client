@@ -50,18 +50,15 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
-pub struct NoteScreener {
+pub struct NoteScreener<STORE: Store, AUTH: TransactionAuthenticator> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
-    store: Arc<dyn Store>,
+    store: Arc<STORE>,
     /// A reference to the transaction authenticator
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
 }
 
-impl NoteScreener {
-    pub fn new(
-        store: Arc<dyn Store>,
-        authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    ) -> Self {
+impl<STORE: Store, AUTH: TransactionAuthenticator> NoteScreener<STORE, AUTH> {
+    pub fn new(store: Arc<STORE>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
     }
 

@@ -17,7 +17,6 @@ use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::{
-    Client,
     rpc::{
         NodeRpcClient, RpcError,
         domain::{
@@ -32,8 +31,6 @@ use crate::{
     },
     transaction::ForeignAccount,
 };
-
-pub type MockClient = Client;
 
 /// Mock RPC API
 ///
