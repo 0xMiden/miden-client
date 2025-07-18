@@ -9,8 +9,8 @@ pub struct Word(NativeWord);
 
 #[wasm_bindgen]
 impl Word {
-    #[wasm_bindgen(js_name = "newFromU64s")]
-    pub fn new_from_u64s(u64_vec: Vec<u64>) -> Word {
+    #[wasm_bindgen(constructor)]
+    pub fn new(u64_vec: Vec<u64>) -> Word {
         let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
 
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
@@ -43,6 +43,16 @@ impl Word {
     #[wasm_bindgen(js_name = "toHex")]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
+    }
+
+    #[wasm_bindgen(js_name = "toU64s")]
+    pub fn to_u64s(&self) -> Vec<u64> {
+        self.0.iter().map(|felt| felt.as_int()).collect::<Vec<u64>>()
+    }
+
+    #[wasm_bindgen(js_name = "toFelts")]
+    pub fn to_felts(&self) -> Vec<Felt> {
+        self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()
     }
 }
 

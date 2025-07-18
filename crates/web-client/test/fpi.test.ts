@@ -14,7 +14,7 @@ export const testStandardFpi = async (): Promise<void> => {
     let felt3 = new window.Felt(15n);
     let felt4 = new window.Felt(15n);
     const MAP_KEY = window.Word.newFromFelts([felt1, felt2, felt3, felt4]);
-    const FPI_STORAGE_VALUE = window.Word.newFromU64s(
+    const FPI_STORAGE_VALUE = new window.Word(
       new BigUint64Array([9n, 12n, 18n, 30n])
     );
 
