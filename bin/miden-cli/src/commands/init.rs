@@ -39,7 +39,7 @@ directory"
 )]
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
-    /// endpoint. Defaults to the testnet network.
+    /// endpoint.
     #[clap(long, short)]
     network: Network,
 
