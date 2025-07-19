@@ -18,7 +18,7 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
-use miden_node_store::{GenesisState, Store};
+use miden_node_store::{GenesisState, Store, genesis::config::{AccountFileWithName, GenesisConfig}};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_objects::{
     Felt, ONE,
@@ -45,6 +45,7 @@ pub struct NodeBuilder {
     block_interval: Duration,
     batch_interval: Duration,
     rpc_port: u16,
+    genesis_config: Option<PathBuf>,
 }
 
 impl NodeBuilder {
@@ -58,6 +59,7 @@ impl NodeBuilder {
             block_interval: Duration::from_millis(DEFAULT_BLOCK_INTERVAL),
             batch_interval: Duration::from_millis(DEFAULT_BATCH_INTERVAL),
             rpc_port: DEFAULT_RPC_PORT,
+            genesis_config: None,
         }
     }
 
@@ -80,6 +82,13 @@ impl NodeBuilder {
         self.rpc_port = port;
         self
     }
+
+    /// Sets the genesis configuration file path.
+    #[must_use]
+    pub fn with_genesis_config(mut self, config_path: PathBuf) -> Self {
+        self.genesis_config = Some(config_path);
+        self
+    }
     // START
     // --------------------------------------------------------------------------------------------
 
@@ -89,20 +98,6 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        let account_file =
-            generate_genesis_account().context("failed to create genesis account")?;
-
-        // Write account data to disk (including secrets).
-        //
-        // Without this the accounts would be inaccessible by the user.
-        // This is not used directly by the node, but rather by the owner / operator of the node.
-        let filepath = self.data_directory.join(GENESIS_ACCOUNT_FILE);
-        File::create_new(&filepath)
-            .and_then(|mut file| file.write_all(&account_file.to_bytes()))
-            .with_context(|| {
-                format!("failed to write data for genesis account to file {}", filepath.display())
-            })?;
-
         let version = 1;
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -110,7 +105,48 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
+
+        // Load genesis state from config or create default
+        let (genesis_state, account_files) = if let Some(config_path) = &self.genesis_config {
+            // Load and parse the genesis config
+            let toml_str = fs_err::read_to_string(config_path)
+                .with_context(|| format!("Failed to read genesis config from {}", config_path.display()))?;
+            let config = GenesisConfig::read_toml(&toml_str)
+                .with_context(|| format!("Failed to parse genesis config from {}", config_path.display()))?;
+            
+            // Convert to genesis state
+            let (state, secrets) = config.into_state()
+                .context("Failed to create genesis state from config")?;
+            
+            // Convert secrets to account files
+            let files: Vec<AccountFileWithName> = secrets.as_account_files(&state)
+                .collect::<Result<Vec<_>, _>>()
+                .context("Failed to convert secrets to account files")?;
+            
+            (state, files)
+        } else {
+            // Create default genesis with single faucet
+            let account_file = generate_genesis_account()
+                .context("failed to create genesis account")?;
+            
+            let genesis_state = GenesisState::new(vec![account_file.account.clone()], version, timestamp);
+            let file = AccountFileWithName {
+                name: GENESIS_ACCOUNT_FILE.to_string(),
+                account_file,
+            };
+            
+            (genesis_state, vec![file])
+        };
+
+        // Write account files to disk
+        for AccountFileWithName { name, account_file } in account_files {
+            let filepath = self.data_directory.join(&name);
+            File::create_new(&filepath)
+                .and_then(|mut file| file.write_all(&account_file.to_bytes()))
+                .with_context(|| {
+                    format!("failed to write data for genesis account to file {}", filepath.display())
+                })?;
+        }
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)

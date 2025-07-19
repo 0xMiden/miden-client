@@ -97,7 +97,7 @@ test-docs: ## Run documentation tests
 
 .PHONY: start-node
 start-node: ## Start the testing node server
-	RUST_LOG=info cargo run --release --package node-builder --locked
+	RUST_LOG=info cargo run --release --package node-builder --locked -- --genesis-config tests/config/genesis_swap_test.toml
 
 .PHONY: start-node-background
 start-node-background: ## Start the testing node server in background

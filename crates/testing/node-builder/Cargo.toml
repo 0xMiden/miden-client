@@ -26,6 +26,8 @@ miden-objects             = { workspace = true }
 
 # External dependencies
 anyhow      = "1.0"
+clap        = { version = "4.5", features = ["derive"] }
+fs-err      = "3.0"
 rand        = { workspace = true }
 rand_chacha = { version = "0.9" }
 tokio       = { features = ["full"], version = "1.0" }
