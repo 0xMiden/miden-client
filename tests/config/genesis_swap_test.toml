@@ -1,0 +1,29 @@
+# Genesis configuration for swap integration tests
+timestamp = 1717344256
+version   = 1
+
+# BTC Faucet (mock BTC token)
+[[fungible_faucet]]
+decimals     = 8
+max_supply   = 21_000_000_000_000_00  # 21M BTC with 8 decimals
+storage_mode = "private"
+symbol       = "BTC"
+
+# ETH Faucet (mock ETH token)
+[[fungible_faucet]]
+decimals     = 0  # No decimals for ETH in these tests
+max_supply   = 120_000_000  # 120M ETH 
+storage_mode = "private"
+symbol       = "ETH"
+
+# Wallet A - Has 1000 BTC initially
+[[wallet]]
+assets             = [{ amount = 1000_0000_0000, symbol = "BTC" }]  # 1000 BTC (8 decimals)
+storage_mode       = "private"
+has_updatable_code = false
+
+# Wallet B - Has 1000 ETH initially
+[[wallet]]
+assets             = [{ amount = 1000, symbol = "ETH" }]  # 1000 ETH (no decimals)
+storage_mode       = "private"
+has_updatable_code = false

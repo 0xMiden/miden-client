@@ -2,9 +2,18 @@
 
 use std::{fs, io::Write, path::PathBuf, process, time::Duration};
 
+use clap::Parser;
 use node_builder::{DEFAULT_BATCH_INTERVAL, DEFAULT_BLOCK_INTERVAL, DEFAULT_RPC_PORT, NodeBuilder};
 
 const PID_FILE: &str = "miden-node.pid";
+
+#[derive(Parser, Debug)]
+#[command(name = "node-builder", about = "Testing node builder for Miden")]
+struct Args {
+    /// Path to genesis configuration file
+    #[arg(long)]
+    genesis_config: Option<PathBuf>,
+}
 
 fn write_pid_file() -> anyhow::Result<()> {
     let pid = process::id();
@@ -37,14 +46,21 @@ fn ensure_data_dir(data_dir: &PathBuf) -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+    
     let data_dir = PathBuf::from("./data");
     ensure_data_dir(&data_dir)?;
     write_pid_file()?;
 
-    let builder = NodeBuilder::new(data_dir)
+    let mut builder = NodeBuilder::new(data_dir)
         .with_rpc_port(DEFAULT_RPC_PORT)
         .with_block_interval(Duration::from_millis(DEFAULT_BLOCK_INTERVAL))
         .with_batch_interval(Duration::from_millis(DEFAULT_BATCH_INTERVAL));
+    
+    if let Some(genesis_config) = args.genesis_config {
+        println!("Using genesis configuration from: {}", genesis_config.display());
+        builder = builder.with_genesis_config(genesis_config);
+    }
 
     let handle = builder.start().await?;
     println!("Node started successfully with PID: {}", process::id());

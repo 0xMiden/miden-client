@@ -22,6 +22,48 @@ Note that in order to run this as part of a CI/CD workflow (at least on github),
 
 To stop the background node, you can use the `make stop-node` command.
 
+## Running tests with Genesis Configuration
+
+The node builder now supports custom genesis configurations, which allows you to pre-fund accounts and set up initial state without requiring setup transactions in your tests.
+
+To run the node with a custom genesis configuration:
+
+```bash
+# Start node with custom genesis configuration
+make start-node-with-genesis
+
+# Or in background
+make start-node-background-with-genesis
+```
+
+This uses the genesis configuration file at `tests/config/genesis_swap_test.toml`, which sets up:
+- Two faucet accounts (BTC and ETH mock tokens)
+- Two wallet accounts pre-funded with tokens from these faucets
+
+### Example: Swap Tests
+
+The swap integration tests (`tests/src/swap_transactions_tests.rs`) have been refactored to use pre-funded accounts from genesis. This eliminates the need for:
+- Creating faucet accounts during the test
+- Minting and distributing tokens to test accounts
+- Waiting for multiple setup transactions
+
+To run the swap tests with genesis configuration:
+
+1. Start the node with genesis config:
+   ```bash
+   make start-node-background-with-genesis
+   ```
+
+2. Run the swap tests:
+   ```bash
+   cargo test -p miden-client-tests swap --release
+   ```
+
+3. Stop the node when done:
+   ```bash
+   make stop-node
+   ```
+
 ## Integration Test Flow
 
 The integration test goes through a series of supported flows such as minting and transferring assets which runs against a running node.

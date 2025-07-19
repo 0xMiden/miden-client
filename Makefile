@@ -103,8 +103,22 @@ start-node: ## Start the testing node server
 start-node-background: ## Start the testing node server in background
 	./scripts/start-binary-bg.sh node-builder
 
-.PHONY: stop-node
-stop-node: ## Stop the testing node server
+.PHONY: start-node-with-genesis
+start-node-with-genesis: ## Start the testing node server with genesis configuration
+	RUST_LOG=info cargo run --release --package node-builder --locked -- --genesis-config tests/config/genesis_swap_test.toml
+
+.PHONY: start-node-background-with-genesis
+start-node-background-with-genesis: ## Start the testing node server in background with genesis configuration
+	RUST_LOG=none cargo run --release --package node-builder --locked -- --genesis-config tests/config/genesis_swap_test.toml & echo $$! > .node-builder.pid; \
+	sleep 4; \
+	if ! ps -p $$(cat .node-builder.pid) > /dev/null; then \
+	    echo "Failed to start node-builder"; \
+	    rm -f .node-builder.pid; \
+	    exit 1; \
+	fi; \
+	rm -f .node-builder.pid
+
+.PHONY: stop-node: ## Stop the testing node server
 	-pkill -f "node-builder"
 	sleep 1
 
@@ -131,11 +145,11 @@ start-prover: ## Start the remote prover
 
 .PHONY: start-prover-background
 start-prover-background: ## Start the remote prover in background
-	cd $(PROVER_DIR) && ../../../scripts/start-binary-bg.sh testing-remote-prover
+	./scripts/start-binary-bg.sh remote-prover
 
 .PHONY: stop-prover
-stop-prover: ## Stop prover process
-	-pkill -f "testing-remote-prover"
+stop-prover: ## Stop the remote prover
+	-pkill -f "miden-proving-service"
 	sleep 1
 
 # --- Installing ----------------------------------------------------------------------------------
@@ -164,17 +178,51 @@ check-wasm: ## Build the client library for wasm32
 
 ## --- Setup --------------------------------------------------------------------------------------
 
+.PHONY: check-rust
+check-rust: ## Check Rust code (format and clippy)
+	$(CODEGEN) cargo fmt --all --check
+	$(CODEGEN) cargo clippy $(FEATURES_CLIENT) -- -D warnings
+	$(CODEGEN) cargo clippy --workspace --tests -- -D warnings
+
+.PHONY: fix-rust
+fix-rust: ## Auto-fix Rust code (rustfmt)
+	$(CODEGEN) cargo fmt --all
+
+.PHONY: fix-toml
+fix-toml: ## Auto-fix TOML code (taplo)
+	taplo fmt
+
+.PHONY: clean
+clean: ## Clean all build artifacts
+	cargo clean
+	$(MAKE) -C $(PROVER_DIR) clean
+	cd ./crates/web-client && npm run clean
+
+# --- Documentation --------------------------------------------------------------------------------
+
+.PHONY: build-docs
+build-docs: ## Build documentation
+	cd docs && mdbook build
+
+.PHONY: serve-docs
+serve-docs: ## Serve documentation
+	cd docs && mdbook serve
+
+# --- Helper commands ------------------------------------------------------------------------------
+
 .PHONY: check-tools
-check-tools: ## Checks if development tools are installed
-	@echo "Checking development tools..."
+check-tools: ## Check if required tools are installed
+	@echo "Checking for required development tools..."
+	@command -v rustc   >/dev/null 2>&1 && echo "[OK] rustc is installed"   || echo "[MISSING] rustc  (https://rustup.rs)"
+	@command -v cargo   >/dev/null 2>&1 && echo "[OK] cargo is installed"   || echo "[MISSING] cargo  (https://rustup.rs)"
+	@command -v nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest (make install-tools)"
 	@command -v mdbook  >/dev/null 2>&1 && echo "[OK] mdbook is installed"  || echo "[MISSING] mdbook (make install-tools)"
-	@command -v typos   >/dev/null 2>&1 && echo "[OK] typos is installed"   || echo "[MISSING] typos  (make install-tools)"
-	@command -v nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest(make install-tools)"
+	@command -v node    >/dev/null 2>&1 && echo "[OK] node is installed"    || echo "[MISSING] node   (https://nodejs.org)"
+	@command -v npm     >/dev/null 2>&1 && echo "[OK] npm is installed"     || echo "[MISSING] npm    (https://nodejs.org)"
 	@command -v taplo   >/dev/null 2>&1 && echo "[OK] taplo is installed"   || echo "[MISSING] taplo  (make install-tools)"
 	@command -v yarn    >/dev/null 2>&1 && echo "[OK] yarn is installed"    || echo "[MISSING] yarn   (make install-tools)"
 
-.PHONY: install-tools
-install-tools: ## Installs Rust + Node tools required by the Makefile
+.PHONY: install-tools: ## Installs Rust + Node tools required by the Makefile
 	@echo "Installing development tools..."
 	# Rust-related
 	cargo install mdbook --locked
