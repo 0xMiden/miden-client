@@ -18,7 +18,7 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
-use miden_node_store::{GenesisState, Store};
+use miden_node_store::{GenesisState, Store, genesis::config::{GenesisConfig, FungibleFaucetConfig, WalletConfig, AssetEntry, StorageMode, AccountFileWithName}};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_objects::{
     Felt, ONE,
@@ -89,28 +89,54 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        let account_file =
-            generate_genesis_account().context("failed to create genesis account")?;
-
-        // Write account data to disk (including secrets).
-        //
-        // Without this the accounts would be inaccessible by the user.
-        // This is not used directly by the node, but rather by the owner / operator of the node.
-        let filepath = self.data_directory.join(GENESIS_ACCOUNT_FILE);
-        File::create_new(&filepath)
-            .and_then(|mut file| file.write_all(&account_file.to_bytes()))
-            .with_context(|| {
-                format!("failed to write data for genesis account to file {}", filepath.display())
-            })?;
-
-        let version = 1;
-        let timestamp = SystemTime::now()
+        // Create genesis configuration
+        let timestamp: u32 = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("current timestamp should be greater than unix epoch")
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
+
+        let config = GenesisConfig {
+            version: 1,
+            timestamp,
+            fungible_faucet: vec![
+                FungibleFaucetConfig {
+                    symbol: "BTC".to_string(),
+                    decimals: 0,
+                    max_supply: 1000000,
+                    storage_mode: StorageMode::Private,
+                },
+                FungibleFaucetConfig {
+                    symbol: "ETH".to_string(),
+                    decimals: 0,
+                    max_supply: 1000000,
+                    storage_mode: StorageMode::Private,
+                },
+            ],
+            wallet: vec![
+                WalletConfig {
+                    has_updatable_code: true,
+                    storage_mode: StorageMode::Private,
+                    assets: vec![AssetEntry { symbol: "BTC".to_string(), amount: 1000 }],
+                },
+                WalletConfig {
+                    has_updatable_code: true,
+                    storage_mode: StorageMode::Private,
+                    assets: vec![AssetEntry { symbol: "ETH".to_string(), amount: 1000 }],
+                },
+            ],
+        };
+
+        let (genesis_state, secrets) = config.into_state().context("failed to create genesis state")?;
+
+        // Write account data to disk
+        for item in secrets.as_account_files(&genesis_state) {
+            let item = item.context("failed to get account file")?;
+            let filepath = self.data_directory.join(item.name);
+            let mut file = File::create_new(&filepath).context("failed to create file")?;
+            item.account_file.write_into(&mut file).context("failed to write account file")?;
+        }
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)

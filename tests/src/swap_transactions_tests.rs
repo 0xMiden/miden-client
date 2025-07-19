@@ -10,6 +10,9 @@ use miden_objects::{
     note::{NoteDetails, NoteFile, NoteType},
 };
 
+use std::fs;
+use miden_objects::utils::Deserializable as _;
+
 // SWAP FULLY ONCHAIN
 // ================================================================================================
 
@@ -24,39 +27,38 @@ async fn swap_fully_onchain() {
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();
 
-    // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    // Import pre-funded accounts from genesis
+    let btc_faucet_data = AccountFile::read_from_bytes(&fs::read("data/faucet_btc.mac").expect("file exists")).expect("valid file");
+    let btc_faucet_id = btc_faucet_data.account.id();
+    client1.add_account(&btc_faucet_data.account, btc_faucet_data.account_seed, false).await.unwrap();
+    for key in btc_faucet_data.auth_secret_keys {
+        authenticator_1.add_key(&key).unwrap();
+    }
+    let btc_faucet_account: Account = client1.get_account(btc_faucet_id).await.unwrap().unwrap().into();
 
-    // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let eth_faucet_data = AccountFile::read_from_bytes(&fs::read("data/faucet_eth.mac").expect("file exists")).expect("valid file");
+    let eth_faucet_id = eth_faucet_data.account.id();
+    client2.add_account(&eth_faucet_data.account, eth_faucet_data.account_seed, false).await.unwrap();
+    for key in eth_faucet_data.auth_secret_keys {
+        authenticator_2.add_key(&key).unwrap();
+    }
+    let eth_faucet_account: Account = client2.get_account(eth_faucet_id).await.unwrap().unwrap().into();
 
-    // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    let account_a_data = AccountFile::read_from_bytes(&fs::read("data/wallet_0.mac").expect("file exists")).expect("valid file");
+    let account_a_id = account_a_data.account.id();
+    client1.add_account(&account_a_data.account, account_a_data.account_seed, false).await.unwrap();
+    for key in account_a_data.auth_secret_keys {
+        authenticator_1.add_key(&key).unwrap();
+    }
+    let account_a: Account = client1.get_account(account_a_id).await.unwrap().unwrap().into();
 
-    // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
-
-    // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
-
-    mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
-
-    // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
-
-    mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
+    let account_b_data = AccountFile::read_from_bytes(&fs::read("data/wallet_1.mac").expect("file exists")).expect("valid file");
+    let account_b_id = account_b_data.account.id();
+    client2.add_account(&account_b_data.account, account_b_data.account_seed, false).await.unwrap();
+    for key in account_b_data.auth_secret_keys {
+        authenticator_2.add_key(&key).unwrap();
+    }
+    let account_b: Account = client2.get_account(account_b_id).await.unwrap().unwrap().into();
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
@@ -189,36 +191,38 @@ async fn swap_private() {
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();
 
-    // Create Client 1's basic wallet (We'll call it accountA)
-    let (account_a, ..) =
-        insert_new_wallet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
+    // Import pre-funded accounts from genesis
+    let btc_faucet_data = AccountFile::read_from_bytes(&fs::read("data/faucet_btc.mac").expect("file exists")).expect("valid file");
+    let btc_faucet_id = btc_faucet_data.account.id();
+    client1.add_account(&btc_faucet_data.account, btc_faucet_data.account_seed, false).await.unwrap();
+    for key in btc_faucet_data.auth_secret_keys {
+        authenticator_1.add_key(&key).unwrap();
+    }
+    let btc_faucet_account: Account = client1.get_account(btc_faucet_id).await.unwrap().unwrap().into();
 
-    // Create Client 2's basic wallet (We'll call it accountB)
-    let (account_b, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let eth_faucet_data = AccountFile::read_from_bytes(&fs::read("data/faucet_eth.mac").expect("file exists")).expect("valid file");
+    let eth_faucet_id = eth_faucet_data.account.id();
+    client2.add_account(&eth_faucet_data.account, eth_faucet_data.account_seed, false).await.unwrap();
+    for key in eth_faucet_data.auth_secret_keys {
+        authenticator_2.add_key(&key).unwrap();
+    }
+    let eth_faucet_account: Account = client2.get_account(eth_faucet_id).await.unwrap().unwrap().into();
 
-    // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
-            .await
-            .unwrap();
-    // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
-            .await
-            .unwrap();
+    let account_a_data = AccountFile::read_from_bytes(&fs::read("data/wallet_0.mac").expect("file exists")).expect("valid file");
+    let account_a_id = account_a_data.account.id();
+    client1.add_account(&account_a_data.account, account_a_data.account_seed, false).await.unwrap();
+    for key in account_a_data.auth_secret_keys {
+        authenticator_1.add_key(&key).unwrap();
+    }
+    let account_a: Account = client1.get_account(account_a_id).await.unwrap().unwrap().into();
 
-    // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
-    mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
-
-    // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
-    mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
+    let account_b_data = AccountFile::read_from_bytes(&fs::read("data/wallet_1.mac").expect("file exists")).expect("valid file");
+    let account_b_id = account_b_data.account.id();
+    client2.add_account(&account_b_data.account, account_b_data.account_seed, false).await.unwrap();
+    for key in account_b_data.auth_secret_keys {
+        authenticator_2.add_key(&key).unwrap();
+    }
+    let account_b: Account = client2.get_account(account_b_id).await.unwrap().unwrap().into();
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
