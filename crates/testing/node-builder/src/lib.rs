@@ -45,6 +45,10 @@ pub struct NodeBuilder {
     block_interval: Duration,
     batch_interval: Duration,
     rpc_port: u16,
+    /// Optional list of account files to use for the genesis block. If `None`, the
+    /// builder will generate a single public fungible faucet which is the current
+    /// default behaviour.
+    genesis_accounts: Option<Vec<AccountFile>>,
 }
 
 impl NodeBuilder {
@@ -58,7 +62,17 @@ impl NodeBuilder {
             block_interval: Duration::from_millis(DEFAULT_BLOCK_INTERVAL),
             batch_interval: Duration::from_millis(DEFAULT_BATCH_INTERVAL),
             rpc_port: DEFAULT_RPC_PORT,
+            genesis_accounts: None,
         }
+    }
+
+    /// Overrides the default genesis creation logic with the provided list of
+    /// `AccountFile`s. The accounts will be used to build the genesis state and
+    /// persisted to disk so that test clients can import and use the secret keys.
+    #[must_use]
+    pub fn with_genesis_accounts(mut self, accounts: Vec<AccountFile>) -> Self {
+        self.genesis_accounts = Some(accounts);
+        self
     }
 
     /// Sets the block production interval.
@@ -89,19 +103,29 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
-        let account_file =
-            generate_genesis_account().context("failed to create genesis account")?;
+        // -------------------------------------------------------------------------------------
+        // Build genesis accounts
+        let mut account_files: Vec<AccountFile> = if let Some(accts) = &self.genesis_accounts {
+            accts.clone()
+        } else {
+            vec![generate_genesis_account().context("failed to create genesis account")?]
+        };
 
-        // Write account data to disk (including secrets).
-        //
-        // Without this the accounts would be inaccessible by the user.
-        // This is not used directly by the node, but rather by the owner / operator of the node.
-        let filepath = self.data_directory.join(GENESIS_ACCOUNT_FILE);
-        File::create_new(&filepath)
-            .and_then(|mut file| file.write_all(&account_file.to_bytes()))
-            .with_context(|| {
-                format!("failed to write data for genesis account to file {}", filepath.display())
-            })?;
+        // Persist all account files (including secrets) so that tests can import them later.
+        // File name format: <account_id>.mac
+        for account_file in &account_files {
+            let filename = format!("{}-genesis.mac", account_file.account.id());
+            let filepath = self.data_directory.join(filename);
+            // Use `create_new` to avoid accidental overwrite of existing files.
+            File::create_new(&filepath)
+                .and_then(|mut file| file.write_all(&account_file.to_bytes()))
+                .with_context(|| {
+                    format!(
+                        "failed to write data for genesis account to file {}",
+                        filepath.display()
+                    )
+                })?;
+        }
 
         let version = 1;
         let timestamp = SystemTime::now()
@@ -110,7 +134,14 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
+
+        // Extract bare `Account`s for the genesis state
+        let genesis_accounts: Vec<Account> = account_files
+            .iter()
+            .map(|file| file.account.clone())
+            .collect();
+
+        let genesis_state = GenesisState::new(genesis_accounts, version, timestamp);
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)
