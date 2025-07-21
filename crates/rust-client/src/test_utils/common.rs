@@ -24,7 +24,7 @@ use toml::Table;
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, Word,
+    Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
         component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
@@ -86,7 +86,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
         .rng(Box::new(rng))
         .store(store)
         .filesystem_keystore(auth_path.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 
     (builder, keystore)

@@ -43,7 +43,7 @@ use rand::{Rng, RngCore, rngs::StdRng};
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError,
+    Client, ClientError, DebugMode,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     note::NoteRelevance,
@@ -96,7 +96,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
         .rng(Box::new(rng))
         .store(store)
         .filesystem_keystore(keystore_path.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 
     (builder, rpc_api, keystore)
