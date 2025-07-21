@@ -54,7 +54,7 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
+use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 use core::cmp::max;
 
 use miden_objects::{
@@ -71,7 +71,8 @@ use miden_tx::{
 use crate::{
     Client, ClientError,
     note::NoteScreener,
-    store::{NoteFilter, Store, TransactionFilter},
+    store::{NoteFilter, TransactionFilter},
+    sync::state_sync::DefaultOnNoteReceived,
 };
 mod block_header;
 
@@ -119,20 +120,10 @@ impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<ST
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let on_note_received = DefaultOnNoteReceived::new(self.store.clone());
         let state_sync = StateSync::new(
             self.rpc_api.clone(),
-            Box::new({
-                let store_clone = self.store.clone();
-                move |committed_note, public_note, note_screener, note_tags| {
-                    Box::pin(on_note_received(
-                        store_clone.clone(),
-                        committed_note,
-                        public_note,
-                        note_screener,
-                        note_tags,
-                    ))
-                }
-            }),
+            Arc::new(on_note_received),
             self.tx_graceful_blocks,
             note_screener,
         );
