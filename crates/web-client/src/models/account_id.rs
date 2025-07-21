@@ -1,8 +1,7 @@
-use core::fmt;
-use std::{error::Error, str::FromStr};
+use std::str::FromStr;
 
 use miden_objects::{
-    Felt as NativeFelt,
+    Felt as NativeFelt, NetworkIdError,
     account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId},
 };
 use wasm_bindgen::prelude::*;
@@ -114,27 +113,15 @@ impl From<&AccountId> for NativeAccountId {
 }
 
 impl TryFrom<NetworkId> for NativeNetworkId {
-    type Error = NetworkIdErr;
+    type Error = NetworkIdError;
     fn try_from(value: NetworkId) -> Result<Self, Self::Error> {
         match value {
             NetworkId::Devnet => Ok(NativeNetworkId::Devnet),
             NetworkId::Mainnet => Ok(NativeNetworkId::Mainnet),
             NetworkId::Testnet => Ok(NativeNetworkId::Testnet),
-            NetworkId::__Invalid => Err(NetworkIdErr),
+            NetworkId::__Invalid => Err(NetworkIdError::NetworkIdParseError(
+                "expected either a devnet, mainnet or testnet network ID".into(),
+            )),
         }
     }
 }
-
-// ERROR TYPES
-// ================================================================================================
-
-#[derive(Debug)]
-pub struct NetworkIdErr;
-
-impl fmt::Display for NetworkIdErr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "expected either a devnet, mainnet or testnet network ID")
-    }
-}
-
-impl Error for NetworkIdErr {}
