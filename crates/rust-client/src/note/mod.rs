@@ -93,7 +93,7 @@ pub use note_update_tracker::{
 };
 
 /// Note retrieval methods.
-impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
+impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
     // INPUT NOTE DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -196,10 +196,7 @@ impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<ST
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub async fn get_input_note_with_id_prefix<
-    STORE: Store + 'static,
-    AUTH: TransactionAuthenticator + 'static,
->(
+pub async fn get_input_note_with_id_prefix<STORE: Store, AUTH: TransactionAuthenticator>(
     client: &Client<STORE, AUTH>,
     note_id_prefix: &str,
 ) -> Result<InputNoteRecord, IdPrefixFetchError> {

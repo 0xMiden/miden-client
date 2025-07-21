@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Network information management methods.
-impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
+impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {

@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Tag management methods
-impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
+impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
     /// Returns the list of note tags tracked by the client along with their source.
     ///
     /// When syncing the state with the node, these tags will be added to the sync request and

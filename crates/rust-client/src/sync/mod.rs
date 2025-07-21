@@ -72,7 +72,6 @@ use crate::{
     Client, ClientError,
     note::NoteScreener,
     store::{NoteFilter, TransactionFilter},
-    sync::state_sync::DefaultOnNoteReceived,
 };
 mod block_header;
 
@@ -80,7 +79,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{OnNoteReceived, StateSync, on_note_received};
+pub use state_sync::{OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
@@ -88,7 +87,7 @@ pub use state_sync_update::{
 };
 
 /// Client synchronization methods.
-impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
+impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
 
@@ -120,13 +119,8 @@ impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<ST
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
-        let on_note_received = DefaultOnNoteReceived::new(self.store.clone());
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Arc::new(on_note_received),
-            self.tx_graceful_blocks,
-            note_screener,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
         // Get current state of the client
         let accounts = self

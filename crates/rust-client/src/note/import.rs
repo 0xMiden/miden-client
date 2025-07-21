@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Note importing methods.
-impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
+impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
 
