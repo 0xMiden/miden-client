@@ -15,7 +15,9 @@ use rand::Rng;
 use crate::rpc::{Endpoint, TonicRpcClient};
 #[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
-use crate::{Client, ClientError, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store};
+use crate::{
+    Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store,
+};
 
 // CONSTANTS
 // ================================================================================================
@@ -59,7 +61,7 @@ pub struct ClientBuilder {
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig>,
     /// A flag to enable debug mode.
-    in_debug_mode: bool,
+    in_debug_mode: DebugMode,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
@@ -77,7 +79,7 @@ impl Default for ClientBuilder {
             #[cfg(feature = "sqlite")]
             store_path: "store.sqlite3".to_string(),
             keystore: None,
-            in_debug_mode: false,
+            in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
         }
@@ -93,7 +95,7 @@ impl ClientBuilder {
 
     /// Enable or disable debug mode.
     #[must_use]
-    pub fn in_debug_mode(mut self, debug: bool) -> Self {
+    pub fn in_debug_mode(mut self, debug: DebugMode) -> Self {
         self.in_debug_mode = debug;
         self
     }
@@ -240,7 +242,7 @@ impl ClientBuilder {
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
-                self.in_debug_mode,
+                self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,

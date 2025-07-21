@@ -4,6 +4,7 @@
 
 - [BREAKING] Incremented MSRV to 1.88.
 * [BREAKING] Updated `toBech32` AccountID method: it now expects a parameter to specify the NetworkID [(#1043)](https://github.com/0xMiden/miden-client/pull/1043).
+- Introduced enums instead of booleans for public APIs (#1042).
 
 ## 0.10.0 (2025-07-12)
 
