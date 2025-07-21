@@ -38,6 +38,7 @@ pub struct ExecCmd {
     ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
     ///    ]
     #[arg(long, short)]
+    #[clap(verbatim_doc_comment)]
     inputs_path: Option<String>,
 
     /// Print the output stack grouped into words
