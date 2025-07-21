@@ -64,7 +64,7 @@
 
 Will turn the Account ID into its bech32 string representation. To avoid a potential
 wrongful encoding, this function will expect only IDs for either mainnet ("mm"),
-testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, use
+testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
 `Self::to_bech_32_custom`.
 
 #### Parameters
