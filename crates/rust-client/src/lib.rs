@@ -245,7 +245,7 @@ pub struct Client<STORE: Store, AUTH: TransactionAuthenticator> {
 }
 
 /// Construction and access methods.
-impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
 

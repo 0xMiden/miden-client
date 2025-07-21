@@ -463,7 +463,7 @@ impl TransactionStoreUpdate {
 }
 
 /// Transaction management methods
-impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -1141,7 +1141,7 @@ impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,

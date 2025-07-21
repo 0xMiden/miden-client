@@ -1,4 +1,4 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::fmt;
 
 use miden_lib::{account::interface::AccountInterface, note::well_known_note::WellKnownNote};
@@ -17,7 +17,10 @@ use thiserror::Error;
 use tonic::async_trait;
 
 use crate::{
-    store::{Store, StoreError, data_store::ClientDataStore},
+    ClientError,
+    rpc::domain::note::CommittedNote,
+    store::{InputNoteRecord, NoteFilter, Store, StoreError, data_store::ClientDataStore},
+    sync::OnNoteReceived,
     transaction::{TransactionRequestBuilder, TransactionRequestError},
 };
 
@@ -58,7 +61,7 @@ pub struct NoteScreener<STORE: Store, AUTH: TransactionAuthenticator> {
     authenticator: Option<Arc<AUTH>>,
 }
 
-impl<STORE: Store, AUTH: TransactionAuthenticator> NoteScreener<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> NoteScreener<STORE, AUTH> {
     pub fn new(store: Arc<STORE>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
     }
@@ -128,10 +131,8 @@ impl<STORE: Store, AUTH: TransactionAuthenticator> NoteScreener<STORE, AUTH> {
             .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
-        let transaction_executor = TransactionExecutor::new(
-            &data_store,
-            self.authenticator.as_deref().map(|a| a as &dyn TransactionAuthenticator),
-        );
+        let transaction_executor =
+            TransactionExecutor::new(&data_store, self.authenticator.as_deref());
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
@@ -182,7 +183,9 @@ impl<STORE: Store, AUTH: TransactionAuthenticator> NoteScreener<STORE, AUTH> {
 // ================================================================================================
 
 #[async_trait(?Send)]
-impl OnNoteReceived<STORE, AUTH> for NoteScreener<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> OnNoteReceived<STORE, AUTH>
+    for NoteScreener<STORE, AUTH>
+{
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
     /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]

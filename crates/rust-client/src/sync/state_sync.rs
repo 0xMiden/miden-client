@@ -13,6 +13,7 @@ use miden_objects::{
     note::{NoteId, NoteTag},
     transaction::PartialBlockchain,
 };
+use miden_tx::auth::TransactionAuthenticator;
 use tonic::async_trait;
 use tracing::info;
 
@@ -21,12 +22,12 @@ use super::{
 };
 use crate::{
     ClientError,
-    note::{NoteScreener, NoteUpdateTracker},
+    note::NoteUpdateTracker,
     rpc::{
         NodeRpcClient,
         domain::{note::CommittedNote, transaction::TransactionInclusion},
     },
-    store::{InputNoteRecord, NoteFilter, OutputNoteRecord, Store, StoreError},
+    store::{InputNoteRecord, OutputNoteRecord, Store, StoreError},
     transaction::TransactionRecord,
 };
 
@@ -73,7 +74,7 @@ pub struct StateSync<STORE: Store, AUTH: TransactionAuthenticator> {
     tx_graceful_blocks: Option<u32>,
 }
 
-impl<STORE: Store, AUTH: TransactionAuthenticator> StateSync<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> StateSync<STORE, AUTH> {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments

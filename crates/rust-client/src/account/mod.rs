@@ -88,7 +88,7 @@ pub mod component {
 ///   with the network.
 ///
 /// - **Data retrieval:** The module also provides methods to fetch account-related data.
-impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 

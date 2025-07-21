@@ -71,7 +71,7 @@ use miden_tx::{
 use crate::{
     Client, ClientError,
     note::NoteScreener,
-    store::{NoteFilter, TransactionFilter},
+    store::{NoteFilter, Store, TransactionFilter},
 };
 mod block_header;
 
@@ -87,7 +87,7 @@ pub use state_sync_update::{
 };
 
 /// Client synchronization methods.
-impl<STORE: Store, AUTH: TransactionAuthenticator> Client<STORE, AUTH> {
+impl<STORE: Store + 'static, AUTH: TransactionAuthenticator + 'static> Client<STORE, AUTH> {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
 
