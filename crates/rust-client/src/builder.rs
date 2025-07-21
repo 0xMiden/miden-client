@@ -219,18 +219,13 @@ impl ClientBuilder {
 
         // Initialize the authenticator.
         let authenticator = match self.keystore {
-            Some(AuthenticatorConfig::Instance(authenticator)) => authenticator,
+            Some(AuthenticatorConfig::Instance(authenticator)) => Some(authenticator),
             Some(AuthenticatorConfig::Path(ref path)) => {
                 let keystore = FilesystemKeyStore::new(path.into())
                     .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
-                Arc::new(keystore)
+                Some(Arc::new(keystore) as Arc<dyn TransactionAuthenticator>)
             },
-            None => {
-                return Err(ClientError::ClientInitializationError(
-                    "Keystore must be specified. Call `.keystore(...)` or `.filesystem_keystore(...)` with a keystore path."
-                        .into(),
-                ))
-            }
+            None => None,
         };
 
         Ok(Client::new(
