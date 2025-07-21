@@ -1232,7 +1232,7 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
-    use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
+    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
     use miden_objects::{
         Word,
         account::{AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot},
@@ -1281,7 +1281,7 @@ mod test {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(wallet_component)
-            .with_auth_component(RpoFalcon512::new(pub_key))
+            .with_auth_component(AuthRpoFalcon512::new(pub_key))
             .with_assets([asset_1, asset_2])
             .build_existing()
             .unwrap();

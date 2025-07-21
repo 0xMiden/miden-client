@@ -348,7 +348,7 @@ fn foreign_account_with_code(
     .with_supports_all_types();
 
     let secret_key = SecretKey::new();
-    let auth_component = RpoFalcon512::new(secret_key.public_key());
+    let auth_component = AuthRpoFalcon512::new(secret_key.public_key());
 
     let (account, seed) = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())

@@ -27,7 +27,7 @@ use crate::{
     Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
-        component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
+        component::{BasicFungibleFaucet, BasicWallet, AuthRpoFalcon512},
     },
     auth::AuthSecretKey,
     builder::ClientBuilder,
@@ -168,7 +168,7 @@ pub async fn insert_new_wallet_with_seed(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -200,7 +200,7 @@ pub async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();

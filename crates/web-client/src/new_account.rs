@@ -74,7 +74,7 @@ impl WebClient {
             let (new_account, seed) = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
-                .with_auth_component(RpoFalcon512::new(pub_key))
+                .with_auth_component(AuthRpoFalcon512::new(pub_key))
                 .with_component(
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,

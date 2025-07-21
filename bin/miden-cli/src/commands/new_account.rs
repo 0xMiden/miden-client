@@ -18,7 +18,7 @@ use miden_client::{
     transaction::TransactionRequestBuilder,
     utils::Deserializable,
 };
-use miden_lib::account::auth::RpoFalcon512;
+use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
@@ -271,7 +271,7 @@ async fn create_client_account(
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key()));
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()));
 
     // Process component templates and add them to the account builder.
     let account_components = process_component_templates(&component_templates, &init_storage_data)?;
@@ -299,7 +299,7 @@ async fn create_client_account(
 /// Submits a deploy transaction to the node for the specified account.
 async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), CliError> {
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
+    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
     let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
 

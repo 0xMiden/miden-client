@@ -453,7 +453,7 @@ mod tests {
     use std::vec::Vec;
 
     use miden_lib::{
-        account::auth::RpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
+        account::auth::AuthRpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
     };
     use miden_objects::{
         EMPTY_WORD, Felt, Word, ZERO,
@@ -509,7 +509,7 @@ mod tests {
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap(),
             )
-            .with_auth_component(RpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()

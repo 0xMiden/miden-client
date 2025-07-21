@@ -5,7 +5,9 @@ use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::RpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512,
+        faucets::BasicFungibleFaucet,
+        interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
@@ -132,7 +134,7 @@ async fn insert_new_wallet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -163,7 +165,7 @@ async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -312,7 +314,7 @@ async fn insert_same_account_twice_fails() {
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
         Felt::new(2),
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -328,7 +330,7 @@ async fn account_code() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
         Felt::ZERO,
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -352,7 +354,7 @@ async fn get_account_by_id() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
         Felt::new(10),
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::assembler(),
     );
 
@@ -1762,6 +1764,7 @@ async fn swap_chain_test() {
                     Asset::Fungible(FungibleAsset::new(pairs[0].1.id(), 1).unwrap()),
                     Asset::Fungible(FungibleAsset::new(pairs[1].1.id(), 1).unwrap()),
                 ),
+                NoteType::Private,
                 NoteType::Private,
                 client.rng(),
             )
