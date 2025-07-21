@@ -190,8 +190,14 @@ pub struct SwapCmd {
     #[arg(short, long, help=format!("Asset requested.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     requested_asset: String,
 
+    /// Visibility of the swap note to be created.
     #[arg(short, long, value_enum)]
     note_type: NoteType,
+
+    /// Visibility of the payback note.
+    #[arg(short, long, value_enum)]
+    payback_note_type: NoteType,
+
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
     force: bool,
@@ -223,7 +229,12 @@ impl SwapCmd {
         );
 
         let transaction_request = TransactionRequestBuilder::new()
-            .build_swap(&swap_transaction, (&self.note_type).into(), client.rng())
+            .build_swap(
+                &swap_transaction,
+                (&self.note_type).into(),
+                (&self.note_type).into(),
+                client.rng(),
+            )
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
             })?;
