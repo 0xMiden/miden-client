@@ -15,7 +15,7 @@ impl AuthSecretKey {
     #[wasm_bindgen(js_name = "getRpoFalcon512PublicKeyAsWord")]
     pub fn get_rpo_falcon_512_public_key_as_word(&self) -> Word {
         let public_key = match self.0 {
-            NativeAuthSecretKey::AuthRpoFalcon512(ref key) => key.public_key(),
+            NativeAuthSecretKey::RpoFalcon512(ref key) => key.public_key(),
         };
         let public_key_as_native_word: NativeWord = public_key.into();
         public_key_as_native_word.into()
@@ -24,7 +24,7 @@ impl AuthSecretKey {
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match self.0 {
-            NativeAuthSecretKey::AuthRpoFalcon512(ref key) => key.to_bytes(),
+            NativeAuthSecretKey::RpoFalcon512(ref key) => key.to_bytes(),
         };
 
         let secret_key_as_native_felts = secret_key_as_bytes

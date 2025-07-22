@@ -2,7 +2,7 @@ use miden_client::{
     account::{Account, AccountBuilder, AccountType},
     crypto::SecretKey,
 };
-use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_lib::account::{auth::AuthRpoFalcon512, wallets::BasicWallet};
 use miden_objects::Felt;
 use rand::{RngCore, SeedableRng, rngs::StdRng};
 use wasm_bindgen::JsValue;

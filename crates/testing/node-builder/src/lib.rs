@@ -357,7 +357,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     Ok(AccountFile::new(
         updated_account,
         Some(account_seed),
-        vec![AuthSecretKey::AuthRpoFalcon512(secret)],
+        vec![AuthSecretKey::RpoFalcon512(secret)],
     ))
 }
 
