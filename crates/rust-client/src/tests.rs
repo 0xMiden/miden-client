@@ -5,9 +5,7 @@ use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::AuthRpoFalcon512,
-        faucets::BasicFungibleFaucet,
-        interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
@@ -90,7 +88,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    let rpc_api = MockRpcApi::new();
+    let rpc_api = MockRpcApi::new().await;
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let builder = ClientBuilder::new()

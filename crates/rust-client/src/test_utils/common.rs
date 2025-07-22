@@ -27,7 +27,7 @@ use crate::{
     Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
-        component::{BasicFungibleFaucet, BasicWallet, AuthRpoFalcon512},
+        component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet},
     },
     auth::AuthSecretKey,
     builder::ClientBuilder,

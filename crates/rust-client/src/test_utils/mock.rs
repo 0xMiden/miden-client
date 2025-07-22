@@ -10,10 +10,10 @@ use miden_objects::{
         rand::RpoRandomCoin,
     },
     note::{NoteExecutionMode, NoteId, NoteTag, NoteType, Nullifier},
-    testing::{account_id::ACCOUNT_ID_PRIVATE_SENDER, note::NoteBuilder},
-    transaction::{InputNoteCommitment, OutputNote, ProvenTransaction},
+    testing::note::NoteBuilder,
+    transaction::{OutputNote, ProvenTransaction},
 };
-use miden_testing::{MockChain, MockChainNote};
+use miden_testing::{MockChain, MockChainBuilder, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::{
@@ -44,24 +44,17 @@ pub struct MockRpcApi {
     committed_transactions: Arc<RwLock<Vec<TransactionSummary>>>, /* TODO: Should this be tracked by the mock_chain? */
     pub mock_chain: Arc<RwLock<MockChain>>,
 }
-impl Default for MockRpcApi {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+
 impl MockRpcApi {
     /// Creates a new `MockRpcApi` instance with pre-populated blocks and notes.
-    pub fn new() -> Self {
-        let mock_chain = MockChain::new();
-        let api = Self {
-            committed_transactions: Arc::new(RwLock::new(vec![])),
-            mock_chain: Arc::new(RwLock::new(mock_chain)),
-        };
-
-        let from_account_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
+    pub async fn new() -> Self {
+        let mut mock_chain_builder = MockChainBuilder::new();
+        let mock_account = mock_chain_builder
+            .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+            .unwrap();
 
         let note_first = NoteBuilder::new(
-            from_account_id,
+            mock_account.id(),
             RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()),
         )
         .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
@@ -69,36 +62,48 @@ impl MockRpcApi {
         .unwrap();
 
         let note_second = NoteBuilder::new(
-            from_account_id,
+            mock_account.id(),
             RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()),
         )
         .note_type(NoteType::Private)
         .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
         .build(&TransactionKernel::assembler())
         .unwrap();
+        let mut mock_chain = mock_chain_builder.build().unwrap();
 
-        api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note
-        api.seal_block(vec![], vec![]); // Block 2
-        api.seal_block(vec![], vec![]); // Block 3
-        api.seal_block(vec![OutputNote::Full(note_second.clone())], vec![]); // Block 4 - Second note
-        api.seal_block(vec![], vec![note_second.nullifier()]); // Block 5 - Second note nullifier
+        // Block 1: Create first note
+        mock_chain.add_pending_note(OutputNote::Full(note_first));
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 2
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 3
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 4: Create second note
+        mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
+        mock_chain.prove_next_block().unwrap();
+
+        let transaction = mock_chain
+            .build_tx_context(mock_account, &[note_second.id()], &[])
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute()
+            .await
+            .unwrap();
+
+        // Block 5: Consume (nullify) second note
+        mock_chain.add_pending_executed_transaction(&transaction).unwrap();
+        mock_chain.prove_next_block().unwrap();
+
+        let api = Self {
+            committed_transactions: Arc::new(RwLock::new(vec![])),
+            mock_chain: Arc::new(RwLock::new(mock_chain)),
+        };
 
         api
-    }
-
-    /// Seals a block with the given notes and nullifiers.
-    fn seal_block(&self, notes: Vec<OutputNote>, nullifiers: Vec<miden_objects::note::Nullifier>) {
-        let mut mock_chain = self.mock_chain.write();
-
-        for note in notes {
-            mock_chain.add_pending_note(note);
-        }
-
-        for nullifier in nullifiers {
-            mock_chain.add_pending_nullifier(nullifier);
-        }
-
-        mock_chain.prove_next_block().unwrap();
     }
 
     /// Returns the current MMR of the blockchain.
@@ -309,15 +314,11 @@ impl NodeRpcClient for MockRpcApi {
         proven_transaction: ProvenTransaction,
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
-        let notes: Vec<OutputNote> = proven_transaction.output_notes().iter().cloned().collect();
 
-        let nullifiers: Vec<Nullifier> = proven_transaction
-            .input_notes()
-            .iter()
-            .map(InputNoteCommitment::nullifier)
-            .collect();
+        let mut mock_chain = self.mock_chain.write();
+        mock_chain.add_pending_proven_transaction(proven_transaction.clone());
 
-        self.seal_block(notes, nullifiers);
+        mock_chain.prove_next_block().unwrap();
         self.committed_transactions.write().push(TransactionSummary {
             transaction_id: Some(proven_transaction.id().into()),
             block_num: self.get_chain_tip_block_num().as_u32(),
