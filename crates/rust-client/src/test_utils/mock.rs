@@ -30,10 +30,11 @@ use crate::{
             note::NoteSyncRecord, responses::SyncStateResponse, transaction::TransactionSummary,
         },
     },
+    testing::common::TestClientKeyStore,
     transaction::ForeignAccount,
 };
 
-pub type MockClient = Client;
+pub type MockClient = Client<TestClientKeyStore>;
 
 /// Mock RPC API
 ///

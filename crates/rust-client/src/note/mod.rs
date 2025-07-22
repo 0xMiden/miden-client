@@ -59,6 +59,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use miden_objects::account::AccountId;
+use miden_tx::auth::TransactionAuthenticator;
 
 use crate::{
     Client, ClientError, IdPrefixFetchError,
@@ -92,7 +93,10 @@ pub use note_update_tracker::{
 };
 
 /// Note retrieval methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
     // INPUT NOTE DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -195,10 +199,13 @@ impl Client {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub async fn get_input_note_with_id_prefix(
-    client: &Client,
+pub async fn get_input_note_with_id_prefix<AUTH>(
+    client: &Client<AUTH>,
     note_id_prefix: &str,
-) -> Result<InputNoteRecord, IdPrefixFetchError> {
+) -> Result<InputNoteRecord, IdPrefixFetchError>
+where
+    AUTH: TransactionAuthenticator,
+{
     let mut input_note_records = client
         .get_input_notes(NoteFilter::All)
         .await

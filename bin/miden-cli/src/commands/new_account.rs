@@ -13,7 +13,7 @@ use miden_client::{
         Account, AccountBuilder, AccountStorageMode, AccountType,
         component::COMPONENT_TEMPLATE_EXTENSION,
     },
-    auth::AuthSecretKey,
+    auth::{AuthSecretKey, TransactionAuthenticator},
     crypto::SecretKey,
     transaction::TransactionRequestBuilder,
     utils::Deserializable,
@@ -101,7 +101,11 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let mut component_template_paths = vec![PathBuf::from("basic-wallet")];
         component_template_paths.extend(self.extra_components.iter().cloned());
 
@@ -170,7 +174,11 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
             &keystore,
@@ -240,8 +248,8 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 ///
 /// The created account will have a Falcon-based auth component, additional to any specified
 /// component.
-async fn create_client_account(
-    client: &mut Client,
+async fn create_client_account<AUTH: TransactionAuthenticator + 'static>(
+    client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
@@ -297,7 +305,10 @@ async fn create_client_account(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), CliError> {
+async fn deploy_account<AUTH: TransactionAuthenticator + 'static>(
+    client: &mut Client<AUTH>,
+    account: &Account,
+) -> Result<(), CliError> {
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
     // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.

@@ -50,18 +50,18 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
-pub struct NoteScreener {
+pub struct NoteScreener<AUTH> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
     /// A reference to the transaction authenticator
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
 }
 
-impl NoteScreener {
-    pub fn new(
-        store: Arc<dyn Store>,
-        authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    ) -> Self {
+impl<AUTH> NoteScreener<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
+    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
     }
 
@@ -130,8 +130,10 @@ impl NoteScreener {
             .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
-        let transaction_executor =
-            TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+        let transaction_executor = TransactionExecutor::new(
+            &data_store,
+            self.authenticator.as_ref().map(|arc| arc.as_ref()),
+        );
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());

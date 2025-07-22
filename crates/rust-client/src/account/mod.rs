@@ -87,7 +87,7 @@ pub mod component {
 ///   with the network.
 ///
 /// - **Data retrieval:** The module also provides methods to fetch account-related data.
-impl Client {
+impl<AUTH> Client<AUTH> {
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 

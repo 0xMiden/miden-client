@@ -44,8 +44,8 @@ use crate::{
     },
 };
 
-pub type TestClient = Client;
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
+pub type TestClient = Client<TestClientKeyStore>;
 
 // CONSTANTS
 // ================================================================================================
@@ -66,7 +66,8 @@ pub const RECALL_HEIGHT_DELTA: u32 = 50;
 ///
 /// Panics if there is no config file at `TEST_CLIENT_CONFIG_FILE_PATH`, or if it cannot be
 /// deserialized.
-pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore) {
+pub async fn create_test_client_builder() -> (ClientBuilder<TestClientKeyStore>, TestClientKeyStore)
+{
     let (rpc_endpoint, rpc_timeout, store_config, auth_path) = get_client_config();
 
     let store = {
@@ -143,7 +144,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
 
 /// Inserts a new wallet account into the client and into the keystore.
 pub async fn insert_new_wallet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {
@@ -155,7 +156,7 @@ pub async fn insert_new_wallet(
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
 pub async fn insert_new_wallet_with_seed(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
@@ -180,7 +181,7 @@ pub async fn insert_new_wallet_with_seed(
 
 /// Inserts a new fungible faucet account into the client and into the keystore.
 pub async fn insert_new_fungible_faucet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {

@@ -92,9 +92,9 @@ impl FaucetDetailsMap {
     /// - A faucet ID was provided but the amount isn't in base units.
     /// - The amount has more than the allowed number of decimals.
     /// - The token symbol isn't present in the token symbol map file.
-    pub async fn parse_fungible_asset(
+    pub async fn parse_fungible_asset<AUTH>(
         &self,
-        client: &Client,
+        client: &Client<AUTH>,
         arg: &str,
     ) -> Result<FungibleAsset, CliError> {
         let (amount, asset) = arg.split_once("::").ok_or(CliError::Parse(
