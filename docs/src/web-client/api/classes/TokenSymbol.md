@@ -2,29 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteId
+[@demox-labs/miden-sdk](../README.md) / TokenSymbol
 
-# Class: NoteId
+# Class: TokenSymbol
 
 ## Constructors
 
 ### Constructor
 
-> **new NoteId**(`recipient_digest`, `asset_commitment_digest`): `NoteId`
+> **new TokenSymbol**(`symbol`): `TokenSymbol`
 
 #### Parameters
 
-##### recipient\_digest
+##### symbol
 
-[`Word`](Word.md)
-
-##### asset\_commitment\_digest
-
-[`Word`](Word.md)
+`string`
 
 #### Returns
 
-`NoteId`
+`TokenSymbol`
 
 ## Methods
 
