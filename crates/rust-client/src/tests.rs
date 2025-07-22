@@ -23,18 +23,22 @@ use miden_objects::{
         rand::{FeltRng, RpoRandomCoin},
     },
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteFile, NoteInputs, NoteMetadata, NoteRecipient,
-        NoteTag, NoteType,
+        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
+        NoteRecipient, NoteTag, NoteType,
     },
-    testing::account_id::{
-        ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
+    testing::{
+        account_id::{
+            ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+            ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+            ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+            ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
+        },
+        note::NoteBuilder,
     },
     transaction::{InputNote, OutputNote},
     vm::AdviceInputs,
 };
+use miden_testing::{MockChain, MockChainBuilder};
 use miden_tx::{
     TransactionExecutorError,
     utils::{Deserializable, Serializable},
@@ -89,7 +93,7 @@ pub async fn create_test_client_builder()
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    let rpc_api = MockRpcApi::new().await;
+    let rpc_api = MockRpcApi::new(create_prebuilt_mock_chain().await);
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let builder = ClientBuilder::new()
@@ -110,6 +114,56 @@ pub async fn create_test_client()
     client.ensure_genesis_in_place().await.unwrap();
 
     (client, rpc_api, keystore)
+}
+
+pub async fn create_prebuilt_mock_chain() -> MockChain {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+
+    let note_first =
+        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+            .build(&TransactionKernel::assembler())
+            .unwrap();
+
+    let note_second =
+        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+            .note_type(NoteType::Private)
+            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+            .build(&TransactionKernel::assembler())
+            .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // Block 1: Create first note
+    mock_chain.add_pending_note(OutputNote::Full(note_first));
+    mock_chain.prove_next_block().unwrap();
+
+    // Block 2
+    mock_chain.prove_next_block().unwrap();
+
+    // Block 3
+    mock_chain.prove_next_block().unwrap();
+
+    // Block 4: Create second note
+    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
+    mock_chain.prove_next_block().unwrap();
+
+    let transaction = mock_chain
+        .build_tx_context(mock_account, &[note_second.id()], &[])
+        .unwrap()
+        .build()
+        .unwrap()
+        .execute()
+        .await
+        .unwrap();
+
+    // Block 5: Consume (nullify) second note
+    mock_chain.add_pending_executed_transaction(&transaction).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    mock_chain
 }
 
 pub fn create_test_store_path() -> std::path::PathBuf {
@@ -471,7 +525,7 @@ async fn sync_state_mmr() {
 
     // Try reconstructing the partial_mmr from what's in the database
     let partial_mmr = client.build_current_partial_mmr().await.unwrap();
-    assert_eq!(partial_mmr.forest().num_leaves(), 6);
+    assert!(partial_mmr.forest().num_leaves() >= 6);
     assert!(partial_mmr.open(0).unwrap().is_none());
     assert!(partial_mmr.open(1).unwrap().is_some());
     assert!(partial_mmr.open(2).unwrap().is_none());

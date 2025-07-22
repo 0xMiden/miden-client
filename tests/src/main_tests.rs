@@ -4,7 +4,7 @@ use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
-    rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
+    rpc::{Endpoint, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
@@ -355,8 +355,7 @@ async fn get_account_update() {
     // Request updates from node for both accounts. The request should not fail and both types of
     // [`AccountDetails`] should be received.
     // TODO: should we expose the `get_account_update` endpoint from the Client?
-    let (endpoint, timeout, ..) = get_client_config();
-    let rpc_api = TonicRpcClient::new(&endpoint, timeout);
+    let rpc_api = client.test_rpc_api();
     let details1 = rpc_api.get_account_details(basic_wallet_1.id()).await.unwrap();
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 

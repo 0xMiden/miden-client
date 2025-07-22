@@ -1,19 +1,23 @@
-use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
-
-use miden_lib::transaction::TransactionKernel;
-use miden_objects::{
-    Felt, Word,
-    account::{AccountCode, AccountDelta, AccountId},
-    block::{BlockHeader, BlockNumber, ProvenBlock},
-    crypto::{
-        merkle::{Forest, MerklePath, Mmr, MmrProof, SmtProof},
-        rand::RpoRandomCoin,
-    },
-    note::{NoteExecutionMode, NoteId, NoteTag, NoteType, Nullifier},
-    testing::note::NoteBuilder,
-    transaction::{OutputNote, ProvenTransaction},
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    vec::Vec,
 };
-use miden_testing::{MockChain, MockChainBuilder, MockChainNote};
+
+use miden_objects::{
+    LexicographicWord, Word,
+    account::{
+        Account, AccountCode, AccountDelta, AccountId, AccountStorageDelta, AccountVaultDelta,
+        FungibleAssetDelta, NonFungibleAssetDelta, NonFungibleDeltaAction, StorageSlot,
+        delta::AccountUpdateDetails,
+    },
+    asset::Asset,
+    block::{BlockHeader, BlockNumber, ProvenBlock},
+    crypto::merkle::{Forest, MerklePath, Mmr, MmrProof, SmtProof},
+    note::{NoteId, NoteTag, Nullifier},
+    transaction::ProvenTransaction,
+};
+use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::{
@@ -21,13 +25,16 @@ use crate::{
     rpc::{
         NodeRpcClient, RpcError,
         domain::{
-            account::{AccountProofs, FetchedAccount},
+            account::{
+                AccountProof, AccountProofs, AccountUpdateSummary, FetchedAccount, StateHeaders,
+            },
             note::{CommittedNote, FetchedNote, NoteSyncInfo},
             nullifier::NullifierUpdate,
             sync::StateSyncInfo,
         },
         generated::{
-            note::NoteSyncRecord, responses::SyncStateResponse, transaction::TransactionSummary,
+            account::AccountSummary, note::NoteSyncRecord, responses::SyncStateResponse,
+            transaction::TransactionSummary,
         },
     },
     transaction::ForeignAccount,
@@ -37,69 +44,30 @@ pub type MockClient<AUTH> = Client<AUTH>;
 
 /// Mock RPC API
 ///
-/// This struct implements the RPC API used by the client to communicate with the node. It is
-/// intended to be used for testing purposes only.
+/// This struct implements the RPC API used by the client to communicate with the node. It simulates
+/// most of the functionality of the actual node, with some small differences:
+/// - It uses a `MockChain` to simulate the blockchain state.
+/// - Blocks are not automatically created after time passes, but rather a new block is created on
+///   specific rpc requests:
+///     - Each `prove_next_block` call will create a new block with the elements created by the
+///       transaction.
+///     - Each `sync_state` call will create a new empty block to simulate the real node's automatic
+///       block creation.
 #[derive(Clone)]
 pub struct MockRpcApi {
-    committed_transactions: Arc<RwLock<Vec<TransactionSummary>>>, /* TODO: Should this be tracked by the mock_chain? */
     pub mock_chain: Arc<RwLock<MockChain>>,
 }
 
+impl Default for MockRpcApi {
+    fn default() -> Self {
+        Self::new(MockChain::new())
+    }
+}
+
 impl MockRpcApi {
-    /// Creates a new `MockRpcApi` instance with pre-populated blocks and notes.
-    pub async fn new() -> Self {
-        let mut mock_chain_builder = MockChainBuilder::new();
-        let mock_account = mock_chain_builder
-            .add_existing_mock_account(miden_testing::Auth::IncrNonce)
-            .unwrap();
-
-        let note_first = NoteBuilder::new(
-            mock_account.id(),
-            RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()),
-        )
-        .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-        .build(&TransactionKernel::assembler())
-        .unwrap();
-
-        let note_second = NoteBuilder::new(
-            mock_account.id(),
-            RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()),
-        )
-        .note_type(NoteType::Private)
-        .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-        .build(&TransactionKernel::assembler())
-        .unwrap();
-        let mut mock_chain = mock_chain_builder.build().unwrap();
-
-        // Block 1: Create first note
-        mock_chain.add_pending_note(OutputNote::Full(note_first));
-        mock_chain.prove_next_block().unwrap();
-
-        // Block 2
-        mock_chain.prove_next_block().unwrap();
-
-        // Block 3
-        mock_chain.prove_next_block().unwrap();
-
-        // Block 4: Create second note
-        mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
-        mock_chain.prove_next_block().unwrap();
-
-        let transaction = mock_chain
-            .build_tx_context(mock_account, &[note_second.id()], &[])
-            .unwrap()
-            .build()
-            .unwrap()
-            .execute()
-            .await
-            .unwrap();
-
-        // Block 5: Consume (nullify) second note
-        mock_chain.add_pending_executed_transaction(&transaction).unwrap();
-        mock_chain.prove_next_block().unwrap();
-
+    /// Creates a new `MockRpcApi` instance with the state of the provided `MockChain`.
+    pub fn new(mock_chain: MockChain) -> Self {
         Self {
-            committed_transactions: Arc::new(RwLock::new(vec![])),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
         }
     }
@@ -124,6 +92,7 @@ impl MockRpcApi {
         &self,
         request_block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
+        account_ids: &[AccountId],
     ) -> Result<SyncStateResponse, RpcError> {
         // Determine the next block number to sync
         let next_block_num = self
@@ -158,21 +127,52 @@ impl MockRpcApi {
             .unwrap();
 
         // Collect notes that are in the next block
-        let notes = self.get_notes_in_block(next_block_num, note_tags);
+        let notes = self.get_notes_in_block(next_block_num, note_tags, account_ids);
 
         let transactions = self
-            .committed_transactions
+            .mock_chain
             .read()
+            .proven_blocks()
             .iter()
-            .filter(|tx| tx.block_num == next_block_num.as_u32())
-            .cloned()
+            .filter(|block| {
+                block.header().block_num() > request_block_num
+                    && block.header().block_num() <= next_block_num
+            })
+            .flat_map(|block| {
+                block.transactions().as_slice().iter().map(|tx| TransactionSummary {
+                    transaction_id: Some(tx.id().into()),
+                    block_num: next_block_num.as_u32(),
+                    account_id: Some(tx.account_id().into()),
+                })
+            })
+            .collect();
+
+        let accounts = self
+            .mock_chain
+            .read()
+            .account_tree()
+            .account_commitments()
+            .filter_map(|(account_id, commitment)| {
+                if account_ids.contains(&account_id) {
+                    Some(AccountSummary {
+                        account_id: Some(account_id.into()),
+                        account_commitment: Some(commitment.into()),
+                        // TODO: The `block_num` should be the block number where the account was
+                        // last updated. This isn't tracked by the
+                        // MockChain. For now, we use the chain tip block number.
+                        block_num: next_block_num.as_u32(),
+                    })
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         Ok(SyncStateResponse {
             chain_tip: self.get_chain_tip_block_num().as_u32(),
             block_header: Some(next_block.into()),
             mmr_delta: Some(mmr_delta.try_into()?),
-            accounts: vec![],
+            accounts,
             transactions,
             notes,
         })
@@ -183,6 +183,7 @@ impl MockRpcApi {
         &self,
         block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
+        account_ids: &[AccountId],
     ) -> Vec<NoteSyncRecord> {
         self.mock_chain
             .read()
@@ -190,7 +191,8 @@ impl MockRpcApi {
             .values()
             .filter_map(move |note| {
                 if note.inclusion_proof().location().block_num() == block_num
-                    && note_tags.contains(&note.metadata().tag())
+                    && (note_tags.contains(&note.metadata().tag())
+                        || account_ids.contains(&note.metadata().sender()))
                 {
                     Some(NoteSyncRecord {
                         note_index: u32::from(
@@ -223,17 +225,19 @@ use alloc::boxed::Box;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    /// Returns the next note updates after the specified block number. Only notes that match the
+    /// provided tags will be returned.
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags)?;
+        let response = self.get_sync_state_request(block_num, note_tags, &[])?;
 
         let response = NoteSyncInfo {
             chain_tip: response.chain_tip,
             block_header: response.block_header.unwrap().try_into().unwrap(),
-            mmr_path: MerklePath::default(),
+            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
             notes: response
                 .notes
                 .into_iter()
@@ -252,21 +256,31 @@ impl NodeRpcClient for MockRpcApi {
         Ok(response)
     }
 
-    /// Executes the specified sync state request and returns the response.
+    /// Executes the specified sync state request and returns the response. A new empty block will
+    /// be created each time this method is called to simulate the real node's automatic block
+    /// creation.
+    ///
+    /// Account updates for all specified accounts will always be included in the response. This is
+    /// different from the real RPC API, where only accounts that have updates in the specified
+    /// block range will be returned.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
-        _account_ids: &[AccountId],
+        account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags)?;
+        {
+            // This simulates a new block being added to the chain for each sync request.
+            self.mock_chain.write().prove_next_block().unwrap();
+        }
+
+        let response = self.get_sync_state_request(block_num, note_tags, account_ids)?;
 
         Ok(response.try_into().unwrap())
     }
 
-    /// Creates and executes a `GetBlockHeaderByNumberRequest`. Will retrieve the block header
-    /// for the specified block number. If the block number is not provided, the chain tip block
-    /// header will be returned.
+    /// Retrieves the block header for the specified block number. If the block number is not
+    /// provided, the chain tip block header will be returned.
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -287,6 +301,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok((block, mmr_proof))
     }
 
+    /// Returns the node's tracked notes that match the provided note IDs.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         // assume all public notes for now
         let notes = self.mock_chain.read().committed_notes().clone();
@@ -307,6 +322,8 @@ impl NodeRpcClient for MockRpcApi {
         Ok(return_notes)
     }
 
+    /// Simulates the submission of a proven transaction to the node. This will create a new block
+    /// just for the new transaction and return the block number of the newly created block.
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
@@ -322,31 +339,85 @@ impl NodeRpcClient for MockRpcApi {
 
         let block_num = self.get_chain_tip_block_num();
 
-        self.committed_transactions.write().push(TransactionSummary {
-            transaction_id: Some(proven_transaction.id().into()),
-            block_num: block_num.as_u32(),
-            account_id: Some(proven_transaction.account_id().into()),
-        });
-
         Ok(block_num)
     }
 
-    async fn get_account_details(
-        &self,
-        _account_id: AccountId,
-    ) -> Result<FetchedAccount, RpcError> {
-        unimplemented!("shouldn't be used for now")
+    /// Returns the node's tracked account details for the specified account ID.
+    ///
+    /// The `last_block_num` in the returned `AccountUpdateSummary` is always the block number of
+    /// the latest block in the mock chain, as the `MockChain` does not track the last update
+    /// block number for accounts.
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
+        let mock_chain = self.mock_chain.read();
+        let commitment = mock_chain.account_tree().open(account_id).state_commitment();
+        let chain_tip = mock_chain.latest_block_header().block_num();
+
+        let summary = AccountUpdateSummary {
+            commitment,
+            // TODO: The `last_block_num` should be the block number where the account was last
+            // updated. This isn't tracked by the MockChain. For now, we use the chain
+            // tip block number.
+            last_block_num: chain_tip.as_u32(),
+        };
+
+        if let Ok(account) = mock_chain.committed_account(account_id) {
+            Ok(FetchedAccount::Public(account.clone(), summary))
+        } else {
+            Ok(FetchedAccount::Private(account_id, summary))
+        }
     }
 
+    /// Returns the account proofs for the specified accounts. The `known_account_codes` parameter
+    /// is ignored in the mock implementation and the latest account code is always returned.
     async fn get_account_proofs(
         &self,
-        _: &BTreeSet<ForeignAccount>,
-        _code_commitments: Vec<AccountCode>,
+        account_storage_requests: &BTreeSet<ForeignAccount>,
+        _known_account_codes: Vec<AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
-        // TODO: Implement fully
-        unimplemented!("shouldn't be used for now")
+        let mock_chain = self.mock_chain.read();
+
+        let chain_tip = mock_chain.latest_block_header().block_num();
+        let mut proofs = vec![];
+        for account in account_storage_requests {
+            let headers = match account {
+                ForeignAccount::Public(account_id, account_storage_requirements) => {
+                    let account = mock_chain.committed_account(*account_id).unwrap();
+
+                    let mut storage_slots = BTreeMap::new();
+                    for (index, storage_keys) in account_storage_requirements.inner() {
+                        if let Some(StorageSlot::Map(storage_map)) =
+                            account.storage().slots().get(*index as usize)
+                        {
+                            let proofs = storage_keys
+                                .iter()
+                                .map(|map_key| storage_map.open(map_key))
+                                .collect::<Vec<_>>();
+                            storage_slots.insert(*index, proofs);
+                        } else {
+                            panic!("Storage slot at index {} is not a map", index);
+                        }
+                    }
+
+                    Some(StateHeaders {
+                        account_header: account.into(),
+                        storage_header: account.storage().to_header(),
+                        code: account.code().clone(),
+                        storage_slots,
+                    })
+                },
+                ForeignAccount::Private(_) => None,
+            };
+
+            let witness = mock_chain.account_tree().open(account.account_id());
+
+            proofs.push(AccountProof::new(witness, headers).unwrap());
+        }
+
+        Ok((chain_tip, proofs))
     }
 
+    /// Returns the nullifiers created after the specified block number that match the provided
+    /// prefixes.
     async fn check_nullifiers_by_prefix(
         &self,
         prefixes: &[u16],
@@ -369,17 +440,56 @@ impl NodeRpcClient for MockRpcApi {
         Ok(nullifiers)
     }
 
-    async fn check_nullifiers(&self, _nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        unimplemented!("shouldn't be used for now")
+    /// Returns proofs for all the provided nullifiers.
+    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
+        Ok(nullifiers
+            .iter()
+            .map(|nullifier| self.mock_chain.read().nullifier_tree().open(nullifier).into_proof())
+            .collect())
     }
 
+    /// Returns the account state delta for the specified account ID between the given block range.
+    ///
+    /// If the account was created in the specified block range, it will return a delta including
+    /// the starting state of the account, with its initial storage and vault contents.
     async fn get_account_state_delta(
         &self,
-        _account_id: AccountId,
-        _from_block: BlockNumber,
-        _to_block: BlockNumber,
+        account_id: AccountId,
+        from_block: BlockNumber,
+        to_block: BlockNumber,
     ) -> Result<AccountDelta, RpcError> {
-        unimplemented!("shouldn't be used for now")
+        let mock_chain = self.mock_chain.read();
+        let proven_blocks = mock_chain
+            .proven_blocks()
+            .iter()
+            .filter(|block| {
+                block.header().block_num() > from_block && block.header().block_num() <= to_block
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let account_deltas = proven_blocks.iter().flat_map(|block| {
+            block.updated_accounts().iter().filter_map(|update| {
+                if update.account_id() == account_id {
+                    match update.details() {
+                        AccountUpdateDetails::Private => None,
+                        AccountUpdateDetails::Delta(delta) => Some(delta.clone()),
+                        AccountUpdateDetails::New(account) => Some(build_starting_delta(account)), //TODO: this might need to be handled
+                    }
+                } else {
+                    None
+                }
+            })
+        });
+
+        let combined_delta = account_deltas
+            .reduce(|mut accumulator, delta| {
+                accumulator.merge(delta).unwrap();
+                accumulator
+            })
+            .unwrap();
+
+        Ok(combined_delta)
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
@@ -394,4 +504,54 @@ impl NodeRpcClient for MockRpcApi {
 
         Ok(block)
     }
+}
+
+/// Builds an [`AccountDelta`] from the given [`Account`]. This delta represents the
+/// starting state of the account, including its storage and vault contents.
+fn build_starting_delta(account: &Account) -> AccountDelta {
+    // Build storage delta
+    let mut values = BTreeMap::new();
+    let mut maps = BTreeMap::new();
+    for (slot_idx, slot) in account.storage().clone().into_iter().enumerate() {
+        let slot_idx: u8 = slot_idx.try_into().expect("slot index must fit into `u8`");
+
+        match slot {
+            StorageSlot::Value(value) => {
+                values.insert(slot_idx, value);
+            },
+
+            StorageSlot::Map(map) => {
+                maps.insert(slot_idx, map.into());
+            },
+        }
+    }
+    let storage_delta = AccountStorageDelta::from_parts(values, maps).unwrap();
+
+    // Build vault delta
+    let mut fungible = BTreeMap::new();
+    let mut non_fungible = BTreeMap::new();
+    for asset in account.vault().assets() {
+        match asset {
+            Asset::Fungible(asset) => {
+                fungible.insert(
+                    asset.faucet_id(),
+                    asset
+                        .amount()
+                        .try_into()
+                        .expect("asset amount should be at most i64::MAX by construction"),
+                );
+            },
+
+            Asset::NonFungible(asset) => {
+                non_fungible.insert(LexicographicWord::new(asset), NonFungibleDeltaAction::Add);
+            },
+        }
+    }
+
+    let vault_delta = AccountVaultDelta::new(
+        FungibleAssetDelta::new(fungible).unwrap(),
+        NonFungibleAssetDelta::new(non_fungible),
+    );
+
+    AccountDelta::new(account.id(), storage_delta, vault_delta, account.nonce()).unwrap()
 }
