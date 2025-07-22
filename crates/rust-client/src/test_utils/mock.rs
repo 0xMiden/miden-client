@@ -315,17 +315,22 @@ impl NodeRpcClient for MockRpcApi {
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 
-        let mut mock_chain = self.mock_chain.write();
-        mock_chain.add_pending_proven_transaction(proven_transaction.clone());
+        {
+            let mut mock_chain = self.mock_chain.write();
+            mock_chain.add_pending_proven_transaction(proven_transaction.clone());
 
-        mock_chain.prove_next_block().unwrap();
+            mock_chain.prove_next_block().unwrap();
+        };
+
+        let block_num = self.get_chain_tip_block_num();
+
         self.committed_transactions.write().push(TransactionSummary {
             transaction_id: Some(proven_transaction.id().into()),
-            block_num: self.get_chain_tip_block_num().as_u32(),
+            block_num: block_num.as_u32(),
             account_id: Some(proven_transaction.account_id().into()),
         });
 
-        Ok(self.get_chain_tip_block_num())
+        Ok(block_num)
     }
 
     async fn get_account_details(
