@@ -232,8 +232,14 @@ export const swapTransaction = async (
       const assetAFaucetId = window.AccountId.fromHex(_assetAFaucetId);
       const assetBFaucetId = window.AccountId.fromHex(_assetBFaucetId);
 
-      const swapNoteType = _swapNoteType === "public" ? window.NoteType.Public : window.NoteType.Private;
-      const paybackNoteType = _paybackNoteType === "public" ? window.NoteType.Public : window.NoteType.Private;
+      const swapNoteType =
+        _swapNoteType === "public"
+          ? window.NoteType.Public
+          : window.NoteType.Private;
+      const paybackNoteType =
+        _paybackNoteType === "public"
+          ? window.NoteType.Public
+          : window.NoteType.Private;
 
       // Swap transaction
 

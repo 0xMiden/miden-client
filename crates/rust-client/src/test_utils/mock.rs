@@ -98,12 +98,10 @@ impl MockRpcApi {
         mock_chain.add_pending_executed_transaction(&transaction).unwrap();
         mock_chain.prove_next_block().unwrap();
 
-        let api = Self {
+        Self {
             committed_transactions: Arc::new(RwLock::new(vec![])),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
-        };
-
-        api
+        }
     }
 
     /// Returns the current MMR of the blockchain.
