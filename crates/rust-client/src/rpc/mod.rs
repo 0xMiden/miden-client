@@ -118,17 +118,17 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
-    /// Fetches note-related data for a list of [NoteId] using the `/GetNotesById` rpc endpoint.
+    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
     ///
-    /// For any NoteType::Private note, the return data is only the
-    /// [miden_objects::note::NoteMetadata], whereas for NoteType::Onchain notes, the return
+    /// For any `NoteType::Private` note, the return data is only the
+    /// [`miden_objects::note::NoteMetadata`], whereas for `NoteType::Onchain` notes, the return
     /// data includes all details.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client. The returned [StateSyncInfo]
+    /// - `block_num` is the last block number known by the client. The returned [`StateSyncInfo`]
     ///   should contain data starting from the next block, until the first block which contains a
     ///   note of matching the requested tag, or the chain tip if there are no notes.
     /// - `account_ids` is a list of account IDs and determines the accounts the client is
@@ -201,7 +201,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// then `None` is returned.
     /// The `block_num` parameter is the block number to start the search from.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::check_nullifiers_by_prefix].
+    /// The default implementation of this method uses [`NodeRpcClient::check_nullifiers_by_prefix`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
@@ -215,7 +215,7 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|update| update.block_num))
     }
 
-    /// Fetches public note-related data for a list of [NoteId] and builds [InputNoteRecord]s with
+    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s with
     /// it. If a note is not found or it's private, it is ignored and will not be included in the
     /// returned list.
     ///
@@ -308,6 +308,7 @@ pub enum NodeRpcClientEndpoint {
     GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
+    GetNotesById,
     SyncState,
     SubmitProvenTx,
     SyncNotes,
@@ -327,6 +328,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
             },
+            NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
