@@ -179,7 +179,15 @@ impl Client {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account =
+            self.rpc_api.get_account_details(account_id).await.map_err(|err| {
+                let err_str = format!("{err}").to_lowercase();
+                if err_str.contains("not found") || err_str.contains("unknown accountidversion") {
+                    ClientError::AccountNotFoundOnNetwork(account_id)
+                } else {
+                    ClientError::RpcError(err)
+                }
+            })?;
 
         let account = match fetched_account {
             FetchedAccount::Private(..) => {

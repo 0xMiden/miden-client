@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeSet, string::String, sync::Arc, vec::Vec};
 
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
@@ -327,11 +327,13 @@ impl NodeRpcClient for MockRpcApi {
         Ok(self.get_chain_tip_block_num())
     }
 
-    async fn get_account_details(
-        &self,
-        _account_id: AccountId,
-    ) -> Result<FetchedAccount, RpcError> {
-        unimplemented!("shouldn't be used for now")
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
+        // For testing purposes, return a "not found" error for any account
+        // that doesn't exist in our mock data
+        Err(RpcError::RequestError(
+            String::from("GetAccountDetails"),
+            format!("Account with ID {account_id} not found"),
+        ))
     }
 
     async fn get_account_proofs(

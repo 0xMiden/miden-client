@@ -1803,3 +1803,16 @@ async fn swap_chain_test() {
         1
     );
 }
+
+#[tokio::test]
+async fn import_account_by_id_nonexistent_returns_custom_error() {
+    let (mut client, _rpc_api, _) = create_test_client().await;
+    // Use a valid account ID that doesn't exist in the mock node
+    // Use the same format as other test account IDs but with different value
+    let nonexistent_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2).unwrap();
+    let result = client.import_account_by_id(nonexistent_id).await;
+    match result {
+        Err(ClientError::AccountNotFoundOnNetwork(id)) => assert_eq!(id, nonexistent_id),
+        other => panic!("Expected AccountNotFoundOnNetwork error, got: {:?}", other),
+    }
+}
