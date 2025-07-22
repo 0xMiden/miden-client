@@ -9,10 +9,7 @@
 ### Features
 
 * Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
-
-### Features
-
-* Added TokenSymbol Type to Web Client (#1046).
+* Added `TokenSymbol` Type to Web Client (#1046).
 
 ## 0.10.0 (2025-07-12)
 
