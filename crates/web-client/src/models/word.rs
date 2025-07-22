@@ -47,7 +47,7 @@ impl Word {
 
     #[wasm_bindgen(js_name = "toU64s")]
     pub fn to_u64s(&self) -> Vec<u64> {
-        self.0.iter().map(|felt| felt.as_int()).collect::<Vec<u64>>()
+        self.0.iter().map(NativeFelt::as_int).collect::<Vec<u64>>()
     }
 
     #[wasm_bindgen(js_name = "toFelts")]
