@@ -4,6 +4,7 @@
 
 - [BREAKING] Incremented MSRV to 1.88.
 - Introduced enums instead of booleans for public APIs (#1042).
+- [BREAKING] Made authenticator optional for `ClientBuilder` and `Client::new`. `Client::new` now takes `Option<Arc<dyn TransactionAuthenticator>>` for the authenticator parameter.
 
 ## 0.10.0 (2025-07-12)
 
