@@ -300,6 +300,8 @@ describe("swap transaction tests", () => {
         assetAAmount,
         faucetB,
         assetBAmount,
+        "private",
+        "private",
         flag
       );
 
