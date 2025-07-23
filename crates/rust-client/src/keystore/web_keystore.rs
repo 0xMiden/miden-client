@@ -1,12 +1,12 @@
 use alloc::{string::ToString, sync::Arc, vec::Vec};
 
 use miden_lib::utils::{Deserializable, Serializable};
+use miden_tx::auth::SigningInputs;
 use rand::Rng;
 
 use super::KeyStoreError;
 use crate::{
     AuthenticationError, Felt, Word,
-    account::AccountDelta,
     auth::{AuthSecretKey, TransactionAuthenticator},
     store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth},
     utils::RwLock,
@@ -68,9 +68,9 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     fn get_signature(
         &self,
         pub_key: Word,
-        message: Word,
-        _account_delta: &AccountDelta,
+        signing_inputs: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
+        let message = signing_inputs.to_commitment();
         let mut rng = self.rng.write();
         let secret_key = self
             .get_key(pub_key)
