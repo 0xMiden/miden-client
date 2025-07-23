@@ -66,17 +66,7 @@ export const testStandardFpi = async (): Promise<void> => {
     );
     await client.syncState();
 
-    let deploymentTxScript = window.TransactionScript.compile(
-      `
-                begin 
-                    call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
-                end
-            `,
-      window.TransactionKernel.assembler()
-    );
-
     let txRequest = new window.TransactionRequestBuilder()
-      .withCustomScript(deploymentTxScript)
       .build();
 
     let txResult = await client.newTransaction(foreignAccountId, txRequest);

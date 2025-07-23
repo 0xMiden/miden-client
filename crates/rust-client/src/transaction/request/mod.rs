@@ -303,10 +303,6 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
-                if self.input_notes.is_empty() {
-                    return Err(TransactionRequestError::NoInputNotes);
-                }
-
                 let empty_script =
                     TransactionScript::compile("begin nop end", TransactionKernel::assembler())?;
 

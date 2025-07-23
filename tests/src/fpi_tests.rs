@@ -378,24 +378,10 @@ async fn deploy_foreign_account(
     keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
     client.add_account(&foreign_account, Some(foreign_seed), false).await.unwrap();
 
-    let deployment_tx_script = TransactionScript::compile(
-        "begin 
-                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
-            end",
-        TransactionKernel::assembler(),
-    )
-    .unwrap();
-
-    println!("Deploying foreign account with an auth transaction");
+    println!("Deploying foreign account");
 
     let tx = client
-        .new_transaction(
-            foreign_account_id,
-            TransactionRequestBuilder::new()
-                .custom_script(deployment_tx_script)
-                .build()
-                .unwrap(),
-        )
+        .new_transaction(foreign_account_id, TransactionRequestBuilder::new().build().unwrap())
         .await
         .unwrap();
     let tx_id = tx.executed_transaction().id();
