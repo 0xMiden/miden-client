@@ -65,7 +65,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&AuthSecretKey::AuthRpoFalcon512(key_pair))
+            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
             .await
             .map_err(|err| err.to_string())?;
 
