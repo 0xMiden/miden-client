@@ -74,7 +74,7 @@ async fn swap_fully_onchain() {
                 Asset::Fungible(requested_asset),
             ),
             NoteType::Public,
-            NoteType::Public,
+            NoteType::Private,
             client1.rng(),
         )
         .unwrap();
