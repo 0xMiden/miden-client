@@ -6,7 +6,7 @@ use miden_client::{
     testing::common::*,
     transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
 };
-use miden_lib::{account::auth::RpoFalcon512, utils::word_to_masm_push_string};
+use miden_lib::{account::auth::AuthRpoFalcon512, utils::word_to_masm_push_string};
 use miden_objects::{
     account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap},
     crypto::dsa::rpo_falcon512::SecretKey,
