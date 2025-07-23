@@ -1098,7 +1098,8 @@ export const counterAccountComponent = async (): Promise<
       `;
     const incrNonceAuthCode = `use.miden::account
         export.auth__basic
-          push.1 exec.account::incr_nonce
+          exec.account::incr_nonce
+          drop
         end`;
     const client = window.client;
 

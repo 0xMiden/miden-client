@@ -53,7 +53,8 @@ const COUNTER_CONTRACT: &str = "
 const INCR_NONCE_AUTH_CODE: &str = "
     use.miden::account
     export.auth__basic
-        push.1 exec.account::incr_nonce
+        exec.account::incr_nonce
+        drop
     end
 ";
 
