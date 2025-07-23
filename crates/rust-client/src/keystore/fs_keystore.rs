@@ -9,13 +9,10 @@ use std::{
     vec::Vec,
 };
 
-use miden_objects::{
-    Felt, Word,
-    account::{AccountDelta, AuthSecretKey},
-};
+use miden_objects::{Felt, Word, account::AuthSecretKey};
 use miden_tx::{
     AuthenticationError,
-    auth::TransactionAuthenticator,
+    auth::{SigningInputs, TransactionAuthenticator},
     utils::{Deserializable, Serializable, sync::RwLock},
 };
 use rand::{Rng, SeedableRng};
@@ -132,10 +129,11 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
     fn get_signature(
         &self,
         pub_key: Word,
-        message: Word,
-        _account_delta: &AccountDelta,
+        signing_info: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
         let mut rng = self.rng.write();
+
+        let message = signing_info.to_commitment();
 
         let secret_key = self
             .get_key(pub_key)
