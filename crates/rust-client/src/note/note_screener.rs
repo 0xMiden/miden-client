@@ -130,10 +130,8 @@ where
             .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
-        let transaction_executor = TransactionExecutor::new(
-            &data_store,
-            self.authenticator.as_ref().map(|arc| arc.as_ref()),
-        );
+        let transaction_executor =
+            TransactionExecutor::new(&data_store, self.authenticator.as_ref().map(AsRef::as_ref));
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
