@@ -103,7 +103,8 @@ pub async fn create_test_client_builder()
     (builder, rpc_api, keystore)
 }
 
-pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
+pub async fn create_test_client()
+-> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = create_test_client_builder().await;
     let mut client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
