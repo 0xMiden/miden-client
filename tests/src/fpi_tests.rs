@@ -182,8 +182,6 @@ async fn nested_fpi_calls() {
     
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
-
-            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
@@ -267,8 +265,6 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
-    
-            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
@@ -382,24 +378,10 @@ async fn deploy_foreign_account(
     keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
     client.add_account(&foreign_account, Some(foreign_seed), false).await.unwrap();
 
-    let deployment_tx_script = TransactionScript::compile(
-        "begin 
-                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
-            end",
-        TransactionKernel::assembler(),
-    )
-    .unwrap();
-
-    println!("Deploying foreign account with an auth transaction");
+    println!("Deploying foreign account");
 
     let tx = client
-        .new_transaction(
-            foreign_account_id,
-            TransactionRequestBuilder::new()
-                .custom_script(deployment_tx_script)
-                .build()
-                .unwrap(),
-        )
+        .new_transaction(foreign_account_id, TransactionRequestBuilder::new().build().unwrap())
         .await
         .unwrap();
     let tx_id = tx.executed_transaction().id();

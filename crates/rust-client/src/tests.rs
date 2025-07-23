@@ -43,7 +43,7 @@ use rand::{Rng, RngCore, rngs::StdRng};
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, DebugMode,
+    ClientError, DebugMode,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     note::NoteRelevance,
@@ -55,10 +55,11 @@ use crate::{
     sync::NoteTagSource,
     testing::{
         common::{
-            ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT,
-            assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
-            execute_failing_tx, execute_tx, execute_tx_and_sync, mint_and_consume, mint_note,
-            setup_two_wallets_and_faucet, setup_wallet_and_faucet, wait_for_tx,
+            ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+            TestClientKeyStore, assert_account_has_single_asset,
+            assert_note_cannot_be_consumed_twice, consume_notes, execute_failing_tx, execute_tx,
+            execute_tx_and_sync, mint_and_consume, mint_note, setup_two_wallets_and_faucet,
+            setup_wallet_and_faucet, wait_for_tx,
         },
         mock::{MockClient, MockRpcApi},
     },
@@ -75,8 +76,8 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 // HELPERS
 // ================================================================================================
 
-pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, FilesystemKeyStore<StdRng>)
-{
+pub async fn create_test_client_builder()
+-> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let store = Arc::new(store);
 
@@ -102,7 +103,8 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
     (builder, rpc_api, keystore)
 }
 
-pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
+pub async fn create_test_client()
+-> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = create_test_client_builder().await;
     let mut client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
@@ -117,7 +119,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
 }
 
 async fn insert_new_wallet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {
@@ -143,7 +145,7 @@ async fn insert_new_wallet(
 }
 
 async fn insert_new_fungible_faucet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {

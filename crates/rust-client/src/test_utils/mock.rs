@@ -33,7 +33,7 @@ use crate::{
     transaction::ForeignAccount,
 };
 
-pub type MockClient = Client;
+pub type MockClient<AUTH> = Client<AUTH>;
 
 /// Mock RPC API
 ///

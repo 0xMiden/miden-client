@@ -5,6 +5,7 @@ use miden_client::{
     Client, RemoteTransactionProver,
     account::AccountId,
     asset::{FungibleAsset, NonFungibleDeltaAction},
+    auth::TransactionAuthenticator,
     note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
     store::NoteRecordError,
     transaction::{
@@ -61,7 +62,10 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
         let faucet_details_map = load_faucet_details_map()?;
 
@@ -129,7 +133,10 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -208,7 +215,10 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -284,7 +294,10 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let mut authenticated_notes = Vec::new();
@@ -352,8 +365,8 @@ impl ConsumeNotesCmd {
 // EXECUTE TRANSACTION
 // ================================================================================================
 
-async fn execute_transaction(
-    client: &mut Client,
+async fn execute_transaction<AUTH: TransactionAuthenticator + 'static>(
+    client: &mut Client<AUTH>,
     account_id: AccountId,
     transaction_request: TransactionRequest,
     force: bool,

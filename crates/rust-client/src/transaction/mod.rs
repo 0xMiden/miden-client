@@ -22,6 +22,7 @@
 //! ```rust
 //! use miden_client::{
 //!     Client,
+//!     auth::TransactionAuthenticator,
 //!     crypto::FeltRng,
 //!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
 //! };
@@ -32,8 +33,11 @@
 //! ///
 //! /// This transaction is executed by `sender_id`, and creates an output note
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
-//! async fn create_and_submit_transaction<R: rand::Rng>(
-//!     client: &mut Client,
+//! async fn create_and_submit_transaction<
+//!     R: rand::Rng,
+//!     AUTH: TransactionAuthenticator + 'static,
+//! >(
+//!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
 //!     target_id: AccountId,
 //!     faucet_id: AccountId,
@@ -79,7 +83,7 @@ use miden_objects::{
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
+    DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
@@ -463,7 +467,10 @@ impl TransactionStoreUpdate {
 }
 
 /// Transaction management methods
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + 'static,
+{
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -913,7 +920,7 @@ impl Client {
     ) -> Result<(), ClientError> {
         // Get outgoing assets
         let (fungible_balance_map, non_fungible_set) =
-            Client::get_outgoing_assets(transaction_request);
+            Client::<AUTH>::get_outgoing_assets(transaction_request);
 
         // Get incoming assets
         let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
@@ -1122,10 +1129,10 @@ impl Client {
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
-    pub(crate) fn build_executor<'store, 'auth>(
+    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore>(
         &'auth self,
-        data_store: &'store ClientDataStore,
-    ) -> Result<TransactionExecutor<'store, 'auth>, TransactionExecutorError> {
+        data_store: &'store STORE,
+    ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
         TransactionExecutor::with_options(
             data_store,
             self.authenticator.as_deref(),
@@ -1138,7 +1145,7 @@ impl Client {
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl Client {
+impl<AUTH: TransactionAuthenticator + 'static> Client<AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
