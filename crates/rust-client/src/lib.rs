@@ -184,8 +184,8 @@ pub use miden_tx::ExecutionOptions;
 /// client library.
 pub mod utils {
     pub use miden_tx::utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_hex_string,
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
+        bytes_to_hex_string, hex_to_bytes,
         sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
 }
