@@ -182,8 +182,6 @@ async fn nested_fpi_calls() {
     
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
-
-            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
@@ -267,8 +265,6 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
     
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
-    
-            call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
         end
         ",
         fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),

@@ -556,7 +556,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::contracts::auth::basic->auth_tx
             use.miden::kernels::tx::prologue
             use.miden::kernels::tx::memory
 
@@ -564,8 +563,6 @@ export const customTransaction = async (
                 push.0 push.${_assertedValue}
                 # => [0, ${_assertedValue}]
                 assert_eq
-
-                call.auth_tx::auth__tx_rpo_falcon512
             end
         `;
 

@@ -108,8 +108,6 @@ export const testStandardFpi = async (): Promise<void> => {
         
                 exec.tx::execute_foreign_procedure
                 push.9.12.18.30 assert_eqw
-        
-                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
             end
         `;
     txScript = txScript
