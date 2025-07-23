@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
-    rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
+    rpc::{NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
