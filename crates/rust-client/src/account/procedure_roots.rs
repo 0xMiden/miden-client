@@ -3,4 +3,4 @@
 
 /// Procedure root of the `AuthRpoFalcon512` authentication component.
 pub const AUTH_RPO_FALCON_512: &str =
-    "0xaf502aa5c6a6416d3fef0de98b82dada73b066fb6a9c86baa96990f4ab9360bd";
+    "0x7f9e4a997e88c1f30b51d6f9834291b600e2609867b4e597f089ff5329c23ff9";

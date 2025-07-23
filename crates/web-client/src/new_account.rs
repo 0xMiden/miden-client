@@ -4,7 +4,7 @@ use miden_client::{
     auth::AuthSecretKey,
     crypto::SecretKey as NativeSecretKey,
 };
-use miden_lib::account::{auth::RpoFalcon512, faucets::BasicFungibleFaucet};
+use miden_lib::account::{auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet};
 use miden_objects::asset::TokenSymbol;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;

@@ -242,7 +242,7 @@ impl SwapCmd {
             .build_swap(
                 &swap_transaction,
                 (&self.note_type).into(),
-                (&self.note_type).into(),
+                (&self.payback_note_type).into(),
                 client.rng(),
             )
             .map_err(|err| {
