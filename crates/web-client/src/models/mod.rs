@@ -81,6 +81,7 @@ pub mod secret_key;
 pub mod storage_map;
 pub mod storage_slot;
 pub mod sync_summary;
+pub mod token_symbol;
 pub mod transaction_args;
 pub mod transaction_filter;
 pub mod transaction_id;

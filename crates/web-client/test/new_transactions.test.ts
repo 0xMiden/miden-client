@@ -516,7 +516,7 @@ export const customTransaction = async (
         ])
       );
 
-      const serialNum = window.Word.newFromU64s(
+      const serialNum = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
       let noteRecipient = new window.NoteRecipient(
@@ -642,10 +642,10 @@ const customTxWithMultipleNotes = async (
         undefined
       );
 
-      let serialNum1 = window.Word.newFromU64s(
+      let serialNum1 = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
-      let serialNum2 = window.Word.newFromU64s(
+      let serialNum2 = new window.Word(
         new BigUint64Array([BigInt(5), BigInt(6), BigInt(7), BigInt(8)])
       );
 
@@ -1179,9 +1179,7 @@ export const counterAccountComponent = async (): Promise<
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
-    let serialNum = window.Word.newFromU64s(
-      new BigUint64Array(randomInts.map(BigInt))
-    );
+    let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
