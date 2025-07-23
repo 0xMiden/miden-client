@@ -16,8 +16,8 @@
 //! #   crypto::FeltRng
 //! # };
 //! # use miden_objects::account::AccountStorageMode;
-//! # async fn add_new_account_example(
-//! #     client: &mut miden_client::Client
+//! # async fn add_new_account_example<AUTH>(
+//! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
 //! let (account, seed) = AccountBuilder::new(random_seed)

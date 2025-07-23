@@ -22,6 +22,7 @@
 //! ```rust
 //! use miden_client::{
 //!     Client,
+//!     auth::TransactionAuthenticator,
 //!     crypto::FeltRng,
 //!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
 //! };
@@ -32,8 +33,11 @@
 //! ///
 //! /// This transaction is executed by `sender_id`, and creates an output note
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
-//! async fn create_and_submit_transaction<R: rand::Rng>(
-//!     client: &mut Client,
+//! async fn create_and_submit_transaction<
+//!     R: rand::Rng,
+//!     AUTH: TransactionAuthenticator + 'static,
+//! >(
+//!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
 //!     target_id: AccountId,
 //!     faucet_id: AccountId,

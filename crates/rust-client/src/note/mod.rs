@@ -19,6 +19,7 @@
 //!
 //! ```rust
 //! use miden_client::{
+//!     auth::TransactionAuthenticator,
 //!     Client,
 //!     crypto::FeltRng,
 //!     note::{NoteScreener, get_input_note_with_id_prefix},
@@ -26,7 +27,7 @@
 //! };
 //! use miden_objects::account::AccountId;
 //!
-//! # async fn example(client: &Client) -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example<AUTH: TransactionAuthenticator>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
 //! let input_notes = client.get_input_notes(NoteFilter::Committed).await?;
 //! println!("Found {} committed input notes.", input_notes.len());
