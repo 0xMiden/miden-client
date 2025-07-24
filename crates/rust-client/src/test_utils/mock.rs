@@ -53,6 +53,9 @@ pub type MockClient<AUTH> = Client<AUTH>;
 ///       transaction.
 ///     - Each `sync_state` call will create a new empty block to simulate the real node's automatic
 ///       block creation.
+/// - Network account and transactions aren't supported in the current version.
+/// - Account update block numbers aren't tracked, so any endpoint that returns when certain account updates
+///   were made will return the chain tip block number instead.
 #[derive(Clone)]
 pub struct MockRpcApi {
     pub mock_chain: Arc<RwLock<MockChain>>,
@@ -505,6 +508,18 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block)
     }
 }
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<MockChain> for MockRpcApi {
+    fn from(mock_chain: MockChain) -> Self {
+        MockRpcApi::new(mock_chain)
+    }
+}
+
+// HELPERS
+// ================================================================================================
 
 /// Builds an [`AccountDelta`] from the given [`Account`]. This delta represents the
 /// starting state of the account, including its storage and vault contents.
