@@ -35,6 +35,7 @@ import { MethodName, WorkerAction } from "../constants.js";
 
 // Global state variables.
 let wasmWebClient = null;
+let wasmSeed = null; // Seed for the WASM WebClient, if needed.
 let ready = false; // Indicates if the worker is fully initialized.
 let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
@@ -111,9 +112,21 @@ const methodHandlers = {
 
     // Call the unified submit_transaction method with an optional prover.
     await wasmWebClient.submitTransaction(transactionResult, prover);
-    return;
+    if (wasmWebClient.usesMockChain()) {
+      let serializedMockChain = wasmWebClient.serializeMockChain();
+
+      return serializedMockChain.buffer;
+    }
   },
-  [MethodName.SYNC_STATE]: async () => {
+  [MethodName.SYNC_STATE]: async (args) => {
+    let [serializedMockChain] = args;
+
+    if (wasmWebClient.usesMockChain()) {
+      serializedMockChain = new Uint8Array(serializedMockChain);
+      wasmWebClient = new wasm.WebClient();
+      await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
+    }
+
     const syncSummary = await wasmWebClient.syncState();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
@@ -127,10 +140,16 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, seed] = args;
+      const [rpcUrl, seed, initMockChain] = args;
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, seed);
+      if (rpcUrl) {
+        await wasmWebClient.createClient(rpcUrl, seed);
+      } else {
+        await wasmWebClient.createMockedClient(seed, initMockChain);
+      }
+
+      wasmSeed = seed;
       ready = true;
       // Signal that the worker is fully initialized.
       self.postMessage({ ready: true });

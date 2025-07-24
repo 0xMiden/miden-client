@@ -198,6 +198,7 @@ pub mod utils {
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_objects::testing::*;
+    pub use miden_testing::*;
 
     pub use crate::test_utils::*;
 }

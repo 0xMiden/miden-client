@@ -5,8 +5,9 @@ use std::fmt::Write;
 use miden_client::{
     Client, ExecutionOptions,
     keystore::WebKeyStore,
-    rpc::{Endpoint, TonicRpcClient},
+    rpc::{Endpoint, NodeRpcClient, TonicRpcClient},
     store::web_store::WebStore,
+    testing::mock::MockRpcApi,
 };
 use miden_objects::{
     Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::RpoRandomCoin,
@@ -18,6 +19,7 @@ pub mod account;
 pub mod export;
 pub mod helpers;
 pub mod import;
+pub mod mock;
 pub mod models;
 pub mod new_account;
 pub mod new_transactions;
@@ -32,6 +34,7 @@ pub struct WebClient {
     store: Option<Arc<WebStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
+    mock_rpc_api: Option<Arc<MockRpcApi>>,
 }
 
 impl Default for WebClient {
@@ -44,19 +47,43 @@ impl Default for WebClient {
 impl WebClient {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        WebClient { inner: None, store: None, keystore: None }
+        WebClient {
+            inner: None,
+            store: None,
+            keystore: None,
+            mock_rpc_api: None,
+        }
     }
 
     pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
         self.inner.as_mut()
     }
 
+    /// Creates a new client with the given node URL and optional seed.
+    /// If `node_url` is `None`, it defaults to the testnet endpoint.
     #[wasm_bindgen(js_name = "createClient")]
     pub async fn create_client(
         &mut self,
         node_url: Option<String>,
         seed: Option<Vec<u8>>,
     ) -> Result<JsValue, JsValue> {
+        let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
+            Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
+        })?;
+
+        let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
+
+        self.setup_client(web_rpc_client, seed).await?;
+
+        Ok(JsValue::from_str("Client created successfully"))
+    }
+
+    /// Initializes the inner client and components with the given RPC client and optional seed.
+    async fn setup_client(
+        &mut self,
+        rpc_client: Arc<dyn NodeRpcClient>,
+        seed: Option<Vec<u8>>,
+    ) -> Result<(), JsValue> {
         let mut rng = match seed {
             Some(seed_bytes) => {
                 if seed_bytes.len() == 32 {
@@ -72,22 +99,18 @@ impl WebClient {
         let coin_seed: [u64; 4] = rng.random();
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-        let web_store: WebStore = WebStore::new()
-            .await
-            .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?;
-        let web_store = Arc::new(web_store);
+
+        let web_store = Arc::new(
+            WebStore::new()
+                .await
+                .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
+        );
 
         let keystore = WebKeyStore::new(rng);
 
-        let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
-            Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
-        })?;
-
-        let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
-
         self.inner = Some(
             Client::new(
-                web_rpc_client,
+                rpc_client,
                 Box::new(rng),
                 web_store.clone(),
                 Some(Arc::new(keystore.clone())),
@@ -104,10 +127,11 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
         );
+
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 
-        Ok(JsValue::from_str("Client created successfully"))
+        Ok(())
     }
 }
 

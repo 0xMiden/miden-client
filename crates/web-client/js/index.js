@@ -150,9 +150,10 @@ export {
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
 export class WebClient {
-  constructor(rpcUrl, seed) {
+  constructor(rpcUrl, seed, serializedMockChain) {
     this.rpcUrl = rpcUrl;
     this.seed = seed;
+    this.initMockChain = serializedMockChain;
 
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
@@ -213,7 +214,7 @@ export class WebClient {
       this.loaded.then(() => {
         this.worker.postMessage({
           action: WorkerAction.INIT,
-          args: [this.rpcUrl, this.seed],
+          args: [this.rpcUrl, this.seed, this.initMockChain],
         });
       });
     } else {
@@ -239,10 +240,47 @@ export class WebClient {
    */
   static async createClient(rpcUrl, seed) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, seed);
+    const instance = new WebClient(rpcUrl, seed, null);
 
     // Wait for the underlying wasmWebClient to be initialized.
     await instance.wasmWebClient.createClient(rpcUrl, seed);
+
+    // Wait for the worker to be ready
+    await instance.ready;
+
+    // Return a proxy that forwards missing properties to wasmWebClient.
+    return new Proxy(instance, {
+      get(target, prop, receiver) {
+        // If the property exists on the wrapper, return it.
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
+        }
+        // Otherwise, if the wasmWebClient has it, return that.
+        if (target.wasmWebClient && prop in target.wasmWebClient) {
+          const value = target.wasmWebClient[prop];
+          if (typeof value === "function") {
+            return value.bind(target.wasmWebClient);
+          }
+          return value;
+        }
+        return undefined;
+      },
+    });
+  }
+
+  /**
+   * Factory method to create a WebClient with a mock for testing purposes.
+   *
+   * @param seed - The seed for the account (optional).
+   * @param serializedMockChain - Serialized mock chain data (optional). Will use an empty chain if not provided.
+   * @returns A promise that resolves to a mocked WebClient.
+   */
+  static async createMockedClient(seed, serializedMockChain) {
+    // Construct the instance (synchronously).
+    const instance = new WebClient(null, seed, serializedMockChain);
+
+    // Wait for the underlying wasmWebClient to be initialized.
+    await instance.wasmWebClient.createMockedClient(seed, serializedMockChain);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -381,7 +419,20 @@ export class WebClient {
       }
 
       // Always call the same worker method.
-      await this.callMethodWithWorker(MethodName.SUBMIT_TRANSACTION, ...args);
+      let serializedMockChain = await this.callMethodWithWorker(
+        MethodName.SUBMIT_TRANSACTION,
+        ...args
+      );
+
+      if (this.wasmWebClient.usesMockChain()) {
+        serializedMockChain = new Uint8Array(serializedMockChain);
+
+        this.wasmWebClient = new WasmWebClient();
+        await this.wasmWebClient.createMockedClient(
+          this.seed,
+          serializedMockChain
+        );
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
@@ -393,8 +444,15 @@ export class WebClient {
       if (!this.worker) {
         return await this.wasmWebClient.syncState();
       }
+
+      let serializedMockChain = null;
+      if (this.wasmWebClient.usesMockChain()) {
+        serializedMockChain = this.wasmWebClient.serializeMockChain().buffer;
+      }
+
       const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE
+        MethodName.SYNC_STATE,
+        serializedMockChain
       );
       return wasm.SyncSummary.deserialize(
         new Uint8Array(serializedSyncSummaryBytes)
