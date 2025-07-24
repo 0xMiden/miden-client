@@ -2073,6 +2073,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-client-integration-tests"
+version = "0.11.0"
+dependencies = [
+ "async-trait",
+ "clap 4.5.41",
+ "futures",
+ "miden-client",
+ "miden-lib",
+ "miden-objects",
+ "rand 0.9.1",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "winter-maybe-async 0.12.0",
+]
+
+[[package]]
 name = "miden-client-tests"
 version = "0.11.0"
 dependencies = [

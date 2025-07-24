@@ -1,0 +1,30 @@
+[package]
+authors.workspace      = true
+description            = "Integration Tests for the miden client library"
+edition.workspace      = true
+license.workspace      = true
+name                   = "miden-client-integration-tests"
+publish                = false
+version.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[[bin]]
+name = "miden-client-integration-tests"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+miden-client = { features = ["sqlite", "tonic", "std", "testing"], path = "../../crates/rust-client" }
+miden-lib = { default-features = false, features = ["testing"], workspace = true }
+miden-objects = { default-features = false, features = ["testing"], workspace = true }
+
+# External dependencies
+async-trait = { workspace = true }
+clap = { version = "4.4", features = ["derive", "env"] }
+rand = { workspace = true }
+tokio = { workspace = true }
+uuid = { version = "1.0", features = ["v4"] }
+winter-maybe-async = { features = ["async"], version = "0.12" }
+tempfile = "3.10" 
+futures = { version = "0.3" }
