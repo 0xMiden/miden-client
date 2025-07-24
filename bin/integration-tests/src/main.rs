@@ -1,4 +1,6 @@
-use futures::FutureExt;
+use std::sync::{Arc, Mutex};
+
+use futures::{join, FutureExt};
 
 use crate::tests::{
     client::{
@@ -20,7 +22,7 @@ use crate::tests::{
 
 mod tests;
 
-async fn run_test<F, Fut>(name: &str, test_fn: F, failed_tests: &mut Vec<String>)
+async fn run_test<F, Fut>(name: &str, test_fn: F, failed_tests: &Arc<Mutex<Vec<String>>>)
 where
     F: FnOnce() -> Fut,
     Fut: Future<Output = ()>,
@@ -39,7 +41,7 @@ where
             } else {
                 "Unknown panic".into()
             };
-            failed_tests.push(format!("{}: {}", name, msg));
+            failed_tests.lock().unwrap().push(format!("{}: {}", name, msg));
         },
     }
 }
@@ -49,109 +51,101 @@ async fn main() {
     println!("  Starting Miden Client Integration Tests...");
     println!("==============================================");
 
-    let mut failed_tests = Vec::new();
+    let failed_tests = Arc::new(Mutex::new(Vec::new()));
 
+    join!(
+    // CLIENT
     run_test(
         "client_builder_initializes_client_with_endpoint",
         || client_builder_initializes_client_with_endpoint(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
     run_test(
         "client_builder_fails_without_keystore",
         || client_builder_fails_without_keystore(),
-        &mut failed_tests,
-    )
-    .await;
-    run_test("multiple_tx_on_same_block", || multiple_tx_on_same_block(), &mut failed_tests).await;
-    run_test("import_expected_notes", || import_expected_notes(), &mut failed_tests).await;
+        &failed_tests,
+    ),
+    run_test("multiple_tx_on_same_block", || multiple_tx_on_same_block(), &failed_tests),
+    run_test("import_expected_notes", || import_expected_notes(), &failed_tests),
     run_test(
         "import_expected_note_uncommitted",
         || import_expected_note_uncommitted(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
     run_test(
         "import_expected_notes_from_the_past_as_committed",
         || import_expected_notes_from_the_past_as_committed(),
-        &mut failed_tests,
-    )
-    .await;
-    run_test("get_account_update", || get_account_update(), &mut failed_tests).await;
-    run_test("sync_detail_values", || sync_detail_values(), &mut failed_tests).await;
+        &failed_tests,
+    ),
+    run_test("get_account_update", || get_account_update(), &failed_tests),
+    run_test("sync_detail_values", || sync_detail_values(), &failed_tests),
     run_test(
         "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
         || multiple_transactions_can_be_committed_in_different_blocks_without_sync(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
     run_test(
         "consume_multiple_expected_notes",
         || consume_multiple_expected_notes(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
     run_test(
         "import_consumed_note_with_proof",
         || import_consumed_note_with_proof(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
     run_test(
         "import_consumed_note_with_id",
         || import_consumed_note_with_id(),
-        &mut failed_tests,
-    )
-    .await;
-    run_test("import_note_with_proof", || import_note_with_proof(), &mut failed_tests).await;
-    run_test("discarded_transaction", || discarded_transaction(), &mut failed_tests).await;
-    run_test("custom_transaction_prover", || custom_transaction_prover(), &mut failed_tests).await;
-    run_test("locked_account", || locked_account(), &mut failed_tests).await;
-    run_test("expired_transaction_fails", || expired_transaction_fails(), &mut failed_tests).await;
-    run_test("unused_rpc_api", || unused_rpc_api(), &mut failed_tests).await;
-    run_test("ignore_invalid_notes", || ignore_invalid_notes(), &mut failed_tests).await;
+        &failed_tests,
+    ),
+    run_test("import_note_with_proof", || import_note_with_proof(), &failed_tests),
+    run_test("discarded_transaction", || discarded_transaction(), &failed_tests),
+    run_test("custom_transaction_prover", || custom_transaction_prover(), &failed_tests),
+    run_test("locked_account", || locked_account(), &failed_tests),
+    run_test("expired_transaction_fails", || expired_transaction_fails(), &failed_tests),
+    run_test("unused_rpc_api", || unused_rpc_api(), &failed_tests),
+    run_test("ignore_invalid_notes", || ignore_invalid_notes(), &failed_tests),
 
     // CUSTOM TRANSACTION
-    run_test("merkle_store", || merkle_store(), &mut failed_tests).await;
+    run_test("merkle_store", || merkle_store(), &failed_tests),
     run_test(
         "onchain_notes_sync_with_tag",
         || onchain_notes_sync_with_tag(),
-        &mut failed_tests,
-    )
-    .await;
-    run_test("transaction_request", || transaction_request(), &mut failed_tests).await;
+        &failed_tests,
+    ),
+    run_test("transaction_request", || transaction_request(), &failed_tests),
 
     // FPI
-    run_test("standard_fpi_public", || standard_fpi_public(), &mut failed_tests).await;
-    run_test("standard_fpi_private", || standard_fpi_private(), &mut failed_tests).await;
-    run_test("fpi_execute_program", || fpi_execute_program(), &mut failed_tests).await;
-    run_test("nested_fpi_calls", || nested_fpi_calls(), &mut failed_tests).await;
+    run_test("standard_fpi_public", || standard_fpi_public(), &failed_tests),
+    run_test("standard_fpi_private", || standard_fpi_private(), &failed_tests),
+    run_test("fpi_execute_program", || fpi_execute_program(), &failed_tests),
+    run_test("nested_fpi_calls", || nested_fpi_calls(), &failed_tests),
 
     // NETWORK TRANSACTION
-    run_test("counter_contract_ntx", || counter_contract_ntx(), &mut failed_tests).await;
+    run_test("counter_contract_ntx", || counter_contract_ntx(), &failed_tests),
     run_test(
         "recall_note_before_ntx_consumes_it",
         || recall_note_before_ntx_consumes_it(),
-        &mut failed_tests,
-    )
-    .await;
+        &failed_tests,
+    ),
 
     // ONCHAIN
-    run_test("import_account_by_id", || import_account_by_id(), &mut failed_tests).await;
-    run_test("onchain_accounts", || onchain_accounts(), &mut failed_tests).await;
-    run_test("onchain_notes_flow", || onchain_notes_flow(), &mut failed_tests).await;
+    run_test("import_account_by_id", || import_account_by_id(), &failed_tests),
+    run_test("onchain_accounts", || onchain_accounts(), &failed_tests),
+    run_test("onchain_notes_flow", || onchain_notes_flow(), &failed_tests),
 
     // SWAP TRANSACTION
-    run_test("swap_fully_onchain", || swap_fully_onchain(), &mut failed_tests).await;
-    run_test("swap_private", || swap_private(), &mut failed_tests).await;
-
+    run_test("swap_fully_onchain", || swap_fully_onchain(), &failed_tests),
+    run_test("swap_private", || swap_private(), &failed_tests),
+    );
     // Print summary
     println!("\n=== TEST SUMMARY ===");
-    if failed_tests.is_empty() {
+    if failed_tests.lock().unwrap().is_empty() {
         println!("All tests passed!");
     } else {
-        println!("{} tests failed:", failed_tests.len());
-        for failed_test in &failed_tests {
+        println!("{} tests failed:", failed_tests.lock().unwrap().len());
+        for failed_test in failed_tests.lock().unwrap().iter() {
             println!("  - {}", failed_test);
         }
         std::process::exit(1);
