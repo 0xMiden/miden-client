@@ -14,6 +14,7 @@ use miden_objects::{
     block::BlockNumber,
     note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag},
 };
+use miden_tx::auth::TransactionAuthenticator;
 
 use crate::{
     Client, ClientError,
@@ -23,7 +24,10 @@ use crate::{
 };
 
 /// Note importing methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + 'static,
+{
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
 
@@ -286,7 +290,7 @@ impl Client {
                 let note_inclusion_proof = NoteInclusionProof::new(
                     note_block_num,
                     note.note_index(),
-                    note.merkle_path().clone(),
+                    note.merkle_path().clone().try_into()?,
                 )?;
 
                 return Ok(Some((note.metadata(), note_inclusion_proof)));

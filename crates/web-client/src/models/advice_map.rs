@@ -1,13 +1,8 @@
-use miden_objects::{
-    Felt as NativeFelt, crypto::hash::rpo::RpoDigest as NativeRpoDigest,
-    vm::AdviceMap as NativeAdviceMap,
-};
+use miden_objects::{Felt as NativeFelt, Word as NativeWord, vm::AdviceMap as NativeAdviceMap};
 use wasm_bindgen::prelude::*;
 
-use super::{
-    felt::{Felt, FeltArray},
-    rpo_digest::RpoDigest,
-};
+use super::felt::{Felt, FeltArray};
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -20,10 +15,10 @@ impl AdviceMap {
         AdviceMap(NativeAdviceMap::new())
     }
 
-    pub fn insert(&mut self, key: &RpoDigest, value: &FeltArray) -> Option<Vec<Felt>> {
-        let native_rpo_digest: NativeRpoDigest = key.into();
+    pub fn insert(&mut self, key: &Word, value: &FeltArray) -> Option<Vec<Felt>> {
+        let native_word: NativeWord = key.into();
         let native_felts: Vec<NativeFelt> = value.into();
-        let insert_result: Option<Vec<NativeFelt>> = self.0.insert(native_rpo_digest, native_felts);
+        let insert_result: Option<Vec<NativeFelt>> = self.0.insert(native_word, native_felts);
         insert_result.map(|native_felts_vec| native_felts_vec.into_iter().map(Into::into).collect())
     }
 }

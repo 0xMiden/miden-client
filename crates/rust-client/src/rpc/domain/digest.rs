@@ -2,14 +2,9 @@ use alloc::{string::String, vec::Vec};
 use core::fmt::{self, Debug, Display, Formatter};
 
 use hex::ToHex;
-use miden_objects::{Digest, Felt, StarkField, note::NoteId};
+use miden_objects::{Felt, StarkField, Word, note::NoteId};
 
 use crate::rpc::{errors::RpcConversionError, generated::digest};
-
-// CONSTANTS
-// ================================================================================================
-
-pub const DIGEST_DATA_SIZE: usize = 32;
 
 // FORMATTING
 // ================================================================================================
@@ -38,7 +33,7 @@ impl ToHex for &digest::Digest {
 
 impl ToHex for digest::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(DIGEST_DATA_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
         data.extend(format!("{:016x}", self.d0).chars());
         data.extend(format!("{:016x}", self.d1).chars());
         data.extend(format!("{:016x}", self.d2).chars());
@@ -47,7 +42,7 @@ impl ToHex for digest::Digest {
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(DIGEST_DATA_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
         data.extend(format!("{:016X}", self.d0).chars());
         data.extend(format!("{:016X}", self.d1).chars());
         data.extend(format!("{:016X}", self.d2).chars());
@@ -59,8 +54,8 @@ impl ToHex for digest::Digest {
 // INTO
 // ================================================================================================
 
-impl From<Digest> for digest::Digest {
-    fn from(value: Digest) -> Self {
+impl From<Word> for digest::Digest {
+    fn from(value: Word) -> Self {
         Self {
             d0: value[0].as_int(),
             d1: value[1].as_int(),
@@ -70,21 +65,21 @@ impl From<Digest> for digest::Digest {
     }
 }
 
-impl From<&Digest> for digest::Digest {
-    fn from(value: &Digest) -> Self {
+impl From<&Word> for digest::Digest {
+    fn from(value: &Word) -> Self {
         (*value).into()
     }
 }
 
 impl From<&NoteId> for digest::Digest {
     fn from(value: &NoteId) -> Self {
-        (*value).inner().into()
+        value.as_word().into()
     }
 }
 
 impl From<NoteId> for digest::Digest {
     fn from(value: NoteId) -> Self {
-        value.inner().into()
+        value.as_word().into()
     }
 }
 
@@ -111,7 +106,7 @@ impl TryFrom<digest::Digest> for [Felt; 4] {
     }
 }
 
-impl TryFrom<digest::Digest> for Digest {
+impl TryFrom<digest::Digest> for Word {
     type Error = RpcConversionError;
 
     fn try_from(value: digest::Digest) -> Result<Self, Self::Error> {
@@ -127,7 +122,7 @@ impl TryFrom<&digest::Digest> for [Felt; 4] {
     }
 }
 
-impl TryFrom<&digest::Digest> for Digest {
+impl TryFrom<&digest::Digest> for Word {
     type Error = RpcConversionError;
 
     fn try_from(value: &digest::Digest) -> Result<Self, Self::Error> {

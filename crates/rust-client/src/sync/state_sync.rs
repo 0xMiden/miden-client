@@ -7,13 +7,14 @@ use alloc::{
 use core::{future::Future, pin::Pin};
 
 use miden_objects::{
-    Digest,
+    Word,
     account::{Account, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr},
     note::{NoteId, NoteTag},
     transaction::PartialBlockchain,
 };
+use miden_tx::auth::TransactionAuthenticator;
 use tracing::info;
 
 use super::{
@@ -45,11 +46,11 @@ use crate::{
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived = Box<
+pub type OnNoteReceived<AUTH> = Box<
     dyn Fn(
         CommittedNote,
         Option<InputNoteRecord>,
-        Arc<NoteScreener>,
+        Arc<NoteScreener<AUTH>>,
         Arc<BTreeSet<NoteTag>>,
     ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
 >;
@@ -63,19 +64,19 @@ pub type OnNoteReceived = Box<
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
-pub struct StateSync {
+pub struct StateSync<AUTH> {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
     /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived,
+    on_note_received: OnNoteReceived<AUTH>,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
     /// The note screener used to check the relevance of notes.
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<AUTH>>,
 }
 
-impl StateSync {
+impl<AUTH> StateSync<AUTH> {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments
@@ -86,9 +87,9 @@ impl StateSync {
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived,
+        on_note_received: OnNoteReceived<AUTH>,
         tx_graceful_blocks: Option<u32>,
-        note_screener: NoteScreener,
+        note_screener: NoteScreener<AUTH>,
     ) -> Self {
         Self {
             rpc_api,
@@ -261,7 +262,7 @@ impl StateSync {
         &self,
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
-        account_commitment_updates: &[(AccountId, Digest)],
+        account_commitment_updates: &[(AccountId, Word)],
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
@@ -290,7 +291,7 @@ impl StateSync {
     /// state of the client.
     async fn get_updated_public_accounts(
         &self,
-        account_updates: &[(AccountId, Digest)],
+        account_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
     ) -> Result<Vec<Account>, ClientError> {
         let mut mismatched_public_accounts = vec![];
@@ -458,9 +459,9 @@ fn apply_mmr_changes(
     new_block_has_relevant_notes: bool,
     current_partial_mmr: &mut PartialMmr,
     mmr_delta: MmrDelta,
-) -> Result<(MmrPeaks, Vec<(InOrderIndex, Digest)>), ClientError> {
+) -> Result<(MmrPeaks, Vec<(InOrderIndex, Word)>), ClientError> {
     // Apply the MMR delta to bring MMR to forest equal to chain tip
-    let mut new_authentication_nodes: Vec<(InOrderIndex, Digest)> =
+    let mut new_authentication_nodes: Vec<(InOrderIndex, Word)> =
         current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
 
     let new_peaks = current_partial_mmr.peaks();
@@ -478,13 +479,16 @@ fn apply_mmr_changes(
 /// committed note to check if it's relevant. If the note wasn't being tracked but it came in the
 /// sync response it may be a new public note, in that case we use the [`NoteScreener`] to check its
 /// relevance.
-pub async fn on_note_received(
+pub async fn on_note_received<AUTH>(
     store: Arc<dyn Store>,
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<AUTH>>,
     note_tags: Arc<BTreeSet<NoteTag>>,
-) -> Result<bool, ClientError> {
+) -> Result<bool, ClientError>
+where
+    AUTH: TransactionAuthenticator,
+{
     let note_id = *committed_note.note_id();
 
     if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()

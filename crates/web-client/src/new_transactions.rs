@@ -180,6 +180,7 @@ impl WebClient {
         requested_asset_faucet_id: &AccountId,
         requested_asset_amount: u64,
         note_type: NoteType,
+        payback_note_type: NoteType,
     ) -> Result<TransactionRequest, JsValue> {
         let offered_fungible_asset =
             FungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
@@ -207,7 +208,12 @@ impl WebClient {
             })?;
 
             NativeTransactionRequestBuilder::new()
-                .build_swap(&swap_transaction_data, note_type.into(), client.rng())
+                .build_swap(
+                    &swap_transaction_data,
+                    note_type.into(),
+                    payback_note_type.into(),
+                    client.rng(),
+                )
                 .map_err(|err| {
                     js_error_with_context(err, "failed to create swap transaction request")
                 })?

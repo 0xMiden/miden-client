@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use miden_client::{
     ClientError, ONE,
     builder::ClientBuilder,
+    keystore::FilesystemKeyStore,
     rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
@@ -29,11 +30,11 @@ mod swap_transactions_tests;
 async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientError> {
     let (endpoint, _, store_config, auth_path) = get_client_config();
 
-    let mut client = ClientBuilder::new()
+    let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().unwrap())
         .sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;
 
@@ -49,10 +50,10 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
 #[tokio::test]
 async fn client_builder_fails_without_keystore() {
     let (_, _, store_config, _) = get_client_config();
-    let result = ClientBuilder::new()
+    let result = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&Endpoint::default(), Some(10_000))
         .sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await;
 
@@ -1151,7 +1152,7 @@ async fn unused_rpc_api() {
         .unwrap();
 
     assert_eq!(node_nullifier.nullifier, nullifier);
-    assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.inner());
+    assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
 
     let account_delta = client
         .test_rpc_api()

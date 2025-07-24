@@ -6,6 +6,22 @@
 
 # Class: Word
 
+## Constructors
+
+### Constructor
+
+> **new Word**(`u64_vec`): `Word`
+
+#### Parameters
+
+##### u64\_vec
+
+`BigUint64Array`
+
+#### Returns
+
+`Word`
+
 ## Methods
 
 ### free()
@@ -18,6 +34,36 @@
 
 ***
 
+### toFelts()
+
+> **toFelts**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
+### toHex()
+
+> **toHex**(): `string`
+
+#### Returns
+
+`string`
+
+***
+
+### toU64s()
+
+> **toU64s**(): `BigUint64Array`
+
+#### Returns
+
+`BigUint64Array`
+
+***
+
 ### newFromFelts()
 
 > `static` **newFromFelts**(`felt_vec`): `Word`
@@ -27,22 +73,6 @@
 ##### felt\_vec
 
 [`Felt`](Felt.md)[]
-
-#### Returns
-
-`Word`
-
-***
-
-### newFromU64s()
-
-> `static` **newFromU64s**(`u64_vec`): `Word`
-
-#### Parameters
-
-##### u64\_vec
-
-`BigUint64Array`
 
 #### Returns
 

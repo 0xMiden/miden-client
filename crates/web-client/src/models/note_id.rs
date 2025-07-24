@@ -1,7 +1,7 @@
 use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -10,7 +10,7 @@ pub struct NoteId(NativeNoteId);
 #[wasm_bindgen]
 impl NoteId {
     #[wasm_bindgen(constructor)]
-    pub fn new(recipient_digest: &RpoDigest, asset_commitment_digest: &RpoDigest) -> NoteId {
+    pub fn new(recipient_digest: &Word, asset_commitment_digest: &Word) -> NoteId {
         NoteId(NativeNoteId::new(recipient_digest.into(), asset_commitment_digest.into()))
     }
 

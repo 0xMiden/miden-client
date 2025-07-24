@@ -1,7 +1,7 @@
 use miden_objects::asset::AssetVault as NativeAssetVault;
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, fungible_asset::FungibleAsset, rpo_digest::RpoDigest};
+use super::{account_id::AccountId, fungible_asset::FungibleAsset, word::Word};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -9,7 +9,7 @@ pub struct AssetVault(NativeAssetVault);
 
 #[wasm_bindgen]
 impl AssetVault {
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.0.root().into()
     }
 

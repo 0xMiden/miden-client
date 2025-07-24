@@ -35,7 +35,6 @@ import {
   OutputNote,
   OutputNotesArray,
   PublicKey,
-  RpoDigest,
   Rpo256,
   SecretKey,
   SlotAndKeys,
@@ -43,6 +42,7 @@ import {
   StorageMap,
   StorageSlot,
   TestUtils,
+  TokenSymbol,
   TransactionFilter,
   TransactionKernel,
   TransactionProver,
@@ -101,7 +101,6 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     PublicKey: typeof PublicKey;
-    RpoDigest: typeof RpoDigest;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
     SlotAndKeys: typeof SlotAndKeys;
@@ -109,6 +108,7 @@ declare global {
     StorageMap: typeof StorageMap;
     StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
+    TokenSymbol: typeof TokenSymbol;
     TransactionFilter: typeof TransactionFilter;
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;

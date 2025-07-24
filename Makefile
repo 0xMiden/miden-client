@@ -47,7 +47,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix toml clippy fix-wasm clippy-wasm typos ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: format fix toml clippy fix-wasm clippy-wasm typos-check ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -184,4 +184,5 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
+	yarn --silent
 	@echo "Development tools installation complete!"

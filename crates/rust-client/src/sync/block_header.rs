@@ -2,20 +2,23 @@ use alloc::{sync::Arc, vec::Vec};
 
 use crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_objects::{
-    Digest,
+    Word,
     block::{BlockHeader, BlockNumber},
-    crypto::{self, merkle::MerklePath},
+    crypto::{
+        self,
+        merkle::{Forest, MerklePath},
+    },
 };
 use tracing::warn;
 
 use crate::{
     Client, ClientError,
     rpc::NodeRpcClient,
-    store::{PartialBlockchainFilter, StoreError},
+    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
 };
 
 /// Network information management methods.
-impl Client {
+impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
@@ -35,8 +38,8 @@ impl Client {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        let blank_mmr_peaks =
-            MmrPeaks::new(0, vec![]).expect("Blank MmrPeaks should not fail to instantiate");
+        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
+            .expect("Blank MmrPeaks should not fail to instantiate");
         self.store.insert_block_header(&genesis_block, blank_mmr_peaks, false).await?;
         Ok(genesis_block)
     }
@@ -65,14 +68,14 @@ impl Client {
                 .await?
             {
                 Some((_, previous_block_had_notes)) => previous_block_had_notes,
-                None => false,
+                None => BlockRelevance::Irrelevant,
             }
         } else {
-            false
+            BlockRelevance::Irrelevant
         };
 
         let mut current_partial_mmr =
-            PartialMmr::from_parts(current_peaks, tracked_nodes, track_latest);
+            PartialMmr::from_parts(current_peaks, tracked_nodes, track_latest.into());
 
         let (current_block, has_client_notes) = self
             .store
@@ -80,7 +83,7 @@ impl Client {
             .await?
             .expect("Current block should be in the store");
 
-        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+        current_partial_mmr.add(current_block.commitment(), has_client_notes.into());
 
         Ok(current_partial_mmr)
     }
@@ -133,14 +136,14 @@ impl Client {
 pub(crate) fn adjust_merkle_path_for_forest(
     merkle_path: &MerklePath,
     block_num: BlockNumber,
-    forest: usize,
-) -> Vec<(InOrderIndex, Digest)> {
+    forest: Forest,
+) -> Vec<(InOrderIndex, Word)> {
     assert!(
-        forest > block_num.as_usize(),
+        forest.num_leaves() > block_num.as_usize(),
         "Can't adjust merkle path for a forest that does not include the block number"
     );
 
-    let rightmost_index = InOrderIndex::from_leaf_pos(forest - 1);
+    let rightmost_index = InOrderIndex::from_leaf_pos(forest.num_leaves() - 1);
 
     let mut idx = InOrderIndex::from_leaf_pos(block_num.as_usize());
     let mut path_nodes = vec![];
@@ -161,7 +164,7 @@ pub(crate) async fn fetch_block_header(
     rpc_api: Arc<dyn NodeRpcClient>,
     block_num: BlockNumber,
     current_partial_mmr: &mut PartialMmr,
-) -> Result<(BlockHeader, Vec<(InOrderIndex, Digest)>), ClientError> {
+) -> Result<(BlockHeader, Vec<(InOrderIndex, Word)>), ClientError> {
     let (block_header, mmr_proof) = rpc_api.get_block_header_with_proof(block_num).await?;
 
     // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR

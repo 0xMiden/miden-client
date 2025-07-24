@@ -15,7 +15,9 @@ use rand::Rng;
 use crate::rpc::{Endpoint, TonicRpcClient};
 #[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
-use crate::{Client, ClientError, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store};
+use crate::{
+    Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store,
+};
 
 // CONSTANTS
 // ================================================================================================
@@ -33,9 +35,9 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 ///
 /// - A direct instance of an authenticator, or
 /// - A keystore path as a string which is then used as an authenticator.
-enum AuthenticatorConfig {
+enum AuthenticatorConfig<AUTH> {
     Path(String),
-    Instance(Arc<dyn TransactionAuthenticator>),
+    Instance(Arc<AUTH>),
 }
 
 // CLIENT BUILDER
@@ -46,7 +48,7 @@ enum AuthenticatorConfig {
 /// This builder allows you to configure the various components required by the client, such as the
 /// RPC endpoint, store, RNG, and keystore. It is generic over the keystore type. By default, it
 /// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
-pub struct ClientBuilder {
+pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
     /// An optional store provided by the user.
@@ -57,9 +59,9 @@ pub struct ClientBuilder {
     #[cfg(feature = "sqlite")]
     store_path: String,
     /// The keystore configuration provided by the user.
-    keystore: Option<AuthenticatorConfig>,
+    keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
-    in_debug_mode: bool,
+    in_debug_mode: DebugMode,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
@@ -68,7 +70,7 @@ pub struct ClientBuilder {
     max_block_number_delta: Option<u32>,
 }
 
-impl Default for ClientBuilder {
+impl<AUTH> Default for ClientBuilder<AUTH> {
     fn default() -> Self {
         Self {
             rpc_api: None,
@@ -77,14 +79,17 @@ impl Default for ClientBuilder {
             #[cfg(feature = "sqlite")]
             store_path: "store.sqlite3".to_string(),
             keystore: None,
-            in_debug_mode: false,
+            in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
         }
     }
 }
 
-impl ClientBuilder {
+impl<AUTH> ClientBuilder<AUTH>
+where
+    AUTH: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static,
+{
     /// Create a new `ClientBuilder` with default settings.
     #[must_use]
     pub fn new() -> Self {
@@ -93,7 +98,7 @@ impl ClientBuilder {
 
     /// Enable or disable debug mode.
     #[must_use]
-    pub fn in_debug_mode(mut self, debug: bool) -> Self {
+    pub fn in_debug_mode(mut self, debug: DebugMode) -> Self {
         self.in_debug_mode = debug;
         self
     }
@@ -137,7 +142,7 @@ impl ClientBuilder {
 
     /// Optionally provide a custom authenticator instance.
     #[must_use]
-    pub fn authenticator(mut self, authenticator: Arc<dyn TransactionAuthenticator>) -> Self {
+    pub fn authenticator(mut self, authenticator: Arc<AUTH>) -> Self {
         self.keystore = Some(AuthenticatorConfig::Instance(authenticator));
         self
     }
@@ -177,7 +182,7 @@ impl ClientBuilder {
     /// - Returns an error if the store cannot be instantiated.
     /// - Returns an error if the keystore is not specified or fails to initialize.
     #[allow(clippy::unused_async, unused_mut)]
-    pub async fn build(mut self) -> Result<Client, ClientError> {
+    pub async fn build(mut self) -> Result<Client<AUTH>, ClientError> {
         // Determine the RPC client to use.
         let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
             client
@@ -212,7 +217,7 @@ impl ClientBuilder {
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new)))
+            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
         // Initialize the authenticator.
@@ -221,7 +226,7 @@ impl ClientBuilder {
             Some(AuthenticatorConfig::Path(ref path)) => {
                 let keystore = FilesystemKeyStore::new(path.into())
                     .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
-                Arc::new(keystore)
+                Arc::new(AUTH::from(keystore))
             },
             None => {
                 return Err(ClientError::ClientInitializationError(
@@ -240,7 +245,7 @@ impl ClientBuilder {
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
                 false,
-                self.in_debug_mode,
+                self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,

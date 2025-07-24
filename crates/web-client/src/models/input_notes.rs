@@ -1,7 +1,7 @@
 use miden_objects::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
 use wasm_bindgen::prelude::*;
 
-use super::{input_note::InputNote, rpo_digest::RpoDigest};
+use super::{input_note::InputNote, word::Word};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -9,7 +9,7 @@ pub struct InputNotes(NativeInputNotes<NativeInputNote>);
 
 #[wasm_bindgen]
 impl InputNotes {
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 

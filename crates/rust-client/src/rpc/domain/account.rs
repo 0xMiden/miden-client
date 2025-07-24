@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::{
-    Digest,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader},
     block::{AccountWitness, BlockNumber},
     crypto::merkle::{MerklePath, SmtProof},
@@ -45,7 +45,7 @@ impl FetchedAccount {
     }
 
     // Returns the account update summary commitment
-    pub fn commitment(&self) -> Digest {
+    pub fn commitment(&self) -> Word {
         match self {
             Self::Private(_, summary) | Self::Public(_, summary) => summary.commitment,
         }
@@ -75,14 +75,14 @@ impl From<FetchedAccount> for Option<Account> {
 /// Contains public updated information about the account requested.
 pub struct AccountUpdateSummary {
     /// Commitment of the account, that represents a commitment to its updated state.
-    pub commitment: Digest,
+    pub commitment: Word,
     /// Block number of last account update.
     pub last_block_num: u32,
 }
 
 impl AccountUpdateSummary {
     /// Creates a new [`AccountUpdateSummary`].
-    pub fn new(commitment: Digest, last_block_num: u32) -> Self {
+    pub fn new(commitment: Word, last_block_num: u32) -> Self {
         Self { commitment, last_block_num }
     }
 }
@@ -177,7 +177,7 @@ impl ProtoAccountStateHeader {
     pub fn into_domain(
         self,
         account_id: AccountId,
-        known_account_codes: &BTreeMap<Digest, AccountCode>,
+        known_account_codes: &BTreeMap<Word, AccountCode>,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
         use crate::rpc::{RpcError, generated::responses::StorageSlotMapProof};
 
@@ -307,12 +307,12 @@ impl AccountProof {
     }
 
     /// Returns the code commitment, if account code is present in the state headers.
-    pub fn code_commitment(&self) -> Option<Digest> {
+    pub fn code_commitment(&self) -> Option<Word> {
         self.account_code().map(AccountCode::commitment)
     }
 
     /// Returns the current state commitment of the account.
-    pub fn account_commitment(&self) -> Digest {
+    pub fn account_commitment(&self) -> Word {
         self.account_witness.state_commitment()
     }
 
@@ -360,7 +360,7 @@ impl TryFrom<ProtoAccountWitness> for AccountWitness {
 // ================================================================================================
 
 pub type StorageSlotIndex = u8;
-pub type StorageMapKey = Digest;
+pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.

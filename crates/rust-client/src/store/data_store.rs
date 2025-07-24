@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, collections::BTreeSet, sync::Arc, vec::Vec};
 
 use miden_objects::{
-    Digest, MastForest, Word,
+    MastForest, Word,
     account::{Account, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MerklePath, PartialMmr},
@@ -89,7 +89,7 @@ impl DataStore for ClientDataStore {
 // ================================================================================================
 
 impl MastForestStore for ClientDataStore {
-    fn get(&self, procedure_hash: &Digest) -> Option<Arc<MastForest>> {
+    fn get(&self, procedure_hash: &Word) -> Option<Arc<MastForest>> {
         self.transaction_mast_store.get(procedure_hash)
     }
 }
@@ -119,7 +119,8 @@ async fn build_partial_mmr_with_paths(
         authenticated_blocks.iter().map(BlockHeader::block_num).collect();
 
     let authentication_paths =
-        get_authentication_path_for_blocks(store, &block_nums, partial_mmr.forest()).await?;
+        get_authentication_path_for_blocks(store, &block_nums, partial_mmr.forest().num_leaves())
+            .await?;
 
     for (header, path) in authenticated_blocks.iter().zip(authentication_paths.iter()) {
         partial_mmr

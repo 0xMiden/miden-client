@@ -20,11 +20,11 @@
 
 ### root()
 
-> **root**(): [`RpoDigest`](RpoDigest.md)
+> **root**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 

@@ -16,7 +16,7 @@ use db_management::{
     utils::apply_migrations,
 };
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -26,7 +26,7 @@ use rusqlite::{Connection, types::Value};
 use tonic::async_trait;
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
     PartialBlockchainFilter, Store, TransactionFilter,
 };
 use crate::{
@@ -198,12 +198,13 @@ impl Store for SqliteStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_numbers = block_numbers.clone();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_block_headers(conn, &block_numbers)
-        })
-        .await
+        Ok(self
+            .interact_with_connection(move |conn| {
+                SqliteStore::get_block_headers(conn, &block_numbers)
+            })
+            .await?)
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
@@ -213,7 +214,7 @@ impl Store for SqliteStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_partial_blockchain_nodes(conn, &filter)
         })
@@ -222,7 +223,7 @@ impl Store for SqliteStore {
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let nodes = nodes.to_vec();
         self.interact_with_connection(move |conn| {
@@ -279,7 +280,7 @@ impl Store for SqliteStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_header_by_commitment(conn, account_commitment)

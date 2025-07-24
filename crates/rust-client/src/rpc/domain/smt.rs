@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     crypto::merkle::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof},
 };
 
@@ -11,16 +11,16 @@ use crate::rpc::{errors::RpcConversionError, generated};
 // SMT LEAF ENTRY
 // ================================================================================================
 
-impl From<&(Digest, Word)> for generated::smt::SmtLeafEntry {
-    fn from(value: &(Digest, Word)) -> Self {
+impl From<&(Word, Word)> for generated::smt::SmtLeafEntry {
+    fn from(value: &(Word, Word)) -> Self {
         generated::smt::SmtLeafEntry {
             key: Some(value.0.into()),
-            value: Some(Digest::new(value.1).into()),
+            value: Some(value.1.into()),
         }
     }
 }
 
-impl TryFrom<&generated::smt::SmtLeafEntry> for (Digest, Word) {
+impl TryFrom<&generated::smt::SmtLeafEntry> for (Word, Word) {
     type Error = RpcConversionError;
 
     fn try_from(value: &generated::smt::SmtLeafEntry) -> Result<Self, Self::Error> {
@@ -29,12 +29,12 @@ impl TryFrom<&generated::smt::SmtLeafEntry> for (Digest, Word) {
             None => return Err(generated::smt::SmtLeafEntry::missing_field("key")),
         };
 
-        let value: Digest = match value.value {
+        let value: Word = match value.value {
             Some(value) => value.try_into()?,
             None => return Err(generated::smt::SmtLeafEntry::missing_field("value")),
         };
 
-        Ok((key, value.into()))
+        Ok((key, value))
     }
 }
 

@@ -7,6 +7,7 @@ use std::{
 use miden_client::{
     Client, ClientError,
     account::{AccountFile, AccountId},
+    auth::TransactionAuthenticator,
     note::NoteFile,
     utils::Deserializable,
 };
@@ -29,7 +30,11 @@ pub struct ImportCmd {
 }
 
 impl ImportCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         validate_paths(&self.filenames)?;
         let (mut current_config, _) = load_config_file()?;
         for filename in &self.filenames {
@@ -37,7 +42,7 @@ impl ImportCmd {
 
             if let Ok(note_file) = note_file {
                 let note_id = client.import_note(note_file).await?;
-                println!("Successfully imported note {}", note_id.inner());
+                println!("Successfully imported note {}", note_id.to_hex());
             } else {
                 info!(
                     "Attempting to import account data from {}...",
@@ -67,8 +72,8 @@ impl ImportCmd {
 // IMPORT ACCOUNT
 // ================================================================================================
 
-async fn import_account(
-    client: &mut Client,
+async fn import_account<AUTH>(
+    client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_data_file_contents: &[u8],
     overwrite: bool,

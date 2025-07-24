@@ -4,8 +4,9 @@ use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::{
-    Client, IdPrefixFetchError,
+    Client, DebugMode, IdPrefixFetchError,
     account::AccountHeader,
+    auth::TransactionAuthenticator,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
@@ -104,8 +105,8 @@ impl Cli {
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {
-            Ok(value) if value.to_lowercase() == "true" => true,
-            _ => self.debug,
+            Ok(value) if value.to_lowercase() == "true" => DebugMode::Enabled,
+            _ => DebugMode::Disabled,
         };
 
         // Create the client
@@ -177,8 +178,8 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub(crate) async fn get_output_note_with_id_prefix(
-    client: &Client,
+pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticator>(
+    client: &Client<AUTH>,
     note_id_prefix: &str,
 ) -> Result<OutputNoteRecord, IdPrefixFetchError> {
     let mut output_note_records = client
@@ -223,8 +224,8 @@ pub(crate) async fn get_output_note_with_id_prefix(
 ///   `account_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one account found
 ///   where `account_id_prefix` is a prefix of its ID.
-async fn get_account_with_id_prefix(
-    client: &Client,
+async fn get_account_with_id_prefix<AUTH>(
+    client: &Client<AUTH>,
     account_id_prefix: &str,
 ) -> Result<AccountHeader, IdPrefixFetchError> {
     let mut accounts = client

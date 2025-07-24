@@ -1,7 +1,9 @@
 use alloc::string::String;
+use core::num::TryFromIntError;
 
 use miden_objects::{
-    AccountError, AccountIdError, AssetVaultError, Digest, NoteError, TransactionScriptError,
+    AccountError, AccountIdError, AssetVaultError, NoteError, TransactionScriptError, Word,
+    WordError,
     account::AccountId,
     crypto::merkle::MmrError,
     utils::{DeserializationError, HexParseError},
@@ -21,7 +23,7 @@ pub enum StoreError {
     #[error("asset vault error")]
     AssetVaultError(#[from] AssetVaultError),
     #[error("account code data with root {0} not found")]
-    AccountCodeDataNotFound(Digest),
+    AccountCodeDataNotFound(Word),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
     #[error("account error")]
@@ -29,13 +31,13 @@ pub enum StoreError {
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
     #[error("account commitment {0} already exists")]
-    AccountCommitmentAlreadyExists(Digest),
+    AccountCommitmentAlreadyExists(Word),
     #[error("account commitment mismatch for account {0}")]
     AccountCommitmentMismatch(AccountId),
     #[error("public key {0} not found")]
     AccountKeyNotFound(String),
     #[error("account storage data with root {0} not found")]
-    AccountStorageNotFound(Digest),
+    AccountStorageNotFound(Word),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
     #[error("error deserializing data from the store")]
@@ -44,6 +46,8 @@ pub enum StoreError {
     DatabaseError(String),
     #[error("error parsing hex")]
     HexParseError(#[from] HexParseError),
+    #[error("failed to convert int")]
+    InvalidInt(#[from] TryFromIntError),
     #[error("note record error")]
     NoteRecordError(#[from] NoteRecordError),
     #[error("error constructing mmr")]
@@ -59,7 +63,9 @@ pub enum StoreError {
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]
-    VaultDataNotFound(Digest),
+    VaultDataNotFound(Word),
+    #[error("failed to parse word: {0}")]
+    WordError(#[from] WordError),
 }
 
 impl From<StoreError> for DataStoreError {

@@ -34,11 +34,11 @@
 
 ### digest()
 
-> **digest**(): [`RpoDigest`](RpoDigest.md)
+> **digest**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 

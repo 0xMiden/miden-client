@@ -4,9 +4,9 @@ use alloc::{collections::BTreeMap, rc::Rc, string::String, vec::Vec};
 use std::{collections::BTreeSet, num::NonZeroUsize};
 
 use miden_objects::{
-    Digest,
+    Word,
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
+    crypto::merkle::{Forest, InOrderIndex, MmrPeaks},
 };
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{
@@ -16,7 +16,7 @@ use rusqlite::{
 use super::SqliteStore;
 use crate::{
     insert_sql,
-    store::{PartialBlockchainFilter, StoreError},
+    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
     subst,
 };
 
@@ -80,7 +80,7 @@ impl SqliteStore {
     pub(crate) fn get_block_headers(
         conn: &mut Connection,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_number_list = block_numbers
             .iter()
             .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
@@ -117,7 +117,7 @@ impl SqliteStore {
     pub(crate) fn get_partial_blockchain_nodes(
         conn: &mut Connection,
         filter: &PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         let mut params = Vec::new();
         if let PartialBlockchainFilter::List(ids) = &filter {
             let id_values = ids
@@ -160,12 +160,12 @@ impl SqliteStore {
             return parse_partial_blockchain_peaks(block_num.as_u32(), &partial_blockchain_peaks);
         }
 
-        Ok(MmrPeaks::new(0, vec![])?)
+        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
     pub fn insert_partial_blockchain_nodes(
         conn: &mut Connection,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 
@@ -177,7 +177,7 @@ impl SqliteStore {
     /// Inserts a list of MMR authentication nodes to the Partial Blockchain nodes table.
     pub(crate) fn insert_partial_blockchain_nodes_tx(
         tx: &Transaction<'_>,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         for (index, node) in nodes {
             insert_partial_blockchain_node(tx, *index, *node)?;
@@ -241,7 +241,7 @@ impl SqliteStore {
 fn insert_partial_blockchain_node(
     tx: &Transaction<'_>,
     id: InOrderIndex,
-    node: Digest,
+    node: Word,
 ) -> Result<(), StoreError> {
     let SerializedPartialBlockchainNodeData { id, node } =
         serialize_partial_blockchain_node(id, node);
@@ -251,14 +251,18 @@ fn insert_partial_blockchain_node(
 }
 
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
-    let mmr_peaks_nodes = Vec::<Digest>::read_from_bytes(peaks_nodes)?;
+    let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
-    MmrPeaks::new(forest as usize, mmr_peaks_nodes).map_err(StoreError::MmrError)
+    MmrPeaks::new(
+        Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
+        mmr_peaks_nodes,
+    )
+    .map_err(StoreError::MmrError)
 }
 
 fn serialize_block_header(
     block_header: &BlockHeader,
-    partial_blockchain_peaks: &[Digest],
+    partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
     let block_num = block_header.block_num();
@@ -291,16 +295,16 @@ fn parse_block_headers_columns(
 
 fn parse_block_header(
     serialized_block_header_parts: &SerializedBlockHeaderParts,
-) -> Result<(BlockHeader, bool), StoreError> {
+) -> Result<(BlockHeader, BlockRelevance), StoreError> {
     Ok((
         BlockHeader::read_from_bytes(&serialized_block_header_parts.header)?,
-        serialized_block_header_parts.has_client_notes,
+        serialized_block_header_parts.has_client_notes.into(),
     ))
 }
 
 fn serialize_partial_blockchain_node(
     id: InOrderIndex,
-    node: Digest,
+    node: Word,
 ) -> SerializedPartialBlockchainNodeData {
     let id = i64::try_from(id.inner()).expect("id is a valid i64");
     let node = node.to_hex();
@@ -317,7 +321,7 @@ fn parse_partial_blockchain_nodes_columns(
 
 fn parse_partial_blockchain_nodes(
     serialized_partial_blockchain_node_parts: &SerializedPartialBlockchainNodeParts,
-) -> Result<(InOrderIndex, Digest), StoreError> {
+) -> Result<(InOrderIndex, Word), StoreError> {
     let id = InOrderIndex::new(
         NonZeroUsize::new(
             usize::try_from(serialized_partial_blockchain_node_parts.id)
@@ -325,7 +329,7 @@ fn parse_partial_blockchain_nodes(
         )
         .unwrap(),
     );
-    let node: Digest = Digest::try_from(&serialized_partial_blockchain_node_parts.node)?;
+    let node: Word = Word::try_from(&serialized_partial_blockchain_node_parts.node)?;
     Ok((id, node))
 }
 
@@ -348,7 +352,10 @@ mod test {
     use alloc::vec::Vec;
 
     use miden_lib::transaction::TransactionKernel;
-    use miden_objects::{block::BlockHeader, crypto::merkle::MmrPeaks};
+    use miden_objects::{
+        block::BlockHeader,
+        crypto::merkle::{Forest, MmrPeaks},
+    };
 
     use crate::store::{
         Store,
@@ -372,7 +379,7 @@ mod test {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                let dummy_peaks = MmrPeaks::new(0, Vec::new()).unwrap();
+                let dummy_peaks = MmrPeaks::new(Forest::empty(), Vec::new()).unwrap();
                 (0..5).for_each(|block_num| {
                     SqliteStore::insert_block_header_tx(
                         &tx,

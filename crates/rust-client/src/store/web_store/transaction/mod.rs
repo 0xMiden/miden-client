@@ -3,7 +3,7 @@ use alloc::{
     vec::Vec,
 };
 
-use miden_objects::{Digest, block::BlockNumber, transaction::TransactionScript};
+use miden_objects::{Word, block::BlockNumber, transaction::TransactionScript};
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
@@ -57,7 +57,7 @@ impl WebStore {
                 let commit_height: Option<BlockNumber> =
                     tx_idxdb.commit_height.map(|height| height.parse::<u32>().unwrap().into());
 
-                let id: Digest = tx_idxdb.id.try_into()?;
+                let id: Word = tx_idxdb.id.try_into()?;
 
                 let details = TransactionDetails::read_from_bytes(&tx_idxdb.details)?;
 

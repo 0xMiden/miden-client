@@ -5,7 +5,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 use crate::{
     models::{
         account_code::AccountCode, account_id::AccountId, account_storage::AccountStorage,
-        asset_vault::AssetVault, felt::Felt, rpo_digest::RpoDigest,
+        asset_vault::AssetVault, felt::Felt, word::Word,
     },
     utils::{deserialize_from_uint8array, serialize_to_uint8array},
 };
@@ -20,7 +20,7 @@ impl Account {
         self.0.id().into()
     }
 
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 

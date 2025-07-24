@@ -5,7 +5,7 @@ use alloc::{
 
 use chrono::Utc;
 use miden_objects::{
-    Digest, Word,
+    Word,
     note::{NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript},
     utils::Deserializable,
 };
@@ -51,7 +51,7 @@ pub struct SerializedOutputNoteData {
 // ================================================================================================
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let note_id = note.id().inner().to_string();
+    let note_id = note.id().to_hex().to_string();
     let note_assets = note.assets().to_bytes();
 
     let details = note.details();
@@ -104,7 +104,7 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
 }
 
 pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
-    let note_id = note.id().inner().to_string();
+    let note_id = note.id().to_hex().to_string();
     let note_assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
     let metadata = note.metadata().to_bytes();
@@ -181,7 +181,7 @@ pub fn parse_output_note_idxdb_object(
 ) -> Result<OutputNoteRecord, StoreError> {
     let note_metadata = NoteMetadata::read_from_bytes(&note_idxdb.metadata)?;
     let note_assets = NoteAssets::read_from_bytes(&note_idxdb.assets)?;
-    let recipient = Digest::try_from(note_idxdb.recipient_digest)?;
+    let recipient = Word::try_from(note_idxdb.recipient_digest)?;
     let state = OutputNoteState::read_from_bytes(&note_idxdb.state)?;
 
     Ok(OutputNoteRecord::new(

@@ -6,10 +6,10 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest,
+    Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
     block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{MerklePath, MmrProof, SmtProof},
+    crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof},
     note::{NoteId, NoteTag, Nullifier},
     transaction::ProvenTransaction,
     utils::Deserializable,
@@ -174,7 +174,7 @@ impl NodeRpcClient for TonicRpcClient {
                 .try_into()?;
 
             Some(MmrProof {
-                forest: forest as usize,
+                forest: Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
                 position: block_header.block_num().as_usize(),
                 merkle_path,
             })
@@ -187,7 +187,7 @@ impl NodeRpcClient for TonicRpcClient {
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let request = GetNotesByIdRequest {
-            note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
+            note_ids: note_ids.iter().map(|id| id.as_word().into()).collect(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
@@ -315,7 +315,7 @@ impl NodeRpcClient for TonicRpcClient {
             });
         }
 
-        let known_account_codes: BTreeMap<Digest, AccountCode> =
+        let known_account_codes: BTreeMap<Word, AccountCode> =
             known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
 
         let request = GetAccountProofsRequest {
@@ -426,7 +426,7 @@ impl NodeRpcClient for TonicRpcClient {
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
         let request = CheckNullifiersRequest {
-            nullifiers: nullifiers.iter().map(|nul| nul.inner().into()).collect(),
+            nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;

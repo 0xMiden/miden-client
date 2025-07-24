@@ -4,19 +4,19 @@ use miden_client::rpc::domain::account::{
 };
 use wasm_bindgen::prelude::*;
 
-use crate::models::rpo_digest::RpoDigest;
+use crate::models::word::Word;
 
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct SlotAndKeys {
     storage_slot_index: u8,
-    storage_map_keys: Vec<RpoDigest>,
+    storage_map_keys: Vec<Word>,
 }
 
 #[wasm_bindgen]
 impl SlotAndKeys {
     #[wasm_bindgen(constructor)]
-    pub fn new(storage_slot_index: u8, storage_map_keys: Vec<RpoDigest>) -> SlotAndKeys {
+    pub fn new(storage_slot_index: u8, storage_map_keys: Vec<Word>) -> SlotAndKeys {
         SlotAndKeys { storage_slot_index, storage_map_keys }
     }
 
@@ -24,7 +24,7 @@ impl SlotAndKeys {
         self.storage_slot_index
     }
 
-    pub fn storage_map_keys(&self) -> Vec<RpoDigest> {
+    pub fn storage_map_keys(&self) -> Vec<Word> {
         self.storage_map_keys.clone()
     }
 }

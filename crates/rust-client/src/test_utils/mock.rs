@@ -2,18 +2,18 @@ use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    Digest, Felt,
+    Felt, Word,
     account::{AccountCode, AccountDelta, AccountId},
     block::{BlockHeader, BlockNumber, ProvenBlock},
     crypto::{
-        merkle::{MerklePath, Mmr, MmrProof, SmtProof},
+        merkle::{Forest, MerklePath, Mmr, MmrProof, SmtProof},
         rand::RpoRandomCoin,
     },
     note::{NoteExecutionMode, NoteId, NoteTag, NoteType, Nullifier},
-    testing::{account_id::ACCOUNT_ID_PRIVATE_SENDER, note::NoteBuilder},
-    transaction::{InputNoteCommitment, OutputNote, ProvenTransaction},
+    testing::note::NoteBuilder,
+    transaction::{OutputNote, ProvenTransaction},
 };
-use miden_testing::{MockChain, MockChainNote};
+use miden_testing::{MockChain, MockChainBuilder, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::{
@@ -33,7 +33,7 @@ use crate::{
     transaction::ForeignAccount,
 };
 
-pub type MockClient = Client;
+pub type MockClient<AUTH> = Client<AUTH>;
 
 /// Mock RPC API
 ///
@@ -44,57 +44,64 @@ pub struct MockRpcApi {
     committed_transactions: Arc<RwLock<Vec<TransactionSummary>>>, /* TODO: Should this be tracked by the mock_chain? */
     pub mock_chain: Arc<RwLock<MockChain>>,
 }
-impl Default for MockRpcApi {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+
 impl MockRpcApi {
     /// Creates a new `MockRpcApi` instance with pre-populated blocks and notes.
-    pub fn new() -> Self {
-        let mock_chain = MockChain::new();
-        let api = Self {
+    pub async fn new() -> Self {
+        let mut mock_chain_builder = MockChainBuilder::new();
+        let mock_account = mock_chain_builder
+            .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+            .unwrap();
+
+        let note_first = NoteBuilder::new(
+            mock_account.id(),
+            RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()),
+        )
+        .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+        .build(&TransactionKernel::assembler())
+        .unwrap();
+
+        let note_second = NoteBuilder::new(
+            mock_account.id(),
+            RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()),
+        )
+        .note_type(NoteType::Private)
+        .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+        .build(&TransactionKernel::assembler())
+        .unwrap();
+        let mut mock_chain = mock_chain_builder.build().unwrap();
+
+        // Block 1: Create first note
+        mock_chain.add_pending_note(OutputNote::Full(note_first));
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 2
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 3
+        mock_chain.prove_next_block().unwrap();
+
+        // Block 4: Create second note
+        mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
+        mock_chain.prove_next_block().unwrap();
+
+        let transaction = mock_chain
+            .build_tx_context(mock_account, &[note_second.id()], &[])
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute()
+            .await
+            .unwrap();
+
+        // Block 5: Consume (nullify) second note
+        mock_chain.add_pending_executed_transaction(&transaction).unwrap();
+        mock_chain.prove_next_block().unwrap();
+
+        Self {
             committed_transactions: Arc::new(RwLock::new(vec![])),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
-        };
-
-        let from_account_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
-
-        let note_first =
-            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new)))
-                .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-                .build(&TransactionKernel::assembler())
-                .unwrap();
-
-        let note_second =
-            NoteBuilder::new(from_account_id, RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new)))
-                .note_type(NoteType::Private)
-                .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-                .build(&TransactionKernel::assembler())
-                .unwrap();
-
-        api.seal_block(vec![OutputNote::Full(note_first)], vec![]); // Block 1 - First note
-        api.seal_block(vec![], vec![]); // Block 2
-        api.seal_block(vec![], vec![]); // Block 3
-        api.seal_block(vec![OutputNote::Full(note_second.clone())], vec![]); // Block 4 - Second note
-        api.seal_block(vec![], vec![note_second.nullifier()]); // Block 5 - Second note nullifier
-
-        api
-    }
-
-    /// Seals a block with the given notes and nullifiers.
-    fn seal_block(&self, notes: Vec<OutputNote>, nullifiers: Vec<miden_objects::note::Nullifier>) {
-        let mut mock_chain = self.mock_chain.write();
-
-        for note in notes {
-            mock_chain.add_pending_note(note);
         }
-
-        for nullifier in nullifiers {
-            mock_chain.add_pending_nullifier(nullifier);
-        }
-
-        mock_chain.prove_next_block().unwrap();
     }
 
     /// Returns the current MMR of the blockchain.
@@ -117,7 +124,7 @@ impl MockRpcApi {
         &self,
         request_block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> SyncStateResponse {
+    ) -> Result<SyncStateResponse, RpcError> {
         // Determine the next block number to sync
         let next_block_num = self
             .mock_chain
@@ -145,8 +152,10 @@ impl MockRpcApi {
             request_block_num.as_usize() + 1
         };
 
-        let mmr_delta =
-            self.get_mmr().get_delta(from_block_num, next_block_num.as_usize()).unwrap();
+        let mmr_delta = self
+            .get_mmr()
+            .get_delta(Forest::new(from_block_num), Forest::new(next_block_num.as_usize()))
+            .unwrap();
 
         // Collect notes that are in the next block
         let notes = self.get_notes_in_block(next_block_num, note_tags);
@@ -159,14 +168,14 @@ impl MockRpcApi {
             .cloned()
             .collect::<Vec<_>>();
 
-        SyncStateResponse {
+        Ok(SyncStateResponse {
             chain_tip: self.get_chain_tip_block_num().as_u32(),
             block_header: Some(next_block.into()),
-            mmr_delta: Some(mmr_delta.into()),
+            mmr_delta: Some(mmr_delta.try_into()?),
             accounts: vec![],
             transactions,
             notes,
-        }
+        })
     }
 
     /// Retrieves notes that are included in the specified block number.
@@ -189,7 +198,9 @@ impl MockRpcApi {
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some((*note.metadata()).into()),
-                        merkle_path: Some(note.inclusion_proof().note_path().clone().into()),
+                        merkle_path: Some(
+                            MerklePath::from(note.inclusion_proof().note_path().clone()).into(),
+                        ),
                     })
                 } else {
                     None
@@ -217,7 +228,7 @@ impl NodeRpcClient for MockRpcApi {
         block_num: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags);
+        let response = self.get_sync_state_request(block_num, note_tags)?;
 
         let response = NoteSyncInfo {
             chain_tip: response.chain_tip,
@@ -227,7 +238,7 @@ impl NodeRpcClient for MockRpcApi {
                 .notes
                 .into_iter()
                 .map(|note| {
-                    let digest: Digest = note.note_id.unwrap().try_into().unwrap();
+                    let digest: Word = note.note_id.unwrap().try_into().unwrap();
                     let note_id: NoteId = NoteId::from(digest);
                     let note_index = u16::try_from(note.note_index).unwrap();
                     let merkle_path = note.merkle_path.unwrap().try_into().unwrap();
@@ -248,7 +259,7 @@ impl NodeRpcClient for MockRpcApi {
         _account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags);
+        let response = self.get_sync_state_request(block_num, note_tags)?;
 
         Ok(response.try_into().unwrap())
     }
@@ -301,22 +312,23 @@ impl NodeRpcClient for MockRpcApi {
         proven_transaction: ProvenTransaction,
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
-        let notes: Vec<OutputNote> = proven_transaction.output_notes().iter().cloned().collect();
 
-        let nullifiers: Vec<Nullifier> = proven_transaction
-            .input_notes()
-            .iter()
-            .map(InputNoteCommitment::nullifier)
-            .collect();
+        {
+            let mut mock_chain = self.mock_chain.write();
+            mock_chain.add_pending_proven_transaction(proven_transaction.clone());
 
-        self.seal_block(notes, nullifiers);
+            mock_chain.prove_next_block().unwrap();
+        };
+
+        let block_num = self.get_chain_tip_block_num();
+
         self.committed_transactions.write().push(TransactionSummary {
             transaction_id: Some(proven_transaction.id().into()),
-            block_num: self.get_chain_tip_block_num().as_u32(),
+            block_num: block_num.as_u32(),
             account_id: Some(proven_transaction.account_id().into()),
         });
 
-        Ok(self.get_chain_tip_block_num())
+        Ok(block_num)
     }
 
     async fn get_account_details(

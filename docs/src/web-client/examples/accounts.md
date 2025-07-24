@@ -72,6 +72,5 @@ For more detailed information about the classes and methods used in these exampl
 - [WebClient](docs/src/web-client/api/classes/WebClient.md) - Main client class for interacting with the Miden network
 - [Account](docs/src/web-client/api/classes/Account.md) - Account class and its properties
 - [AccountId](docs/src/web-client/api/classes/AccountId.md) - Account identifier class and utilities
-- [RpoDigest](docs/src/web-client/api/classes/RpoDigest.md) - Commitment hash class used for various account properties
 
 For a complete list of available classes and utilities, see the [SDK API Reference](docs/src/web-client/api/README.md). 

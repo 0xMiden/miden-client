@@ -14,7 +14,7 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest, Word,
+    Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrPeaks},
@@ -25,7 +25,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
     PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use crate::{
@@ -139,7 +139,7 @@ impl Store for WebStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         self.get_block_headers(block_numbers).await
     }
 
@@ -150,13 +150,13 @@ impl Store for WebStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.get_partial_blockchain_nodes(filter).await
     }
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         self.insert_partial_blockchain_nodes(nodes).await
     }
@@ -204,7 +204,7 @@ impl Store for WebStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.get_account_header_by_commitment(account_commitment).await
     }

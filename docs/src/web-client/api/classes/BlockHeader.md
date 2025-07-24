@@ -10,11 +10,11 @@
 
 ### accountRoot()
 
-> **accountRoot**(): [`RpoDigest`](RpoDigest.md)
+> **accountRoot**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
@@ -30,21 +30,21 @@
 
 ### chainCommitment()
 
-> **chainCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **chainCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### commitment()
 
-> **commitment**(): [`RpoDigest`](RpoDigest.md)
+> **commitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
@@ -60,51 +60,51 @@
 
 ### noteRoot()
 
-> **noteRoot**(): [`RpoDigest`](RpoDigest.md)
+> **noteRoot**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### nullifierRoot()
 
-> **nullifierRoot**(): [`RpoDigest`](RpoDigest.md)
+> **nullifierRoot**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### prevBlockCommitment()
 
-> **prevBlockCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **prevBlockCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### proofCommitment()
 
-> **proofCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **proofCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### subCommitment()
 
-> **subCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **subCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
@@ -120,21 +120,21 @@
 
 ### txCommitment()
 
-> **txCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **txCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### txKernelCommitment()
 
-> **txKernelCommitment**(): [`RpoDigest`](RpoDigest.md)
+> **txKernelCommitment**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
