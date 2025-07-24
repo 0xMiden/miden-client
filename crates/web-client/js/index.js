@@ -381,7 +381,20 @@ export class WebClient {
       }
 
       // Always call the same worker method.
-      await this.callMethodWithWorker(MethodName.SUBMIT_TRANSACTION, ...args);
+      let serializedMockChain = await this.callMethodWithWorker(
+        MethodName.SUBMIT_TRANSACTION,
+        ...args
+      );
+
+      if (this.wasmWebClient.usesMockChain()) {
+        serializedMockChain = new Uint8Array(serializedMockChain);
+
+        this.wasmWebClient = new WasmWebClient();
+        await this.wasmWebClient.createMockedClient(
+          this.seed,
+          serializedMockChain
+        );
+      }
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
@@ -393,8 +406,15 @@ export class WebClient {
       if (!this.worker) {
         return await this.wasmWebClient.syncState();
       }
+
+      let serializedMockChain = null;
+      if (this.wasmWebClient.usesMockChain()) {
+        serializedMockChain = this.wasmWebClient.serializeMockChain().buffer;
+      }
+
       const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-        MethodName.SYNC_STATE
+        MethodName.SYNC_STATE,
+        serializedMockChain
       );
       return wasm.SyncSummary.deserialize(
         new Uint8Array(serializedSyncSummaryBytes)
