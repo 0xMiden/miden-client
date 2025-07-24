@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1 (2025-07-24)
+
+### Fixes
+
+* Avoid passing unneeded nodes to `PartialMmr::from_parts` (#1081).
+
 ## 0.10.0 (2025-07-12)
 
 ### Features

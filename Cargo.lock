@@ -1978,7 +1978,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2054,7 +2054,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-web"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "miden-client",
  "miden-lib",

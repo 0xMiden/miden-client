@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Web Client library that facilitates interaction with the Miden rollup"
-documentation          = "https://docs.rs/miden-client-web/0.10.0"
+documentation          = "https://docs.rs/miden-client-web/0.10.1"
 edition.workspace      = true
 keywords               = ["client", "miden", "wasm", "web"]
 license.workspace      = true
@@ -10,7 +10,7 @@ name                   = "miden-client-web"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.10.0"
+version                = "0.10.1"
 
 [package.metadata.cargo-machete]
 ignored = ["wasm-bindgen-futures"]
