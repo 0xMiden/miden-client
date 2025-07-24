@@ -57,7 +57,7 @@ pub struct TonicRpcClient {
     client: RwLock<Option<ApiClient>>,
     endpoint: String,
     timeout_ms: u64,
-    genesis_commitment: RwLock<Option<Digest>>,
+    genesis_commitment: RwLock<Option<Word>>,
 }
 
 impl TonicRpcClient {
@@ -85,9 +85,9 @@ impl TonicRpcClient {
     /// Sets the genesis commitment for the client and reconnects to the node providing the
     /// genesis commitment in the request headers. If the genesis commitment is already set,
     /// this method does nothing.
-    async fn set_genesis_commitment(&self, commitment: Digest) -> Result<(), RpcError> {
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
         if self.genesis_commitment.read().is_some() {
-            //Genesis commitment is already set, ignoring the new value."
+            // Genesis commitment is already set, ignoring the new value.
             return Ok(());
         }
 
