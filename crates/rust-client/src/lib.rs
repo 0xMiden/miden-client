@@ -85,7 +85,7 @@
 //!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client = Client::new(
+//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
 //!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
@@ -184,8 +184,8 @@ pub use miden_tx::ExecutionOptions;
 /// client library.
 pub mod utils {
     pub use miden_tx::utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_hex_string,
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
+        bytes_to_hex_string, hex_to_bytes,
         sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
 }
@@ -219,7 +219,7 @@ use store::Store;
 ///   as notes and transactions.
 /// - Connects to a Miden node to periodically sync with the current state of the network.
 /// - Executes, proves, and submits transactions to the network as directed by the user.
-pub struct Client {
+pub struct Client<AUTH> {
     /// The client's store, which provides a way to write and read entities to provide persistence.
     store: Arc<dyn Store>,
     /// An instance of [`FeltRng`] which provides randomness tools for generating new keys,
@@ -233,7 +233,7 @@ pub struct Client {
     tx_prover: Arc<LocalTransactionProver>,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
     /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
@@ -244,7 +244,10 @@ pub struct Client {
 }
 
 /// Construction and access methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
 
@@ -274,7 +277,7 @@ impl Client {
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Arc<dyn TransactionAuthenticator>,
+        authenticator: Arc<AUTH>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,

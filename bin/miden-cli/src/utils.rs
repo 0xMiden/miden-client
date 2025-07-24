@@ -24,8 +24,8 @@ For example, `100::0xabcdef0123456789` or `1.23::TST`";
 
 /// Returns a tracked Account ID matching a hex string or the default one defined in the Client
 /// config.
-pub(crate) async fn get_input_acc_id_by_prefix_or_default(
-    client: &Client,
+pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
+    client: &Client<AUTH>,
     account_id: Option<String>,
 ) -> Result<AccountId, CliError> {
     let account_id_str = if let Some(account_id_prefix) = account_id {
@@ -53,8 +53,8 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default(
 ///
 /// - Will return a `IdPrefixFetchError` if the provided account ID string can't be parsed as an
 ///   `AccountId` and doesn't correspond to an account tracked by the client either.
-pub(crate) async fn parse_account_id(
-    client: &Client,
+pub(crate) async fn parse_account_id<AUTH>(
+    client: &Client<AUTH>,
     account_id: &str,
 ) -> Result<AccountId, CliError> {
     if account_id.starts_with("0x") {

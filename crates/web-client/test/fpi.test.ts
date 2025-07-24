@@ -14,7 +14,7 @@ export const testStandardFpi = async (): Promise<void> => {
     let felt3 = new window.Felt(15n);
     let felt4 = new window.Felt(15n);
     const MAP_KEY = window.Word.newFromFelts([felt1, felt2, felt3, felt4]);
-    const FPI_STORAGE_VALUE = window.Word.newFromU64s(
+    const FPI_STORAGE_VALUE = new window.Word(
       new BigUint64Array([9n, 12n, 18n, 30n])
     );
 
@@ -66,18 +66,7 @@ export const testStandardFpi = async (): Promise<void> => {
     );
     await client.syncState();
 
-    let deploymentTxScript = window.TransactionScript.compile(
-      `
-                begin 
-                    call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
-                end
-            `,
-      window.TransactionKernel.assembler()
-    );
-
-    let txRequest = new window.TransactionRequestBuilder()
-      .withCustomScript(deploymentTxScript)
-      .build();
+    let txRequest = new window.TransactionRequestBuilder().build();
 
     let txResult = await client.newTransaction(foreignAccountId, txRequest);
 
@@ -108,8 +97,6 @@ export const testStandardFpi = async (): Promise<void> => {
         
                 exec.tx::execute_foreign_procedure
                 push.9.12.18.30 assert_eqw
-        
-                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
             end
         `;
     txScript = txScript

@@ -31,7 +31,7 @@ pub mod utils;
 pub struct WebClient {
     store: Option<Arc<WebStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
-    inner: Option<Client>,
+    inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
 }
 
 impl Default for WebClient {
@@ -47,7 +47,7 @@ impl WebClient {
         WebClient { inner: None, store: None, keystore: None }
     }
 
-    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client> {
+    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
         self.inner.as_mut()
     }
 

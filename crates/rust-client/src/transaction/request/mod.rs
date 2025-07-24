@@ -279,7 +279,7 @@ impl TransactionRequest {
             TransactionArgs::new(advice_map, foreign_account_inputs).with_note_args(note_args);
 
         tx_args = if let Some(argument) = self.script_arg {
-            tx_args.with_tx_script_and_arg(tx_script, argument)
+            tx_args.with_tx_script_and_args(tx_script, argument)
         } else {
             tx_args.with_tx_script(tx_script)
         };
@@ -303,10 +303,6 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
-                if self.input_notes.is_empty() {
-                    return Err(TransactionRequestError::NoInputNotes);
-                }
-
                 let empty_script =
                     TransactionScript::compile("begin nop end", TransactionKernel::assembler())?;
 
@@ -453,7 +449,7 @@ mod tests {
     use std::vec::Vec;
 
     use miden_lib::{
-        account::auth::RpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
+        account::auth::AuthRpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
     };
     use miden_objects::{
         EMPTY_WORD, Felt, Word, ZERO,
@@ -509,7 +505,7 @@ mod tests {
             .with_component(
                 AccountMockComponent::new_with_empty_slots(TransactionKernel::assembler()).unwrap(),
             )
-            .with_auth_component(RpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()
