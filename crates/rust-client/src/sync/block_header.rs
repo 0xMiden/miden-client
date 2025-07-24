@@ -56,8 +56,8 @@ impl Client {
             self.store.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
 
         // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
-        // we can get an MMR based on those peaks, add the current block number and align it with 
-        // the set of all nodes in the store. 
+        // we can get an MMR based on those peaks, add the current block number and align it with
+        // the set of all nodes in the store.
         // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
         // we need for the passed peaks. The alternative here is to truncate the set of all nodes
         // before calling `from_parts`
