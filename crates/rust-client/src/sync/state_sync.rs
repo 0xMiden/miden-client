@@ -37,7 +37,8 @@ use crate::{
 /// The action to be taken when a note update is received as part of the sync response.
 #[allow(clippy::large_enum_variant)]
 pub enum NoteUpdateAction {
-    /// The note commit update is relevant and should be applied to the store.
+    /// The note commit update is relevant and the specified note should be marked as committed in
+    /// the store, storing its inclusion proof.
     Commit(CommittedNote),
     /// The public note is relevant and should be inserted into the store.
     Insert(InputNoteRecord),
