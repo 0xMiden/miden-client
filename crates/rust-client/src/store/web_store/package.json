@@ -1,0 +1,9 @@
+{
+  "name": "web_store",
+  "version": "1.0.0",
+  "license": "MIT",
+  "dependencies": {
+    "dexie": "^4.0.11",
+    "typescript": "^5.8.3"
+  }
+}

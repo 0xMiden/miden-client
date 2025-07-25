@@ -7,7 +7,6 @@ use super::flattened_vec::FlattenedU8Vec;
 
 // Sync IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/sync.js")]
-
 extern "C" {
     // GETS
     // ================================================================================================
