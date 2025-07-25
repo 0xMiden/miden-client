@@ -1,4 +1,5 @@
 use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
+use miden_objects::PrettyPrint;
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]
@@ -7,6 +8,12 @@ pub struct NoteScript(NativeNoteScript);
 
 #[wasm_bindgen]
 impl NoteScript {
+    /// Print the source MAST of this NoteScript instance.
+    #[wasm_bindgen(js_name = toString)]
+    pub fn to_string(&self) -> String {
+        self.0.to_pretty_string()
+    }
+
     pub fn p2id() -> Self {
         WellKnownNote::P2ID.script().into()
     }
@@ -43,5 +50,13 @@ impl From<NoteScript> for NativeNoteScript {
 impl From<&NoteScript> for NativeNoteScript {
     fn from(note_script: &NoteScript) -> Self {
         note_script.0.clone()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_note_script() {
+        dbg!(NoteScript::test())
     }
 }
