@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, path::PathBuf};
 
 use clap::Parser;
-use miden_client::{Client, Felt, Word};
+use miden_client::{Client, Felt, Word, auth::TransactionAuthenticator};
 use miden_objects::vm::AdviceInputs;
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -47,7 +47,10 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let script_path = PathBuf::from(&self.script_path);
         if !script_path.exists() {
             return Err(CliError::Exec(

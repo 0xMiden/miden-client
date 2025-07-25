@@ -459,7 +459,7 @@ pub(crate) fn undo_account_state(
 
 #[cfg(test)]
 mod tests {
-    use miden_lib::account::auth::RpoFalcon512;
+    use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_objects::{
         EMPTY_WORD,
         account::{AccountCode, AccountComponent},
@@ -477,7 +477,7 @@ mod tests {
             .unwrap()
             .with_supports_all_types();
         let account_code = AccountCode::from_components(
-            &[RpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
+            &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
             miden_objects::account::AccountType::RegularAccountUpdatableCode,
         )
         .unwrap();

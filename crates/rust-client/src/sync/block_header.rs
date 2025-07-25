@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// Network information management methods.
-impl Client {
+impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {

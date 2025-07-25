@@ -5,7 +5,7 @@ use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::RpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
@@ -43,7 +43,7 @@ use rand::{Rng, RngCore, rngs::StdRng};
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, DebugMode,
+    ClientError, DebugMode,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     note::NoteRelevance,
@@ -55,10 +55,11 @@ use crate::{
     sync::NoteTagSource,
     testing::{
         common::{
-            ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT,
-            assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
-            execute_failing_tx, execute_tx, execute_tx_and_sync, mint_and_consume, mint_note,
-            setup_two_wallets_and_faucet, setup_wallet_and_faucet, wait_for_tx,
+            ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+            TestClientKeyStore, assert_account_has_single_asset,
+            assert_note_cannot_be_consumed_twice, consume_notes, execute_failing_tx, execute_tx,
+            execute_tx_and_sync, mint_and_consume, mint_note, setup_two_wallets_and_faucet,
+            setup_wallet_and_faucet, wait_for_tx,
         },
         mock::{MockClient, MockRpcApi},
     },
@@ -75,8 +76,8 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 // HELPERS
 // ================================================================================================
 
-pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, FilesystemKeyStore<StdRng>)
-{
+pub async fn create_test_client_builder()
+-> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let store = Arc::new(store);
 
@@ -88,7 +89,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    let rpc_api = MockRpcApi::new();
+    let rpc_api = MockRpcApi::new().await;
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     let builder = ClientBuilder::new()
@@ -102,7 +103,8 @@ pub async fn create_test_client_builder() -> (ClientBuilder, MockRpcApi, Filesys
     (builder, rpc_api, keystore)
 }
 
-pub async fn create_test_client() -> (MockClient, MockRpcApi, FilesystemKeyStore<StdRng>) {
+pub async fn create_test_client()
+-> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = create_test_client_builder().await;
     let mut client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
@@ -117,7 +119,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
 }
 
 async fn insert_new_wallet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {
@@ -132,7 +134,7 @@ async fn insert_new_wallet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -143,7 +145,7 @@ async fn insert_new_wallet(
 }
 
 async fn insert_new_fungible_faucet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {
@@ -163,7 +165,7 @@ async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -312,7 +314,7 @@ async fn insert_same_account_twice_fails() {
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
         Felt::new(2),
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -328,7 +330,7 @@ async fn account_code() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
         Felt::ZERO,
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::testing_assembler(),
     );
 
@@ -352,7 +354,7 @@ async fn get_account_by_id() {
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
         Felt::new(10),
-        RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
         TransactionKernel::assembler(),
     );
 
@@ -1762,6 +1764,7 @@ async fn swap_chain_test() {
                     Asset::Fungible(FungibleAsset::new(pairs[0].1.id(), 1).unwrap()),
                     Asset::Fungible(FungibleAsset::new(pairs[1].1.id(), 1).unwrap()),
                 ),
+                NoteType::Private,
                 NoteType::Private,
                 client.rng(),
             )

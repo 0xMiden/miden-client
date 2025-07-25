@@ -2,10 +2,12 @@
 
 ## 0.11.0 (TBD)
 
-- [BREAKING] Incremented MSRV to 1.88.
+* [BREAKING] Incremented MSRV to 1.88.
 * [BREAKING] Updated `toBech32` AccountID method: it now expects a parameter to specify the NetworkID [(#1043)](https://github.com/0xMiden/miden-client/pull/1043).
 - Introduced enums instead of booleans for public APIs (#1042).
 - [BREAKING] Made authenticator optional for `ClientBuilder` and `Client::new`. `Client::new` now takes `Option<Arc<dyn TransactionAuthenticator>>` for the authenticator parameter (#1056).
+* Introduced enums instead of booleans for public APIs (#1042).
+* [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action (#1051).
 
 ### Features
 

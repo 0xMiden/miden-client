@@ -13,12 +13,12 @@ use miden_client::{
         Account, AccountBuilder, AccountStorageMode, AccountType,
         component::COMPONENT_TEMPLATE_EXTENSION,
     },
-    auth::AuthSecretKey,
+    auth::{AuthSecretKey, TransactionAuthenticator},
     crypto::SecretKey,
     transaction::TransactionRequestBuilder,
     utils::Deserializable,
 };
-use miden_lib::account::auth::RpoFalcon512;
+use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_objects::account::{
     AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
@@ -101,7 +101,11 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let mut component_template_paths = vec![PathBuf::from("basic-wallet")];
         component_template_paths.extend(self.extra_components.iter().cloned());
 
@@ -170,7 +174,11 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
             &keystore,
@@ -240,8 +248,8 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 ///
 /// The created account will have a Falcon-based auth component, additional to any specified
 /// component.
-async fn create_client_account(
-    client: &mut Client,
+async fn create_client_account<AUTH: TransactionAuthenticator + 'static>(
+    client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
@@ -271,7 +279,7 @@ async fn create_client_account(
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key()));
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()));
 
     // Process component templates and add them to the account builder.
     let account_components = process_component_templates(&component_templates, &init_storage_data)?;
@@ -297,9 +305,12 @@ async fn create_client_account(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), CliError> {
+async fn deploy_account<AUTH: TransactionAuthenticator + 'static>(
+    client: &mut Client<AUTH>,
+    account: &Account,
+) -> Result<(), CliError> {
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
+    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
     let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
 

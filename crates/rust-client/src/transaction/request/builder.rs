@@ -320,6 +320,7 @@ impl TransactionRequestBuilder {
     /// - `swap_data` is the data for the swap transaction that contains the sender account ID, the
     ///   offered asset, and the requested asset.
     /// - `note_type` determines the visibility of the note to be created.
+    /// - `payback_note_type` determines the visibility of the payback note.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
     ///
@@ -328,6 +329,7 @@ impl TransactionRequestBuilder {
         self,
         swap_data: &SwapTransactionData,
         note_type: NoteType,
+        payback_note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // The created note is the one that we need as the output of the tx, the other one is the
@@ -337,6 +339,8 @@ impl TransactionRequestBuilder {
             swap_data.offered_asset(),
             swap_data.requested_asset(),
             note_type,
+            Felt::ZERO,
+            payback_note_type,
             Felt::ZERO,
             rng,
         )?;

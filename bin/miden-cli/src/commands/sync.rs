@@ -1,5 +1,5 @@
 use clap::Parser;
-use miden_client::Client;
+use miden_client::{Client, auth::TransactionAuthenticator};
 
 use crate::errors::CliError;
 
@@ -8,7 +8,10 @@ use crate::errors::CliError;
 pub struct SyncCmd {}
 
 impl SyncCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let new_details = client.sync_state().await?;
 
         println!("State synced to block {}", new_details.block_num);
