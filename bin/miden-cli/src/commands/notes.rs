@@ -3,7 +3,7 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use miden_client::{
     Client, ClientError, IdPrefixFetchError,
     asset::Asset,
-    crypto::Digest,
+    auth::TransactionAuthenticator,
     note::{
         NoteConsumability, NoteInputs, NoteMetadata, WellKnownNote, get_input_note_with_id_prefix,
     },
@@ -62,7 +62,10 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator>(
+        &self,
+        client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         match self {
             NotesCmd { list: Some(NoteFilter::Consumable), .. } => {
                 list_consumable_notes(client, None).await?;
@@ -100,7 +103,10 @@ struct CliNoteSummary {
 
 // LIST NOTES
 // ================================================================================================
-async fn list_notes(client: Client, filter: ClientNoteFilter) -> Result<(), CliError> {
+async fn list_notes<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
+    filter: ClientNoteFilter,
+) -> Result<(), CliError> {
     let input_notes = client
         .get_input_notes(filter.clone())
         .await?
@@ -123,7 +129,11 @@ async fn list_notes(client: Client, filter: ClientNoteFilter) -> Result<(), CliE
 // SHOW NOTE
 // ================================================================================================
 #[allow(clippy::too_many_lines)]
-async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(), CliError> {
+async fn show_note<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
+    note_id: String,
+    with_code: bool,
+) -> Result<(), CliError> {
     let input_note_record = get_input_note_with_id_prefix(&client, &note_id).await;
     let output_note_record = get_output_note_with_id_prefix(&client, &note_id).await;
 
@@ -290,8 +300,8 @@ async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(
 
 // LIST CONSUMABLE INPUT NOTES
 // ================================================================================================
-async fn list_consumable_notes(
-    client: Client,
+async fn list_consumable_notes<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
     account_id: Option<&String>,
 ) -> Result<(), CliError> {
     let account_id = match account_id {
@@ -372,7 +382,7 @@ fn note_summary(
                 let details = record.details();
                 (
                     details.inputs().commitment().to_string(),
-                    Digest::new(details.serial_num()).to_string(),
+                    details.serial_num().to_string(),
                     details.script().root().to_string(),
                 )
             },
@@ -380,7 +390,7 @@ fn note_summary(
                 let recipient = record.recipient().expect("output record should have recipient");
                 (
                     recipient.inputs().commitment().to_string(),
-                    Digest::new(recipient.serial_num()).to_string(),
+                    recipient.serial_num().to_string(),
                     recipient.script().root().to_string(),
                 )
             },
@@ -410,7 +420,7 @@ fn note_summary(
         note_metadata.map_or("-".to_string(), |metadata| metadata.tag().to_string());
 
     CliNoteSummary {
-        id: note_id.inner().to_string(),
+        id: note_id.to_hex(),
         script_root: script_root_str,
         assets_commitment: assets_commitment_str,
         inputs_commitment: inputs_commitment_str,

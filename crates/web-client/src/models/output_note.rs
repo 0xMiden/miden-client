@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     note::Note, note_assets::NoteAssets, note_header::NoteHeader, note_id::NoteId,
-    note_metadata::NoteMetadata, partial_note::PartialNote, rpo_digest::RpoDigest,
+    note_metadata::NoteMetadata, partial_note::PartialNote, word::Word,
 };
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ impl OutputNote {
     }
 
     #[wasm_bindgen(js_name = "recipientDigest")]
-    pub fn recipient_digest(&self) -> Option<RpoDigest> {
+    pub fn recipient_digest(&self) -> Option<Word> {
         self.0.recipient_digest().map(Into::into)
     }
 

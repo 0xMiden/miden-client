@@ -24,10 +24,10 @@ use toml::Table;
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, Word,
+    Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
-        component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
+        component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet},
     },
     auth::AuthSecretKey,
     builder::ClientBuilder,
@@ -44,8 +44,8 @@ use crate::{
     },
 };
 
-pub type TestClient = Client;
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
+pub type TestClient = Client<TestClientKeyStore>;
 
 // CONSTANTS
 // ================================================================================================
@@ -66,7 +66,8 @@ pub const RECALL_HEIGHT_DELTA: u32 = 50;
 ///
 /// Panics if there is no config file at `TEST_CLIENT_CONFIG_FILE_PATH`, or if it cannot be
 /// deserialized.
-pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore) {
+pub async fn create_test_client_builder() -> (ClientBuilder<TestClientKeyStore>, TestClientKeyStore)
+{
     let (rpc_endpoint, rpc_timeout, store_config, auth_path) = get_client_config();
 
     let store = {
@@ -77,7 +78,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore = FilesystemKeyStore::new(auth_path.clone()).unwrap();
 
@@ -86,7 +87,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
         .rng(Box::new(rng))
         .store(store)
         .filesystem_keystore(auth_path.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 
     (builder, keystore)
@@ -143,7 +144,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
 
 /// Inserts a new wallet account into the client and into the keystore.
 pub async fn insert_new_wallet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {
@@ -155,7 +156,7 @@ pub async fn insert_new_wallet(
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
 pub async fn insert_new_wallet_with_seed(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
@@ -168,7 +169,7 @@ pub async fn insert_new_wallet_with_seed(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -180,7 +181,7 @@ pub async fn insert_new_wallet_with_seed(
 
 /// Inserts a new fungible faucet account into the client and into the keystore.
 pub async fn insert_new_fungible_faucet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {
@@ -200,7 +201,7 @@ pub async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();

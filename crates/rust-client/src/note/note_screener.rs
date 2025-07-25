@@ -50,18 +50,18 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
-pub struct NoteScreener {
+pub struct NoteScreener<AUTH> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
     /// A reference to the transaction authenticator
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
 }
 
-impl NoteScreener {
-    pub fn new(
-        store: Arc<dyn Store>,
-        authenticator: Option<Arc<dyn TransactionAuthenticator>>,
-    ) -> Self {
+impl<AUTH> NoteScreener<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
+    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
     }
 
@@ -120,8 +120,10 @@ impl NoteScreener {
         let transaction_request =
             TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
 
-        let tx_script =
-            transaction_request.build_transaction_script(&AccountInterface::from(account), true)?;
+        let tx_script = transaction_request.build_transaction_script(
+            &AccountInterface::from(account),
+            crate::DebugMode::Enabled,
+        )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
         let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
@@ -129,7 +131,7 @@ impl NoteScreener {
 
         let data_store = ClientDataStore::new(self.store.clone());
         let transaction_executor =
-            TransactionExecutor::new(&data_store, self.authenticator.as_deref());
+            TransactionExecutor::new(&data_store, self.authenticator.as_ref().map(AsRef::as_ref));
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());

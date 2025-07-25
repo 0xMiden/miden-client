@@ -21,7 +21,8 @@ use miden_client::{
     testing::{
         account_id::ACCOUNT_ID_PRIVATE_SENDER,
         common::{
-            ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, execute_tx_and_sync, insert_new_wallet,
+            ACCOUNT_ID_REGULAR, TEST_CLIENT_RPC_CONFIG_FILE, TestClientKeyStore,
+            execute_tx_and_sync, insert_new_wallet,
         },
     },
     transaction::{OutputNote, TransactionRequestBuilder},
@@ -737,7 +738,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
     temp_file
 }
 
-pub type TestClient = Client;
+pub type TestClient = Client<TestClientKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
 async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, CliKeyStore) {
@@ -762,7 +763,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new)));
+    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
     let keystore = CliKeyStore::new(temp_dir()).unwrap();
 

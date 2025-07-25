@@ -22,6 +22,7 @@
 //! ```rust
 //! use miden_client::{
 //!     Client,
+//!     auth::TransactionAuthenticator,
 //!     crypto::FeltRng,
 //!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
 //! };
@@ -32,8 +33,11 @@
 //! ///
 //! /// This transaction is executed by `sender_id`, and creates an output note
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
-//! async fn create_and_submit_transaction<R: rand::Rng>(
-//!     client: &mut Client,
+//! async fn create_and_submit_transaction<
+//!     R: rand::Rng,
+//!     AUTH: TransactionAuthenticator + 'static,
+//! >(
+//!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
 //!     target_id: AccountId,
 //!     faucet_id: AccountId,
@@ -70,7 +74,7 @@ use alloc::{
 use core::fmt::{self};
 
 use miden_objects::{
-    AssetError, Digest, Felt,
+    AssetError, Felt, Word,
     account::{Account, AccountCode, AccountDelta, AccountId},
     assembly::DefaultSourceManager,
     asset::{Asset, NonFungibleAsset},
@@ -79,7 +83,7 @@ use miden_objects::{
     transaction::{AccountInputs, TransactionArgs},
 };
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
+    DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
@@ -262,11 +266,11 @@ pub struct TransactionDetails {
     /// ID of the account that executed the transaction.
     pub account_id: AccountId,
     /// Initial state of the account before the transaction was executed.
-    pub init_account_state: Digest,
+    pub init_account_state: Word,
     /// Final state of the account after the transaction was executed.
-    pub final_account_state: Digest,
+    pub final_account_state: Word,
     /// Nullifiers of the input notes consumed in the transaction.
-    pub input_note_nullifiers: Vec<Digest>,
+    pub input_note_nullifiers: Vec<Word>,
     /// Output notes generated as a result of the transaction.
     pub output_notes: OutputNotes,
     /// Block number for the block against which the transaction was executed.
@@ -293,9 +297,9 @@ impl Serializable for TransactionDetails {
 impl Deserializable for TransactionDetails {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let account_id = AccountId::read_from(source)?;
-        let init_account_state = Digest::read_from(source)?;
-        let final_account_state = Digest::read_from(source)?;
-        let input_note_nullifiers = Vec::<Digest>::read_from(source)?;
+        let init_account_state = Word::read_from(source)?;
+        let final_account_state = Word::read_from(source)?;
+        let input_note_nullifiers = Vec::<Word>::read_from(source)?;
         let output_notes = OutputNotes::read_from(source)?;
         let block_num = BlockNumber::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
@@ -463,7 +467,10 @@ impl TransactionStoreUpdate {
 }
 
 /// Transaction management methods
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + 'static,
+{
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -529,7 +536,7 @@ impl Client {
 
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
-            self.in_debug_mode(),
+            self.in_debug_mode().into(),
         )?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
@@ -913,7 +920,7 @@ impl Client {
     ) -> Result<(), ClientError> {
         // Get outgoing assets
         let (fungible_balance_map, non_fungible_set) =
-            Client::get_outgoing_assets(transaction_request);
+            Client::<AUTH>::get_outgoing_assets(transaction_request);
 
         // Get incoming assets
         let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
@@ -1122,10 +1129,10 @@ impl Client {
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
-    pub(crate) fn build_executor<'store, 'auth>(
+    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore>(
         &'auth self,
-        data_store: &'store ClientDataStore,
-    ) -> Result<TransactionExecutor<'store, 'auth>, TransactionExecutorError> {
+        data_store: &'store STORE,
+    ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
         TransactionExecutor::with_options(
             data_store,
             self.authenticator.as_deref(),
@@ -1138,7 +1145,7 @@ impl Client {
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl Client {
+impl<AUTH: TransactionAuthenticator + 'static> Client<AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
@@ -1215,7 +1222,7 @@ fn validate_executed_transaction(
         .filter_map(|n| n.recipient().map(NoteRecipient::digest))
         .collect::<Vec<_>>();
 
-    let missing_recipient_digest: Vec<Digest> = expected_output_recipients
+    let missing_recipient_digest: Vec<Word> = expected_output_recipients
         .iter()
         .filter_map(|recipient| {
             (!tx_output_recipient_digests.contains(&recipient.digest()))
@@ -1232,7 +1239,7 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
-    use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
+    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
     use miden_objects::{
         Word,
         account::{AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot},
@@ -1281,7 +1288,7 @@ mod test {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(wallet_component)
-            .with_auth_component(RpoFalcon512::new(pub_key))
+            .with_auth_component(AuthRpoFalcon512::new(pub_key))
             .with_assets([asset_1, asset_2])
             .build_existing()
             .unwrap();

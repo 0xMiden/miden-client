@@ -5,16 +5,16 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest,
+    Word,
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
+    crypto::merkle::{Forest, InOrderIndex, MmrPeaks},
 };
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
-use crate::store::{PartialBlockchainFilter, StoreError};
+use crate::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 
 mod js_bindings;
 use js_bindings::{
@@ -67,7 +67,7 @@ impl WebStore {
     pub(crate) async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let formatted_block_numbers_list: Vec<String> = block_numbers
             .iter()
             .map(|block_number| i64::from(block_number.as_u32()).to_string())
@@ -81,13 +81,13 @@ impl WebStore {
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
         // Transform the list of Option<BlockHeaderIdxdbObject> to a list of results
-        let results: Result<Vec<(BlockHeader, bool)>, StoreError> = block_headers_idxdb
+        let results: Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> = block_headers_idxdb
             .into_iter()
             .filter_map(|record_option| record_option.map(Ok))
             .map(|record_result: Result<BlockHeaderIdxdbObject, StoreError>| {
                 let record = record_result?;
                 let block_header = BlockHeader::read_from_bytes(&record.header)?;
-                let has_client_notes = record.has_client_notes;
+                let has_client_notes = record.has_client_notes.into();
 
                 Ok((block_header, has_client_notes))
             })
@@ -119,7 +119,7 @@ impl WebStore {
     pub(crate) async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         match filter {
             PartialBlockchainFilter::All => {
                 let promise = idxdb_get_partial_blockchain_nodes_all();
@@ -132,7 +132,7 @@ impl WebStore {
             },
             PartialBlockchainFilter::List(ids) => {
                 let formatted_list: Vec<String> =
-                    ids.iter().map(|id| (Into::<u64>::into(*id)).to_string()).collect();
+                    ids.iter().map(|id| (Into::<usize>::into(*id)).to_string()).collect();
 
                 let promise = idxdb_get_partial_blockchain_nodes(formatted_list);
                 let js_value = JsFuture::from(promise).await.map_err(|js_error| {
@@ -161,18 +161,18 @@ impl WebStore {
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
         if let Some(peaks) = mmr_peaks_idxdb.peaks {
-            let mmr_peaks_nodes: Vec<Digest> = Vec::<Digest>::read_from_bytes(&peaks)?;
+            let mmr_peaks_nodes: Vec<Word> = Vec::<Word>::read_from_bytes(&peaks)?;
 
-            return MmrPeaks::new(block_num.as_usize(), mmr_peaks_nodes)
+            return MmrPeaks::new(Forest::new(block_num.as_usize()), mmr_peaks_nodes)
                 .map_err(StoreError::MmrError);
         }
 
-        Ok(MmrPeaks::new(0, vec![])?)
+        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
     pub(crate) async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let mut serialized_node_ids = Vec::new();
         let mut serialized_nodes = Vec::new();

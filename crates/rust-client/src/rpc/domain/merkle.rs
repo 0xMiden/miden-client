@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
 use miden_objects::{
-    Digest,
-    crypto::merkle::{MerklePath, MmrDelta},
+    Word,
+    crypto::merkle::{Forest, MerklePath, MmrDelta},
 };
 
 use crate::rpc::{errors::RpcConversionError, generated};
@@ -27,7 +27,7 @@ impl TryFrom<&generated::merkle::MerklePath> for MerklePath {
     type Error = RpcConversionError;
 
     fn try_from(merkle_path: &generated::merkle::MerklePath) -> Result<Self, Self::Error> {
-        merkle_path.siblings.iter().map(Digest::try_from).collect()
+        merkle_path.siblings.iter().map(Word::try_from).collect()
     }
 }
 
@@ -42,10 +42,15 @@ impl TryFrom<generated::merkle::MerklePath> for MerklePath {
 // MMR DELTA
 // ================================================================================================
 
-impl From<MmrDelta> for generated::mmr::MmrDelta {
-    fn from(value: MmrDelta) -> Self {
+impl TryFrom<MmrDelta> for generated::mmr::MmrDelta {
+    type Error = RpcConversionError;
+
+    fn try_from(value: MmrDelta) -> Result<Self, Self::Error> {
         let data = value.data.into_iter().map(generated::digest::Digest::from).collect();
-        generated::mmr::MmrDelta { forest: value.forest as u64, data }
+        Ok(generated::mmr::MmrDelta {
+            forest: u64::try_from(value.forest.num_leaves())?,
+            data,
+        })
     }
 }
 
@@ -54,10 +59,10 @@ impl TryFrom<generated::mmr::MmrDelta> for MmrDelta {
 
     fn try_from(value: generated::mmr::MmrDelta) -> Result<Self, Self::Error> {
         let data: Result<Vec<_>, RpcConversionError> =
-            value.data.into_iter().map(Digest::try_from).collect();
+            value.data.into_iter().map(Word::try_from).collect();
 
         Ok(MmrDelta {
-            forest: usize::try_from(value.forest).expect("forest is limited to usize size"),
+            forest: Forest::new(usize::try_from(value.forest).expect("u64 should fit in usize")),
             data: data?,
         })
     }

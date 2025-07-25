@@ -514,7 +514,7 @@ Meant to be used in conjunction with the force_import_store method
 
 ### newSwapTransactionRequest()
 
-> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`): [`TransactionRequest`](TransactionRequest.md)
+> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
@@ -539,6 +539,10 @@ Meant to be used in conjunction with the force_import_store method
 `bigint`
 
 ##### note\_type
+
+[`NoteType`](../enumerations/NoteType.md)
+
+##### payback\_note\_type
 
 [`NoteType`](../enumerations/NoteType.md)
 

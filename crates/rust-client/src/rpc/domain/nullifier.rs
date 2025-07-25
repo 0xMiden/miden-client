@@ -1,7 +1,7 @@
-use miden_objects::{crypto::hash::rpo::RpoDigest, note::Nullifier};
+use miden_objects::{Word, note::Nullifier};
 
 use super::MissingFieldHelper;
-use crate::rpc::{self, errors::RpcConversionError, generated::digest::Digest};
+use crate::rpc::{self, errors::RpcConversionError, generated::digest::Digest as ProtoWord};
 
 // NULLIFIER UPDATE
 // ================================================================================================
@@ -18,12 +18,12 @@ pub struct NullifierUpdate {
 // CONVERSIONS
 // ================================================================================================
 
-impl TryFrom<Digest> for Nullifier {
+impl TryFrom<ProtoWord> for Nullifier {
     type Error = RpcConversionError;
 
-    fn try_from(value: Digest) -> Result<Self, Self::Error> {
-        let digest: RpoDigest = value.try_into()?;
-        Ok(digest.into())
+    fn try_from(value: ProtoWord) -> Result<Self, Self::Error> {
+        let word: Word = value.try_into()?;
+        Ok(word.into())
     }
 }
 

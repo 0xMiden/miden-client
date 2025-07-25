@@ -26,11 +26,12 @@
 //! The following example shows how to initiate a state sync and handle the resulting summary:
 //!
 //! ```rust
+//! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
 //! # use miden_objects::{block::BlockHeader, Felt, Word, StarkField};
 //! # use miden_objects::crypto::rand::FeltRng;
-//! # async fn run_sync(client: &mut Client) -> Result<(), ClientError> {
+//! # async fn run_sync<AUTH: TransactionAuthenticator + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
 //! // notes, etc. For more information on the data that gets requested, see the doc comments for
@@ -63,7 +64,10 @@ use miden_objects::{
     note::{NoteId, NoteTag},
     transaction::{PartialBlockchain, TransactionId},
 };
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::{
+    auth::TransactionAuthenticator,
+    utils::{Deserializable, DeserializationError, Serializable},
+};
 
 use crate::{
     Client, ClientError,
@@ -84,7 +88,10 @@ pub use state_sync_update::{
 };
 
 /// Client synchronization methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + 'static,
+{
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
 
@@ -154,7 +161,7 @@ impl Client {
         // Build current partial MMR
         let current_partial_mmr = self.build_current_partial_mmr().await?;
 
-        let all_block_numbers = (0..current_partial_mmr.forest())
+        let all_block_numbers = (0..current_partial_mmr.forest().num_leaves())
             .filter_map(|block_num| {
                 current_partial_mmr.is_tracked(block_num).then_some(BlockNumber::from(
                     u32::try_from(block_num).expect("block number should be less than u32::MAX"),

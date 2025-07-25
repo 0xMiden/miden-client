@@ -207,6 +207,8 @@ export const swapTransaction = async (
   assetAAmount: bigint,
   assetBFaucetId: string,
   assetBAmount: bigint,
+  swapNoteType: string = "private",
+  paybackNoteType: string = "private",
   withRemoteProver: boolean = false
 ): Promise<SwapTransactionResult> => {
   return await testingPage.evaluate(
@@ -217,6 +219,8 @@ export const swapTransaction = async (
       _assetAAmount,
       _assetBFaucetId,
       _assetBAmount,
+      _swapNoteType,
+      _paybackNoteType,
       _withRemoteProver
     ) => {
       const client = window.client;
@@ -228,6 +232,15 @@ export const swapTransaction = async (
       const assetAFaucetId = window.AccountId.fromHex(_assetAFaucetId);
       const assetBFaucetId = window.AccountId.fromHex(_assetBFaucetId);
 
+      const swapNoteType =
+        _swapNoteType === "public"
+          ? window.NoteType.Public
+          : window.NoteType.Private;
+      const paybackNoteType =
+        _paybackNoteType === "public"
+          ? window.NoteType.Public
+          : window.NoteType.Private;
+
       // Swap transaction
 
       let swapTransactionRequest = client.newSwapTransactionRequest(
@@ -236,7 +249,8 @@ export const swapTransaction = async (
         _assetAAmount,
         assetBFaucetId,
         _assetBAmount,
-        window.NoteType.Private
+        swapNoteType,
+        paybackNoteType
       );
 
       let expectedOutputNotes = swapTransactionRequest.expectedOutputOwnNotes();
@@ -345,6 +359,8 @@ export const swapTransaction = async (
     assetAAmount,
     assetBFaucetId,
     assetBAmount,
+    swapNoteType,
+    paybackNoteType,
     withRemoteProver
   );
 };
