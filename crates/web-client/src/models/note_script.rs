@@ -10,6 +10,7 @@ pub struct NoteScript(NativeNoteScript);
 impl NoteScript {
     /// Print the MAST source for this script.
     #[wasm_bindgen(js_name = toString)]
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_pretty_string()
     }
@@ -50,13 +51,5 @@ impl From<NoteScript> for NativeNoteScript {
 impl From<&NoteScript> for NativeNoteScript {
     fn from(note_script: &NoteScript) -> Self {
         note_script.0.clone()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_note_script() {
-        dbg!(NoteScript::test())
     }
 }
