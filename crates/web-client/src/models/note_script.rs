@@ -8,7 +8,7 @@ pub struct NoteScript(NativeNoteScript);
 
 #[wasm_bindgen]
 impl NoteScript {
-    /// Print the source MAST of this NoteScript instance.
+    /// Print the MAST source for this script.
     #[wasm_bindgen(js_name = toString)]
     pub fn to_string(&self) -> String {
         self.0.to_pretty_string()
