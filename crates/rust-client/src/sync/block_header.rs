@@ -22,12 +22,15 @@ impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
-        let genesis = self.store.get_block_header_by_num(0.into()).await?;
+        let genesis = match self.store.get_block_header_by_num(0.into()).await? {
+            Some((block, _)) => block,
+            None => self.retrieve_and_store_genesis().await?,
+        };
 
-        match genesis {
-            Some((block, _)) => Ok(block),
-            None => self.retrieve_and_store_genesis().await,
-        }
+        // Set the genesis commitment in the RPC API client for future requests.
+        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+
+        Ok(genesis)
     }
 
     /// Calls `get_block_header_by_number` requesting the genesis block and storing it

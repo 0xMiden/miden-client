@@ -252,7 +252,7 @@ impl NoteUpdateTracker {
         let inclusion_proof = NoteInclusionProof::new(
             block_header.block_num(),
             committed_note.note_index(),
-            committed_note.merkle_path().clone().try_into()?,
+            committed_note.inclusion_path().clone(),
         )?;
 
         if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {

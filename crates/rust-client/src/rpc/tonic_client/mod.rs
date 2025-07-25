@@ -57,6 +57,7 @@ pub struct TonicRpcClient {
     client: RwLock<Option<ApiClient>>,
     endpoint: String,
     timeout_ms: u64,
+    genesis_commitment: RwLock<Option<Word>>,
 }
 
 impl TonicRpcClient {
@@ -67,6 +68,7 @@ impl TonicRpcClient {
             client: RwLock::new(None),
             endpoint: endpoint.to_string(),
             timeout_ms,
+            genesis_commitment: RwLock::new(None),
         }
     }
 
@@ -74,18 +76,42 @@ impl TonicRpcClient {
     /// `rpc_api` field is initialized and returns a write guard to it.
     async fn ensure_connected(&self) -> Result<ApiClient, RpcError> {
         if self.client.read().is_none() {
-            let new_client = ApiClient::new_client(self.endpoint.clone(), self.timeout_ms).await?;
-            let mut client = self.client.write();
-            client.replace(new_client);
+            self.connect().await?;
         }
 
         Ok(self.client.read().as_ref().expect("rpc_api should be initialized").clone())
+    }
+
+    /// Connects to the Miden node, setting the client API with the provided URL, timeout and
+    /// genesis commitment.
+    async fn connect(&self) -> Result<(), RpcError> {
+        let genesis_commitment = *self.genesis_commitment.read();
+        let new_client =
+            ApiClient::new_client(self.endpoint.clone(), self.timeout_ms, genesis_commitment)
+                .await?;
+        let mut client = self.client.write();
+        client.replace(new_client);
+
+        Ok(())
     }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
+    /// Sets the genesis commitment for the client and reconnects to the node providing the
+    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// this method does nothing.
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
+        if self.genesis_commitment.read().is_some() {
+            // Genesis commitment is already set, ignoring the new value.
+            return Ok(());
+        }
+
+        *self.genesis_commitment.write() = Some(commitment);
+        self.connect().await
+    }
+
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
