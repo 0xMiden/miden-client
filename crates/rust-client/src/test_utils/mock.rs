@@ -54,6 +54,7 @@ pub type MockClient<AUTH> = Client<AUTH>;
 ///   updates were made will return the chain tip block number instead.
 #[derive(Clone)]
 pub struct MockRpcApi {
+    account_commitment_updates: Arc<RwLock<BTreeMap<BlockNumber, BTreeMap<AccountId, Word>>>>,
     pub mock_chain: Arc<RwLock<MockChain>>,
 }
 
@@ -67,6 +68,7 @@ impl MockRpcApi {
     /// Creates a new `MockRpcApi` instance with the state of the provided `MockChain`.
     pub fn new(mock_chain: MockChain) -> Self {
         Self {
+            account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
         }
     }
@@ -84,7 +86,18 @@ impl MockRpcApi {
     /// Advances the mock chain by proving the next block. Committing all pending objects to the
     /// chain in the process.
     pub fn prove_block(&self) {
-        self.mock_chain.write().prove_next_block().unwrap();
+        let proven_block = self.mock_chain.write().prove_next_block().unwrap();
+        let mut account_commitment_updates = self.account_commitment_updates.write();
+        let block_num = proven_block.header().block_num();
+        let updates: BTreeMap<AccountId, Word> = proven_block
+            .updated_accounts()
+            .iter()
+            .map(|update| (update.account_id(), update.final_state_commitment()))
+            .collect();
+
+        if !updates.is_empty() {
+            account_commitment_updates.insert(block_num, updates);
+        }
     }
 
     /// Retrieves a block by its block number.
@@ -152,26 +165,17 @@ impl MockRpcApi {
             })
             .collect();
 
-        let accounts = self
-            .mock_chain
-            .read()
-            .account_tree()
-            .account_commitments()
-            .filter_map(|(account_id, commitment)| {
-                if account_ids.contains(&account_id) {
-                    Some(AccountSummary {
-                        account_id: Some(account_id.into()),
-                        account_commitment: Some(commitment.into()),
-                        // TODO: The `block_num` should be the block number where the account was
-                        // last updated. This isn't tracked by the
-                        // MockChain. For now, we use the chain tip block number.
-                        block_num: next_block_num.as_u32(),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut accounts = vec![];
+
+        for (block_num, updates) in self.account_commitment_updates.read().iter() {
+            if *block_num > request_block_num && *block_num <= next_block_num {
+                accounts.extend(updates.iter().map(|(account_id, commitment)| AccountSummary {
+                    account_id: Some((*account_id).into()),
+                    account_commitment: Some(commitment.into()),
+                    block_num: block_num.as_u32(),
+                }));
+            }
+        }
 
         Ok(SyncStateResponse {
             chain_tip: self.get_chain_tip_block_num().as_u32(),
@@ -346,19 +350,24 @@ impl NodeRpcClient for MockRpcApi {
     /// the latest block in the mock chain, as the `MockChain` does not track the last update
     /// block number for accounts.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let mock_chain = self.mock_chain.read();
-        let commitment = mock_chain.account_tree().open(account_id).state_commitment();
-        let chain_tip = mock_chain.latest_block_header().block_num();
+        let summary = self
+            .account_commitment_updates
+            .read()
+            .iter()
+            .rev()
+            .find_map(|(block_num, updates)| {
+                if let Some(commitment) = updates.get(&account_id) {
+                    Some(AccountUpdateSummary {
+                        commitment: *commitment,
+                        last_block_num: block_num.as_u32(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .unwrap();
 
-        let summary = AccountUpdateSummary {
-            commitment,
-            // TODO: The `last_block_num` should be the block number where the account was last
-            // updated. This isn't tracked by the MockChain. For now, we use the chain
-            // tip block number.
-            last_block_num: chain_tip.as_u32(),
-        };
-
-        if let Ok(account) = mock_chain.committed_account(account_id) {
+        if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
             Ok(FetchedAccount::Public(account.clone(), summary))
         } else {
             Ok(FetchedAccount::Private(account_id, summary))
@@ -472,7 +481,7 @@ impl NodeRpcClient for MockRpcApi {
                     match update.details() {
                         AccountUpdateDetails::Private => None,
                         AccountUpdateDetails::Delta(delta) => Some(delta.clone()),
-                        AccountUpdateDetails::New(account) => Some(build_starting_delta(account)), //TODO: this might need to be handled
+                        AccountUpdateDetails::New(account) => Some(build_starting_delta(account)),
                     }
                 } else {
                     None
@@ -564,4 +573,25 @@ fn build_starting_delta(account: &Account) -> AccountDelta {
     );
 
     AccountDelta::new(account.id(), storage_delta, vault_delta, account.nonce()).unwrap()
+}
+
+fn build_account_updates(
+    mock_chain: &MockChain,
+) -> BTreeMap<BlockNumber, BTreeMap<AccountId, Word>> {
+    let mut account_commitment_updates = BTreeMap::new();
+    for block in mock_chain.proven_blocks() {
+        let block_num = block.header().block_num();
+        let mut updates = BTreeMap::new();
+
+        for update in block.updated_accounts() {
+            updates.insert(update.account_id(), update.final_state_commitment());
+        }
+
+        if updates.is_empty() {
+            continue;
+        }
+
+        account_commitment_updates.insert(block_num, updates);
+    }
+    account_commitment_updates
 }
