@@ -11,7 +11,7 @@ use crate::tests::{
         import_expected_note_uncommitted, import_expected_notes,
         import_expected_notes_from_the_past_as_committed, import_note_with_proof, locked_account,
         multiple_transactions_can_be_committed_in_different_blocks_without_sync,
-        multiple_tx_on_same_block, sync_detail_values, unused_rpc_api,
+        multiple_tx_on_same_block, output_only_note, sync_detail_values, unused_rpc_api,
     },
     custom_transaction::{merkle_store, onchain_notes_sync_with_tag, transaction_request},
     fpi::{fpi_execute_program, nested_fpi_calls, standard_fpi_private, standard_fpi_public},
@@ -103,6 +103,7 @@ async fn main() {
         run_test("expired_transaction_fails", expired_transaction_fails, &failed_tests),
         run_test("unused_rpc_api", unused_rpc_api, &failed_tests),
         run_test("ignore_invalid_notes", ignore_invalid_notes, &failed_tests),
+        run_test("output_only_note", output_only_note, &failed_tests),
         // CUSTOM TRANSACTION
         run_test("merkle_store", merkle_store, &failed_tests),
         run_test("onchain_notes_sync_with_tag", onchain_notes_sync_with_tag, &failed_tests,),

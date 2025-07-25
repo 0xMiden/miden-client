@@ -85,8 +85,6 @@ pub async fn transaction_request() {
             push.1.2.3.4
             # => [[1,2,3,4], TX_SCRIPT_ARG]
             assert_eqw
-
-            call.auth_tx::auth__tx_rpo_falcon512
         end
         ";
     let tx_script = client.script_builder().compile_tx_script(code).unwrap();
@@ -211,9 +209,7 @@ pub async fn merkle_store() {
         )
         .as_str();
     }
-
-    code += "call.auth_tx::auth__tx_rpo_falcon512 end";
-
+    code += "end";
     // Build the transaction
     let tx_script = client.script_builder().compile_tx_script(&code).unwrap();
 

@@ -2,7 +2,9 @@ use std::{sync::Arc, time::Duration};
 
 use miden_client::{
     ClientError, ONE,
+    account::AccountId,
     builder::ClientBuilder,
+    keystore::FilesystemKeyStore,
     rpc::{Endpoint, NodeRpcClient, TonicRpcClient, domain::account::FetchedAccount},
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
@@ -22,7 +24,7 @@ use winter_maybe_async::maybe_async_trait;
 pub async fn client_builder_initializes_client_with_endpoint() {
     let (endpoint, _, store_config, auth_path) = get_client_config();
 
-    let mut client = ClientBuilder::new()
+    let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().unwrap())
         .sqlite_store(store_config.to_str().unwrap())
@@ -40,7 +42,7 @@ pub async fn client_builder_initializes_client_with_endpoint() {
 
 pub async fn client_builder_fails_without_keystore() {
     let (_, _, store_config, _) = get_client_config();
-    let result = ClientBuilder::new()
+    let result = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&Endpoint::default(), Some(10_000))
         .sqlite_store(store_config.to_str().unwrap())
         .in_debug_mode(miden_client::DebugMode::Enabled)
@@ -1171,4 +1173,34 @@ pub async fn ignore_invalid_notes() {
     assert_eq!(consumed_notes.len(), 2);
     assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
     assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
+}
+
+pub async fn output_only_note() {
+    let (mut client, authenticator) = create_test_client().await;
+
+    let faucet =
+        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await
+            .unwrap()
+            .0;
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            fungible_asset,
+            AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap(),
+            NoteType::Public,
+            client.rng(),
+        )
+        .unwrap();
+    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await;
+
+    // The created note should be an output only note because it is not consumable by any client
+    // account.
+    let input_note = client.get_input_note(note_id).await.unwrap();
+    assert!(input_note.is_none());
+
+    let output_note = client.get_output_note(note_id).await.unwrap();
+    assert!(output_note.is_some());
 }

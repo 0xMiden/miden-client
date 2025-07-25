@@ -73,6 +73,7 @@ pub async fn swap_fully_onchain() {
                 Asset::Fungible(requested_asset),
             ),
             NoteType::Public,
+            NoteType::Private,
             client1.rng(),
         )
         .unwrap();
@@ -233,6 +234,7 @@ pub async fn swap_private() {
                 Asset::Fungible(offered_asset),
                 Asset::Fungible(requested_asset),
             ),
+            NoteType::Private,
             NoteType::Private,
             client1.rng(),
         )
