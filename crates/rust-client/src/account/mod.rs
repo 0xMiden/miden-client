@@ -182,7 +182,7 @@ impl Client {
         let fetched_account =
             self.rpc_api.get_account_details(account_id).await.map_err(|err| {
                 let err_str = format!("{err}").to_lowercase();
-                if err_str.contains("not found") || err_str.contains("unknown accountidversion") {
+                if err_str.contains("not found") {
                     ClientError::AccountNotFoundOnNetwork(account_id)
                 } else {
                     ClientError::RpcError(err)
