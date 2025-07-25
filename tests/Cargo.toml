@@ -12,19 +12,10 @@ version.workspace      = true
 
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../crates/rust-client" }
-
-# Miden dependencies
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
-
-# External dependencies
-rand = { workspace = true }
+miden-client-integration-tests = { path = "../bin/integration-tests" }
 
 [dev-dependencies]
-async-trait        = { version = "0.1" }
-miden-lib          = { default-features = false, features = ["testing"], workspace = true }
-tokio              = { workspace = true }
-winter-maybe-async = { features = ["async"], version = "0.12" }
+tokio = { workspace = true }
 
 [[test]]
 name = "integration"
