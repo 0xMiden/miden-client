@@ -80,8 +80,8 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
 
             let note_id: NoteId = note_id.into();
 
-            let merkle_path = note
-                .merkle_path
+            let inclusion_path = note
+                .inclusion_path
                 .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
                 .try_into()?;
 
@@ -93,7 +93,7 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
             let committed_note = super::note::CommittedNote::new(
                 note_id,
                 u16::try_from(note.note_index).expect("note index out of range"),
-                merkle_path,
+                inclusion_path,
                 metadata,
             );
 

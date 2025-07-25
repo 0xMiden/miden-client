@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use miden_objects::{
     Word,
-    crypto::merkle::{Forest, MerklePath, MmrDelta},
+    crypto::merkle::{Forest, MerklePath, MmrDelta, SparseMerklePath},
 };
 
 use crate::rpc::{errors::RpcConversionError, generated};
@@ -36,6 +36,37 @@ impl TryFrom<generated::merkle::MerklePath> for MerklePath {
 
     fn try_from(merkle_path: generated::merkle::MerklePath) -> Result<Self, Self::Error> {
         MerklePath::try_from(&merkle_path)
+    }
+}
+
+// SPARSE MERKLE PATH
+
+// ================================================================================================
+
+impl From<SparseMerklePath> for generated::merkle::SparseMerklePath {
+    fn from(value: SparseMerklePath) -> Self {
+        let (empty_nodes_mask, siblings) = value.into_parts();
+
+        generated::merkle::SparseMerklePath {
+            empty_nodes_mask,
+
+            siblings: siblings.into_iter().map(generated::digest::Digest::from).collect(),
+        }
+    }
+}
+
+impl TryFrom<generated::merkle::SparseMerklePath> for SparseMerklePath {
+    type Error = RpcConversionError;
+
+    fn try_from(merkle_path: generated::merkle::SparseMerklePath) -> Result<Self, Self::Error> {
+        Ok(SparseMerklePath::from_parts(
+            merkle_path.empty_nodes_mask,
+            merkle_path
+                .siblings
+                .into_iter()
+                .map(Word::try_from)
+                .collect::<Result<Vec<_>, _>>()?,
+        )?)
     }
 }
 

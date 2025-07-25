@@ -198,9 +198,7 @@ impl MockRpcApi {
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some((*note.metadata()).into()),
-                        merkle_path: Some(
-                            MerklePath::from(note.inclusion_proof().note_path().clone()).into(),
-                        ),
+                        inclusion_path: Some(note.inclusion_proof().note_path().clone().into()),
                     })
                 } else {
                     None
@@ -241,7 +239,7 @@ impl NodeRpcClient for MockRpcApi {
                     let digest: Word = note.note_id.unwrap().try_into().unwrap();
                     let note_id: NoteId = NoteId::from(digest);
                     let note_index = u16::try_from(note.note_index).unwrap();
-                    let merkle_path = note.merkle_path.unwrap().try_into().unwrap();
+                    let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
                     let metadata = note.metadata.unwrap().try_into().unwrap();
 
                     CommittedNote::new(note_id, note_index, merkle_path, metadata)

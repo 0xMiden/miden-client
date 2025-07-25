@@ -1,8 +1,8 @@
 use alloc::string::String;
-use miden_objects::Word;
 use core::ops::{Deref, DerefMut};
 
 use api_client_wrapper::{ApiClient, InnerClient};
+use miden_objects::Word;
 use tonic::{
     metadata::{AsciiMetadataValue, errors::InvalidMetadataValue},
     service::Interceptor,
@@ -52,9 +52,9 @@ pub(crate) mod api_client_wrapper {
 #[cfg(feature = "tonic")]
 pub(crate) mod api_client_wrapper {
     use alloc::{boxed::Box, string::String};
-    use miden_objects::Word;
     use core::time::Duration;
 
+    use miden_objects::Word;
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
     use super::{MetadataInterceptor, header_interceptor};
@@ -142,16 +142,12 @@ impl Interceptor for MetadataInterceptor {
 /// genesis commitment.
 fn header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
     let version = env!("CARGO_PKG_VERSION");
-    let accept_value = format!("application/vnd.miden.{version}+grpc");
-    let interceptor = MetadataInterceptor::default()
-        .with_metadata("accept", accept_value)
-        .expect("valid key/value metadata for interceptor");
-
+    let mut accept_value = format!("application/vnd.miden; version={version}");
     if let Some(commitment) = genesis_digest {
-        interceptor
-            .with_metadata("miden-network", commitment.to_hex())
-            .expect("valid key/value metadata for interceptor")
-    } else {
-        interceptor
+        accept_value.push_str(&format!("; genesis={}", commitment.to_hex()));
     }
+
+    MetadataInterceptor::default()
+        .with_metadata("accept", accept_value)
+        .expect("valid key/value metadata for interceptor")
 }

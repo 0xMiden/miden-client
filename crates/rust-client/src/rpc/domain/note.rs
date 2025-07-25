@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use miden_objects::{
     Felt, Word,
     block::BlockHeader,
-    crypto::merkle::MerklePath,
+    crypto::merkle::{MerklePath, SparseMerklePath},
     note::{Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteTag, NoteType},
 };
 use miden_tx::utils::Deserializable;
@@ -54,15 +54,14 @@ impl TryFrom<ProtoInclusionProof> for NoteInclusionProof {
     type Error = RpcConversionError;
 
     fn try_from(value: ProtoInclusionProof) -> Result<Self, Self::Error> {
-        let merkle_path: MerklePath = value
-            .merkle_path
-            .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
-            .try_into()?;
         Ok(NoteInclusionProof::new(
             value.block_num.into(),
             u16::try_from(value.note_index_in_block)
                 .map_err(|_| RpcConversionError::InvalidField("NoteIndexInBlock".into()))?,
-            merkle_path.try_into()?,
+            value
+                .inclusion_path
+                .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
+                .try_into()?,
         )?)
     }
 }
@@ -115,9 +114,9 @@ impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
 
             let note_id: NoteId = note_id.into();
 
-            let merkle_path = note
-                .merkle_path
-                .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
+            let inclusion_path = note
+                .inclusion_path
+                .ok_or(RpcError::ExpectedDataMissing("Notes.SparseMerklePath".into()))?
                 .try_into()?;
 
             let metadata = note
@@ -128,7 +127,7 @@ impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
             let committed_note = CommittedNote::new(
                 note_id,
                 u16::try_from(note.note_index).expect("note index out of range"),
-                merkle_path,
+                inclusion_path,
                 metadata,
             );
 
@@ -150,7 +149,7 @@ pub struct CommittedNote {
     /// Note index for the note merkle tree.
     note_index: u16,
     /// Merkle path for the note merkle tree up to the block's note root.
-    merkle_path: MerklePath,
+    inclusion_path: SparseMerklePath,
     /// Note metadata.
     metadata: NoteMetadata,
 }
@@ -159,13 +158,13 @@ impl CommittedNote {
     pub fn new(
         note_id: NoteId,
         note_index: u16,
-        merkle_path: MerklePath,
+        inclusion_path: SparseMerklePath,
         metadata: NoteMetadata,
     ) -> Self {
         Self {
             note_id,
             note_index,
-            merkle_path,
+            inclusion_path,
             metadata,
         }
     }
@@ -178,8 +177,8 @@ impl CommittedNote {
         self.note_index
     }
 
-    pub fn merkle_path(&self) -> &MerklePath {
-        &self.merkle_path
+    pub fn inclusion_path(&self) -> &SparseMerklePath {
+        &self.inclusion_path
     }
 
     pub fn metadata(&self) -> NoteMetadata {

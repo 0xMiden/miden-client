@@ -238,7 +238,7 @@ impl NoteUpdateTracker {
         let inclusion_proof = NoteInclusionProof::new(
             block_header.block_num(),
             committed_note.note_index(),
-            committed_note.merkle_path().clone().try_into()?,
+            committed_note.inclusion_path().clone(),
         )?;
 
         let mut tracked_input = false;
