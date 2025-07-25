@@ -16,8 +16,8 @@
 //! #   crypto::FeltRng
 //! # };
 //! # use miden_objects::account::AccountStorageMode;
-//! # async fn add_new_account_example(
-//! #     client: &mut miden_client::Client
+//! # async fn add_new_account_example<AUTH>(
+//! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
 //! let (account, seed) = AccountBuilder::new(random_seed)
@@ -37,7 +37,7 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_lib::account::{auth::AuthRpoFalcon512, wallets::BasicWallet};
 use miden_objects::{Word, crypto::dsa::rpo_falcon512::PublicKey};
 
 use super::Client;
@@ -64,7 +64,7 @@ pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
 
     pub use miden_lib::account::{
-        auth::RpoFalcon512, faucets::BasicFungibleFaucet, wallets::BasicWallet,
+        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, wallets::BasicWallet,
     };
     pub use miden_objects::account::{
         AccountComponent, AccountComponentMetadata, AccountComponentTemplate, FeltRepresentation,
@@ -87,7 +87,7 @@ pub mod component {
 ///   with the network.
 ///
 /// - **Data retrieval:** The module also provides methods to fetch account-related data.
-impl Client {
+impl<AUTH> Client<AUTH> {
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 
@@ -263,13 +263,13 @@ impl Client {
 /// `Client::import_account_by_id` to import a public account from the network (provided that the
 /// used seed is known).
 ///
-/// This function will only work for accounts with the [`BasicWallet`] and [`RpoFalcon512`]
+/// This function will only work for accounts with the [`BasicWallet`] and [`AuthRpoFalcon512`]
 /// components.
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
-/// - `public_key`: Public key of the account used in the [`RpoFalcon512`] component.
+/// - `public_key`: Public key of the account used in the [`AuthRpoFalcon512`] component.
 /// - `storage_mode`: Storage mode of the account.
 /// - `is_mutable`: Whether the account is mutable or not.
 ///
@@ -290,7 +290,7 @@ pub fn build_wallet_id(
     let (account, _) = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(public_key))
+        .with_auth_component(AuthRpoFalcon512::new(public_key))
         .with_component(BasicWallet)
         .build()?;
 
@@ -304,7 +304,7 @@ pub fn build_wallet_id(
 pub mod tests {
     use alloc::vec::Vec;
 
-    use miden_lib::{account::auth::RpoFalcon512, transaction::TransactionKernel};
+    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
     use miden_objects::{
         EMPTY_WORD, Felt, Word,
         account::{Account, AccountFile, AuthSecretKey},
@@ -320,7 +320,7 @@ pub mod tests {
         let account = Account::mock(
             account_id,
             Felt::new(2),
-            RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
             TransactionKernel::testing_assembler(),
         );
 
@@ -350,7 +350,7 @@ pub mod tests {
         let account = Account::mock(
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
             Felt::new(0),
-            RpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
             TransactionKernel::testing_assembler(),
         );
 

@@ -3,6 +3,7 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use miden_client::{
     Client, ClientError, IdPrefixFetchError,
     asset::Asset,
+    auth::TransactionAuthenticator,
     note::{
         NoteConsumability, NoteInputs, NoteMetadata, WellKnownNote, get_input_note_with_id_prefix,
     },
@@ -61,7 +62,10 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator>(
+        &self,
+        client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         match self {
             NotesCmd { list: Some(NoteFilter::Consumable), .. } => {
                 list_consumable_notes(client, None).await?;
@@ -99,7 +103,10 @@ struct CliNoteSummary {
 
 // LIST NOTES
 // ================================================================================================
-async fn list_notes(client: Client, filter: ClientNoteFilter) -> Result<(), CliError> {
+async fn list_notes<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
+    filter: ClientNoteFilter,
+) -> Result<(), CliError> {
     let input_notes = client
         .get_input_notes(filter.clone())
         .await?
@@ -122,7 +129,11 @@ async fn list_notes(client: Client, filter: ClientNoteFilter) -> Result<(), CliE
 // SHOW NOTE
 // ================================================================================================
 #[allow(clippy::too_many_lines)]
-async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(), CliError> {
+async fn show_note<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
+    note_id: String,
+    with_code: bool,
+) -> Result<(), CliError> {
     let input_note_record = get_input_note_with_id_prefix(&client, &note_id).await;
     let output_note_record = get_output_note_with_id_prefix(&client, &note_id).await;
 
@@ -289,8 +300,8 @@ async fn show_note(client: Client, note_id: String, with_code: bool) -> Result<(
 
 // LIST CONSUMABLE INPUT NOTES
 // ================================================================================================
-async fn list_consumable_notes(
-    client: Client,
+async fn list_consumable_notes<AUTH: TransactionAuthenticator>(
+    client: Client<AUTH>,
     account_id: Option<&String>,
 ) -> Result<(), CliError> {
     let account_id = match account_id {

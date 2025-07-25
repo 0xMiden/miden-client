@@ -1,4 +1,7 @@
-use miden_client::{Client, store::TransactionFilter, transaction::TransactionRecord};
+use miden_client::{
+    Client, auth::TransactionAuthenticator, store::TransactionFilter,
+    transaction::TransactionRecord,
+};
 
 use crate::{Parser, create_dynamic_table, errors::CliError};
 
@@ -11,7 +14,10 @@ pub struct TransactionCmd {
 }
 
 impl TransactionCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+        &self,
+        client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         list_transactions(client).await?;
         Ok(())
     }
@@ -19,7 +25,9 @@ impl TransactionCmd {
 
 // LIST TRANSACTIONS
 // ================================================================================================
-async fn list_transactions(client: Client) -> Result<(), CliError> {
+async fn list_transactions<AUTH: TransactionAuthenticator + 'static>(
+    client: Client<AUTH>,
+) -> Result<(), CliError> {
     let transactions = client.get_transactions(TransactionFilter::All).await?;
     print_transactions_summary(&transactions);
     Ok(())

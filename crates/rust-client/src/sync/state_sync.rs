@@ -14,6 +14,7 @@ use miden_objects::{
     note::{NoteId, NoteTag},
     transaction::PartialBlockchain,
 };
+use miden_tx::auth::TransactionAuthenticator;
 use tracing::info;
 
 use super::{
@@ -33,6 +34,18 @@ use crate::{
 // SYNC CALLBACKS
 // ================================================================================================
 
+/// The action to be taken when a note update is received as part of the sync response.
+#[allow(clippy::large_enum_variant)]
+pub enum NoteUpdateAction {
+    /// The note commit update is relevant and the specified note should be marked as committed in
+    /// the store, storing its inclusion proof.
+    Commit(CommittedNote),
+    /// The public note is relevant and should be inserted into the store.
+    Insert(InputNoteRecord),
+    /// The note update is not relevant and should be discarded.
+    Discard,
+}
+
 /// Callback that gets executed when a new note is received as part of the sync response.
 ///
 /// It receives:
@@ -45,13 +58,13 @@ use crate::{
 ///
 /// It returns a boolean indicating if the received note update is relevant. If the return value
 /// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived = Box<
+pub type OnNoteReceived<AUTH> = Box<
     dyn Fn(
         CommittedNote,
         Option<InputNoteRecord>,
-        Arc<NoteScreener>,
+        Arc<NoteScreener<AUTH>>,
         Arc<BTreeSet<NoteTag>>,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
+    ) -> Pin<Box<dyn Future<Output = Result<NoteUpdateAction, ClientError>>>>,
 >;
 
 // STATE SYNC
@@ -63,19 +76,19 @@ pub type OnNoteReceived = Box<
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
-pub struct StateSync {
+pub struct StateSync<AUTH> {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
     /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived,
+    on_note_received: OnNoteReceived<AUTH>,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
     /// The note screener used to check the relevance of notes.
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<AUTH>>,
 }
 
-impl StateSync {
+impl<AUTH> StateSync<AUTH> {
     /// Creates a new instance of the state sync component.
     ///
     /// # Arguments
@@ -86,9 +99,9 @@ impl StateSync {
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived,
+        on_note_received: OnNoteReceived<AUTH>,
         tx_graceful_blocks: Option<u32>,
-        note_screener: NoteScreener,
+        note_screener: NoteScreener<AUTH>,
     ) -> Self {
         Self {
             rpc_api,
@@ -341,21 +354,26 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            if (self.on_note_received)(
-                committed_note.clone(),
-                public_note.clone(),
+            match (self.on_note_received)(
+                committed_note,
+                public_note,
                 self.note_screener.clone(),
                 note_tags.clone(),
             )
             .await?
             {
-                found_relevant_note = true;
+                NoteUpdateAction::Commit(committed_note) => {
+                    found_relevant_note = true;
 
-                note_updates.apply_committed_note_state_transitions(
-                    &committed_note,
-                    public_note,
-                    block_header,
-                )?;
+                    note_updates
+                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
+                },
+                NoteUpdateAction::Insert(public_note) => {
+                    found_relevant_note = true;
+
+                    note_updates.apply_new_public_note(public_note, block_header)?;
+                },
+                NoteUpdateAction::Discard => {},
             }
         }
 
@@ -478,40 +496,47 @@ fn apply_mmr_changes(
 /// committed note to check if it's relevant. If the note wasn't being tracked but it came in the
 /// sync response it may be a new public note, in that case we use the [`NoteScreener`] to check its
 /// relevance.
-pub async fn on_note_received(
+pub async fn on_note_received<AUTH>(
     store: Arc<dyn Store>,
     committed_note: CommittedNote,
     public_note: Option<InputNoteRecord>,
-    note_screener: Arc<NoteScreener>,
+    note_screener: Arc<NoteScreener<AUTH>>,
     note_tags: Arc<BTreeSet<NoteTag>>,
-) -> Result<bool, ClientError> {
+) -> Result<NoteUpdateAction, ClientError>
+where
+    AUTH: TransactionAuthenticator,
+{
     let note_id = *committed_note.note_id();
 
     if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
         || !store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()
     {
         // The note is being tracked by the client so it is relevant
-        Ok(true)
+        Ok(NoteUpdateAction::Commit(committed_note))
     } else if let Some(public_note) = public_note {
         // If tracked by the user, keep note regardless of inputs and extra checks
         if let Some(metadata) = public_note.metadata()
             && note_tags.contains(&metadata.tag())
         {
-            return Ok(true);
+            return Ok(NoteUpdateAction::Insert(public_note));
         }
 
         // The note is not being tracked by the client and is public so we can screen it
         let new_note_relevance = note_screener
             .check_relevance(
-                &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
+                &public_note.clone().try_into().map_err(ClientError::NoteRecordConversionError)?,
             )
             .await?;
 
         let is_relevant = !new_note_relevance.is_empty();
-        Ok(is_relevant)
+        if is_relevant {
+            Ok(NoteUpdateAction::Insert(public_note))
+        } else {
+            Ok(NoteUpdateAction::Discard)
+        }
     } else {
         // The note is not being tracked by the client and is private so we can't determine if it
         // is relevant
-        Ok(false)
+        Ok(NoteUpdateAction::Discard)
     }
 }
