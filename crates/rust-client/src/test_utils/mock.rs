@@ -47,15 +47,11 @@ pub type MockClient<AUTH> = Client<AUTH>;
 /// This struct implements the RPC API used by the client to communicate with the node. It simulates
 /// most of the functionality of the actual node, with some small differences:
 /// - It uses a `MockChain` to simulate the blockchain state.
-/// - Blocks are not automatically created after time passes, but rather a new block is created on
-///   specific rpc requests:
-///     - Each `prove_next_block` call will create a new block with the elements created by the
-///       transaction.
-///     - Each `sync_state` call will create a new empty block to simulate the real node's automatic
-///       block creation.
+/// - Blocks are not automatically created after time passes, but rather new blocks are created when
+///   calling the `prove_block` method.
 /// - Network account and transactions aren't supported in the current version.
-/// - Account update block numbers aren't tracked, so any endpoint that returns when certain account updates
-///   were made will return the chain tip block number instead.
+/// - Account update block numbers aren't tracked, so any endpoint that returns when certain account
+///   updates were made will return the chain tip block number instead.
 #[derive(Clone)]
 pub struct MockRpcApi {
     pub mock_chain: Arc<RwLock<MockChain>>,
@@ -83,6 +79,12 @@ impl MockRpcApi {
     /// Returns the chain tip block number.
     pub fn get_chain_tip_block_num(&self) -> BlockNumber {
         self.mock_chain.read().latest_block_header().block_num()
+    }
+
+    /// Advances the mock chain by proving the next block. Committing all pending objects to the
+    /// chain in the process.
+    pub fn prove_block(&self) {
+        self.mock_chain.write().prove_next_block().unwrap();
     }
 
     /// Retrieves a block by its block number.
@@ -272,11 +274,6 @@ impl NodeRpcClient for MockRpcApi {
         account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        {
-            // This simulates a new block being added to the chain for each sync request.
-            self.mock_chain.write().prove_next_block().unwrap();
-        }
-
         let response = self.get_sync_state_request(block_num, note_tags, account_ids)?;
 
         Ok(response.try_into().unwrap())
@@ -336,8 +333,6 @@ impl NodeRpcClient for MockRpcApi {
         {
             let mut mock_chain = self.mock_chain.write();
             mock_chain.add_pending_proven_transaction(proven_transaction.clone());
-
-            mock_chain.prove_next_block().unwrap();
         };
 
         let block_num = self.get_chain_tip_block_num();
