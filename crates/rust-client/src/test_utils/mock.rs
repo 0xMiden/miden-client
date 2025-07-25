@@ -221,6 +221,11 @@ use alloc::boxed::Box;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
+        // The mock client doesn't use accept headers, so we don't need to do anything here.
+        Ok(())
+    }
+
     async fn sync_notes(
         &self,
         block_num: BlockNumber,

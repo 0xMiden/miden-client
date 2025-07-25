@@ -1,5 +1,8 @@
 use alloc::string::String;
-use core::ops::{Deref, DerefMut};
+use core::{
+    fmt::Write,
+    ops::{Deref, DerefMut},
+};
 
 use api_client_wrapper::{ApiClient, InnerClient};
 use miden_objects::Word;
@@ -144,7 +147,8 @@ fn header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
     let version = env!("CARGO_PKG_VERSION");
     let mut accept_value = format!("application/vnd.miden; version={version}");
     if let Some(commitment) = genesis_digest {
-        accept_value.push_str(&format!("; genesis={}", commitment.to_hex()));
+        write!(accept_value, "; genesis={}", commitment.to_hex())
+            .expect("valid hex representation of Word");
     }
 
     MetadataInterceptor::default()

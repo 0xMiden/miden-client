@@ -82,19 +82,6 @@ impl TonicRpcClient {
         Ok(self.client.read().as_ref().expect("rpc_api should be initialized").clone())
     }
 
-    /// Sets the genesis commitment for the client and reconnects to the node providing the
-    /// genesis commitment in the request headers. If the genesis commitment is already set,
-    /// this method does nothing.
-    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
-        if self.genesis_commitment.read().is_some() {
-            // Genesis commitment is already set, ignoring the new value.
-            return Ok(());
-        }
-
-        *self.genesis_commitment.write() = Some(commitment);
-        self.connect().await
-    }
-
     /// Connects to the Miden node, setting the client API with the provided URL, timeout and
     /// genesis commitment.
     async fn connect(&self) -> Result<(), RpcError> {
@@ -112,6 +99,19 @@ impl TonicRpcClient {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
+    /// Sets the genesis commitment for the client and reconnects to the node providing the
+    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// this method does nothing.
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
+        if self.genesis_commitment.read().is_some() {
+            // Genesis commitment is already set, ignoring the new value.
+            return Ok(());
+        }
+
+        *self.genesis_commitment.write() = Some(commitment);
+        self.connect().await
+    }
+
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
@@ -159,10 +159,6 @@ impl NodeRpcClient for TonicRpcClient {
             .block_header
             .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
             .try_into()?;
-
-        if block_header.block_num() == BlockNumber::GENESIS {
-            self.set_genesis_commitment(block_header.commitment()).await?;
-        }
 
         let mmr_proof = if include_mmr_proof {
             let forest = response
