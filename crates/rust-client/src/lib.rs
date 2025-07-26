@@ -277,7 +277,7 @@ where
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+        authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,

@@ -226,7 +226,7 @@ where
             Some(AuthenticatorConfig::Path(ref path)) => {
                 let keystore = FilesystemKeyStore::new(path.into())
                     .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
-                Some(Arc::new(keystore) as Arc<dyn TransactionAuthenticator>)
+                Some(Arc::new(AUTH::from(keystore)))
             },
             None => None,
         };
