@@ -201,7 +201,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// then `None` is returned.
     /// The `block_num` parameter is the block number to start the search from.
     ///
-    /// The default implementation of this method uses [`NodeRpcClient::check_nullifiers_by_prefix`].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::check_nullifiers_by_prefix`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
@@ -215,11 +216,11 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|update| update.block_num))
     }
 
-    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s with
-    /// it. If a note is not found or it's private, it is ignored and will not be included in the
-    /// returned list.
+    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
+    /// with it. If a note is not found or it's private, it is ignored and will not be included
+    /// in the returned list.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_notes_by_id].
+    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
     async fn get_public_note_records(
         &self,
         note_ids: &[NoteId],
@@ -250,7 +251,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `local_accounts` parameter is a list of account headers that the client has
     /// stored locally and that it wants to check for updates. If an account is private or didn't
     /// change, it is ignored and will not be included in the returned list.
-    /// The default implementation of this method uses [NodeRpcClient::get_account_details].
+    /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
     async fn get_updated_public_accounts(
         &self,
         local_accounts: &[&AccountHeader],
@@ -274,7 +275,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// along with the MMR proof.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_block_header_by_number].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::get_block_header_by_number`].
     async fn get_block_header_with_proof(
         &self,
         block_num: BlockNumber,
@@ -285,10 +287,10 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note with the specified ID.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_notes_by_id].
+    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
     ///
     /// Errors:
-    /// - [RpcError::NoteNotFound] if the note with the specified ID is not found.
+    /// - [`RpcError::NoteNotFound`] if the note with the specified ID is not found.
     async fn get_note_by_id(&self, note_id: NoteId) -> Result<FetchedNote, RpcError> {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))

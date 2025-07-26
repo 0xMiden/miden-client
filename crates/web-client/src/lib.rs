@@ -4,11 +4,9 @@ use std::fmt::Write;
 
 use miden_client::{
     Client, ExecutionOptions,
-    builder::ClientBuilder,
     keystore::WebKeyStore,
     rpc::{Endpoint, TonicRpcClient},
     store::web_store::WebStore,
-    sync::SyncSummary,
 };
 use miden_objects::{
     Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::RpoRandomCoin,
@@ -84,54 +82,30 @@ impl WebClient {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
-
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
-        let mut client_builder = ClientBuilder::new()
-            .rpc(web_rpc_client)
-            .store(web_store.clone())
-            .authenticator(Arc::new(keystore.clone()));
+        // For WASM builds, use direct construction since std feature is not available
+        // and the version mismatch error handling will be done at the RPC level
+        self.inner = Some(Client::new(
+            web_rpc_client,
+            Box::new(rng),
+            web_store.clone(),
+            Arc::new(keystore.clone()),
+            ExecutionOptions::new(
+                Some(MAX_TX_EXECUTION_CYCLES),
+                MIN_TX_EXECUTION_CYCLES,
+                false,
+                false,
+            )
+            .expect("Default executor's options should always be valid"),
+            None,
+            None,
+        ));
 
-        // Try to build the client, handling version mismatch errors specially
-        let client = match client_builder.build().await {
-            Ok(client) => client,
-            Err(client_error) => {
-                use miden_client::{ClientError, rpc::RpcError};
-
-                match &client_error {
-                    ClientError::RpcError(RpcError::RpcVersionMismatch {
-                        client_version,
-                        server_version,
-                    }) => {
-                        let server_info = match server_version {
-                            Some(version) => format!("server version '{}'", version),
-                            None => "an incompatible server version".to_string(),
-                        };
-
-                        let error_message = format!(
-                            "RPC version mismatch: Your client (version '{}') is incompatible with {}. \
-                            Please update your client or connect to a compatible server.",
-                            client_version, server_info
-                        );
-
-                        return Err(JsValue::from_str(&error_message));
-                    },
-                    _ => {
-                        return Err(JsValue::from_str(&format!(
-                            "Failed to initialize client: {}",
-                            client_error
-                        )));
-                    },
-                }
-            },
-        };
-
-        self.inner = Some(client);
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 
-        let summary = SyncSummary::default();
-        Ok(summary.into())
+        Ok(JsValue::from_str("Client created successfully"))
     }
 }
 

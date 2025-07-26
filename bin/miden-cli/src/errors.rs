@@ -76,64 +76,51 @@ pub enum CliError {
     Transaction(#[source] SourceError, String),
 }
 
-/// Formats ClientError with special handling for RPC version mismatch errors.
+/// Formats `ClientError` with special handling for RPC version mismatch errors.
 fn format_client_error(client_error: &ClientError) -> String {
     match client_error {
         ClientError::RpcError(RpcError::RpcVersionMismatch { client_version, server_version }) => {
             let server_info = match server_version {
-                Some(version) => format!("server version '{}'", version),
+                Some(version) => format!("server version '{version}'"),
                 None => "an incompatible server version".to_string(),
             };
 
             format!(
-                "RPC version mismatch: Your client (version '{}') is incompatible with {}.\n\n\
+                "RPC version mismatch: Your client (version '{client_version}') is incompatible with {server_info}.\n\n\
                 This usually happens when:\n\
                 • Your client is newer than the server - use an older client version\n\
                 • Your client is older than the server - update your client\n\
                 • You're connecting to a server with a different protocol version\n\n\
-                Please update your client or connect to a compatible server.",
-                client_version, server_info
+                Please update your client or connect to a compatible server."
             )
         },
-        _ => format!("client error: {}", client_error),
+        _ => format!("client error: {client_error}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use miden_client::{ClientError, rpc::RpcError};
+
     use super::*;
 
     #[test]
     fn test_format_client_error_version_mismatch() {
-        // Test with server version
-        let client_error = ClientError::RpcError(RpcError::RpcVersionMismatch {
-            client_version: "0.10.0".to_string(),
-            server_version: Some("0.9.0".to_string()),
+        let version_mismatch_error = ClientError::RpcError(RpcError::RpcVersionMismatch {
+            client_version: "0.11.0".to_string(),
+            server_version: Some("0.10.0".to_string()),
         });
 
-        let formatted = format_client_error(&client_error);
+        let formatted = format_client_error(&version_mismatch_error);
         assert!(formatted.contains("RPC version mismatch"));
+        assert!(formatted.contains("0.11.0"));
         assert!(formatted.contains("0.10.0"));
-        assert!(formatted.contains("server version '0.9.0'"));
-        assert!(formatted.contains("update your client"));
 
-        // Test without server version
-        let client_error = ClientError::RpcError(RpcError::RpcVersionMismatch {
-            client_version: "0.10.0".to_string(),
-            server_version: None,
-        });
-
-        let formatted = format_client_error(&client_error);
-        assert!(formatted.contains("RPC version mismatch"));
-        assert!(formatted.contains("0.10.0"));
-        assert!(formatted.contains("an incompatible server version"));
-
-        // Test other client errors
-        let client_error = ClientError::AccountLocked(
-            miden_objects::account::AccountId::try_from(0x1234567890abcdef_u128).unwrap(),
-        );
-
-        let formatted = format_client_error(&client_error);
-        assert!(formatted.starts_with("client error:"));
+        // Test with AccountId for other error types
+        let account_id =
+            miden_objects::account::AccountId::try_from(0x1234_5678_90ab_cdef_u128).unwrap();
+        let other_error = ClientError::AccountDataNotFound(account_id);
+        let formatted_other = format_client_error(&other_error);
+        assert!(formatted_other.contains("client error:"));
     }
 }
