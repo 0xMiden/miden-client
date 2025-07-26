@@ -30,7 +30,7 @@ let client:Client = Client::new(
     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
     rng,
     store,
-    Arc::new(keystore),
+    Some(Arc::new(keystore)), // Authenticator is optional - use None if no authentication is needed
     false, // Set to true for debug mode, if needed.
     None, // Set to Some to enable stale transactions after an amount of blocks.
     None, // Set to Some to enable recency checks when executing transactions.
