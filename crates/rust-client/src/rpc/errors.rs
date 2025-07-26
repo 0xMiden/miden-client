@@ -29,6 +29,13 @@ pub enum RpcError {
     NoteNotFound(NoteId),
     #[error("rpc request failed for {0}: {1}")]
     RequestError(String, String),
+    #[error(
+        "rpc version mismatch: client version '{client_version}' is incompatible with server. Please update your client or use a compatible server version"
+    )]
+    RpcVersionMismatch {
+        client_version: String,
+        server_version: Option<String>,
+    },
 }
 
 impl From<DeserializationError> for RpcError {

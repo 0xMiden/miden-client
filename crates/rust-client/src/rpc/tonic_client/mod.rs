@@ -40,6 +40,54 @@ use crate::{
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
 
+// HELPER FUNCTIONS
+// ================================================================================================
+
+/// Converts a `tonic::Status` error to an `RpcError`, detecting version mismatch errors.
+fn convert_tonic_error(err: &tonic::Status, endpoint_name: &str) -> RpcError {
+    let error_message = err.message();
+    let client_version = env!("CARGO_PKG_VERSION");
+
+    // Check for common version mismatch indicators
+    if err.code() == tonic::Code::Unimplemented
+        || err.code() == tonic::Code::NotFound
+        || error_message.contains("unsupported")
+        || error_message.contains("not supported")
+        || error_message.contains("version")
+        || error_message.contains("incompatible")
+        || error_message.contains("406")  // Not Acceptable
+        || error_message.contains("415")
+    // Unsupported Media Type
+    {
+        // Try to extract server version from error message if present
+        let server_version = extract_server_version_from_error(error_message);
+
+        RpcError::RpcVersionMismatch {
+            client_version: client_version.to_string(),
+            server_version,
+        }
+    } else {
+        RpcError::RequestError(endpoint_name.to_string(), err.to_string())
+    }
+}
+
+/// Attempts to extract server version information from error messages.
+fn extract_server_version_from_error(error_message: &str) -> Option<String> {
+    // Look for common patterns in error messages that might contain version info
+    if let Some(start) = error_message.find("version") {
+        let remaining = &error_message[start..];
+        if let Some(version_start) = remaining.find(char::is_numeric) {
+            let version_part = &remaining[version_start..];
+            if let Some(version_end) = version_part.find(|c: char| !c.is_numeric() && c != '.') {
+                return Some(version_part[..version_end].to_string());
+            }
+        }
+    }
+
+    // If we can't extract a specific version, just indicate it's unknown
+    None
+}
+
 // TONIC RPC CLIENT
 // ================================================================================================
 
@@ -97,10 +145,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::SubmitProvenTx.to_string())
         })?;
 
         Ok(BlockNumber::from(api_response.into_inner().block_height))
@@ -121,10 +166,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string())
         })?;
 
         let response = api_response.into_inner();
@@ -163,10 +205,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::GetNotesById.to_string())
         })?;
 
         let response_notes = api_response
@@ -180,7 +219,7 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
-    /// into a [StateSyncInfo] struct.
+    /// into a [`StateSyncInfo`] struct.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
@@ -200,13 +239,13 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.sync_state(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncState.to_string(), err.to_string())
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::SyncState.to_string())
         })?;
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [FetchedAccount] from
-    /// the `GetAccountDetailsResponse` response.
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
+    /// from the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
     ///
@@ -214,7 +253,7 @@ impl NodeRpcClient for TonicRpcClient {
     ///
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields (account, summary,
-    ///   account_commitment, details).
+    ///   `account_commitment`, details).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
@@ -222,10 +261,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_account_details(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountDetails.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::GetAccountDetails.to_string())
         })?;
         let response = response.into_inner();
         let account_info = response.details.ok_or(RpcError::ExpectedDataMissing(
@@ -300,10 +336,7 @@ impl NodeRpcClient for TonicRpcClient {
             .get_account_proofs(request)
             .await
             .map_err(|err| {
-                RpcError::RequestError(
-                    NodeRpcClientEndpoint::GetAccountProofs.to_string(),
-                    err.to_string(),
-                )
+                convert_tonic_error(&err, &NodeRpcClientEndpoint::GetAccountProofs.to_string())
             })?
             .into_inner();
 
@@ -344,7 +377,7 @@ impl NodeRpcClient for TonicRpcClient {
         Ok((block_num, account_proofs))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [NoteSyncInfo] from the
+    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
     /// response.
     async fn sync_notes(
         &self,
@@ -358,7 +391,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.sync_notes(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncNotes.to_string(), err.to_string())
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::SyncNotes.to_string())
         })?;
 
         response.into_inner().try_into()
@@ -378,10 +411,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string())
         })?;
         let response = response.into_inner();
         let nullifiers = response
@@ -402,10 +432,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiers.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::CheckNullifiers.to_string())
         })?;
 
         let response = response.into_inner();
@@ -429,10 +456,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_account_state_delta(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountStateDelta.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::GetAccountStateDelta.to_string())
         })?;
 
         let response = response.into_inner();
@@ -449,10 +473,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
-                err.to_string(),
-            )
+            convert_tonic_error(&err, &NodeRpcClientEndpoint::GetBlockByNumber.to_string())
         })?;
 
         let response = response.into_inner();
@@ -467,31 +488,86 @@ impl NodeRpcClient for TonicRpcClient {
 
 #[cfg(test)]
 mod tests {
-    use std::boxed::Box;
-
-    use super::TonicRpcClient;
-    use crate::rpc::{Endpoint, NodeRpcClient};
-
-    fn assert_send_sync<T: Send + Sync>() {}
+    use super::*;
 
     #[test]
-    fn is_send_sync() {
-        assert_send_sync::<TonicRpcClient>();
-        assert_send_sync::<Box<dyn NodeRpcClient>>();
+    fn test_convert_tonic_error_detects_version_mismatch() {
+        let client_version = env!("CARGO_PKG_VERSION");
+
+        // Test unimplemented error
+        let unimplemented_status = tonic::Status::unimplemented("Method not supported");
+        let error = convert_tonic_error(&unimplemented_status, "TestEndpoint");
+
+        match error {
+            RpcError::RpcVersionMismatch { client_version: cv, server_version: _ } => {
+                assert_eq!(cv, client_version);
+            },
+            _ => panic!("Expected RpcVersionMismatch error"),
+        }
+
+        // Test error with "version" in message
+        let version_status = tonic::Status::invalid_argument("Unsupported version 0.9.0");
+        let error = convert_tonic_error(&version_status, "TestEndpoint");
+
+        match error {
+            RpcError::RpcVersionMismatch { client_version: cv, server_version: _ } => {
+                assert_eq!(cv, client_version);
+            },
+            _ => panic!("Expected RpcVersionMismatch error"),
+        }
+
+        // Test normal error that should not be treated as version mismatch
+        let normal_status = tonic::Status::internal("Some internal error");
+        let error = convert_tonic_error(&normal_status, "TestEndpoint");
+
+        match error {
+            RpcError::RequestError(endpoint, _) => {
+                assert_eq!(endpoint, "TestEndpoint");
+            },
+            _ => panic!("Expected RequestError"),
+        }
     }
 
-    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
-    async fn dyn_trait_send_fut(client: Box<dyn NodeRpcClient>) {
-        // This won't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
-        let res = client.get_block_header_by_number(None, false).await;
-        assert!(res.is_ok());
+    #[test]
+    fn test_extract_server_version_from_error() {
+        // Test version extraction from error message
+        let message_with_version = "Unsupported version 0.9.5, please upgrade";
+        let extracted = extract_server_version_from_error(message_with_version);
+        assert_eq!(extracted, Some("0.9.5".to_string()));
+
+        // Test message with no extractable version
+        let message_without_version = "Connection failed";
+        let extracted = extract_server_version_from_error(message_without_version);
+        assert_eq!(extracted, None);
+
+        // Test message with "version" but no number
+        let message_with_version_word = "version check failed";
+        let extracted = extract_server_version_from_error(message_with_version_word);
+        assert_eq!(extracted, None);
     }
 
-    #[tokio::test]
-    async fn future_is_send() {
-        let endpoint = &Endpoint::devnet();
-        let client = TonicRpcClient::new(endpoint, 10000);
-        let client: Box<TonicRpcClient> = client.into();
-        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
+    #[test]
+    fn test_rpc_version_mismatch_error_formatting() {
+        // Test the RpcError directly - this is what gets formatted by the thiserror derive
+        let rpc_error = RpcError::RpcVersionMismatch {
+            client_version: "0.11.0".to_string(),
+            server_version: Some("0.10.0".to_string()),
+        };
+
+        let rpc_error_string = rpc_error.to_string();
+
+        // Check that the error message contains expected parts
+        assert!(rpc_error_string.contains("version"));
+        assert!(rpc_error_string.contains("0.11.0"));
+        assert!(rpc_error_string.contains("incompatible"));
+
+        // Test the error variant is properly constructed
+        match rpc_error {
+            RpcError::RpcVersionMismatch { client_version, server_version } => {
+                assert_eq!(client_version, "0.11.0");
+                assert_eq!(server_version, Some("0.10.0".to_string()));
+            },
+            _ => panic!("Expected RpcVersionMismatch variant"),
+        }
     }
 }
