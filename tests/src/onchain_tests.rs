@@ -6,6 +6,7 @@ use miden_client::{
     transaction::{PaymentNoteDescription, TransactionRequestBuilder},
 };
 use miden_objects::{
+    EMPTY_WORD,
     account::AccountStorageMode,
     asset::{Asset, FungibleAsset},
     note::{NoteFile, NoteType},
@@ -374,4 +375,19 @@ async fn import_account_by_id() {
         MINT_AMOUNT * 2,
     )
     .await;
+}
+
+#[tokio::test]
+async fn incorrect_genesis() {
+    let (builder, _) = create_test_client_builder().await;
+    let mut client = builder.build().await.unwrap();
+
+    // Set an incorrect genesis commitment
+    client.test_rpc_api().set_genesis_commitment(EMPTY_WORD).await.unwrap();
+
+    // This request would always be valid as it requests the chain tip. But it should fail
+    // because the genesis commitment in the request header does not match the one in the node.
+    let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
+
+    assert!(result.is_err());
 }
