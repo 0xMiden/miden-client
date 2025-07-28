@@ -356,14 +356,10 @@ impl NodeRpcClient for MockRpcApi {
             .iter()
             .rev()
             .find_map(|(block_num, updates)| {
-                if let Some(commitment) = updates.get(&account_id) {
-                    Some(AccountUpdateSummary {
-                        commitment: *commitment,
-                        last_block_num: block_num.as_u32(),
-                    })
-                } else {
-                    None
-                }
+                updates.get(&account_id).map(|commitment| AccountUpdateSummary {
+                    commitment: *commitment,
+                    last_block_num: block_num.as_u32(),
+                })
             })
             .unwrap();
 
