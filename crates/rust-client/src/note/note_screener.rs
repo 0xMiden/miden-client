@@ -204,39 +204,46 @@ where
     {
         let note_id = *committed_note.note_id();
 
-        if !self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
-            || !self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()
-        {
+        let input_note_present =
+            !self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty();
+        let output_note_present =
+            !self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty();
+
+        if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
-            Ok(NoteUpdateAction::Commit(committed_note))
-        } else if let Some(public_note) = public_note {
-            // If tracked by the user, keep note regardless of inputs and extra checks
-            if let Some(metadata) = public_note.metadata()
-                && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
-            {
-                return Ok(NoteUpdateAction::Insert(public_note));
-            }
+            return Ok(NoteUpdateAction::Commit(committed_note));
+        }
 
-            // The note is not being tracked by the client and is public so we can screen it
-            let new_note_relevance = self
-                .check_relevance(
-                    &public_note
-                        .clone()
-                        .try_into()
-                        .map_err(ClientError::NoteRecordConversionError)?,
-                )
-                .await?;
+        match public_note {
+            Some(public_note) => {
+                // If tracked by the user, keep note regardless of inputs and extra checks
+                if let Some(metadata) = public_note.metadata()
+                    && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
+                {
+                    return Ok(NoteUpdateAction::Insert(public_note));
+                }
 
-            let is_relevant = !new_note_relevance.is_empty();
-            if is_relevant {
-                Ok(NoteUpdateAction::Insert(public_note))
-            } else {
+                // The note is not being tracked by the client and is public so we can screen it
+                let new_note_relevance = self
+                    .check_relevance(
+                        &public_note
+                            .clone()
+                            .try_into()
+                            .map_err(ClientError::NoteRecordConversionError)?,
+                    )
+                    .await?;
+                let is_relevant = !new_note_relevance.is_empty();
+                if is_relevant {
+                    Ok(NoteUpdateAction::Insert(public_note))
+                } else {
+                    Ok(NoteUpdateAction::Discard)
+                }
+            },
+            None => {
+                // The note is not being tracked by the client and is private so we can't determine
+                // if it is relevant
                 Ok(NoteUpdateAction::Discard)
-            }
-        } else {
-            // The note is not being tracked by the client and is private so we can't determine if
-            // it is relevant
-            Ok(NoteUpdateAction::Discard)
+            },
         }
     }
 }
