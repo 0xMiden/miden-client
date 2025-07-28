@@ -14,7 +14,7 @@ use tracing::warn;
 use crate::{
     Client, ClientError,
     rpc::NodeRpcClient,
-    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
+    store::{PartialBlockchainFilter, StoreError},
 };
 
 /// Network information management methods.
@@ -76,6 +76,7 @@ impl<AUTH> Client<AUTH> {
             .expect("Current block should be in the store");
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
+        let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
         let current_partial_mmr =
