@@ -10,6 +10,7 @@ use miden_objects::{
     utils::Deserializable,
 };
 use miden_tx::utils::Serializable;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
 use super::{
@@ -24,26 +25,42 @@ use crate::{
 // TYPES
 // ================================================================================================
 
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedInputNoteData {
+    #[wasm_bindgen(js_name = "noteId")]
     pub note_id: String,
+    #[wasm_bindgen(js_name = "noteAssets")]
     pub note_assets: Vec<u8>,
+    #[wasm_bindgen(js_name = "serialNumber")]
     pub serial_number: Vec<u8>,
     pub inputs: Vec<u8>,
+    #[wasm_bindgen(js_name = "noteScriptRoot")]
     pub note_script_root: String,
+    #[wasm_bindgen(js_name = "noteScript")]
     pub note_script: Vec<u8>,
     pub nullifier: String,
+    #[wasm_bindgen(js_name = "stateDiscriminant")]
     pub state_discriminant: u8,
     pub state: Vec<u8>,
+    #[wasm_bindgen(js_name = "createdAt")]
     pub created_at: String,
 }
 
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedOutputNoteData {
+    #[wasm_bindgen(js_name = "noteId")]
     pub note_id: String,
+    #[wasm_bindgen(js_name = "noteAssets")]
     pub note_assets: Vec<u8>,
+    #[wasm_bindgen(js_name = "recipientDigest")]
     pub recipient_digest: String,
     pub metadata: Vec<u8>,
     pub nullifier: Option<String>,
+    #[wasm_bindgen(js_name = "expectedHeight")]
     pub expected_height: u32,
+    #[wasm_bindgen(js_name = "stateDiscriminant")]
     pub state_discriminant: u8,
     pub state: Vec<u8>,
 }
