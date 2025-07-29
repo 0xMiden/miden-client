@@ -34,22 +34,32 @@ use crate::{
 // ================================================================================================
 
 pub trait NoteAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<(), ClientError>;
+    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError>;
 }
 
 pub struct CommitAction(pub CommittedNote);
 
 impl NoteAction for CommitAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<(), ClientError> {
-        note_updates.apply_committed_note_state_transitions(&self.0, block_header)
+    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+        note_updates.apply_committed_note_state_transitions(&self.0, block_header)?;
+        Ok(true)
     }
 }
 
 pub struct InsertAction(pub InputNoteRecord);
 
 impl NoteAction for InsertAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<(), ClientError> {
-        note_updates.apply_new_public_note(self.0, block_header)
+    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+        note_updates.apply_new_public_note(self.0, block_header)?;
+        Ok(true)
+    }
+}
+
+pub struct DiscardAction;
+
+impl NoteAction for DiscardAction {
+    fn apply(self, _note_updates: &mut NoteUpdateTracker, _block_header: &BlockHeader) -> Result<bool, ClientError> {
+        Ok(false)
     }
 }
 
@@ -59,7 +69,7 @@ pub trait OnNoteReceived {
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<Option<Box<dyn NoteAction + Send + Sync>>, ClientError>;
+    ) -> Result<Box<dyn NoteAction + Send + Sync>, ClientError>;
 }
 
 // STATE SYNC
@@ -343,10 +353,9 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            if let Some(action) = self.note_screener.on_note_received(committed_note, public_note).await? {
-                action.apply(note_updates, block_header)?;
-                found_relevant_note = true;
-            }
+            let action = self.note_screener.on_note_received(committed_note, public_note).await?;
+            let is_relevant = action.apply(note_updates, block_header)?;
+            found_relevant_note |= is_relevant;
         }
 
         Ok(found_relevant_note)
