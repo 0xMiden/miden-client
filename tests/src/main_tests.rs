@@ -30,6 +30,7 @@ use winter_maybe_async::maybe_async_trait;
 
 mod custom_transactions_tests;
 mod fpi_tests;
+mod multisig;
 mod network_transaction_tests;
 mod onchain_tests;
 mod swap_transactions_tests;
