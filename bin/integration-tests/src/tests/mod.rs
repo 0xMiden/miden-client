@@ -1,6 +1,7 @@
 pub mod client;
 pub mod custom_transaction;
 pub mod fpi;
+pub mod multisig;
 pub mod network_transaction;
 pub mod onchain;
 pub mod swap_transaction;
