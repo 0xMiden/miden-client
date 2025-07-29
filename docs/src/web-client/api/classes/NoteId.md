@@ -45,3 +45,19 @@
 #### Returns
 
 `string`
+
+***
+
+### fromHex()
+
+> `static` **fromHex**(`hex`): `NoteId`
+
+#### Parameters
+
+##### hex
+
+`string`
+
+#### Returns
+
+`NoteId`

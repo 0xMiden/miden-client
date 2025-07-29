@@ -1,4 +1,5 @@
 use miden_client::Word;
+use miden_client::rpc::domain::note::FetchedNote;
 use miden_client::store::OutputNoteRecord;
 use miden_objects::note::{NoteId, NoteScript as NativeNoteScript};
 use wasm_bindgen::prelude::*;
@@ -8,6 +9,8 @@ use crate::models::account_id::AccountId;
 use crate::models::consumable_note_record::ConsumableNoteRecord;
 use crate::models::input_note_record::InputNoteRecord;
 use crate::models::note_filter::NoteFilter;
+use crate::models::note_id::NoteId as NoteIdModel;
+use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -108,6 +111,30 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get consumable notes"))?;
 
             Ok(result.into_iter().map(Into::into).collect())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "getNoteInclusionProof")]
+    pub async fn get_note_inclusion_proof(
+        &mut self,
+        note_id: NoteIdModel,
+    ) -> Result<Option<NoteInclusionProof>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let note = client
+                .get_fetched_note(note_id.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to get note inclusion proof"))?;
+
+            let inclusion_proof = match note {
+                Some(FetchedNote::Private(_, _, proof) | FetchedNote::Public(_, proof)) => {
+                    Some(proof)
+                },
+                None => None,
+            };
+
+            Ok(inclusion_proof.map(NoteInclusionProof::from))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

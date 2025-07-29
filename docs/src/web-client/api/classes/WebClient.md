@@ -262,6 +262,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getNoteInclusionProof()
+
+> **getNoteInclusionProof**(`note_id`): `Promise`\<[`NoteInclusionProof`](NoteInclusionProof.md)\>
+
+#### Parameters
+
+##### note\_id
+
+[`NoteId`](NoteId.md)
+
+#### Returns
+
+`Promise`\<[`NoteInclusionProof`](NoteInclusionProof.md)\>
+
+***
+
 ### getOutputNote()
 
 > **getOutputNote**(`note_id`): `Promise`\<`any`\>
