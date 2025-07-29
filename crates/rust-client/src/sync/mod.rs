@@ -80,7 +80,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
+pub use state_sync::{NoteAction, CommitAction, InsertAction, DiscardAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{

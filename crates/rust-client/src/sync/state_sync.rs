@@ -34,13 +34,13 @@ use crate::{
 // ================================================================================================
 
 pub trait NoteAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError>;
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError>;
 }
 
 pub struct CommitAction(pub CommittedNote);
 
 impl NoteAction for CommitAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
         note_updates.apply_committed_note_state_transitions(&self.0, block_header)?;
         Ok(true)
     }
@@ -49,8 +49,9 @@ impl NoteAction for CommitAction {
 pub struct InsertAction(pub InputNoteRecord);
 
 impl NoteAction for InsertAction {
-    fn apply(self, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
-        note_updates.apply_new_public_note(self.0, block_header)?;
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+        let this = *self;
+        note_updates.apply_new_public_note(this.0, block_header)?;
         Ok(true)
     }
 }
@@ -58,7 +59,7 @@ impl NoteAction for InsertAction {
 pub struct DiscardAction;
 
 impl NoteAction for DiscardAction {
-    fn apply(self, _note_updates: &mut NoteUpdateTracker, _block_header: &BlockHeader) -> Result<bool, ClientError> {
+    fn apply(self: Box<Self>, _note_updates: &mut NoteUpdateTracker, _block_header: &BlockHeader) -> Result<bool, ClientError> {
         Ok(false)
     }
 }

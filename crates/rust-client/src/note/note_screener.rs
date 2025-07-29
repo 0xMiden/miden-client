@@ -20,7 +20,7 @@ use crate::{
     ClientError,
     rpc::domain::note::CommittedNote,
     store::{InputNoteRecord, NoteFilter, Store, StoreError, data_store::ClientDataStore},
-    sync::{NoteUpdateAction, OnNoteReceived},
+    sync::{CommitAction, InsertAction, DiscardAction, OnNoteReceived},
     transaction::{TransactionRequestBuilder, TransactionRequestError},
 };
 
@@ -194,7 +194,7 @@ where
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<Option<Box<dyn super::super::sync::NoteAction + Send + Sync>>, ClientError>
+    ) -> Result<Box<dyn crate::sync::NoteAction + Send + Sync>, ClientError>
     where
         AUTH: TransactionAuthenticator,
     {
@@ -207,7 +207,7 @@ where
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
-            return Ok(Some(Box::new(super::super::sync::CommitAction(committed_note)))));
+            return Ok(Box::new(CommitAction(committed_note)));
         }
 
         match public_note {
@@ -216,7 +216,7 @@ where
                 if let Some(metadata) = public_note.metadata()
                     && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
                 {
-                    return Ok(Some(Box::new(super::super::sync::InsertAction(public_note)))));
+                    return Ok(Box::new(InsertAction(public_note)));
                 }
 
                 // The note is not being tracked by the client and is public so we can screen it
@@ -230,15 +230,15 @@ where
                     .await?;
                 let is_relevant = !new_note_relevance.is_empty();
                 if is_relevant {
-                    Ok(Some(Box::new(super::super::sync::InsertAction(public_note)))))
+                    Ok(Box::new(InsertAction(public_note)))
                 } else {
-                    Ok(None)
+                    Ok(Box::new(DiscardAction))
                 }
             },
             None => {
                 // The note is not being tracked by the client and is private so we can't determine
                 // if it is relevant
-                Ok(None)
+                Ok(Box::new(DiscardAction))
             },
         }
     }
