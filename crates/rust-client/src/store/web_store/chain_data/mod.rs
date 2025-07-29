@@ -14,14 +14,17 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
-use crate::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
+use crate::store::{
+    BlockRelevance, PartialBlockchainFilter, StoreError,
+    web_store::chain_data::js_bindings::idxdb_get_partial_blockchain_nodes_before_block,
+};
 
 mod js_bindings;
 use js_bindings::{
     idxdb_get_block_headers, idxdb_get_partial_blockchain_nodes,
-    idxdb_get_partial_blockchain_nodes_all, idxdb_get_partial_blockchain_peaks_by_block_num,
-    idxdb_get_tracked_block_headers, idxdb_insert_block_header,
-    idxdb_insert_partial_blockchain_nodes, idxdb_prune_irrelevant_blocks,
+    idxdb_get_partial_blockchain_peaks_by_block_num, idxdb_get_tracked_block_headers,
+    idxdb_insert_block_header, idxdb_insert_partial_blockchain_nodes,
+    idxdb_prune_irrelevant_blocks,
 };
 
 mod models;
@@ -121,8 +124,8 @@ impl WebStore {
         filter: PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         match filter {
-            PartialBlockchainFilter::All => {
-                let promise = idxdb_get_partial_blockchain_nodes_all();
+            PartialBlockchainFilter::ByBlock(number) => {
+                let promise = idxdb_get_partial_blockchain_nodes_before_block(number.as_u32());
                 let js_value = JsFuture::from(promise).await.map_err(|js_error| {
                     StoreError::DatabaseError(format!(
                         "failed to get all partial blockchain nodes: {js_error:?}",
@@ -173,6 +176,7 @@ impl WebStore {
     pub(crate) async fn insert_partial_blockchain_nodes(
         &self,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError> {
         let mut serialized_node_ids = Vec::new();
         let mut serialized_nodes = Vec::new();
@@ -183,7 +187,11 @@ impl WebStore {
             serialized_nodes.push(node);
         }
 
-        let promise = idxdb_insert_partial_blockchain_nodes(serialized_node_ids, serialized_nodes);
+        let promise = idxdb_insert_partial_blockchain_nodes(
+            serialized_node_ids,
+            serialized_nodes,
+            block_num.to_string(),
+        );
         JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!(
                 "failed to insert partial blockchain nodes: {js_error:?}",

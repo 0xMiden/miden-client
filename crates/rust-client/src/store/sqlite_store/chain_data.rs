@@ -36,6 +36,7 @@ struct SerializedBlockHeaderParts {
 struct SerializedPartialBlockchainNodeData {
     id: i64,
     node: String,
+    block_num: u32,
 }
 struct SerializedPartialBlockchainNodeParts {
     id: u64,
@@ -49,7 +50,9 @@ impl PartialBlockchainFilter {
     fn to_query(&self) -> String {
         let base = String::from("SELECT id, node FROM partial_blockchain_nodes");
         match self {
-            PartialBlockchainFilter::All => base,
+            PartialBlockchainFilter::ByBlock(number) => {
+                format!("{base} WHERE block_num < {number}")
+            },
             PartialBlockchainFilter::List(_) => {
                 format!("{base} WHERE id IN rarray(?)")
             },
@@ -166,10 +169,11 @@ impl SqliteStore {
     pub fn insert_partial_blockchain_nodes(
         conn: &mut Connection,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 
-        Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
+        Self::insert_partial_blockchain_nodes_tx(&tx, nodes, block_num)?;
 
         Ok(tx.commit().map(|_| ())?)
     }
@@ -178,9 +182,10 @@ impl SqliteStore {
     pub(crate) fn insert_partial_blockchain_nodes_tx(
         tx: &Transaction<'_>,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError> {
         for (index, node) in nodes {
-            insert_partial_blockchain_node(tx, *index, *node)?;
+            insert_partial_blockchain_node(tx, *index, *node, block_num)?;
         }
         Ok(())
     }
@@ -242,11 +247,12 @@ fn insert_partial_blockchain_node(
     tx: &Transaction<'_>,
     id: InOrderIndex,
     node: Word,
+    block_num: BlockNumber,
 ) -> Result<(), StoreError> {
-    let SerializedPartialBlockchainNodeData { id, node } =
-        serialize_partial_blockchain_node(id, node);
-    const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
-    tx.execute(QUERY, params![id, node])?;
+    let SerializedPartialBlockchainNodeData { id, node, block_num } =
+        serialize_partial_blockchain_node(id, node, block_num);
+    const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node, block_num } | IGNORE);
+    tx.execute(QUERY, params![id, node, block_num])?;
     Ok(())
 }
 
@@ -305,10 +311,12 @@ fn parse_block_header(
 fn serialize_partial_blockchain_node(
     id: InOrderIndex,
     node: Word,
+    block_num: BlockNumber,
 ) -> SerializedPartialBlockchainNodeData {
+    let block_num: u32 = block_num.as_u32();
     let id = i64::try_from(id.inner()).expect("id is a valid i64");
     let node = node.to_hex();
-    SerializedPartialBlockchainNodeData { id, node }
+    SerializedPartialBlockchainNodeData { id, node, block_num }
 }
 
 fn parse_partial_blockchain_nodes_columns(

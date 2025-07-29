@@ -231,7 +231,8 @@ export async function applyStateSync(stateUpdate) {
       await updatePartialBlockchainNodes(
         tx,
         serializedNodeIds,
-        serializedNodes
+        serializedNodes,
+        blockNum
       );
       await updateCommittedNoteTags(tx, committedNoteIds);
     }
@@ -278,7 +279,7 @@ async function updateBlockHeader(
   }
 }
 
-async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
+async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes, blockNum) {
   try {
     // Check if the arrays are not of the same length
     if (nodeIndexes.length !== nodes.length) {
@@ -295,6 +296,7 @@ async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
     const data = nodes.map((node, index) => ({
       id: nodeIndexes[index],
       node: node,
+      blockNum: blockNum,
     }));
     // Use bulkPut to add/overwrite the entries
     await tx.partialBlockchainNodes.bulkPut(data);

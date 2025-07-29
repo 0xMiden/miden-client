@@ -12,7 +12,6 @@ use miden_objects::{
     block::{BlockHeader, BlockNumber},
     crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr},
     note::{NoteId, NoteTag},
-    transaction::PartialBlockchain,
 };
 use miden_tx::auth::TransactionAuthenticator;
 use tracing::info;
@@ -132,37 +131,41 @@ impl<AUTH> StateSync<AUTH> {
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     ///
     /// # Arguments
-    /// * `current_partial_blockchain` - The current partial view of the blockchain.
+    /// * `current_partial_mmr` - The current partial view of the blockchain's [`PartialMmr`].
     /// * `accounts` - All the headers of tracked accounts.
     /// * `note_tags` - The note tags to be used in the sync state request.
     /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         self,
-        current_partial_blockchain: PartialBlockchain,
+        mut current_partial_mmr: PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
         unspent_output_notes: Vec<OutputNoteRecord>,
         uncommitted_transactions: Vec<TransactionRecord>,
     ) -> Result<StateSyncUpdate, ClientError> {
-        let block_num =
-            current_partial_blockchain.chain_length().checked_sub(1).unwrap_or_default();
+        let block_num: u32 = current_partial_mmr
+            .forest()
+            .num_leaves()
+            .checked_sub(1)
+            .unwrap_or_default()
+            .try_into()
+            .expect("mmr forest fits into u32");
 
         let mut state_sync_update = StateSyncUpdate {
-            block_num,
+            block_num: BlockNumber::from(block_num),
             note_updates: NoteUpdateTracker::new(unspent_input_notes, unspent_output_notes),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
 
-        let mut partial_mmr = current_partial_blockchain.mmr().clone();
         let note_tags = Arc::new(note_tags);
         loop {
             if !self
                 .sync_state_step(
                     &mut state_sync_update,
-                    &mut partial_mmr,
+                    &mut current_partial_mmr,
                     &accounts,
                     note_tags.clone(),
                 )
@@ -172,7 +175,8 @@ impl<AUTH> StateSync<AUTH> {
             }
         }
 
-        self.sync_nullifiers(&mut state_sync_update, block_num).await?;
+        self.sync_nullifiers(&mut state_sync_update, BlockNumber::from(block_num))
+            .await?;
 
         Ok(state_sync_update)
     }

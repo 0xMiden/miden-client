@@ -175,19 +175,20 @@ pub trait Store: Send + Sync {
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
 
-    /// Retrieves all MMR authentication nodes based on [PartialBlockchainFilter].
+    /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError>;
 
-    /// Inserts blockchain MMR authentication nodes.
+    /// Inserts MMR authentication nodes produced when appending `block_num` to the chain.
     ///
-    /// In the case where the [`InOrderIndex`] already exists on the table, the insertion is
-    /// ignored.
+    /// If a node with the same [`InOrderIndex`] already exists, the insertion for that entry is
+    /// ignored and the existing value is left unchanged.
     async fn insert_partial_blockchain_nodes(
         &self,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError>;
 
     /// Returns peaks information from the blockchain by a specific block number.
@@ -323,8 +324,8 @@ pub trait Store: Send + Sync {
 /// Filters for searching specific MMR nodes.
 // TODO: Should there be filters for specific blocks instead of nodes?
 pub enum PartialBlockchainFilter {
-    /// Return all nodes.
-    All,
+    /// Return all nodes included strictly before [`BlockNumber`].
+    ByBlock(BlockNumber),
     /// Filter by the specified in-order indices.
     List(Vec<InOrderIndex>),
 }

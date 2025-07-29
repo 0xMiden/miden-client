@@ -57,7 +57,7 @@ db.version(1).stores({
   [Table.NotesScripts]: indexes("scriptRoot"),
   [Table.StateSync]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-  [Table.PartialBlockchainNodes]: indexes("id"),
+  [Table.PartialBlockchainNodes]: indexes("id", "blockNum"),
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
   [Table.ForeignAccountCode]: indexes("accountId"),
 });
