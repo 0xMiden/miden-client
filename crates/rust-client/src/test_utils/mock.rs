@@ -27,7 +27,7 @@ use crate::{
             sync::StateSyncInfo,
         },
         generated::{
-            note::NoteSyncRecord, responses::SyncStateResponse, transaction::TransactionSummary,
+            note::NoteSyncRecord, rpc_store::SyncStateResponse, transaction::TransactionSummary,
         },
     },
     transaction::ForeignAccount,
@@ -193,7 +193,7 @@ impl MockRpcApi {
                     && note_tags.contains(&note.metadata().tag())
                 {
                     Some(NoteSyncRecord {
-                        note_index: u32::from(
+                        note_index_in_block: u32::from(
                             note.inclusion_proof().location().node_index_in_block(),
                         ),
                         note_id: Some(note.id().into()),
@@ -241,9 +241,8 @@ impl NodeRpcClient for MockRpcApi {
                 .notes
                 .into_iter()
                 .map(|note| {
-                    let digest: Word = note.note_id.unwrap().try_into().unwrap();
-                    let note_id: NoteId = NoteId::from(digest);
-                    let note_index = u16::try_from(note.note_index).unwrap();
+                    let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
+                    let note_index = u16::try_from(note.note_index_in_block).unwrap();
                     let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
                     let metadata = note.metadata.unwrap().try_into().unwrap();
 

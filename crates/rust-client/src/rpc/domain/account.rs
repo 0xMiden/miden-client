@@ -13,13 +13,7 @@ use thiserror::Error;
 use crate::rpc::{
     RpcError,
     errors::RpcConversionError,
-    generated::{
-        account::{AccountHeader as ProtoAccountHeader, AccountId as ProtoAccountId},
-        requests::get_account_proofs_request,
-        responses::{
-            AccountStateHeader as ProtoAccountStateHeader, AccountWitness as ProtoAccountWitness,
-        },
-    },
+    generated::{self as proto},
 };
 
 // FETCHED ACCOUNT
@@ -90,13 +84,13 @@ impl AccountUpdateSummary {
 // ACCOUNT ID
 // ================================================================================================
 
-impl Display for ProtoAccountId {
+impl Display for proto::account::AccountId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("0x{}", self.id.to_hex()))
     }
 }
 
-impl Debug for ProtoAccountId {
+impl Debug for proto::account::AccountId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
@@ -105,7 +99,7 @@ impl Debug for ProtoAccountId {
 // INTO PROTO ACCOUNT ID
 // ================================================================================================
 
-impl From<AccountId> for ProtoAccountId {
+impl From<AccountId> for proto::account::AccountId {
     fn from(account_id: AccountId) -> Self {
         Self { id: account_id.to_bytes() }
     }
@@ -114,10 +108,10 @@ impl From<AccountId> for ProtoAccountId {
 // FROM PROTO ACCOUNT ID
 // ================================================================================================
 
-impl TryFrom<ProtoAccountId> for AccountId {
+impl TryFrom<proto::account::AccountId> for AccountId {
     type Error = RpcConversionError;
 
-    fn try_from(account_id: ProtoAccountId) -> Result<Self, Self::Error> {
+    fn try_from(account_id: proto::account::AccountId) -> Result<Self, Self::Error> {
         AccountId::read_from_bytes(&account_id.id).map_err(|_| RpcConversionError::NotAValidFelt)
     }
 }
@@ -125,7 +119,7 @@ impl TryFrom<ProtoAccountId> for AccountId {
 // ACCOUNT HEADER
 // ================================================================================================
 
-impl ProtoAccountHeader {
+impl proto::account::AccountHeader {
     #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
         use alloc::string::String;
@@ -134,7 +128,7 @@ impl ProtoAccountHeader {
 
         use crate::rpc::RpcError;
 
-        let ProtoAccountHeader {
+        let proto::account::AccountHeader {
             nonce,
             vault_root,
             storage_commitment,
@@ -163,7 +157,7 @@ impl ProtoAccountHeader {
 // FROM PROTO ACCOUNT HEADERS
 // ================================================================================================
 
-impl ProtoAccountStateHeader {
+impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
     /// Converts the RPC response into `StateHeaders`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
@@ -179,9 +173,12 @@ impl ProtoAccountStateHeader {
         account_id: AccountId,
         known_account_codes: &BTreeMap<Word, AccountCode>,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
-        use crate::rpc::{RpcError, generated::responses::StorageSlotMapProof};
+        use crate::rpc::{
+            RpcError,
+            generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof,
+        };
 
-        let ProtoAccountStateHeader {
+        let proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             header,
             storage_header,
             account_code,
@@ -334,10 +331,10 @@ impl AccountProof {
 // ACCOUNT WITNESS
 // ================================================================================================
 
-impl TryFrom<ProtoAccountWitness> for AccountWitness {
+impl TryFrom<proto::account::AccountWitness> for AccountWitness {
     type Error = RpcError;
 
-    fn try_from(account_witness: ProtoAccountWitness) -> Result<Self, Self::Error> {
+    fn try_from(account_witness: proto::account::AccountWitness) -> Result<Self, Self::Error> {
         let state_commitment = account_witness
             .commitment
             .ok_or(RpcError::ExpectedDataMissing(String::from("AccountWitness.StateCommitment")))?
@@ -389,17 +386,23 @@ impl AccountStorageRequirements {
     }
 }
 
-impl From<AccountStorageRequirements> for Vec<get_account_proofs_request::StorageRequest> {
-    fn from(value: AccountStorageRequirements) -> Vec<get_account_proofs_request::StorageRequest> {
+impl From<AccountStorageRequirements>
+    for Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest>
+{
+    fn from(
+        value: AccountStorageRequirements,
+    ) -> Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest> {
         let mut requests = Vec::with_capacity(value.0.len());
         for (slot_index, map_keys) in value.0 {
-            requests.push(get_account_proofs_request::StorageRequest {
-                storage_slot_index: u32::from(slot_index),
-                map_keys: map_keys
-                    .into_iter()
-                    .map(crate::rpc::generated::digest::Digest::from)
-                    .collect(),
-            });
+            requests.push(
+                proto::rpc_store::account_proofs_request::account_request::StorageRequest {
+                    storage_slot_index: u32::from(slot_index),
+                    map_keys: map_keys
+                        .into_iter()
+                        .map(crate::rpc::generated::primitives::Digest::from)
+                        .collect(),
+                },
+            );
         }
         requests
     }

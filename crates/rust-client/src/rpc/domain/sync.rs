@@ -10,12 +10,12 @@ use miden_objects::{
 };
 
 use super::{note::CommittedNote, transaction::TransactionInclusion};
-use crate::rpc::{RpcError, generated::responses::SyncStateResponse};
+use crate::rpc::{RpcError, generated as proto};
 
 // STATE SYNC INFO
 // ================================================================================================
 
-/// Represents a `SyncStateResponse` with fields converted into domain types.
+/// Represents a `proto::rpc_store::SyncStateResponse` with fields converted into domain types.
 pub struct StateSyncInfo {
     /// The block number of the chain tip at the moment of the response.
     pub chain_tip: BlockNumber,
@@ -36,10 +36,10 @@ pub struct StateSyncInfo {
 // STATE SYNC INFO CONVERSION
 // ================================================================================================
 
-impl TryFrom<SyncStateResponse> for StateSyncInfo {
+impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
     type Error = RpcError;
 
-    fn try_from(value: SyncStateResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc_store::SyncStateResponse) -> Result<Self, Self::Error> {
         let chain_tip = value.chain_tip;
 
         // Validate and convert block header
@@ -73,12 +73,10 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
         // Validate and convert account note inclusions into an (AccountId, Word) tuple
         let mut note_inclusions = vec![];
         for note in value.notes {
-            let note_id: Word = note
+            let note_id: NoteId = note
                 .note_id
                 .ok_or(RpcError::ExpectedDataMissing("Notes.Id".into()))?
                 .try_into()?;
-
-            let note_id: NoteId = note_id.into();
 
             let inclusion_path = note
                 .inclusion_path
@@ -92,7 +90,7 @@ impl TryFrom<SyncStateResponse> for StateSyncInfo {
 
             let committed_note = super::note::CommittedNote::new(
                 note_id,
-                u16::try_from(note.note_index).expect("note index out of range"),
+                u16::try_from(note.note_index_in_block).expect("note index out of range"),
                 inclusion_path,
                 metadata,
             );

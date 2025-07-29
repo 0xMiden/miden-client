@@ -9,24 +9,30 @@ use miden_objects::{
 use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
-use crate::rpc::{
-    RpcError,
-    generated::{
-        note::{
-            CommittedNote as ProtoCommittedNote, NoteInclusionInBlockProof as ProtoInclusionProof,
-            NoteMetadata as ProtoNoteMetadata,
-        },
-        responses::SyncNoteResponse,
-    },
-};
+use crate::rpc::{RpcError, generated as proto};
 
-impl TryFrom<ProtoNoteMetadata> for NoteMetadata {
+impl From<NoteId> for proto::note::NoteId {
+    fn from(value: NoteId) -> Self {
+        proto::note::NoteId { id: Some(value.into()) }
+    }
+}
+
+impl TryFrom<proto::note::NoteId> for NoteId {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoNoteMetadata) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::note::NoteId) -> Result<Self, Self::Error> {
+        Word::try_from(value.id.ok_or(proto::note::NoteId::missing_field("Notes.Id"))?)
+            .map(Into::into)
+    }
+}
+
+impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::note::NoteMetadata) -> Result<Self, Self::Error> {
         let sender = value
             .sender
-            .ok_or_else(|| ProtoNoteMetadata::missing_field("Sender"))?
+            .ok_or_else(|| proto::note::NoteMetadata::missing_field("Sender"))?
             .try_into()?;
         let note_type = NoteType::try_from(u64::from(value.note_type))?;
         let tag = NoteTag::from(value.tag);
@@ -38,9 +44,9 @@ impl TryFrom<ProtoNoteMetadata> for NoteMetadata {
     }
 }
 
-impl From<NoteMetadata> for ProtoNoteMetadata {
+impl From<NoteMetadata> for proto::note::NoteMetadata {
     fn from(value: NoteMetadata) -> Self {
-        ProtoNoteMetadata {
+        proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
             note_type: value.note_type() as u32,
             tag: value.tag().into(),
@@ -50,17 +56,17 @@ impl From<NoteMetadata> for ProtoNoteMetadata {
     }
 }
 
-impl TryFrom<ProtoInclusionProof> for NoteInclusionProof {
+impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoInclusionProof) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::note::NoteInclusionInBlockProof) -> Result<Self, Self::Error> {
         Ok(NoteInclusionProof::new(
             value.block_num.into(),
             u16::try_from(value.note_index_in_block)
                 .map_err(|_| RpcConversionError::InvalidField("NoteIndexInBlock".into()))?,
             value
                 .inclusion_path
-                .ok_or_else(|| ProtoInclusionProof::missing_field("MerklePath"))?
+                .ok_or_else(|| proto::note::NoteInclusionInBlockProof::missing_field("MerklePath"))?
                 .try_into()?,
         )?)
     }
@@ -69,7 +75,7 @@ impl TryFrom<ProtoInclusionProof> for NoteInclusionProof {
 // SYNC NOTE
 // ================================================================================================
 
-/// Represents a `SyncNoteResponse` with fields converted into domain types.
+/// Represents a `roto::rpc_store::SyncNotesResponse` with fields converted into domain types.
 #[derive(Debug)]
 pub struct NoteSyncInfo {
     /// Number of the latest block in the chain.
@@ -87,10 +93,10 @@ pub struct NoteSyncInfo {
     pub notes: Vec<CommittedNote>,
 }
 
-impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
+impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
-    fn try_from(value: SyncNoteResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc_store::SyncNotesResponse) -> Result<Self, Self::Error> {
         let chain_tip = value.chain_tip;
 
         // Validate and convert block header
@@ -107,12 +113,10 @@ impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
         // Validate and convert account note inclusions into an (AccountId, Word) tuple
         let mut notes = vec![];
         for note in value.notes {
-            let note_id: Word = note
+            let note_id: NoteId = note
                 .note_id
                 .ok_or(RpcError::ExpectedDataMissing("Notes.Id".into()))?
                 .try_into()?;
-
-            let note_id: NoteId = note_id.into();
 
             let inclusion_path = note
                 .inclusion_path
@@ -126,7 +130,7 @@ impl TryFrom<SyncNoteResponse> for NoteSyncInfo {
 
             let committed_note = CommittedNote::new(
                 note_id,
-                u16::try_from(note.note_index).expect("note index out of range"),
+                u16::try_from(note.note_index_in_block).expect("note index out of range"),
                 inclusion_path,
                 metadata,
             );
@@ -225,26 +229,26 @@ impl FetchedNote {
     }
 }
 
-impl TryFrom<ProtoCommittedNote> for FetchedNote {
+impl TryFrom<proto::note::CommittedNote> for FetchedNote {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoCommittedNote) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::note::CommittedNote) -> Result<Self, Self::Error> {
         let inclusion_proof = value
             .inclusion_proof
-            .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof"))?;
+            .ok_or_else(|| proto::note::CommittedNote::missing_field("InclusionProof"))?;
 
-        let note_id: Word = inclusion_proof
+        let note_id: NoteId = inclusion_proof
             .note_id
-            .ok_or_else(|| ProtoCommittedNote::missing_field("InclusionProof.NoteId"))?
+            .ok_or_else(|| proto::note::CommittedNote::missing_field("InclusionProof.NoteId"))?
             .try_into()?;
 
         let inclusion_proof = NoteInclusionProof::try_from(inclusion_proof)?;
 
-        let note = value.note.ok_or_else(|| ProtoCommittedNote::missing_field("Note"))?;
+        let note = value.note.ok_or_else(|| proto::note::CommittedNote::missing_field("Note"))?;
 
         let metadata = note
             .metadata
-            .ok_or_else(|| ProtoCommittedNote::missing_field("Note.Metadata"))?
+            .ok_or_else(|| proto::note::CommittedNote::missing_field("Note.Metadata"))?
             .try_into()?;
 
         if let Some(detail_bytes) = note.details {
@@ -253,7 +257,7 @@ impl TryFrom<ProtoCommittedNote> for FetchedNote {
 
             Ok(FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_proof))
         } else {
-            Ok(FetchedNote::Private(NoteId::from(note_id), metadata, inclusion_proof))
+            Ok(FetchedNote::Private(note_id, metadata, inclusion_proof))
         }
     }
 }

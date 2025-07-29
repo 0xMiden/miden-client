@@ -25,17 +25,9 @@ use super::{
         note::FetchedNote,
         nullifier::NullifierUpdate,
     },
-    generated::requests::{
-        CheckNullifiersByPrefixRequest, CheckNullifiersRequest, GetAccountDetailsRequest,
-        GetAccountProofsRequest, GetAccountStateDeltaRequest, GetBlockByNumberRequest,
-        GetNotesByIdRequest, SubmitProvenTransactionRequest, SyncNoteRequest, SyncStateRequest,
-        get_account_proofs_request::{self},
-    },
+    generated as proto,
 };
-use crate::{
-    rpc::{errors::RpcConversionError, generated::requests::GetBlockHeaderByNumberRequest},
-    transaction::ForeignAccount,
-};
+use crate::{rpc::errors::RpcConversionError, transaction::ForeignAccount};
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -116,7 +108,7 @@ impl NodeRpcClient for TonicRpcClient {
         &self,
         proven_transaction: ProvenTransaction,
     ) -> Result<BlockNumber, RpcError> {
-        let request = SubmitProvenTransactionRequest {
+        let request = proto::transaction::ProvenTransaction {
             transaction: proven_transaction.to_bytes(),
         };
 
@@ -137,7 +129,7 @@ impl NodeRpcClient for TonicRpcClient {
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
     ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        let request = GetBlockHeaderByNumberRequest {
+        let request = proto::shared::BlockHeaderByNumberRequest {
             block_num: block_num.as_ref().map(BlockNumber::as_u32),
             include_mmr_proof: Some(include_mmr_proof),
         };
@@ -182,8 +174,8 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let request = GetNotesByIdRequest {
-            note_ids: note_ids.iter().map(|id| id.as_word().into()).collect(),
+        let request = proto::note::NoteIdList {
+            ids: note_ids.iter().map(|id| (*id).into()).collect(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
@@ -217,7 +209,7 @@ impl NodeRpcClient for TonicRpcClient {
 
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncStateRequest {
+        let request = proto::rpc_store::SyncStateRequest {
             block_num: block_num.as_u32(),
             account_ids,
             note_tags,
@@ -243,7 +235,7 @@ impl NodeRpcClient for TonicRpcClient {
     ///   account_commitment, details).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
+        let request = proto::account::AccountId { id: account_id.to_bytes() };
 
         let mut rpc_api = self.ensure_connected().await?;
 
@@ -254,12 +246,8 @@ impl NodeRpcClient for TonicRpcClient {
             )
         })?;
         let response = response.into_inner();
-        let account_info = response.details.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `account`".to_string(),
-        ))?;
-
-        let account_summary = account_info.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response's account should have a `summary`".to_string(),
+        let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
+            "GetAccountDetails response should have an `summary`".to_string(),
         ))?;
 
         let commitment =
@@ -274,11 +262,11 @@ impl NodeRpcClient for TonicRpcClient {
         if account_id.is_private() {
             Ok(FetchedAccount::Private(account_id, update_summary))
         } else {
-            let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have `details`".to_string(),
-            ))?;
-
-            let account = Account::read_from_bytes(&details_bytes)?;
+            let account = Account::read_from_bytes(&response.details.ok_or(
+                RpcError::ExpectedDataMissing(
+                    "GetAccountDetails response should have an `account`".to_string(),
+                ),
+            )?)?;
 
             Ok(FetchedAccount::Public(account, update_summary))
         }
@@ -301,11 +289,12 @@ impl NodeRpcClient for TonicRpcClient {
         known_account_codes: Vec<AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let requested_accounts = account_requests.len();
-        let mut rpc_account_requests: Vec<get_account_proofs_request::AccountRequest> =
-            Vec::with_capacity(account_requests.len());
+        let mut rpc_account_requests: Vec<
+            proto::rpc_store::account_proofs_request::AccountRequest,
+        > = Vec::with_capacity(account_requests.len());
 
         for foreign_account in account_requests {
-            rpc_account_requests.push(get_account_proofs_request::AccountRequest {
+            rpc_account_requests.push(proto::rpc_store::account_proofs_request::AccountRequest {
                 account_id: Some(foreign_account.account_id().into()),
                 storage_requests: foreign_account.storage_slot_requirements().into(),
             });
@@ -314,7 +303,7 @@ impl NodeRpcClient for TonicRpcClient {
         let known_account_codes: BTreeMap<Word, AccountCode> =
             known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
 
-        let request = GetAccountProofsRequest {
+        let request = proto::rpc_store::AccountProofsRequest {
             account_requests: rpc_account_requests,
             include_headers: Some(true),
             code_commitments: known_account_codes.keys().map(Into::into).collect(),
@@ -379,7 +368,8 @@ impl NodeRpcClient for TonicRpcClient {
     ) -> Result<NoteSyncInfo, RpcError> {
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncNoteRequest { block_num: block_num.as_u32(), note_tags };
+        let request =
+            proto::rpc_store::SyncNotesRequest { block_num: block_num.as_u32(), note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 
@@ -395,7 +385,7 @@ impl NodeRpcClient for TonicRpcClient {
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = CheckNullifiersByPrefixRequest {
+        let request = proto::rpc_store::CheckNullifiersByPrefixRequest {
             nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
             prefix_len: 16,
             block_num: block_num.as_u32(),
@@ -421,7 +411,7 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = CheckNullifiersRequest {
+        let request = proto::rpc_store::NullifierList {
             nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
         };
 
@@ -446,7 +436,7 @@ impl NodeRpcClient for TonicRpcClient {
         from_block: BlockNumber,
         to_block: BlockNumber,
     ) -> Result<AccountDelta, RpcError> {
-        let request = GetAccountStateDeltaRequest {
+        let request = proto::rpc_store::AccountStateDeltaRequest {
             account_id: Some(account_id.into()),
             from_block_num: from_block.as_u32(),
             to_block_num: to_block.as_u32(),
@@ -470,7 +460,7 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = GetBlockByNumberRequest { block_num: block_num.as_u32() };
+        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
 
         let mut rpc_api = self.ensure_connected().await?;
 

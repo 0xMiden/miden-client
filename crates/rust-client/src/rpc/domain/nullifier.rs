@@ -1,7 +1,6 @@
 use miden_objects::{Word, note::Nullifier};
 
-use super::MissingFieldHelper;
-use crate::rpc::{self, errors::RpcConversionError, generated::digest::Digest as ProtoWord};
+use crate::rpc::{domain::MissingFieldHelper, errors::RpcConversionError, generated as proto};
 
 // NULLIFIER UPDATE
 // ================================================================================================
@@ -18,23 +17,27 @@ pub struct NullifierUpdate {
 // CONVERSIONS
 // ================================================================================================
 
-impl TryFrom<ProtoWord> for Nullifier {
+impl TryFrom<proto::primitives::Digest> for Nullifier {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoWord) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
         Ok(word.into())
     }
 }
 
-impl TryFrom<&rpc::generated::responses::NullifierUpdate> for NullifierUpdate {
+impl TryFrom<&proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate>
+    for NullifierUpdate
+{
     type Error = RpcConversionError;
 
-    fn try_from(value: &rpc::generated::responses::NullifierUpdate) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: &proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             nullifier: value
                 .nullifier
-                .ok_or(rpc::generated::responses::NullifierUpdate::missing_field("nullifier"))?
+                .ok_or(proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate::missing_field("nullifier"))?
                 .try_into()?,
             block_num: value.block_num,
         })
