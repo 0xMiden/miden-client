@@ -82,9 +82,10 @@ impl WebClient {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
-
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
+        // For WASM builds, use direct construction since std feature is not available
+        // and the version mismatch error handling will be done at the RPC level
         self.inner = Some(Client::new(
             web_rpc_client,
             Box::new(rng),
@@ -100,6 +101,7 @@ impl WebClient {
             None,
             None,
         ));
+
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 
