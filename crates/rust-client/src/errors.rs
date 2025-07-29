@@ -1,4 +1,5 @@
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
@@ -70,6 +71,8 @@ pub enum ClientError {
     NoteRecordConversionError(#[from] NoteRecordError),
     #[error("no consumable note for account {0}")]
     NoConsumableNoteForAccount(AccountId),
+    #[error("on note received failure: {0}")]
+    OnNoteReceivedFailure(String, #[source] Option<Box<dyn core::error::Error + Send + Sync>>),
     #[error("rpc api error")]
     RpcError(#[from] RpcError),
     #[error("recency condition error: {0}")]
