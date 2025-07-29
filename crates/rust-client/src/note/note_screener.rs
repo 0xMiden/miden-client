@@ -190,15 +190,11 @@ impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
 where
     AUTH: TransactionAuthenticator,
 {
-    /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
-    /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
-    /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]
-    /// to check its relevance.
     async fn on_note_received(
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>
+    ) -> Result<Option<Box<dyn super::super::sync::NoteAction + Send + Sync>>, ClientError>
     where
         AUTH: TransactionAuthenticator,
     {
@@ -211,7 +207,7 @@ where
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
-            return Ok(NoteUpdateAction::Commit(committed_note));
+            return Ok(Some(Box::new(super::super::sync::CommitAction(committed_note)))));
         }
 
         match public_note {
@@ -220,7 +216,7 @@ where
                 if let Some(metadata) = public_note.metadata()
                     && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
                 {
-                    return Ok(NoteUpdateAction::Insert(public_note));
+                    return Ok(Some(Box::new(super::super::sync::InsertAction(public_note)))));
                 }
 
                 // The note is not being tracked by the client and is public so we can screen it
@@ -234,15 +230,15 @@ where
                     .await?;
                 let is_relevant = !new_note_relevance.is_empty();
                 if is_relevant {
-                    Ok(NoteUpdateAction::Insert(public_note))
+                    Ok(Some(Box::new(super::super::sync::InsertAction(public_note)))))
                 } else {
-                    Ok(NoteUpdateAction::Discard)
+                    Ok(None)
                 }
             },
             None => {
                 // The note is not being tracked by the client and is private so we can't determine
                 // if it is relevant
-                Ok(NoteUpdateAction::Discard)
+                Ok(None)
             },
         }
     }
