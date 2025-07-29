@@ -291,8 +291,8 @@ pub mod rpc_client {
     where
         T: tonic::client::GrpcService<tonic::body::Body>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+        T::ResponseBody: Body<Data = Bytes> + core::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + core::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -317,7 +317,7 @@ pub mod rpc_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            >>::Error: Into<StdError> + core::marker::Send + core::marker::Sync,
         {
             RpcClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -356,7 +356,7 @@ pub mod rpc_client {
         pub async fn status(
             &mut self,
             request: impl tonic::IntoRequest<()>,
-        ) -> std::result::Result<tonic::Response<super::StoreStatus>, tonic::Status> {
+        ) -> core::result::Result<tonic::Response<super::StoreStatus>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -375,7 +375,7 @@ pub mod rpc_client {
         pub async fn check_nullifiers(
             &mut self,
             request: impl tonic::IntoRequest<super::NullifierList>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::CheckNullifiersResponse>,
             tonic::Status,
         > {
@@ -402,7 +402,7 @@ pub mod rpc_client {
         pub async fn check_nullifiers_by_prefix(
             &mut self,
             request: impl tonic::IntoRequest<super::CheckNullifiersByPrefixRequest>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::CheckNullifiersByPrefixResponse>,
             tonic::Status,
         > {
@@ -427,7 +427,7 @@ pub mod rpc_client {
         pub async fn get_account_details(
             &mut self,
             request: impl tonic::IntoRequest<super::super::account::AccountId>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::super::account::AccountDetails>,
             tonic::Status,
         > {
@@ -452,7 +452,7 @@ pub mod rpc_client {
         pub async fn get_account_proofs(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountProofsRequest>,
-        ) -> std::result::Result<tonic::Response<super::AccountProofs>, tonic::Status> {
+        ) -> core::result::Result<tonic::Response<super::AccountProofs>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -475,7 +475,7 @@ pub mod rpc_client {
         pub async fn get_account_state_delta(
             &mut self,
             request: impl tonic::IntoRequest<super::AccountStateDeltaRequest>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::AccountStateDelta>,
             tonic::Status,
         > {
@@ -500,7 +500,7 @@ pub mod rpc_client {
         pub async fn get_block_by_number(
             &mut self,
             request: impl tonic::IntoRequest<super::super::blockchain::BlockNumber>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::super::blockchain::MaybeBlock>,
             tonic::Status,
         > {
@@ -528,7 +528,7 @@ pub mod rpc_client {
             request: impl tonic::IntoRequest<
                 super::super::shared::BlockHeaderByNumberRequest,
             >,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::super::shared::BlockHeaderByNumberResponse>,
             tonic::Status,
         > {
@@ -553,7 +553,7 @@ pub mod rpc_client {
         pub async fn get_notes_by_id(
             &mut self,
             request: impl tonic::IntoRequest<super::super::note::NoteIdList>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::super::note::CommittedNoteList>,
             tonic::Status,
         > {
@@ -586,7 +586,7 @@ pub mod rpc_client {
         pub async fn sync_notes(
             &mut self,
             request: impl tonic::IntoRequest<super::SyncNotesRequest>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::SyncNotesResponse>,
             tonic::Status,
         > {
@@ -622,7 +622,7 @@ pub mod rpc_client {
         pub async fn sync_state(
             &mut self,
             request: impl tonic::IntoRequest<super::SyncStateRequest>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::SyncStateResponse>,
             tonic::Status,
         > {

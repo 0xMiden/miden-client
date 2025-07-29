@@ -236,7 +236,7 @@ where
             }
         };
 
-        Ok(Client::new(
+        Client::new(
             rpc_api,
             rng,
             arc_store,
@@ -250,6 +250,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
-        ))
+        )
+        .await
     }
 }

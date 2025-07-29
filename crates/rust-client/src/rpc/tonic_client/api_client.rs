@@ -24,7 +24,7 @@ pub(crate) mod api_client_wrapper {
     use miden_objects::Word;
     use tonic::service::interceptor::InterceptedService;
 
-    use super::{MetadataInterceptor, header_interceptor};
+    use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
 
     pub type WasmClient = tonic_web_wasm_client::Client;
@@ -43,7 +43,7 @@ pub(crate) mod api_client_wrapper {
             genesis_commitment: Option<Word>,
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
-            let interceptor = header_interceptor(genesis_commitment);
+            let interceptor = accept_header_interceptor(genesis_commitment);
             Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
         }
     }
@@ -60,7 +60,7 @@ pub(crate) mod api_client_wrapper {
     use miden_objects::Word;
     use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
-    use super::{MetadataInterceptor, header_interceptor};
+    use super::{MetadataInterceptor, accept_header_interceptor};
     use crate::rpc::{RpcError, generated::rpc::api_client::ApiClient as ProtoClient};
 
     pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
@@ -88,7 +88,7 @@ pub(crate) mod api_client_wrapper {
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
 
             // Set up the accept metadata interceptor.
-            let interceptor = header_interceptor(genesis_commitment);
+            let interceptor = accept_header_interceptor(genesis_commitment);
 
             // Return the connected client.
             Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
@@ -143,7 +143,7 @@ impl Interceptor for MetadataInterceptor {
 /// Returns the HTTP header [`MetadataInterceptor`] that is expected by Miden RPC.
 /// The interceptor sets the `accept` header to the Miden API version and optionally includes the
 /// genesis commitment.
-fn header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
+fn accept_header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
     let version = env!("CARGO_PKG_VERSION");
     let mut accept_value = format!("application/vnd.miden; version={version}");
     if let Some(commitment) = genesis_digest {

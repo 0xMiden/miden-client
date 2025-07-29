@@ -782,7 +782,9 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
             .expect("Default executor's options should always be valid"),
             None,
             None,
-        ),
+        )
+        .await
+        .unwrap(),
         keystore,
     )
 }

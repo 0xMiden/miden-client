@@ -27,9 +27,6 @@ impl<AUTH> Client<AUTH> {
             None => self.retrieve_and_store_genesis().await?,
         };
 
-        // Set the genesis commitment in the RPC API client for future requests.
-        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
-
         Ok(genesis)
     }
 

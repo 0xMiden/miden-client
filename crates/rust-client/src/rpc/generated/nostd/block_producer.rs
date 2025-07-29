@@ -103,8 +103,8 @@ pub mod api_client {
     where
         T: tonic::client::GrpcService<tonic::body::Body>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+        T::ResponseBody: Body<Data = Bytes> + core::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + core::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -129,7 +129,7 @@ pub mod api_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+            >>::Error: Into<StdError> + core::marker::Send + core::marker::Sync,
         {
             ApiClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -168,7 +168,7 @@ pub mod api_client {
         pub async fn status(
             &mut self,
             request: impl tonic::IntoRequest<()>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::BlockProducerStatus>,
             tonic::Status,
         > {
@@ -194,7 +194,7 @@ pub mod api_client {
             request: impl tonic::IntoRequest<
                 super::super::transaction::ProvenTransaction,
             >,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<super::SubmitProvenTransactionResponse>,
             tonic::Status,
         > {
@@ -230,7 +230,7 @@ pub mod api_client {
         pub async fn mempool_subscription(
             &mut self,
             request: impl tonic::IntoRequest<super::MempoolSubscriptionRequest>,
-        ) -> std::result::Result<
+        ) -> core::result::Result<
             tonic::Response<tonic::codec::Streaming<super::MempoolEvent>>,
             tonic::Status,
         > {
