@@ -33,35 +33,44 @@ use crate::{
 // SYNC CALLBACKS
 // ================================================================================================
 
-/// The action to be taken when a note update is received as part of the sync response.
-#[allow(clippy::large_enum_variant)]
-pub enum NoteUpdateAction {
-    /// The note commit update is relevant and the specified note should be marked as committed in
-    /// the store, storing its inclusion proof.
-    Commit(CommittedNote),
-    /// The public note is relevant and should be inserted into the store.
-    Insert(InputNoteRecord),
-    /// The note update is not relevant and should be discarded.
-    Discard,
+pub trait NoteAction {
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError>;
+}
+
+pub struct CommitAction(pub CommittedNote);
+
+impl NoteAction for CommitAction {
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+        note_updates.apply_committed_note_state_transitions(&self.0, block_header)?;
+        Ok(true)
+    }
+}
+
+pub struct InsertAction(pub InputNoteRecord);
+
+impl NoteAction for InsertAction {
+    fn apply(self: Box<Self>, note_updates: &mut NoteUpdateTracker, block_header: &BlockHeader) -> Result<bool, ClientError> {
+        let this = *self;
+        note_updates.apply_new_public_note(this.0, block_header)?;
+        Ok(true)
+    }
+}
+
+pub struct DiscardAction;
+
+impl NoteAction for DiscardAction {
+    fn apply(self: Box<Self>, _note_updates: &mut NoteUpdateTracker, _block_header: &BlockHeader) -> Result<bool, ClientError> {
+        Ok(false)
+    }
 }
 
 #[async_trait(?Send)]
 pub trait OnNoteReceived {
-    /// Callback that gets executed when a new note is received as part of the sync response.
-    ///
-    /// It receives:
-    ///
-    /// - The committed note received from the network.
-    /// - An optional note record that corresponds to the state of the note in the network (only if
-    ///   the note is public).
-    ///
-    /// It returns an enum indicating the action to be taken for the received note update. Whether
-    /// the note updated should be committed, new public note inserted, or ignored.
     async fn on_note_received(
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>;
+    ) -> Result<Box<dyn NoteAction + Send + Sync>, ClientError>;
 }
 
 // STATE SYNC
@@ -340,25 +349,14 @@ impl StateSync {
 
         let mut found_relevant_note = false;
 
-        // Process note inclusions
         let new_public_notes = self.fetch_public_note_details(&public_note_ids).await?;
+
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            match self.note_screener.on_note_received(committed_note, public_note).await? {
-                NoteUpdateAction::Commit(committed_note) => {
-                    found_relevant_note = true;
-
-                    note_updates
-                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
-                },
-                NoteUpdateAction::Insert(public_note) => {
-                    found_relevant_note = true;
-
-                    note_updates.apply_new_public_note(public_note, block_header)?;
-                },
-                NoteUpdateAction::Discard => {},
-            }
+            let action = self.note_screener.on_note_received(committed_note, public_note).await?;
+            let is_relevant = action.apply(note_updates, block_header)?;
+            found_relevant_note |= is_relevant;
         }
 
         Ok(found_relevant_note)
