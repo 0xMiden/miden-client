@@ -89,7 +89,7 @@
 //!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
-//!     Arc::new(keystore),
+//!     Some(Arc::new(keystore)), // or None if no authenticator is needed
 //!     ExecutionOptions::new(
 //!         Some(MAX_TX_EXECUTION_CYCLES),
 //!         MIN_TX_EXECUTION_CYCLES,
@@ -99,7 +99,9 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
-//! );
+//! )
+//! .await
+//! .unwrap();
 //!
 //! # Ok(())
 //! # }
@@ -277,12 +279,11 @@ where
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Arc<AUTH>,
+        authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Result<Self, ClientError> {
-        let authenticator = Some(authenticator);
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
