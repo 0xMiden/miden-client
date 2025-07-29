@@ -26,6 +26,7 @@ mod fpi_tests;
 mod network_transaction_tests;
 mod onchain_tests;
 mod swap_transactions_tests;
+mod multisig;
 
 #[tokio::test]
 async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientError> {

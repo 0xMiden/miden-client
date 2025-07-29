@@ -126,6 +126,7 @@ pub mod rpc;
 pub mod store;
 pub mod sync;
 pub mod transaction;
+pub mod multisig;
 
 #[cfg(feature = "std")]
 pub mod builder;
