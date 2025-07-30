@@ -83,15 +83,11 @@ typedoc: ## Generate web client package documentation.
 
 .PHONY: test
 test: ## Run tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
-
-.PHONY: test-deps
-test-deps: ## Install dependencies for tests
-	$(CODEGEN) cargo install cargo-nextest
+	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-docs
 test-docs: ## Run documentation tests
-	$(CODEGEN) cargo test --doc $(FEATURES_CLIENT)
+	cargo test --doc $(FEATURES_CLIENT)
 
 # --- Integration testing -------------------------------------------------------------------------
 
@@ -110,19 +106,19 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
-	$(CODEGEN) cd ./crates/web-client && npm run test:clean
+	cd ./crates/web-client && npm run test:clean
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
-	$(CODEGEN) cd ./crates/web-client && npm run test:remote_prover
+	cd ./crates/web-client && npm run test:remote_prover
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	$(CODEGEN) cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: start-prover
