@@ -92,6 +92,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("account with id {0} not found on the network")]
+    AccountNotFoundOnNetwork(AccountId),
 }
 
 // CONVERSIONS
