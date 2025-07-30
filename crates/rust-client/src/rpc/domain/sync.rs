@@ -10,7 +10,7 @@ use miden_objects::{
 };
 
 use super::{note::CommittedNote, transaction::TransactionInclusion};
-use crate::rpc::{RpcError, generated as proto};
+use crate::rpc::{RpcError, domain::MissingFieldHelper, generated as proto};
 
 // STATE SYNC INFO
 // ================================================================================================
@@ -45,13 +45,13 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
         // Validate and convert block header
         let block_header: BlockHeader = value
             .block_header
-            .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
+            .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(block_header)))?
             .try_into()?;
 
         // Validate and convert MMR Delta
         let mmr_delta = value
             .mmr_delta
-            .ok_or(RpcError::ExpectedDataMissing("MmrDelta".into()))?
+            .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(mmr_delta)))?
             .try_into()?;
 
         // Validate and convert account commitment updates into an (AccountId, Word) tuple
@@ -59,13 +59,15 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
         for update in value.accounts {
             let account_id = update
                 .account_id
-                .ok_or(RpcError::ExpectedDataMissing("AccountCommitmentUpdate.AccountId".into()))?
+                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    accounts.account_id
+                )))?
                 .try_into()?;
             let account_commitment = update
                 .account_commitment
-                .ok_or(RpcError::ExpectedDataMissing(
-                    "AccountCommitmentUpdate.AccountCommitment".into(),
-                ))?
+                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    accounts.account_commitment
+                )))?
                 .try_into()?;
             account_commitment_updates.push((account_id, account_commitment));
         }
@@ -75,17 +77,23 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
         for note in value.notes {
             let note_id: NoteId = note
                 .note_id
-                .ok_or(RpcError::ExpectedDataMissing("Notes.Id".into()))?
+                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    notes.note_id
+                )))?
                 .try_into()?;
 
             let inclusion_path = note
                 .inclusion_path
-                .ok_or(RpcError::ExpectedDataMissing("Notes.MerklePath".into()))?
+                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    notes.inclusion_path
+                )))?
                 .try_into()?;
 
             let metadata = note
                 .metadata
-                .ok_or(RpcError::ExpectedDataMissing("Metadata".into()))?
+                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    notes.metadata
+                )))?
                 .try_into()?;
 
             let committed_note = super::note::CommittedNote::new(
@@ -103,14 +111,18 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
             .iter()
             .map(|transaction_summary| {
                 let transaction_id = transaction_summary.transaction_id.ok_or(
-                    RpcError::ExpectedDataMissing("TransactionSummary.TransactionId".into()),
+                    proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                        transactions.transaction_id
+                    )),
                 )?;
                 let transaction_id = TransactionId::try_from(transaction_id)?;
 
                 let transaction_block_num = transaction_summary.block_num;
 
                 let transaction_account_id = transaction_summary.account_id.clone().ok_or(
-                    RpcError::ExpectedDataMissing("TransactionSummary.TransactionId".into()),
+                    proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                        transactions.account_id
+                    )),
                 )?;
                 let transaction_account_id = AccountId::try_from(transaction_account_id)?;
 

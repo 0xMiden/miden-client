@@ -25,12 +25,12 @@ impl TryFrom<&proto::primitives::SmtLeafEntry> for (Word, Word) {
     fn try_from(value: &proto::primitives::SmtLeafEntry) -> Result<Self, Self::Error> {
         let key = match value.key {
             Some(key) => key.try_into()?,
-            None => return Err(proto::primitives::SmtLeafEntry::missing_field("key")),
+            None => return Err(proto::primitives::SmtLeafEntry::missing_field(stringify!(key))),
         };
 
         let value: Word = match value.value {
             Some(value) => value.try_into()?,
-            None => return Err(proto::primitives::SmtLeafEntry::missing_field("value")),
+            None => return Err(proto::primitives::SmtLeafEntry::missing_field(stringify!(value))),
         };
 
         Ok((key, value))
@@ -83,7 +83,7 @@ impl TryFrom<&proto::primitives::SmtLeaf> for SmtLeaf {
                     entries.entries.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
                 Ok(SmtLeaf::Multiple(entries))
             },
-            None => Err(proto::primitives::SmtLeaf::missing_field("leaf")),
+            None => Err(proto::primitives::SmtLeaf::missing_field(stringify!(leaf))),
         }
     }
 }
@@ -112,12 +112,12 @@ impl TryFrom<&proto::primitives::SmtOpening> for SmtProof {
     fn try_from(value: &proto::primitives::SmtOpening) -> Result<Self, Self::Error> {
         let leaf = match &value.leaf {
             Some(leaf) => leaf.try_into()?,
-            None => return Err(proto::primitives::SmtOpening::missing_field("leaf")),
+            None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(leaf))),
         };
 
         let path = match &value.path {
             Some(path) => path.try_into()?,
-            None => return Err(proto::primitives::SmtOpening::missing_field("path")),
+            None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(path))),
         };
 
         SmtProof::new(path, leaf).map_err(|err| RpcConversionError::InvalidField(err.to_string()))

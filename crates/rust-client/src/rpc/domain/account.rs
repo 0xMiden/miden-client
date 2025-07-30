@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::{
@@ -12,6 +12,7 @@ use thiserror::Error;
 
 use crate::rpc::{
     RpcError,
+    domain::MissingFieldHelper,
     errors::RpcConversionError,
     generated::{self as proto},
 };
@@ -122,11 +123,9 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 impl proto::account::AccountHeader {
     #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
-        use alloc::string::String;
-
         use miden_objects::Felt;
 
-        use crate::rpc::RpcError;
+        use crate::rpc::domain::MissingFieldHelper;
 
         let proto::account::AccountHeader {
             nonce,
@@ -135,13 +134,13 @@ impl proto::account::AccountHeader {
             code_commitment,
         } = self;
         let vault_root = vault_root
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountHeader.VaultRoot")))?
+            .ok_or(proto::account::AccountHeader::missing_field(stringify!(vault_root)))?
             .try_into()?;
         let storage_commitment = storage_commitment
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountHeader.StorageCommitment")))?
+            .ok_or(proto::account::AccountHeader::missing_field(stringify!(storage_commitment)))?
             .try_into()?;
         let code_commitment = code_commitment
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountHeader.CodeCommitment")))?
+            .ok_or(proto::account::AccountHeader::missing_field(stringify!(code_commitment)))?
             .try_into()?;
 
         Ok(AccountHeader::new(
@@ -174,7 +173,7 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
         known_account_codes: &BTreeMap<Word, AccountCode>,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
         use crate::rpc::{
-            RpcError,
+            RpcError, domain::MissingFieldHelper,
             generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof,
         };
 
@@ -185,7 +184,11 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             storage_maps,
         } = self;
         let account_header = header
-            .ok_or(RpcError::ExpectedDataMissing("Account.StateHeader".into()))?
+            .ok_or(
+                proto::rpc_store::account_proofs::account_proof::AccountStateHeader::missing_field(
+                    stringify!(header),
+                ),
+            )?
             .into_domain(account_id)?;
 
         let storage_header = AccountStorageHeader::read_from_bytes(&storage_header)?;
@@ -337,15 +340,15 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
     fn try_from(account_witness: proto::account::AccountWitness) -> Result<Self, Self::Error> {
         let state_commitment = account_witness
             .commitment
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountWitness.StateCommitment")))?
+            .ok_or(proto::account::AccountWitness::missing_field(stringify!(state_commitment)))?
             .try_into()?;
         let merkle_path = account_witness
             .path
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountWitness.MerklePath")))?
+            .ok_or(proto::account::AccountWitness::missing_field(stringify!(merkle_path)))?
             .try_into()?;
         let account_id = account_witness
             .witness_id
-            .ok_or(RpcError::ExpectedDataMissing(String::from("AccountWitness.WitnessId")))?
+            .ok_or(proto::account::AccountWitness::missing_field(stringify!(witness_id)))?
             .try_into()?;
 
         let witness = AccountWitness::new(account_id, state_commitment, merkle_path).unwrap();

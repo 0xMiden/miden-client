@@ -16,11 +16,9 @@
 
 ### Features
 
-* Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
-* Added `TokenSymbol` Type to Web Client (#1046).
-* [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
 * Added ability to convert `Word` to `U64` array and `Felt` array in Web Client (([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
 * Added `TokenSymbol` type to Web Client ([#1046](https://github.com/0xMiden/miden-client/pull/1046)).
+* [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
 
 ## 0.10.1 (2025-07-26)
 

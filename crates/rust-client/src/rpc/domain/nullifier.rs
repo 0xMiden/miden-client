@@ -37,7 +37,7 @@ impl TryFrom<&proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUp
         Ok(Self {
             nullifier: value
                 .nullifier
-                .ok_or(proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate::missing_field("nullifier"))?
+                .ok_or(proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate::missing_field(stringify!(nullifier)))?
                 .try_into()?,
             block_num: value.block_num,
         })
