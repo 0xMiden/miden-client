@@ -121,7 +121,10 @@ const methodHandlers = {
   [MethodName.SYNC_STATE]: async (args) => {
     let [serializedMockChain] = args;
 
+    console.log("Syncing state in worker...");
+
     if (wasmWebClient.usesMockChain()) {
+      console.log("Updating mock chain in worker...");
       serializedMockChain = new Uint8Array(serializedMockChain);
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
@@ -140,10 +143,19 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, seed] = args;
+      const [rpcUrl, seed, initMockChain] = args;
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, seed);
+      if (rpcUrl) {
+        console.log(`WORKER: Initializing WebClient with RPC URL: ${rpcUrl}`);
+        await wasmWebClient.createClient(rpcUrl, seed);
+      } else {
+        console.log(
+          `WORKER: Initializing mocked WebClient with mock chain: ${initMockChain}`
+        );
+        await wasmWebClient.createMockedClient(seed, initMockChain);
+      }
+
       wasmSeed = seed;
       ready = true;
       // Signal that the worker is fully initialized.
