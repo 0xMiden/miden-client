@@ -1,10 +1,12 @@
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::{
     input_note_state::InputNoteState, note_details::NoteDetails, note_id::NoteId,
     note_inclusion_proof::NoteInclusionProof, note_metadata::NoteMetadata,
 };
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -55,6 +57,14 @@ impl InputNoteRecord {
     #[wasm_bindgen(js_name = "isProcessing")]
     pub fn is_processing(&self) -> bool {
         self.0.is_processing()
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<InputNoteRecord, JsValue> {
+        deserialize_from_uint8array::<NativeInputNoteRecord>(bytes).map(InputNoteRecord)
     }
 }
 
