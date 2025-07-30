@@ -27,7 +27,7 @@
 //! };
 //! use miden_objects::account::AccountId;
 //!
-//! # async fn example<AUTH: TransactionAuthenticator>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example<AUTH: TransactionAuthenticator + Sync>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
 //! let input_notes = client.get_input_notes(NoteFilter::Committed).await?;
 //! println!("Found {} committed input notes.", input_notes.len());
