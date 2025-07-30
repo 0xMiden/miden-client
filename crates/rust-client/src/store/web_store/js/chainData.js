@@ -43,7 +43,7 @@ export async function insertBlockHeader(
   }
 }
 
-export async function insertPartialBlockchainNodes(ids, nodes) {
+export async function insertPartialBlockchainNodes(ids, nodes, blockNum) {
   try {
     // Check if the arrays are not of the same length
     if (ids.length !== nodes.length) {
@@ -57,7 +57,8 @@ export async function insertPartialBlockchainNodes(ids, nodes) {
     // Create array of objects with id and node
     const data = nodes.map((node, index) => ({
       id: ids[index],
-      node: node,
+      node,
+      blockNum,
     }));
 
     // Use bulkPut to add/overwrite the entries
@@ -173,10 +174,14 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
   }
 }
 
-export async function getPartialBlockchainNodesAll() {
+export async function getPartialBlockchainNodesBeforeBlock(blockNumExclusive) {
   try {
-    const partialBlockchainNodesAll = await partialBlockchainNodes.toArray();
-    return partialBlockchainNodesAll;
+    const rows = await partialBlockchainNodes
+      .where("blockNum")
+      .below(blockNumExclusive)
+      .toArray();
+
+    return rows;
   } catch (err) {
     console.error("Failed to get partial blockchain nodes: ", err.toString());
     throw err;

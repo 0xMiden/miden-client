@@ -147,7 +147,7 @@ impl WebStore {
         let mut serialized_node_ids = Vec::with_capacity(auth_nodes_len);
         let mut serialized_nodes = Vec::with_capacity(auth_nodes_len);
         for (id, node) in block_updates.new_authentication_nodes() {
-            let SerializedPartialBlockchainNodeData { id, node } =
+            let SerializedPartialBlockchainNodeData { id, node, .. } =
                 serialize_partial_blockchain_node(*id, *node)?;
             serialized_node_ids.push(id);
             serialized_nodes.push(node);

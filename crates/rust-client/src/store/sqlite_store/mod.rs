@@ -224,10 +224,11 @@ impl Store for SqliteStore {
     async fn insert_partial_blockchain_nodes(
         &self,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError> {
         let nodes = nodes.to_vec();
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_partial_blockchain_nodes(conn, &nodes)
+            SqliteStore::insert_partial_blockchain_nodes(conn, &nodes, block_num)
         })
         .await
     }

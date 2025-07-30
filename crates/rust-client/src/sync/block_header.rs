@@ -53,21 +53,14 @@ impl<AUTH> Client<AUTH> {
     pub(crate) async fn build_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         let current_block_num = self.store.get_sync_height().await?;
 
-        let tracked_nodes =
-            self.store.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
+        let tracked_nodes = self
+            .store
+            .get_partial_blockchain_nodes(PartialBlockchainFilter::ByBlock(current_block_num))
+            .await?;
         let current_peaks =
             self.store.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
 
-        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
-        // we can get an MMR based on those peaks, add the current block number and align it with
-        // the set of all nodes in the store.
-        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
-        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
-        // before calling `from_parts`
-        //
-        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
-        // for tracked blocks in the MMR. This would however block us from the convenience of
-        // just getting all nodes from the store.
+        let mut current_partial_mmr = PartialMmr::from_parts(current_peaks, tracked_nodes, true);
 
         let (current_block, has_client_notes) = self
             .store
@@ -75,12 +68,7 @@ impl<AUTH> Client<AUTH> {
             .await?
             .expect("Current block should be in the store");
 
-        let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
-        let has_client_notes = has_client_notes.into();
-        current_partial_mmr.add(current_block.commitment(), has_client_notes);
-
-        let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+        current_partial_mmr.add(current_block.commitment(), bool::from(has_client_notes));
 
         Ok(current_partial_mmr)
     }
@@ -113,7 +101,9 @@ impl<AUTH> Client<AUTH> {
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
+        self.store
+            .insert_partial_blockchain_nodes(&path_nodes, block_header.block_num())
+            .await?;
 
         Ok(block_header)
     }

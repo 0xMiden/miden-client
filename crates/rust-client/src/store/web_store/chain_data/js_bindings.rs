@@ -1,5 +1,6 @@
 use alloc::{string::String, vec::Vec};
 
+use miden_objects::block::BlockNumber;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
@@ -15,8 +16,8 @@ extern "C" {
     #[wasm_bindgen(js_name = getTrackedBlockHeaders)]
     pub fn idxdb_get_tracked_block_headers() -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getPartialBlockchainNodesAll)]
-    pub fn idxdb_get_partial_blockchain_nodes_all() -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getPartialBlockchainNodesBeforeBlock)]
+    pub fn idxdb_get_partial_blockchain_nodes_before_block(block_num: u32) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getPartialBlockchainNodes)]
     pub fn idxdb_get_partial_blockchain_nodes(ids: Vec<String>) -> js_sys::Promise;
@@ -39,6 +40,7 @@ extern "C" {
     pub fn idxdb_insert_partial_blockchain_nodes(
         ids: Vec<String>,
         nodes: Vec<String>,
+        block_num: String,
     ) -> js_sys::Promise;
 
     // DELETES

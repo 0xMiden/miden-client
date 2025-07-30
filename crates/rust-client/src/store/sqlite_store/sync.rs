@@ -129,7 +129,11 @@ impl SqliteStore {
         }
 
         // Insert new authentication nodes (inner nodes of the PartialBlockchain)
-        Self::insert_partial_blockchain_nodes_tx(&tx, block_updates.new_authentication_nodes())?;
+        Self::insert_partial_blockchain_nodes_tx(
+            &tx,
+            block_updates.new_authentication_nodes(),
+            block_num,
+        )?;
 
         // Update notes
         apply_note_updates_tx(&tx, &note_updates)?;

@@ -5,7 +5,11 @@ use alloc::{
 };
 use core::num::NonZeroUsize;
 
-use miden_objects::{Word, block::BlockHeader, crypto::merkle::InOrderIndex};
+use miden_objects::{
+    Word,
+    block::{BlockHeader, BlockNumber},
+    crypto::merkle::InOrderIndex,
+};
 use miden_tx::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;

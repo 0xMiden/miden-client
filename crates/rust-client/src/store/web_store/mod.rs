@@ -157,8 +157,9 @@ impl Store for WebStore {
     async fn insert_partial_blockchain_nodes(
         &self,
         nodes: &[(InOrderIndex, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), StoreError> {
-        self.insert_partial_blockchain_nodes(nodes).await
+        self.insert_partial_blockchain_nodes(nodes, block_num).await
     }
 
     async fn get_partial_blockchain_peaks_by_block_num(
