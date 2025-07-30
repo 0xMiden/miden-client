@@ -56,7 +56,7 @@ chrono                = { optional = false, version = "0.4" }
 deadpool              = { default-features = false, features = ["managed", "rt_tokio_1"], optional = true, version = "0.12" }
 deadpool-sync         = { optional = true, version = "0.1" }
 getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
-hex                   = { version = "0.4" }
+hex                   = { workspace = true }
 prost                 = { default-features = false, features = ["derive"], version = "0.13" }
 rand                  = { workspace = true }
 rusqlite              = { features = ["array", "bundled", "vtab"], optional = true, version = "0.36" }

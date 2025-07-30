@@ -100,6 +100,7 @@ before(async () => {
         PublicKey,
         Rpo256,
         SecretKey,
+        Signature,
         SlotAndKeys,
         SlotAndKeysArray,
         StorageMap,
@@ -166,6 +167,7 @@ before(async () => {
       window.PublicKey = PublicKey;
       window.Rpo256 = Rpo256;
       window.SecretKey = SecretKey;
+      window.Signature = Signature;
       window.SlotAndKeys = SlotAndKeys;
       window.SlotAndKeysArray = SlotAndKeysArray;
       window.StorageMap = StorageMap;

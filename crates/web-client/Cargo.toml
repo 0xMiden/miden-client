@@ -33,6 +33,7 @@ miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
 
 # External dependencies
+hex                  = { workspace = true }
 rand                 = { workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
