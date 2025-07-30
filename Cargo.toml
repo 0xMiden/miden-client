@@ -30,7 +30,9 @@ miden-node-rpc = { branch = "bernhard-async-experimental", git = "https://github
 miden-node-store = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-objects = { branch = "pgackst-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-remote-prover = { branch = "bernhard-async-experimental", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover = { branch = "bernhard-async-experimental", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "bernhard-async-experimental", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
