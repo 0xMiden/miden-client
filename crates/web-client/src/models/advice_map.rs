@@ -1,3 +1,5 @@
+use alloc::sync::Arc;
+
 use miden_objects::{Felt as NativeFelt, Word as NativeWord, vm::AdviceMap as NativeAdviceMap};
 use wasm_bindgen::prelude::*;
 
@@ -12,14 +14,16 @@ pub struct AdviceMap(NativeAdviceMap);
 impl AdviceMap {
     #[wasm_bindgen(constructor)]
     pub fn new() -> AdviceMap {
-        AdviceMap(NativeAdviceMap::new())
+        AdviceMap(NativeAdviceMap::default())
     }
 
     pub fn insert(&mut self, key: &Word, value: &FeltArray) -> Option<Vec<Felt>> {
-        let native_word: NativeWord = key.into();
+        let native_key: NativeWord = key.into();
         let native_felts: Vec<NativeFelt> = value.into();
-        let insert_result: Option<Vec<NativeFelt>> = self.0.insert(native_word, native_felts);
-        insert_result.map(|native_felts_vec| native_felts_vec.into_iter().map(Into::into).collect())
+        let arc_felts: Arc<[NativeFelt]> = native_felts.into();
+        self.0
+            .insert(native_key, arc_felts)
+            .map(|arc| arc.iter().cloned().map(Into::into).collect())
     }
 }
 

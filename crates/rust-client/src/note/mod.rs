@@ -96,7 +96,7 @@ pub use note_update_tracker::{
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     // INPUT NOTE DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
@@ -205,7 +205,7 @@ pub async fn get_input_note_with_id_prefix<AUTH>(
     note_id_prefix: &str,
 ) -> Result<InputNoteRecord, IdPrefixFetchError>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     let mut input_note_records = client
         .get_input_notes(NoteFilter::All)

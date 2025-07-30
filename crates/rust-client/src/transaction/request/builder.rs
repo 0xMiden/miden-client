@@ -199,8 +199,12 @@ impl TransactionRequestBuilder {
 
     /// Extends the advice map with the specified `([Word], Vec<[Felt]>)` pairs.
     #[must_use]
-    pub fn extend_advice_map<T: IntoIterator<Item = (Word, Vec<Felt>)>>(mut self, iter: T) -> Self {
-        self.advice_map.extend(iter);
+    pub fn extend_advice_map<I, V>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = (Word, V)>,
+        V: AsRef<[Felt]>,
+    {
+        self.advice_map.extend(iter.into_iter().map(|(w, v)| (w, v.as_ref().to_vec())));
         self
     }
 

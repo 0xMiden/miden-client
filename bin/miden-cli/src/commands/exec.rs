@@ -47,7 +47,7 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -80,8 +80,7 @@ impl ExecCmd {
             None => vec![],
         };
 
-        let mut advice_inputs = AdviceInputs::default();
-        advice_inputs.extend_map(inputs);
+        let advice_inputs = AdviceInputs::default().with_map(inputs);
 
         let tx_script = client.script_builder().compile_tx_script(&program)?;
 

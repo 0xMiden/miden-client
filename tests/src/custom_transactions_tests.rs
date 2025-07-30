@@ -167,7 +167,7 @@ async fn merkle_store() {
     let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
 
     let note_args_map = vec![(note, Some(note_args_commitment))];
-    let mut advice_map = AdviceMap::new();
+    let mut advice_map = AdviceMap::default();
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
     // Build merkle store and advice stack with merkle root
@@ -180,18 +180,18 @@ async fn merkle_store() {
 
     let mut code = format!(
         "
-                            use.std::collections::mmr
-                            use.miden::contracts::auth::basic->auth_tx
-                            use.miden::kernels::tx::prologue
-                            use.miden::kernels::tx::memory
+         use.std::collections::mmr
+         use.miden::contracts::auth::basic->auth_tx
+         use.miden::kernels::tx::prologue
+         use.miden::kernels::tx::memory
 
-                            begin
-                                # leaf count -> mem[4000][0]
-                                push.{num_leaves} push.4000 mem_store
+         begin
+             # leaf count -> mem[4000][0]
+             push.{num_leaves} push.4000 mem_store
 
-                                # merkle root -> mem[4004]
-                                push.{} push.4004 mem_storew dropw
-                        ",
+             # merkle root -> mem[4004]
+             push.{} push.4004 mem_storew dropw
+        ",
         merkle_root.to_hex()
     );
 

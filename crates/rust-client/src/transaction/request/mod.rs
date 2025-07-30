@@ -12,7 +12,7 @@ use miden_lib::{
     transaction::TransactionKernel,
 };
 use miden_objects::{
-    AccountError, Felt, NoteError, TransactionInputError, TransactionScriptError, Word,
+    AccountError, NoteError, TransactionInputError, TransactionScriptError, Word,
     account::AccountId,
     crypto::merkle::{MerkleError, MerkleStore},
     note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote},
@@ -332,7 +332,7 @@ impl Serializable for TransactionRequest {
         }
         self.expected_output_recipients.write_into(target);
         self.expected_future_notes.write_into(target);
-        self.advice_map.clone().into_iter().collect::<Vec<_>>().write_into(target);
+        self.advice_map.write_into(target);
         self.merkle_store.write_into(target);
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
@@ -366,9 +366,7 @@ impl Deserializable for TransactionRequest {
         let expected_output_recipients = BTreeMap::<Word, NoteRecipient>::read_from(source)?;
         let expected_future_notes = BTreeMap::<NoteId, (NoteDetails, NoteTag)>::read_from(source)?;
 
-        let mut advice_map = AdviceMap::new();
-        let advice_vec = Vec::<(Word, Vec<Felt>)>::read_from(source)?;
-        advice_map.extend(advice_vec);
+        let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;

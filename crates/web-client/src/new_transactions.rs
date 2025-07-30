@@ -25,8 +25,6 @@ impl WebClient {
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionResult, JsValue> {
-        self.fetch_and_cache_account_auth_by_account_id(account_id).await?;
-
         if let Some(client) = self.get_mut_inner() {
             let native_transaction_execution_result: NativeTransactionResult = client
                 .new_transaction(account_id.into(), transaction_request.into())
