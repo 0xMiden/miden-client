@@ -1,11 +1,10 @@
 //! Contains structures and functions related to FPI (Foreign Procedure Invocation) transactions.
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
 use core::cmp::Ordering;
 
 use miden_objects::{
-    account::{AccountId, PartialAccount, PartialStorage, PartialStorageMap},
+    account::{AccountId, PartialAccount, PartialStorage},
     asset::PartialVault,
-    crypto::merkle::PartialSmt,
     transaction::AccountInputs,
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
@@ -136,23 +135,20 @@ impl TryFrom<AccountProof> for AccountInputs {
         }) = state_headers
         {
             // discard slot indices - not needed for execution
-            let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
-            for (_, slots) in storage_slots {
-                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(slots)?);
-                storage_map_proofs.push(storage_map);
-            }
+            let storage_map_proofs =
+                storage_slots.into_iter().flat_map(|(_, slots)| slots).collect();
 
             return Ok(AccountInputs::new(
                 PartialAccount::new(
                     account_header.id(),
                     account_header.nonce(),
                     code,
-                    PartialStorage::new(storage_header, storage_map_proofs.into_iter())?,
-                    PartialVault::new(PartialSmt::new()), /* We don't use
-                                                           * vault
-                                                           * information so we
-                                                           * leave it
-                                                           * empty */
+                    PartialStorage::new(storage_header, storage_map_proofs),
+                    PartialVault::new(account_header.vault_root(), vec![]), /* We don't use
+                                                                             * vault
+                                                                             * information so we
+                                                                             * leave it
+                                                                             * empty */
                 ),
                 witness,
             ));
