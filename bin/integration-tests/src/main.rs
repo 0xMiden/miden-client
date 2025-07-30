@@ -4,11 +4,10 @@ use futures::{FutureExt, join};
 
 use crate::tests::{
     client::{
-        client_builder_fails_without_keystore, client_builder_initializes_client_with_endpoint,
-        consume_multiple_expected_notes, custom_transaction_prover, discarded_transaction,
-        expired_transaction_fails, get_account_update, ignore_invalid_notes,
-        import_consumed_note_with_id, import_consumed_note_with_proof,
-        import_expected_note_uncommitted, import_expected_notes,
+        client_builder_initializes_client_with_endpoint, consume_multiple_expected_notes,
+        custom_transaction_prover, discarded_transaction, expired_transaction_fails,
+        get_account_update, ignore_invalid_notes, import_consumed_note_with_id,
+        import_consumed_note_with_proof, import_expected_note_uncommitted, import_expected_notes,
         import_expected_notes_from_the_past_as_committed, import_note_with_proof, locked_account,
         multiple_transactions_can_be_committed_in_different_blocks_without_sync,
         multiple_tx_on_same_block, output_only_note, sync_detail_values, unused_rpc_api,
@@ -16,7 +15,7 @@ use crate::tests::{
     custom_transaction::{merkle_store, onchain_notes_sync_with_tag, transaction_request},
     fpi::{fpi_execute_program, nested_fpi_calls, standard_fpi_private, standard_fpi_public},
     network_transaction::{counter_contract_ntx, recall_note_before_ntx_consumes_it},
-    onchain::{import_account_by_id, onchain_accounts, onchain_notes_flow},
+    onchain::{import_account_by_id, incorrect_genesis, onchain_accounts, onchain_notes_flow},
     swap_transaction::{swap_fully_onchain, swap_private},
 };
 
@@ -59,11 +58,6 @@ async fn main() {
         run_test(
             "client_builder_initializes_client_with_endpoint",
             client_builder_initializes_client_with_endpoint,
-            &failed_tests,
-        ),
-        run_test(
-            "client_builder_fails_without_keystore",
-            client_builder_fails_without_keystore,
             &failed_tests,
         ),
         run_test("multiple_tx_on_same_block", multiple_tx_on_same_block, &failed_tests),
@@ -124,6 +118,7 @@ async fn main() {
         run_test("import_account_by_id", import_account_by_id, &failed_tests),
         run_test("onchain_accounts", onchain_accounts, &failed_tests),
         run_test("onchain_notes_flow", onchain_notes_flow, &failed_tests),
+        run_test("incorrect_genesis", incorrect_genesis, &failed_tests),
         // SWAP TRANSACTION
         run_test("swap_fully_onchain", swap_fully_onchain, &failed_tests),
         run_test("swap_private", swap_private, &failed_tests),

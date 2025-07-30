@@ -27,7 +27,7 @@ use crate::{
             sync::StateSyncInfo,
         },
         generated::{
-            note::NoteSyncRecord, responses::SyncStateResponse, transaction::TransactionSummary,
+            note::NoteSyncRecord, rpc_store::SyncStateResponse, transaction::TransactionSummary,
         },
     },
     transaction::ForeignAccount,
@@ -193,14 +193,12 @@ impl MockRpcApi {
                     && note_tags.contains(&note.metadata().tag())
                 {
                     Some(NoteSyncRecord {
-                        note_index: u32::from(
+                        note_index_in_block: u32::from(
                             note.inclusion_proof().location().node_index_in_block(),
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some((*note.metadata()).into()),
-                        merkle_path: Some(
-                            MerklePath::from(note.inclusion_proof().note_path().clone()).into(),
-                        ),
+                        inclusion_path: Some(note.inclusion_proof().note_path().clone().into()),
                     })
                 } else {
                     None
@@ -223,6 +221,11 @@ use alloc::boxed::Box;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
+        // The mock client doesn't use accept headers, so we don't need to do anything here.
+        Ok(())
+    }
+
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
@@ -238,10 +241,9 @@ impl NodeRpcClient for MockRpcApi {
                 .notes
                 .into_iter()
                 .map(|note| {
-                    let digest: Word = note.note_id.unwrap().try_into().unwrap();
-                    let note_id: NoteId = NoteId::from(digest);
-                    let note_index = u16::try_from(note.note_index).unwrap();
-                    let merkle_path = note.merkle_path.unwrap().try_into().unwrap();
+                    let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
+                    let note_index = u16::try_from(note.note_index_in_block).unwrap();
+                    let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
                     let metadata = note.metadata.unwrap().try_into().unwrap();
 
                     CommittedNote::new(note_id, note_index, merkle_path, metadata)

@@ -55,7 +55,7 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
+use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
 use core::cmp::max;
 
 use miden_objects::{
@@ -80,7 +80,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{OnNoteReceived, StateSync, on_note_received};
+pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
@@ -123,23 +123,8 @@ where
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Box::new({
-                let store_clone = self.store.clone();
-                move |committed_note, public_note, note_screener, note_tags| {
-                    Box::pin(on_note_received(
-                        store_clone.clone(),
-                        committed_note,
-                        public_note,
-                        note_screener,
-                        note_tags,
-                    ))
-                }
-            }),
-            self.tx_graceful_blocks,
-            note_screener,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
         // Get current state of the client
         let accounts = self

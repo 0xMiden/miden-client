@@ -38,6 +38,15 @@
 use alloc::vec::Vec;
 
 use miden_lib::account::{auth::AuthRpoFalcon512, wallets::BasicWallet};
+// RE-EXPORTS
+// ================================================================================================
+pub use miden_objects::{
+    AccountIdError, NetworkIdError,
+    account::{
+        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
+        AccountStorage, AccountStorageMode, AccountType, NetworkId, StorageMap, StorageSlot,
+    },
+};
 use miden_objects::{Word, crypto::dsa::rpo_falcon512::PublicKey};
 
 use super::Client;
@@ -45,19 +54,6 @@ use crate::{
     errors::ClientError,
     rpc::domain::account::FetchedAccount,
     store::{AccountRecord, AccountStatus},
-};
-
-pub mod procedure_roots;
-
-// RE-EXPORTS
-// ================================================================================================
-
-pub use miden_objects::{
-    AccountIdError, NetworkIdError,
-    account::{
-        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-        AccountStorage, AccountStorageMode, AccountType, NetworkId, StorageMap, StorageSlot,
-    },
 };
 
 pub mod component {

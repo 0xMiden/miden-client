@@ -85,21 +85,25 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
-        self.inner = Some(Client::new(
-            web_rpc_client,
-            Box::new(rng),
-            web_store.clone(),
-            Arc::new(keystore.clone()),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                false,
+        self.inner = Some(
+            Client::new(
+                web_rpc_client,
+                Box::new(rng),
+                web_store.clone(),
+                Some(Arc::new(keystore.clone())),
+                ExecutionOptions::new(
+                    Some(MAX_TX_EXECUTION_CYCLES),
+                    MIN_TX_EXECUTION_CYCLES,
+                    false,
+                    false,
+                )
+                .expect("Default executor's options should always be valid"),
+                None,
+                None,
             )
-            .expect("Default executor's options should always be valid"),
-            None,
-            None,
-        ));
+            .await
+            .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
+        );
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 

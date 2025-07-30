@@ -14,7 +14,7 @@ use tracing::warn;
 use crate::{
     Client, ClientError,
     rpc::NodeRpcClient,
-    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
+    store::{PartialBlockchainFilter, StoreError},
 };
 
 /// Network information management methods.
@@ -22,12 +22,12 @@ impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
-        let genesis = self.store.get_block_header_by_num(0.into()).await?;
+        let genesis = match self.store.get_block_header_by_num(0.into()).await? {
+            Some((block, _)) => block,
+            None => self.retrieve_and_store_genesis().await?,
+        };
 
-        match genesis {
-            Some((block, _)) => Ok(block),
-            None => self.retrieve_and_store_genesis().await,
-        }
+        Ok(genesis)
     }
 
     /// Calls `get_block_header_by_number` requesting the genesis block and storing it
@@ -50,9 +50,6 @@ impl<AUTH> Client<AUTH> {
     /// Builds the current view of the chain's [`PartialMmr`]. Because we want to add all new
     /// authentication nodes that could come from applying the MMR updates, we need to track all
     /// known leaves thus far.
-    ///
-    /// As part of the syncing process, we add the current block number so we don't need to
-    /// track it here.
     pub(crate) async fn build_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         let current_block_num = self.store.get_sync_height().await?;
 
@@ -61,21 +58,16 @@ impl<AUTH> Client<AUTH> {
         let current_peaks =
             self.store.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
 
-        let track_latest = if current_block_num.as_u32() != 0 {
-            match self
-                .store
-                .get_block_header_by_num(BlockNumber::from(current_block_num.as_u32() - 1))
-                .await?
-            {
-                Some((_, previous_block_had_notes)) => previous_block_had_notes,
-                None => BlockRelevance::Irrelevant,
-            }
-        } else {
-            BlockRelevance::Irrelevant
-        };
-
-        let mut current_partial_mmr =
-            PartialMmr::from_parts(current_peaks, tracked_nodes, track_latest.into());
+        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
+        // we can get an MMR based on those peaks, add the current block number and align it with
+        // the set of all nodes in the store.
+        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
+        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
+        // before calling `from_parts`
+        //
+        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
+        // for tracked blocks in the MMR. This would however block us from the convenience of
+        // just getting all nodes from the store.
 
         let (current_block, has_client_notes) = self
             .store
@@ -83,7 +75,12 @@ impl<AUTH> Client<AUTH> {
             .await?
             .expect("Current block should be in the store");
 
-        current_partial_mmr.add(current_block.commitment(), has_client_notes.into());
+        let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
+        let has_client_notes = has_client_notes.into();
+        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+
+        let current_partial_mmr =
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
 
         Ok(current_partial_mmr)
     }

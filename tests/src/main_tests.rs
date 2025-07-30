@@ -11,11 +11,6 @@ async fn client_builder_initializes_client_with_endpoint() {
 }
 
 #[tokio::test]
-async fn client_builder_fails_without_keystore() {
-    miden_client_integration_tests::tests::client::client_builder_fails_without_keystore().await
-}
-
-#[tokio::test]
 async fn multiple_tx_on_same_block() {
     miden_client_integration_tests::tests::client::multiple_tx_on_same_block().await
 }

@@ -772,7 +772,7 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
             Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
             store,
-            std::sync::Arc::new(keystore.clone()),
+            Some(std::sync::Arc::new(keystore.clone())),
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
@@ -782,7 +782,9 @@ async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, C
             .expect("Default executor's options should always be valid"),
             None,
             None,
-        ),
+        )
+        .await
+        .unwrap(),
         keystore,
     )
 }

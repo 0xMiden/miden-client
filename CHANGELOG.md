@@ -2,15 +2,27 @@
 
 ## 0.11.0 (TBD)
 
+### Changes
+
 * [BREAKING] Incremented MSRV to 1.88.
-* [BREAKING] Updated `toBech32` AccountID method: it now expects a parameter to specify the NetworkID [(#1043)](https://github.com/0xMiden/miden-client/pull/1043).
-* Introduced enums instead of booleans for public APIs (#1042).
-* [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action (#1051).
+* [BREAKING] Updated `toBech32` AccountID method: it now expects a parameter to specify the NetworkID ([#1043](https://github.com/0xMiden/miden-client/pull/1043)).
+* Introduced enums instead of booleans for public APIs ([#1042](https://github.com/0xMiden/miden-client/pull/1042)).
+* [BREAKING] Made authenticator optional for `ClientBuilder` and `Client::new`. The authenticator parameter is now optional, allowing clients to be created without authentication capabilities ([#1056](https://github.com/0xMiden/miden-client/pull/1056)).
+* [BREAKING] Updated `applyStateSync` to receive a single object and then write the changes in a single transaction ([#1050](https://github.com/0xMiden/miden-client/pull/1050))
+* [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action ([#1051](https://github.com/0xMiden/miden-client/pull/1051)).
+* [BREAKING] Changed `OnNoteReceived` from closure to trait object (#1080)
+* `NoteScript` now has a `toString` method that prints its own MAST source [(#1082)](https://github.com/0xMiden/miden-client/pull/1082).
+
 
 ### Features
 
-* Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
-* Added `TokenSymbol` Type to Web Client (#1046).
+* Added ability to convert `Word` to `U64` array and `Felt` array in Web Client (([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
+* Added `TokenSymbol` type to Web Client ([#1046](https://github.com/0xMiden/miden-client/pull/1046)).
+* [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
+
+## 0.10.1 (2025-07-26)
+
+* Avoid passing unneeded nodes to `PartialMmr::from_parts` (#1081).
 
 ## 0.10.0 (2025-07-12)
 
