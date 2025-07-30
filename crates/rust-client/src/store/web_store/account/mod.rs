@@ -26,8 +26,8 @@ use js_bindings::{
 
 mod models;
 use models::{
-    AccountAuthIdxdbObject, AccountCodeIdxdbObject, AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject, AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
+    AccountCodeIdxdbObject, AccountRecordIdxdbObject, AccountStorageIdxdbObject,
+    AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
 };
 
 pub(crate) mod utils;

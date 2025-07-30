@@ -23,7 +23,7 @@ impl AdviceMap {
         let arc_felts: Arc<[NativeFelt]> = native_felts.into();
         self.0
             .insert(native_key, arc_felts)
-            .map(|arc| arc.iter().cloned().map(Into::into).collect())
+            .map(|arc| arc.iter().copied().map(Into::into).collect())
     }
 }
 

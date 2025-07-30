@@ -9,7 +9,7 @@ use miden_objects::{
     transaction::AccountInputs,
 };
 use miden_tx::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
+    ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
 };
 
 use super::TransactionRequestError;
@@ -147,7 +147,7 @@ impl TryFrom<AccountProof> for AccountInputs {
 
             // TODO: Remove this hack - we can't see the partialsmt root without proofs afaik
             let mut bytes = Vec::new();
-            bytes.write(&account_header.vault_root());
+            bytes.write(account_header.vault_root());
             bytes.write_usize(0);
             bytes.write_usize(0);
 

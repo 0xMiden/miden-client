@@ -3,8 +3,6 @@ use alloc::{string::ToString, sync::Arc, vec::Vec};
 use miden_lib::utils::{Deserializable, Serializable};
 use miden_tx::auth::SigningInputs;
 use rand::Rng;
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::js_sys;
 
 use super::KeyStoreError;
 use crate::{
@@ -73,12 +71,13 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         signing_inputs: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
         let message = signing_inputs.to_commitment();
-        let mut rng = self.rng.write();
 
         let secret_key = self
             .get_key(pub_key)
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
+
+        let mut rng = self.rng.write();
 
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;

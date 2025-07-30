@@ -1,2 +1,3 @@
+future-size-threshold        = 131072
 large-error-threshold        = 256
 too-many-arguments-threshold = 8
