@@ -18,6 +18,16 @@
 
 ***
 
+### root()
+
+> **root**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### toString()
 
 > **toString**(): `string`

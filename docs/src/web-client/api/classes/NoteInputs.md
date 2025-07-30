@@ -31,3 +31,13 @@
 #### Returns
 
 `void`
+
+***
+
+### values()
+
+> **values**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]
