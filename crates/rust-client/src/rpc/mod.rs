@@ -49,6 +49,7 @@ use domain::{
     sync::StateSyncInfo,
 };
 use miden_objects::{
+    Word,
     account::{Account, AccountCode, AccountDelta, AccountHeader, AccountId},
     block::{BlockHeader, BlockNumber, ProvenBlock},
     crypto::merkle::{MmrProof, SmtProof},
@@ -95,6 +96,11 @@ use crate::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait NodeRpcClient: Send + Sync {
+    /// Sets the genesis commitment for the client and reconnects to the node providing the
+    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// this method does nothing.
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
+
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
     async fn submit_proven_transaction(

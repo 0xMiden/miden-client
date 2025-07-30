@@ -18,6 +18,28 @@
 
 ***
 
+### root()
+
+> **root**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### toString()
+
+> **toString**(): `string`
+
+Print the MAST source for this script.
+
+#### Returns
+
+`string`
+
+***
+
 ### p2id()
 
 > `static` **p2id**(): `NoteScript`

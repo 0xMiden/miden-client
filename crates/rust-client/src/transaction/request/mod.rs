@@ -12,9 +12,9 @@ use miden_lib::{
     transaction::TransactionKernel,
 };
 use miden_objects::{
-    Felt, NoteError, TransactionInputError, TransactionScriptError, Word,
+    AccountError, Felt, NoteError, TransactionInputError, TransactionScriptError, Word,
     account::AccountId,
-    crypto::merkle::MerkleStore,
+    crypto::merkle::{MerkleError, MerkleStore},
     note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote},
     transaction::{AccountInputs, InputNote, InputNotes, TransactionArgs, TransactionScript},
     vm::AdviceMap,
@@ -405,6 +405,8 @@ impl Default for TransactionRequestBuilder {
 pub enum TransactionRequestError {
     #[error("account interface error")]
     AccountInterfaceError(#[from] AccountInterfaceError),
+    #[error("account error")]
+    AccountError(#[from] AccountError),
     #[error("duplicate input note with IDs: {0}")]
     DuplicateInputNote(NoteId),
     #[error("foreign account data missing in the account proof")]
@@ -423,6 +425,8 @@ pub enum TransactionRequestError {
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
     InvalidTransactionScript(#[from] TransactionScriptError),
+    #[error("merkle error")]
+    MerkleError(#[from] MerkleError),
     #[error("specified authenticated input note with id {0} is missing")]
     MissingAuthenticatedInputNote(NoteId),
     #[error("a transaction without output notes must have at least one input note")]

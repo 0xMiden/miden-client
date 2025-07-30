@@ -5,7 +5,7 @@ use miden_client::{
     account::AccountId,
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
-    rpc::{Endpoint, domain::account::FetchedAccount},
+    rpc::domain::account::FetchedAccount,
     store::{InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter},
     testing::common::*,
     transaction::{
@@ -46,19 +46,6 @@ async fn client_builder_initializes_client_with_endpoint() -> Result<(), ClientE
     assert!(sync_summary.block_num.as_u32() > 0);
 
     Ok(())
-}
-
-#[tokio::test]
-async fn client_builder_fails_without_keystore() {
-    let (_, _, store_config, _) = get_client_config();
-    let result = ClientBuilder::<FilesystemKeyStore<_>>::new()
-        .tonic_rpc_client(&Endpoint::default(), Some(10_000))
-        .sqlite_store(store_config.to_str().unwrap())
-        .in_debug_mode(miden_client::DebugMode::Enabled)
-        .build()
-        .await;
-
-    assert!(result.is_err(), "Expected client build to fail without a keystore");
 }
 
 #[tokio::test]

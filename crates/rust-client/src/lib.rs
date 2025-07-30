@@ -89,7 +89,7 @@
 //!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
-//!     Arc::new(keystore),
+//!     Some(Arc::new(keystore)), // or None if no authenticator is needed
 //!     ExecutionOptions::new(
 //!         Some(MAX_TX_EXECUTION_CYCLES),
 //!         MIN_TX_EXECUTION_CYCLES,
@@ -99,7 +99,9 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
-//! );
+//! )
+//! .await
+//! .unwrap();
 //!
 //! # Ok(())
 //! # }
@@ -203,7 +205,7 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_lib::utils::ScriptBuilder;
-use miden_objects::crypto::rand::FeltRng;
+use miden_objects::{block::BlockNumber, crypto::rand::FeltRng};
 use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
 use rand::RngCore;
 use rpc::NodeRpcClient;
@@ -273,19 +275,23 @@ where
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
-    pub fn new(
+    pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Arc<AUTH>,
+        authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
-    ) -> Self {
-        let authenticator = Some(authenticator);
+    ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
-        Self {
+        if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
+            // Set the genesis commitment in the RPC API client for future requests.
+            rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        Ok(Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
@@ -294,7 +300,7 @@ where
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
-        }
+        })
     }
 
     /// Returns true if the client is in debug mode.

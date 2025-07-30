@@ -290,7 +290,7 @@ where
                 let note_inclusion_proof = NoteInclusionProof::new(
                     note_block_num,
                     note.note_index(),
-                    note.merkle_path().clone().try_into()?,
+                    note.inclusion_path().clone(),
                 )?;
 
                 return Ok(Some((note.metadata(), note_inclusion_proof)));

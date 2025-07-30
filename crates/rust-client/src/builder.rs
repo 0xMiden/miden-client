@@ -222,21 +222,16 @@ where
 
         // Initialize the authenticator.
         let authenticator = match self.keystore {
-            Some(AuthenticatorConfig::Instance(authenticator)) => authenticator,
+            Some(AuthenticatorConfig::Instance(authenticator)) => Some(authenticator),
             Some(AuthenticatorConfig::Path(ref path)) => {
                 let keystore = FilesystemKeyStore::new(path.into())
                     .map_err(|err| ClientError::ClientInitializationError(err.to_string()))?;
-                Arc::new(AUTH::from(keystore))
+                Some(Arc::new(AUTH::from(keystore)))
             },
-            None => {
-                return Err(ClientError::ClientInitializationError(
-                    "Keystore must be specified. Call `.keystore(...)` or `.filesystem_keystore(...)` with a keystore path."
-                        .into(),
-                ))
-            }
+            None => None,
         };
 
-        Ok(Client::new(
+        Client::new(
             rpc_api,
             rng,
             arc_store,
@@ -250,6 +245,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
-        ))
+        )
+        .await
     }
 }

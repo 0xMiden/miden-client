@@ -1,26 +1,23 @@
 use miden_objects::{Word, account::AccountId, transaction::TransactionId};
 
-use crate::rpc::{
-    errors::RpcConversionError,
-    generated::{digest::Digest as ProtoDigest, transaction::TransactionId as ProtoTransactionId},
-};
+use crate::rpc::{errors::RpcConversionError, generated as proto};
 
 // INTO TRANSACTION ID
 // ================================================================================================
 
-impl TryFrom<ProtoDigest> for TransactionId {
+impl TryFrom<proto::primitives::Digest> for TransactionId {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoDigest) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
         Ok(word.into())
     }
 }
 
-impl TryFrom<ProtoTransactionId> for TransactionId {
+impl TryFrom<proto::transaction::TransactionId> for TransactionId {
     type Error = RpcConversionError;
 
-    fn try_from(value: ProtoTransactionId) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::transaction::TransactionId) -> Result<Self, Self::Error> {
         value
             .id
             .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
@@ -31,7 +28,7 @@ impl TryFrom<ProtoTransactionId> for TransactionId {
     }
 }
 
-impl From<TransactionId> for ProtoTransactionId {
+impl From<TransactionId> for proto::transaction::TransactionId {
     fn from(value: TransactionId) -> Self {
         Self { id: Some(value.as_word().into()) }
     }
