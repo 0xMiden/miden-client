@@ -46,7 +46,7 @@ pub type MockClient<AUTH> = Client<AUTH>;
 ///
 /// This struct implements the RPC API used by the client to communicate with the node. It simulates
 /// most of the functionality of the actual node, with some small differences:
-/// - It uses a `MockChain` to simulate the blockchain state.
+/// - It uses a [`MockChain`] to simulate the blockchain state.
 /// - Blocks are not automatically created after time passes, but rather new blocks are created when
 ///   calling the `prove_block` method.
 /// - Network account and transactions aren't supported in the current version.
@@ -65,7 +65,7 @@ impl Default for MockRpcApi {
 }
 
 impl MockRpcApi {
-    /// Creates a new `MockRpcApi` instance with the state of the provided `MockChain`.
+    /// Creates a new [`MockRpcApi`] instance with the state of the provided [`MockChain`].
     pub fn new(mock_chain: MockChain) -> Self {
         Self {
             account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
@@ -83,7 +83,7 @@ impl MockRpcApi {
         self.mock_chain.read().latest_block_header().block_num()
     }
 
-    /// Advances the mock chain by proving the next block. Committing all pending objects to the
+    /// Advances the mock chain by proving the next block, committing all pending objects to the
     /// chain in the process.
     pub fn prove_block(&self) {
         let proven_block = self.mock_chain.write().prove_next_block().unwrap();
@@ -265,13 +265,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(response)
     }
 
-    /// Executes the specified sync state request and returns the response. A new empty block will
-    /// be created each time this method is called to simulate the real node's automatic block
-    /// creation.
-    ///
-    /// Account updates for all specified accounts will always be included in the response. This is
-    /// different from the real RPC API, where only accounts that have updates in the specified
-    /// block range will be returned.
+    /// Executes the specified sync state request and returns the response.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
@@ -345,10 +339,6 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns the node's tracked account details for the specified account ID.
-    ///
-    /// The `last_block_num` in the returned `AccountUpdateSummary` is always the block number of
-    /// the latest block in the mock chain, as the `MockChain` does not track the last update
-    /// block number for accounts.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let summary = self
             .account_commitment_updates
