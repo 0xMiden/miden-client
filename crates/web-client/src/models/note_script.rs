@@ -2,6 +2,8 @@ use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
 use miden_objects::PrettyPrint;
 use wasm_bindgen::prelude::*;
 
+use super::word::Word;
+
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteScript(NativeNoteScript);
@@ -25,6 +27,10 @@ impl NoteScript {
 
     pub fn swap() -> Self {
         WellKnownNote::SWAP.script().into()
+    }
+
+    pub fn root(&self) -> Word {
+        self.0.root().into()
     }
 }
 // CONVERSIONS

@@ -163,11 +163,11 @@ check-wasm: ## Build the client library for wasm32
 .PHONY: check-tools
 check-tools: ## Checks if development tools are installed
 	@echo "Checking development tools..."
-	@command -v mdbook  >/dev/null 2>&1 && echo "[OK] mdbook is installed"  || echo "[MISSING] mdbook (make install-tools)"
-	@command -v typos   >/dev/null 2>&1 && echo "[OK] typos is installed"   || echo "[MISSING] typos  (make install-tools)"
-	@command -v nextest >/dev/null 2>&1 && echo "[OK] nextest is installed" || echo "[MISSING] nextest(make install-tools)"
-	@command -v taplo   >/dev/null 2>&1 && echo "[OK] taplo is installed"   || echo "[MISSING] taplo  (make install-tools)"
-	@command -v yarn    >/dev/null 2>&1 && echo "[OK] yarn is installed"    || echo "[MISSING] yarn   (make install-tools)"
+	@command -v mdbook        >/dev/null 2>&1 && echo "[OK] mdbook is installed"        || echo "[MISSING] mdbook       (make install-tools)"
+	@command -v typos         >/dev/null 2>&1 && echo "[OK] typos is installed"         || echo "[MISSING] typos        (make install-tools)"
+	@command -v cargo nextest >/dev/null 2>&1 && echo "[OK] cargo-nextest is installed" || echo "[MISSING] cargo-nextest(make install-tools)"
+	@command -v taplo         >/dev/null 2>&1 && echo "[OK] taplo is installed"         || echo "[MISSING] taplo        (make install-tools)"
+	@command -v yarn          >/dev/null 2>&1 && echo "[OK] yarn is installed"          || echo "[MISSING] yarn         (make install-tools)"
 
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile

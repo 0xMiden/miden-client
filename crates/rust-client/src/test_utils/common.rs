@@ -17,7 +17,7 @@ use miden_objects::{
     asset::{Asset, FungibleAsset, TokenSymbol},
     crypto::{dsa::rpo_falcon512::SecretKey, rand::RpoRandomCoin},
     note::{NoteId, NoteType},
-    transaction::{InputNote, OutputNote, TransactionId},
+    transaction::{OutputNote, TransactionId},
 };
 use rand::{Rng, RngCore, rngs::StdRng};
 use toml::Table;
@@ -397,41 +397,39 @@ pub async fn setup_wallet_and_faucet(
     (basic_account, faucet_account)
 }
 
-/// Mints a note from `faucet_account_id` for `basic_account_id`, waits for inclusion and returns it
-/// with 1000 units of the corresponding fungible asset.
+/// Mints a note from `faucet_account_id` for `basic_account_id` and returns the executed
+/// transaction ID and the note with 1000 units of the corresponding fungible asset.
 pub async fn mint_note(
     client: &mut TestClient,
     basic_account_id: AccountId,
     faucet_account_id: AccountId,
     note_type: NoteType,
-) -> InputNote {
+) -> (TransactionId, Note) {
     // Create a Mint Tx for 1000 units of our fungible asset
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    execute_tx_and_sync(client, fungible_asset.faucet_id(), tx_request.clone()).await;
+    let tx_id = execute_tx(client, fungible_asset.faucet_id(), tx_request.clone()).await;
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-    let note = client.get_input_note(note_id).await.unwrap().unwrap();
-    note.try_into().unwrap()
+    (tx_id, tx_request.expected_output_own_notes().pop().unwrap())
 }
 
-/// Consumes and wait until the transaction gets committed.
+/// Executes a transaction that consumes the provided notes and returns the transaction ID.
 /// This assumes the notes contain assets.
 pub async fn consume_notes(
     client: &mut TestClient,
     account_id: AccountId,
-    input_notes: &[InputNote],
-) {
+    input_notes: &[Note],
+) -> TransactionId {
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(input_notes.iter().map(InputNote::id).collect())
+        .build_consume_notes(input_notes.iter().map(Note::id).collect())
         .unwrap();
-    execute_tx_and_sync(client, account_id, tx_request).await;
+    execute_tx(client, account_id, tx_request).await
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -511,7 +509,7 @@ pub async fn execute_tx_and_consume_output_notes(
     client: &mut TestClient,
     executor: AccountId,
     consumer: AccountId,
-) {
+) -> TransactionId {
     let output_notes = tx_request
         .expected_output_own_notes()
         .into_iter()
@@ -524,8 +522,7 @@ pub async fn execute_tx_and_consume_output_notes(
         .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
-    let transaction_id = execute_tx(client, consumer, tx_request).await;
-    wait_for_tx(client, transaction_id).await;
+    execute_tx(client, consumer, tx_request).await
 }
 
 /// Mint assets for the target account and consume them immediately without waiting for the first
@@ -535,7 +532,7 @@ pub async fn mint_and_consume(
     basic_account_id: AccountId,
     faucet_account_id: AccountId,
     note_type: NoteType,
-) {
+) -> TransactionId {
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap(),
@@ -546,5 +543,5 @@ pub async fn mint_and_consume(
         .unwrap();
 
     execute_tx_and_consume_output_notes(tx_request, client, faucet_account_id, basic_account_id)
-        .await;
+        .await
 }
