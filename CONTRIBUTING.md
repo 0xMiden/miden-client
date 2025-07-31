@@ -98,6 +98,10 @@ We use [semver](https://semver.org/) naming convention.
   - As mentioned above, `make lint` can be used for checking there.
 - If the PR includes changes to the web client, the documentation needs to be up to date. You can automatically generate them by running `make typedoc`.
 
+### Changelog
+
+If a PR introduces anything a downstream user might notice - a new feature, a behaviour change, a bug-fix, a deprecation, or a breaking API change - add a bullet to [CHANGELOG.md](./CHANGELOG.md) under the last existing heading (corresponds to the unreleased version when working on the `next` branch). The convention is to write a past-tense summary (e.g. "* [BREAKING] Renamed foo() to bar() in `Client` {#PR number link}"). Internal refactors or smaller tweaks that don’t affect public behaviour can be left out.
+
 ## Write bug reports with detail, background, and sample code
 
 **Great Bug Reports** tend to have:

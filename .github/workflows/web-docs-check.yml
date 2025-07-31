@@ -27,21 +27,26 @@ jobs:
             core.setOutput('skip', labels.includes('bypass-sdk-version-bump'));
 
       - name: Install Rust toolchain
+        if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
         run: rustup update --no-self-update
 
       - name: Setup Node.js
+        if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
       - name: Add WASM target
+        if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
         run: rustup target add wasm32-unknown-unknown
 
       - name: Install Dependencies
+        if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
         working-directory: crates/web-client
         run: yarn install
 
       - name: Build Project
+        if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
         working-directory: crates/web-client
         run: yarn build
 
