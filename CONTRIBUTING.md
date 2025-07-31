@@ -71,23 +71,32 @@ For example, a new change to the `miden-node-store` crate might have the followi
     // ================================================================================
     ```
 
-- [Rustfmt](https://github.com/rust-lang/rustfmt), [Clippy](https://github.com/rust-lang/rust-clippy), [Rustdoc](https://doc.rust-lang.org/rustdoc/index.html) and [Typos](https://github.com/crate-ci/typos) linting is included in CI pipeline. Anyways it's preferable to run linting locally before push. To simplify running these commands in a reproducible manner we use `make` commands, you can run:
+- [Rustfmt](https://github.com/rust-lang/rustfmt), [Clippy](https://github.com/rust-lang/rust-clippy), [Rustdoc](https://doc.rust-lang.org/rustdoc/index.html), [Typos](https://github.com/crate-ci/typos) and [Taplo](https://github.com/tamasfe/taplo) linting is included in the CI pipeline. 
 
-    ```
-    make lint
-    ```
+You can run all checks locally before opening a PR. To simplify running all checks in a reproducible manner we use `make` commands:
 
-You can find more information about other `make` commands in the [Makefile](Makefile)
+```
+make lint
+```
+
+You can find more information about other `make` commands in the [Makefile](Makefile).
 
 ### Versioning
 We use [semver](https://semver.org/) naming convention.
 
 ## Pre-PR checklist
-1. Repo forked and branch created from `next` according to the naming convention.
-2. Commit messages and code style follow conventions.
-3. Tests added for new functionality.
-4. Documentation/comments updated for all changes according to our documentation convention.
-5. Rustfmt, Clippy and Rustdoc linting passed.
+
+> [!TIP]
+> You can check if you have the tools that we use by running `make check-tools`.
+
+- Repo forked and branch created from `next` according to the naming convention.
+- Commit messages and code style follow conventions.
+- Tests added for new functionality, with all previously existing tests passing.
+  - Read more on how to run integration tests [here](./tests/README.md).
+- Documentation/comments updated for all changes according to our documentation convention.
+- Lints: Rustfmt, Clippy, Rustdoc, Typos and TOML-formatting linting passing.
+  - As mentioned above, `make lint` can be used for checking there.
+- If the PR includes changes to the web client, the documentation needs to be up to date. You can automatically generate them by running `make typedoc`.
 
 ## Write bug reports with detail, background, and sample code
 
