@@ -79,6 +79,82 @@ describe("get_transactions tests", () => {
     expect(result.transactionIds.length).to.equal(0);
     expect(result.uncommittedTransactionIds.length).to.equal(0);
   });
+
+  it("get_transactions filters by specific transaction IDs successfully", async () => {
+    const { accountId, faucetId } = await setupWalletAndFaucet();
+
+    await mintAndConsumeTransaction(accountId, faucetId);
+    await mintAndConsumeTransaction(accountId, faucetId);
+
+    const result = await testingPage.evaluate(async () => {
+      const client = window.client;
+
+      let allTransactions = await client.getTransactions(
+        window.TransactionFilter.all()
+      );
+      let firstTransactionId = allTransactions[0].id();
+      let filteredTransactions = await client.getTransactions(
+        window.TransactionFilter.ids([firstTransactionId])
+      );
+
+      return {
+        allTransactionsCount: allTransactions.length,
+        filteredTransactionsCount: filteredTransactions.length,
+        filteredTransactionId: filteredTransactions[0].id().toHex(),
+        originalTransactionId: firstTransactionId.toHex(),
+      };
+    });
+
+    expect(result.allTransactionsCount).to.be.greaterThan(1);
+    expect(result.filteredTransactionsCount).to.equal(1);
+    expect(result.filteredTransactionId).to.equal(result.originalTransactionId);
+  });
+
+  it("get_transactions filters expired transactions successfully", async () => {
+    const { accountId, faucetId } = await setupWalletAndFaucet();
+
+    const { transactionId: uncommittedTransactionId } = await mintTransaction(
+      accountId,
+      faucetId,
+      false,
+      false
+    );
+
+    const result = await testingPage.evaluate(async () => {
+      const client = window.client;
+
+      let summary = await client.syncState();
+      let currentBlockNum = summary.blockNum();
+
+      let futureBlockNum = currentBlockNum + 10;
+      let expiredFilter =
+        window.TransactionFilter.expiredBefore(futureBlockNum);
+      let expiredTransactions = await client.getTransactions(expiredFilter);
+      let uncommittedTransactions = await client.getTransactions(
+        window.TransactionFilter.uncommitted()
+      );
+
+      return {
+        currentBlockNum: currentBlockNum,
+        futureBlockNum: futureBlockNum,
+        expiredTransactionsCount: expiredTransactions.length,
+        uncommittedTransactionsCount: uncommittedTransactions.length,
+        expiredTransactionIds: expiredTransactions.map((tx) => tx.id().toHex()),
+        uncommittedTransactionIds: uncommittedTransactions.map((tx) =>
+          tx.id().toHex()
+        ),
+      };
+    });
+
+    expect(result.uncommittedTransactionsCount).to.be.greaterThan(0);
+    expect(result.uncommittedTransactionIds).to.include(
+      uncommittedTransactionId
+    );
+    expect(result.expiredTransactionsCount).to.be.at.most(
+      result.uncommittedTransactionsCount
+    );
+    expect(result.expiredTransactionIds).to.include(uncommittedTransactionId);
+  });
 });
 
 // COMPILE_TX_SCRIPT TESTS
