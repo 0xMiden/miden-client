@@ -1,5 +1,10 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
-use core::fmt;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{error::Error as CoreError, fmt};
 
 use miden_lib::{account::interface::AccountInterface, note::well_known_note::WellKnownNote};
 use miden_objects::{
@@ -17,7 +22,6 @@ use thiserror::Error;
 use tonic::async_trait;
 
 use crate::{
-    ClientError,
     rpc::domain::note::CommittedNote,
     store::{InputNoteRecord, NoteFilter, Store, StoreError, data_store::ClientDataStore},
     sync::{NoteUpdateAction, OnNoteReceived},
@@ -198,16 +202,34 @@ where
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>
+    ) -> Result<NoteUpdateAction, (String, Option<Box<dyn CoreError + Send + Sync>>)>
     where
         AUTH: TransactionAuthenticator,
     {
         let note_id = *committed_note.note_id();
 
-        let input_note_present =
-            !self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty();
-        let output_note_present =
-            !self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty();
+        let input_note_present = !self
+            .store
+            .get_input_notes(NoteFilter::Unique(note_id))
+            .await
+            .map_err(|err| {
+                (
+                    "failed to get input notes".to_string(),
+                    Some(Box::new(err) as Box<dyn CoreError + Send + Sync>),
+                )
+            })?
+            .is_empty();
+        let output_note_present = !self
+            .store
+            .get_output_notes(NoteFilter::Unique(note_id))
+            .await
+            .map_err(|err| {
+                (
+                    "failed to get output notes".to_string(),
+                    Some(Box::new(err) as Box<dyn CoreError + Send + Sync>),
+                )
+            })?
+            .is_empty();
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
@@ -218,20 +240,34 @@ where
             Some(public_note) => {
                 // If tracked by the user, keep note regardless of inputs and extra checks
                 if let Some(metadata) = public_note.metadata()
-                    && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
+                    && self
+                        .store
+                        .get_unique_note_tags()
+                        .await
+                        .map_err(|err| {
+                            (
+                                "failed to get unique note tags".to_string(),
+                                Some(Box::new(err) as Box<dyn CoreError + Send + Sync>),
+                            )
+                        })?
+                        .contains(&metadata.tag())
                 {
                     return Ok(NoteUpdateAction::Insert(public_note));
                 }
 
                 // The note is not being tracked by the client and is public so we can screen it
-                let new_note_relevance = self
-                    .check_relevance(
-                        &public_note
-                            .clone()
-                            .try_into()
-                            .map_err(ClientError::NoteRecordConversionError)?,
+                let note: Note = public_note.clone().try_into().map_err(|err| {
+                    (
+                        "failed to convert public note".to_string(),
+                        Some(Box::new(err) as Box<dyn CoreError + Send + Sync>),
                     )
-                    .await?;
+                })?;
+                let new_note_relevance = self.check_relevance(&note).await.map_err(|err| {
+                    (
+                        "failed to check note relevance".to_string(),
+                        Some(Box::new(err) as Box<dyn CoreError + Send + Sync>),
+                    )
+                })?;
                 let is_relevant = !new_note_relevance.is_empty();
                 if is_relevant {
                     Ok(NoteUpdateAction::Insert(public_note))

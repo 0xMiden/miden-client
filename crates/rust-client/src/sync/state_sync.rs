@@ -1,9 +1,11 @@
 use alloc::{
     boxed::Box,
     collections::{BTreeMap, BTreeSet},
+    string::String,
     sync::Arc,
     vec::Vec,
 };
+use core::error::Error;
 
 use miden_objects::{
     Word,
@@ -61,7 +63,7 @@ pub trait OnNoteReceived {
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>;
+    ) -> Result<NoteUpdateAction, (String, Option<Box<dyn Error + Send + Sync>>)>;
 }
 
 // STATE SYNC
@@ -345,7 +347,12 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            match self.note_screener.on_note_received(committed_note, public_note).await? {
+            match self
+                .note_screener
+                .on_note_received(committed_note, public_note)
+                .await
+                .map_err(|(msg, err)| ClientError::OnNoteReceivedFailure(msg, err))?
+            {
                 NoteUpdateAction::Commit(committed_note) => {
                     found_relevant_note = true;
 
