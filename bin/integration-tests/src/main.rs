@@ -2,21 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use futures::{FutureExt, join};
 
-use crate::tests::{
-    client::{
-        client_builder_initializes_client_with_endpoint, consume_multiple_expected_notes,
-        custom_transaction_prover, discarded_transaction, expired_transaction_fails,
-        get_account_update, ignore_invalid_notes, import_consumed_note_with_id,
-        import_consumed_note_with_proof, import_expected_note_uncommitted, import_expected_notes,
-        import_expected_notes_from_the_past_as_committed, import_note_with_proof, locked_account,
-        multiple_transactions_can_be_committed_in_different_blocks_without_sync,
-        multiple_tx_on_same_block, output_only_note, sync_detail_values, unused_rpc_api,
-    },
-    custom_transaction::{merkle_store, onchain_notes_sync_with_tag, transaction_request},
-    fpi::{fpi_execute_program, nested_fpi_calls, standard_fpi_private, standard_fpi_public},
-    network_transaction::{counter_contract_ntx, recall_note_before_ntx_consumes_it},
-    onchain::{import_account_by_id, incorrect_genesis, onchain_accounts, onchain_notes_flow},
-    swap_transaction::{swap_fully_onchain, swap_private},
+use crate::tests::fpi::{
+    fpi_execute_program, nested_fpi_calls, standard_fpi_private, standard_fpi_public,
 };
 
 mod tests;

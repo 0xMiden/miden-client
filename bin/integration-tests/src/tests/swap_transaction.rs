@@ -50,12 +50,18 @@ pub async fn swap_fully_onchain() {
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
 
-    mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
+    let tx_id =
+        mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
+            .await;
+    wait_for_tx(&mut client1, tx_id).await;
 
     // mint 1000 ETH for accountB
     println!("minting 1000 eth for account B");
 
-    mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
+    let tx_id =
+        mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
+            .await;
+    wait_for_tx(&mut client2, tx_id).await;
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
@@ -213,11 +219,17 @@ pub async fn swap_private() {
 
     // mint 1000 BTC for accountA
     println!("minting 1000 btc for account A");
-    mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
+    let tx_id =
+        mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
+            .await;
+    wait_for_tx(&mut client1, tx_id).await;
 
     // mint 1000 ETH for accountB
     println!("minting 1000 eth for account B");
-    mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
+    let tx_id =
+        mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
+            .await;
+    wait_for_tx(&mut client2, tx_id).await;
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC

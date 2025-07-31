@@ -9,6 +9,11 @@ async fn onchain_accounts() {
 }
 
 #[tokio::test]
+async fn import_account_by_id() {
+    miden_client_integration_tests::tests::onchain::import_account_by_id().await
+}
+
+#[tokio::test]
 async fn incorrect_genesis() {
     miden_client_integration_tests::tests::onchain::incorrect_genesis().await
 }

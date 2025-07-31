@@ -49,3 +49,33 @@
 #### Returns
 
 `void`
+
+***
+
+### inputs()
+
+> **inputs**(): [`NoteInputs`](NoteInputs.md)
+
+#### Returns
+
+[`NoteInputs`](NoteInputs.md)
+
+***
+
+### script()
+
+> **script**(): [`NoteScript`](NoteScript.md)
+
+#### Returns
+
+[`NoteScript`](NoteScript.md)
+
+***
+
+### serialNum()
+
+> **serialNum**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
