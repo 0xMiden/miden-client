@@ -18,7 +18,7 @@ impl TransactionFilter {
     }
 
     pub fn ids(transaction_ids: Vec<TransactionId>) -> TransactionFilter {
-        let native_ids = transaction_ids.into_iter().map(|id| id.into()).collect();
+        let native_ids = transaction_ids.into_iter().map(Into::into).collect();
         TransactionFilter(NativeTransactionFilter::Ids(native_ids))
     }
 
