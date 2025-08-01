@@ -35,7 +35,7 @@
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
 //! async fn create_and_submit_transaction<
 //!     R: rand::Rng,
-//!     AUTH: TransactionAuthenticator + 'static,
+//!     AUTH: TransactionAuthenticator + Sync + 'static,
 //! >(
 //!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
@@ -469,7 +469,7 @@ impl TransactionStoreUpdate {
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + 'static,
+    AUTH: TransactionAuthenticator + Sync + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
@@ -1129,7 +1129,7 @@ where
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
-    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore>(
+    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore + Sync>(
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
@@ -1145,7 +1145,7 @@ where
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl<AUTH: TransactionAuthenticator + 'static> Client<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,

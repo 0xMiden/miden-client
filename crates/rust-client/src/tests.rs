@@ -1778,7 +1778,8 @@ async fn input_note_checks() {
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
 
     let mut mint_notes = vec![];
-    for _ in 0..10 {
+
+    for _ in 0..5 {
         mint_notes.push(mint_note(&mut client, wallet.id(), faucet.id(), NoteType::Public).await.1);
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();

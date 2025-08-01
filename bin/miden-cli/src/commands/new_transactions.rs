@@ -62,7 +62,7 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -133,7 +133,7 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -215,7 +215,7 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -294,7 +294,7 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -365,7 +365,7 @@ impl ConsumeNotesCmd {
 // EXECUTE TRANSACTION
 // ================================================================================================
 
-async fn execute_transaction<AUTH: TransactionAuthenticator + 'static>(
+async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     account_id: AccountId,
     transaction_request: TransactionRequest,

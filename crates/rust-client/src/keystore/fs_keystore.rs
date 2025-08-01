@@ -5,7 +5,7 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Write},
     path::PathBuf,
     string::ToString,
-    sync::Arc,
+    sync::{Arc, RwLock},
     vec::Vec,
 };
 
@@ -13,7 +13,7 @@ use miden_objects::{Felt, Word, account::AuthSecretKey};
 use miden_tx::{
     AuthenticationError,
     auth::{SigningInputs, TransactionAuthenticator},
-    utils::{Deserializable, Serializable, sync::RwLock},
+    utils::{Deserializable, Serializable},
 };
 use rand::{Rng, SeedableRng};
 
@@ -118,7 +118,7 @@ impl FilesystemKeyStore<rand::rngs::StdRng> {
     }
 }
 
-impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// Gets a signature over a message, given a public key.
     ///
     /// The public key should correspond to one of the keys tracked by the keystore.
@@ -126,12 +126,12 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: Word,
         signing_info: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
-        let mut rng = self.rng.write();
+        let mut rng = self.rng.write().expect("poisoned lock");
 
         let message = signing_info.to_commitment();
 

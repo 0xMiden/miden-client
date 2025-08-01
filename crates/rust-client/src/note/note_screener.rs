@@ -63,7 +63,7 @@ pub struct NoteScreener<AUTH> {
 
 impl<AUTH> NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
@@ -188,7 +188,7 @@ where
 #[async_trait(?Send)]
 impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
@@ -198,10 +198,7 @@ where
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>
-    where
-        AUTH: TransactionAuthenticator,
-    {
+    ) -> Result<NoteUpdateAction, ClientError> {
         let note_id = *committed_note.note_id();
 
         let input_note_present =

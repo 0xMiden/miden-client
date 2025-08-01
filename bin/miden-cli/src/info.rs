@@ -5,7 +5,7 @@ use miden_client::{Client, auth::TransactionAuthenticator, store::NoteFilter};
 use super::config::CliConfig;
 use crate::{errors::CliError, load_config_file};
 
-pub async fn print_client_info<AUTH: TransactionAuthenticator + 'static>(
+pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     let (config, _) = load_config_file()?;
@@ -17,7 +17,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + 'static>(
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats<AUTH: TransactionAuthenticator + 'static>(
+async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);

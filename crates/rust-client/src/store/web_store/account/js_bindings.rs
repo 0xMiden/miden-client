@@ -30,10 +30,7 @@ extern "C" {
     pub fn idxdb_get_account_asset_vault(vault_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> JsValue;
-
-    #[wasm_bindgen(js_name = fetchAndCacheAccountAuthByPubKey)]
-    pub fn idxdb_fetch_and_cache_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
 
     // INSERTS
     // ================================================================================================
