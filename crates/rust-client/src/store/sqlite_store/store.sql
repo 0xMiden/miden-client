@@ -52,7 +52,6 @@ CREATE TABLE accounts (
     storage_root TEXT NOT NULL,                 -- Root of the account_storage Merkle tree.
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
     nonce BIGINT NOT NULL,                      -- Account nonce.
-    committed BOOLEAN NOT NULL,                 -- True if recorded, false if not.
     account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),

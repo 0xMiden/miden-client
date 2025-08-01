@@ -23,8 +23,15 @@ use crate::{
 
 // TYPES
 // ================================================================================================
-type SerializedAccountData = (String, String, String, String, Value, bool, String);
-type SerializedAccountsParts = (String, u64, String, String, String, Option<Vec<u8>>, bool);
+struct SerializedHeaderData {
+    id: String,
+    nonce: u64,
+    vault_root: String,
+    storage_commitment: String,
+    code_commitment: String,
+    account_seed: Option<Vec<u8>>,
+    locked: bool,
+}
 
 type SerializedAccountCodeData = (String, Vec<u8>);
 
@@ -261,8 +268,12 @@ pub(super) fn insert_account_record(
     account: &Account,
     account_seed: Option<Word>,
 ) -> Result<(), StoreError> {
-    let (id, code_root, storage_root, vault_root, nonce, committed, commitment) =
-        serialize_account(account);
+    let id: String = account.id().to_hex();
+    let code_commitment = account.code().commitment().to_string();
+    let storage_commitment = account.storage().commitment().to_string();
+    let vault_root = account.vault().root().to_string();
+    let nonce = u64_to_value(account.nonce().as_int());
+    let commitment = account.commitment().to_string();
 
     let account_seed = account_seed.map(|seed| seed.to_bytes());
 
@@ -273,7 +284,6 @@ pub(super) fn insert_account_record(
             storage_root,
             vault_root,
             nonce,
-            committed,
             account_seed,
             account_commitment,
             locked
@@ -284,11 +294,10 @@ pub(super) fn insert_account_record(
         QUERY,
         params![
             id,
-            code_root,
-            storage_root,
+            code_commitment,
+            storage_commitment,
             vault_root,
             nonce,
-            committed,
             account_seed,
             commitment,
             false,
@@ -369,25 +378,41 @@ pub(super) fn lock_account_on_unexpected_commitment(
 }
 
 /// Parse accounts columns from the provided row into native types.
-pub(super) fn parse_accounts_columns(
+fn parse_accounts_columns(
     row: &rusqlite::Row<'_>,
-) -> Result<SerializedAccountsParts, rusqlite::Error> {
+) -> Result<SerializedHeaderData, rusqlite::Error> {
     let id: String = row.get(0)?;
     let nonce: u64 = column_value_as_u64(row, 1)?;
     let vault_root: String = row.get(2)?;
-    let storage_root: String = row.get(3)?;
-    let code_root: String = row.get(4)?;
+    let storage_commitment: String = row.get(3)?;
+    let code_commitment: String = row.get(4)?;
     let account_seed: Option<Vec<u8>> = row.get(5)?;
     let locked: bool = row.get(6)?;
-    Ok((id, nonce, vault_root, storage_root, code_root, account_seed, locked))
+
+    Ok(SerializedHeaderData {
+        id,
+        nonce,
+        vault_root,
+        storage_commitment,
+        code_commitment,
+        account_seed,
+        locked,
+    })
 }
 
 /// Parse an account from the provided parts.
-pub(super) fn parse_accounts(
-    serialized_account_parts: SerializedAccountsParts,
+fn parse_accounts(
+    serialized_account_parts: SerializedHeaderData,
 ) -> Result<(AccountHeader, AccountStatus), StoreError> {
-    let (id, nonce, vault_root, storage_root, code_root, account_seed, locked) =
-        serialized_account_parts;
+    let SerializedHeaderData {
+        id,
+        nonce,
+        vault_root,
+        storage_commitment,
+        code_commitment,
+        account_seed,
+        locked,
+    } = serialized_account_parts;
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
 
     let status = match (account_seed, locked) {
@@ -401,25 +426,11 @@ pub(super) fn parse_accounts(
             AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
             Felt::new(nonce),
             Word::try_from(&vault_root)?,
-            Word::try_from(&storage_root)?,
-            Word::try_from(&code_root)?,
+            Word::try_from(&storage_commitment)?,
+            Word::try_from(&code_commitment)?,
         ),
         status,
     ))
-}
-
-/// Serialized the provided account into database compatible types.
-// TODO: review the clippy exemption.
-fn serialize_account(account: &Account) -> SerializedAccountData {
-    let id: String = account.id().to_hex();
-    let code_root = account.code().commitment().to_string();
-    let commitment_root = account.storage().commitment().to_string();
-    let vault_root = account.vault().root().to_string();
-    let committed = account.is_public();
-    let nonce = u64_to_value(account.nonce().as_int());
-    let commitment = account.commitment().to_string();
-
-    (id, code_root, commitment_root, vault_root, nonce, committed, commitment)
 }
 
 /// Serialize the provided `account_code` into database compatible types.
