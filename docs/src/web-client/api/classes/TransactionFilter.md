@@ -28,6 +28,38 @@
 
 ***
 
+### expiredBefore()
+
+> `static` **expiredBefore**(`block_num`): `TransactionFilter`
+
+#### Parameters
+
+##### block\_num
+
+`number`
+
+#### Returns
+
+`TransactionFilter`
+
+***
+
+### ids()
+
+> `static` **ids**(`transaction_ids`): `TransactionFilter`
+
+#### Parameters
+
+##### transaction\_ids
+
+[`TransactionId`](TransactionId.md)[]
+
+#### Returns
+
+`TransactionFilter`
+
+***
+
 ### uncommitted()
 
 > `static` **uncommitted**(): `TransactionFilter`
