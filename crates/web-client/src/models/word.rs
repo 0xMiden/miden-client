@@ -1,8 +1,9 @@
-use miden_lib::utils::Deserializable;
 use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::felt::Felt;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -41,18 +42,12 @@ impl Word {
         Word(native_word)
     }
 
-    #[wasm_bindgen(js_name = "toHex")]
-    pub fn to_hex(&self) -> String {
-        self.0.to_hex()
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
     }
 
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
-        let bytes = hex::decode(&hex)
-            .map_err(|err| JsValue::from_str(&format!("Invalid hex string: {err}")))?;
-
-        let native_word = NativeWord::read_from_bytes(&bytes)
-            .map_err(|err| JsValue::from_str(&format!("Invalid word string: {err}")))?;
+    pub fn deserialize(bytes: &Uint8Array) -> Result<Word, JsValue> {
+        let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
         Ok(Word(native_word))
     }
 

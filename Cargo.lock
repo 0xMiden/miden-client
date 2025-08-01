@@ -2095,7 +2095,6 @@ dependencies = [
 name = "miden-client-web"
 version = "0.11.0"
 dependencies = [
- "hex",
  "miden-client",
  "miden-lib",
  "miden-objects",

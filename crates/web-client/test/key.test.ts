@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { testingPage } from "./mocha.global.setup.mjs";
 
-describe("signature", () => {
+describe.only("signature", () => {
   it("should produce a valid signature", async () => {
     const isValid = await testingPage.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
@@ -55,9 +55,9 @@ describe("signature", () => {
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
       const signature = secretKey.sign(message);
-      const serializedSignature = signature.toHex();
+      const serializedSignature = signature.serialize();
       const deserializedSignature =
-        window.Signature.fromHex(serializedSignature);
+        window.Signature.deserialize(serializedSignature);
 
       const isValid = secretKey
         .publicKey()
@@ -69,30 +69,36 @@ describe("signature", () => {
   });
 });
 
-describe("public key", () => {
+describe.only("public key", () => {
   it("should be able to serialize and deserialize a public key", async () => {
     const isValid = await testingPage.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const publicKey = secretKey.publicKey();
-      const serializedPublicKey = publicKey.toHex();
+      const serializedPublicKey = publicKey.serialize();
       const deserializedPublicKey =
-        window.PublicKey.fromHex(serializedPublicKey);
-      const serializedDeserializedPublicKey = deserializedPublicKey.toHex();
-      return serializedPublicKey === serializedDeserializedPublicKey;
+        window.PublicKey.deserialize(serializedPublicKey);
+      const serializedDeserializedPublicKey = deserializedPublicKey.serialize();
+      return (
+        serializedPublicKey.toString() ===
+        serializedDeserializedPublicKey.toString()
+      );
     });
     expect(isValid).to.be.true;
   });
 });
 
-describe("secret key", () => {
+describe.only("secret key", () => {
   it("should be able to serialize and deserialize a secret key", async () => {
     const isValid = await testingPage.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
-      const serializedSecretKey = secretKey.toHex();
+      const serializedSecretKey = secretKey.serialize();
       const deserializedSecretKey =
-        window.SecretKey.fromHex(serializedSecretKey);
-      const serializedDeserializedSecretKey = deserializedSecretKey.toHex();
-      return serializedSecretKey === serializedDeserializedSecretKey;
+        window.SecretKey.deserialize(serializedSecretKey);
+      const serializedDeserializedSecretKey = deserializedSecretKey.serialize();
+      return (
+        serializedSecretKey.toString() ===
+        serializedDeserializedSecretKey.toString()
+      );
     });
     expect(isValid).to.be.true;
   });

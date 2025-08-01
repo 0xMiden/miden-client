@@ -43,7 +43,6 @@ miden-tx = { branch = "next", default-features = false, features = [
 
 # External dependencies
 async-trait = "0.1"
-hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.2" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }

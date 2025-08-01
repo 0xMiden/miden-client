@@ -1,10 +1,12 @@
-use hex::ToHex;
-use miden_client::utils::{Deserializable, Serializable};
 use miden_objects::{Word as NativeWord, crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey};
 use rand::{SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::models::{public_key::PublicKey, signature::Signature, word::Word};
+use crate::{
+    models::{public_key::PublicKey, signature::Signature, word::Word},
+    utils::{deserialize_from_uint8array, serialize_to_uint8array},
+};
 
 #[wasm_bindgen]
 pub struct SecretKey(NativeSecretKey);
@@ -31,7 +33,6 @@ impl SecretKey {
         self.0.public_key().into()
     }
 
-    #[wasm_bindgen(js_name = "sign")]
     pub fn sign(&self, message: &Word) -> Result<Signature, JsValue> {
         let native_message: NativeWord = message.into();
         let mut rng = StdRng::from_os_rng();
@@ -39,17 +40,12 @@ impl SecretKey {
         Ok(signature.into())
     }
 
-    #[wasm_bindgen(js_name = "toHex")]
-    pub fn to_hex(&self) -> String {
-        self.0.to_bytes().encode_hex()
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
     }
 
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<SecretKey, JsValue> {
-        let bytes = hex::decode(&hex)
-            .map_err(|err| JsValue::from_str(&format!("Invalid hex string: {err}")))?;
-        let native_secret_key = NativeSecretKey::read_from_bytes(&bytes)
-            .map_err(|err| JsValue::from_str(&format!("Invalid secret key string: {err}")))?;
+    pub fn deserialize(bytes: &Uint8Array) -> Result<SecretKey, JsValue> {
+        let native_secret_key = deserialize_from_uint8array::<NativeSecretKey>(bytes)?;
         Ok(SecretKey(native_secret_key))
     }
 }
