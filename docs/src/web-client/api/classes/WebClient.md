@@ -761,3 +761,19 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 [`NoteTag`](NoteTag.md)
+
+***
+
+### readNoteScriptFromBytes()
+
+> `static` **readNoteScriptFromBytes**(`script_bytes`): [`NoteScript`](NoteScript.md)
+
+#### Parameters
+
+##### script\_bytes
+
+`Uint8Array`
+
+#### Returns
+
+[`NoteScript`](NoteScript.md)
