@@ -687,3 +687,19 @@ Meant to be used in conjunction with the force_import_store method
 #### Returns
 
 [`NoteTag`](NoteTag.md)
+
+***
+
+### readNoteScriptFromBytes()
+
+> `static` **readNoteScriptFromBytes**(`script_bytes`): [`NoteScript`](NoteScript.md)
+
+#### Parameters
+
+##### script\_bytes
+
+`Uint8Array`
+
+#### Returns
+
+[`NoteScript`](NoteScript.md)
