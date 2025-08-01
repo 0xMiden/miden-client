@@ -28,6 +28,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### sign()
 
 > **sign**(`message`): [`Signature`](Signature.md)
@@ -44,25 +54,15 @@
 
 ***
 
-### toHex()
+### deserialize()
 
-> **toHex**(): `string`
-
-#### Returns
-
-`string`
-
-***
-
-### fromHex()
-
-> `static` **fromHex**(`hex`): `SecretKey`
+> `static` **deserialize**(`bytes`): `SecretKey`
 
 #### Parameters
 
-##### hex
+##### bytes
 
-`string`
+`Uint8Array`
 
 #### Returns
 

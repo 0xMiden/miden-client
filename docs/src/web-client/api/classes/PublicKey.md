@@ -18,13 +18,13 @@
 
 ***
 
-### toHex()
+### serialize()
 
-> **toHex**(): `string`
+> **serialize**(): `Uint8Array`
 
 #### Returns
 
-`string`
+`Uint8Array`
 
 ***
 
@@ -48,15 +48,15 @@
 
 ***
 
-### fromHex()
+### deserialize()
 
-> `static` **fromHex**(`hex`): `PublicKey`
+> `static` **deserialize**(`bytes`): `PublicKey`
 
 #### Parameters
 
-##### hex
+##### bytes
 
-`string`
+`Uint8Array`
 
 #### Returns
 

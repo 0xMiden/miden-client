@@ -34,6 +34,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### toFelts()
 
 > **toFelts**(): [`Felt`](Felt.md)[]
@@ -41,16 +51,6 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
-
-***
-
-### toHex()
-
-> **toHex**(): `string`
-
-#### Returns
-
-`string`
 
 ***
 
@@ -64,15 +64,15 @@
 
 ***
 
-### fromHex()
+### deserialize()
 
-> `static` **fromHex**(`hex`): `Word`
+> `static` **deserialize**(`bytes`): `Word`
 
 #### Parameters
 
-##### hex
+##### bytes
 
-`string`
+`Uint8Array`
 
 #### Returns
 

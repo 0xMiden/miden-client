@@ -18,25 +18,25 @@
 
 ***
 
-### toHex()
+### serialize()
 
-> **toHex**(): `string`
+> **serialize**(): `Uint8Array`
 
 #### Returns
 
-`string`
+`Uint8Array`
 
 ***
 
-### fromHex()
+### deserialize()
 
-> `static` **fromHex**(`hex`): `Signature`
+> `static` **deserialize**(`bytes`): `Signature`
 
 #### Parameters
 
-##### hex
+##### bytes
 
-`string`
+`Uint8Array`
 
 #### Returns
 
