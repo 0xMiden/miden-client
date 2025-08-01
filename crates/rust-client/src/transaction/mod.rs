@@ -980,10 +980,10 @@ where
         account_id: AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
-        let current_chain_tip =
-            self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
-
         if let Some(max_block_number_delta) = self.max_block_number_delta {
+            let current_chain_tip =
+                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
+
             if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
                 return Err(ClientError::RecencyConditionError(
                     "The client is too far behind the chain tip to execute the transaction"
