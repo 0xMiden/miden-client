@@ -362,7 +362,7 @@ pub mod tests {
     use std::boxed::Box;
 
     use super::SqliteStore;
-    use crate::{store::Store, tests::create_test_store_path};
+    use crate::{store::Store, testing::config::create_test_store_path};
 
     fn assert_send_sync<T: Send + Sync>() {}
 

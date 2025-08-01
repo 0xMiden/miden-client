@@ -2,7 +2,7 @@ use miden_client::{
     ZERO,
     note::NoteExecutionHint,
     store::NoteFilter,
-    testing::common::*,
+    testing::{common::*, config::ClientConfig},
     transaction::{InputNote, TransactionRequest, TransactionRequestBuilder},
     utils::{Deserializable, Serializable},
 };
@@ -47,8 +47,8 @@ const NOTE_ARGS: [Felt; 8] = [
     Felt::new(9),
 ];
 
-pub async fn transaction_request() {
-    let (mut client, authenticator) = create_test_client().await;
+pub async fn transaction_request(client_config: ClientConfig) {
+    let (mut client, authenticator) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     client.sync_state().await.unwrap();
@@ -138,8 +138,8 @@ pub async fn transaction_request() {
     assert!(input_note.is_consumed());
 }
 
-pub async fn merkle_store() {
-    let (mut client, authenticator) = create_test_client().await;
+pub async fn merkle_store(client_config: ClientConfig) {
+    let (mut client, authenticator) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     client.sync_state().await.unwrap();
@@ -226,15 +226,19 @@ pub async fn merkle_store() {
     client.sync_state().await.unwrap();
 }
 
-pub async fn onchain_notes_sync_with_tag() {
+pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) {
     // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = create_test_client().await;
+    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
     // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, keystore_2) = create_test_client().await;
+    let (mut client_2, keystore_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     // Client 3 will be the control client. We won't add any tags and expect the note not to be
     // fetched
-    let (mut client_3, ..) = create_test_client().await;
+    let (mut client_3, ..) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     wait_for_node(&mut client_3).await;
 
     // Create accounts

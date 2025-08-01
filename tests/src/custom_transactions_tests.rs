@@ -16,15 +16,22 @@
 
 #[tokio::test]
 async fn transaction_request() {
-    miden_client_integration_tests::tests::custom_transaction::transaction_request().await
+    miden_client_integration_tests::tests::custom_transaction::transaction_request(
+        Default::default(),
+    )
+    .await
 }
 
 #[tokio::test]
 async fn merkle_store() {
-    miden_client_integration_tests::tests::custom_transaction::merkle_store().await
+    miden_client_integration_tests::tests::custom_transaction::merkle_store(Default::default())
+        .await
 }
 
 #[tokio::test]
 async fn onchain_notes_sync_with_tag() {
-    miden_client_integration_tests::tests::custom_transaction::onchain_notes_sync_with_tag().await
+    miden_client_integration_tests::tests::custom_transaction::onchain_notes_sync_with_tag(
+        Default::default(),
+    )
+    .await
 }

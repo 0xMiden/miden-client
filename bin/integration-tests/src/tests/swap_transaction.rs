@@ -1,7 +1,7 @@
 use miden_client::{
     account::Account,
     note::{Note, build_swap_tag},
-    testing::common::*,
+    testing::{common::*, config::ClientConfig},
     transaction::{SwapTransactionData, TransactionRequestBuilder},
 };
 use miden_objects::{
@@ -13,12 +13,14 @@ use miden_objects::{
 // SWAP FULLY ONCHAIN
 // ================================================================================================
 
-pub async fn swap_fully_onchain() {
+pub async fn swap_fully_onchain(client_config: ClientConfig) {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
-    let (mut client1, authenticator_1) = create_test_client().await;
+    let (mut client1, authenticator_1) = create_test_client(client_config.clone()).await;
     wait_for_node(&mut client1).await;
-    let (mut client2, authenticator_2) = create_test_client().await;
+    let (mut client2, authenticator_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
 
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();
@@ -184,12 +186,14 @@ pub async fn swap_fully_onchain() {
     }
 }
 
-pub async fn swap_private() {
+pub async fn swap_private(client_config: ClientConfig) {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
-    let (mut client1, authenticator_1) = create_test_client().await;
+    let (mut client1, authenticator_1) = create_test_client(client_config.clone()).await;
     wait_for_node(&mut client1).await;
-    let (mut client2, authenticator_2) = create_test_client().await;
+    let (mut client2, authenticator_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
 
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();

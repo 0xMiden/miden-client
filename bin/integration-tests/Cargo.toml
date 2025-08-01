@@ -21,9 +21,11 @@ miden-objects = { default-features = false, features = ["testing"], workspace = 
 
 # External dependencies
 async-trait        = { workspace = true }
+clap               = { features = ["derive"], version = "4.0" }
 futures            = { version = "0.3" }
 rand               = { workspace = true }
 tokio              = { workspace = true }
+url                = { version = "2.5.4" }
 winter-maybe-async = { features = ["async"], version = "0.12" }
 
 [package.metadata.cargo-machete]

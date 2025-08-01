@@ -59,7 +59,13 @@ make integration-test
 
 ### Running tests against a remote node
 
-You can run the integration tests against a remote node by overwriting the rpc section of the configuration file at `./config/miden-client-rpc.toml`.
+You can run the integration tests against a remote node by setting the `MIDEN_RPC_ENDPOINT` environment variable to the URL of the node you want to test against.
+
+For example, to run the integration tests against a node running on `localhost:57291`, you can do:
+
+```bash
+MIDEN_RPC_ENDPOINT=http://localhost:57291 make integration-test-full
+```
 
 ## CI integration
 

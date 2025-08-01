@@ -2,7 +2,7 @@ use miden_client::{
     account::build_wallet_id,
     auth::AuthSecretKey,
     store::{InputNoteState, NoteFilter},
-    testing::common::*,
+    testing::{common::*, config::ClientConfig},
     transaction::{PaymentNoteDescription, TransactionRequestBuilder},
 };
 use miden_objects::{
@@ -17,13 +17,17 @@ use rand::RngCore;
 // TESTS
 // ================================================================================================
 
-pub async fn onchain_notes_flow() {
+pub async fn onchain_notes_flow(client_config: ClientConfig) {
     // Client 1 is an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = create_test_client().await;
+    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await;
     // Client 2 is an private account which will consume the note that it will sync from the node
-    let (mut client_2, keystore_2) = create_test_client().await;
+    let (mut client_2, keystore_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     // Client 3 will be transferred part of the assets by client 2's account
-    let (mut client_3, keystore_3) = create_test_client().await;
+    let (mut client_3, keystore_3) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     wait_for_node(&mut client_3).await;
 
     // Create faucet account
@@ -141,9 +145,11 @@ pub async fn onchain_notes_flow() {
     .await;
 }
 
-pub async fn onchain_accounts() {
-    let (mut client_1, keystore_1) = create_test_client().await;
-    let (mut client_2, keystore_2) = create_test_client().await;
+pub async fn onchain_accounts(client_config: ClientConfig) {
+    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await;
+    let (mut client_2, keystore_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     wait_for_node(&mut client_2).await;
 
     let (faucet_account_header, _, secret_key) =
@@ -325,9 +331,11 @@ pub async fn onchain_accounts() {
     assert_eq!(new_to_account_balance, to_account_balance + TRANSFER_AMOUNT);
 }
 
-pub async fn import_account_by_id() {
-    let (mut client_1, keystore_1) = create_test_client().await;
-    let (mut client_2, keystore_2) = create_test_client().await;
+pub async fn import_account_by_id(client_config: ClientConfig) {
+    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await;
+    let (mut client_2, keystore_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     wait_for_node(&mut client_1).await;
 
     let mut user_seed = [0u8; 32];
@@ -387,8 +395,8 @@ pub async fn import_account_by_id() {
     .await;
 }
 
-pub async fn incorrect_genesis() {
-    let (builder, _) = create_test_client_builder().await;
+pub async fn incorrect_genesis(client_config: ClientConfig) {
+    let (builder, _) = create_test_client_builder(client_config).await;
     let mut client = builder.build().await.unwrap();
 
     // Set an incorrect genesis commitment

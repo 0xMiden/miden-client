@@ -9,6 +9,7 @@ use miden_client::{
             TestClient, create_test_client, execute_tx_and_sync, insert_new_wallet,
             wait_for_blocks, wait_for_tx,
         },
+        config::ClientConfig,
         note::NoteBuilder,
     },
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
@@ -134,9 +135,9 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-pub async fn counter_contract_ntx() {
+pub async fn counter_contract_ntx(client_config: ClientConfig) {
     const BUMP_NOTE_NUMBER: u64 = 5;
-    let (mut client, keystore) = create_test_client().await;
+    let (mut client, keystore) = create_test_client(client_config).await;
     client.sync_state().await.unwrap();
 
     let (network_account, library) =
@@ -206,8 +207,8 @@ pub async fn counter_contract_ntx() {
     );
 }
 
-pub async fn recall_note_before_ntx_consumes_it() {
-    let (mut client, keystore) = create_test_client().await;
+pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
+    let (mut client, keystore) = create_test_client(client_config).await;
     client.sync_state().await.unwrap();
 
     let (network_account, library) =
