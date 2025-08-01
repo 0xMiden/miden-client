@@ -22,12 +22,19 @@ CREATE TABLE account_storage (
     PRIMARY KEY (root)
 );
 
+-- TODO: document
 -- Create account_vaults table
 CREATE TABLE account_vaults (
-    root TEXT NOT NULL,         -- root of the Merkle tree for the account asset vault.
-    assets BLOB NOT NULL,       -- serialized account vault assets.
-    PRIMARY KEY (root)
+    root TEXT NOT NULL,
+    faucet_id_prefix TEXT NOT NULL,
+    fungible_faucet_id TEXT NULL,
+    fungible_faucet_amount UNSIGNED BIG INT NULL,
+    non_fungible_asset BLOB NULL,
+    PRIMARY KEY (root, faucet_id_prefix),
+    CONSTRAINT check_asset_type CHECK ((non_fungible_asset IS NULL AND fungible_faucet_id IS NOT NULL AND fungible_faucet_amount IS NOT NULL) OR (non_fungible_asset IS NOT NULL AND fungible_faucet_id IS NULL AND fungible_faucet_amount IS NULL))
 );
+
+CREATE INDEX idx_account_vaults_root ON account_vaults(root);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(
@@ -51,7 +58,6 @@ CREATE TABLE accounts (
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_root) REFERENCES account_code(root),
     FOREIGN KEY (storage_root) REFERENCES account_storage(root),
-    FOREIGN KEY (vault_root) REFERENCES account_vaults(root)
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );

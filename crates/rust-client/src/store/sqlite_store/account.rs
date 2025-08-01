@@ -9,9 +9,9 @@ use std::{collections::BTreeMap, rc::Rc};
 use miden_objects::{
     AccountError, Felt, Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
+    asset::{Asset, AssetVault, FungibleAsset, NonFungibleAsset},
 };
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use rusqlite::{Connection, Transaction, named_params, params, types::Value};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
@@ -26,13 +26,15 @@ use crate::{
 type SerializedAccountData = (String, String, String, String, Value, bool, String);
 type SerializedAccountsParts = (String, u64, String, String, String, Option<Vec<u8>>, bool);
 
-type SerializedAccountVaultData = (String, Vec<u8>);
-
 type SerializedAccountCodeData = (String, Vec<u8>);
 
 type SerializedAccountStorageData = (String, Vec<u8>);
 
-type SerializedFullAccountParts = (String, u64, Option<Vec<u8>>, Vec<u8>, Vec<u8>, Vec<u8>, bool);
+struct SerializedAssetData {
+    fungible_faucet_id: Option<String>,
+    fungible_faucet_amount: Option<u64>,
+    non_fungible_asset: Option<Vec<u8>>,
+}
 
 impl SqliteStore {
     // ACCOUNTS
@@ -102,20 +104,47 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        const QUERY: &str = "SELECT accounts.id, accounts.nonce, accounts.account_seed, account_code.code, account_storage.slots, account_vaults.assets, accounts.locked \
-                            FROM accounts \
-                            JOIN account_code ON accounts.code_root = account_code.root \
-                            JOIN account_storage ON accounts.storage_root = account_storage.root \
-                            JOIN account_vaults ON accounts.vault_root = account_vaults.root \
-                            WHERE accounts.id = ? \
-                            ORDER BY accounts.nonce DESC \
-                            LIMIT 1";
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+            return Ok(None);
+        };
 
-        conn.prepare(QUERY)?
-            .query_map(params![account_id.to_hex()], parse_account_columns)?
-            .map(|result| Ok(result?).and_then(parse_account))
+        const VAULT_QUERY: &str = "SELECT  fungible_faucet_id, fungible_faucet_amount, non_fungible_asset FROM account_vaults WHERE root = ?";
+        let assets = conn
+            .prepare(VAULT_QUERY)?
+            .query_map(params![header.vault_root().to_hex()], parse_asset_columns)?
+            .map(|result| Ok(result?).and_then(parse_asset))
+            .collect::<Result<Vec<Asset>, StoreError>>()?;
+
+        let vault = AssetVault::new(&assets)?;
+
+        const STORAGE_QUERY: &str = "SELECT slots FROM account_storage WHERE root = ?";
+        let slots = conn
+            .prepare(STORAGE_QUERY)?
+            .query_map(params![header.storage_commitment().to_hex()], |row| {
+                let slots: Vec<u8> = row.get(0)?;
+                Ok(slots)
+            })?
             .next()
-            .transpose()
+            .transpose()?
+            .unwrap(); // TODO: Remove
+        let storage = AccountStorage::read_from_bytes(&slots)?;
+
+        const CODE_QUERY: &str = "SELECT code FROM account_code WHERE root = ?";
+        let code = conn
+            .prepare(CODE_QUERY)?
+            .query_map(params![header.code_commitment().to_hex()], |row| {
+                let code: Vec<u8> = row.get(0)?;
+                Ok(code)
+            })?
+            .next()
+            .transpose()?
+            .unwrap(); // TODO: Remove
+        let account_code = AccountCode::from_bytes(&code)?;
+
+        Ok(Some(AccountRecord::new(
+            Account::from_parts(header.id(), vault, storage, account_code, header.nonce()),
+            status,
+        )))
     }
 
     pub(crate) fn insert_account(
@@ -292,9 +321,29 @@ pub(super) fn insert_account_asset_vault(
     tx: &Transaction<'_>,
     asset_vault: &AssetVault,
 ) -> Result<(), StoreError> {
-    let (vault_root, assets) = serialize_account_asset_vault(asset_vault);
-    const QUERY: &str = insert_sql!(account_vaults { root, assets } | IGNORE);
-    tx.execute(QUERY, params![vault_root, assets])?;
+    for asset in asset_vault.assets() {
+        let serialized_asset = serialize_asset(&asset);
+        const QUERY: &str = insert_sql!(
+            account_vaults {
+                root,
+                faucet_id_prefix,
+                fungible_faucet_id,
+                fungible_faucet_amount,
+                non_fungible_asset
+            } | IGNORE
+        );
+        tx.execute(
+            QUERY,
+            params![
+                asset_vault.root().to_string(),
+                asset.faucet_id_prefix().to_string(),
+                serialized_asset.fungible_faucet_id,
+                serialized_asset.fungible_faucet_amount,
+                serialized_asset.non_fungible_asset,
+            ],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -359,34 +408,6 @@ pub(super) fn parse_accounts(
     ))
 }
 
-/// Parse an account from the provided parts.
-pub(super) fn parse_account(
-    serialized_account_parts: SerializedFullAccountParts,
-) -> Result<AccountRecord, StoreError> {
-    let (id, nonce, account_seed, code, storage, assets, locked) = serialized_account_parts;
-    let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
-    let account_id: AccountId =
-        AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic");
-    let account_code = AccountCode::from_bytes(&code)?;
-    let account_storage = AccountStorage::read_from_bytes(&storage)?;
-    let account_assets: Vec<Asset> = Vec::<Asset>::read_from_bytes(&assets)?;
-    let account = Account::from_parts(
-        account_id,
-        AssetVault::new(&account_assets)?,
-        account_storage,
-        account_code,
-        Felt::new(nonce),
-    );
-
-    let status = match (account_seed, locked) {
-        (_, true) => AccountStatus::Locked,
-        (Some(seed), _) => AccountStatus::New { seed },
-        _ => AccountStatus::Tracked,
-    };
-
-    Ok(AccountRecord::new(account, status))
-}
-
 /// Serialized the provided account into database compatible types.
 // TODO: review the clippy exemption.
 fn serialize_account(account: &Account) -> SerializedAccountData {
@@ -418,25 +439,58 @@ fn serialize_account_storage(account_storage: &AccountStorage) -> SerializedAcco
 }
 
 /// Serialize the provided `asset_vault` into database compatible types.
-fn serialize_account_asset_vault(asset_vault: &AssetVault) -> SerializedAccountVaultData {
-    let commitment = asset_vault.root().to_string();
-    let assets = asset_vault.assets().collect::<Vec<Asset>>().to_bytes();
-    (commitment, assets)
+fn serialize_asset(asset: &Asset) -> SerializedAssetData {
+    match asset {
+        Asset::Fungible(fungible) => {
+            let id = fungible.faucet_id().to_hex();
+            let amount = fungible.amount();
+            SerializedAssetData {
+                fungible_faucet_id: Some(id),
+                fungible_faucet_amount: Some(amount),
+                non_fungible_asset: None,
+            }
+        },
+        Asset::NonFungible(non_fungible) => SerializedAssetData {
+            fungible_faucet_id: None,
+            fungible_faucet_amount: None,
+            non_fungible_asset: Some(non_fungible.to_bytes()),
+        },
+    }
 }
 
-/// Parse accounts parts from the provided row into native types.
-pub(super) fn parse_account_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedFullAccountParts, rusqlite::Error> {
-    let id: String = row.get(0)?;
-    let nonce: u64 = column_value_as_u64(row, 1)?;
-    let account_seed: Option<Vec<u8>> = row.get(2)?;
-    let code: Vec<u8> = row.get(3)?;
-    let storage: Vec<u8> = row.get(4)?;
-    let assets: Vec<u8> = row.get(5)?;
-    let locked: bool = row.get(6)?;
+fn parse_asset_columns(row: &rusqlite::Row<'_>) -> Result<SerializedAssetData, rusqlite::Error> {
+    let fungible_faucet_id: Option<String> = row.get(0)?;
+    let fungible_faucet_amount: Option<u64> = row.get(1)?;
+    let non_fungible_asset: Option<Vec<u8>> = row.get(2)?;
 
-    Ok((id, nonce, account_seed, code, storage, assets, locked))
+    Ok(SerializedAssetData {
+        fungible_faucet_id,
+        fungible_faucet_amount,
+        non_fungible_asset,
+    })
+}
+
+fn parse_asset(serialized_asset: SerializedAssetData) -> Result<Asset, StoreError> {
+    let SerializedAssetData {
+        fungible_faucet_id,
+        fungible_faucet_amount,
+        non_fungible_asset,
+    } = serialized_asset;
+
+    match (fungible_faucet_id, fungible_faucet_amount, non_fungible_asset) {
+        (Some(faucet_id), Some(amount), None) => {
+            let faucet_id = AccountId::from_hex(&faucet_id)?;
+            let fungible_asset = FungibleAsset::new(faucet_id, amount)?;
+            Ok(Asset::Fungible(fungible_asset))
+        },
+        (None, None, Some(non_fungible_asset)) => {
+            let non_fungible_asset = NonFungibleAsset::read_from_bytes(&non_fungible_asset)?;
+            Ok(Asset::NonFungible(non_fungible_asset))
+        },
+        _ => Err(StoreError::DataDeserializationError(DeserializationError::InvalidValue(
+            "Invalid asset data".to_string(),
+        ))),
+    }
 }
 
 /// Removes account states with the specified hashes from the database.
