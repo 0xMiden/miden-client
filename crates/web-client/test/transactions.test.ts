@@ -92,16 +92,20 @@ describe("get_transactions tests", () => {
       let allTransactions = await client.getTransactions(
         window.TransactionFilter.all()
       );
+      const allTxLength = allTransactions.length;
       let firstTransactionId = allTransactions[0].id();
-      let filteredTransactions = await client.getTransactions(
-        window.TransactionFilter.ids([firstTransactionId])
-      );
+      const firstTxIdHex = firstTransactionId.toHex();
+
+      const filter = window.TransactionFilter.ids([firstTransactionId]);
+      let filteredTransactions = await client.getTransactions(filter);
+      const filteredTxLength = filteredTransactions.length;
+      const filteredTxIdHex = filteredTransactions[0].id().toHex();
 
       return {
-        allTransactionsCount: allTransactions.length,
-        filteredTransactionsCount: filteredTransactions.length,
-        filteredTransactionId: filteredTransactions[0].id().toHex(),
-        originalTransactionId: firstTransactionId.toHex(),
+        allTransactionsCount: allTxLength,
+        filteredTransactionsCount: filteredTxLength,
+        filteredTransactionId: filteredTxIdHex,
+        originalTransactionId: firstTxIdHex,
       };
     });
 
