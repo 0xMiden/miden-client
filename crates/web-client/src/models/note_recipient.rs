@@ -7,7 +7,7 @@ use miden_objects::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::{note_inputs::NoteInputs, note_script::NoteScript, rpo_digest::RpoDigest, word::Word};
+use super::{note_inputs::NoteInputs, note_script::NoteScript, word::Word};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -26,8 +26,21 @@ impl NoteRecipient {
         NoteRecipient(native_note_recipient)
     }
 
-    pub fn digest(&self) -> RpoDigest {
+    pub fn digest(&self) -> Word {
         self.0.digest().into()
+    }
+
+    #[wasm_bindgen(js_name = "serialNum")]
+    pub fn serial_num(&self) -> Word {
+        self.0.serial_num().into()
+    }
+
+    pub fn script(&self) -> NoteScript {
+        self.0.script().into()
+    }
+
+    pub fn inputs(&self) -> NoteInputs {
+        self.0.inputs().into()
     }
 }
 

@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     felt::{Felt, FeltArray},
-    rpo_digest::RpoDigest,
+    word::Word,
 };
 
 #[wasm_bindgen]
@@ -12,7 +12,7 @@ pub struct Rpo256;
 #[wasm_bindgen]
 impl Rpo256 {
     #[wasm_bindgen(js_name = "hashElements")]
-    pub fn hash_elements(felt_array: &FeltArray) -> RpoDigest {
+    pub fn hash_elements(felt_array: &FeltArray) -> Word {
         let felts: Vec<Felt> = felt_array.into();
         let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();
 

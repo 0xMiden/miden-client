@@ -42,7 +42,7 @@ pub struct AccountCmd {
 }
 
 impl AccountCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         let (cli_config, _) = load_config_file()?;
         match self {
             AccountCmd {
@@ -98,7 +98,7 @@ impl AccountCmd {
 // LIST ACCOUNTS
 // ================================================================================================
 
-async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), CliError> {
+async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
     let mut table =
@@ -128,8 +128,8 @@ async fn list_accounts(client: Client, cli_config: &CliConfig) -> Result<(), Cli
 // SHOW ACCOUNT
 // ================================================================================================
 
-pub async fn show_account(
-    client: Client,
+pub async fn show_account<AUTH>(
+    client: Client<AUTH>,
     account_id: AccountId,
     cli_config: &CliConfig,
     with_code: bool,

@@ -7,7 +7,7 @@ use alloc::{
 use std::{collections::BTreeMap, rc::Rc};
 
 use miden_objects::{
-    AccountError, Digest, Felt, Word,
+    AccountError, Felt, Word,
     account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
     asset::{Asset, AssetVault},
 };
@@ -82,7 +82,7 @@ impl SqliteStore {
 
     pub(crate) fn get_account_header_by_commitment(
         conn: &mut Connection,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str: String = account_commitment.to_string();
         const QUERY: &str = "SELECT id, nonce, vault_root, storage_root, code_root, account_seed, locked \
@@ -303,7 +303,7 @@ pub(super) fn insert_account_asset_vault(
 pub(super) fn lock_account_on_unexpected_commitment(
     tx: &Transaction<'_>,
     account_id: &AccountId,
-    mismatched_digest: &Digest,
+    mismatched_digest: &Word,
 ) -> Result<(), StoreError> {
     // Mismatched digests may be due to stale network data. If the mismatched digest is
     // tracked in the db and corresponds to the mismatched account, it means we
@@ -351,9 +351,9 @@ pub(super) fn parse_accounts(
         AccountHeader::new(
             AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
             Felt::new(nonce),
-            Digest::try_from(&vault_root)?,
-            Digest::try_from(&storage_root)?,
-            Digest::try_from(&code_root)?,
+            Word::try_from(&vault_root)?,
+            Word::try_from(&storage_root)?,
+            Word::try_from(&code_root)?,
         ),
         status,
     ))
@@ -448,7 +448,7 @@ pub(super) fn parse_account_columns(
 /// implementation to handle transaction rollbacks.
 pub(crate) fn undo_account_state(
     tx: &Transaction<'_>,
-    account_hashes: &[Digest],
+    account_hashes: &[Word],
 ) -> Result<(), StoreError> {
     const QUERY: &str = "DELETE FROM accounts WHERE account_commitment = ?";
     for account_id in account_hashes {
@@ -459,7 +459,7 @@ pub(crate) fn undo_account_state(
 
 #[cfg(test)]
 mod tests {
-    use miden_lib::account::auth::RpoFalcon512;
+    use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_objects::{
         EMPTY_WORD,
         account::{AccountCode, AccountComponent},
@@ -477,7 +477,7 @@ mod tests {
             .unwrap()
             .with_supports_all_types();
         let account_code = AccountCode::from_components(
-            &[RpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
+            &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
             miden_objects::account::AccountType::RegularAccountUpdatableCode,
         )
         .unwrap();

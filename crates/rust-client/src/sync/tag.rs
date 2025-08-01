@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Tag management methods
-impl Client {
+impl<AUTH> Client<AUTH> {
     /// Returns the list of note tags tracked by the client along with their source.
     ///
     /// When syncing the state with the node, these tags will be added to the sync request and

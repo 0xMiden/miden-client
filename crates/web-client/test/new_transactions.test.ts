@@ -300,6 +300,8 @@ describe("swap transaction tests", () => {
         assetAAmount,
         faucetB,
         assetBAmount,
+        "private",
+        "private",
         flag
       );
 
@@ -514,7 +516,7 @@ export const customTransaction = async (
         ])
       );
 
-      const serialNum = window.Word.newFromU64s(
+      const serialNum = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
       let noteRecipient = new window.NoteRecipient(
@@ -554,7 +556,6 @@ export const customTransaction = async (
       // Just like in the miden test, you can modify this script to get the execution to fail
       // by modifying the assert
       let txScript = `
-            use.miden::contracts::auth::basic->auth_tx
             use.miden::kernels::tx::prologue
             use.miden::kernels::tx::memory
 
@@ -562,8 +563,6 @@ export const customTransaction = async (
                 push.0 push.${_assertedValue}
                 # => [0, ${_assertedValue}]
                 assert_eq
-
-                call.auth_tx::auth__tx_rpo_falcon512
             end
         `;
 
@@ -571,10 +570,7 @@ export const customTransaction = async (
       // with Invalid/Valid Transaction Script
       let transactionScript = await client.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
-      let noteAndArgs = new window.NoteAndArgs(
-        note,
-        noteArgsCommitment.toWord()
-      );
+      let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
@@ -646,10 +642,10 @@ const customTxWithMultipleNotes = async (
         undefined
       );
 
-      let serialNum1 = window.Word.newFromU64s(
+      let serialNum1 = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
-      let serialNum2 = window.Word.newFromU64s(
+      let serialNum2 = new window.Word(
         new BigUint64Array([BigInt(5), BigInt(6), BigInt(7), BigInt(8)])
       );
 
@@ -1102,7 +1098,8 @@ export const counterAccountComponent = async (): Promise<
       `;
     const incrNonceAuthCode = `use.miden::account
         export.auth__basic
-          push.1 exec.account::incr_nonce
+          exec.account::incr_nonce
+          drop
         end`;
     const client = window.client;
 
@@ -1182,9 +1179,7 @@ export const counterAccountComponent = async (): Promise<
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
-    let serialNum = window.Word.newFromU64s(
-      new BigUint64Array(randomInts.map(BigInt))
-    );
+    let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,

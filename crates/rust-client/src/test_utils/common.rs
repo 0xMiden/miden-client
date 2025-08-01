@@ -17,17 +17,17 @@ use miden_objects::{
     asset::{Asset, FungibleAsset, TokenSymbol},
     crypto::{dsa::rpo_falcon512::SecretKey, rand::RpoRandomCoin},
     note::{NoteId, NoteType},
-    transaction::{InputNote, OutputNote, TransactionId},
+    transaction::{OutputNote, TransactionId},
 };
 use rand::{Rng, RngCore, rngs::StdRng};
 use toml::Table;
 use uuid::Uuid;
 
 use crate::{
-    Client, ClientError, Word,
+    Client, ClientError, DebugMode, Word,
     account::{
         AccountBuilder, AccountType,
-        component::{BasicFungibleFaucet, BasicWallet, RpoFalcon512},
+        component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet},
     },
     auth::AuthSecretKey,
     builder::ClientBuilder,
@@ -44,8 +44,8 @@ use crate::{
     },
 };
 
-pub type TestClient = Client;
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
+pub type TestClient = Client<TestClientKeyStore>;
 
 // CONSTANTS
 // ================================================================================================
@@ -66,7 +66,8 @@ pub const RECALL_HEIGHT_DELTA: u32 = 50;
 ///
 /// Panics if there is no config file at `TEST_CLIENT_CONFIG_FILE_PATH`, or if it cannot be
 /// deserialized.
-pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore) {
+pub async fn create_test_client_builder() -> (ClientBuilder<TestClientKeyStore>, TestClientKeyStore)
+{
     let (rpc_endpoint, rpc_timeout, store_config, auth_path) = get_client_config();
 
     let store = {
@@ -77,7 +78,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore = FilesystemKeyStore::new(auth_path.clone()).unwrap();
 
@@ -86,7 +87,7 @@ pub async fn create_test_client_builder() -> (ClientBuilder, TestClientKeyStore)
         .rng(Box::new(rng))
         .store(store)
         .filesystem_keystore(auth_path.to_str().unwrap())
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);
 
     (builder, keystore)
@@ -143,7 +144,7 @@ pub fn create_test_store_path() -> std::path::PathBuf {
 
 /// Inserts a new wallet account into the client and into the keystore.
 pub async fn insert_new_wallet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {
@@ -155,7 +156,7 @@ pub async fn insert_new_wallet(
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
 pub async fn insert_new_wallet_with_seed(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
@@ -168,7 +169,7 @@ pub async fn insert_new_wallet_with_seed(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -180,7 +181,7 @@ pub async fn insert_new_wallet_with_seed(
 
 /// Inserts a new fungible faucet account into the client and into the keystore.
 pub async fn insert_new_fungible_faucet(
-    client: &mut Client,
+    client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Word, SecretKey), ClientError> {
@@ -200,7 +201,7 @@ pub async fn insert_new_fungible_faucet(
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
@@ -396,41 +397,39 @@ pub async fn setup_wallet_and_faucet(
     (basic_account, faucet_account)
 }
 
-/// Mints a note from `faucet_account_id` for `basic_account_id`, waits for inclusion and returns it
-/// with 1000 units of the corresponding fungible asset.
+/// Mints a note from `faucet_account_id` for `basic_account_id` and returns the executed
+/// transaction ID and the note with 1000 units of the corresponding fungible asset.
 pub async fn mint_note(
     client: &mut TestClient,
     basic_account_id: AccountId,
     faucet_account_id: AccountId,
     note_type: NoteType,
-) -> InputNote {
+) -> (TransactionId, Note) {
     // Create a Mint Tx for 1000 units of our fungible asset
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
     println!("Minting Asset");
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    execute_tx_and_sync(client, fungible_asset.faucet_id(), tx_request.clone()).await;
+    let tx_id = execute_tx(client, fungible_asset.faucet_id(), tx_request.clone()).await;
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
-    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-    let note = client.get_input_note(note_id).await.unwrap().unwrap();
-    note.try_into().unwrap()
+    (tx_id, tx_request.expected_output_own_notes().pop().unwrap())
 }
 
-/// Consumes and wait until the transaction gets committed.
+/// Executes a transaction that consumes the provided notes and returns the transaction ID.
 /// This assumes the notes contain assets.
 pub async fn consume_notes(
     client: &mut TestClient,
     account_id: AccountId,
-    input_notes: &[InputNote],
-) {
+    input_notes: &[Note],
+) -> TransactionId {
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(input_notes.iter().map(InputNote::id).collect())
+        .build_consume_notes(input_notes.iter().map(Note::id).collect())
         .unwrap();
-    execute_tx_and_sync(client, account_id, tx_request).await;
+    execute_tx(client, account_id, tx_request).await
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -510,7 +509,7 @@ pub async fn execute_tx_and_consume_output_notes(
     client: &mut TestClient,
     executor: AccountId,
     consumer: AccountId,
-) {
+) -> TransactionId {
     let output_notes = tx_request
         .expected_output_own_notes()
         .into_iter()
@@ -523,8 +522,7 @@ pub async fn execute_tx_and_consume_output_notes(
         .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
-    let transaction_id = execute_tx(client, consumer, tx_request).await;
-    wait_for_tx(client, transaction_id).await;
+    execute_tx(client, consumer, tx_request).await
 }
 
 /// Mint assets for the target account and consume them immediately without waiting for the first
@@ -534,7 +532,7 @@ pub async fn mint_and_consume(
     basic_account_id: AccountId,
     faucet_account_id: AccountId,
     note_type: NoteType,
-) {
+) -> TransactionId {
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(
             FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap(),
@@ -545,5 +543,5 @@ pub async fn mint_and_consume(
         .unwrap();
 
     execute_tx_and_consume_output_notes(tx_request, client, faucet_account_id, basic_account_id)
-        .await;
+        .await
 }

@@ -1,7 +1,7 @@
 use miden_objects::block::BlockHeader as NativeBlockHeader;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -13,17 +13,17 @@ impl BlockHeader {
         self.0.version()
     }
 
-    pub fn commitment(&self) -> RpoDigest {
+    pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
     #[wasm_bindgen(js_name = "subCommitment")]
-    pub fn sub_commitment(&self) -> RpoDigest {
+    pub fn sub_commitment(&self) -> Word {
         self.0.sub_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "prevBlockCommitment")]
-    pub fn prev_block_commitment(&self) -> RpoDigest {
+    pub fn prev_block_commitment(&self) -> Word {
         self.0.prev_block_commitment().into()
     }
 
@@ -33,37 +33,37 @@ impl BlockHeader {
     }
 
     #[wasm_bindgen(js_name = "chainCommitment")]
-    pub fn chain_commitment(&self) -> RpoDigest {
+    pub fn chain_commitment(&self) -> Word {
         self.0.chain_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "accountRoot")]
-    pub fn account_root(&self) -> RpoDigest {
+    pub fn account_root(&self) -> Word {
         self.0.account_root().into()
     }
 
     #[wasm_bindgen(js_name = "nullifierRoot")]
-    pub fn nullifier_root(&self) -> RpoDigest {
+    pub fn nullifier_root(&self) -> Word {
         self.0.nullifier_root().into()
     }
 
     #[wasm_bindgen(js_name = "noteRoot")]
-    pub fn note_root(&self) -> RpoDigest {
+    pub fn note_root(&self) -> Word {
         self.0.note_root().into()
     }
 
     #[wasm_bindgen(js_name = "txCommitment")]
-    pub fn tx_commitment(&self) -> RpoDigest {
+    pub fn tx_commitment(&self) -> Word {
         self.0.tx_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "txKernelCommitment")]
-    pub fn tx_kernel_commitment(&self) -> RpoDigest {
+    pub fn tx_kernel_commitment(&self) -> Word {
         self.0.tx_kernel_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "proofCommitment")]
-    pub fn proof_commitment(&self) -> RpoDigest {
+    pub fn proof_commitment(&self) -> Word {
         self.0.proof_commitment().into()
     }
 

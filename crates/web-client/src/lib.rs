@@ -31,7 +31,7 @@ pub mod utils;
 pub struct WebClient {
     store: Option<Arc<WebStore>>,
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
-    inner: Option<Client>,
+    inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
 }
 
 impl Default for WebClient {
@@ -47,7 +47,7 @@ impl WebClient {
         WebClient { inner: None, store: None, keystore: None }
     }
 
-    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client> {
+    pub(crate) fn get_mut_inner(&mut self) -> Option<&mut Client<WebKeyStore<RpoRandomCoin>>> {
         self.inner.as_mut()
     }
 
@@ -71,7 +71,7 @@ impl WebClient {
         };
         let coin_seed: [u64; 4] = rng.random();
 
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
         let web_store: WebStore = WebStore::new()
             .await
             .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?;
@@ -85,21 +85,25 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
-        self.inner = Some(Client::new(
-            web_rpc_client,
-            Box::new(rng),
-            web_store.clone(),
-            Arc::new(keystore.clone()),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                false,
+        self.inner = Some(
+            Client::new(
+                web_rpc_client,
+                Box::new(rng),
+                web_store.clone(),
+                Some(Arc::new(keystore.clone())),
+                ExecutionOptions::new(
+                    Some(MAX_TX_EXECUTION_CYCLES),
+                    MIN_TX_EXECUTION_CYCLES,
+                    false,
+                    false,
+                )
+                .expect("Default executor's options should always be valid"),
+                None,
+                None,
             )
-            .expect("Default executor's options should always be valid"),
-            None,
-            None,
-        ));
+            .await
+            .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
+        );
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 

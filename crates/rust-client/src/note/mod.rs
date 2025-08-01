@@ -19,6 +19,7 @@
 //!
 //! ```rust
 //! use miden_client::{
+//!     auth::TransactionAuthenticator,
 //!     Client,
 //!     crypto::FeltRng,
 //!     note::{NoteScreener, get_input_note_with_id_prefix},
@@ -26,7 +27,7 @@
 //! };
 //! use miden_objects::account::AccountId;
 //!
-//! # async fn example(client: &Client) -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example<AUTH: TransactionAuthenticator>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
 //! let input_notes = client.get_input_notes(NoteFilter::Committed).await?;
 //! println!("Found {} committed input notes.", input_notes.len());
@@ -59,6 +60,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use miden_objects::account::AccountId;
+use miden_tx::auth::TransactionAuthenticator;
 
 use crate::{
     Client, ClientError, IdPrefixFetchError,
@@ -92,7 +94,10 @@ pub use note_update_tracker::{
 };
 
 /// Note retrieval methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
     // INPUT NOTE DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -195,10 +200,13 @@ impl Client {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub async fn get_input_note_with_id_prefix(
-    client: &Client,
+pub async fn get_input_note_with_id_prefix<AUTH>(
+    client: &Client<AUTH>,
     note_id_prefix: &str,
-) -> Result<InputNoteRecord, IdPrefixFetchError> {
+) -> Result<InputNoteRecord, IdPrefixFetchError>
+where
+    AUTH: TransactionAuthenticator,
+{
     let mut input_note_records = client
         .get_input_notes(NoteFilter::All)
         .await
