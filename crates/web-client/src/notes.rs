@@ -1,5 +1,9 @@
 use miden_client::{Word, store::OutputNoteRecord};
-use miden_objects::note::{NoteId, NoteScript as NativeNoteScript};
+use miden_objects::{
+    note::{NoteId, NoteScript as NativeNoteScript},
+    utils::Deserializable,
+    vm::Program,
+};
 use wasm_bindgen::prelude::*;
 
 use super::models::note_script::NoteScript;
@@ -113,5 +117,13 @@ impl WebClient {
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
+    }
+
+    #[wasm_bindgen(js_name = "readNoteScriptFromBytes")]
+    pub fn read_note_script_from_bytes(script_bytes: &[u8]) -> Result<NoteScript, JsValue> {
+        let program = Program::read_from_bytes(script_bytes)
+            .map_err(|err| js_error_with_context(err, "failed to deserialize masb bytes"))?;
+
+        Ok(NativeNoteScript::new(program).into())
     }
 }
