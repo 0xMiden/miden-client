@@ -143,6 +143,9 @@ stop-prover: ## Stop prover process
 install: ## Install the CLI binary
 	cargo install --path bin/miden-cli --locked
 
+install-tests: ## Install the tests binary
+	cargo install --path bin/integration-tests --locked
+
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary and client library in release mode

@@ -44,7 +44,6 @@ use miden_tx::{
     utils::{Deserializable, Serializable},
 };
 use rand::{Rng, RngCore, rngs::StdRng};
-use uuid::Uuid;
 
 use crate::{
     ClientError, DebugMode,
@@ -64,6 +63,7 @@ use crate::{
             assert_note_cannot_be_consumed_twice, consume_notes, execute_failing_tx, execute_tx,
             mint_and_consume, mint_note, setup_two_wallets_and_faucet, setup_wallet_and_faucet,
         },
+        config::create_test_store_path,
         mock::{MockClient, MockRpcApi},
     },
     transaction::{
@@ -163,12 +163,6 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
     mock_chain.prove_next_block().unwrap();
 
     mock_chain
-}
-
-pub fn create_test_store_path() -> std::path::PathBuf {
-    let mut temp_file = temp_dir();
-    temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
-    temp_file
 }
 
 async fn insert_new_wallet(
