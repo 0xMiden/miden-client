@@ -3,6 +3,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
 };
 use miden_objects::{
+    Word as NativeWord,
     note::{
         Note as NativeNote, NoteDetails as NativeNoteDetails, NoteId as NativeNoteId,
         NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag,
@@ -22,6 +23,7 @@ use crate::models::{
         note_details_and_tag::NoteDetailsAndTagArray, note_id_and_args::NoteIdAndArgsArray,
     },
     transaction_script::TransactionScript,
+    word::Word,
 };
 
 #[derive(Clone)]
@@ -95,6 +97,20 @@ impl TransactionRequestBuilder {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
             foreign_accounts.into_iter().map(Into::into).collect();
         self.0 = self.0.clone().foreign_accounts(native_foreign_accounts);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withScriptArg")]
+    pub fn with_script_arg(mut self, script_arg: &Word) -> Self {
+        let native_word: NativeWord = script_arg.into();
+        self.0 = self.0.clone().script_arg(native_word);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withAuthArg")]
+    pub fn with_auth_arg(mut self, auth_arg: &Word) -> Self {
+        let native_word: NativeWord = auth_arg.into();
+        self.0 = self.0.clone().auth_arg(native_word);
         self
     }
 
