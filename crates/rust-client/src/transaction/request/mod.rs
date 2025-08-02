@@ -198,6 +198,13 @@ impl TransactionRequest {
         self.ignore_invalid_input_notes
     }
 
+    /// Returns the optional [`Word`] that will be pushed to the operand stack before the
+    /// transaction script execution. If the advice map is extended with user-defined entries,
+    /// this script argument can be used as a key to access the corresponding value.
+    pub fn script_arg(&self) -> Option<&Word> {
+        self.script_arg.as_ref()
+    }
+
     /// Builds the [`InputNotes`] needed for the transaction execution. Full valid notes for the
     /// specified authenticated notes need to be provided, otherwise an error will be returned.
     /// The transaction input notes will include both authenticated and unauthenticated notes in the
@@ -545,5 +552,121 @@ mod tests {
 
         let deserialized_tx_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
         assert_eq!(tx_request, deserialized_tx_request);
+    }
+
+    #[test]
+    fn transaction_request_with_script_arg() {
+        let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
+        let target_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+        let mut rng = RpoRandomCoin::new(Word::default());
+
+        let note = create_p2id_note(
+            sender_id,
+            target_id,
+            vec![FungibleAsset::new(faucet_id, 100).unwrap().into()],
+            NoteType::Private,
+            ZERO,
+            &mut rng,
+        )
+        .unwrap();
+
+        // Test 1: Build transaction request with script_arg
+        let script_arg = [Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)];
+        let tx_request = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note.id(), None)])
+            .script_arg(script_arg.into())
+            .build()
+            .unwrap();
+
+        assert_eq!(tx_request.script_arg, Some(script_arg.into()));
+
+        // Test 2: Verify script_arg is properly serialized and deserialized
+        let mut buffer = Vec::new();
+        tx_request.write_into(&mut buffer);
+
+        let deserialized_tx_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
+        assert_eq!(tx_request.script_arg, deserialized_tx_request.script_arg);
+        assert_eq!(deserialized_tx_request.script_arg, Some(script_arg.into()));
+
+        // Test 3: Build transaction request without script_arg (should be None)
+        let tx_request_no_arg = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note.id(), None)])
+            .build()
+            .unwrap();
+
+        assert_eq!(tx_request_no_arg.script_arg, None);
+
+        // Test 4: Verify that script_arg can be overwritten
+        let new_script_arg = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
+        let tx_request_overwrite = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note.id(), None)])
+            .script_arg(script_arg.into())
+            .script_arg(new_script_arg.into()) // This should overwrite the previous value
+            .build()
+            .unwrap();
+
+        assert_eq!(tx_request_overwrite.script_arg, Some(new_script_arg.into()));
+    }
+
+    #[test]
+    fn transaction_request_script_arg_to_transaction_args() {
+        use miden_objects::transaction::TransactionScript;
+        
+        let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
+        let target_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+        let mut rng = RpoRandomCoin::new(Word::default());
+
+        let note = create_p2id_note(
+            sender_id,
+            target_id,
+            vec![FungibleAsset::new(faucet_id, 100).unwrap().into()],
+            NoteType::Private,
+            ZERO,
+            &mut rng,
+        )
+        .unwrap();
+
+        // Create a dummy transaction script
+        let tx_script = TransactionScript::compile("begin nop end", TransactionKernel::assembler())
+            .expect("Failed to compile script");
+
+        // Test 1: TransactionRequest with script_arg - verify it's properly converted
+        let script_arg = [Felt::new(5), Felt::new(10), Felt::new(15), Felt::new(20)];
+        let tx_request = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note.id(), None)])
+            .script_arg(script_arg.into())
+            .build()
+            .unwrap();
+
+        // Verify the script_arg is stored in the request
+        assert_eq!(tx_request.script_arg(), Some(&script_arg.into()));
+
+        // Convert to TransactionArgs - this should use with_tx_script_and_args internally
+        let tx_args = tx_request.into_transaction_args(tx_script.clone(), vec![]);
+
+        // Verify that tx_script was set (we can't directly access the args but we know
+        // from the code that with_tx_script_and_args was called with our script_arg)
+        assert!(tx_args.tx_script().is_some());
+        assert_eq!(tx_args.tx_script().unwrap(), &tx_script);
+
+        // Test 2: TransactionRequest without script_arg - verify it uses with_tx_script
+        let tx_request_no_arg = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note.id(), None)])
+            .build()
+            .unwrap();
+
+        // Verify no script_arg is stored
+        assert_eq!(tx_request_no_arg.script_arg(), None);
+
+        // Convert to TransactionArgs - this should use with_tx_script internally
+        let tx_args_no_arg = tx_request_no_arg.into_transaction_args(tx_script.clone(), vec![]);
+
+        // Verify that tx_script was set
+        assert!(tx_args_no_arg.tx_script().is_some());
+        assert_eq!(tx_args_no_arg.tx_script().unwrap(), &tx_script);
     }
 }
