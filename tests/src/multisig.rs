@@ -48,20 +48,15 @@ async fn multisig() {
         vec![secret_key_a.public_key(), secret_key_b.public_key()],
     );
 
-    let mut init_seed = [0u8; 32];
-    coordinator_client.rng().fill_bytes(&mut init_seed);
-
-    let multisig_account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(multisig_auth_component)
-        .with_component(BasicWallet)
-        .build()
-        .unwrap();
+    let multisig_account = coordinator_client.setup_account(vec![pub_key_a, pub_key_b], 2);
 
     coordinator_client.add_account(&multisig_account, None, false).await.unwrap();
 
-    let tx_request = TransactionRequestBuilder::new().build().unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        // Needs https://github.com/0xMiden/miden-client/issues/1119:
+        // .with_auth_arg(salt)
+        .build()
+        .unwrap();
     let tx_summary = coordinator_client
         .propose_multisig_transaction(multisig_account.id(), tx_request)
         .await
