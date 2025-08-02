@@ -11,8 +11,11 @@ use miden_objects::{
     note::{NoteDetails, NoteFile, NoteType},
 };
 
-// SWAP FULLY ONCHAIN
-// ================================================================================================
+pub async fn setup_multisig_client() -> (MultisigClient, TestClientKeyStore) {
+    let (mut client, keystore) = create_test_client().await;
+    let multisig_client = MultisigClient::new(client);
+    (multisig_client, keystore)
+}
 
 #[tokio::test]
 async fn multisig() {
@@ -22,7 +25,7 @@ async fn multisig() {
     wait_for_node(&mut signer_a_client).await;
     let (mut signer_b_client, authenticator_b) = create_test_client().await;
 
-    let (mut coordinator_client, authenticator_c) = create_test_client().await;
+    let (mut coordinator_client, _): (MultisigClient, _) = setup_multisig_client().await;
 
     signer_a_client.sync_state().await.unwrap();
     signer_b_client.sync_state().await.unwrap();
