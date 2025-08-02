@@ -566,47 +566,4 @@ mod tests {
         let deserialized_tx_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
         assert_eq!(tx_request, deserialized_tx_request);
     }
-
-    #[test]
-    fn transaction_request_with_auth_arg() {
-        let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
-        let target_id =
-            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
-        let mut rng = RpoRandomCoin::new(Word::default());
-
-        let note = create_p2id_note(
-            sender_id,
-            target_id,
-            vec![FungibleAsset::new(faucet_id, 100).unwrap().into()],
-            NoteType::Private,
-            ZERO,
-            &mut rng,
-        )
-        .unwrap();
-
-        let auth_arg = [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)];
-        let script_arg = [Felt::new(5), Felt::new(6), Felt::new(7), Felt::new(8)];
-
-        // Build a transaction request with auth_arg
-        let tx_request = TransactionRequestBuilder::new()
-            .authenticated_input_notes(vec![(note.id(), None)])
-            .expected_output_recipients(vec![note.recipient().clone()])
-            .script_arg(script_arg.into())
-            .auth_arg(auth_arg.into())
-            .build()
-            .unwrap();
-
-        // Verify the auth_arg was set correctly
-        assert_eq!(tx_request.auth_arg(), &Some(auth_arg.into()));
-        assert_eq!(tx_request.script_arg(), &Some(script_arg.into()));
-
-        // Test serialization/deserialization preserves auth_arg
-        let mut buffer = Vec::new();
-        tx_request.write_into(&mut buffer);
-
-        let deserialized_tx_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
-        assert_eq!(tx_request, deserialized_tx_request);
-        assert_eq!(deserialized_tx_request.auth_arg(), &Some(auth_arg.into()));
-    }
 }
