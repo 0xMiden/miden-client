@@ -22,6 +22,7 @@
 * Added ability to convert `Word` to `U64` array and `Felt` array in Web Client (([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
 * Added `TokenSymbol` type to Web Client ([#1046](https://github.com/0xMiden/miden-client/pull/1046)).
 * [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
+* Added authentication arguments support to `TransactionRequest` ([#1121](https://github.com/0xMiden/miden-client/pull/1121)).
 
 ## 0.10.1 (2025-07-26)
 
