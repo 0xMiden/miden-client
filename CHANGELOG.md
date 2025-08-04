@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2 (2025-08-04)
+
+### Fixes
+
+* Adds `AuthScheme::NoAuth` support to `Client` (#1123).
+
 ## 0.10.1 (2025-07-26)
 
 ### Fixes
