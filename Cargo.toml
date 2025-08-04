@@ -22,25 +22,23 @@ version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib = { branch = "pgackst-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-lib = { branch = "bernhard-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-node-block-producer = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-node-ntx-builder = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-node-proto-build = { branch = "bernhard-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-node" }
 miden-node-rpc = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
-miden-objects = { branch = "pgackst-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-objects = { branch = "bernhard-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-remote-prover = { branch = "bernhard-async-experimental", features = [
   "concurrent",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "bernhard-async-experimental", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { branch = "pgackst-async-experimental", default-features = false, features = [
-  "async",
+miden-testing = { branch = "bernhard-async-experimental", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
-miden-tx = { branch = "pgackst-async-experimental", default-features = false, features = [
-  "async",
+miden-tx = { branch = "bernhard-async-experimental", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
