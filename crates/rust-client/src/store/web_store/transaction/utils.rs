@@ -4,11 +4,12 @@ use alloc::{
 };
 
 use miden_objects::{
-    Digest,
+    Word,
     block::BlockNumber,
     transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript},
 };
 use miden_tx::utils::Serializable;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
@@ -20,13 +21,20 @@ use crate::{
 // TYPES
 // ================================================================================================
 
+#[derive(Debug, Clone)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct SerializedTransactionData {
     pub id: String,
     pub details: Vec<u8>,
+    #[wasm_bindgen(js_name = "scriptRoot")]
     pub script_root: Option<Vec<u8>>,
+    #[wasm_bindgen(js_name = "txScript")]
     pub tx_script: Option<Vec<u8>>,
+    #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: String,
+    #[wasm_bindgen(js_name = "commitHeight")]
     pub commit_height: Option<String>,
+    #[wasm_bindgen(js_name = "discardCause")]
     pub discard_cause: Option<Vec<u8>>,
 }
 
@@ -39,10 +47,10 @@ pub async fn insert_proven_transaction_data(
     submission_height: BlockNumber,
 ) -> Result<(), StoreError> {
     // Build transaction record
-    let nullifiers: Vec<Digest> = executed_transaction
+    let nullifiers: Vec<Word> = executed_transaction
         .input_notes()
         .iter()
-        .map(|x| x.nullifier().inner())
+        .map(|x| x.nullifier().as_word())
         .collect();
 
     let output_notes = executed_transaction.output_notes();
@@ -71,10 +79,10 @@ pub async fn insert_proven_transaction_data(
 }
 
 /// Serializes the transaction record into a format suitable for storage in the database.
-pub(super) fn serialize_transaction_record(
+pub(crate) fn serialize_transaction_record(
     transaction_record: &TransactionRecord,
 ) -> SerializedTransactionData {
-    let transaction_id: String = transaction_record.id.inner().into();
+    let transaction_id: String = transaction_record.id.as_word().to_hex();
 
     let script_root = transaction_record.script.as_ref().map(|script| script.root().to_bytes());
     let tx_script = transaction_record.script.as_ref().map(TransactionScript::to_bytes);

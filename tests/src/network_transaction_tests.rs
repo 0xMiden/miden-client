@@ -15,7 +15,6 @@ use miden_client::{
 };
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    Digest,
     account::AccountComponent,
     assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
 };
@@ -54,7 +53,8 @@ const COUNTER_CONTRACT: &str = "
 const INCR_NONCE_AUTH_CODE: &str = "
     use.miden::account
     export.auth__basic
-        push.1 exec.account::incr_nonce
+        exec.account::incr_nonce
+        drop
     end
 ";
 
@@ -73,7 +73,7 @@ async fn deploy_counter_contract(
         begin
             call.counter_contract::increment_count
         end",
-        assembler.with_library(&library).unwrap(),
+        assembler.with_dynamic_library(&library).unwrap(),
     )
     .unwrap();
 
@@ -153,7 +153,7 @@ async fn counter_contract_ntx() {
             .storage()
             .get_item(0)
             .unwrap(),
-        Digest::from([ZERO, ZERO, ZERO, Felt::new(1)])
+        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
     let (native_account, _native_seed, _) =
@@ -163,7 +163,7 @@ async fn counter_contract_ntx() {
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
-        .with_library(library)
+        .with_dynamic_library(library)
         .unwrap();
 
     let mut network_notes = vec![];
@@ -203,7 +203,7 @@ async fn counter_contract_ntx() {
 
     assert_eq!(
         a.storage().get_item(0).unwrap(),
-        Digest::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
+        Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
     );
 }
 
@@ -227,7 +227,7 @@ async fn recall_note_before_ntx_consumes_it() {
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
-        .with_library(library)
+        .with_dynamic_library(library)
         .unwrap();
 
     let network_note = NoteBuilder::new(wallet.id(), client.rng())
@@ -280,7 +280,7 @@ async fn recall_note_before_ntx_consumes_it() {
             .storage()
             .get_item(0)
             .unwrap(),
-        Digest::from([ZERO, ZERO, ZERO, Felt::new(1)])
+        Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
     // The native account should have the incremented value
@@ -294,6 +294,6 @@ async fn recall_note_before_ntx_consumes_it() {
             .storage()
             .get_item(0)
             .unwrap(),
-        Digest::from([ZERO, ZERO, ZERO, Felt::new(2)])
+        Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
     );
 }

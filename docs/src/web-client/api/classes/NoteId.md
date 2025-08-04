@@ -16,11 +16,11 @@
 
 ##### recipient\_digest
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ##### asset\_commitment\_digest
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 #### Returns
 

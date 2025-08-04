@@ -73,7 +73,7 @@
 //! let coin_seed: [u64; 4] = rng.random();
 //!
 //! // Initialize the random coin using the generated seed.
-//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
 //! // Determine the number of blocks to consider a transaction stale.
@@ -85,11 +85,11 @@
 //!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client = Client::new(
+//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
 //!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
-//!     Arc::new(keystore),
+//!     Some(Arc::new(keystore)), // or None if no authenticator is needed
 //!     ExecutionOptions::new(
 //!         Some(MAX_TX_EXECUTION_CYCLES),
 //!         MIN_TX_EXECUTION_CYCLES,
@@ -99,7 +99,9 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
-//! );
+//! )
+//! .await
+//! .unwrap();
 //!
 //! # Ok(())
 //! # }
@@ -166,16 +168,12 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::{
-        Digest,
-        crypto::{
-            dsa::rpo_falcon512::SecretKey,
-            merkle::{
-                InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf,
-                SmtProof,
-            },
-            rand::{FeltRng, RpoRandomCoin},
+    pub use miden_objects::crypto::{
+        dsa::rpo_falcon512::SecretKey,
+        merkle::{
+            InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf, SmtProof,
         },
+        rand::{FeltRng, RpoRandomCoin},
     };
 }
 
@@ -188,8 +186,8 @@ pub use miden_tx::ExecutionOptions;
 /// client library.
 pub mod utils {
     pub use miden_tx::utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_hex_string,
+        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
+        bytes_to_hex_string, hex_to_bytes,
         sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
 }
@@ -207,7 +205,7 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_lib::utils::ScriptBuilder;
-use miden_objects::crypto::rand::FeltRng;
+use miden_objects::{block::BlockNumber, crypto::rand::FeltRng};
 use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
 use rand::RngCore;
 use rpc::NodeRpcClient;
@@ -223,7 +221,7 @@ use store::Store;
 ///   as notes and transactions.
 /// - Connects to a Miden node to periodically sync with the current state of the network.
 /// - Executes, proves, and submits transactions to the network as directed by the user.
-pub struct Client {
+pub struct Client<AUTH> {
     /// The client's store, which provides a way to write and read entities to provide persistence.
     store: Arc<dyn Store>,
     /// An instance of [`FeltRng`] which provides randomness tools for generating new keys,
@@ -237,7 +235,7 @@ pub struct Client {
     tx_prover: Arc<LocalTransactionProver>,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
     /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
@@ -248,7 +246,10 @@ pub struct Client {
 }
 
 /// Construction and access methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
 
@@ -274,19 +275,23 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
-    pub fn new(
+    pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Arc<dyn TransactionAuthenticator>,
+        authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
-    ) -> Self {
-        let authenticator = Some(authenticator);
+    ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
-        Self {
+        if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
+            // Set the genesis commitment in the RPC API client for future requests.
+            rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        Ok(Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
@@ -295,7 +300,7 @@ impl Client {
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
-        }
+        })
     }
 
     /// Returns true if the client is in debug mode.
@@ -366,5 +371,30 @@ impl FeltRng for ClientRng {
 
     fn draw_word(&mut self) -> Word {
         self.0.draw_word()
+    }
+}
+
+/// Indicates whether the client is operating in debug mode.
+pub enum DebugMode {
+    Enabled,
+    Disabled,
+}
+
+impl From<DebugMode> for bool {
+    fn from(debug_mode: DebugMode) -> Self {
+        match debug_mode {
+            DebugMode::Enabled => true,
+            DebugMode::Disabled => false,
+        }
+    }
+}
+
+impl From<bool> for DebugMode {
+    fn from(debug_mode: bool) -> DebugMode {
+        if debug_mode {
+            DebugMode::Enabled
+        } else {
+            DebugMode::Disabled
+        }
     }
 }

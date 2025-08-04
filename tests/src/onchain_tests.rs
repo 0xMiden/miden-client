@@ -6,6 +6,7 @@ use miden_client::{
     transaction::{PaymentNoteDescription, TransactionRequestBuilder},
 };
 use miden_objects::{
+    EMPTY_WORD,
     account::AccountStorageMode,
     asset::{Asset, FungibleAsset},
     note::{NoteFile, NoteType},
@@ -68,7 +69,9 @@ async fn onchain_notes_flow() {
     assert_eq!(received_note.note(), &note);
 
     // consume the note
-    consume_notes(&mut client_2, basic_wallet_1.id(), &[received_note]).await;
+    let tx_id =
+        consume_notes(&mut client_2, basic_wallet_1.id(), &[received_note.note().clone()]).await;
+    wait_for_tx(&mut client_2, tx_id).await;
     assert_account_has_single_asset(
         &client_2,
         basic_wallet_1.id(),
@@ -128,7 +131,8 @@ async fn onchain_notes_flow() {
         .try_into()
         .unwrap();
 
-    consume_notes(&mut client_3, basic_wallet_2.id(), &[note]).await;
+    let tx_id = consume_notes(&mut client_3, basic_wallet_2.id(), &[note]).await;
+    wait_for_tx(&mut client_3, tx_id).await;
     assert_account_has_single_asset(
         &client_3,
         basic_wallet_2.id(),
@@ -172,8 +176,9 @@ async fn onchain_accounts() {
     // First Mint necessary token
     println!("First client consuming note");
     client_1.sync_state().await.unwrap();
-    let note =
+    let (tx_id, note) =
         mint_note(&mut client_1, target_account_id, faucet_account_id, NoteType::Private).await;
+    wait_for_tx(&mut client_1, tx_id).await;
 
     // Update the state in the other client and ensure the onchain faucet commitment is consistent
     // between clients
@@ -194,23 +199,27 @@ async fn onchain_accounts() {
 
     // Now use the faucet in the second client to mint to its own account
     println!("Second client consuming note");
-    let second_client_note = mint_note(
+    let (tx_id, second_client_note) = mint_note(
         &mut client_2,
         second_client_target_account_id,
         faucet_account_id,
         NoteType::Private,
     )
     .await;
+    wait_for_tx(&mut client_2, tx_id).await;
 
     // Update the state in the other client and ensure the onchain faucet commitment is consistent
     // between clients
     client_1.sync_state().await.unwrap();
 
     println!("About to consume");
-    consume_notes(&mut client_1, target_account_id, &[note]).await;
+    let tx_id = consume_notes(&mut client_1, target_account_id, &[note]).await;
+    wait_for_tx(&mut client_1, tx_id).await;
     assert_account_has_single_asset(&client_1, target_account_id, faucet_account_id, MINT_AMOUNT)
         .await;
-    consume_notes(&mut client_2, second_client_target_account_id, &[second_client_note]).await;
+    let tx_id =
+        consume_notes(&mut client_2, second_client_target_account_id, &[second_client_note]).await;
+    wait_for_tx(&mut client_2, tx_id).await;
     assert_account_has_single_asset(
         &client_2,
         second_client_target_account_id,
@@ -345,11 +354,15 @@ async fn import_account_by_id() {
     let faucet_account_id = faucet_account_header.id();
 
     // First mint and consume in the first client
-    mint_and_consume(&mut client_1, target_account_id, faucet_account_id, NoteType::Public).await;
+    let tx_id =
+        mint_and_consume(&mut client_1, target_account_id, faucet_account_id, NoteType::Public)
+            .await;
+    wait_for_tx(&mut client_1, tx_id).await;
 
     // Mint a note for the second client
-    let note =
+    let (tx_id, note) =
         mint_note(&mut client_1, target_account_id, faucet_account_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await;
 
     // Import the public account by id
     let built_wallet_id =
@@ -366,7 +379,8 @@ async fn import_account_by_id() {
     // Now use the wallet in the second client to consume the generated note
     println!("Second client consuming note");
     client_2.sync_state().await.unwrap();
-    consume_notes(&mut client_2, target_account_id, &[note]).await;
+    let tx_id = consume_notes(&mut client_2, target_account_id, &[note]).await;
+    wait_for_tx(&mut client_2, tx_id).await;
     assert_account_has_single_asset(
         &client_2,
         target_account_id,
@@ -374,4 +388,19 @@ async fn import_account_by_id() {
         MINT_AMOUNT * 2,
     )
     .await;
+}
+
+#[tokio::test]
+async fn incorrect_genesis() {
+    let (builder, _) = create_test_client_builder().await;
+    let mut client = builder.build().await.unwrap();
+
+    // Set an incorrect genesis commitment
+    client.test_rpc_api().set_genesis_commitment(EMPTY_WORD).await.unwrap();
+
+    // This request would always be valid as it requests the chain tip. But it should fail
+    // because the genesis commitment in the request header does not match the one in the node.
+    let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
+
+    assert!(result.is_err());
 }

@@ -1,7 +1,7 @@
 use miden_objects::note::NoteInputs as NativeNoteInputs;
 use wasm_bindgen::prelude::*;
 
-use super::felt::FeltArray;
+use super::felt::{Felt, FeltArray};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -15,10 +15,26 @@ impl NoteInputs {
         let native_note_inputs = NativeNoteInputs::new(native_felts).unwrap();
         NoteInputs(native_note_inputs)
     }
+
+    pub fn values(&self) -> Vec<Felt> {
+        self.0.values().iter().map(Into::into).collect()
+    }
 }
 
 // CONVERSIONS
 // ================================================================================================
+
+impl From<NativeNoteInputs> for NoteInputs {
+    fn from(native_note_inputs: NativeNoteInputs) -> Self {
+        NoteInputs(native_note_inputs)
+    }
+}
+
+impl From<&NativeNoteInputs> for NoteInputs {
+    fn from(native_note_inputs: &NativeNoteInputs) -> Self {
+        NoteInputs(native_note_inputs.clone())
+    }
+}
 
 impl From<NoteInputs> for NativeNoteInputs {
     fn from(note_inputs: NoteInputs) -> Self {

@@ -1,5 +1,4 @@
-use miden_client::{store::NoteExportType, utils::Serializable};
-use miden_objects::Digest;
+use miden_client::{Word, store::NoteExportType, utils::Serializable};
 use wasm_bindgen::prelude::*;
 
 use crate::{WebClient, js_error_with_context};
@@ -13,7 +12,7 @@ impl WebClient {
         export_type: String,
     ) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id = Digest::try_from(note_id)
+            let note_id = Word::try_from(note_id)
                 .map_err(|err| js_error_with_context(err, "failed to parse input note id"))?
                 .into();
 

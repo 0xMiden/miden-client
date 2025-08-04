@@ -18,13 +18,20 @@ And on a second terminal do:
 make integration-test-full
 ```
 
+For running web client integration tests, you can do:
+
+```bash
+# This will run the integration test suite for the web SDK
+make integration-test-web-client
+```
+
 Note that in order to run this as part of a CI/CD workflow (at least on github), you'll need to use `make start-node-background` instead so the process keeps running on background.
 
 To stop the background node, you can use the `make stop-node` command.
 
-## Integration Test Flow
+## Integration tests flow
 
-The integration test goes through a series of supported flows such as minting and transferring assets which runs against a running node.
+The integration testing suite goes through a series of supported flows such as minting and transferring assets which runs against a running node.
 
 ### Setup
 

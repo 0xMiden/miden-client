@@ -9,13 +9,10 @@ use std::{
     vec::Vec,
 };
 
-use miden_objects::{
-    Digest, Felt, Word,
-    account::{AccountDelta, AuthSecretKey},
-};
+use miden_objects::{Felt, Word, account::AuthSecretKey};
 use miden_tx::{
     AuthenticationError,
-    auth::TransactionAuthenticator,
+    auth::{SigningInputs, TransactionAuthenticator},
     utils::{Deserializable, Serializable, sync::RwLock},
 };
 use rand::{Rng, SeedableRng};
@@ -132,17 +129,18 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
     fn get_signature(
         &self,
         pub_key: Word,
-        message: Word,
-        _account_delta: &AccountDelta,
+        signing_info: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
         let mut rng = self.rng.write();
+
+        let message = signing_info.to_commitment();
 
         let secret_key = self
             .get_key(pub_key)
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
+        let AuthSecretKey::RpoFalcon512(k) =
+            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
 
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
     }
@@ -150,7 +148,7 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
 
 /// Hashes a public key to a string representation.
 fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = Digest::from(pub_key).to_hex();
+    let pub_key = pub_key.to_hex();
     let mut hasher = DefaultHasher::new();
     pub_key.hash(&mut hasher);
     hasher.finish().to_string()
