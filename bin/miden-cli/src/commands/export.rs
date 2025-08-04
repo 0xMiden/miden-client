@@ -165,6 +165,7 @@ pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
     for auth in interface.auth() {
         match auth {
             AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
+            AuthScheme::NoAuth => {},
         }
     }
 
