@@ -28,7 +28,34 @@ before(async () => {
   console.log("Starting test server...");
   serverProcess = spawn("npx", ["http-server", "./dist", "-p", TEST_SERVER_PORT], {
     stdio: "inherit",
-    shell: process.platform == "win32",
+    shell: true,
+  });
+
+  // Wait for server to start
+  console.log("Waiting for server to start...");
+  await new Promise((resolve, reject) => {
+    const checkServer = async () => {
+      try {
+        const response = await fetch(TEST_SERVER);
+        if (response.ok) {
+          console.log("Server is ready!");
+          resolve();
+        } else {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+      } catch (error) {
+        // Server not ready yet, wait and try again
+        setTimeout(checkServer, 500);
+      }
+    };
+    
+    // Start checking after a brief delay
+    setTimeout(checkServer, 1000);
+    
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      reject(new Error("Timeout waiting for server to start"));
+    }, 30000);
   });
 
   try {
