@@ -1230,3 +1230,100 @@ describe("counter account component tests", () => {
     expect(finalCounter).to.equal("2");
   });
 });
+
+// FAUCET DEPLOYMENT AND DEXIE CLEANUP TEST
+// =======================================================================================================
+
+describe("faucet deployment with dexie cleanup tests", () => {
+  it("deploys a faucet, cleans dexie completely, then creates mint transaction request", async () => {
+    // First, deploy a faucet
+    const { accountId, faucetId } = await setupWalletAndFaucet();
+
+    // Clean dexie completely using the provided JavaScript code
+    await testingPage.evaluate(async () => {
+      const dbs = await indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name) {
+          await indexedDB.deleteDatabase(db.name);
+          console.log(`Deleted database: ${db.name}`);
+        }
+      }
+      console.log("All databases deleted.");
+    });
+
+    // After cleaning dexie, we need to reinitialize the client and recreate accounts
+    await testingPage.evaluate(async () => {
+      // Reinitialize the client after dexie cleanup
+      await window.helpers.refreshClient();
+    });
+
+    // Create new wallet and faucet after cleanup
+    const { accountId: newAccountId, faucetId: newFaucetId } =
+      await setupWalletAndFaucet();
+
+    // Create a mintTransactionRequest for the account with the faucetId
+    const mintResult = await testingPage.evaluate(
+      async (_accountId: string, _faucetId: string) => {
+        const client = window.client;
+
+        await client.syncState();
+
+        const targetAccountId = window.AccountId.fromHex(_accountId);
+        const faucetAccountId = window.AccountId.fromHex(_faucetId);
+
+        // Create mint transaction request
+        const mintTransactionRequest = client.newMintTransactionRequest(
+          targetAccountId,
+          faucetAccountId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        const mintTransactionResult = await client.newTransaction(
+          faucetAccountId,
+          mintTransactionRequest
+        );
+
+        await client.submitTransaction(mintTransactionResult);
+
+        console.log("WORKING");
+
+        await window.helpers.waitForTransaction(
+          mintTransactionResult.executedTransaction().id().toHex()
+        );
+
+        return {
+          success: true,
+          targetAccount: _accountId,
+          faucetAccount: _faucetId,
+          amount: "1000",
+          transactionId: mintTransactionResult
+            .executedTransaction()
+            .id()
+            .toHex(),
+          numOutputNotesCreated: mintTransactionResult
+            .createdNotes()
+            .numNotes(),
+          createdNoteId: mintTransactionResult
+            .createdNotes()
+            .notes()[0]
+            .id()
+            .toString(),
+        };
+      },
+      newAccountId,
+      newFaucetId
+    );
+
+    // Verify the test completed successfully
+    expect(mintResult.success).to.be.true;
+    expect(mintResult.targetAccount).to.equal(newAccountId);
+    expect(mintResult.faucetAccount).to.equal(newFaucetId);
+    expect(mintResult.amount).to.equal("1000");
+
+    // Verify the transaction was executed successfully
+    expect(mintResult.transactionId).to.not.be.empty;
+    expect(mintResult.numOutputNotesCreated).to.equal(1);
+    expect(mintResult.createdNoteId).to.not.be.empty;
+  });
+});

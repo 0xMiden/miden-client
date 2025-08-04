@@ -26,7 +26,7 @@ const REMOTE_TX_PROVER_PORT = 50051;
 
 before(async () => {
   console.log("Starting test server...");
-  serverProcess = spawn("http-server", ["./dist", "-p", TEST_SERVER_PORT], {
+  serverProcess = spawn("npx", ["http-server", "./dist", "-p", TEST_SERVER_PORT], {
     stdio: "inherit",
     shell: process.platform == "win32",
   });
