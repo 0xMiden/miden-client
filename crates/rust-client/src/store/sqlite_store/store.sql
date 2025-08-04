@@ -15,12 +15,29 @@ CREATE TABLE account_code (
     PRIMARY KEY (root)
 );
 
+-- TODO: document
 -- Create account_storage table
 CREATE TABLE account_storage (
-    root TEXT NOT NULL,         -- root of the account storage Merkle tree.
-    slots BLOB NOT NULL,        -- serialized key-value pair of non-empty account slots.
-    PRIMARY KEY (root)
+    root TEXT NOT NULL,
+    slot_index UNSIGNED BIG INT NOT NULL,
+    slot_value TEXT NULL,
+    slot_map_root TEXT NULL,
+    PRIMARY KEY (root, slot_index),
+    CONSTRAINT check_slot_value CHECK ((slot_value IS NOT NULL AND slot_map_root IS NULL) OR (slot_value IS NULL AND slot_map_root IS NOT NULL))
 );
+
+CREATE INDEX idx_account_storage_root ON account_storage(root);
+
+-- TODO: document
+-- Create storage_map_entries table
+CREATE TABLE storage_map_entries (
+    root TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (root, key)
+);
+
+CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
 -- TODO: document
 -- Create account_vaults table
@@ -56,7 +73,6 @@ CREATE TABLE accounts (
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_root) REFERENCES account_code(root),
-    FOREIGN KEY (storage_root) REFERENCES account_storage(root),
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );

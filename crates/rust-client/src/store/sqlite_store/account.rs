@@ -7,8 +7,10 @@ use alloc::{
 use std::{collections::BTreeMap, rc::Rc};
 
 use miden_objects::{
-    AccountError, Felt, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
+    AccountError, Felt, Word, WordError,
+    account::{
+        Account, AccountCode, AccountHeader, AccountId, AccountStorage, StorageMap, StorageSlot,
+    },
     asset::{Asset, AssetVault, FungibleAsset, NonFungibleAsset},
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
@@ -35,7 +37,12 @@ struct SerializedHeaderData {
 
 type SerializedAccountCodeData = (String, Vec<u8>);
 
-type SerializedAccountStorageData = (String, Vec<u8>);
+struct SerializedStorageSlotData {
+    index: u64,
+    value: Option<String>,
+    map_root: Option<String>,
+    map_entries: Vec<(String, String)>,
+}
 
 struct SerializedAssetData {
     fungible_faucet_id: Option<String>,
@@ -124,17 +131,7 @@ impl SqliteStore {
 
         let vault = AssetVault::new(&assets)?;
 
-        const STORAGE_QUERY: &str = "SELECT slots FROM account_storage WHERE root = ?";
-        let slots = conn
-            .prepare(STORAGE_QUERY)?
-            .query_map(params![header.storage_commitment().to_hex()], |row| {
-                let slots: Vec<u8> = row.get(0)?;
-                Ok(slots)
-            })?
-            .next()
-            .transpose()?
-            .unwrap(); // TODO: Remove
-        let storage = AccountStorage::read_from_bytes(&slots)?;
+        let storage = get_account_storage(conn, header.storage_commitment())?;
 
         const CODE_QUERY: &str = "SELECT code FROM account_code WHERE root = ?";
         let code = conn
@@ -319,9 +316,33 @@ pub(super) fn insert_account_storage(
     tx: &Transaction<'_>,
     account_storage: &AccountStorage,
 ) -> Result<(), StoreError> {
-    let (storage_root, storage_slots) = serialize_account_storage(account_storage);
-    const QUERY: &str = insert_sql!(account_storage { root, slots } | IGNORE);
-    tx.execute(QUERY, params![storage_root, storage_slots])?;
+    for (index, slot) in account_storage.slots().iter().enumerate() {
+        let SerializedStorageSlotData { index, value, map_root, map_entries } =
+            serialize_account_storage_slot(
+                u64::try_from(index).expect("There are at most 255 slots"),
+                slot,
+            );
+        const QUERY: &str = insert_sql!(
+            account_storage {
+                root,
+                slot_index,
+                slot_value,
+                slot_map_root
+            } | IGNORE
+        );
+
+        tx.execute(
+            QUERY,
+            params![account_storage.commitment().to_string(), index, value, map_root,],
+        )?;
+
+        for (key, value) in map_entries {
+            const MAP_ENTRY_QUERY: &str =
+                insert_sql!(storage_map_entries { root, key, value } | IGNORE);
+            tx.execute(MAP_ENTRY_QUERY, params![slot.value().to_string(), key, value])?;
+        }
+    }
+
     Ok(())
 }
 
@@ -441,12 +462,41 @@ fn serialize_account_code(account_code: &AccountCode) -> SerializedAccountCodeDa
     (commitment, code)
 }
 
-/// Serialize the provided `account_storage` into database compatible types.
-fn serialize_account_storage(account_storage: &AccountStorage) -> SerializedAccountStorageData {
-    let commitment = account_storage.commitment().to_string();
-    let storage = account_storage.to_bytes();
+fn parse_storage_slot_columns(
+    row: &rusqlite::Row<'_>,
+    map_entries: &mut BTreeMap<String, Vec<(String, String)>>,
+) -> Result<SerializedStorageSlotData, rusqlite::Error> {
+    let index: u64 = column_value_as_u64(row, 0)?;
+    let value: Option<String> = row.get(1)?;
+    let map_root: Option<String> = row.get(2)?;
+    let map_entries = if let Some(root) = &map_root {
+        map_entries.remove(root).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
-    (commitment, storage)
+    Ok(SerializedStorageSlotData { index, value, map_root, map_entries })
+}
+
+/// Serialize the provided `account_storage` into database compatible types.
+fn serialize_account_storage_slot(index: u64, slot: &StorageSlot) -> SerializedStorageSlotData {
+    match slot {
+        StorageSlot::Value(value) => SerializedStorageSlotData {
+            index,
+            value: Some(value.to_string()),
+            map_root: None,
+            map_entries: Vec::new(),
+        },
+        StorageSlot::Map(map) => SerializedStorageSlotData {
+            index,
+            value: None,
+            map_root: Some(map.root().to_string()),
+            map_entries: map
+                .entries()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect(),
+        },
+    }
 }
 
 /// Serialize the provided `asset_vault` into database compatible types.
@@ -520,6 +570,70 @@ pub(crate) fn undo_account_state(
         tx.execute(QUERY, params![account_id.to_hex()])?;
     }
     Ok(())
+}
+
+pub(crate) fn get_account_storage(
+    conn: &Connection,
+    storage_commitment: Word,
+) -> Result<AccountStorage, StoreError> {
+    const STORAGE_MAP_QUERY: &str =
+        "SELECT root, key, value FROM storage_map_entries WHERE root in (
+                SELECT slot_map_root FROM account_storage WHERE root = ?
+            )";
+
+    let map_entries = conn
+        .prepare(STORAGE_MAP_QUERY)?
+        .query_map(params![storage_commitment.to_hex()], |row| {
+            let root: String = row.get(0)?;
+            let key: String = row.get(1)?;
+            let value: String = row.get(2)?;
+            Ok((root, key, value))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut map_entries: BTreeMap<String, Vec<(String, String)>> =
+        map_entries.into_iter().fold(BTreeMap::new(), |mut acc, (root, key, value)| {
+            acc.entry(root).or_default().push((key, value));
+            acc
+        });
+
+    const STORAGE_QUERY: &str =
+        "SELECT slot_index, slot_value, slot_map_root FROM account_storage WHERE root = ?";
+    let storage_slots = conn
+        .prepare(STORAGE_QUERY)?
+        .query_map(params![storage_commitment.to_hex()], |row| {
+            parse_storage_slot_columns(row, &mut map_entries)
+        })?
+        .map(|result| Ok(result?))
+        .collect::<Result<Vec<SerializedStorageSlotData>, StoreError>>()?;
+
+    let mut slots = vec![];
+    for slot in storage_slots {
+        let slot = match (slot.value, slot.map_root) {
+            (Some(value), None) => StorageSlot::Value(Word::try_from(value)?),
+            (None, Some(_)) => {
+                let entries = slot
+                    .map_entries
+                    .into_iter()
+                    .map(|(key, value)| -> Result<(Word, Word), WordError> {
+                        Ok((Word::try_from(key)?, Word::try_from(value)?))
+                    })
+                    .collect::<Result<Vec<(Word, Word)>, _>>()?;
+
+                StorageSlot::Map(StorageMap::with_entries(entries).map_err(|_| {
+                    DeserializationError::InvalidValue("Duplicate storage map entries".to_string())
+                })?)
+            },
+            _ => {
+                return Err(StoreError::DataDeserializationError(
+                    DeserializationError::InvalidValue("Invalid storage slot data".to_string()),
+                ));
+            },
+        };
+        slots.push(slot);
+    }
+
+    Ok(AccountStorage::new(slots)?)
 }
 
 #[cfg(test)]
