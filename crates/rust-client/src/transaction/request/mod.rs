@@ -90,8 +90,8 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
     /// execution.
     script_arg: Option<Word>,
-    /// Optional [`Word`] that will be passed to the authentication procedure during
-    /// transaction execution.
+    /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
+    /// during transaction execution.
     auth_arg: Option<Word>,
 }
 

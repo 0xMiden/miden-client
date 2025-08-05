@@ -68,8 +68,8 @@ pub struct TransactionRequestBuilder {
     /// execution. If the advice map is extended with some user defined entries, this script
     /// argument could be used as a key to access the corresponding value.
     script_arg: Option<Word>,
-    /// Optional [`Word`] that will be passed to the authentication procedure during
-    /// transaction execution.
+    /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
+    /// during transaction execution.
     auth_arg: Option<Word>,
 }
 
@@ -244,8 +244,8 @@ impl TransactionRequestBuilder {
         self
     }
 
-    /// Sets an optional [`Word`] that will be passed to the authentication procedure during
-    /// transaction execution.
+    /// Sets an optional [`Word`] that will be pushed to the stack for the authentication
+    /// procedure during transaction execution.
     #[must_use]
     pub fn auth_arg(mut self, auth_arg: Word) -> Self {
         self.auth_arg = Some(auth_arg);
