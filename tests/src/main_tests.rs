@@ -169,8 +169,11 @@ async fn import_expected_notes() {
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
     client_2.sync_state().await.unwrap();
 
-    // If the verification is requested before execution then the import should fail
-    assert!(client_2.import_note(NoteFile::NoteId(note.id())).await.is_err());
+    // Importing a public note before it's committed onchain should fail
+    assert!(matches!(
+        client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap_err(),
+        ClientError::NoteNotFoundOnChain(_)
+    ));
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
     // Use client 1 to wait until a couple of blocks have passed
@@ -182,12 +185,12 @@ async fn import_expected_notes() {
     client_2.import_note(NoteFile::NoteId(note.clone().id())).await.unwrap();
     client_2.sync_state().await.unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    // If imported after execution and syncing then the inclusion proof should be Some
+    assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
+
     assert!(
         new_sync_data.block_num > input_note.inclusion_proof().unwrap().location().block_num() + 1
     );
-
-    // If imported after execution and syncing then the inclusion proof should be Some
-    assert!(input_note.inclusion_proof().is_some());
 
     // If client 2 successfully consumes the note, we confirm we have MMR and block header data
     let tx_id =
@@ -206,7 +209,7 @@ async fn import_expected_notes() {
     let note: InputNoteRecord =
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
 
-    // Import an uncommitted note without verification
+    // Import the node before it's committed onchain works if we have full `NoteDetails`
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
         .import_note(NoteFile::NoteDetails {
@@ -219,7 +222,8 @@ async fn import_expected_notes() {
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
 
     // If imported before execution then the inclusion proof should be None
-    assert!(input_note.inclusion_proof().is_none());
+    assert!(input_note.inclusion_proof().is_none(), "Unexpectedly found inclusion proof");
+    assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
 
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
     client_2.sync_state().await.unwrap();
@@ -227,7 +231,7 @@ async fn import_expected_notes() {
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
-    assert!(input_note.inclusion_proof().is_some());
+    assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
     let tx_id =
