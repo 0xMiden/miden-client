@@ -34,11 +34,8 @@ impl ClientDataStore {
     pub fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.transaction_mast_store.clone()
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl DataStore for ClientDataStore {
-    async fn get_transaction_inputs(
+    async fn get_transaction_inputs_inner(
         &self,
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
@@ -82,6 +79,18 @@ impl DataStore for ClientDataStore {
                 )
             })?;
         Ok((account, seed, block_header, partial_blockchain))
+    }
+}
+
+impl DataStore for ClientDataStore {
+    fn get_transaction_inputs(
+        &self,
+        account_id: AccountId,
+        block_refs: BTreeSet<BlockNumber>,
+    ) -> impl Future<
+        Output = Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError>,
+    > {
+        self.get_transaction_inputs_inner(account_id, block_refs)
     }
 }
 

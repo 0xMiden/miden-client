@@ -66,12 +66,14 @@
 //! documentation.
 
 use alloc::{
+    boxed::Box,
     collections::{BTreeMap, BTreeSet},
     string::ToString,
     sync::Arc,
     vec::Vec,
 };
 use core::fmt::{self};
+use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 
 use miden_objects::{
     AssetError, Felt, Word,
@@ -80,7 +82,7 @@ use miden_objects::{
     asset::{Asset, NonFungibleAsset},
     block::BlockNumber,
     note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
-    transaction::{AccountInputs, TransactionArgs},
+    transaction::{AccountInputs, TransactionArgs, TransactionWitness},
 };
 use miden_tx::{
     DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
@@ -118,7 +120,7 @@ pub use miden_objects::{
 };
 pub use miden_tx::{
     DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
-    TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
+    TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
     ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
@@ -128,6 +130,34 @@ pub use request::{
 // TRANSACTION RESULT
 // ================================================================================================
 
+#[async_trait::async_trait(?Send)]
+pub trait TransactionProver {
+    async fn prove(
+        &self,
+        tx_result: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError>;
+}
+
+#[async_trait::async_trait(?Send)]
+impl TransactionProver for LocalTransactionProver {
+    async fn prove(
+        &self,
+        witness: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        LocalTransactionProver::prove(self, witness)
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl TransactionProver for RemoteTransactionProver {
+    async fn prove(
+        &self,
+        witness: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        let fut = RemoteTransactionProver::prove(self, witness);
+        fut.await
+    }
+}
 /// Represents the result of executing a transaction by the client.
 ///
 /// It contains an [`ExecutedTransaction`], and a list of `future_notes` that we expect to receive
