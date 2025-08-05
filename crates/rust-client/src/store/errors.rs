@@ -2,8 +2,8 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_objects::{
-    AccountError, AccountIdError, AssetVaultError, NoteError, TransactionScriptError, Word,
-    WordError,
+    AccountError, AccountIdError, AssetError, AssetVaultError, NoteError, TransactionScriptError,
+    Word, WordError,
     account::AccountId,
     crypto::merkle::MmrError,
     utils::{DeserializationError, HexParseError},
@@ -20,6 +20,8 @@ use super::note_record::NoteRecordError;
 #[derive(Debug, Error)]
 #[allow(clippy::large_enum_variant)]
 pub enum StoreError {
+    #[error("asset error")]
+    AssetError(#[from] AssetError),
     #[error("asset vault error")]
     AssetVaultError(#[from] AssetVaultError),
     #[error("account code data with root {0} not found")]
