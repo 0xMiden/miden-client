@@ -557,6 +557,8 @@ mod tests {
                 OutputNote::Full(notes.pop().unwrap()),
                 OutputNote::Partial(notes.pop().unwrap().into()),
             ])
+            .script_arg(rng.draw_word())
+            .auth_arg(rng.draw_word())
             .build()
             .unwrap();
 
