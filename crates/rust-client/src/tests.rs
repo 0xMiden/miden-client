@@ -1926,3 +1926,28 @@ async fn swap_chain_test() {
         1
     );
 }
+
+#[tokio::test]
+async fn test_store_as_smt() {
+    let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
+
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+
+    // First Mint necessary token
+    mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let account: Account = client.get_account(wallet.id()).await.unwrap().unwrap().into();
+
+    let (asset, asset_smt_proof) = client
+        .test_store()
+        .get_vault_item(account.vault().root(), faucet.id())
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(asset, account.vault().assets().next().unwrap());
+    assert_eq!(asset_smt_proof, account.vault().asset_tree().open(&asset.vault_key()));
+}

@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use miden_client::{
     ClientError, ONE,
-    account::AccountId,
+    account::{Account, AccountId},
     builder::ClientBuilder,
     keystore::FilesystemKeyStore,
     rpc::domain::account::FetchedAccount,

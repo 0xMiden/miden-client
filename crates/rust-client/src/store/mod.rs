@@ -30,8 +30,9 @@ use core::fmt::Debug;
 use miden_objects::{
     Word,
     account::{Account, AccountCode, AccountHeader, AccountId},
+    asset::Asset,
     block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
+    crypto::merkle::{InOrderIndex, MmrPeaks, SmtProof},
     note::{NoteId, NoteTag, Nullifier},
     transaction::TransactionId,
 };
@@ -315,6 +316,12 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    async fn get_vault_item(
+        &self,
+        vault_root: Word,
+        faucet_id: AccountId,
+    ) -> Result<Option<(Asset, SmtProof)>, StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

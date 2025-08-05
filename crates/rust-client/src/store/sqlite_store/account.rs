@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use std::{collections::BTreeMap, rc::Rc};
+use std::{collections::BTreeMap, println, rc::Rc};
 
 use miden_objects::{
     AccountError, Felt, Word, WordError,
@@ -12,6 +12,7 @@ use miden_objects::{
         Account, AccountCode, AccountHeader, AccountId, AccountStorage, StorageMap, StorageSlot,
     },
     asset::{Asset, AssetVault, FungibleAsset, NonFungibleAsset},
+    crypto::merkle::{NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof},
 };
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use rusqlite::{Connection, Transaction, named_params, params, types::Value};
@@ -241,6 +242,28 @@ impl SqliteStore {
             })
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
     }
+
+    pub fn get_asset(
+        conn: &Connection,
+        vault_root: Word,
+        faucet_id: AccountId,
+    ) -> Result<Option<Asset>, StoreError> {
+        const QUERY: &str = "SELECT fungible_faucet_id, fungible_faucet_amount, non_fungible_asset \
+            FROM account_vaults WHERE root = ? AND faucet_id_prefix = ?";
+
+        println!("Asset vault root: {}", vault_root.to_string());
+        println!("Faucet ID prefix: {}", faucet_id.prefix().to_hex());
+
+        Ok(conn
+            .prepare(QUERY)?
+            .query_map(
+                params![vault_root.to_hex(), faucet_id.prefix().to_hex()],
+                parse_asset_columns,
+            )?
+            .map(|result| Ok(result?).and_then(parse_asset))
+            .next()
+            .transpose()?)
+    }
 }
 
 // HELPERS
@@ -351,6 +374,7 @@ pub(super) fn insert_account_asset_vault(
     tx: &Transaction<'_>,
     asset_vault: &AssetVault,
 ) -> Result<(), StoreError> {
+    println!("Inserting asset vault with root: {}", asset_vault.root().to_string());
     for asset in asset_vault.assets() {
         let serialized_asset = serialize_asset(&asset);
         const QUERY: &str = insert_sql!(
@@ -362,11 +386,16 @@ pub(super) fn insert_account_asset_vault(
                 non_fungible_asset
             } | IGNORE
         );
+        println!("Asset vault root: {}", asset_vault.root().to_string());
+        println!("Faucet ID prefix: {}", asset.faucet_id_prefix().to_hex());
+        println!("Fungible faucet ID: {:?}", serialized_asset.fungible_faucet_id);
+        println!("Fungible faucet amount: {:?}", serialized_asset.fungible_faucet_amount);
+        println!("Non-fungible asset: {:?}", serialized_asset.non_fungible_asset);
         tx.execute(
             QUERY,
             params![
                 asset_vault.root().to_string(),
-                asset.faucet_id_prefix().to_string(),
+                asset.faucet_id_prefix().to_hex(),
                 serialized_asset.fungible_faucet_id,
                 serialized_asset.fungible_faucet_amount,
                 serialized_asset.non_fungible_asset,
