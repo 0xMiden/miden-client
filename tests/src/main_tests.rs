@@ -312,9 +312,24 @@ async fn import_expected_notes_from_the_past_as_committed() {
 
     // Use client 1 to wait until a couple of blocks have passed
     wait_for_blocks(&mut client_1, 3).await;
+
+    // importing the note before client_2 is synced will result in a note with `Expected` state
+    let note_id = client_2
+        .import_note(NoteFile::NoteDetails {
+            details: note.clone().into(),
+            after_block_num: block_height_before,
+            tag: Some(note.metadata().unwrap().tag()),
+        })
+        .await
+        .unwrap();
+
+    let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
+
+    assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
+
     client_2.sync_state().await.unwrap();
 
-    // If the verification is requested before execution then the import should fail
+    // import the note after syncing the client
     let note_id = client_2
         .import_note(NoteFile::NoteDetails {
             details: note.clone().into(),
@@ -330,6 +345,7 @@ async fn import_expected_notes_from_the_past_as_committed() {
     let client_1_note = client_1.get_input_note(note_id).await.unwrap().unwrap();
 
     assert_eq!(imported_note.state(), client_1_note.state());
+    assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
 }
 
 #[tokio::test]
