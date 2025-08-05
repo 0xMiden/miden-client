@@ -43,3 +43,9 @@ impl From<&NativeTransactionId> for TransactionId {
         TransactionId(*native_id)
     }
 }
+
+impl From<TransactionId> for NativeTransactionId {
+    fn from(transaction_id: TransactionId) -> Self {
+        transaction_id.0
+    }
+}
