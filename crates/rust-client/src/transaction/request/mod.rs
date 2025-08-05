@@ -201,12 +201,12 @@ impl TransactionRequest {
         self.ignore_invalid_input_notes
     }
 
-    /// Returns the script arg for the transaction request.
+    /// Returns the script argument for the transaction request.
     pub fn script_arg(&self) -> &Option<Word> {
         &self.script_arg
     }
 
-    /// Returns the auth arg for the transaction request.
+    /// Returns the auth argument for the transaction request.
     pub fn auth_arg(&self) -> &Option<Word> {
         &self.auth_arg
     }
