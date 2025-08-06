@@ -28,7 +28,7 @@ impl NoteAssets {
                 if asset.is_fungible() {
                     Some(asset.unwrap_fungible().into())
                 } else {
-                    None // TODO: Support non fungible assets
+                    None
                 }
             })
             .collect()
