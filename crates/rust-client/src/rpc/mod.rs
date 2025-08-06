@@ -39,23 +39,22 @@
 //! For further details and examples, see the documentation for the individual methods in the
 //! [`NodeRpcClient`] trait.
 
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
 
-use domain::{
-    account::{AccountProofs, FetchedAccount},
-    note::{FetchedNote, NoteSyncInfo},
-    nullifier::NullifierUpdate,
-    sync::StateSyncInfo,
-};
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountDelta, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
-};
+use domain::account::{AccountProofs, FetchedAccount};
+use domain::note::{FetchedNote, NoteSyncInfo};
+use domain::nullifier::NullifierUpdate;
+use domain::sync::StateSyncInfo;
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountDelta, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -80,10 +79,9 @@ mod tonic_client;
 #[cfg(any(feature = "tonic", feature = "web-tonic"))]
 pub use tonic_client::TonicRpcClient;
 
-use crate::{
-    store::{InputNoteRecord, input_note_states::UnverifiedNoteState},
-    transaction::ForeignAccount,
-};
+use crate::store::InputNoteRecord;
+use crate::store::input_note_states::UnverifiedNoteState;
+use crate::transaction::ForeignAccount;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================

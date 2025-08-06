@@ -1,31 +1,28 @@
-use std::{env, sync::Arc};
+use std::env;
+use std::sync::Arc;
 
 use clap::Parser;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
-use miden_client::{
-    Client, DebugMode, IdPrefixFetchError,
-    account::AccountHeader,
-    auth::TransactionAuthenticator,
-    builder::ClientBuilder,
-    keystore::FilesystemKeyStore,
-    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
-};
+use miden_client::account::AccountHeader;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::builder::ClientBuilder;
+use miden_client::keystore::FilesystemKeyStore;
+use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
+use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use rand::rngs::StdRng;
 mod commands;
-use commands::{
-    account::AccountCmd,
-    exec::ExecCmd,
-    export::ExportCmd,
-    import::ImportCmd,
-    init::InitCmd,
-    new_account::{NewAccountCmd, NewWalletCmd},
-    new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd},
-    notes::NotesCmd,
-    sync::SyncCmd,
-    tags::TagsCmd,
-    transactions::TransactionCmd,
-};
+use commands::account::AccountCmd;
+use commands::exec::ExecCmd;
+use commands::export::ExportCmd;
+use commands::import::ImportCmd;
+use commands::init::InitCmd;
+use commands::new_account::{NewAccountCmd, NewWalletCmd};
+use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::notes::NotesCmd;
+use commands::sync::SyncCmd;
+use commands::tags::TagsCmd;
+use commands::transactions::TransactionCmd;
 
 use self::utils::load_config_file;
 

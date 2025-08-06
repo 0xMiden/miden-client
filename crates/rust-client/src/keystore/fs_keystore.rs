@@ -1,20 +1,18 @@
 use alloc::string::String;
-use std::{
-    fs::OpenOptions,
-    hash::{DefaultHasher, Hash, Hasher},
-    io::{BufRead, BufReader, BufWriter, Write},
-    path::PathBuf,
-    string::ToString,
-    sync::Arc,
-    vec::Vec,
-};
+use std::fs::OpenOptions;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::PathBuf;
+use std::string::ToString;
+use std::sync::Arc;
+use std::vec::Vec;
 
-use miden_objects::{Felt, Word, account::AuthSecretKey};
-use miden_tx::{
-    AuthenticationError,
-    auth::{SigningInputs, TransactionAuthenticator},
-    utils::{Deserializable, Serializable, sync::RwLock},
-};
+use miden_objects::account::AuthSecretKey;
+use miden_objects::{Felt, Word};
+use miden_tx::AuthenticationError;
+use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
+use miden_tx::utils::sync::RwLock;
+use miden_tx::utils::{Deserializable, Serializable};
 use rand::{Rng, SeedableRng};
 
 use super::KeyStoreError;

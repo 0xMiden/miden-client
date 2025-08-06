@@ -1,5 +1,6 @@
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
 
 use crate::models::public_key::PublicKey;

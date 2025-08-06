@@ -53,15 +53,16 @@
 //! ```rust
 //! use std::sync::Arc;
 //!
-//! use miden_client::{
-//!     Client, ExecutionOptions, Felt,
-//!     crypto::RpoRandomCoin,
-//!     keystore::FilesystemKeyStore,
-//!     rpc::{Endpoint, TonicRpcClient},
-//!     store::{Store, sqlite_store::SqliteStore},
-//! };
-//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::FeltRng};
-//! use rand::{Rng, rngs::StdRng};
+//! use miden_client::crypto::RpoRandomCoin;
+//! use miden_client::keystore::FilesystemKeyStore;
+//! use miden_client::rpc::{Endpoint, TonicRpcClient};
+//! use miden_client::store::Store;
+//! use miden_client::store::sqlite_store::SqliteStore;
+//! use miden_client::{Client, ExecutionOptions, Felt};
+//! use miden_objects::crypto::rand::FeltRng;
+//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+//! use rand::Rng;
+//! use rand::rngs::StdRng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create the SQLite store from the client configuration.
@@ -143,11 +144,18 @@ mod errors;
 
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
-    pub use miden_objects::{
-        account::delta::{
-            AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta, NonFungibleDeltaAction,
-        },
-        asset::{Asset, AssetVault, FungibleAsset, NonFungibleAsset, TokenSymbol},
+    pub use miden_objects::account::delta::{
+        AccountVaultDelta,
+        FungibleAssetDelta,
+        NonFungibleAssetDelta,
+        NonFungibleDeltaAction,
+    };
+    pub use miden_objects::asset::{
+        Asset,
+        AssetVault,
+        FungibleAsset,
+        NonFungibleAsset,
+        TokenSymbol,
     };
 }
 
@@ -168,13 +176,18 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::crypto::{
-        dsa::rpo_falcon512::SecretKey,
-        merkle::{
-            InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf, SmtProof,
-        },
-        rand::{FeltRng, RpoRandomCoin},
+    pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub use miden_objects::crypto::merkle::{
+        InOrderIndex,
+        LeafIndex,
+        MerklePath,
+        MmrDelta,
+        MmrPeaks,
+        MmrProof,
+        SmtLeaf,
+        SmtProof,
     };
+    pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
@@ -185,10 +198,16 @@ pub use miden_tx::ExecutionOptions;
 /// Provides various utilities that are commonly used throughout the Miden
 /// client library.
 pub mod utils {
+    pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
     pub use miden_tx::utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
-        bytes_to_hex_string, hex_to_bytes,
-        sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
+        ByteReader,
+        ByteWriter,
+        Deserializable,
+        DeserializationError,
+        Serializable,
+        ToHex,
+        bytes_to_hex_string,
+        hex_to_bytes,
     };
 }
 
@@ -205,8 +224,10 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_lib::utils::ScriptBuilder;
-use miden_objects::{block::BlockNumber, crypto::rand::FeltRng};
-use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
+use miden_objects::block::BlockNumber;
+use miden_objects::crypto::rand::FeltRng;
+use miden_tx::LocalTransactionProver;
+use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;

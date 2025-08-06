@@ -20,13 +20,17 @@
 //! The following example demonstrates how to create and submit a transaction:
 //!
 //! ```rust
-//! use miden_client::{
-//!     Client,
-//!     auth::TransactionAuthenticator,
-//!     crypto::FeltRng,
-//!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
+//! use miden_client::Client;
+//! use miden_client::auth::TransactionAuthenticator;
+//! use miden_client::crypto::FeltRng;
+//! use miden_client::transaction::{
+//!     PaymentNoteDescription,
+//!     TransactionRequestBuilder,
+//!     TransactionResult,
 //! };
-//! use miden_objects::{account::AccountId, asset::FungibleAsset, note::NoteType};
+//! use miden_objects::account::AccountId;
+//! use miden_objects::asset::FungibleAsset;
+//! use miden_objects::note::NoteType;
 //! # use std::error::Error;
 //!
 //! /// Executes, proves and submits a P2ID transaction.
@@ -65,64 +69,75 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    string::ToString,
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt::{self};
 
-use miden_objects::{
-    AssetError, Felt, Word,
-    account::{Account, AccountCode, AccountDelta, AccountId},
-    assembly::DefaultSourceManager,
-    asset::{Asset, NonFungibleAsset},
-    block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
-    transaction::{AccountInputs, TransactionArgs},
-};
-use miden_tx::{
-    DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-};
+use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::assembly::DefaultSourceManager;
+use miden_objects::asset::{Asset, NonFungibleAsset};
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
+use miden_objects::transaction::{AccountInputs, TransactionArgs};
+use miden_objects::{AssetError, Felt, Word};
+use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::{DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
-use crate::{
-    ClientError,
-    note::{NoteScreener, NoteUpdateTracker},
-    rpc::domain::account::AccountProof,
-    store::{
-        InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
-        TransactionFilter, data_store::ClientDataStore, input_note_states::ExpectedNoteState,
-    },
-    sync::NoteTagRecord,
+use crate::ClientError;
+use crate::note::{NoteScreener, NoteUpdateTracker};
+use crate::rpc::domain::account::AccountProof;
+use crate::store::data_store::ClientDataStore;
+use crate::store::input_note_states::ExpectedNoteState;
+use crate::store::{
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    StoreError,
+    TransactionFilter,
 };
+use crate::sync::NoteTagRecord;
 
 mod request;
 
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_lib::{
-    account::interface::{AccountComponentInterface, AccountInterface},
-    transaction::TransactionKernel,
+pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
+pub use miden_lib::transaction::TransactionKernel;
+pub use miden_objects::transaction::{
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNote,
+    OutputNotes,
+    ProvenTransaction,
+    TransactionId,
+    TransactionScript,
 };
-pub use miden_objects::{
-    transaction::{
-        ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
-        TransactionId, TransactionScript,
-    },
-    vm::{AdviceInputs, AdviceMap},
-};
+pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
-    TransactionProver, TransactionProverError, auth::TransactionAuthenticator,
+    DataStoreError,
+    LocalTransactionProver,
+    ProvingOptions,
+    TransactionExecutorError,
+    TransactionProver,
+    TransactionProverError,
 };
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -1239,28 +1254,30 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
-    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
-    use miden_objects::{
-        Word,
-        account::{AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot},
-        asset::{Asset, FungibleAsset},
-        crypto::dsa::rpo_falcon512::SecretKey,
-        note::NoteType,
-        testing::{
-            account_component::BASIC_WALLET_CODE,
-            account_id::{
-                ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-            },
-        },
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_objects::Word;
+    use miden_objects::account::{
+        AccountBuilder,
+        AccountComponent,
+        AuthSecretKey,
+        StorageMap,
+        StorageSlot,
+    };
+    use miden_objects::asset::{Asset, FungibleAsset};
+    use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    use miden_objects::note::NoteType;
+    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     };
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::PaymentNoteDescription;
-    use crate::{
-        tests::create_test_client,
-        transaction::{TransactionRequestBuilder, TransactionResult},
-    };
+    use crate::tests::create_test_client;
+    use crate::transaction::{TransactionRequestBuilder, TransactionResult};
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {

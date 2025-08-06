@@ -1,16 +1,23 @@
 use miden_client::note::{
-    NoteExecutionHint as NativeNoteExecutionHint, NoteInputs as NativeNoteInputs,
-    NoteMetadata as NativeNoteMetadata, NoteRecipient as NativeNoteRecipient,
-    NoteTag as NativeNoteTag, WellKnownNote,
+    NoteExecutionHint as NativeNoteExecutionHint,
+    NoteInputs as NativeNoteInputs,
+    NoteMetadata as NativeNoteMetadata,
+    NoteRecipient as NativeNoteRecipient,
+    NoteTag as NativeNoteTag,
+    WellKnownNote,
 };
 use miden_lib::note::utils;
 use miden_objects::note::Note as NativeNote;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    account_id::AccountId, felt::Felt, note_assets::NoteAssets, note_id::NoteId,
-    note_metadata::NoteMetadata, note_recipient::NoteRecipient, note_type::NoteType, word::Word,
-};
+use super::account_id::AccountId;
+use super::felt::Felt;
+use super::note_assets::NoteAssets;
+use super::note_id::NoteId;
+use super::note_metadata::NoteMetadata;
+use super::note_recipient::NoteRecipient;
+use super::note_type::NoteType;
+use super::word::Word;
 
 #[wasm_bindgen]
 #[derive(Clone)]

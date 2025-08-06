@@ -1,4 +1,5 @@
-use miden_objects::{Felt as NativeFelt, Word as NativeWord, vm::AdviceMap as NativeAdviceMap};
+use miden_objects::vm::AdviceMap as NativeAdviceMap;
+use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
 use super::felt::{Felt, FeltArray};

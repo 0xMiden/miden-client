@@ -2,16 +2,14 @@ extern crate alloc;
 use alloc::sync::Arc;
 use std::fmt::Write;
 
-use miden_client::{
-    Client, ExecutionOptions,
-    keystore::WebKeyStore,
-    rpc::{Endpoint, TonicRpcClient},
-    store::web_store::WebStore,
-};
-use miden_objects::{
-    Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::RpoRandomCoin,
-};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use miden_client::keystore::WebKeyStore;
+use miden_client::rpc::{Endpoint, TonicRpcClient};
+use miden_client::store::web_store::WebStore;
+use miden_client::{Client, ExecutionOptions};
+use miden_objects::crypto::rand::RpoRandomCoin;
+use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
 
 pub mod account;

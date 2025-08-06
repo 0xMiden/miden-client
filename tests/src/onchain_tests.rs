@@ -1,17 +1,13 @@
-use miden_client::{
-    account::build_wallet_id,
-    auth::AuthSecretKey,
-    store::{InputNoteState, NoteFilter},
-    testing::common::*,
-    transaction::{PaymentNoteDescription, TransactionRequestBuilder},
-};
-use miden_objects::{
-    EMPTY_WORD,
-    account::AccountStorageMode,
-    asset::{Asset, FungibleAsset},
-    note::{NoteFile, NoteType},
-    transaction::InputNote,
-};
+use miden_client::account::build_wallet_id;
+use miden_client::auth::AuthSecretKey;
+use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::testing::common::*;
+use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
+use miden_objects::EMPTY_WORD;
+use miden_objects::account::AccountStorageMode;
+use miden_objects::asset::{Asset, FungibleAsset};
+use miden_objects::note::{NoteFile, NoteType};
+use miden_objects::transaction::InputNote;
 use rand::RngCore;
 
 // TESTS

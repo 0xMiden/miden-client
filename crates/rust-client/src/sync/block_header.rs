@@ -1,21 +1,16 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::{
-    Word,
-    block::{BlockHeader, BlockNumber},
-    crypto::{
-        self,
-        merkle::{Forest, MerklePath},
-    },
-};
+use miden_objects::Word;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{Forest, MerklePath};
+use miden_objects::crypto::{self};
 use tracing::warn;
 
-use crate::{
-    Client, ClientError,
-    rpc::NodeRpcClient,
-    store::{PartialBlockchainFilter, StoreError},
-};
+use crate::rpc::NodeRpcClient;
+use crate::store::{PartialBlockchainFilter, StoreError};
+use crate::{Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {

@@ -1,27 +1,37 @@
-use std::{io, sync::Arc};
+use std::io;
+use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
-use miden_client::{
-    Client, RemoteTransactionProver,
-    account::AccountId,
-    asset::{FungibleAsset, NonFungibleDeltaAction},
-    auth::TransactionAuthenticator,
-    note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
-    store::NoteRecordError,
-    transaction::{
-        InputNote, OutputNote, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-        TransactionRequestBuilder, TransactionResult,
-    },
+use miden_client::account::AccountId;
+use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::note::{
+    BlockNumber,
+    NoteType as MidenNoteType,
+    build_swap_tag,
+    get_input_note_with_id_prefix,
 };
+use miden_client::store::NoteRecordError;
+use miden_client::transaction::{
+    InputNote,
+    OutputNote,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionResult,
+};
+use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
-use crate::{
-    create_dynamic_table,
-    errors::CliError,
-    utils::{
-        SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_config_file,
-        load_faucet_details_map, parse_account_id,
-    },
+use crate::create_dynamic_table;
+use crate::errors::CliError;
+use crate::utils::{
+    SHARED_TOKEN_DOCUMENTATION,
+    get_input_acc_id_by_prefix_or_default,
+    load_config_file,
+    load_faucet_details_map,
+    parse_account_id,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

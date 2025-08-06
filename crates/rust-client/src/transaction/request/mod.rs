@@ -1,23 +1,30 @@
 //! Contains structures and functions related to transaction creation.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_lib::{
-    account::interface::{AccountInterface, AccountInterfaceError},
-    transaction::TransactionKernel,
+use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
+use miden_lib::transaction::TransactionKernel;
+use miden_objects::account::AccountId;
+use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_objects::transaction::{
+    AccountInputs,
+    InputNote,
+    InputNotes,
+    TransactionArgs,
+    TransactionScript,
 };
+use miden_objects::vm::AdviceMap;
 use miden_objects::{
-    AccountError, Felt, NoteError, TransactionInputError, TransactionScriptError, Word,
-    account::AccountId,
-    crypto::merkle::{MerkleError, MerkleStore},
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote},
-    transaction::{AccountInputs, InputNote, InputNotes, TransactionArgs, TransactionScript},
-    vm::AdviceMap,
+    AccountError,
+    Felt,
+    NoteError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
@@ -28,7 +35,8 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::ForeignAccount;
 
-use crate::{DebugMode, store::InputNoteRecord};
+use crate::DebugMode;
+use crate::store::InputNoteRecord;
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -472,31 +480,27 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_lib::{
-        account::auth::AuthRpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::note::create_p2id_note;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
+    use miden_objects::asset::FungibleAsset;
+    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+    use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+    use miden_objects::note::{NoteTag, NoteType};
+    use miden_objects::testing::account_component::AccountMockComponent;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
     };
-    use miden_objects::{
-        EMPTY_WORD, Felt, Word, ZERO,
-        account::{AccountBuilder, AccountId, AccountType},
-        asset::FungibleAsset,
-        crypto::{
-            dsa::rpo_falcon512::PublicKey,
-            rand::{FeltRng, RpoRandomCoin},
-        },
-        note::{NoteTag, NoteType},
-        testing::{
-            account_component::AccountMockComponent,
-            account_id::{
-                ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE, ACCOUNT_ID_SENDER,
-            },
-        },
-        transaction::OutputNote,
-    };
+    use miden_objects::transaction::OutputNote;
+    use miden_objects::{EMPTY_WORD, Felt, Word, ZERO};
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
-    use crate::{rpc::domain::account::AccountStorageRequirements, transaction::ForeignAccount};
+    use crate::rpc::domain::account::AccountStorageRequirements;
+    use crate::transaction::ForeignAccount;
 
     #[test]
     fn transaction_request_serialization() {
