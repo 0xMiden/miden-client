@@ -12,7 +12,7 @@
 * [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action ([#1051](https://github.com/0xMiden/miden-client/pull/1051)).
 * [BREAKING] Changed `OnNoteReceived` from closure to trait object (#1080)
 * `NoteScript` now has a `toString` method that prints its own MAST source [(#1082)](https://github.com/0xMiden/miden-client/pull/1082).
-* Web Client `Note` model now has getter to expose `NoteScript`
+* Added a `NoteScript` getter for the Web Client `Note` model ([#1135](https://github.com/0xMiden/miden-client/pull/1135/))
 
 
 ### Features
