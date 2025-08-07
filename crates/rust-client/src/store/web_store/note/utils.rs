@@ -1,25 +1,30 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use chrono::Utc;
-use miden_objects::{
-    Word,
-    note::{NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript},
-    utils::Deserializable,
+use miden_objects::Word;
+use miden_objects::note::{
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
 };
+use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{
-    InputNoteIdxdbObject, OutputNoteIdxdbObject,
-    js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note},
-};
-use crate::{
-    note::NoteUpdateTracker,
-    store::{InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState, StoreError},
+use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
+use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::note::NoteUpdateTracker;
+use crate::store::{
+    InputNoteRecord,
+    InputNoteState,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 
 // TYPES

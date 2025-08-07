@@ -1,28 +1,31 @@
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::boxed::Box;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt;
 
-use miden_lib::{account::interface::AccountInterface, note::well_known_note::WellKnownNote};
-use miden_objects::{
-    AccountError, AssetError,
-    account::{Account, AccountId},
-    assembly::DefaultSourceManager,
-    note::{Note, NoteId},
-    transaction::{InputNote, InputNotes},
-};
+use miden_lib::account::interface::AccountInterface;
+use miden_lib::note::well_known_note::WellKnownNote;
+use miden_objects::account::{Account, AccountId};
+use miden_objects::assembly::DefaultSourceManager;
+use miden_objects::note::{Note, NoteId};
+use miden_objects::transaction::{InputNote, InputNotes};
+use miden_objects::{AccountError, AssetError};
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
-    auth::TransactionAuthenticator,
+    NoteAccountExecution,
+    NoteConsumptionChecker,
+    TransactionExecutor,
+    TransactionExecutorError,
 };
 use thiserror::Error;
 use tonic::async_trait;
 
-use crate::{
-    ClientError,
-    rpc::domain::note::CommittedNote,
-    store::{InputNoteRecord, NoteFilter, Store, StoreError, data_store::ClientDataStore},
-    sync::{NoteUpdateAction, OnNoteReceived},
-    transaction::{TransactionRequestBuilder, TransactionRequestError},
-};
+use crate::ClientError;
+use crate::rpc::domain::note::CommittedNote;
+use crate::store::data_store::ClientDataStore;
+use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
+use crate::sync::{NoteUpdateAction, OnNoteReceived};
+use crate::transaction::{TransactionRequestBuilder, TransactionRequestError};
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -98,11 +101,10 @@ where
                     // p2ide
                     let script_root = note.script().root();
 
-                    if script_root == WellKnownNote::P2IDE.script_root() {
-                        if let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
-                        {
-                            note_relevances.push((id, relevance));
-                        }
+                    if script_root == WellKnownNote::P2IDE.script_root()
+                        && let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
+                    {
+                        note_relevances.push((id, relevance));
                     }
                 },
                 // If an error occurs while checking consumability, we count it as not relevant for

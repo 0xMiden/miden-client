@@ -1,8 +1,14 @@
+use miden_objects::Word as NativeWord;
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::public_key::PublicKey;
+use crate::models::signature::Signature;
+use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 pub struct SecretKey(NativeSecretKey);
@@ -27,6 +33,22 @@ impl SecretKey {
     #[wasm_bindgen(js_name = "publicKey")]
     pub fn public_key(&self) -> PublicKey {
         self.0.public_key().into()
+    }
+
+    pub fn sign(&self, message: &Word) -> Result<Signature, JsValue> {
+        let native_message: NativeWord = message.into();
+        let mut rng = StdRng::from_os_rng();
+        let signature = self.0.sign_with_rng(native_message, &mut rng);
+        Ok(signature.into())
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<SecretKey, JsValue> {
+        let native_secret_key = deserialize_from_uint8array::<NativeSecretKey>(bytes)?;
+        Ok(SecretKey(native_secret_key))
     }
 }
 

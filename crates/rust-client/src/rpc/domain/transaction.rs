@@ -1,6 +1,9 @@
-use miden_objects::{Word, account::AccountId, transaction::TransactionId};
+use miden_objects::Word;
+use miden_objects::account::AccountId;
+use miden_objects::transaction::TransactionId;
 
-use crate::rpc::{errors::RpcConversionError, generated as proto};
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // INTO TRANSACTION ID
 // ================================================================================================

@@ -1,10 +1,9 @@
-use miden_objects::{
-    account::AccountId as NativeAccountId,
-    note::{NoteExecutionMode as NativeNoteExecutionMode, NoteTag as NativeNoteTag},
-};
+use miden_objects::account::AccountId as NativeAccountId;
+use miden_objects::note::{NoteExecutionMode as NativeNoteExecutionMode, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, note_execution_mode::NoteExecutionMode};
+use super::account_id::AccountId;
+use super::note_execution_mode::NoteExecutionMode;
 
 #[derive(Clone, Copy)]
 #[wasm_bindgen]

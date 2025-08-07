@@ -1,13 +1,18 @@
-use miden_objects::{
-    note::{Note as NativeNote, NoteHeader as NativeNoteHeader, PartialNote as NativePartialNote},
-    transaction::OutputNote as NativeOutputNote,
+use miden_objects::note::{
+    Note as NativeNote,
+    NoteHeader as NativeNoteHeader,
+    PartialNote as NativePartialNote,
 };
+use miden_objects::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    note::Note, note_assets::NoteAssets, note_header::NoteHeader, note_id::NoteId,
-    note_metadata::NoteMetadata, partial_note::PartialNote, word::Word,
-};
+use super::note::Note;
+use super::note_assets::NoteAssets;
+use super::note_header::NoteHeader;
+use super::note_id::NoteId;
+use super::note_metadata::NoteMetadata;
+use super::partial_note::PartialNote;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

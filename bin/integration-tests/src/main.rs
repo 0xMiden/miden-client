@@ -1,20 +1,18 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use clap::Parser;
 use futures::FutureExt;
-use miden_client::{
-    rpc::Endpoint,
-    testing::config::{ClientConfig, create_test_auth_path, create_test_store_path},
-};
+use miden_client::rpc::Endpoint;
+use miden_client::testing::config::{ClientConfig, create_test_auth_path, create_test_store_path};
 use url::Url;
 
-use crate::tests::{
-    client::*, custom_transaction::*, fpi::*, network_transaction::*, onchain::*,
-    swap_transaction::*,
-};
+use crate::tests::client::*;
+use crate::tests::custom_transaction::*;
+use crate::tests::fpi::*;
+use crate::tests::network_transaction::*;
+use crate::tests::onchain::*;
+use crate::tests::swap_transaction::*;
 
 mod tests;
 

@@ -1,22 +1,18 @@
-use std::{
-    fs::{self, File},
-    io::Read,
-    path::PathBuf,
-};
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::PathBuf;
 
-use miden_client::{
-    Client, ClientError,
-    account::{AccountFile, AccountId},
-    auth::TransactionAuthenticator,
-    note::NoteFile,
-    utils::Deserializable,
-};
+use miden_client::account::{AccountFile, AccountId};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::note::NoteFile;
+use miden_client::utils::Deserializable;
+use miden_client::{Client, ClientError};
 use tracing::info;
 
-use crate::{
-    CliKeyStore, Parser, commands::account::maybe_set_default_account, errors::CliError,
-    utils::load_config_file,
-};
+use crate::commands::account::maybe_set_default_account;
+use crate::errors::CliError;
+use crate::utils::load_config_file;
+use crate::{CliKeyStore, Parser};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Import notes or accounts")]

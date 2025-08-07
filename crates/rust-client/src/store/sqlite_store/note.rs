@@ -1,31 +1,35 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{
-    rc::Rc,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::rc::Rc;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    block::BlockNumber,
-    crypto::utils::{Deserializable, Serializable},
-    note::{
-        NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript, Nullifier,
-    },
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::crypto::utils::{Deserializable, Serializable};
+use miden_objects::note::{
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    Nullifier,
 };
-use rusqlite::{Connection, Transaction, params, params_from_iter, types::Value};
+use rusqlite::types::Value;
+use rusqlite::{Connection, Transaction, params, params_from_iter};
 
-use super::{SqliteStore, chain_data::set_block_header_has_client_notes};
-use crate::{
-    insert_sql,
-    note::NoteUpdateTracker,
-    store::{
-        NoteFilter, StoreError,
-        note_record::{InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState},
-    },
-    subst,
+use super::SqliteStore;
+use super::chain_data::set_block_header_has_client_notes;
+use crate::note::NoteUpdateTracker;
+use crate::store::note_record::{
+    InputNoteRecord,
+    InputNoteState,
+    OutputNoteRecord,
+    OutputNoteState,
 };
+use crate::store::{NoteFilter, StoreError};
+use crate::{insert_sql, subst};
 
 // TYPES
 // ================================================================================================

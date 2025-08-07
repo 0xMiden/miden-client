@@ -1,10 +1,9 @@
-use miden_client::{
-    Client,
-    note::{NoteExecutionMode, NoteTag},
-};
+use miden_client::Client;
+use miden_client::note::{NoteExecutionMode, NoteTag};
 use tracing::info;
 
-use crate::{Parser, create_dynamic_table, errors::CliError, load_config_file};
+use crate::errors::CliError;
+use crate::{Parser, create_dynamic_table, load_config_file};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]

@@ -1,23 +1,21 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-};
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use std::boxed::Box;
 
-use miden_objects::{
-    Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
-    crypto::rand::{FeltRng, RpoRandomCoin},
-};
-use miden_tx::{ExecutionOptions, auth::TransactionAuthenticator};
+use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_tx::ExecutionOptions;
+use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
+use crate::keystore::FilesystemKeyStore;
+use crate::rpc::NodeRpcClient;
 #[cfg(feature = "tonic")]
 use crate::rpc::{Endpoint, TonicRpcClient};
+use crate::store::Store;
 #[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
-use crate::{
-    Client, ClientError, DebugMode, keystore::FilesystemKeyStore, rpc::NodeRpcClient, store::Store,
-};
+use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
 // ================================================================================================

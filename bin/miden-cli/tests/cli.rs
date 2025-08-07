@@ -1,30 +1,37 @@
-use std::{
-    env::{self, temp_dir},
-    fs::{self, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::env::{self, temp_dir};
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use assert_cmd::Command;
-use miden_client::{
-    self, Client, ExecutionOptions, Felt,
-    account::{AccountId, AccountStorageMode},
-    crypto::{FeltRng, RpoRandomCoin},
-    note::{
-        Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata,
-        NoteRecipient, NoteTag, NoteType,
-    },
-    rpc::{Endpoint, TonicRpcClient},
-    store::sqlite_store::SqliteStore,
-    testing::{
-        account_id::ACCOUNT_ID_PRIVATE_SENDER,
-        common::{ACCOUNT_ID_REGULAR, TestClientKeyStore, execute_tx_and_sync, insert_new_wallet},
-        config::ClientConfig,
-    },
-    transaction::{OutputNote, TransactionRequestBuilder},
-    utils::Serializable,
+use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::crypto::{FeltRng, RpoRandomCoin};
+use miden_client::note::{
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteFile,
+    NoteId,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
+use miden_client::rpc::{Endpoint, TonicRpcClient};
+use miden_client::store::sqlite_store::SqliteStore;
+use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
+use miden_client::testing::common::{
+    ACCOUNT_ID_REGULAR,
+    TestClientKeyStore,
+    execute_tx_and_sync,
+    insert_new_wallet,
+};
+use miden_client::testing::config::ClientConfig;
+use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::utils::Serializable;
+use miden_client::{self, Client, ExecutionOptions, Felt};
 use miden_client_cli::CliKeyStore;
 use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;

@@ -1,17 +1,14 @@
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
-use miden_objects::{
-    account::{Account, AccountId},
-    note::{NoteId, NoteTag},
-};
+use miden_objects::account::{Account, AccountId};
+use miden_objects::note::{NoteId, NoteTag};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use tracing::warn;
 
-use crate::{
-    Client,
-    errors::ClientError,
-    store::{InputNoteRecord, NoteRecordError},
-};
+use crate::Client;
+use crate::errors::ClientError;
+use crate::store::{InputNoteRecord, NoteRecordError};
 
 /// Tag management methods
 impl<AUTH> Client<AUTH> {

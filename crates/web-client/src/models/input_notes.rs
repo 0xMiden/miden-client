@@ -1,7 +1,8 @@
 use miden_objects::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
 use wasm_bindgen::prelude::*;
 
-use super::{input_note::InputNote, word::Word};
+use super::input_note::InputNote;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

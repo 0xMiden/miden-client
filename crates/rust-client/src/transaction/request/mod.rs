@@ -1,23 +1,30 @@
 //! Contains structures and functions related to transaction creation.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_lib::{
-    account::interface::{AccountInterface, AccountInterfaceError},
-    transaction::TransactionKernel,
+use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
+use miden_lib::transaction::TransactionKernel;
+use miden_objects::account::AccountId;
+use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_objects::transaction::{
+    AccountInputs,
+    InputNote,
+    InputNotes,
+    TransactionArgs,
+    TransactionScript,
 };
+use miden_objects::vm::AdviceMap;
 use miden_objects::{
-    AccountError, Felt, NoteError, TransactionInputError, TransactionScriptError, Word,
-    account::AccountId,
-    crypto::merkle::{MerkleError, MerkleStore},
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote},
-    transaction::{AccountInputs, InputNote, InputNotes, TransactionArgs, TransactionScript},
-    vm::AdviceMap,
+    AccountError,
+    Felt,
+    NoteError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
@@ -28,7 +35,8 @@ pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionReques
 mod foreign;
 pub use foreign::ForeignAccount;
 
-use crate::{DebugMode, store::InputNoteRecord};
+use crate::DebugMode;
+use crate::store::InputNoteRecord;
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -90,6 +98,9 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
     /// execution.
     script_arg: Option<Word>,
+    /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
+    /// during transaction execution.
+    auth_arg: Option<Word>,
 }
 
 impl TransactionRequest {
@@ -198,6 +209,16 @@ impl TransactionRequest {
         self.ignore_invalid_input_notes
     }
 
+    /// Returns the script argument for the transaction request.
+    pub fn script_arg(&self) -> &Option<Word> {
+        &self.script_arg
+    }
+
+    /// Returns the auth argument for the transaction request.
+    pub fn auth_arg(&self) -> &Option<Word> {
+        &self.auth_arg
+    }
+
     /// Builds the [`InputNotes`] needed for the transaction execution. Full valid notes for the
     /// specified authenticated notes need to be provided, otherwise an error will be returned.
     /// The transaction input notes will include both authenticated and unauthenticated notes in the
@@ -284,6 +305,10 @@ impl TransactionRequest {
             tx_args.with_tx_script(tx_script)
         };
 
+        if let Some(auth_argument) = self.auth_arg {
+            tx_args = tx_args.with_auth_args(auth_argument);
+        }
+
         tx_args
             .extend_output_note_recipients(expected_output_recipients.into_values().map(Box::new));
         tx_args.extend_merkle_store(merkle_store.inner_nodes());
@@ -338,6 +363,7 @@ impl Serializable for TransactionRequest {
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
         self.script_arg.write_into(target);
+        self.auth_arg.write_into(target);
     }
 }
 
@@ -374,6 +400,7 @@ impl Deserializable for TransactionRequest {
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;
+        let auth_arg = Option::<Word>::read_from(source)?;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -387,6 +414,7 @@ impl Deserializable for TransactionRequest {
             expiration_delta,
             ignore_invalid_input_notes,
             script_arg,
+            auth_arg,
         })
     }
 }
@@ -452,31 +480,27 @@ pub enum TransactionRequestError {
 mod tests {
     use std::vec::Vec;
 
-    use miden_lib::{
-        account::auth::AuthRpoFalcon512, note::create_p2id_note, transaction::TransactionKernel,
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::note::create_p2id_note;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
+    use miden_objects::asset::FungibleAsset;
+    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+    use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+    use miden_objects::note::{NoteTag, NoteType};
+    use miden_objects::testing::account_component::AccountMockComponent;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
     };
-    use miden_objects::{
-        EMPTY_WORD, Felt, Word, ZERO,
-        account::{AccountBuilder, AccountId, AccountType},
-        asset::FungibleAsset,
-        crypto::{
-            dsa::rpo_falcon512::PublicKey,
-            rand::{FeltRng, RpoRandomCoin},
-        },
-        note::{NoteTag, NoteType},
-        testing::{
-            account_component::AccountMockComponent,
-            account_id::{
-                ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE, ACCOUNT_ID_SENDER,
-            },
-        },
-        transaction::OutputNote,
-    };
+    use miden_objects::transaction::OutputNote;
+    use miden_objects::{EMPTY_WORD, Felt, Word, ZERO};
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
-    use crate::{rpc::domain::account::AccountStorageRequirements, transaction::ForeignAccount};
+    use crate::rpc::domain::account::AccountStorageRequirements;
+    use crate::transaction::ForeignAccount;
 
     #[test]
     fn transaction_request_serialization() {
@@ -537,6 +561,8 @@ mod tests {
                 OutputNote::Full(notes.pop().unwrap()),
                 OutputNote::Partial(notes.pop().unwrap().into()),
             ])
+            .script_arg(rng.draw_word())
+            .auth_arg(rng.draw_word())
             .build()
             .unwrap();
 

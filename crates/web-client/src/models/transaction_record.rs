@@ -1,10 +1,11 @@
 use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    account_id::AccountId, output_notes::OutputNotes, transaction_id::TransactionId,
-    transaction_status::TransactionStatus, word::Word,
-};
+use super::account_id::AccountId;
+use super::output_notes::OutputNotes;
+use super::transaction_id::TransactionId;
+use super::transaction_status::TransactionStatus;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

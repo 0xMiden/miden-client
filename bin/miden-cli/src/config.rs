@@ -1,14 +1,10 @@
 use core::fmt::Debug;
-use std::{
-    fmt::Display,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::fmt::Display;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use figment::{
-    Metadata, Profile, Provider,
-    value::{Dict, Map},
-};
+use figment::value::{Dict, Map};
+use figment::{Metadata, Profile, Provider};
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 

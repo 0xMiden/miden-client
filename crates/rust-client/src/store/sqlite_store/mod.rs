@@ -4,36 +4,37 @@
 //! nodes using an `SQLite` database.
 //! It is compiled only when the `sqlite` feature flag is enabled.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
-use std::{path::PathBuf, string::ToString};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
+use std::path::PathBuf;
+use std::string::ToString;
 
-use db_management::{
-    pool_manager::{Pool, SqlitePoolManager},
-    utils::apply_migrations,
-};
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteTag, Nullifier},
-};
-use rusqlite::{Connection, types::Value};
+use db_management::pool_manager::{Pool, SqlitePoolManager};
+use db_management::utils::apply_migrations;
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteTag, Nullifier};
+use rusqlite::Connection;
+use rusqlite::types::Value;
 use tonic::async_trait;
 
 use super::{
-    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    TransactionFilter,
 };
-use crate::{
-    store::StoreError,
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::store::StoreError;
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 mod account;
 mod chain_data;
@@ -362,7 +363,8 @@ pub mod tests {
     use std::boxed::Box;
 
     use super::SqliteStore;
-    use crate::{store::Store, testing::config::create_test_store_path};
+    use crate::store::Store;
+    use crate::testing::config::create_test_store_path;
 
     fn assert_send_sync<T: Send + Sync>() {}
 

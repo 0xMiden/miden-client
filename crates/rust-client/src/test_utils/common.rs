@@ -1,47 +1,44 @@
-use std::{
-    boxed::Box,
-    fs::OpenOptions,
-    io::Write,
-    println,
-    string::ToString,
-    sync::Arc,
-    time::{Duration, Instant},
-    vec::Vec,
-};
+use std::boxed::Box;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::println;
+use std::string::ToString;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use std::vec::Vec;
 
-use miden_objects::{
-    Felt, FieldElement,
-    account::{Account, AccountId, AccountStorageMode},
-    asset::{Asset, FungibleAsset, TokenSymbol},
-    crypto::{dsa::rpo_falcon512::SecretKey, rand::RpoRandomCoin},
-    note::{NoteId, NoteType},
-    transaction::{OutputNote, TransactionId},
-};
-use rand::{Rng, RngCore, rngs::StdRng};
+use miden_objects::account::{Account, AccountId, AccountStorageMode};
+use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+use miden_objects::crypto::rand::RpoRandomCoin;
+use miden_objects::note::{NoteId, NoteType};
+use miden_objects::transaction::{OutputNote, TransactionId};
+use miden_objects::{Felt, FieldElement};
+use rand::rngs::StdRng;
+use rand::{Rng, RngCore};
 use uuid::Uuid;
 
-use crate::{
-    Client, ClientError, DebugMode, Word,
-    account::{
-        AccountBuilder, AccountType,
-        component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet},
-    },
-    auth::AuthSecretKey,
-    builder::ClientBuilder,
-    crypto::FeltRng,
-    keystore::FilesystemKeyStore,
-    note::{Note, create_p2id_note},
-    rpc::{RpcError, TonicRpcClient},
-    store::{NoteFilter, TransactionFilter, sqlite_store::SqliteStore},
-    sync::SyncSummary,
-    testing::{
-        account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE, config::ClientConfig,
-    },
-    transaction::{
-        NoteArgs, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
-        TransactionStatus,
-    },
+use crate::account::component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet};
+use crate::account::{AccountBuilder, AccountType};
+use crate::auth::AuthSecretKey;
+use crate::builder::ClientBuilder;
+use crate::crypto::FeltRng;
+use crate::keystore::FilesystemKeyStore;
+use crate::note::{Note, create_p2id_note};
+use crate::rpc::{RpcError, TonicRpcClient};
+use crate::store::sqlite_store::SqliteStore;
+use crate::store::{NoteFilter, TransactionFilter};
+use crate::sync::SyncSummary;
+use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use crate::testing::config::ClientConfig;
+use crate::transaction::{
+    NoteArgs,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
+use crate::{Client, ClientError, DebugMode, Word};
 
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
 pub type TestClient = Client<TestClientKeyStore>;
