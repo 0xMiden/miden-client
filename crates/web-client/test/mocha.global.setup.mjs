@@ -117,6 +117,7 @@ before(async () => {
         TransactionScriptInputPairArray,
         Word,
         WebClient,
+        WebClientMock,
       } = await import("./index.js");
       let rpcUrl = `http://localhost:${rpcPort}`;
       let proverUrl = null;
@@ -182,6 +183,7 @@ before(async () => {
       window.TransactionScriptInputPair = TransactionScriptInputPair;
       window.TransactionScriptInputPairArray = TransactionScriptInputPairArray;
       window.WebClient = WebClient;
+      window.WebClientMock = WebClientMock;
       window.Word = Word;
 
       // Create a namespace for helper functions

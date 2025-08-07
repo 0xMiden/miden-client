@@ -41,7 +41,7 @@ let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
 
 // Define a mapping from method names to handler functions.
-const methodHandlers = {
+let methodHandlers = {
   [MethodName.NEW_WALLET]: async (args) => {
     const [walletStorageModeStr, mutable, seed] = args;
     const walletStorageMode =
@@ -90,7 +90,6 @@ const methodHandlers = {
     return serializedTransactionResult.buffer;
   },
   [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    // Destructure the arguments. The prover may be undefined.
     const [serializedTransactionResult, serializedProver] = args;
     const transactionResult = wasm.TransactionResult.deserialize(
       new Uint8Array(serializedTransactionResult)
@@ -112,25 +111,33 @@ const methodHandlers = {
 
     // Call the unified submit_transaction method with an optional prover.
     await wasmWebClient.submitTransaction(transactionResult, prover);
-    if (wasmWebClient.usesMockChain()) {
-      let serializedMockChain = wasmWebClient.serializeMockChain();
-
-      return serializedMockChain.buffer;
-    }
+    return;
   },
-  [MethodName.SYNC_STATE]: async (args) => {
-    let [serializedMockChain] = args;
-
-    if (wasmWebClient.usesMockChain()) {
-      serializedMockChain = new Uint8Array(serializedMockChain);
-      wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
-    }
-
+  [MethodName.SYNC_STATE]: async () => {
     const syncSummary = await wasmWebClient.syncState();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },
+};
+
+// Add mock methods to the handler mapping.
+methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
+  let [serializedMockChain] = args;
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
+
+  return await methodHandlers[MethodName.SYNC_STATE]();
+};
+
+methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
+  let serializedMockChain = args.pop();
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  wasmWebClient = new wasm.WebClient();
+  await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
+
+  await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
+
+  return wasmWebClient.serializeMockChain().buffer;
 };
 
 /**
@@ -140,14 +147,10 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, seed, initMockChain] = args;
+      const [rpcUrl, seed] = args;
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
-      if (rpcUrl) {
-        await wasmWebClient.createClient(rpcUrl, seed);
-      } else {
-        await wasmWebClient.createMockedClient(seed, initMockChain);
-      }
+      await wasmWebClient.createClient(rpcUrl, seed);
 
       wasmSeed = seed;
       ready = true;

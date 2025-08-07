@@ -1,18 +1,9 @@
 import { expect } from "chai";
 import { testingPage } from "./mocha.global.setup.mjs";
-import {
-  clearStore,
-  createNewFaucet,
-  createNewWallet,
-  fundAccountFromFaucet,
-  getAccount,
-  getAccountBalance,
-  StorageMode,
-} from "./webClientTestUtils";
 
 const mockChainTest = async () => {
   return await testingPage.evaluate(async () => {
-    const client = await window.WebClient.createMockedClient();
+    const client = await window.WebClientMock.createClient();
     await client.syncState();
 
     const account = await client.newWallet(
