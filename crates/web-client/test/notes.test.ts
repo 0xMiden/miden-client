@@ -159,6 +159,60 @@ describe("get_consumable_notes", () => {
   });
 });
 
+describe.only("standalone p2Id note", () => {
+  it("should create a proper consumable p2id note from the createP2IDNote function", async ()=> {
+    const { accountId: senderId, faucetId } = await setupWalletAndFaucet();
+    const { accountId: targetId } = await setupWalletAndFaucet();
+
+    const { createdNoteId } = await mintTransaction(senderId, faucetId, false, false);
+
+    await consumeTransaction(senderId, faucetId, createdNoteId, false);
+
+    const result = await testingPage.evaluate(async(
+      _senderId: string,
+      _targetId: string,
+      _faucetId: string
+    ) => {
+      let senderAccountId = window.AccountId.fromHex(_senderId);
+      let targetAccountId = window.AccountId.fromHex(_targetId);
+      let faucetAccountId = window.AccountId.fromHex(_faucetId);
+
+      let fungibleAsset = new window.FungibleAsset(faucetAccountId, BigInt(10));
+      let noteAssets = new window.NoteAssets([fungibleAsset]);
+      let p2IdNote = window.Note.createP2IDNote(senderAccountId, targetAccountId, noteAssets, window.NoteType.Public, new window.Felt(0n));
+
+      let outputNote = window.OutputNote.full(p2IdNote);
+
+      let transactionRequest = new window.TransactionRequestBuilder()
+        .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+        .build();
+
+      let client = window.client;
+      let transactionResult = await client.newTransaction(
+        senderAccountId, 
+        transactionRequest
+      )
+
+      await client.submitTransaction(transactionResult);
+
+      await window.helpers.waitForTransaction(
+        transactionResult.executedTransaction().id().toHex()
+      );
+
+      let targetAccountBalance = (await client.getAccount(targetAccountId))?.vault().getBalance(faucetAccountId).toString();
+      return {
+        targetAccountBalance: targetAccountBalance
+      }
+    },
+    senderId,
+    targetId,
+    faucetId
+    );
+
+    expect(result.targetAccountBalance).to.equal("10");
+  });
+});
+
 // TODO:
 describe("get_output_note", () => {});
 

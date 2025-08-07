@@ -1,10 +1,10 @@
 use miden_client::note::{
-    NoteExecutionHint as NativeNoteExecutionHint, NoteInputs as NativeNoteInputs,
-    NoteMetadata as NativeNoteMetadata, NoteRecipient as NativeNoteRecipient,
-    NoteTag as NativeNoteTag, WellKnownNote,
+    NoteMetadata as NativeNoteMetadata,
+    NoteTag as NativeNoteTag,
 };
 use miden_lib::note::utils;
-use miden_objects::note::Note as NativeNote;
+use miden_objects::{block::BlockNumber as NativeBlockNumber, crypto::rand::{FeltRng, RpoRandomCoin}, note::{Note as NativeNote, NoteExecutionHint as NativeNoteExecutionHint}};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
 
 use super::{
@@ -49,10 +49,14 @@ impl Note {
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
-        serial_num: &Word,
         aux: &Felt,
     ) -> Self {
-        let recipient = utils::build_p2id_recipient(target.into(), serial_num.into()).unwrap();
+        let mut rng = StdRng::from_os_rng();
+        let coin_seed: [u64; 4] = rng.random();
+        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+
+        let serial_num = rng.draw_word();
+        let recipient = utils::build_p2id_recipient(target.into(), serial_num).unwrap();
         let tag = NativeNoteTag::from_account_id(target.into());
 
         let metadata = NativeNoteMetadata::new(
@@ -72,29 +76,35 @@ impl Note {
         sender: &AccountId,
         target: &AccountId,
         assets: &NoteAssets,
+        reclaim_height: Option<u32>,
+        timelock_height: Option<u32>,
         note_type: NoteType,
-        serial_num: &Word,
-        recall_height: u32,
         aux: &Felt,
     ) -> Self {
-        let note_script = WellKnownNote::P2IDE.script();
+        let mut rng = StdRng::from_os_rng();
+        let coin_seed: [u64; 4] = rng.random();
+        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 
-        let inputs = NativeNoteInputs::new(vec![
-            target.suffix().into(),
-            target.prefix().into(),
-            recall_height.into(),
-        ])
+        let serial_num = rng.draw_word();
+        let recipient = utils::build_p2ide_recipient(
+            target.into(), 
+            reclaim_height.map(NativeBlockNumber::from), 
+            timelock_height.map(NativeBlockNumber::from), 
+            serial_num
+        )
         .unwrap();
 
-        let recipient = NativeNoteRecipient::new(serial_num.into(), note_script, inputs);
-
         let tag = NativeNoteTag::from_account_id(target.into());
+        let execution_hint = match timelock_height {
+            Some(height) => NativeNoteExecutionHint::after_block(height.into()).unwrap(),
+            None => NativeNoteExecutionHint::always(),
+        };
 
         let metadata = NativeNoteMetadata::new(
             sender.into(),
             note_type.into(),
             tag,
-            NativeNoteExecutionHint::always(),
+            execution_hint,
             (*aux).into(),
         )
         .unwrap();
