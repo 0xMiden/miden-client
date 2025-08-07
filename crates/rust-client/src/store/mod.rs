@@ -130,7 +130,7 @@ pub trait Store: Send + Sync {
 
     /// Returns the nullifiers of all unspent input notes.
     ///
-    /// The default implementation of this method uses [Store::get_input_notes].
+    /// The default implementation of this method uses [`Store::get_input_notes`].
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.get_input_notes(NoteFilter::Unspent)
             .await?
@@ -162,7 +162,7 @@ pub trait Store: Send + Sync {
     /// that represents whether the block contains notes relevant to the client. Returns `None` if
     /// the block is not found.
     ///
-    /// The default implementation of this method uses [Store::get_block_headers].
+    /// The default implementation of this method uses [`Store::get_block_headers`].
     async fn get_block_header_by_num(
         &self,
         block_number: BlockNumber,
@@ -175,7 +175,7 @@ pub trait Store: Send + Sync {
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
 
-    /// Retrieves all MMR authentication nodes based on [PartialBlockchainFilter].
+    /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,

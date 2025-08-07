@@ -98,11 +98,10 @@ where
                     // p2ide
                     let script_root = note.script().root();
 
-                    if script_root == WellKnownNote::P2IDE.script_root() {
-                        if let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
-                        {
-                            note_relevances.push((id, relevance));
-                        }
+                    if script_root == WellKnownNote::P2IDE.script_root()
+                        && let Some(relevance) = Self::check_p2ide_recall_consumability(note, &id)?
+                    {
+                        note_relevances.push((id, relevance));
                     }
                 },
                 // If an error occurs while checking consumability, we count it as not relevant for
