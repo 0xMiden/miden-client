@@ -102,7 +102,9 @@ export async function getAccountHeader(accountId) {
 
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      const seedAsBytes = new Uint8Array(mostRecentRecord.accountSed);
+      const seedAsBytes = new Uint8Array(
+        Object.values(mostRecentRecord.accountSeed)
+      );
       if (seedAsBytes.length > 0) {
         accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
       }
@@ -184,11 +186,9 @@ export async function getAccountCode(codeRoot) {
 
     // The first record is the only one due to the uniqueness constraint
     const codeRecord = allMatchingRecords[0];
-
     // Convert the code Blob to an ArrayBuffer
-    const codeArray = new Uint8Array(codeRecord.code);
+    const codeArray = new Uint8Array(Object.values(codeRecord.code));
     const codeBase64 = uint8ArrayToBase64(codeArray);
-
     return {
       root: codeRecord.root,
       code: codeBase64,
