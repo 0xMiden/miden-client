@@ -16,6 +16,7 @@ use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
+use super::note_script::NoteScript;
 use super::note_type::NoteType;
 use super::word::Word;
 
@@ -48,6 +49,10 @@ impl Note {
 
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().clone().into()
+    }
+
+    pub fn script(&self) -> NoteScript {
+        self.0.script().clone().into()
     }
 
     #[wasm_bindgen(js_name = "createP2IDNote")]

@@ -2,9 +2,7 @@ use miden_objects::account::AccountDelta as NativeAccountDelta;
 use wasm_bindgen::prelude::*;
 
 use super::{
-    // account_storage_delta::AccountStorageDelta,
-    // account_vault_delta::AccountVaultDelta,
-    felt::Felt,
+    account_storage_delta::AccountStorageDelta, account_vault_delta::AccountVaultDelta, felt::Felt,
 };
 
 #[derive(Clone)]
@@ -18,15 +16,13 @@ impl AccountDelta {
         self.0.is_empty()
     }
 
-    // TODO: storage
-    // pub fn storage(&self) -> AccountStorageDelta {
-    //     self.0.storage().into()
-    // }
+    pub fn storage(&self) -> AccountStorageDelta {
+        self.0.storage().into()
+    }
 
-    // TODO: vault
-    // pub fn vault(&self) -> AccountVaultDelta {
-    //     self.0.vault().into()
-    // }
+    pub fn vault(&self) -> AccountVaultDelta {
+        self.0.vault().into()
+    }
 
     #[wasm_bindgen(js_name = "nonceDelta")]
     pub fn nonce_delta(&self) -> Felt {
