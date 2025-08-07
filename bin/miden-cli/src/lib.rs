@@ -43,17 +43,16 @@ const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 /// name, then we simply display the standard "miden-client".
 pub fn client_binary_name() -> OsString {
     std::env::current_exe()
-        .map(|executable| {
-            executable
-                .file_name()
-                .expect("ERROR: failed to obtain the executable's file name")
-                .to_os_string()
-        })
         .inspect_err(|e| {
             eprintln!(
-                "WARNING: Couldn't obtain the name of the current executable because of {e}.\
+                "WARNING: Couldn't obtain the path of the current executable because of {e}.\
              Defaulting to miden-client."
             );
+        })
+        .and_then(|executable_path| {
+            executable_path.file_name().map(std::ffi::OsStr::to_os_string).ok_or(
+                std::io::Error::other("Couldn't obtain the file name of the current executable"),
+            )
         })
         .unwrap_or(OsString::from("miden-client"))
 }
