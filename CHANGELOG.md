@@ -10,11 +10,11 @@
 * [BREAKING] Made authenticator optional for `ClientBuilder` and `Client::new`. The authenticator parameter is now optional, allowing clients to be created without authentication capabilities ([#1056](https://github.com/0xMiden/miden-client/pull/1056)).
 * [BREAKING] Updated `applyStateSync` to receive a single object and then write the changes in a single transaction ([#1050](https://github.com/0xMiden/miden-client/pull/1050)).
 * [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action ([#1051](https://github.com/0xMiden/miden-client/pull/1051)).
-* [BREAKING] Changed `OnNoteReceived` from closure to trait object (#1080)
 * `NoteScript` now has a `toString` method that prints its own MAST source [(#1082)](https://github.com/0xMiden/miden-client/pull/1082).
 * Added a `NoteScript` getter for the Web Client `Note` model ([#1135](https://github.com/0xMiden/miden-client/pull/1135/)).
 * [BREAKING] Changed `OnNoteReceived` from closure to trait object ([#1080](https://github.com/0xMiden/miden-client/pull/1080)).
 * Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
+* Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
 
 ### Features
 

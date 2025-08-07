@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+  "bin/integration-tests",
   "bin/miden-cli",
   "crates/rust-client",
   "crates/testing/node-builder",
