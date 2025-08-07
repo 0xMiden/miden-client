@@ -15,6 +15,7 @@
 * Added a `NoteScript` getter for the Web Client `Note` model ([#1135](https://github.com/0xMiden/miden-client/pull/1135/)).
 * [BREAKING] Changed `OnNoteReceived` from closure to trait object ([#1080](https://github.com/0xMiden/miden-client/pull/1080)).
 * Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
+* Account related records are now directly stored as Uint8Arrays instead of using Blobs, this fixes a bug with Webkit-based browsers [(#1137)](https://github.com/0xMiden/miden-client/pull/1137)
 
 ### Features
 
