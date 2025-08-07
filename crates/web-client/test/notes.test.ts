@@ -160,152 +160,193 @@ describe("get_consumable_notes", () => {
 });
 
 describe("createP2IDNote and createP2IDENote", () => {
-  it("should create a proper consumable p2id note from the createP2IDNote function", async ()=> {
+  it("should create a proper consumable p2id note from the createP2IDNote function", async () => {
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet();
     const { accountId: targetId } = await setupWalletAndFaucet();
 
-    const { createdNoteId } = await mintTransaction(senderId, faucetId, false, true);
+    const { createdNoteId } = await mintTransaction(
+      senderId,
+      faucetId,
+      false,
+      true
+    );
 
     await consumeTransaction(senderId, faucetId, createdNoteId, false);
 
-    const result = await testingPage.evaluate(async(
-      _senderId: string,
-      _targetId: string,
-      _faucetId: string
-    ) => {
-      let client = window.client;
+    const result = await testingPage.evaluate(
+      async (_senderId: string, _targetId: string, _faucetId: string) => {
+        let client = window.client;
 
-      let senderAccountId = window.AccountId.fromHex(_senderId);
-      let targetAccountId = window.AccountId.fromHex(_targetId);
-      let faucetAccountId = window.AccountId.fromHex(_faucetId);
+        let senderAccountId = window.AccountId.fromHex(_senderId);
+        let targetAccountId = window.AccountId.fromHex(_targetId);
+        let faucetAccountId = window.AccountId.fromHex(_faucetId);
 
-      let fungibleAsset = new window.FungibleAsset(faucetAccountId, BigInt(10));
-      let noteAssets = new window.NoteAssets([fungibleAsset]);
-      let p2IdNote = window.Note.createP2IDNote(senderAccountId, targetAccountId, noteAssets, window.NoteType.Public, new window.Felt(0n));
+        let fungibleAsset = new window.FungibleAsset(
+          faucetAccountId,
+          BigInt(10)
+        );
+        let noteAssets = new window.NoteAssets([fungibleAsset]);
+        let p2IdNote = window.Note.createP2IDNote(
+          senderAccountId,
+          targetAccountId,
+          noteAssets,
+          window.NoteType.Public,
+          new window.Felt(0n)
+        );
 
-      let outputNote = window.OutputNote.full(p2IdNote);
+        let outputNote = window.OutputNote.full(p2IdNote);
 
-      let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
-        .build();
+        let transactionRequest = new window.TransactionRequestBuilder()
+          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .build();
 
-      let transactionResult = await client.newTransaction(
-        senderAccountId, 
-        transactionRequest
-      )
+        let transactionResult = await client.newTransaction(
+          senderAccountId,
+          transactionRequest
+        );
 
-      await client.submitTransaction(transactionResult);
+        await client.submitTransaction(transactionResult);
 
-      await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
-      );
+        await window.helpers.waitForTransaction(
+          transactionResult.executedTransaction().id().toHex()
+        );
 
-      let createdNoteId = transactionResult.createdNotes()
+        let createdNoteId = transactionResult
+          .createdNotes()
           .notes()[0]
           .id()
-          .toString()
+          .toString();
 
-      let consumeTransactionRequest = client.newConsumeTransactionRequest([createdNoteId])
+        let consumeTransactionRequest = client.newConsumeTransactionRequest([
+          createdNoteId,
+        ]);
 
-      let consumeTransactionResult = await client.newTransaction(
-        targetAccountId,
-        consumeTransactionRequest
-      );
+        let consumeTransactionResult = await client.newTransaction(
+          targetAccountId,
+          consumeTransactionRequest
+        );
 
-      await client.submitTransaction(consumeTransactionResult);
+        await client.submitTransaction(consumeTransactionResult);
 
-      await window.helpers.waitForTransaction(
-        consumeTransactionResult.executedTransaction().id().toHex()
-      );
+        await window.helpers.waitForTransaction(
+          consumeTransactionResult.executedTransaction().id().toHex()
+        );
 
-      let senderAccountBalance = (await client.getAccount(senderAccountId))?.vault().getBalance(faucetAccountId).toString();
-      let targetAccountBalance = (await client.getAccount(targetAccountId))?.vault().getBalance(faucetAccountId).toString();
+        let senderAccountBalance = (await client.getAccount(senderAccountId))
+          ?.vault()
+          .getBalance(faucetAccountId)
+          .toString();
+        let targetAccountBalance = (await client.getAccount(targetAccountId))
+          ?.vault()
+          .getBalance(faucetAccountId)
+          .toString();
 
-      return {
-        senderAccountBalance: senderAccountBalance,
-        targetAccountBalance: targetAccountBalance
-      }
-    },
-    senderId,
-    targetId,
-    faucetId
+        return {
+          senderAccountBalance: senderAccountBalance,
+          targetAccountBalance: targetAccountBalance,
+        };
+      },
+      senderId,
+      targetId,
+      faucetId
     );
 
     expect(result.senderAccountBalance).to.equal("990");
     expect(result.targetAccountBalance).to.equal("10");
   });
 
-  it.only("should create a proper consumable p2ide note from the createP2IDENote function", async ()=> {
+  it.only("should create a proper consumable p2ide note from the createP2IDENote function", async () => {
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet();
     const { accountId: targetId } = await setupWalletAndFaucet();
 
-    const { createdNoteId } = await mintTransaction(senderId, faucetId, false, true);
+    const { createdNoteId } = await mintTransaction(
+      senderId,
+      faucetId,
+      false,
+      true
+    );
 
     await consumeTransaction(senderId, faucetId, createdNoteId, false);
 
-    const result = await testingPage.evaluate(async(
-      _senderId: string,
-      _targetId: string,
-      _faucetId: string
-    ) => {
-      let client = window.client;
+    const result = await testingPage.evaluate(
+      async (_senderId: string, _targetId: string, _faucetId: string) => {
+        let client = window.client;
 
-      console.log(_senderId, _targetId, _faucetId);
-      let senderAccountId = window.AccountId.fromHex(_senderId);
-      let targetAccountId = window.AccountId.fromHex(_targetId);
-      let faucetAccountId = window.AccountId.fromHex(_faucetId);
+        console.log(_senderId, _targetId, _faucetId);
+        let senderAccountId = window.AccountId.fromHex(_senderId);
+        let targetAccountId = window.AccountId.fromHex(_targetId);
+        let faucetAccountId = window.AccountId.fromHex(_faucetId);
 
-      let fungibleAsset = new window.FungibleAsset(faucetAccountId, BigInt(10));
-      let noteAssets = new window.NoteAssets([fungibleAsset]);
-      let p2IdeNote = window.Note.createP2IDENote(
-        senderAccountId, targetAccountId, noteAssets, null, null, window.NoteType.Public, new window.Felt(0n));
+        let fungibleAsset = new window.FungibleAsset(
+          faucetAccountId,
+          BigInt(10)
+        );
+        let noteAssets = new window.NoteAssets([fungibleAsset]);
+        let p2IdeNote = window.Note.createP2IDENote(
+          senderAccountId,
+          targetAccountId,
+          noteAssets,
+          null,
+          null,
+          window.NoteType.Public,
+          new window.Felt(0n)
+        );
 
-      let outputNote = window.OutputNote.full(p2IdeNote);
+        let outputNote = window.OutputNote.full(p2IdeNote);
 
-      let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
-        .build();
+        let transactionRequest = new window.TransactionRequestBuilder()
+          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .build();
 
-      let transactionResult = await client.newTransaction(
-        senderAccountId, 
-        transactionRequest
-      )
+        let transactionResult = await client.newTransaction(
+          senderAccountId,
+          transactionRequest
+        );
 
-      await client.submitTransaction(transactionResult);
+        await client.submitTransaction(transactionResult);
 
-      await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
-      );
+        await window.helpers.waitForTransaction(
+          transactionResult.executedTransaction().id().toHex()
+        );
 
-      let createdNoteId = transactionResult.createdNotes()
+        let createdNoteId = transactionResult
+          .createdNotes()
           .notes()[0]
           .id()
-          .toString()
+          .toString();
 
-      let consumeTransactionRequest = client.newConsumeTransactionRequest([createdNoteId])
+        let consumeTransactionRequest = client.newConsumeTransactionRequest([
+          createdNoteId,
+        ]);
 
-      let consumeTransactionResult = await client.newTransaction(
-        targetAccountId,
-        consumeTransactionRequest
-      );
+        let consumeTransactionResult = await client.newTransaction(
+          targetAccountId,
+          consumeTransactionRequest
+        );
 
-      await client.submitTransaction(consumeTransactionResult);
+        await client.submitTransaction(consumeTransactionResult);
 
-      await window.helpers.waitForTransaction(
-        consumeTransactionResult.executedTransaction().id().toHex()
-      );
+        await window.helpers.waitForTransaction(
+          consumeTransactionResult.executedTransaction().id().toHex()
+        );
 
-      let senderAccountBalance = (await client.getAccount(senderAccountId))?.vault().getBalance(faucetAccountId).toString();
-      let targetAccountBalance = (await client.getAccount(targetAccountId))?.vault().getBalance(faucetAccountId).toString();
+        let senderAccountBalance = (await client.getAccount(senderAccountId))
+          ?.vault()
+          .getBalance(faucetAccountId)
+          .toString();
+        let targetAccountBalance = (await client.getAccount(targetAccountId))
+          ?.vault()
+          .getBalance(faucetAccountId)
+          .toString();
 
-      return {
-        senderAccountBalance: senderAccountBalance,
-        targetAccountBalance: targetAccountBalance
-      }
-    },
-    senderId,
-    targetId,
-    faucetId
+        return {
+          senderAccountBalance: senderAccountBalance,
+          targetAccountBalance: targetAccountBalance,
+        };
+      },
+      senderId,
+      targetId,
+      faucetId
     );
 
     expect(result.senderAccountBalance).to.equal("990");

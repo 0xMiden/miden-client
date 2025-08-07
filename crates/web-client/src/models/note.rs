@@ -1,9 +1,11 @@
-use miden_client::note::{
-    NoteMetadata as NativeNoteMetadata,
-    NoteTag as NativeNoteTag,
-};
+use miden_client::note::{NoteMetadata as NativeNoteMetadata, NoteTag as NativeNoteTag};
 use miden_lib::note::utils;
-use miden_objects::{block::BlockNumber as NativeBlockNumber, crypto::rand::{FeltRng, RpoRandomCoin}, Felt as NativeFelt, note::{Note as NativeNote, NoteExecutionHint as NativeNoteExecutionHint}};
+use miden_objects::{
+    Felt as NativeFelt,
+    block::BlockNumber as NativeBlockNumber,
+    crypto::rand::{FeltRng, RpoRandomCoin},
+    note::{Note as NativeNote, NoteExecutionHint as NativeNoteExecutionHint},
+};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
 
@@ -87,10 +89,10 @@ impl Note {
 
         let serial_num = rng.draw_word();
         let recipient = utils::build_p2ide_recipient(
-            target.into(), 
-            reclaim_height.map(NativeBlockNumber::from), 
-            timelock_height.map(NativeBlockNumber::from), 
-            serial_num
+            target.into(),
+            reclaim_height.map(NativeBlockNumber::from),
+            timelock_height.map(NativeBlockNumber::from),
+            serial_num,
         )
         .unwrap();
 

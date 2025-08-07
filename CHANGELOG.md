@@ -1,5 +1,11 @@
 # Changelog
 
+# 0.10.3 (2025-08-07)
+
+### Fixes
+
+* Fixes createP2IDNote and createP2IDENote Convenience Functions in Web Client (#1138).
+
 ## 0.10.2 (2025-08-04)
 
 ### Fixes
