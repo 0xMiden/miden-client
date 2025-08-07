@@ -19,6 +19,7 @@ import {
   FeltArray,
   ForeignAccount,
   FungibleAsset,
+  InputNoteRecord,
   Library,
   Note,
   NoteAssets,
@@ -90,7 +91,7 @@ declare global {
     ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
     FungibleAssetDelta: typeof FungibleAssetDelta;
-    FungibleAssetDelta: typeof FungibleAssetDelta;
+    InputNoteRecord: typeof InputNoteRecord;
     Library: typeof Library;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;

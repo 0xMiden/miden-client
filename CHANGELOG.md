@@ -20,6 +20,7 @@
 * Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
 * Exposes additional `TransactionFilter` filters in Web Client ([#1114](https://github.com/0xMiden/miden-client/pull/1114))
 * Refactored internal structure of account vault and storage Sqlite tables ([#1128](https://github.com/0xMiden/miden-client/pull/1128)).
+* [BREAKING] Fixed `createP2IDNote` and `createP2IDENote` convenience functions in the Web Client ([#1142](https://github.com/0xMiden/miden-client/pull/1142)).
 
 ### Features
 
