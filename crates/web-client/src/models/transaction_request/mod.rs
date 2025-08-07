@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::{
-    models::note::Note,
+    models::{note::Note, word::Word},
     utils::{deserialize_from_uint8array, serialize_to_uint8array},
 };
 
@@ -48,6 +48,16 @@ impl TransactionRequest {
                 ))
             })
             .collect::<Result<Vec<NoteDetailsAndTag>, _>>()
+    }
+
+    #[wasm_bindgen(js_name = "scriptArg")]
+    pub fn script_arg(&self) -> Option<Word> {
+        self.0.script_arg().map(Word::from)
+    }
+
+    #[wasm_bindgen(js_name = "authArg")]
+    pub fn auth_arg(&self) -> Option<Word> {
+        self.0.auth_arg().map(Word::from)
     }
 }
 

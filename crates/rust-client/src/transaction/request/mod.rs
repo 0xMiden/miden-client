@@ -90,6 +90,9 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the operand stack before the transaction script
     /// execution.
     script_arg: Option<Word>,
+    /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
+    /// during transaction execution.
+    auth_arg: Option<Word>,
 }
 
 impl TransactionRequest {
@@ -198,6 +201,16 @@ impl TransactionRequest {
         self.ignore_invalid_input_notes
     }
 
+    /// Returns the script argument for the transaction request.
+    pub fn script_arg(&self) -> &Option<Word> {
+        &self.script_arg
+    }
+
+    /// Returns the auth argument for the transaction request.
+    pub fn auth_arg(&self) -> &Option<Word> {
+        &self.auth_arg
+    }
+
     /// Builds the [`InputNotes`] needed for the transaction execution. Full valid notes for the
     /// specified authenticated notes need to be provided, otherwise an error will be returned.
     /// The transaction input notes will include both authenticated and unauthenticated notes in the
@@ -284,6 +297,10 @@ impl TransactionRequest {
             tx_args.with_tx_script(tx_script)
         };
 
+        if let Some(auth_argument) = self.auth_arg {
+            tx_args = tx_args.with_auth_args(auth_argument);
+        }
+
         tx_args
             .extend_output_note_recipients(expected_output_recipients.into_values().map(Box::new));
         tx_args.extend_merkle_store(merkle_store.inner_nodes());
@@ -338,6 +355,7 @@ impl Serializable for TransactionRequest {
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
         self.script_arg.write_into(target);
+        self.auth_arg.write_into(target);
     }
 }
 
@@ -374,6 +392,7 @@ impl Deserializable for TransactionRequest {
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;
+        let auth_arg = Option::<Word>::read_from(source)?;
 
         Ok(TransactionRequest {
             unauthenticated_input_notes,
@@ -387,6 +406,7 @@ impl Deserializable for TransactionRequest {
             expiration_delta,
             ignore_invalid_input_notes,
             script_arg,
+            auth_arg,
         })
     }
 }
@@ -537,6 +557,8 @@ mod tests {
                 OutputNote::Full(notes.pop().unwrap()),
                 OutputNote::Partial(notes.pop().unwrap().into()),
             ])
+            .script_arg(rng.draw_word())
+            .auth_arg(rng.draw_word())
             .build()
             .unwrap();
 

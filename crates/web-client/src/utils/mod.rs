@@ -5,6 +5,8 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 pub mod assembler_utils;
 
+use crate::js_error_with_context;
+
 #[cfg(feature = "testing")]
 pub mod test_utils;
 
@@ -20,6 +22,5 @@ pub fn serialize_to_uint8array<T: Serializable>(value: &T) -> Uint8Array {
 pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Result<T, JsValue> {
     let vec = bytes.to_vec();
     let mut reader = SliceReader::new(&vec);
-    T::read_from(&mut reader)
-        .map_err(|e| JsValue::from_str(&format!("Deserialization error: {e:?}")))
+    T::read_from(&mut reader).map_err(|e| js_error_with_context(e, "failed to deserialize"))
 }

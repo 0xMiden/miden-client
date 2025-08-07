@@ -68,6 +68,9 @@ pub struct TransactionRequestBuilder {
     /// execution. If the advice map is extended with some user defined entries, this script
     /// argument could be used as a key to access the corresponding value.
     script_arg: Option<Word>,
+    /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
+    /// during transaction execution.
+    auth_arg: Option<Word>,
 }
 
 impl TransactionRequestBuilder {
@@ -89,6 +92,7 @@ impl TransactionRequestBuilder {
             foreign_accounts: BTreeMap::default(),
             ignore_invalid_input_notes: false,
             script_arg: None,
+            auth_arg: None,
         }
     }
 
@@ -237,6 +241,14 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn script_arg(mut self, script_arg: Word) -> Self {
         self.script_arg = Some(script_arg);
+        self
+    }
+
+    /// Sets an optional [`Word`] that will be pushed to the stack for the authentication
+    /// procedure during transaction execution.
+    #[must_use]
+    pub fn auth_arg(mut self, auth_arg: Word) -> Self {
+        self.auth_arg = Some(auth_arg);
         self
     }
 
@@ -412,6 +424,7 @@ impl TransactionRequestBuilder {
             expiration_delta: self.expiration_delta,
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
             script_arg: self.script_arg,
+            auth_arg: self.auth_arg,
         })
     }
 }

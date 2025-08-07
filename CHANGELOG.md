@@ -8,12 +8,13 @@
 * [BREAKING] Updated `toBech32` AccountID method: it now expects a parameter to specify the NetworkID ([#1043](https://github.com/0xMiden/miden-client/pull/1043)).
 * Introduced enums instead of booleans for public APIs ([#1042](https://github.com/0xMiden/miden-client/pull/1042)).
 * [BREAKING] Made authenticator optional for `ClientBuilder` and `Client::new`. The authenticator parameter is now optional, allowing clients to be created without authentication capabilities ([#1056](https://github.com/0xMiden/miden-client/pull/1056)).
-* [BREAKING] Updated `applyStateSync` to receive a single object and then write the changes in a single transaction ([#1050](https://github.com/0xMiden/miden-client/pull/1050))
+* [BREAKING] Updated `applyStateSync` to receive a single object and then write the changes in a single transaction ([#1050](https://github.com/0xMiden/miden-client/pull/1050)).
 * [BREAKING] Refactored `OnNoteReceived` callback to return enum with update action ([#1051](https://github.com/0xMiden/miden-client/pull/1051)).
-* [BREAKING] Changed `OnNoteReceived` from closure to trait object (#1080)
 * `NoteScript` now has a `toString` method that prints its own MAST source [(#1082)](https://github.com/0xMiden/miden-client/pull/1082).
+* Added a `NoteScript` getter for the Web Client `Note` model ([#1135](https://github.com/0xMiden/miden-client/pull/1135/)).
+* [BREAKING] Changed `OnNoteReceived` from closure to trait object ([#1080](https://github.com/0xMiden/miden-client/pull/1080)).
+* Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
 * Added support for `MockRpcApi` to web client ([#1096](https://github.com/0xMiden/miden-client/pull/1096)).
-
 
 ### Features
 
@@ -23,7 +24,9 @@
 * Added ability to convert `Word` to `U64` array and `Felt` array in Web Client (([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
 * Added `TokenSymbol` type to Web Client ([#1046](https://github.com/0xMiden/miden-client/pull/1046)).
 * [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
-
+* Added authentication arguments support to `TransactionRequest` ([#1121](https://github.com/0xMiden/miden-client/pull/1121)).
+* Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
+  
 ## 0.10.1 (2025-07-26)
 
 * Avoid passing unneeded nodes to `PartialMmr::from_parts` (#1081).

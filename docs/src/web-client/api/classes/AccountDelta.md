@@ -35,3 +35,23 @@
 #### Returns
 
 [`Felt`](Felt.md)
+
+***
+
+### storage()
+
+> **storage**(): [`AccountStorageDelta`](AccountStorageDelta.md)
+
+#### Returns
+
+[`AccountStorageDelta`](AccountStorageDelta.md)
+
+***
+
+### vault()
+
+> **vault**(): [`AccountVaultDelta`](AccountVaultDelta.md)
+
+#### Returns
+
+[`AccountVaultDelta`](AccountVaultDelta.md)

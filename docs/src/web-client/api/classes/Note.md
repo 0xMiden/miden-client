@@ -82,6 +82,16 @@
 
 ***
 
+### script()
+
+> **script**(): [`NoteScript`](NoteScript.md)
+
+#### Returns
+
+[`NoteScript`](NoteScript.md)
+
+***
+
 ### createP2IDENote()
 
 > `static` **createP2IDENote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `recall_height`, `aux`): `Note`
