@@ -28,6 +28,22 @@
 
 ***
 
+### ids()
+
+> `static` **ids**(`ids`): `TransactionFilter`
+
+#### Parameters
+
+##### ids
+
+[`TransactionId`](TransactionId.md)[]
+
+#### Returns
+
+`TransactionFilter`
+
+***
+
 ### uncommitted()
 
 > `static` **uncommitted**(): `TransactionFilter`

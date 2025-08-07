@@ -342,10 +342,10 @@ impl WebStore {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we
         // got a past update and shouldn't lock the account.
-        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await? {
-            if account.id() == *account_id {
-                return Ok(());
-            }
+        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await?
+            && account.id() == *account_id
+        {
+            return Ok(());
         }
 
         let account_id_str = account_id.to_string();
