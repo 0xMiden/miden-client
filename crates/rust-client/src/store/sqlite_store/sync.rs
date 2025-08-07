@@ -6,16 +6,12 @@ use miden_objects::{Word, block::BlockNumber, note::NoteTag};
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
-use super::{SqliteStore, account::undo_account_state};
+use super::SqliteStore;
 use crate::{
     insert_sql,
     store::{
         StoreError,
-        sqlite_store::{
-            account::{lock_account_on_unexpected_commitment, update_account},
-            note::apply_note_updates_tx,
-            transaction::upsert_transaction_record,
-        },
+        sqlite_store::{note::apply_note_updates_tx, transaction::upsert_transaction_record},
     },
     subst,
     sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate},
@@ -167,15 +163,15 @@ impl SqliteStore {
             .map(|tx| tx.details.final_account_state)
             .collect();
 
-        undo_account_state(&tx, &account_hashes_to_delete)?;
+        Self::undo_account_state(&tx, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
         for account in account_updates.updated_public_accounts() {
-            update_account(&tx, account)?;
+            Self::update_account_state(&tx, account)?;
         }
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
-            lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
+            Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
         }
 
         // Commit the updates

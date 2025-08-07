@@ -14,9 +14,7 @@ use miden_objects::{
 };
 use rusqlite::{Connection, Transaction, params, types::Value};
 
-use super::{
-    SqliteStore, account::update_account, note::apply_note_updates_tx, sync::add_note_tag_tx,
-};
+use super::{SqliteStore, note::apply_note_updates_tx, sync::add_note_tag_tx};
 use crate::{
     insert_sql,
     store::{StoreError, TransactionFilter},
@@ -167,7 +165,7 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
-        update_account(&tx, tx_update.updated_account())?;
+        Self::update_account_state(&tx, tx_update.updated_account())?;
 
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;

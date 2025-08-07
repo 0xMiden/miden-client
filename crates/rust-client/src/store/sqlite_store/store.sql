@@ -19,10 +19,8 @@ CREATE TABLE account_code (
 CREATE TABLE account_storage (
     commitment TEXT NOT NULL,               -- commitment to the account storage
     slot_index UNSIGNED BIG INT NOT NULL,   -- index of the slot in the storage
-    slot_value TEXT NULL,                   -- value of the slot, null if it is a map slot
-    slot_map_root TEXT NULL,                -- root of the storage map, null if it is a value slot
-    PRIMARY KEY (commitment, slot_index),
-    CONSTRAINT check_slot_value CHECK ((slot_value IS NOT NULL AND slot_map_root IS NULL) OR (slot_value IS NULL AND slot_map_root IS NOT NULL))
+    slot_value TEXT NULL,                   -- value of the slot, if the slot is a map it contains the root
+    PRIMARY KEY (commitment, slot_index)
 );
 
 CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
@@ -41,11 +39,8 @@ CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 CREATE TABLE account_vaults (
     root TEXT NOT NULL,                             -- root of the account_vault Merkle tree
     faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
-    fungible_faucet_id TEXT NULL,                   -- ID of the fungible faucet, null if this is a non-fungible asset
-    fungible_faucet_amount UNSIGNED BIG INT NULL,   -- amount of the fungible faucet, null if this is a non-fungible asset
-    non_fungible_asset BLOB NULL,                   -- serialized non-fungible asset, null if this is a fungible faucet
-    PRIMARY KEY (root, faucet_id_prefix),
-    CONSTRAINT check_asset_type CHECK ((non_fungible_asset IS NULL AND fungible_faucet_id IS NOT NULL AND fungible_faucet_amount IS NOT NULL) OR (non_fungible_asset IS NOT NULL AND fungible_faucet_id IS NULL AND fungible_faucet_amount IS NULL))
+    asset TEXT NULL,                                -- value that represents the asset in the vault
+    PRIMARY KEY (root, faucet_id_prefix)
 );
 
 CREATE INDEX idx_account_vaults_root ON account_vaults(root);
