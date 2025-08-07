@@ -1140,7 +1140,7 @@ async fn p2ide_transfer_consumed_by_target() {
         InputNoteState::Committed { .. }
     ));
 
-    consume_notes(&mut client, from_account_id, &[note.clone()]).await;
+    consume_notes(&mut client, from_account_id, core::slice::from_ref(&note)).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
