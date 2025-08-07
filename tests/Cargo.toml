@@ -16,6 +16,7 @@ miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../cr
 
 # Miden dependencies
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
+miden-tx      = { default-features = false, workspace = true }
 
 # External dependencies
 rand = { workspace = true }

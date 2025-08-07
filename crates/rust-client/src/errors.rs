@@ -92,6 +92,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("multisig error: {0}")]
+    MultisigTxProposalError(String),
 }
 
 // CONVERSIONS

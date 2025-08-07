@@ -121,6 +121,7 @@ extern crate std;
 
 pub mod account;
 pub mod keystore;
+pub mod multisig;
 pub mod note;
 pub mod rpc;
 pub mod store;
