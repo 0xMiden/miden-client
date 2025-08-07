@@ -8,6 +8,7 @@ use crate::{
     models::{
         account_id::AccountId, consumable_note_record::ConsumableNoteRecord,
         input_note_record::InputNoteRecord, note_filter::NoteFilter,
+        note_id::NoteId as NoteIdModel, note_inclusion_proof::NoteInclusionProof,
     },
 };
 
@@ -110,6 +111,23 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get consumable notes"))?;
 
             Ok(result.into_iter().map(Into::into).collect())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "getNoteInclusionProof")]
+    pub async fn get_note_inclusion_proof(
+        &mut self,
+        note_id: NoteIdModel,
+    ) -> Result<Option<NoteInclusionProof>, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let result = client
+                .get_note_inclusion_proof(note_id.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to get note inclusion proof"))?;
+
+            Ok(result.map(NoteInclusionProof::from))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

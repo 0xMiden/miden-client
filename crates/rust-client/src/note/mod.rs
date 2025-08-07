@@ -64,6 +64,7 @@ use miden_tx::auth::TransactionAuthenticator;
 
 use crate::{
     Client, ClientError, IdPrefixFetchError,
+    rpc::{RpcError, domain::note::FetchedNote},
     store::{InputNoteRecord, NoteFilter, OutputNoteRecord},
 };
 
@@ -162,6 +163,22 @@ where
             .check_relevance(&note.clone().try_into()?)
             .await
             .map_err(Into::into)
+    }
+
+    /// Returns note inclusion proof for given [`NoteId`]. Returns `None` if the note is not found.
+    pub async fn get_note_inclusion_proof(
+        &self,
+        note_id: NoteId,
+    ) -> Result<Option<NoteInclusionProof>, ClientError> {
+        let result = self.rpc_api.get_note_by_id(note_id).await;
+
+        match result {
+            Ok(FetchedNote::Public(_, proof) | FetchedNote::Private(_, _, proof)) => {
+                Ok(Some(proof))
+            },
+            Err(RpcError::NoteNotFound(_)) => Ok(None),
+            Err(err) => Err(ClientError::RpcError(err)),
+        }
     }
 
     /// Retrieves the input note given a [`NoteId`]. Returns `None` if the note is not found.
