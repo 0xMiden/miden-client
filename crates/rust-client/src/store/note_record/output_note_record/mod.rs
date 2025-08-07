@@ -135,11 +135,12 @@ impl OutputNoteRecord {
         block_height: u32,
     ) -> Result<bool, NoteRecordError> {
         if let Some(note_nullifier) = self.nullifier()
-            && note_nullifier != nullifier {
-                return Err(NoteRecordError::StateTransitionError(
-                    "Nullifier does not match the expected value".to_string(),
-                ));
-            }
+            && note_nullifier != nullifier
+        {
+            return Err(NoteRecordError::StateTransitionError(
+                "Nullifier does not match the expected value".to_string(),
+            ));
+        }
 
         let new_state = self.state.nullifier_received(block_height)?;
         if let Some(new_state) = new_state {

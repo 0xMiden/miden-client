@@ -223,8 +223,8 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`] from
-    /// the `GetAccountDetailsResponse` response.
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
+    /// from the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
     ///

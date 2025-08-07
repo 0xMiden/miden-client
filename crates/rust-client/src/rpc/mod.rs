@@ -207,7 +207,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// then `None` is returned.
     /// The `block_num` parameter is the block number to start the search from.
     ///
-    /// The default implementation of this method uses [`NodeRpcClient::check_nullifiers_by_prefix`].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::check_nullifiers_by_prefix`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
@@ -221,9 +222,9 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|update| update.block_num))
     }
 
-    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s with
-    /// it. If a note is not found or it's private, it is ignored and will not be included in the
-    /// returned list.
+    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
+    /// with it. If a note is not found or it's private, it is ignored and will not be included
+    /// in the returned list.
     ///
     /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
     async fn get_public_note_records(
@@ -280,7 +281,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// along with the MMR proof.
     ///
-    /// The default implementation of this method uses [`NodeRpcClient::get_block_header_by_number`].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::get_block_header_by_number`].
     async fn get_block_header_with_proof(
         &self,
         block_num: BlockNumber,
