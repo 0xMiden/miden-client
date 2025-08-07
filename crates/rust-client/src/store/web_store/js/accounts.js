@@ -46,10 +46,10 @@ export async function getAllAccountHeaders() {
       latestRecords.map(async (record) => {
         let accountSeedBase64 = null;
         if (record.accountSeed) {
-          // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-          let accountSeedArrayBuffer = await record.accountSeed.arrayBuffer();
-          let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-          accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+          const seedAsBytes = new Uint8Array(record.accountSed);
+          if (seedAsBytes.length > 0) {
+            accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
+          }
         }
 
         return {
@@ -99,12 +99,13 @@ export async function getAccountHeader(accountId) {
     const mostRecentRecord = sortedRecords[0];
 
     let accountSeedBase64 = null;
+
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      let accountSeedArrayBuffer =
-        await mostRecentRecord.accountSeed.arrayBuffer();
-      let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-      accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+      const seedAsBytes = new Uint8Array(mostRecentRecord.accountSed);
+      if (seedAsBytes.length > 0) {
+        accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
+      }
     }
     const AccountHeader = {
       id: mostRecentRecord.id,
@@ -185,8 +186,7 @@ export async function getAccountCode(codeRoot) {
     const codeRecord = allMatchingRecords[0];
 
     // Convert the code Blob to an ArrayBuffer
-    const codeArrayBuffer = await codeRecord.code.arrayBuffer();
-    const codeArray = new Uint8Array(codeArrayBuffer);
+    const codeArray = new Uint8Array(codeRecord.code);
     const codeBase64 = uint8ArrayToBase64(codeArray);
 
     return {
@@ -322,7 +322,7 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey) {
 export async function insertAccountCode(codeRoot, code) {
   try {
     // Create a Blob from the ArrayBuffer
-    const codeBlob = new Blob([new Uint8Array(code)]);
+    const codeBlob = new Uint8Array(code);
 
     // Prepare the data object to insert
     const data = {
@@ -382,7 +382,6 @@ export async function insertAccountAssetVault(vaultRoot, assets) {
     throw error;
   }
 }
-
 export async function insertAccountRecord(
   accountId,
   codeRoot,
@@ -394,28 +393,21 @@ export async function insertAccountRecord(
   commitment
 ) {
   try {
-    let accountSeedBlob = null;
-    if (accountSeed) {
-      accountSeedBlob = new Blob([new Uint8Array(accountSeed)]);
-    }
-
-    // Prepare the data object to insert
     const data = {
-      id: accountId, // Using accountId as the key
-      codeRoot: codeRoot,
-      storageRoot: storageRoot,
-      vaultRoot: vaultRoot,
-      nonce: nonce,
-      committed: committed,
-      accountSeed: accountSeedBlob,
+      id: accountId,
+      codeRoot,
+      storageRoot,
+      vaultRoot,
+      nonce,
+      committed,
+      accountSeed,
       accountCommitment: commitment,
       locked: false,
     };
 
-    // Perform the insert using Dexie
     await accounts.add(data);
   } catch (error) {
-    console.error(`Error inserting account: ${accountId}:`, error.toString());
+    console.error(`Error inserting account ${accountId}:`, error);
     throw error;
   }
 }
@@ -526,7 +518,8 @@ export async function undoAccountStates(accountCommitments) {
 }
 
 function uint8ArrayToBase64(bytes) {
-  const binary = bytes.reduce(
+  let bytesArray = new Uint8Array(bytes);
+  const binary = bytesArray.reduce(
     (acc, byte) => acc + String.fromCharCode(byte),
     ""
   );
