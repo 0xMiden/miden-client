@@ -9,7 +9,8 @@ use wasm_bindgen::prelude::*;
 
 use super::{
     account_id::AccountId, felt::Felt, note_assets::NoteAssets, note_id::NoteId,
-    note_metadata::NoteMetadata, note_recipient::NoteRecipient, note_type::NoteType, word::Word,
+    note_metadata::NoteMetadata, note_recipient::NoteRecipient, note_script::NoteScript,
+    note_type::NoteType, word::Word,
 };
 
 #[wasm_bindgen]
@@ -41,6 +42,10 @@ impl Note {
 
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().clone().into()
+    }
+
+    pub fn script(&self) -> NoteScript {
+        self.0.script().clone().into()
     }
 
     #[wasm_bindgen(js_name = "createP2IDNote")]

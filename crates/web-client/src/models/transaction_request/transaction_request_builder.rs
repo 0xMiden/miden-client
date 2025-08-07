@@ -3,6 +3,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
 };
 use miden_objects::{
+    Word as NativeWord,
     note::{
         Note as NativeNote, NoteDetails as NativeNoteDetails, NoteId as NativeNoteId,
         NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag,
@@ -22,6 +23,7 @@ use crate::models::{
         note_details_and_tag::NoteDetailsAndTagArray, note_id_and_args::NoteIdAndArgsArray,
     },
     transaction_script::TransactionScript,
+    word::Word,
 };
 
 #[derive(Clone)]
@@ -39,7 +41,7 @@ impl TransactionRequestBuilder {
     #[wasm_bindgen(js_name = "withUnauthenticatedInputNotes")]
     pub fn with_unauthenticated_input_notes(mut self, notes: &NoteAndArgsArray) -> Self {
         let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> = notes.into();
-        self.0 = self.0.clone().unauthenticated_input_notes(native_note_and_note_args);
+        self.0 = self.0.unauthenticated_input_notes(native_note_and_note_args);
         self
     }
 
@@ -47,28 +49,28 @@ impl TransactionRequestBuilder {
     pub fn with_authenticated_input_notes(mut self, notes: &NoteIdAndArgsArray) -> Self {
         let native_note_id_and_note_args: Vec<(NativeNoteId, Option<NativeNoteArgs>)> =
             notes.into();
-        self.0 = self.0.clone().authenticated_input_notes(native_note_id_and_note_args);
+        self.0 = self.0.authenticated_input_notes(native_note_id_and_note_args);
         self
     }
 
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
     pub fn with_own_output_notes(mut self, notes: &OutputNotesArray) -> Self {
         let native_output_notes: Vec<NativeOutputNote> = notes.into();
-        self.0 = self.0.clone().own_output_notes(native_output_notes);
+        self.0 = self.0.own_output_notes(native_output_notes);
         self
     }
 
     #[wasm_bindgen(js_name = "withCustomScript")]
     pub fn with_custom_script(mut self, script: &TransactionScript) -> Self {
         let native_script: NativeTransactionScript = script.into();
-        self.0 = self.0.clone().custom_script(native_script);
+        self.0 = self.0.custom_script(native_script);
         self
     }
 
     #[wasm_bindgen(js_name = "withExpectedOutputRecipients")]
     pub fn with_expected_output_notes(mut self, recipients: &RecipientArray) -> Self {
         let native_recipients: Vec<NativeNoteRecipient> = recipients.into();
-        self.0 = self.0.clone().expected_output_recipients(native_recipients);
+        self.0 = self.0.expected_output_recipients(native_recipients);
         self
     }
 
@@ -79,14 +81,14 @@ impl TransactionRequestBuilder {
     ) -> Self {
         let native_note_details_and_tag: Vec<(NativeNoteDetails, NativeNoteTag)> =
             note_details_and_tag.into();
-        self.0 = self.0.clone().expected_future_notes(native_note_details_and_tag);
+        self.0 = self.0.expected_future_notes(native_note_details_and_tag);
         self
     }
 
     #[wasm_bindgen(js_name = "extendAdviceMap")]
     pub fn extend_advice_map(mut self, advice_map: &AdviceMap) -> Self {
         let native_advice_map: NativeAdviceMap = advice_map.into();
-        self.0 = self.0.clone().extend_advice_map(native_advice_map);
+        self.0 = self.0.extend_advice_map(native_advice_map);
         self
     }
 
@@ -94,7 +96,21 @@ impl TransactionRequestBuilder {
     pub fn with_foreign_accounts(mut self, foreign_accounts: Vec<ForeignAccount>) -> Self {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
             foreign_accounts.into_iter().map(Into::into).collect();
-        self.0 = self.0.clone().foreign_accounts(native_foreign_accounts);
+        self.0 = self.0.foreign_accounts(native_foreign_accounts);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withScriptArg")]
+    pub fn with_script_arg(mut self, script_arg: &Word) -> Self {
+        let native_word: NativeWord = script_arg.into();
+        self.0 = self.0.script_arg(native_word);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withAuthArg")]
+    pub fn with_auth_arg(mut self, auth_arg: &Word) -> Self {
+        let native_word: NativeWord = auth_arg.into();
+        self.0 = self.0.auth_arg(native_word);
         self
     }
 
