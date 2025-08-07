@@ -57,7 +57,7 @@ extern "C" {
 #[derive(Clone)]
 pub struct JsStateSyncUpdate {
     /// The block number for this update, stored as a string since it will be
-    /// persisted in IndexedDB.
+    /// persisted in `IndexedDB`.
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: String,
 
@@ -65,7 +65,7 @@ pub struct JsStateSyncUpdate {
     #[wasm_bindgen(js_name = "flattenedNewBlockHeaders")]
     pub flattened_new_block_headers: FlattenedU8Vec,
 
-    /// The block numbers corresponding to each header in flattened_new_block_headers.
+    /// The block numbers corresponding to each header in `flattened_new_block_headers`.
     /// This vec should have the same length as the number of headers, with each index
     /// representing the block number for the header at that same index.
     #[wasm_bindgen(js_name = "newBlockNums")]
