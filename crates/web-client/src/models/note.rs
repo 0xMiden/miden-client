@@ -3,13 +3,13 @@ use miden_client::note::{
     NoteTag as NativeNoteTag,
 };
 use miden_lib::note::utils;
-use miden_objects::{block::BlockNumber as NativeBlockNumber, crypto::rand::{FeltRng, RpoRandomCoin}, note::{Note as NativeNote, NoteExecutionHint as NativeNoteExecutionHint}};
+use miden_objects::{block::BlockNumber as NativeBlockNumber, crypto::rand::{FeltRng, RpoRandomCoin}, Felt as NativeFelt, note::{Note as NativeNote, NoteExecutionHint as NativeNoteExecutionHint}};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use wasm_bindgen::prelude::*;
 
 use super::{
     account_id::AccountId, felt::Felt, note_assets::NoteAssets, note_id::NoteId,
-    note_metadata::NoteMetadata, note_recipient::NoteRecipient, note_type::NoteType, word::Word,
+    note_metadata::NoteMetadata, note_recipient::NoteRecipient, note_type::NoteType,
 };
 
 #[wasm_bindgen]
@@ -53,7 +53,7 @@ impl Note {
     ) -> Self {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new));
 
         let serial_num = rng.draw_word();
         let recipient = utils::build_p2id_recipient(target.into(), serial_num).unwrap();
@@ -83,7 +83,7 @@ impl Note {
     ) -> Self {
         let mut rng = StdRng::from_os_rng();
         let coin_seed: [u64; 4] = rng.random();
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new));
 
         let serial_num = rng.draw_word();
         let recipient = utils::build_p2ide_recipient(
