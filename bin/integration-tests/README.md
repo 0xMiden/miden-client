@@ -28,7 +28,6 @@ miden-client-integration-tests [OPTIONS]
 - `-s, --store-path <PATH>` - The path to the store directory (uses temporary directory if not provided)
 - `-k, --keystore-path <PATH>` - The path to the keystore directory (uses temporary directory if not provided)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
-- `-m, --max-retries <COUNT>` - The maximum number of times to retry a test that fails
 - `-h, --help` - Show help information
 - `-V, --version` - Show version information
 
@@ -47,11 +46,6 @@ miden-client-integration-tests --rpc-endpoint http://192.168.1.100:57291
 Run tests with custom timeout and store paths:
 ```bash
 miden-client-integration-tests --timeout 30000 --store-path /tmp/miden-store --keystore-path /tmp/miden-keystore
-```
-
-Run tests with retry logic:
-```bash
-miden-client-integration-tests --max-retries 3
 ```
 
 Show help:

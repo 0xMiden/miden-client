@@ -23,10 +23,6 @@ mod tests;
     version
 )]
 struct Args {
-    /// The maximum number of times to retry a test that fails.
-    #[arg(short, long)]
-    max_retries: usize,
-
     /// The URL of the RPC endpoint to use.
     #[arg(short, long, default_value = "http://localhost:57291")]
     rpc_endpoint: Url,
@@ -222,7 +218,7 @@ async fn run_tests(client_config: &ClientConfig) {
     }
 }
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() {
     let args = Args::parse();
 
