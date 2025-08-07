@@ -1,37 +1,36 @@
 #![recursion_limit = "256"]
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::Write,
-    net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
-use miden_lib::{AuthScheme, account::faucets::create_basic_fungible_faucet, utils::Serializable};
+use miden_lib::AuthScheme;
+use miden_lib::account::faucets::create_basic_fungible_faucet;
+use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_objects::{
-    Felt, ONE,
-    account::{Account, AccountFile, AuthSecretKey},
-    asset::TokenSymbol,
-    crypto::dsa::rpo_falcon512::SecretKey,
-};
-use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
-use tokio::{
-    net::TcpListener,
-    sync::Barrier,
-    task::{Id, JoinSet},
-};
+use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+use miden_objects::asset::TokenSymbol;
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+use miden_objects::{Felt, ONE};
+use rand_chacha::ChaCha20Rng;
+use rand_chacha::rand_core::SeedableRng;
+use tokio::net::TcpListener;
+use tokio::sync::Barrier;
+use tokio::task::{Id, JoinSet};
 use url::Url;
 
 pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;

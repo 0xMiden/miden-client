@@ -1,24 +1,26 @@
-use miden_client::{
-    ZERO,
-    note::NoteExecutionHint,
-    store::NoteFilter,
-    testing::common::*,
-    transaction::{InputNote, TransactionRequest, TransactionRequestBuilder},
-    utils::{Deserializable, Serializable},
+use miden_client::ZERO;
+use miden_client::note::NoteExecutionHint;
+use miden_client::store::NoteFilter;
+use miden_client::testing::common::*;
+use miden_client::transaction::{InputNote, TransactionRequest, TransactionRequestBuilder};
+use miden_client::utils::{Deserializable, Serializable};
+use miden_objects::account::{AccountId, AccountStorageMode};
+use miden_objects::asset::FungibleAsset;
+use miden_objects::crypto::hash::rpo::Rpo256;
+use miden_objects::crypto::merkle::{MerkleStore, MerkleTree, NodeIndex};
+use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_objects::note::{
+    Note,
+    NoteAssets,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
-use miden_objects::{
-    Felt, Word,
-    account::{AccountId, AccountStorageMode},
-    asset::FungibleAsset,
-    crypto::{
-        hash::rpo::Rpo256,
-        merkle::{MerkleStore, MerkleTree, NodeIndex},
-        rand::{FeltRng, RpoRandomCoin},
-    },
-    note::{Note, NoteAssets, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType},
-    transaction::OutputNote,
-    vm::AdviceMap,
-};
+use miden_objects::transaction::OutputNote;
+use miden_objects::vm::AdviceMap;
+use miden_objects::{Felt, Word};
 
 // CUSTOM TRANSACTION REQUEST
 // ================================================================================================

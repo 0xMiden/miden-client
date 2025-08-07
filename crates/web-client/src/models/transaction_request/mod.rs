@@ -3,10 +3,9 @@ use miden_objects::note::Note as NativeNote;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::{
-    models::{note::Note, word::Word},
-    utils::{deserialize_from_uint8array, serialize_to_uint8array},
-};
+use crate::models::note::Note;
+use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 pub mod note_and_args;
 pub mod note_details_and_tag;

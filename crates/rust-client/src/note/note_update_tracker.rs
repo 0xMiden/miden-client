@@ -1,16 +1,13 @@
 use alloc::collections::BTreeMap;
 
-use miden_objects::{
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, Nullifier},
-};
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, Nullifier};
 
-use crate::{
-    ClientError,
-    rpc::domain::{note::CommittedNote, nullifier::NullifierUpdate},
-    store::{InputNoteRecord, OutputNoteRecord},
-    transaction::{TransactionRecord, TransactionStatus},
-};
+use crate::ClientError;
+use crate::rpc::domain::note::CommittedNote;
+use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::store::{InputNoteRecord, OutputNoteRecord};
+use crate::transaction::{TransactionRecord, TransactionStatus};
 
 // NOTE UPDATE
 // ================================================================================================

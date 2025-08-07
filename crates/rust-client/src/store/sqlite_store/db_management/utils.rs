@@ -1,11 +1,10 @@
-use std::{
-    string::{String, ToString},
-    sync::LazyLock,
-    vec::Vec,
-};
+use std::string::{String, ToString};
+use std::sync::LazyLock;
+use std::vec::Vec;
 
 use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
-use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params, types::FromSql};
+use rusqlite::types::FromSql;
+use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
 use rusqlite_migration::{M, Migrations, SchemaVersion};
 
 use super::errors::SqliteStoreError;

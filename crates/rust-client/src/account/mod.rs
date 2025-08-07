@@ -37,36 +37,53 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::{auth::AuthRpoFalcon512, wallets::BasicWallet};
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::wallets::BasicWallet;
+use miden_objects::Word;
+use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
-    AccountIdError, NetworkIdError,
+    AccountIdError,
+    NetworkIdError,
     account::{
-        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-        AccountStorage, AccountStorageMode, AccountType, NetworkId, StorageMap, StorageSlot,
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountDelta,
+        AccountFile,
+        AccountHeader,
+        AccountId,
+        AccountStorage,
+        AccountStorageMode,
+        AccountType,
+        NetworkId,
+        StorageMap,
+        StorageSlot,
     },
 };
-use miden_objects::{Word, crypto::dsa::rpo_falcon512::PublicKey};
 
 use super::Client;
-use crate::{
-    errors::ClientError,
-    rpc::domain::account::FetchedAccount,
-    store::{AccountRecord, AccountStatus},
-};
+use crate::errors::ClientError;
+use crate::rpc::domain::account::FetchedAccount;
+use crate::store::{AccountRecord, AccountStatus};
 
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
 
-    pub use miden_lib::account::{
-        auth::AuthRpoFalcon512,
-        faucets::{BasicFungibleFaucet, FungibleFaucetExt},
-        wallets::BasicWallet,
-    };
+    pub use miden_lib::account::auth::AuthRpoFalcon512;
+    pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
+    pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
-        AccountComponent, AccountComponentMetadata, AccountComponentTemplate, FeltRepresentation,
-        InitStorageData, StorageEntry, StorageSlotType, StorageValueName, TemplateType,
+        AccountComponent,
+        AccountComponentMetadata,
+        AccountComponentTemplate,
+        FeltRepresentation,
+        InitStorageData,
+        StorageEntry,
+        StorageSlotType,
+        StorageValueName,
+        TemplateType,
         WordRepresentation,
     };
 }
@@ -302,15 +319,15 @@ pub fn build_wallet_id(
 pub mod tests {
     use alloc::vec::Vec;
 
-    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
-    use miden_objects::{
-        EMPTY_WORD, Felt, Word,
-        account::{Account, AccountFile, AuthSecretKey},
-        crypto::dsa::rpo_falcon512::{PublicKey, SecretKey},
-        testing::account_id::{
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        },
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+    use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     };
+    use miden_objects::{EMPTY_WORD, Felt, Word};
 
     use crate::tests::create_test_client;
 

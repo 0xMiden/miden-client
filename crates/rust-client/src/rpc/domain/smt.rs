@@ -1,11 +1,11 @@
 use alloc::string::ToString;
 
-use miden_objects::{
-    Word,
-    crypto::merkle::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof},
-};
+use miden_objects::Word;
+use miden_objects::crypto::merkle::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 
-use crate::rpc::{domain::MissingFieldHelper, errors::RpcConversionError, generated as proto};
+use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // SMT LEAF ENTRY
 // ================================================================================================

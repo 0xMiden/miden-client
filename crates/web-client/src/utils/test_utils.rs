@@ -1,14 +1,11 @@
-use miden_client::{
-    testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-    transaction::TransactionResult as NativeTransactionResult,
-};
+use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use miden_client::transaction::TransactionResult as NativeTransactionResult;
 use miden_objects::account::AccountId as NativeAccountId;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient, js_error_with_context,
-    models::{account_id::AccountId, transaction_result::TransactionResult},
-};
+use crate::models::account_id::AccountId;
+use crate::models::transaction_result::TransactionResult;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 pub struct TestUtils;

@@ -1,18 +1,19 @@
-use miden_client::{
-    Felt,
-    account::{AccountBuilder, AccountType},
-    auth::AuthSecretKey,
-    crypto::SecretKey as NativeSecretKey,
-};
-use miden_lib::account::{auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet};
+use miden_client::Felt;
+use miden_client::account::{AccountBuilder, AccountType};
+use miden_client::auth::AuthSecretKey;
+use miden_client::crypto::SecretKey as NativeSecretKey;
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_objects::asset::TokenSymbol;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
 
-use super::models::{
-    account::Account, account_storage_mode::AccountStorageMode, secret_key::SecretKey, word::Word,
-};
-use crate::{WebClient, helpers::generate_wallet, js_error_with_context};
+use super::models::account::Account;
+use super::models::account_storage_mode::AccountStorageMode;
+use super::models::secret_key::SecretKey;
+use super::models::word::Word;
+use crate::helpers::generate_wallet;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {

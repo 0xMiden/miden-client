@@ -1,44 +1,46 @@
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use miden_objects::{
-    LexicographicWord, Word,
-    account::{
-        Account, AccountCode, AccountDelta, AccountId, AccountStorageDelta, AccountVaultDelta,
-        FungibleAssetDelta, NonFungibleAssetDelta, NonFungibleDeltaAction, StorageSlot,
-        delta::AccountUpdateDetails,
-    },
-    asset::Asset,
-    block::{BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{Forest, Mmr, MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
+use miden_objects::account::delta::AccountUpdateDetails;
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountId,
+    AccountStorageDelta,
+    AccountVaultDelta,
+    FungibleAssetDelta,
+    NonFungibleAssetDelta,
+    NonFungibleDeltaAction,
+    StorageSlot,
 };
+use miden_objects::asset::Asset;
+use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
+use miden_objects::{LexicographicWord, Word};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
-use crate::{
-    Client,
-    rpc::{
-        NodeRpcClient, RpcError,
-        domain::{
-            account::{
-                AccountProof, AccountProofs, AccountUpdateSummary, FetchedAccount, StateHeaders,
-            },
-            note::{CommittedNote, FetchedNote, NoteSyncInfo},
-            nullifier::NullifierUpdate,
-            sync::StateSyncInfo,
-        },
-        generated::{
-            account::AccountSummary, note::NoteSyncRecord, rpc_store::SyncStateResponse,
-            transaction::TransactionSummary,
-        },
-    },
-    transaction::ForeignAccount,
+use crate::Client;
+use crate::rpc::domain::account::{
+    AccountProof,
+    AccountProofs,
+    AccountUpdateSummary,
+    FetchedAccount,
+    StateHeaders,
 };
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
+use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::generated::account::AccountSummary;
+use crate::rpc::generated::note::NoteSyncRecord;
+use crate::rpc::generated::rpc_store::SyncStateResponse;
+use crate::rpc::generated::transaction::TransactionSummary;
+use crate::rpc::{NodeRpcClient, RpcError};
+use crate::transaction::ForeignAccount;
 
 pub type MockClient<AUTH> = Client<AUTH>;
 

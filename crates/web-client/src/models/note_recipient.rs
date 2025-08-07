@@ -1,13 +1,14 @@
-use miden_objects::{
-    Word as NativeWord,
-    note::{
-        NoteInputs as NativeNoteInputs, NoteRecipient as NativeNoteRecipient,
-        NoteScript as NativeNoteScript,
-    },
+use miden_objects::Word as NativeWord;
+use miden_objects::note::{
+    NoteInputs as NativeNoteInputs,
+    NoteRecipient as NativeNoteRecipient,
+    NoteScript as NativeNoteScript,
 };
 use wasm_bindgen::prelude::*;
 
-use super::{note_inputs::NoteInputs, note_script::NoteScript, word::Word};
+use super::note_inputs::NoteInputs;
+use super::note_script::NoteScript;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

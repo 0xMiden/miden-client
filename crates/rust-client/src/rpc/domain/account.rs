@@ -1,21 +1,24 @@
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader},
-    block::{AccountWitness, BlockNumber},
-    crypto::merkle::{MerklePath, SmtProof},
+use miden_objects::Word;
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorageHeader,
 };
+use miden_objects::block::{AccountWitness, BlockNumber};
+use miden_objects::crypto::merkle::{MerklePath, SmtProof};
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
-use crate::rpc::{
-    RpcError,
-    domain::MissingFieldHelper,
-    errors::RpcConversionError,
-    generated::{self as proto},
-};
+use crate::rpc::RpcError;
+use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated::{self as proto};
 
 // FETCHED ACCOUNT
 // ================================================================================================
@@ -172,10 +175,9 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
         account_id: AccountId,
         known_account_codes: &BTreeMap<Word, AccountCode>,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
-        use crate::rpc::{
-            RpcError, domain::MissingFieldHelper,
-            generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof,
-        };
+        use crate::rpc::RpcError;
+        use crate::rpc::domain::MissingFieldHelper;
+        use crate::rpc::generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof;
 
         let proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             header,

@@ -1,34 +1,26 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr},
-    note::{NoteId, NoteTag},
-    transaction::PartialBlockchain,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
+use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::transaction::PartialBlockchain;
 use tonic::async_trait;
 use tracing::info;
 
-use super::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, state_sync_update::TransactionUpdateTracker,
-};
-use crate::{
-    ClientError,
-    note::NoteUpdateTracker,
-    rpc::{
-        NodeRpcClient,
-        domain::{note::CommittedNote, transaction::TransactionInclusion},
-    },
-    store::{InputNoteRecord, OutputNoteRecord, StoreError},
-    transaction::TransactionRecord,
-};
+use super::state_sync_update::TransactionUpdateTracker;
+use super::{AccountUpdates, BlockUpdates, StateSyncUpdate};
+use crate::ClientError;
+use crate::note::NoteUpdateTracker;
+use crate::rpc::NodeRpcClient;
+use crate::rpc::domain::note::CommittedNote;
+use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
+use crate::transaction::TransactionRecord;
 
 // SYNC CALLBACKS
 // ================================================================================================

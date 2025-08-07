@@ -1,7 +1,5 @@
-use miden_client::{
-    store::TransactionFilter as NativeTransactionFilter,
-    transaction::TransactionId as NativeTransactionId,
-};
+use miden_client::store::TransactionFilter as NativeTransactionFilter;
+use miden_client::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
 
 use super::transaction_id::TransactionId;

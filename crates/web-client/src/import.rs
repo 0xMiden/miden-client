@@ -1,21 +1,15 @@
 use miden_client::auth::AuthSecretKey;
-use miden_objects::{
-    account::{AccountFile, AccountId as NativeAccountId},
-    note::NoteFile,
-    utils::Deserializable,
-};
+use miden_objects::account::{AccountFile, AccountId as NativeAccountId};
+use miden_objects::note::NoteFile;
+use miden_objects::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient,
-    helpers::generate_wallet,
-    js_error_with_context,
-    models::{
-        account::Account, account_id::AccountId as JsAccountId,
-        account_storage_mode::AccountStorageMode,
-    },
-};
+use crate::helpers::generate_wallet;
+use crate::models::account::Account;
+use crate::models::account_id::AccountId as JsAccountId;
+use crate::models::account_storage_mode::AccountStorageMode;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
