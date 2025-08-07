@@ -41,7 +41,7 @@ let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
 
 // Define a mapping from method names to handler functions.
-let methodHandlers = {
+const methodHandlers = {
   [MethodName.NEW_WALLET]: async (args) => {
     const [walletStorageModeStr, mutable, seed] = args;
     const walletStorageMode =
