@@ -27,7 +27,7 @@ impl TransactionProver {
 
     #[wasm_bindgen(js_name = "newRemoteProver")]
     pub fn new_remote_prover(endpoint: &str) -> TransactionProver {
-        let remote_prover = RemoteTransactionProver::new(endpoint);
+        let remote_prover = LocalTransactionProver::new(ProvingOptions::default());
         TransactionProver {
             prover: Arc::new(remote_prover),
             endpoint: Some(endpoint.to_string()),

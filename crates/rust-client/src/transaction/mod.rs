@@ -148,16 +148,6 @@ impl TransactionProver for LocalTransactionProver {
     }
 }
 
-#[async_trait::async_trait(?Send)]
-impl TransactionProver for RemoteTransactionProver {
-    async fn prove(
-        &self,
-        witness: TransactionWitness,
-    ) -> Result<ProvenTransaction, TransactionProverError> {
-        let fut = RemoteTransactionProver::prove(self, witness);
-        fut.await
-    }
-}
 /// Represents the result of executing a transaction by the client.
 ///
 /// It contains an [`ExecutedTransaction`], and a list of `future_notes` that we expect to receive

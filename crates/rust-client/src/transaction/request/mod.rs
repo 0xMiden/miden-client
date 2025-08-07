@@ -9,7 +9,7 @@ use alloc::{
 
 use miden_lib::{
     account::interface::{AccountInterface, AccountInterfaceError},
-    transaction::TransactionKernel,
+    transaction::TransactionKernel, utils::{ScriptBuilder, ScriptBuilderError},
 };
 use miden_objects::{
     AccountError, NoteError, TransactionInputError, TransactionScriptError, Word,
@@ -304,7 +304,7 @@ impl TransactionRequest {
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
                 let empty_script =
-                    TransactionScript::compile("begin nop end", TransactionKernel::assembler())?;
+                    ScriptBuilder::new(true).compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },
@@ -435,6 +435,8 @@ pub enum TransactionRequestError {
     NoteCreationError(#[from] NoteError),
     #[error("pay to id note doesn't contain at least one asset")]
     P2IDNoteWithoutAsset,
+    #[error("error building script: {0}")]
+    ScriptBuilderError(#[from] ScriptBuilderError),
     #[error("transaction script template error: {0}")]
     ScriptTemplateError(String),
     #[error("storage slot {0} not found in account ID {1}")]

@@ -40,14 +40,14 @@ impl AccountComponent {
             .0
             .library()
             .exports()
-            .find(|export| export.name.as_str() == procedure_name)
+            .find(|export| export.name.name.as_str() == procedure_name)
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
                     "Procedure {procedure_name} not found in the account component library"
                 ))
             })?;
 
-        let get_proc_mast_id = self.0.library().get_export_node_id(get_proc_export);
+        let get_proc_mast_id = self.0.library().get_export_node_id(&get_proc_export.name);
 
         let digest_hex = self
             .0

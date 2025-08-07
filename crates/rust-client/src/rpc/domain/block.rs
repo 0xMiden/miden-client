@@ -1,4 +1,4 @@
-use miden_objects::block::BlockHeader;
+use miden_objects::{account::AccountId, block::{BlockHeader, FeeParameters}};
 
 use crate::rpc::{domain::MissingFieldHelper, errors::RpcConversionError, generated as proto};
 
@@ -80,6 +80,7 @@ impl TryFrom<proto::blockchain::BlockHeader> for BlockHeader {
                 .proof_commitment
                 .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(proof_commitment)))?
                 .try_into()?,
+                FeeParameters::new(AccountId::from_hex("0x6052cac009b295a0371032d9ab096a").unwrap(), 0).unwrap(),
             value.timestamp,
         ))
     }

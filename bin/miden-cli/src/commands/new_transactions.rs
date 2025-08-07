@@ -2,16 +2,9 @@ use std::{io, sync::Arc};
 
 use clap::{Parser, ValueEnum};
 use miden_client::{
-    Client, RemoteTransactionProver,
-    account::AccountId,
-    asset::{FungibleAsset, NonFungibleDeltaAction},
-    auth::TransactionAuthenticator,
-    note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
-    store::NoteRecordError,
-    transaction::{
-        InputNote, OutputNote, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-        TransactionRequestBuilder, TransactionResult,
-    },
+    account::AccountId, asset::{FungibleAsset, NonFungibleDeltaAction}, auth::TransactionAuthenticator, note::{build_swap_tag, get_input_note_with_id_prefix, BlockNumber, NoteType as MidenNoteType}, store::NoteRecordError, transaction::{
+        InputNote, LocalTransactionProver, OutputNote, PaymentNoteDescription, ProvingOptions, SwapTransactionData, TransactionRequest, TransactionRequestBuilder, TransactionResult
+    }, Client, RemoteTransactionProver
 };
 use tracing::info;
 
@@ -409,7 +402,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
             ))?;
 
         let remote_prover =
-            Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()));
+            Arc::new(LocalTransactionProver::new(ProvingOptions::default()));
         client
             .submit_transaction_with_prover(transaction_execution_result, remote_prover)
             .await?;

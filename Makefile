@@ -11,8 +11,8 @@ help: ## Show description of all commands
 # protobuf files.
 CODEGEN=CODEGEN=1
 
-FEATURES_WEB_CLIENT=--features "testing"
-FEATURES_CLIENT=--features "testing, std"
+FEATURES_WEB_CLIENT=
+FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
