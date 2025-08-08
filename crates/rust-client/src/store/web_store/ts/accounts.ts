@@ -336,9 +336,6 @@ export async function getAccountAssetVault(vaultRoot: string) {
   }
 }
 
-<<<<<<< HEAD:crates/rust-client/src/store/web_store/js/accounts.js
-export async function getAccountAuthByPubKey(pubKey) {
-=======
 export function getAccountAuthByPubKey(pubKey: string) {
   // Added type
   // Try to get the account auth from the cache
@@ -359,31 +356,13 @@ export function getAccountAuthByPubKey(pubKey: string) {
 var ACCOUNT_AUTH_MAP = new Map<string, string>(); // Added types for Map
 export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
   // Added type
->>>>>>> b1123388a88581403da368813c8e2c4653a04a1d:crates/rust-client/src/store/web_store/ts/accounts.ts
   try {
-    // Try to get the account auth from the store
-    const accountSecretKey = await accountAuths
+    // Fetch all records matching the given id
+    const allMatchingRecords = await accountAuths
       .where("pubKey")
       .equals(pubKey)
-      .first();
+      .toArray();
 
-<<<<<<< HEAD:crates/rust-client/src/store/web_store/js/accounts.js
-    // If it's not in the store, throw an error
-    if (!accountSecretKey) {
-      throw new Error("Account auth not found in store.");
-    }
-
-    let data = {
-      secretKey: accountSecretKey.secretKey,
-    };
-
-    return data;
-  } catch (error) {
-    console.error(
-      `Error fetching account auth for pubKey ${pubKey}:`,
-      error.toString()
-    );
-=======
     // The first record is the only one due to the uniqueness constraint
     const authRecord = allMatchingRecords[0];
 
@@ -411,7 +390,6 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
         String(error)
       );
     }
->>>>>>> b1123388a88581403da368813c8e2c4653a04a1d:crates/rust-client/src/store/web_store/ts/accounts.ts
     throw error;
   }
 }
