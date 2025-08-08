@@ -75,7 +75,7 @@ async fn deploy_counter_contract(
     client.add_account(&acc, Some(seed), false).await.unwrap();
 
     let mut script_builder = ScriptBuilder::new(true);
-    script_builder.link_dynamic_library(&library);
+    script_builder.link_dynamic_library(&library).unwrap();
     let tx_script = script_builder
         .compile_tx_script(
             "use.external_contract::counter_contract

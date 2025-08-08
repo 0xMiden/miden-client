@@ -414,7 +414,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     if delegated_proving {
         let (cli_config, _) = load_config_file()?;
-        let remote_prover_endpoint =
+        let _remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),
                 "remote prover endpoint is not set in the configuration file".to_string(),

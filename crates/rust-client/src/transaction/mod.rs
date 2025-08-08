@@ -1054,21 +1054,21 @@ where
                 )
                 .await?;
 
-            if !execution.failed.is_empty() {
-                let failed_note_ids: BTreeSet<NoteId> =
-                    execution.failed.iter().map(|n| n.note.id()).collect();
-                let filtered_input_notes = InputNotes::new(
-                    input_notes
-                        .into_iter()
-                        .filter(|note| !failed_note_ids.contains(&note.id()))
-                        .collect(),
-                )
-                .expect("Created from a valid input notes list");
-
-                input_notes = filtered_input_notes;
-            } else {
+            if execution.failed.is_empty() {
                 break;
             }
+
+            let failed_note_ids: BTreeSet<NoteId> =
+                execution.failed.iter().map(|n| n.note.id()).collect();
+            let filtered_input_notes = InputNotes::new(
+                input_notes
+                    .into_iter()
+                    .filter(|note| !failed_note_ids.contains(&note.id()))
+                    .collect(),
+            )
+            .expect("Created from a valid input notes list");
+
+            input_notes = filtered_input_notes;
         }
 
         Ok(input_notes)
