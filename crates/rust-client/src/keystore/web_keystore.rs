@@ -1,16 +1,16 @@
-use alloc::{string::ToString, sync::Arc, vec::Vec};
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use miden_lib::utils::{Deserializable, Serializable};
 use miden_tx::auth::SigningInputs;
 use rand::Rng;
 
 use super::KeyStoreError;
-use crate::{
-    AuthenticationError, Felt, Word,
-    auth::{AuthSecretKey, TransactionAuthenticator},
-    store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth},
-    utils::RwLock,
-};
+use crate::auth::{AuthSecretKey, TransactionAuthenticator};
+use crate::store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth};
+use crate::utils::RwLock;
+use crate::{AuthenticationError, Felt, Word};
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
 /// and provides transaction authentication functionality.

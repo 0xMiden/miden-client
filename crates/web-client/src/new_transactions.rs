@@ -1,21 +1,20 @@
-use miden_client::{
-    note::BlockNumber,
-    transaction::{
-        PaymentNoteDescription, SwapTransactionData,
-        TransactionRequestBuilder as NativeTransactionRequestBuilder,
-        TransactionResult as NativeTransactionResult,
-    },
+use miden_client::note::BlockNumber;
+use miden_client::transaction::{
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequestBuilder as NativeTransactionRequestBuilder,
+    TransactionResult as NativeTransactionResult,
 };
-use miden_objects::{asset::FungibleAsset, note::NoteId as NativeNoteId};
+use miden_objects::asset::FungibleAsset;
+use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient, js_error_with_context,
-    models::{
-        account_id::AccountId, note_type::NoteType, provers::TransactionProver,
-        transaction_request::TransactionRequest, transaction_result::TransactionResult,
-    },
-};
+use crate::models::account_id::AccountId;
+use crate::models::note_type::NoteType;
+use crate::models::provers::TransactionProver;
+use crate::models::transaction_request::TransactionRequest;
+use crate::models::transaction_result::TransactionResult;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {

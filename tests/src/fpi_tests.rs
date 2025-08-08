@@ -1,18 +1,15 @@
-use miden_client::{
-    Felt, Word,
-    account::{Account, StorageSlot},
-    auth::AuthSecretKey,
-    rpc::domain::account::{AccountStorageRequirements, StorageMapKey},
-    testing::common::*,
-    transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder},
-};
-use miden_lib::{account::auth::AuthRpoFalcon512, utils::word_to_masm_push_string};
-use miden_objects::{
-    account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap},
-    crypto::dsa::rpo_falcon512::SecretKey,
-    transaction::TransactionScript,
-    vm::AdviceInputs,
-};
+use miden_client::account::{Account, StorageSlot};
+use miden_client::auth::AuthSecretKey;
+use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
+use miden_client::testing::common::*;
+use miden_client::transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder};
+use miden_client::{Felt, Word};
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::utils::word_to_masm_push_string;
+use miden_objects::account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap};
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+use miden_objects::transaction::TransactionScript;
+use miden_objects::vm::AdviceInputs;
 
 // FPI TESTS
 // ================================================================================================

@@ -1,6 +1,8 @@
 use miden_objects::{account::AccountId, block::{BlockHeader, FeeParameters}};
 
-use crate::rpc::{domain::MissingFieldHelper, errors::RpcConversionError, generated as proto};
+use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // BLOCK HEADER
 // ================================================================================================

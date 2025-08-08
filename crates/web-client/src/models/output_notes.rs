@@ -1,7 +1,8 @@
 use miden_objects::transaction::OutputNotes as NativeOutputNotes;
 use wasm_bindgen::prelude::*;
 
-use super::{output_note::OutputNote, word::Word};
+use super::output_note::OutputNote;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

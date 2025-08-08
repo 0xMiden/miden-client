@@ -1,9 +1,10 @@
-use miden_client::{
-    Client, auth::TransactionAuthenticator, store::TransactionFilter,
-    transaction::TransactionRecord,
-};
+use miden_client::Client;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::store::TransactionFilter;
+use miden_client::transaction::TransactionRecord;
 
-use crate::{Parser, create_dynamic_table, errors::CliError};
+use crate::errors::CliError;
+use crate::{Parser, create_dynamic_table};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "Manage and view transactions. Defaults to `list` command")]

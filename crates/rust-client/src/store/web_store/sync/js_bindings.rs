@@ -1,18 +1,15 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{Word, account::Account};
+use miden_objects::Word;
+use miden_objects::account::Account;
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
 use super::flattened_vec::FlattenedU8Vec;
-use crate::store::web_store::{
-    note::utils::{SerializedInputNoteData, SerializedOutputNoteData},
-    transaction::utils::SerializedTransactionData,
-};
+use crate::store::web_store::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
+use crate::store::web_store::transaction::utils::SerializedTransactionData;
 
 // Sync IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/sync.js")]
@@ -60,7 +57,7 @@ extern "C" {
 #[derive(Clone)]
 pub struct JsStateSyncUpdate {
     /// The block number for this update, stored as a string since it will be
-    /// persisted in IndexedDB.
+    /// persisted in `IndexedDB`.
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: String,
 
@@ -68,7 +65,7 @@ pub struct JsStateSyncUpdate {
     #[wasm_bindgen(js_name = "flattenedNewBlockHeaders")]
     pub flattened_new_block_headers: FlattenedU8Vec,
 
-    /// The block numbers corresponding to each header in flattened_new_block_headers.
+    /// The block numbers corresponding to each header in `flattened_new_block_headers`.
     /// This vec should have the same length as the number of headers, with each index
     /// representing the block number for the header at that same index.
     #[wasm_bindgen(js_name = "newBlockNums")]

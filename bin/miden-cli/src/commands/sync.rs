@@ -1,5 +1,6 @@
 use clap::Parser;
-use miden_client::{Client, auth::TransactionAuthenticator};
+use miden_client::Client;
+use miden_client::auth::TransactionAuthenticator;
 
 use crate::errors::CliError;
 

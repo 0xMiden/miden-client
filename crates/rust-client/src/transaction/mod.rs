@@ -20,13 +20,17 @@
 //! The following example demonstrates how to create and submit a transaction:
 //!
 //! ```rust
-//! use miden_client::{
-//!     Client,
-//!     auth::TransactionAuthenticator,
-//!     crypto::FeltRng,
-//!     transaction::{PaymentNoteDescription, TransactionRequestBuilder, TransactionResult},
+//! use miden_client::Client;
+//! use miden_client::auth::TransactionAuthenticator;
+//! use miden_client::crypto::FeltRng;
+//! use miden_client::transaction::{
+//!     PaymentNoteDescription,
+//!     TransactionRequestBuilder,
+//!     TransactionResult,
 //! };
-//! use miden_objects::{account::AccountId, asset::FungibleAsset, note::NoteType};
+//! use miden_objects::account::AccountId;
+//! use miden_objects::asset::FungibleAsset;
+//! use miden_objects::note::NoteType;
 //! # use std::error::Error;
 //!
 //! /// Executes, proves and submits a P2ID transaction.
@@ -91,40 +95,53 @@ use miden_tx::{
 use tracing::info;
 
 use super::Client;
-use crate::{
-    ClientError,
-    note::{NoteScreener, NoteUpdateTracker},
-    rpc::domain::account::AccountProof,
-    store::{
-        InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError,
-        TransactionFilter, data_store::ClientDataStore, input_note_states::ExpectedNoteState,
-    },
-    sync::NoteTagRecord,
+use crate::ClientError;
+use crate::note::{NoteScreener, NoteUpdateTracker};
+use crate::rpc::domain::account::AccountProof;
+use crate::store::data_store::ClientDataStore;
+use crate::store::input_note_states::ExpectedNoteState;
+use crate::store::{
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    StoreError,
+    TransactionFilter,
 };
+use crate::sync::NoteTagRecord;
 
 mod request;
 
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_lib::{
-    account::interface::{AccountComponentInterface, AccountInterface},
-    transaction::TransactionKernel,
+pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
+pub use miden_lib::transaction::TransactionKernel;
+pub use miden_objects::transaction::{
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNote,
+    OutputNotes,
+    ProvenTransaction,
+    TransactionId,
+    TransactionScript,
 };
-pub use miden_objects::{
-    transaction::{
-        ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
-        TransactionId, TransactionScript,
-    },
-    vm::{AdviceInputs, AdviceMap},
-};
+pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
     DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError, auth::TransactionAuthenticator,
 };
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -1001,10 +1018,10 @@ where
         account_id: AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
-        let current_chain_tip =
-            self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
-
         if let Some(max_block_number_delta) = self.max_block_number_delta {
+            let current_chain_tip =
+                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
+
             if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
                 return Err(ClientError::RecencyConditionError(
                     "The client is too far behind the chain tip to execute the transaction"
@@ -1260,28 +1277,30 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
-    use miden_lib::{account::auth::AuthRpoFalcon512, transaction::TransactionKernel};
-    use miden_objects::{
-        Word,
-        account::{AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot},
-        asset::{Asset, FungibleAsset},
-        crypto::dsa::rpo_falcon512::SecretKey,
-        note::NoteType,
-        testing::{
-            account_component::BASIC_WALLET_CODE,
-            account_id::{
-                ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-                ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-            },
-        },
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_objects::Word;
+    use miden_objects::account::{
+        AccountBuilder,
+        AccountComponent,
+        AuthSecretKey,
+        StorageMap,
+        StorageSlot,
+    };
+    use miden_objects::asset::{Asset, FungibleAsset};
+    use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    use miden_objects::note::NoteType;
+    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     };
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::PaymentNoteDescription;
-    use crate::{
-        tests::create_test_client,
-        transaction::{TransactionRequestBuilder, TransactionResult},
-    };
+    use crate::tests::create_test_client;
+    use crate::transaction::{TransactionRequestBuilder, TransactionResult};
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {

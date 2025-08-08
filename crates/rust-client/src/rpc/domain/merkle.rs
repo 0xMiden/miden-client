@@ -1,11 +1,10 @@
 use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    crypto::merkle::{Forest, MerklePath, MmrDelta, SparseMerklePath},
-};
+use miden_objects::Word;
+use miden_objects::crypto::merkle::{Forest, MerklePath, MmrDelta, SparseMerklePath};
 
-use crate::rpc::{errors::RpcConversionError, generated as proto};
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // MERKLE PATH
 // ================================================================================================

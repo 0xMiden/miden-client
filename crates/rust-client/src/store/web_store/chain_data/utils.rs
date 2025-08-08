@@ -1,16 +1,17 @@
-use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use core::num::NonZeroUsize;
 
-use miden_objects::{Word, block::BlockHeader, crypto::merkle::InOrderIndex};
+use miden_objects::Word;
+use miden_objects::block::BlockHeader;
+use miden_objects::crypto::merkle::InOrderIndex;
 use miden_tx::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 
-use crate::store::{StoreError, web_store::chain_data::PartialBlockchainNodeIdxdbObject};
+use crate::store::StoreError;
+use crate::store::web_store::chain_data::PartialBlockchainNodeIdxdbObject;
 
 pub struct SerializedBlockHeaderData {
     pub block_num: String,

@@ -2,10 +2,9 @@ use miden_lib::utils::ScriptBuilder;
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{assembler::Assembler, word::Word},
-};
+use crate::js_error_with_context;
+use crate::models::assembler::Assembler;
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

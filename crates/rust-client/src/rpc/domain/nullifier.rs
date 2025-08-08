@@ -1,6 +1,9 @@
-use miden_objects::{Word, note::Nullifier};
+use miden_objects::Word;
+use miden_objects::note::Nullifier;
 
-use crate::rpc::{domain::MissingFieldHelper, errors::RpcConversionError, generated as proto};
+use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // NULLIFIER UPDATE
 // ================================================================================================

@@ -2,7 +2,8 @@ use miden_client::transaction::NoteArgs as NativeNoteArgs;
 use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{note_id::NoteId, transaction_request::note_and_args::NoteArgs};
+use crate::models::note_id::NoteId;
+use crate::models::transaction_request::note_and_args::NoteArgs;
 
 #[derive(Clone)]
 #[wasm_bindgen]

@@ -1,4 +1,6 @@
-use miden_client::{Word, store::NoteExportType, utils::Serializable};
+use miden_client::Word;
+use miden_client::store::NoteExportType;
+use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 
 use crate::{WebClient, js_error_with_context};
@@ -43,9 +45,9 @@ impl WebClient {
         }
     }
 
-    /// Retrieves the entire underlying web store and returns it as a JsValue
+    /// Retrieves the entire underlying web store and returns it as a `JsValue`
     ///
-    /// Meant to be used in conjunction with the force_import_store method
+    /// Meant to be used in conjunction with the `force_import_store` method
     #[wasm_bindgen(js_name = "exportStore")]
     pub async fn export_store(&mut self) -> Result<JsValue, JsValue> {
         let store = self.store.as_ref().ok_or(JsValue::from_str("Store not initialized"))?;

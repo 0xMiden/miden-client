@@ -2,13 +2,13 @@ use miden_objects::account::{Account as NativeAccount, AccountType as NativeAcco
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::{
-    models::{
-        account_code::AccountCode, account_id::AccountId, account_storage::AccountStorage,
-        asset_vault::AssetVault, felt::Felt, word::Word,
-    },
-    utils::{deserialize_from_uint8array, serialize_to_uint8array},
-};
+use crate::models::account_code::AccountCode;
+use crate::models::account_id::AccountId;
+use crate::models::account_storage::AccountStorage;
+use crate::models::asset_vault::AssetVault;
+use crate::models::felt::Felt;
+use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
 #[wasm_bindgen]

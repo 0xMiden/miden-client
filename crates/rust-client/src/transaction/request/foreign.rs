@@ -1,5 +1,6 @@
 //! Contains structures and functions related to FPI (Foreign Procedure Invocation) transactions.
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use miden_objects::{

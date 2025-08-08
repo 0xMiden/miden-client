@@ -1,14 +1,15 @@
 use miden_lib::account::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
-use miden_objects::{
-    account::{AccountComponent as NativeAccountComponent, StorageSlot as NativeStorageSlot},
-    crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey,
+use miden_objects::account::{
+    AccountComponent as NativeAccountComponent,
+    StorageSlot as NativeStorageSlot,
 };
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{assembler::Assembler, secret_key::SecretKey, storage_slot::StorageSlot},
-};
+use crate::js_error_with_context;
+use crate::models::assembler::Assembler;
+use crate::models::secret_key::SecretKey;
+use crate::models::storage_slot::StorageSlot;
 
 #[wasm_bindgen]
 pub struct AccountComponent(NativeAccountComponent);

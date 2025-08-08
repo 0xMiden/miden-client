@@ -1,10 +1,9 @@
-use miden_objects::{Felt as NativeFelt, crypto::hash::rpo::Rpo256 as NativeRpo256};
+use miden_objects::Felt as NativeFelt;
+use miden_objects::crypto::hash::rpo::Rpo256 as NativeRpo256;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    felt::{Felt, FeltArray},
-    word::Word,
-};
+use super::felt::{Felt, FeltArray};
+use super::word::Word;
 
 #[wasm_bindgen]
 pub struct Rpo256;

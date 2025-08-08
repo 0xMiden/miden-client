@@ -1,33 +1,34 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountDelta, AccountId},
-    block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
-    utils::Deserializable,
-};
-use miden_tx::utils::{Serializable, sync::RwLock};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
+use miden_objects::utils::Deserializable;
+use miden_tx::utils::Serializable;
+use miden_tx::utils::sync::RwLock;
 use tracing::info;
 
+use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::note::FetchedNote;
+use super::domain::nullifier::NullifierUpdate;
 use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint,
+    FetchedAccount,
+    NodeRpcClient,
+    NodeRpcClientEndpoint,
+    NoteSyncInfo,
+    RpcError,
     StateSyncInfo,
-    domain::{
-        account::{AccountProof, AccountProofs, AccountUpdateSummary},
-        note::FetchedNote,
-        nullifier::NullifierUpdate,
-    },
     generated as proto,
 };
-use crate::{rpc::errors::RpcConversionError, transaction::ForeignAccount};
+use crate::rpc::errors::RpcConversionError;
+use crate::transaction::ForeignAccount;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -198,7 +199,7 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
-    /// into a [StateSyncInfo] struct.
+    /// into a [`StateSyncInfo`] struct.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
@@ -223,16 +224,16 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [FetchedAccount] from
-    /// the `GetAccountDetailsResponse` response.
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
+    /// from the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
     ///
     /// - There was an error sending the request to the node.
-    /// - The answer had a `None` for one of the expected fields (account, summary,
-    ///   account_commitment, details).
+    /// - The answer had a `None` for one of the expected fields (`account`, `summary`,
+    ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let request = proto::account::AccountId { id: account_id.to_bytes() };
@@ -359,7 +360,7 @@ impl NodeRpcClient for TonicRpcClient {
         Ok((block_num, account_proofs))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [NoteSyncInfo] from the
+    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
     /// response.
     async fn sync_notes(
         &self,

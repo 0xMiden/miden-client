@@ -1,6 +1,9 @@
 #![recursion_limit = "256"]
 
-use std::{fs, io::Write, path::PathBuf, process, time::Duration};
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::Duration;
+use std::{fs, process};
 
 use node_builder::{DEFAULT_BATCH_INTERVAL, DEFAULT_BLOCK_INTERVAL, DEFAULT_RPC_PORT, NodeBuilder};
 

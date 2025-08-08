@@ -1,11 +1,14 @@
-use std::{collections::BTreeSet, path::PathBuf};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use clap::Parser;
-use miden_client::{Client, Felt, Word, auth::TransactionAuthenticator};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::{Client, Felt, Word};
 use miden_objects::vm::AdviceInputs;
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-use crate::{errors::CliError, utils::get_input_acc_id_by_prefix_or_default};
+use crate::errors::CliError;
+use crate::utils::get_input_acc_id_by_prefix_or_default;
 
 // EXEC COMMAND
 // ================================================================================================

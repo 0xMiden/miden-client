@@ -1,31 +1,29 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use std::rc::Rc;
 
-use miden_objects::{
-    Word,
-    block::BlockNumber,
-    crypto::utils::{Deserializable, Serializable},
-    transaction::{ToInputNoteCommitments, TransactionScript},
-};
-use rusqlite::{Connection, Transaction, params, types::Value};
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::crypto::utils::{Deserializable, Serializable};
+use miden_objects::transaction::{ToInputNoteCommitments, TransactionScript};
+use rusqlite::types::Value;
+use rusqlite::{Connection, Transaction, params};
 
-use super::{
-    SqliteStore, account::update_account, note::apply_note_updates_tx, sync::add_note_tag_tx,
+use super::SqliteStore;
+use super::account::update_account;
+use super::note::apply_note_updates_tx;
+use super::sync::add_note_tag_tx;
+use crate::store::{StoreError, TransactionFilter};
+use crate::transaction::{
+    DiscardCause,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
+    TransactionStoreUpdate,
 };
-use crate::{
-    insert_sql,
-    store::{StoreError, TransactionFilter},
-    subst,
-    transaction::{
-        DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
-        TransactionStoreUpdate,
-    },
-};
+use crate::{insert_sql, subst};
 
 pub(crate) const UPSERT_TRANSACTION_QUERY: &str = insert_sql!(
     transactions {

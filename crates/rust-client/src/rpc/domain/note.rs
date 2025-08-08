@@ -1,11 +1,17 @@
 use alloc::vec::Vec;
 
-use miden_objects::{
-    Felt, Word,
-    block::BlockHeader,
-    crypto::merkle::{MerklePath, SparseMerklePath},
-    note::{Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteTag, NoteType},
+use miden_objects::block::BlockHeader;
+use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
+use miden_objects::note::{
+    Note,
+    NoteDetails,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteTag,
+    NoteType,
 };
+use miden_objects::{Felt, Word};
 use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};

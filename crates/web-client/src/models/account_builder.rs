@@ -1,13 +1,12 @@
 use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{
-        account::Account, account_component::AccountComponent,
-        account_storage_mode::AccountStorageMode, account_type::AccountType, word::Word,
-    },
-};
+use crate::js_error_with_context;
+use crate::models::account::Account;
+use crate::models::account_component::AccountComponent;
+use crate::models::account_storage_mode::AccountStorageMode;
+use crate::models::account_type::AccountType;
+use crate::models::word::Word;
 
 #[wasm_bindgen]
 pub struct AccountBuilderResult {

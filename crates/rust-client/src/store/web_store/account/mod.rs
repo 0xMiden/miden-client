@@ -1,14 +1,10 @@
-use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    AccountIdError, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
-};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::{AccountIdError, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
@@ -32,8 +28,12 @@ use models::{
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault, insert_account_code, insert_account_record, insert_account_storage,
-    parse_account_record_idxdb_object, update_account,
+    insert_account_asset_vault,
+    insert_account_code,
+    insert_account_record,
+    insert_account_storage,
+    parse_account_record_idxdb_object,
+    update_account,
 };
 
 impl WebStore {
@@ -317,10 +317,10 @@ impl WebStore {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we
         // got a past update and shouldn't lock the account.
-        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await? {
-            if account.id() == *account_id {
-                return Ok(());
-            }
+        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await?
+            && account.id() == *account_id
+        {
+            return Ok(());
         }
 
         let account_id_str = account_id.to_string();

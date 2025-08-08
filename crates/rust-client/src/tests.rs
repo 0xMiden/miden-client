@@ -1,76 +1,101 @@
 use alloc::vec::Vec;
-use std::{boxed::Box, collections::BTreeSet, env::temp_dir, println, sync::Arc};
+use std::boxed::Box;
+use std::collections::BTreeSet;
+use std::env::temp_dir;
+use std::println;
+use std::sync::Arc;
 
 // TESTS
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512,
+        faucets::BasicFungibleFaucet,
+        interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
     transaction::TransactionKernel,
 };
-use miden_objects::{
-    EMPTY_WORD, Felt, FieldElement, ONE, Word, ZERO,
-    account::{
-        Account, AccountBuilder, AccountCode, AccountHeader, AccountId, AccountStorageMode,
-        AccountType, AuthSecretKey,
-    },
-    asset::{Asset, FungibleAsset, TokenSymbol},
-    crypto::{
-        dsa::rpo_falcon512::{PublicKey, SecretKey},
-        rand::{FeltRng, RpoRandomCoin},
-    },
-    note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-        NoteRecipient, NoteTag, NoteType,
-    },
-    testing::{
-        account_id::{
-            ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-            ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-            ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-            ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        },
-        note::NoteBuilder,
-    },
-    transaction::{InputNote, OutputNote},
-    vm::AdviceInputs,
+use miden_objects::account::{
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    AuthSecretKey,
 };
+use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_objects::note::{
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
+};
+use miden_objects::testing::account_id::{
+    ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
+};
+use miden_objects::testing::note::NoteBuilder;
+use miden_objects::transaction::{InputNote, OutputNote};
+use miden_objects::vm::AdviceInputs;
+use miden_objects::{EMPTY_WORD, Felt, FieldElement, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder};
-use miden_tx::{
-    TransactionExecutorError,
-    utils::{Deserializable, Serializable},
-};
-use rand::{Rng, RngCore, rngs::StdRng};
+use miden_tx::TransactionExecutorError;
+use miden_tx::utils::{Deserializable, Serializable};
+use rand::rngs::StdRng;
+use rand::{Rng, RngCore};
 use uuid::Uuid;
 
-use crate::{
-    ClientError, DebugMode,
-    builder::ClientBuilder,
-    keystore::FilesystemKeyStore,
-    note::NoteRelevance,
-    rpc::NodeRpcClient,
-    store::{
-        InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter,
-        input_note_states::ConsumedAuthenticatedLocalNoteState, sqlite_store::SqliteStore,
-    },
-    sync::NoteTagSource,
-    testing::{
-        common::{
-            ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
-            TestClientKeyStore, assert_account_has_single_asset,
-            assert_note_cannot_be_consumed_twice, consume_notes, execute_failing_tx, execute_tx,
-            mint_and_consume, mint_note, setup_two_wallets_and_faucet, setup_wallet_and_faucet,
-        },
-        mock::{MockClient, MockRpcApi},
-    },
-    transaction::{
-        DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder,
-        TransactionRequestError, TransactionStatus,
-    },
+use crate::builder::ClientBuilder;
+use crate::keystore::FilesystemKeyStore;
+use crate::note::NoteRelevance;
+use crate::rpc::NodeRpcClient;
+use crate::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
+use crate::store::sqlite_store::SqliteStore;
+use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use crate::sync::NoteTagSource;
+use crate::testing::common::{
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    TestClientKeyStore,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    execute_failing_tx,
+    execute_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
 };
+use crate::testing::mock::{MockClient, MockRpcApi};
+use crate::transaction::{
+    DiscardCause,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
+};
+use crate::{ClientError, DebugMode};
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
@@ -1140,7 +1165,7 @@ async fn p2ide_transfer_consumed_by_target() {
         InputNoteState::Committed { .. }
     ));
 
-    consume_notes(&mut client, from_account_id, &[note.clone()]).await;
+    consume_notes(&mut client, from_account_id, core::slice::from_ref(&note)).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 

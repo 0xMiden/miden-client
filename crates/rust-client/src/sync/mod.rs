@@ -55,25 +55,21 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::{collections::BTreeSet, sync::Arc, vec::Vec};
+use alloc::collections::BTreeSet;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::cmp::max;
 
-use miden_objects::{
-    account::AccountId,
-    block::BlockNumber,
-    note::{NoteId, NoteTag},
-    transaction::{PartialBlockchain, TransactionId},
-};
-use miden_tx::{
-    auth::TransactionAuthenticator,
-    utils::{Deserializable, DeserializationError, Serializable},
-};
+use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::transaction::{PartialBlockchain, TransactionId};
+use miden_tx::auth::TransactionAuthenticator;
+use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
-use crate::{
-    Client, ClientError,
-    note::NoteScreener,
-    store::{NoteFilter, TransactionFilter},
-};
+use crate::note::NoteScreener;
+use crate::store::{NoteFilter, TransactionFilter};
+use crate::{Client, ClientError};
 mod block_header;
 
 mod tag;
@@ -84,7 +80,10 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
+    AccountUpdates,
+    BlockUpdates,
+    StateSyncUpdate,
+    TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.

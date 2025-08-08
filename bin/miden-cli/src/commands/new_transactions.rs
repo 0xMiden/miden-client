@@ -1,4 +1,5 @@
-use std::{io, sync::Arc};
+use std::io;
+use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 use miden_client::{
@@ -8,13 +9,14 @@ use miden_client::{
 };
 use tracing::info;
 
-use crate::{
-    create_dynamic_table,
-    errors::CliError,
-    utils::{
-        SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_config_file,
-        load_faucet_details_map, parse_account_id,
-    },
+use crate::create_dynamic_table;
+use crate::errors::CliError;
+use crate::utils::{
+    SHARED_TOKEN_DOCUMENTATION,
+    get_input_acc_id_by_prefix_or_default,
+    load_config_file,
+    load_faucet_details_map,
+    parse_account_id,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

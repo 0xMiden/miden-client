@@ -10,18 +10,24 @@
 //! [`Client::import_note()`].
 use alloc::string::ToString;
 
-use miden_objects::{
-    block::BlockNumber,
-    note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag},
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{
+    Note,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteTag,
 };
 use miden_tx::auth::TransactionAuthenticator;
 
-use crate::{
-    Client, ClientError,
-    rpc::{RpcError, domain::note::FetchedNote},
-    store::{InputNoteRecord, InputNoteState, input_note_states::ExpectedNoteState},
-    sync::NoteTagRecord,
-};
+use crate::rpc::RpcError;
+use crate::rpc::domain::note::FetchedNote;
+use crate::store::input_note_states::ExpectedNoteState;
+use crate::store::{InputNoteRecord, InputNoteState};
+use crate::sync::NoteTagRecord;
+use crate::{Client, ClientError};
 
 /// Note importing methods.
 impl<AUTH> Client<AUTH>

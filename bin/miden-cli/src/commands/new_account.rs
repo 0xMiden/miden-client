@@ -1,34 +1,31 @@
-use std::{
-    collections::BTreeMap,
-    fs::{self, File},
-    io::{Read, Write},
-    path::PathBuf,
-    vec,
-};
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::vec;
 
 use clap::{Parser, ValueEnum};
-use miden_client::{
-    Client,
-    account::{
-        Account, AccountBuilder, AccountStorageMode, AccountType,
-        component::COMPONENT_TEMPLATE_EXTENSION,
-    },
-    auth::{AuthSecretKey, TransactionAuthenticator},
-    crypto::SecretKey,
-    transaction::TransactionRequestBuilder,
-    utils::Deserializable,
-};
+use miden_client::Client;
+use miden_client::account::component::COMPONENT_TEMPLATE_EXTENSION;
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::{AuthSecretKey, TransactionAuthenticator};
+use miden_client::crypto::SecretKey;
+use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::utils::Deserializable;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_objects::account::{
-    AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
+    AccountComponent,
+    AccountComponentTemplate,
+    InitStorageData,
+    StorageValueName,
 };
 use rand::RngCore;
 use tracing::debug;
 
-use crate::{
-    CLIENT_BINARY_NAME, CliKeyStore, commands::account::maybe_set_default_account,
-    errors::CliError, utils::load_config_file,
-};
+use crate::commands::account::maybe_set_default_account;
+use crate::errors::CliError;
+use crate::utils::load_config_file;
+use crate::{CLIENT_BINARY_NAME, CliKeyStore};
 
 // CLI TYPES
 // ================================================================================================

@@ -1,22 +1,28 @@
-use std::{sync::Arc, vec};
+use std::sync::Arc;
+use std::vec;
 
-use miden_client::{
-    Felt, Word, ZERO,
-    account::{Account, AccountBuilder, AccountStorageMode, StorageSlot},
-    note::NoteTag,
-    testing::{
-        common::{
-            TestClient, create_test_client, execute_tx_and_sync, insert_new_wallet,
-            wait_for_blocks, wait_for_tx,
-        },
-        note::NoteBuilder,
-    },
-    transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageSlot};
+use miden_client::note::NoteTag;
+use miden_client::testing::common::{
+    TestClient,
+    create_test_client,
+    execute_tx_and_sync,
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_tx,
 };
+use miden_client::testing::note::NoteBuilder;
+use miden_client::transaction::{OutputNote, TransactionRequestBuilder, TransactionScript};
+use miden_client::{Felt, Word, ZERO};
 use miden_lib::transaction::TransactionKernel;
-use miden_objects::{
-    account::AccountComponent,
-    assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
+use miden_objects::account::AccountComponent;
+use miden_objects::assembly::{
+    Assembler,
+    DefaultSourceManager,
+    Library,
+    LibraryPath,
+    Module,
+    ModuleKind,
 };
 use rand::RngCore;
 

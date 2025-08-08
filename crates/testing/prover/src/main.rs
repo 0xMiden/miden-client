@@ -3,7 +3,8 @@ use miden_remote_prover::api::{ProofType, RpcListener};
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic_web::GrpcWebLayer;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{EnvFilter, Registry};
 
 const DEFAULT_PROVER_PORT: u16 = 50051;
 

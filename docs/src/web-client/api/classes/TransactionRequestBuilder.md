@@ -54,6 +54,22 @@
 
 ***
 
+### withAuthArg()
+
+> **withAuthArg**(`auth_arg`): `TransactionRequestBuilder`
+
+#### Parameters
+
+##### auth\_arg
+
+[`Word`](Word.md)
+
+#### Returns
+
+`TransactionRequestBuilder`
+
+***
+
 ### withAuthenticatedInputNotes()
 
 > **withAuthenticatedInputNotes**(`notes`): `TransactionRequestBuilder`
@@ -143,6 +159,22 @@
 ##### notes
 
 [`OutputNotesArray`](OutputNotesArray.md)
+
+#### Returns
+
+`TransactionRequestBuilder`
+
+***
+
+### withScriptArg()
+
+> **withScriptArg**(`script_arg`): `TransactionRequestBuilder`
+
+#### Parameters
+
+##### script\_arg
+
+[`Word`](Word.md)
 
 #### Returns
 
