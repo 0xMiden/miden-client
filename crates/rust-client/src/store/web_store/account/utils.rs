@@ -94,8 +94,8 @@ pub async fn insert_account_record(
         vault_root,
         nonce,
         committed,
-        account_seed,
         commitment,
+        account_seed,
     );
     JsFuture::from(promise).await?;
 

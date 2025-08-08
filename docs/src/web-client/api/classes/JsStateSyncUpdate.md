@@ -35,7 +35,7 @@ the ith block, with 1 meaning relevant and 0 meaning not relevant.
 > **blockNum**: `string`
 
 The block number for this update, stored as a string since it will be
-persisted in IndexedDB.
+persisted in `IndexedDB`.
 
 ***
 
@@ -68,7 +68,7 @@ verification.
 
 > **newBlockNums**: `string`[]
 
-The block numbers corresponding to each header in flattened_new_block_headers.
+The block numbers corresponding to each header in `flattened_new_block_headers`.
 This vec should have the same length as the number of headers, with each index
 representing the block number for the header at that same index.
 

@@ -57,8 +57,8 @@ extern "C" {
         vault_root: String,
         nonce: String,
         committed: bool,
-        account_seed: Option<Vec<u8>>,
         commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountAuth)]
