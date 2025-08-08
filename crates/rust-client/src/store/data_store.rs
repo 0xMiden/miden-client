@@ -42,8 +42,6 @@ impl DataStore for ClientDataStore {
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError> {
-        std::println!("about to execute ");
-
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
