@@ -23,17 +23,17 @@ version      = "0.11.0"
 [workspace.dependencies]
 # Miden dependencies
 miden-lib = { branch = "bernhard-merge-next-into-pgackst-async-exp", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-node-block-producer = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "bernhard-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "bernhard-async-experimental", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "igamigo-async-experimental", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "igamigo-async-experimental", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "igamigo-async-experimental", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "igamigo-async-experimental", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "igamigo-async-experimental", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "igamigo-async-experimental", git = "https://github.com/0xMiden/miden-node" }
 miden-objects = { branch = "bernhard-merge-next-into-pgackst-async-exp", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-remote-prover = { branch = "bernhard-async-experimental", features = [
+miden-remote-prover = { branch = "igamigo-async-experimental", features = [
   "concurrent",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "bernhard-async-experimental", default-features = false, features = [
+miden-remote-prover-client = { branch = "igamigo-async-experimental", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-testing = { branch = "bernhard-merge-next-into-pgackst-async-exp", default-features = false, features = [

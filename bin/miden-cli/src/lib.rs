@@ -134,7 +134,9 @@ impl Cli {
         match &self.action {
             Command::Account(account) => account.execute(client).await,
             Command::NewWallet(new_wallet) => Box::pin(new_wallet.execute(client, keystore)).await,
-            Command::NewAccount(new_account) => Box::pin(new_account.execute(client, keystore)).await,
+            Command::NewAccount(new_account) => {
+                Box::pin(new_account.execute(client, keystore)).await
+            },
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) => Ok(()),
             Command::Info => info::print_client_info(&client).await,

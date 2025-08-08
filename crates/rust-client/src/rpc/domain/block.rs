@@ -1,4 +1,3 @@
-use miden_objects::account::AccountId;
 use miden_objects::block::{BlockHeader, FeeParameters};
 
 use crate::rpc::domain::MissingFieldHelper;
@@ -22,21 +21,29 @@ impl From<&BlockHeader> for proto::blockchain::BlockHeader {
             tx_kernel_commitment: Some(header.tx_kernel_commitment().into()),
             proof_commitment: Some(header.proof_commitment().into()),
             timestamp: header.timestamp(),
+            fee_parameters: Some(header.fee_parameters().into()),
         }
+    }
+}
+
+impl From<&FeeParameters> for proto::blockchain::FeeParameters {
+    fn from(fee_params: &FeeParameters) -> Self {
+        Self {
+            native_asset_account_id: Some(fee_params.native_asset_id().into()),
+            base_fee: fee_params.verification_base_fee(),
+        }
+    }
+}
+
+impl From<FeeParameters> for proto::blockchain::FeeParameters {
+    fn from(fee_params: FeeParameters) -> Self {
+        (&fee_params).into()
     }
 }
 
 impl From<BlockHeader> for proto::blockchain::BlockHeader {
     fn from(header: BlockHeader) -> Self {
         (&header).into()
-    }
-}
-
-impl TryFrom<&proto::blockchain::BlockHeader> for BlockHeader {
-    type Error = RpcConversionError;
-
-    fn try_from(value: &proto::blockchain::BlockHeader) -> Result<Self, Self::Error> {
-        (*value).try_into()
     }
 }
 
@@ -83,9 +90,34 @@ impl TryFrom<proto::blockchain::BlockHeader> for BlockHeader {
                 .proof_commitment
                 .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(proof_commitment)))?
                 .try_into()?,
-            FeeParameters::new(AccountId::from_hex("0x6052cac009b295a0371032d9ab096a").unwrap(), 0)
-                .unwrap(),
+            value
+                .fee_parameters
+                .ok_or(proto::blockchain::BlockHeader::missing_field(stringify!(fee_parameters)))?
+                .try_into()?,
             value.timestamp,
         ))
+    }
+}
+
+impl TryFrom<&proto::blockchain::FeeParameters> for FeeParameters {
+    type Error = RpcConversionError;
+
+    fn try_from(value: &proto::blockchain::FeeParameters) -> Result<Self, Self::Error> {
+        let account_id = value
+            .native_asset_account_id
+            .clone()
+            .ok_or(proto::blockchain::FeeParameters::missing_field("account_id"))?
+            .try_into()?;
+
+        Ok(FeeParameters::new(account_id, value.base_fee)
+            .map_err(|_err| RpcConversionError::InvalidField(stringify!(FeeParameter).into()))?)
+    }
+}
+
+impl TryFrom<proto::blockchain::FeeParameters> for FeeParameters {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::blockchain::FeeParameters) -> Result<Self, Self::Error> {
+        FeeParameters::try_from(&value)
     }
 }

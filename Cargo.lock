@@ -2315,7 +2315,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "futures",
@@ -2343,7 +2343,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "futures",
@@ -2364,7 +2364,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "hex",
@@ -2383,7 +2383,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "prost",
@@ -2394,7 +2394,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "futures",
@@ -2421,7 +2421,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -2452,7 +2452,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "figment",
@@ -2529,7 +2529,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2572,7 +2572,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",

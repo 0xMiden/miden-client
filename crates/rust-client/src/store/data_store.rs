@@ -34,14 +34,18 @@ impl ClientDataStore {
     pub fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.transaction_mast_store.clone()
     }
+}
 
-    async fn get_transaction_inputs_inner(
+impl DataStore for ClientDataStore {
+    async fn get_transaction_inputs(
         &self,
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError> {
+        std::println!("about to execute ");
+
         // Pop last block, used as reference (it does not need to be authenticated manually)
-        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("Block set is empty"))?;
+        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
         // Construct Account
         let account_record = self
@@ -79,18 +83,6 @@ impl ClientDataStore {
                 )
             })?;
         Ok((account, seed, block_header, partial_blockchain))
-    }
-}
-
-impl DataStore for ClientDataStore {
-    fn get_transaction_inputs(
-        &self,
-        account_id: AccountId,
-        block_refs: BTreeSet<BlockNumber>,
-    ) -> impl Future<
-        Output = Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError>,
-    > {
-        self.get_transaction_inputs_inner(account_id, block_refs)
     }
 }
 

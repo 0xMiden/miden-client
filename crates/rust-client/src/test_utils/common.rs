@@ -218,7 +218,10 @@ pub async fn execute_failing_tx(
     println!("Executing transaction...");
     // We compare string since we can't compare the error directly
     assert_eq!(
-        Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap_err().to_string(),
+        Box::pin(client.new_transaction(account_id, tx_request))
+            .await
+            .unwrap_err()
+            .to_string(),
         expected_error.to_string()
     );
 }

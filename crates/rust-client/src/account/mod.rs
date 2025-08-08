@@ -318,7 +318,6 @@ pub fn build_wallet_id(
 #[cfg(test)]
 pub mod tests {
     use alloc::boxed::Box;
-
     use alloc::vec::Vec;
 
     use miden_lib::account::auth::AuthRpoFalcon512;

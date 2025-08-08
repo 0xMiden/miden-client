@@ -174,14 +174,16 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
     mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
     mock_chain.prove_next_block().unwrap();
 
-    let transaction = Box::pin(mock_chain
-        .build_tx_context(mock_account, &[note_second.id()], &[])
-        .unwrap()
-        .build()
-        .unwrap()
-        .execute())
-        .await
-        .unwrap();
+    let transaction = Box::pin(
+        mock_chain
+            .build_tx_context(mock_account, &[note_second.id()], &[])
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
 
     // Block 5: Consume (nullify) second note
     mock_chain.add_pending_executed_transaction(&transaction).unwrap();
@@ -660,7 +662,9 @@ async fn mint_transaction() {
         )
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request)).await.unwrap();
+    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+        .await
+        .unwrap();
 
     assert_eq!(transaction.executed_transaction().account_delta().nonce_delta(), ONE);
 }
@@ -728,7 +732,9 @@ async fn transaction_request_expiration() {
         )
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request)).await.unwrap();
+    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+        .await
+        .unwrap();
 
     let (_, tx_outputs, ..) = transaction.executed_transaction().clone().into_parts();
 
@@ -761,8 +767,9 @@ async fn import_processing_note_returns_error() {
         )
         .unwrap();
 
-    let transaction =
-        Box::pin(client.new_transaction(faucet.id(), transaction_request.clone())).await.unwrap();
+    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request.clone()))
+        .await
+        .unwrap();
     Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
@@ -773,8 +780,7 @@ async fn import_processing_note_returns_error() {
         .unauthenticated_input_notes(input)
         .build()
         .unwrap();
-    let transaction = Box::pin(client
-        .new_transaction(account.id(), consume_note_request.clone()))
+    let transaction = Box::pin(client.new_transaction(account.id(), consume_note_request.clone()))
         .await
         .unwrap();
     Box::pin(client.submit_transaction(transaction.clone())).await.unwrap();
@@ -822,7 +828,8 @@ async fn note_without_asset() {
         .build()
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(wallet.id(), transaction_request.clone())).await;
+    let transaction =
+        Box::pin(client.new_transaction(wallet.id(), transaction_request.clone())).await;
 
     assert!(transaction.is_ok());
 
@@ -837,7 +844,9 @@ async fn note_without_asset() {
         .build()
         .unwrap();
 
-    let error = Box::pin(client.new_transaction(faucet.id(), transaction_request)).await.unwrap_err();
+    let error = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+        .await
+        .unwrap_err();
 
     assert!(matches!(
         error,
@@ -894,10 +903,14 @@ async fn execute_program() {
 
     let tx_script = client.script_builder().compile_tx_script(code).unwrap();
 
-    let output_stack = Box::pin(client
-        .execute_program(wallet.id(), tx_script, AdviceInputs::default(), BTreeSet::new()))
-        .await
-        .unwrap();
+    let output_stack = Box::pin(client.execute_program(
+        wallet.id(),
+        tx_script,
+        AdviceInputs::default(),
+        BTreeSet::new(),
+    ))
+    .await
+    .unwrap();
 
     let mut expected_stack = [Felt::new(0); 16];
     for (i, element) in expected_stack.iter_mut().enumerate() {
@@ -932,7 +945,9 @@ async fn real_note_roundtrip() {
         .unwrap();
 
     let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request)).await.unwrap();
+    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+        .await
+        .unwrap();
     Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
@@ -948,7 +963,9 @@ async fn real_note_roundtrip() {
     let transaction_request =
         TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
 
-    let transaction = Box::pin(client.new_transaction(wallet.id(), transaction_request)).await.unwrap();
+    let transaction = Box::pin(client.new_transaction(wallet.id(), transaction_request))
+        .await
+        .unwrap();
     Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     mock_rpc_api.prove_block();
@@ -1319,7 +1336,8 @@ async fn p2ide_transfer_consumed_by_sender() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    let transaction_execution_result = Box::pin(client.new_transaction(from_account_id, tx_request)).await;
+    let transaction_execution_result =
+        Box::pin(client.new_transaction(from_account_id, tx_request)).await;
     assert!(transaction_execution_result.is_err_and(|err| {
         matches!(
             err,
@@ -1457,8 +1475,18 @@ async fn get_consumable_notes() {
 
     // Check that note is consumable by the account that minted
     assert!(!Box::pin(client.get_consumable_notes(None)).await.unwrap().is_empty());
-    assert!(!Box::pin(client.get_consumable_notes(Some(from_account_id))).await.unwrap().is_empty());
-    assert!(Box::pin(client.get_consumable_notes(Some(to_account_id))).await.unwrap().is_empty());
+    assert!(
+        !Box::pin(client.get_consumable_notes(Some(from_account_id)))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        Box::pin(client.get_consumable_notes(Some(to_account_id)))
+            .await
+            .unwrap()
+            .is_empty()
+    );
 
     consume_notes(&mut client, from_account_id, &[note]).await;
     mock_rpc_api.prove_block();
@@ -1490,8 +1518,18 @@ async fn get_consumable_notes() {
     let consumable_notes = Box::pin(client.get_consumable_notes(None)).await.unwrap();
     let relevant_accounts = &consumable_notes.first().unwrap().1;
     assert_eq!(relevant_accounts.len(), 2);
-    assert!(!Box::pin(client.get_consumable_notes(Some(from_account_id))).await.unwrap().is_empty());
-    assert!(!Box::pin(client.get_consumable_notes(Some(to_account_id))).await.unwrap().is_empty());
+    assert!(
+        !Box::pin(client.get_consumable_notes(Some(from_account_id)))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        !Box::pin(client.get_consumable_notes(Some(to_account_id)))
+            .await
+            .unwrap()
+            .is_empty()
+    );
 
     // Check that the note is only consumable after block 100 for the account that sent the
     // transaction
@@ -1839,7 +1877,9 @@ async fn input_note_checks() {
     let consumed_note_tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![mint_notes[0].id()])
         .unwrap();
-    let error = Box::pin(client.new_transaction(wallet.id(), consumed_note_tx_request)).await.unwrap_err();
+    let error = Box::pin(client.new_transaction(wallet.id(), consumed_note_tx_request))
+        .await
+        .unwrap_err();
 
     assert!(matches!(
         error,
@@ -1851,10 +1891,10 @@ async fn input_note_checks() {
     let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![EMPTY_WORD.into()])
         .unwrap();
-    let error = Box::pin(client
-        .new_transaction(wallet.id(), missing_authenticated_note_tx_request))
-        .await
-        .unwrap_err();
+    let error =
+        Box::pin(client.new_transaction(wallet.id(), missing_authenticated_note_tx_request))
+            .await
+            .unwrap_err();
 
     assert!(matches!(
         error,
