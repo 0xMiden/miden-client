@@ -12,9 +12,10 @@ use miden_client::testing::common::{
     wait_for_tx,
 };
 use miden_client::testing::note::NoteBuilder;
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder, TransactionScript};
+use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 use miden_lib::transaction::TransactionKernel;
+use miden_lib::utils::ScriptBuilder;
 use miden_objects::account::AccountComponent;
 use miden_objects::assembly::{
     Assembler,
@@ -73,15 +74,16 @@ async fn deploy_counter_contract(
 
     client.add_account(&acc, Some(seed), false).await.unwrap();
 
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
-    let tx_script = TransactionScript::compile(
-        "use.external_contract::counter_contract
+    let mut script_builder = ScriptBuilder::new(true);
+    script_builder.link_dynamic_library(&library);
+    let tx_script = script_builder
+        .compile_tx_script(
+            "use.external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end",
-        assembler.with_dynamic_library(&library).unwrap(),
-    )
-    .unwrap();
+        )
+        .unwrap();
 
     // Build a transaction request with the custom script
     let tx_increment_request =

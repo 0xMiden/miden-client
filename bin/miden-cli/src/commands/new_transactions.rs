@@ -2,6 +2,7 @@ use std::io;
 use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
+use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
@@ -23,7 +24,6 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionResult,
 };
-use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
 use crate::create_dynamic_table;

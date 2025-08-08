@@ -6,7 +6,6 @@ use core::fmt;
 use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
-use miden_objects::assembly::DefaultSourceManager;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::transaction::{InputNote, InputNotes};
 use miden_objects::{AccountError, AssetError};
@@ -144,7 +143,7 @@ where
                 tx_args,
             )
             .await?;
-        if note_execution_check.successful.len() > 0 {
+        if !note_execution_check.successful.is_empty() {
             return Ok(Some(NoteRelevance::Now));
         }
 

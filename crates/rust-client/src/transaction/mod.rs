@@ -83,7 +83,6 @@ use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::{AccountInputs, TransactionArgs, TransactionWitness};
 use miden_objects::{AssetError, Felt, Word};
-use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -1055,7 +1054,7 @@ where
                 )
                 .await?;
 
-            if execution.failed.len() > 0 {
+            if !execution.failed.is_empty() {
                 let failed_note_ids: BTreeSet<NoteId> =
                     execution.failed.iter().map(|n| n.note.id()).collect();
                 let filtered_input_notes = InputNotes::new(

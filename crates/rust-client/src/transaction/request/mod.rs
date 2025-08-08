@@ -6,7 +6,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
