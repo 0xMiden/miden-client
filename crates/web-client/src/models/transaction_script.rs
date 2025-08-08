@@ -17,7 +17,8 @@ impl TransactionScript {
     }
 
     pub fn compile(script_code: &str, assembler: &Assembler) -> Result<TransactionScript, JsValue> {
-        let native_tx_script = ScriptBuilder::new(true).compile_tx_script(script_code)
+        let native_tx_script = ScriptBuilder::new(true)
+            .compile_tx_script(script_code)
             .map_err(|err| js_error_with_context(err, "failed to compile transaction script"))?;
 
         Ok(TransactionScript(native_tx_script))

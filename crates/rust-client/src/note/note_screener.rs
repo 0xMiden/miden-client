@@ -11,10 +11,7 @@ use miden_objects::note::{Note, NoteId};
 use miden_objects::transaction::{InputNote, InputNotes};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{
-    NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
-    auth::TransactionAuthenticator,
-};
+use miden_tx::{NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError};
 use thiserror::Error;
 use tonic::async_trait;
 
@@ -139,16 +136,15 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
-        let note_execution_check =consumption_checker
-        .check_notes_consumability(
-            account.id(),
-            self.store.get_sync_height().await?,
-            input_notes,
-            tx_args,
-        )
-        .await?;
-        if note_execution_check.successful.len()>0
-        {
+        let note_execution_check = consumption_checker
+            .check_notes_consumability(
+                account.id(),
+                self.store.get_sync_height().await?,
+                input_notes,
+                tx_args,
+            )
+            .await?;
+        if note_execution_check.successful.len() > 0 {
             return Ok(Some(NoteRelevance::Now));
         }
 

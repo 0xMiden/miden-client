@@ -5,18 +5,21 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_lib::{
-    account::interface::{AccountInterface, AccountInterfaceError},
-    transaction::TransactionKernel, utils::{ScriptBuilder, ScriptBuilderError},
+use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
+use miden_lib::transaction::TransactionKernel;
+use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
+use miden_objects::account::AccountId;
+use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_objects::transaction::{
+    AccountInputs,
+    InputNote,
+    InputNotes,
+    TransactionArgs,
+    TransactionScript,
 };
-use miden_objects::{
-    AccountError, NoteError, TransactionInputError, TransactionScriptError, Word,
-    account::AccountId,
-    crypto::merkle::{MerkleError, MerkleStore},
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote},
-    transaction::{AccountInputs, InputNote, InputNotes, TransactionArgs, TransactionScript},
-    vm::AdviceMap,
-};
+use miden_objects::vm::AdviceMap;
+use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
 
@@ -319,8 +322,7 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
-                let empty_script =
-                    ScriptBuilder::new(true).compile_tx_script("begin nop end")?;
+                let empty_script = ScriptBuilder::new(true).compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },

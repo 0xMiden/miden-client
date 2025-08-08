@@ -3,14 +3,16 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::{
-    account::{AccountId, PartialAccount, PartialStorage, PartialStorageMap},
-    asset::PartialVault,
-    crypto::merkle::PartialSmt,
-    transaction::AccountInputs,
-};
+use miden_objects::account::{AccountId, PartialAccount, PartialStorage, PartialStorageMap};
+use miden_objects::asset::PartialVault;
+use miden_objects::crypto::merkle::PartialSmt;
+use miden_objects::transaction::AccountInputs;
 use miden_tx::utils::{
-    ByteWriter, Deserializable, DeserializationError, Serializable, SliceReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+    SliceReader,
 };
 
 use super::TransactionRequestError;

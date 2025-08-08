@@ -69,29 +69,23 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::ToString,
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt::{self};
-use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 
-use miden_objects::{
-    AssetError, Felt, Word,
-    account::{Account, AccountCode, AccountDelta, AccountId},
-    assembly::DefaultSourceManager,
-    asset::{Asset, NonFungibleAsset},
-    block::BlockNumber,
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag},
-    transaction::{AccountInputs, TransactionArgs, TransactionWitness},
-};
-use miden_tx::{
-    DataStore, NoteConsumptionChecker, TransactionExecutor,
-    utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
-};
+use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::assembly::DefaultSourceManager;
+use miden_objects::asset::{Asset, NonFungibleAsset};
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
+use miden_objects::transaction::{AccountInputs, TransactionArgs, TransactionWitness};
+use miden_objects::{AssetError, Felt, Word};
+use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
+use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
@@ -130,8 +124,11 @@ pub use miden_objects::transaction::{
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
-    TransactionProverError, auth::TransactionAuthenticator,
+    DataStoreError,
+    LocalTransactionProver,
+    ProvingOptions,
+    TransactionExecutorError,
+    TransactionProverError,
 };
 pub use request::{
     ForeignAccount,
@@ -1058,10 +1055,14 @@ where
                 )
                 .await?;
 
-            if execution.failed.len()>0 {
-                let failed_note_ids:BTreeSet<NoteId> = execution.failed.iter().map(|n| n.note.id()).collect();
+            if execution.failed.len() > 0 {
+                let failed_note_ids: BTreeSet<NoteId> =
+                    execution.failed.iter().map(|n| n.note.id()).collect();
                 let filtered_input_notes = InputNotes::new(
-                    input_notes.into_iter().filter(|note| !failed_note_ids.contains(&note.id())).collect(),
+                    input_notes
+                        .into_iter()
+                        .filter(|note| !failed_note_ids.contains(&note.id()))
+                        .collect(),
                 )
                 .expect("Created from a valid input notes list");
 
