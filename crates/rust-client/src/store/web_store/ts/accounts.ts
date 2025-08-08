@@ -122,15 +122,12 @@ export async function getAccountHeader(accountId: string) {
       return null;
     }
 
-    let accountSeedBase64 = null;
+    let accountSeedBase64: string | null = null;
 
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      const seedAsBytes = new Uint8Array(
-        Object.values(mostRecentRecord.accountSeed)
-      );
-      if (seedAsBytes.length > 0) {
-        accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
+      if (mostRecentRecord.accountSeed.length > 0) {
+        accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
       }
     }
     const AccountHeader = {
