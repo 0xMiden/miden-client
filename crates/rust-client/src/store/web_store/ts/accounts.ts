@@ -5,6 +5,7 @@ import {
   accountAuths,
   accounts,
   foreignAccountCode,
+  IAccount,
 } from "./schema.js";
 
 // GET FUNCTIONS
@@ -178,11 +179,7 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
 
     let accountSeedBase64 = null;
     if (matchingRecord.accountSeed) {
-      // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      let accountSeedArrayBuffer =
-        await matchingRecord.accountSeed.arrayBuffer();
-      let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-      accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+      accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
     }
     const AccountHeader = {
       id: matchingRecord.id,
@@ -400,12 +397,11 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
 export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
     // Create a Blob from the ArrayBuffer
-    const codeBlob = new Uint8Array(code);
 
     // Prepare the data object to insert
     const data = {
       root: codeRoot, // Using codeRoot as the key
-      code: codeBlob,
+      code,
     };
 
     // Perform the insert using Dexie
@@ -498,7 +494,7 @@ export async function insertAccountRecord(
   nonce: string,
   committed: boolean,
   commitment: string,
-  accountSeed?: Uint8Array
+  accountSeed: Uint8Array | undefined
 ) {
   try {
     const data = {
@@ -513,7 +509,7 @@ export async function insertAccountRecord(
       locked: false,
     };
 
-    await accounts.add(data);
+    await accounts.add(data as IAccount);
   } catch (error: unknown) {
     // Add unknown type
     if (error instanceof Error) {
@@ -612,9 +608,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
         }
 
         // Convert the code Blob to an ArrayBuffer
-        const codeArrayBuffer = await matchingCode.code.arrayBuffer();
-        const codeArray = new Uint8Array(codeArrayBuffer);
-        const codeBase64 = uint8ArrayToBase64(codeArray);
+        const codeBase64 = uint8ArrayToBase64(matchingCode.code);
 
         return {
           accountId: foreignAccount.accountId,
