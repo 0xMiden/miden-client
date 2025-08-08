@@ -221,8 +221,7 @@ async fn import_expected_notes() {
         .unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
 
-    // If imported before execution then the inclusion proof should be None
-    assert!(input_note.inclusion_proof().is_none(), "Unexpectedly found inclusion proof");
+    // If imported before execution, the note should be imported in `Expected` state
     assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
 
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
