@@ -223,8 +223,7 @@ export async function getAccountCode(codeRoot: string) {
     }
 
     // Convert the code Blob to an ArrayBuffer
-    const codeArray = new Uint8Array(Object.values(codeRecord.code));
-    const codeBase64 = uint8ArrayToBase64(codeArray);
+    const codeBase64 = uint8ArrayToBase64(codeRecord.code);
     return {
       root: codeRecord.root,
       code: codeBase64,
@@ -604,7 +603,6 @@ export async function getForeignAccountCode(accountIds: string[]) {
           return undefined;
         }
 
-        // Convert the code Blob to an ArrayBuffer
         const codeBase64 = uint8ArrayToBase64(matchingCode.code);
 
         return {
