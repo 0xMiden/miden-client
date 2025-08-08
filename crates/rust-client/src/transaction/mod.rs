@@ -1277,6 +1277,8 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
+    use alloc::boxed::Box;
+
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::transaction::TransactionKernel;
     use miden_objects::Word;
@@ -1304,7 +1306,7 @@ mod test {
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {
-        let (mut client, _, keystore) = create_test_client().await;
+        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
         let asset_1: Asset =
             FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
                 .unwrap()
@@ -1347,7 +1349,7 @@ mod test {
             )
             .unwrap();
 
-        let tx_result = client.new_transaction(account.id(), tx_request).await.unwrap();
+        let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
         assert!(
             tx_result
                 .created_notes()
@@ -1356,7 +1358,7 @@ mod test {
                 .is_some_and(|assets| assets.num_assets() == 2)
         );
         // Prove and apply transaction
-        client.testing_apply_transaction(tx_result.clone()).await.unwrap();
+        Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
 
         // Test serialization
         let bytes: std::vec::Vec<u8> = tx_result.to_bytes();

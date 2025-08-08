@@ -133,21 +133,21 @@ impl Cli {
         // Execute CLI command
         match &self.action {
             Command::Account(account) => account.execute(client).await,
-            Command::NewWallet(new_wallet) => new_wallet.execute(client, keystore).await,
-            Command::NewAccount(new_account) => new_account.execute(client, keystore).await,
+            Command::NewWallet(new_wallet) => Box::pin(new_wallet.execute(client, keystore)).await,
+            Command::NewAccount(new_account) => Box::pin(new_account.execute(client, keystore)).await,
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) => Ok(()),
             Command::Info => info::print_client_info(&client).await,
-            Command::Notes(notes) => notes.execute(client).await,
+            Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
-            Command::Exec(execute_program) => execute_program.execute(client).await,
+            Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,
-            Command::Mint(mint) => mint.execute(client).await,
-            Command::Send(send) => send.execute(client).await,
-            Command::Swap(swap) => swap.execute(client).await,
-            Command::ConsumeNotes(consume_notes) => consume_notes.execute(client).await,
+            Command::Mint(mint) => Box::pin(mint.execute(client)).await,
+            Command::Send(send) => Box::pin(send.execute(client)).await,
+            Command::Swap(swap) => Box::pin(swap.execute(client)).await,
+            Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }
     }
 }

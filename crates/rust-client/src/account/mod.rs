@@ -317,6 +317,8 @@ pub fn build_wallet_id(
 
 #[cfg(test)]
 pub mod tests {
+    use alloc::boxed::Box;
+
     use alloc::vec::Vec;
 
     use miden_lib::account::auth::AuthRpoFalcon512;
@@ -360,7 +362,7 @@ pub mod tests {
     #[tokio::test]
     pub async fn try_add_account() {
         // generate test client
-        let (mut client, _rpc_api, _) = create_test_client().await;
+        let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
         let account = Account::mock(
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -376,7 +378,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_accounts_test() {
         // generate test client
-        let (mut client, ..) = create_test_client().await;
+        let (mut client, ..) = Box::pin(create_test_client()).await;
 
         let created_accounts_data = create_initial_accounts_data();
 
