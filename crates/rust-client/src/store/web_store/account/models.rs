@@ -36,7 +36,7 @@ pub struct AccountVaultIdxdbObject {
     pub assets: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountRecordIdxdbObject {
     pub id: String,

@@ -72,10 +72,8 @@ impl WebStore {
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account headers: {js_error:?}",))
         })?;
-
         let account_headers_idxdb: Vec<AccountRecordIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
-
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
             .into_iter()
             .map(parse_account_record_idxdb_object)
@@ -167,7 +165,6 @@ impl WebStore {
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account code: {js_error:?}",))
         })?;
-
         let account_code_idxdb: AccountCodeIdxdbObject = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
