@@ -25,8 +25,8 @@ impl WebClient {
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionResult, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let native_transaction_execution_result: NativeTransactionResult = client
-                .new_transaction(account_id.into(), transaction_request.into())
+            let native_transaction_execution_result: NativeTransactionResult = Box::pin(client
+                .new_transaction(account_id.into(), transaction_request.into()))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to create new transaction"))?;
 
@@ -47,15 +47,15 @@ impl WebClient {
         if let Some(client) = self.get_mut_inner() {
             match prover {
                 Some(p) => {
-                    client
-                        .submit_transaction_with_prover(native_transaction_result, p.get_prover())
+                    Box::pin(client
+                        .submit_transaction_with_prover(native_transaction_result, p.get_prover()))
                         .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to submit transaction with prover")
                         })?;
                 },
                 None => {
-                    client.submit_transaction(native_transaction_result).await.map_err(|err| {
+                    Box::pin(client.submit_transaction(native_transaction_result)).await.map_err(|err| {
                         js_error_with_context(err, "failed to submit transaction")
                     })?;
                 },
