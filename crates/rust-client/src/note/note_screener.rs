@@ -10,7 +10,7 @@ use miden_objects::{
     transaction::{InputNote, InputNotes},
 };
 use miden_tx::{
-    NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
+    NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError,
     auth::TransactionAuthenticator,
 };
 use thiserror::Error;
@@ -139,16 +139,15 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
-
-        if let NoteAccountExecution::Success = consumption_checker
-            .check_notes_consumability(
-                account.id(),
-                self.store.get_sync_height().await?,
-                input_notes,
-                tx_args,
-                Arc::new(DefaultSourceManager::default()),
-            )
-            .await?
+        let note_execution_check =consumption_checker
+        .check_notes_consumability(
+            account.id(),
+            self.store.get_sync_height().await?,
+            input_notes,
+            tx_args,
+        )
+        .await?;
+        if note_execution_check.successful.len()>0
         {
             return Ok(Some(NoteRelevance::Now));
         }

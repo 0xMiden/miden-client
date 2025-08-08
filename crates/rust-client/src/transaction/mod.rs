@@ -85,7 +85,7 @@ use miden_objects::{
     transaction::{AccountInputs, TransactionArgs, TransactionWitness},
 };
 use miden_tx::{
-    DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor,
+    DataStore, NoteConsumptionChecker, TransactionExecutor,
     utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable},
 };
 use tracing::info;
@@ -806,6 +806,7 @@ where
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         for note in notes_from_output(executed_tx.output_notes()) {
+            // TODO: check_relevance() should have the option to take multiple notes
             let account_relevance = note_screener.check_relevance(note).await?;
             if !account_relevance.is_empty() {
                 let metadata = *note.metadata();
@@ -1037,13 +1038,13 @@ where
                     self.store.get_sync_height().await?,
                     input_notes.clone(),
                     tx_args.clone(),
-                    Arc::new(DefaultSourceManager::default()),
                 )
                 .await?;
 
-            if let NoteAccountExecution::Failure { failed_note_id, .. } = execution {
+            if execution.failed.len()>0 {
+                let failed_note_ids:BTreeSet<NoteId> = execution.failed.iter().map(|n| n.note.id()).collect();
                 let filtered_input_notes = InputNotes::new(
-                    input_notes.into_iter().filter(|note| note.id() != failed_note_id).collect(),
+                    input_notes.into_iter().filter(|note| !failed_note_ids.contains(&note.id())).collect(),
                 )
                 .expect("Created from a valid input notes list");
 

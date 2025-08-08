@@ -36,7 +36,7 @@ miden-remote-prover = { branch = "bernhard-async-experimental", features = [
 miden-remote-prover-client = { branch = "bernhard-async-experimental", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { branch = "bernhard-async-experimental", default-features = false, features = [
+miden-testing = { branch = "bernhard-merge-next-into-pgackst-async-exp", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
 miden-tx = { branch = "bernhard-merge-next-into-pgackst-async-exp", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
