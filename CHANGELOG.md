@@ -26,7 +26,8 @@
 * [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
 * Added authentication arguments support to `TransactionRequest` ([#1121](https://github.com/0xMiden/miden-client/pull/1121)).
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
-  
+* Added `multicall` support for the CLI (#TBD)
+
 ## 0.10.1 (2025-07-26)
 
 * Avoid passing unneeded nodes to `PartialMmr::from_parts` (#1081).
