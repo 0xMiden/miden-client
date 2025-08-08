@@ -8,13 +8,16 @@ use std::rc::Rc;
 use miden_objects::account::{
     Account,
     AccountCode,
+    AccountDelta,
     AccountHeader,
     AccountId,
+    AccountIdPrefix,
     AccountStorage,
+    NonFungibleDeltaAction,
     StorageMap,
     StorageSlot,
 };
-use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
@@ -96,14 +99,17 @@ impl SqliteStore {
         };
 
         let assets = query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])?;
-
         let vault = AssetVault::new(&assets)?;
 
-        let storage = AccountStorage::new(query_storage_slots(
+        let slots = query_storage_slots(
             conn,
             "commitment = ?",
             params![header.storage_commitment().to_hex()],
-        )?)?;
+        )?
+        .into_values()
+        .collect();
+
+        let storage = AccountStorage::new(slots)?;
 
         let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
             return Ok(None);
@@ -126,7 +132,7 @@ impl SqliteStore {
         Self::insert_storage_slots(
             &tx,
             account.storage().commitment(),
-            account.storage().slots().iter(),
+            account.storage().slots().iter().enumerate(),
         )?;
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
@@ -226,7 +232,7 @@ impl SqliteStore {
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().commitment(),
-            new_account_state.storage().slots().iter(),
+            new_account_state.storage().slots().iter().enumerate(),
         )?;
         Self::insert_assets(
             tx,
@@ -234,6 +240,227 @@ impl SqliteStore {
             new_account_state.vault().assets(),
         )?;
         Self::insert_account_header(tx, &new_account_state.into(), None)
+    }
+
+    /// Fetches the relevant fungible assets that will be updated by the account delta.
+    pub(super) fn relevant_fungible_assets(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
+        let fungible_faucet_prefixes = delta
+            .vault()
+            .fungible()
+            .iter()
+            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
+            .collect::<Vec<Value>>();
+
+        Ok(query_vault_assets(
+                    conn,
+                    "root = ? AND faucet_id_prefix IN rarray(?)",
+                    params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
+                )?
+                .into_iter()
+                // SAFETY: all retrieved assets should be fungible
+                .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
+                .collect())
+    }
+
+    /// Fetches the relevant storage maps that will be updated by the account delta.
+    pub(super) fn relevant_storage_maps(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<u8, StorageMap>, StoreError> {
+        let updated_map_indexes = delta
+            .storage()
+            .maps()
+            .keys()
+            .map(|k| Value::Integer(i64::from(*k)))
+            .collect::<Vec<Value>>();
+
+        query_storage_slots(
+            conn,
+            "commitment = ? AND slot_index IN rarray(?)",
+            params![header.storage_commitment().to_hex(), Rc::new(updated_map_indexes)],
+        )?
+        .into_iter()
+        .map(|(index, slot)| {
+            let StorageSlot::Map(map) = slot else {
+                return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+            };
+
+            Ok((index, map))
+        })
+        .collect()
+    }
+
+    /// Inserts the new `final_account_header` to the store and copies over the previous account
+    /// state (vault and storage). This isn't meant to be the whole account update, just the first
+    /// step. The account delta should then be applied to the copied data.
+    fn copy_account_state(
+        tx: &Transaction<'_>,
+        init_account_header: &AccountHeader,
+        final_account_header: &AccountHeader,
+    ) -> Result<(), StoreError> {
+        Self::insert_account_header(tx, final_account_header, None)?;
+
+        if init_account_header.vault_root() != final_account_header.vault_root() {
+            const VAULT_QUERY: &str = "
+                INSERT OR IGNORE INTO account_vaults (
+                    root,
+                    faucet_id_prefix,
+                    asset
+                )
+                SELECT
+                    ?, --new root
+                    faucet_id_prefix,
+                    asset
+                FROM account_vaults
+                WHERE root = (SELECT vault_root FROM accounts WHERE account_commitment = ?)
+                ";
+            tx.execute(
+                VAULT_QUERY,
+                params![
+                    final_account_header.vault_root().to_hex(),
+                    init_account_header.commitment().to_hex()
+                ],
+            )?;
+        }
+
+        if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
+            const STORAGE_QUERY: &str = "
+                INSERT OR IGNORE INTO account_storage (
+                    commitment,
+                    slot_index,
+                    slot_value
+                )
+                SELECT
+                    ?, -- new commitment
+                    slot_index,
+                    slot_value
+                FROM account_storage
+                WHERE commitment = (SELECT storage_commitment FROM accounts WHERE account_commitment = ?)
+                ";
+
+            tx.execute(
+                STORAGE_QUERY,
+                params![
+                    final_account_header.storage_commitment().to_hex(),
+                    init_account_header.commitment().to_hex()
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Applies the account delta to the account state, updating the vault and storage maps.
+    ///
+    /// This function needs to receive the previously fetched fungible assets and storage maps that
+    /// will be updated by the delta.
+    pub(super) fn apply_account_delta(
+        tx: &Transaction<'_>,
+        init_account_state: &AccountHeader,
+        final_account_state: &AccountHeader,
+        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        mut updated_storage_maps: BTreeMap<u8, StorageMap>,
+        delta: &AccountDelta,
+    ) -> Result<(), StoreError> {
+        // Copy over the storage and vault from the previous state. Non-relevant data will not be
+        // modified.
+        Self::copy_account_state(tx, init_account_state, final_account_state)?;
+
+        // Apply vault delta. This map will contain all updated assets, both fungible and
+        // non-fungible.
+        let mut updated_assets: BTreeMap<AccountIdPrefix, Asset> = BTreeMap::new();
+
+        // We first process the fungible assets. Adding or subtracting them from the vault as
+        // requested.
+        for (faucet_id, delta) in delta.vault().fungible().iter() {
+            let delta_asset = FungibleAsset::new(*faucet_id, delta.unsigned_abs())?;
+
+            match updated_fungible_assets.remove(&faucet_id.prefix()) {
+                Some(mut asset) => {
+                    // If the asset exists, update it accordingly.
+                    if *delta >= 0 {
+                        updated_assets
+                            .insert(faucet_id.prefix(), Asset::Fungible(asset.add(delta_asset)?));
+                    } else {
+                        // TODO: Change sub in miden-base
+                        asset.sub(delta.unsigned_abs())?;
+                        updated_assets.insert(faucet_id.prefix(), Asset::Fungible(asset));
+                    }
+                },
+                None => {
+                    // If the asset doesn't exist, we add it to the map to be inserted.
+                    if *delta > 0 {
+                        updated_assets.insert(faucet_id.prefix(), Asset::Fungible(delta_asset));
+                    }
+                },
+            }
+        }
+
+        // Process non-fungible assets. Here additions or removals don't depend on previous state as
+        // each asset is unique.
+        let (added_nonfungible_assets, removed_nonfungible_assets) =
+            delta.vault().non_fungible().iter().partition::<Vec<_>, _>(|(_, action)| {
+                matches!(action, NonFungibleDeltaAction::Add)
+            });
+
+        updated_assets.extend(
+            added_nonfungible_assets
+                .into_iter()
+                .map(|(asset, _)| (asset.faucet_id_prefix(), Asset::NonFungible(*asset))),
+        );
+
+        const DELETE_QUERY: &str =
+            "DELETE FROM account_vaults WHERE root = ? AND faucet_id_prefix IN rarray(?)";
+
+        tx.execute(
+            DELETE_QUERY,
+            params![
+                final_account_state.vault_root().to_hex(),
+                Rc::new(
+                    removed_nonfungible_assets
+                        .iter()
+                        .map(|(asset, _)| Value::Text(asset.faucet_id_prefix().to_hex()))
+                        .collect::<Vec<Value>>(),
+                ),
+            ],
+        )?;
+
+        Self::insert_assets(tx, final_account_state.vault_root(), updated_assets.into_values())?;
+
+        // Apply storage delta. This map will contain all updated storage slots, both values and
+        // maps. It gets initialized with value type updates which contain the new value and
+        // don't depend on previous state.
+        let mut updated_storage_slots: BTreeMap<u8, StorageSlot> = delta
+            .storage()
+            .values()
+            .iter()
+            .map(|(index, slot)| (*index, StorageSlot::Value(*slot)))
+            .collect();
+
+        // For storage map deltas, we only updated the keys in the delta, this is why we need the
+        // previously retrieved storage maps.
+        for (index, map_delta) in delta.storage().maps() {
+            let mut map = updated_storage_maps.remove(index).unwrap_or_default();
+
+            for (key, value) in map_delta.entries() {
+                map.insert((*key).into(), *value);
+            }
+
+            updated_storage_slots.insert(*index, StorageSlot::Map(map));
+        }
+
+        Self::insert_storage_slots(
+            tx,
+            final_account_state.storage_commitment(),
+            updated_storage_slots.iter().map(|(index, slot)| (*index as usize, slot)),
+        )?;
+
+        Ok(())
     }
 
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
@@ -333,17 +560,17 @@ impl SqliteStore {
     fn insert_storage_slots<'a>(
         tx: &Transaction<'_>,
         commitment: Word,
-        account_storage: impl Iterator<Item = &'a StorageSlot>,
+        account_storage: impl Iterator<Item = (usize, &'a StorageSlot)>,
     ) -> Result<(), StoreError> {
-        for (index, slot) in account_storage.enumerate() {
+        for (index, slot) in account_storage {
             const QUERY: &str =
-                insert_sql!(account_storage { commitment, slot_index, slot_value } | IGNORE);
+                insert_sql!(account_storage { commitment, slot_index, slot_value } | REPLACE);
 
             tx.execute(QUERY, params![commitment.to_hex(), index, slot.value().to_hex()])?;
 
             if let StorageSlot::Map(map) = slot {
                 const MAP_QUERY: &str =
-                    insert_sql!(storage_map_entries { root, key, value } | IGNORE);
+                    insert_sql!(storage_map_entries { root, key, value } | REPLACE);
                 for (key, value) in map.entries() {
                     // Insert each entry of the storage map
                     tx.execute(
@@ -364,7 +591,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         for asset in assets {
             const QUERY: &str =
-                insert_sql!(account_vaults { root, faucet_id_prefix, asset } | IGNORE);
+                insert_sql!(account_vaults { root, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![
@@ -419,30 +646,36 @@ fn query_storage_slots(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<Vec<StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_value FROM account_storage WHERE ";
+) -> Result<BTreeMap<u8, StorageSlot>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value FROM account_storage WHERE ";
 
     let query = format!("{STORAGE_QUERY}{where_clause}");
     let storage_values = conn
         .prepare(&query)?
         .query_map(params, |row| {
-            let value: String = row.get(0)?;
-            Ok(value)
+            let index: u8 = row.get(0)?;
+            let value: String = row.get(1)?;
+            Ok((index, value))
         })?
-        .map(|result| Ok(Word::try_from(result?)?))
-        .collect::<Result<Vec<Word>, StoreError>>()?;
+        .map(|result| {
+            let (index, value) = result?;
+            Ok((index, Word::try_from(value)?))
+        })
+        .collect::<Result<Vec<(u8, Word)>, StoreError>>()?;
 
-    let params: Vec<Value> = storage_values.iter().map(|root| Value::from(root.to_hex())).collect();
+    let possible_roots: Vec<Value> =
+        storage_values.iter().map(|(_, value)| Value::from(value.to_hex())).collect();
 
-    let mut storage_maps = query_storage_maps(conn, "root IN rarray(?)", [Rc::new(params)])?;
+    let mut storage_maps =
+        query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
 
     Ok(storage_values
         .into_iter()
-        .map(|value| {
+        .map(|(index, value)| {
             if let Some(map) = storage_maps.remove(&value) {
-                StorageSlot::Map(map)
+                (index, StorageSlot::Map(map))
             } else {
-                StorageSlot::Value(value)
+                (index, StorageSlot::Value(value))
             }
         })
         .collect())
@@ -527,7 +760,7 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts WHERE ";
+        FROM accounts a WHERE ";
     let query = format!("{SELECT_QUERY}{where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
