@@ -1,6 +1,9 @@
 import { db } from "./schema.js";
 
 async function recursivelyTransformForExport(obj) {
+  if (obj instanceof Uint8Array) {
+    return Array.from(obj);
+  }
   if (obj instanceof Blob) {
     const blobBuffer = await obj.arrayBuffer();
     return {

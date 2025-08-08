@@ -34,7 +34,7 @@ enum Table {
 
 export interface IAccountCode {
   root: string;
-  code: Blob;
+  code: Uint8Array;
 }
 
 export interface IAccountStorage {
@@ -59,7 +59,7 @@ export interface IAccount {
   vaultRoot: string;
   nonce: string;
   committed: boolean;
-  accountSeed: Blob | null;
+  accountSeed?: Uint8Array;
   accountCommitment: string;
   locked: boolean;
 }
