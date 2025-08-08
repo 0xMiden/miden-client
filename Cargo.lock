@@ -336,6 +336,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
+name = "bigdecimal"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a22f228ab7a1b23027ccc6c350b72868017af7ea8356fbdf19f8d991c690013"
+dependencies = [
+ "autocfg",
+ "libm",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -739,6 +752,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7f46116c46ff9ab3eb1597a45688b6715c6e628b5c133e288e709a29bcb4ee"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d00b9596d185e565c2207a0b01f8bd1a135483d02d9b7b0a54b11da8d53412e"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim 0.11.1",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "deadpool"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -747,6 +795,17 @@ dependencies = [
  "deadpool-runtime",
  "num_cpus",
  "tokio",
+]
+
+[[package]]
+name = "deadpool-diesel"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "590573e9e29c5190a5ff782136f871e6e652e35d598a349888e028693601adf1"
+dependencies = [
+ "deadpool",
+ "deadpool-sync",
+ "diesel",
 ]
 
 [[package]]
@@ -765,6 +824,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524bc3df0d57e98ecd022e21ba31166c2625e7d3e5bcc4510efaeeab4abcab04"
 dependencies = [
  "deadpool-runtime",
+]
+
+[[package]]
+name = "deranged"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9e6a11ca8224451684bc0d7d5a7adbf8f2fd6887261a1cfc3c0432f9d4068e"
+dependencies = [
+ "powerfmt",
 ]
 
 [[package]]
@@ -795,6 +863,54 @@ checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "diesel"
+version = "2.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "229850a212cd9b84d4f0290ad9d294afc0ae70fccaa8949dbe8b43ffafa1e20c"
+dependencies = [
+ "bigdecimal",
+ "diesel_derives",
+ "libsqlite3-sys",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "time",
+]
+
+[[package]]
+name = "diesel_derives"
+version = "2.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b96984c469425cb577bf6f17121ecb3e4fe1e81de5d8f780dd372802858d756"
+dependencies = [
+ "diesel_table_macro_syntax",
+ "dsl_auto_type",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "diesel_migrations"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a73ce704bad4231f001bff3314d91dce4aba0770cee8b233991859abc15c1f6"
+dependencies = [
+ "diesel",
+ "migrations_internals",
+ "migrations_macros",
+]
+
+[[package]]
+name = "diesel_table_macro_syntax"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "209c735641a413bc68c4923a9d6ad4bcb3ca306b794edaa7eb0b3228a99ffb25"
+dependencies = [
  "syn 2.0.104",
 ]
 
@@ -837,6 +953,20 @@ name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
+
+[[package]]
+name = "dsl_auto_type"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "139ae9aca7527f85f26dd76483eb38533fd84bd571065da1739656ef71c5ff5b"
+dependencies = [
+ "darling",
+ "either",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
 
 [[package]]
 name = "either"
@@ -1489,6 +1619,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "idna"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1880,6 +2016,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
+name = "mediatype"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f490ea2ae935dd8ac89c472d4df28c7f6b87cc20767e1b21fd5ed6a16e7f61e4"
+
+[[package]]
 name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2171,9 +2313,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-node-block-producer"
+version = "0.11.0"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+dependencies = [
+ "anyhow",
+ "futures",
+ "itertools",
+ "miden-block-prover",
+ "miden-lib",
+ "miden-node-proto",
+ "miden-node-proto-build",
+ "miden-node-utils",
+ "miden-objects",
+ "miden-remote-prover-client",
+ "miden-tx",
+ "miden-tx-batch-prover",
+ "rand 0.9.2",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-reflection",
+ "tower-http",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "miden-node-ntx-builder"
+version = "0.11.0"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+dependencies = [
+ "anyhow",
+ "futures",
+ "miden-node-proto",
+ "miden-node-utils",
+ "miden-objects",
+ "miden-remote-prover-client",
+ "miden-tx",
+ "rand 0.9.2",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "miden-node-proto"
+version = "0.11.0"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+dependencies = [
+ "anyhow",
+ "hex",
+ "http",
+ "miden-node-proto-build",
+ "miden-node-utils",
+ "miden-objects",
+ "prost",
+ "prost-build",
+ "protox 0.8.0",
+ "thiserror 2.0.12",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#97a2fa8af182f6a438ac9a7b650324e67ea2639a"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
 dependencies = [
  "anyhow",
  "prost",
@@ -2182,9 +2392,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-node-rpc"
+version = "0.11.0"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+dependencies = [
+ "anyhow",
+ "futures",
+ "http",
+ "mediatype",
+ "miden-node-proto",
+ "miden-node-proto-build",
+ "miden-node-utils",
+ "miden-objects",
+ "miden-tx",
+ "semver 1.0.26",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-reflection",
+ "tonic-web",
+ "tower",
+ "tower-http",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "miden-node-store"
+version = "0.11.0"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
+dependencies = [
+ "anyhow",
+ "bigdecimal",
+ "deadpool",
+ "deadpool-diesel",
+ "deadpool-sync",
+ "diesel",
+ "diesel_migrations",
+ "hex",
+ "miden-lib",
+ "miden-node-proto",
+ "miden-node-proto-build",
+ "miden-node-utils",
+ "miden-objects",
+ "rand 0.9.2",
+ "rand_chacha 0.9.0",
+ "serde",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "toml 0.8.23",
+ "tonic",
+ "tonic-reflection",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#97a2fa8af182f6a438ac9a7b650324e67ea2639a"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
 dependencies = [
  "anyhow",
  "figment",
@@ -2197,6 +2465,7 @@ dependencies = [
  "rand 0.9.2",
  "serde",
  "thiserror 2.0.12",
+ "tokio",
  "tonic",
  "tower-http",
  "tracing",
@@ -2260,7 +2529,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#97a2fa8af182f6a438ac9a7b650324e67ea2639a"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2303,7 +2572,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#97a2fa8af182f6a438ac9a7b650324e67ea2639a"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#24ed9edc5204b50950b3f67b42d25def12ed4b12"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2456,6 +2725,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "migrations_internals"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bda1634d70d5bd53553cf15dca9842a396e8c799982a3ad22998dc44d961f24"
+dependencies = [
+ "serde",
+ "toml 0.9.5",
+]
+
+[[package]]
+name = "migrations_macros"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffb161cc72176cb37aa47f1fc520d3ef02263d67d661f44f05d05a079e1237fd"
+dependencies = [
+ "migrations_internals",
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2548,6 +2838,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "node-builder"
+version = "0.11.0"
+dependencies = [
+ "anyhow",
+ "miden-lib",
+ "miden-node-block-producer",
+ "miden-node-ntx-builder",
+ "miden-node-rpc",
+ "miden-node-store",
+ "miden-node-utils",
+ "miden-objects",
+ "rand 0.9.2",
+ "rand_chacha 0.9.0",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2595,6 +2904,12 @@ checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "num-conv"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 
 [[package]]
 name = "num-derive"
@@ -3182,6 +3497,12 @@ checksum = "e5a7c30837279ca13e7c867e9e40053bc68740f988cb07f7ca6df43cc734b585"
 dependencies = [
  "zerovec",
 ]
+
+[[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppv-lite86"
@@ -4437,6 +4758,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.3.41"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7619e19bc266e0f9c5e6686659d394bc57973859340060a69221e57dbc0c40"
+dependencies = [
+ "deranged",
+ "itoa",
+ "num-conv",
+ "powerfmt",
+ "serde",
+ "time-core",
+ "time-macros",
+]
+
+[[package]]
+name = "time-core"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e9a38711f559d9e3ce1cdb06dd7c5b8ea546bc90052da6d06bb76da74bb07c"
+
+[[package]]
+name = "time-macros"
+version = "0.2.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3526739392ec93fd8b359c8e98514cb3e8e021beb4e5f597b00a0221f8ed8a49"
+dependencies = [
+ "num-conv",
+ "time-core",
+]
+
+[[package]]
 name = "tinystr"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4667,6 +5019,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb87334d340313fefa513b6e60794d44a86d5f039b523229c99c323e4e19ca4b"
 dependencies = [
  "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9687bd5bfeafebdded2356950f278bba8226f0b32109537c4253406e09aafe1"
+dependencies = [
+ "prost",
+ "prost-types",
  "tokio",
  "tokio-stream",
  "tonic",
