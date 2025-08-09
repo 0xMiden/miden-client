@@ -47,7 +47,7 @@ miden-lib                  = { workspace = true }
 miden-objects              = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-testing              = { optional = true, workspace = true }
-miden-tx                   = { features = ["async"], workspace = true }
+miden-tx                   = { features = [], workspace = true }
 
 # External dependencies
 async-trait           = { workspace = true }
@@ -89,7 +89,7 @@ tonic-build            = { version = "0.13" }
 miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
 miden-lib     = { features = ["testing"], workspace = true }
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
-miden-testing = { default-features = false, features = ["async"], workspace = true }
+miden-testing = { default-features = false, features = [], workspace = true }
 tokio         = { workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
 

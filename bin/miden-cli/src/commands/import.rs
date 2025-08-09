@@ -26,7 +26,7 @@ pub struct ImportCmd {
 }
 
 impl ImportCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,

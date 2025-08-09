@@ -103,8 +103,7 @@ impl WebClient {
     ) -> Result<Vec<ConsumableNoteRecord>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let native_account_id = account_id.map(Into::into);
-            let result = client
-                .get_consumable_notes(native_account_id)
+            let result = Box::pin(client.get_consumable_notes(native_account_id))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get consumable notes"))?;
 
