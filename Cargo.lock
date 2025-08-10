@@ -2086,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2248,7 +2248,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2315,7 +2315,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "futures",
@@ -2343,7 +2343,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "futures",
@@ -2364,7 +2364,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "hex",
@@ -2383,7 +2383,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "prost",
@@ -2394,7 +2394,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "futures",
@@ -2421,7 +2421,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -2452,7 +2452,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "figment",
@@ -2477,7 +2477,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2529,7 +2529,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2572,7 +2572,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-async-experimental#990a93eb8faae93792e740c4f035a5dee3e7a2bd"
+source = "git+https://github.com/0xMiden/miden-node?branch=bernhard-async-experimental#b3972ab2caae0e867ef605d70184b80310deebeb"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2606,7 +2606,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2625,7 +2625,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2640,7 +2640,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=bernhard-merge-next-into-pgackst-async-exp#284b00ca6cb54412aaec9e1e6f0bc74944374c35"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#4e946b770c9c39971503616a9316dbb41f229c89"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -4157,9 +4157,9 @@ dependencies = [
 
 [[package]]
 name = "rustversion"
-version = "1.0.21"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a0d197bd2c9dc6e53b84da9556a69ba4cdfab8619eb41a8bd1cc2027a0f6b1d"
+checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "ryu"

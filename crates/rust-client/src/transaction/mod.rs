@@ -83,6 +83,7 @@ use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::{AccountInputs, TransactionArgs, TransactionWitness};
 use miden_objects::{AssetError, Felt, Word};
+use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -158,6 +159,17 @@ impl TransactionProver for LocalTransactionProver {
         witness: TransactionWitness,
     ) -> Result<ProvenTransaction, TransactionProverError> {
         LocalTransactionProver::prove(self, witness)
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl TransactionProver for RemoteTransactionProver {
+    async fn prove(
+        &self,
+        witness: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        let fut = RemoteTransactionProver::prove(self, witness);
+        fut.await
     }
 }
 

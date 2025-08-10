@@ -2,7 +2,6 @@ use std::io;
 use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
-use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
@@ -15,15 +14,14 @@ use miden_client::note::{
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     InputNote,
-    LocalTransactionProver,
     OutputNote,
     PaymentNoteDescription,
-    ProvingOptions,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
     TransactionResult,
 };
+use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
 use crate::create_dynamic_table;
@@ -414,13 +412,14 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     if delegated_proving {
         let (cli_config, _) = load_config_file()?;
-        let _remote_prover_endpoint =
+        let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),
                 "remote prover endpoint is not set in the configuration file".to_string(),
             ))?;
 
-        let remote_prover = Arc::new(LocalTransactionProver::new(ProvingOptions::default()));
+        let remote_prover =
+            Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()));
         client
             .submit_transaction_with_prover(transaction_execution_result, remote_prover)
             .await?;

@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-//use miden_client::RemoteTransactionProver;
+use miden_client::RemoteTransactionProver;
 use miden_client::transaction::{
     LocalTransactionProver,
     ProvingOptions,
@@ -27,7 +27,7 @@ impl TransactionProver {
 
     #[wasm_bindgen(js_name = "newRemoteProver")]
     pub fn new_remote_prover(endpoint: &str) -> TransactionProver {
-        let remote_prover = LocalTransactionProver::new(ProvingOptions::default());
+        let remote_prover = RemoteTransactionProver::new(endpoint);
         TransactionProver {
             prover: Arc::new(remote_prover),
             endpoint: Some(endpoint.to_string()),
