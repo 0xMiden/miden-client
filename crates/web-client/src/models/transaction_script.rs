@@ -1,7 +1,8 @@
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{assembler::Assembler, word::Word};
+use crate::models::assembler::Assembler;
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

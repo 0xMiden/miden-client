@@ -42,7 +42,10 @@ impl Assembler {
     }
 
     #[wasm_bindgen(js_name = "compileTransactionScript")]
-    pub fn compile_transaction_script(self, note_script: &str) -> Result<TransactionScript, JsValue> {
+    pub fn compile_transaction_script(
+        self,
+        note_script: &str,
+    ) -> Result<TransactionScript, JsValue> {
         let code = self
             .0
             .clone()

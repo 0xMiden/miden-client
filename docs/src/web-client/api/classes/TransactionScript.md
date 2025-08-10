@@ -30,7 +30,7 @@
 
 ### compile()
 
-> `static` **compile**(`script_code`, `_assembler`): `TransactionScript`
+> `static` **compile**(`script_code`, `assembler`): `TransactionScript`
 
 #### Parameters
 
@@ -38,7 +38,7 @@
 
 `string`
 
-##### \_assembler
+##### assembler
 
 [`Assembler`](Assembler.md)
 
