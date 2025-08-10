@@ -204,7 +204,8 @@ export const compileTxScript = async (
       true
     );
 
-    const compiledScript = await client.compileTxScript(_script);
+    let scriptBuilder = new window.ScriptBuilder(true);
+    const compiledScript = scriptBuilder.compileTxScript(_script);
 
     return {
       scriptRoot: compiledScript.root().toHex(),

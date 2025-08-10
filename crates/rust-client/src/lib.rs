@@ -142,6 +142,8 @@ mod errors;
 // RE-EXPORTS
 // ================================================================================================
 
+pub use miden_lib::utils::ScriptBuilder;
+
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
     pub use miden_objects::account::delta::{
@@ -223,7 +225,6 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-use miden_lib::utils::ScriptBuilder;
 use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;

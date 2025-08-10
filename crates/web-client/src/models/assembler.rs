@@ -1,3 +1,4 @@
+use miden_client::transaction::TransactionScript;
 use miden_objects::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
 use miden_objects::note::NoteScript as NativeNoteScript;
 use wasm_bindgen::prelude::*;
@@ -5,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::models::library::Library;
 use crate::models::note_script::NoteScript;
 
+// TODO: With the introduction of script builder, this should be deprecated
 #[wasm_bindgen]
 pub struct Assembler(NativeAssembler);
 
@@ -13,7 +15,6 @@ impl Assembler {
     #[wasm_bindgen(js_name = "withLibrary")]
     pub fn with_library(self, library: &Library) -> Result<Assembler, JsValue> {
         let native_lib: NativeLibrary = library.into();
-
         let new_native_asm = self
             .0
             .with_dynamic_library(native_lib)

@@ -36,6 +36,7 @@ import {
   OutputNotesArray,
   PublicKey,
   Rpo256,
+  ScriptBuilder,
   SecretKey,
   Signature,
   SlotAndKeys,
@@ -103,6 +104,7 @@ declare global {
     OutputNotesArray: typeof OutputNotesArray;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
+    ScriptBuilder: typeof ScriptBuilder;
     SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SlotAndKeys: typeof SlotAndKeys;

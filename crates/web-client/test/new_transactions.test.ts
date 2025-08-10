@@ -508,7 +508,9 @@ export const customTransaction = async (
             end
         `;
 
-      let compiledNoteScript = await client.compileNoteScript(noteScript);
+      let scriptBuilder = new window.ScriptBuilder(true);
+      let compiledNoteScript = scriptBuilder.compileNoteScript(noteScript);
+
       let noteInputs = new window.NoteInputs(
         new window.FeltArray([
           walletAccount.id().prefix(),
@@ -568,7 +570,8 @@ export const customTransaction = async (
 
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
-      let transactionScript = await client.compileTxScript(txScript);
+      let txScriptBuilder = new window.ScriptBuilder(true);
+      let transactionScript = txScriptBuilder.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
@@ -1168,11 +1171,9 @@ export const counterAccountComponent = async (): Promise<
     );
 
     // Create transaction with network note
-    assembler = window.TransactionKernel.assembler()
-      .withDebugMode(true)
-      .withLibrary(accountComponentLib);
-
-    let compiledNoteScript = await assembler.compileNoteScript(scriptCode);
+    let noteScriptBuilder = new window.ScriptBuilder(true);
+    noteScriptBuilder.linkDynamicLibrary(accountComponentLib);
+    let compiledNoteScript = noteScriptBuilder.compileNoteScript(scriptCode);
 
     let noteInputs = new window.NoteInputs(new window.FeltArray([]));
 

@@ -99,6 +99,7 @@ before(async () => {
         OutputNotesArray,
         PublicKey,
         Rpo256,
+        ScriptBuilder,
         SecretKey,
         Signature,
         SlotAndKeys,
@@ -166,6 +167,7 @@ before(async () => {
       window.OutputNotesArray = OutputNotesArray;
       window.PublicKey = PublicKey;
       window.Rpo256 = Rpo256;
+      window.ScriptBuilder = ScriptBuilder;
       window.SecretKey = SecretKey;
       window.Signature = Signature;
       window.SlotAndKeys = SlotAndKeys;
