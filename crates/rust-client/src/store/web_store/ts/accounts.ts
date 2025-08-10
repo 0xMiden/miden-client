@@ -93,7 +93,6 @@ export async function getAllAccountHeaders() {
 }
 
 export async function getAccountHeader(accountId: string) {
-  // Added type for accountId
   try {
     // Fetch all records matching the given id
     const allMatchingRecords = await accounts
@@ -157,7 +156,6 @@ export async function getAccountHeader(accountId: string) {
 }
 
 export async function getAccountHeaderByCommitment(accountCommitment: string) {
-  // Added type
   try {
     // Fetch all records matching the given commitment
     const allMatchingRecords = await accounts
@@ -209,7 +207,6 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
 }
 
 export async function getAccountCode(codeRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountCodes
@@ -252,7 +249,6 @@ export async function getAccountCode(codeRoot: string) {
 }
 
 export async function getAccountStorage(storageRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountStorages
@@ -294,7 +290,6 @@ export async function getAccountStorage(storageRoot: string) {
 }
 
 export async function getAccountAssetVault(vaultRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountVaults
@@ -336,61 +331,37 @@ export async function getAccountAssetVault(vaultRoot: string) {
   }
 }
 
-export function getAccountAuthByPubKey(pubKey: string) {
-  // Added type
-  // Try to get the account auth from the cache
-  let cachedSecretKey = ACCOUNT_AUTH_MAP.get(pubKey);
-
-  // If it's not in the cache, throw an error
-  if (!cachedSecretKey) {
-    throw new Error("Account auth not found in cache.");
-  }
-
-  let data = {
-    secretKey: cachedSecretKey,
-  };
-
-  return data;
-}
-
-var ACCOUNT_AUTH_MAP = new Map<string, string>(); // Added types for Map
-export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
-  // Added type
+export async function getAccountAuthByPubKey(pubKey: string) {
   try {
-    // Fetch all records matching the given id
-    const allMatchingRecords = await accountAuths
+    // Try to get the account auth from the store
+    const accountSecretKey = await accountAuths
       .where("pubKey")
       .equals(pubKey)
-      .toArray();
+      .first();
 
-    // The first record is the only one due to the uniqueness constraint
-    const authRecord = allMatchingRecords[0];
-
-    if (authRecord === undefined) {
-      console.log("No account auth records found for given account ID.");
-      return null; // No records found
+    // If it's not in the store, throw an error
+    if (!accountSecretKey) {
+      throw new Error("Account auth not found in store.");
     }
 
-    // Store the auth info in the map
-    ACCOUNT_AUTH_MAP.set(authRecord.pubKey, authRecord.secretKey);
-
-    return {
-      secretKey: authRecord.secretKey,
+    let data = {
+      secretKey: accountSecretKey.secretKey,
     };
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account auth for pubKey ${pubKey}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account auth for pubKey ${pubKey}: Unexpected value thrown:`,
-        String(error)
-      );
+
+    return data;
+  } catch (e: unknown) {
+    if (e instanceof Error) {
+      console.error(`Error fetching account auth for pubKey ${pubKey}:`, e);
+      if (e.name === "NotFoundError") throw e;
+      throw new Error("Failed to get account auth by pubKey.", { cause: e });
     }
-    throw error;
+    // TODO: We should add helper functions for handling errors in a consistent way
+    const wrapped = new Error(String(e));
+    console.error(
+      `Error fetching account auth for pubKey ${pubKey}:`,
+      wrapped.message
+    );
+    throw wrapped;
   }
 }
 
