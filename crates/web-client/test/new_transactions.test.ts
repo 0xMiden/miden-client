@@ -180,7 +180,7 @@ describe("consume transaction tests", () => {
       expect(result.transactionId).to.not.be.empty;
       expect(result.nonce).to.equal("1");
       expect(result.numConsumedNotes).to.equal(1);
-      expect(result.targetAccountBalanace).to.equal("1000");
+      expect(result.targetAccountBalance).to.equal("1000");
     });
   });
 });
