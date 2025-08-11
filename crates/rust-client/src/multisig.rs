@@ -181,8 +181,11 @@ mod tests {
         .await;
 
         // create a transaction to consume the note by the multisig account
-        let tx_request =
-            TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
+        let salt = Word::empty();
+        let tx_request = TransactionRequestBuilder::new()
+            .auth_arg(salt)
+            .build_consume_notes(vec![note.id()])
+            .unwrap();
 
         // Propose the transaction (should fail with Unauthorized)
         let tx_summary = coordinator_client

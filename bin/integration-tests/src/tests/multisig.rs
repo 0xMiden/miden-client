@@ -2,6 +2,7 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::multisig::MultisigClient;
 use miden_client::testing::common::*;
 use miden_client::transaction::TransactionRequestBuilder;
+use miden_objects::Word;
 use miden_objects::account::AccountStorageMode;
 use miden_tx::auth::SigningInputs;
 
@@ -39,11 +40,9 @@ async fn multisig() {
 
     coordinator_client.add_account(&multisig_account, None, false).await.unwrap();
 
-    let tx_request = TransactionRequestBuilder::new()
-        // Needs https://github.com/0xMiden/miden-client/issues/1119:
-        // .with_auth_arg(salt)
-        .build()
-        .unwrap();
+    let salt = Word::empty();
+
+    let tx_request = TransactionRequestBuilder::new().auth_arg(salt).build().unwrap();
     let tx_summary = coordinator_client
         .propose_multisig_transaction(multisig_account.id(), tx_request.clone())
         .await
