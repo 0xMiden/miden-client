@@ -67,15 +67,15 @@ export interface IAccount {
 export interface ITransaction {
   id: string;
   details: Blob;
-  scriptRoot: string;
-  blockNum: number;
-  commitHeight: number;
-  discardCause: Blob | null;
+  blockNum: string;
+  scriptRoot?: string;
+  commitHeight?: string;
+  discardCause?: Blob | null;
 }
 
 export interface ITransactionScript {
   scriptRoot: string;
-  script: Blob;
+  txScript?: Blob;
 }
 
 export interface IInputNote {

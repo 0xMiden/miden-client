@@ -7,19 +7,10 @@
     "noEmitOnError": true,
     "removeComments": false,
     "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "forceConsistentCasingInFileNames": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "./js",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "esModuleInterop": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "declaration": true
+    "strict": true
   },
   "include": ["./ts/*.ts", "./ts/*.d.ts"],
   "exclude": ["./js"]

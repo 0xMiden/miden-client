@@ -1,8 +1,25 @@
-import { transactions, transactionScripts } from "./schema.js";
+import {
+  ITransaction,
+  ITransactionScript,
+  transactions,
+  transactionScripts,
+} from "./schema.js";
+import { Dexie } from "dexie";
+import { logDexieError, mapOption, uint8ArrayToBase64 } from "./utils.js";
+
+interface ProcessedTransaction {
+  scriptRoot?: string;
+  discardCause?: string;
+  details: string;
+  id: string;
+  txScript?: string;
+  blockNum: string;
+  commitHeight?: string;
+}
 
 const IDS_FILTER_PREFIX = "Ids:";
-export async function getTransactions(filter) {
-  let transactionRecords;
+export async function getTransactions(filter: string) {
+  let transactionRecords: ITransaction[] = [];
 
   try {
     if (filter === "Uncommitted") {
@@ -31,9 +48,11 @@ export async function getTransactions(filter) {
       return [];
     }
 
-    const scriptRoots = transactionRecords.map((transactionRecord) => {
-      return transactionRecord.scriptRoot;
-    });
+    const scriptRoots = transactionRecords
+      .map((transactionRecord) => {
+        return transactionRecord.scriptRoot;
+      })
+      .filter((scriptRoot) => scriptRoot != undefined);
 
     const scripts = await transactionScripts
       .where("scriptRoot")
@@ -48,8 +67,8 @@ export async function getTransactions(filter) {
 
     const processedTransactions = await Promise.all(
       transactionRecords.map(async (transactionRecord) => {
-        let txScriptBase64 = null;
-
+        let txScriptBase64: undefined | string = undefined;
+        let discardCauseBase64: string | undefined = undefined;
         if (transactionRecord.scriptRoot) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
 
@@ -64,29 +83,21 @@ export async function getTransactions(filter) {
           let discardCauseArrayBuffer =
             await transactionRecord.discardCause.arrayBuffer();
           let discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
-          let discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
-          transactionRecord.discardCause = discardCauseBase64;
+          discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
         }
 
         let detailsArrayBuffer = await transactionRecord.details.arrayBuffer();
         let detailsArray = new Uint8Array(detailsArrayBuffer);
         let detailsBase64 = uint8ArrayToBase64(detailsArray);
-        transactionRecord.details = detailsBase64;
 
-        let data = {
+        let data: ProcessedTransaction = {
           id: transactionRecord.id,
-          details: transactionRecord.details,
-          scriptRoot: transactionRecord.scriptRoot
-            ? transactionRecord.scriptRoot
-            : null,
+          details: detailsBase64,
+          scriptRoot: transactionRecord.scriptRoot,
           txScript: txScriptBase64,
           blockNum: transactionRecord.blockNum,
-          commitHeight: transactionRecord.commitHeight
-            ? transactionRecord.commitHeight
-            : null,
-          discardCause: transactionRecord.discardCause
-            ? transactionRecord.discardCause
-            : null,
+          commitHeight: transactionRecord.commitHeight,
+          discardCause: discardCauseBase64,
         };
 
         return data;
@@ -94,13 +105,16 @@ export async function getTransactions(filter) {
     );
 
     return processedTransactions;
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to get transactions: ", err.toString());
     throw err;
   }
 }
 
-export async function insertTransactionScript(scriptRoot, txScript) {
+export async function insertTransactionScript(
+  scriptRoot: Uint8Array,
+  txScript?: Uint8Array
+) {
   try {
     // check if script root already exists
     let record = await transactionScripts
@@ -119,69 +133,50 @@ export async function insertTransactionScript(scriptRoot, txScript) {
     let scriptRootArray = new Uint8Array(scriptRoot);
     let scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
 
-    let txScriptBlob = null;
-    if (txScript) {
-      txScriptBlob = new Blob([new Uint8Array(txScript)]);
-    }
-
-    const data = {
+    const data: ITransactionScript = {
       scriptRoot: scriptRootBase64,
-      txScript: txScriptBlob,
+      txScript: mapOption(
+        txScript,
+        (txScript) => new Blob([new Uint8Array(txScript)])
+      ),
     };
 
     await transactionScripts.add(data);
   } catch (error) {
     // Check if the error is because the record already exists
-    if (error.name === "ConstraintError") {
-    } else {
-      console.error("Failed to insert transaction script: ", error.toString());
-      throw error;
+    if (!(error instanceof Dexie.ConstraintError)) {
+      logDexieError(error, "Failed to insert transaction script");
     }
   }
 }
 
+// FIXME: Add to changelog that these parameters
+// have change order.
 export async function upsertTransactionRecord(
-  transactionId,
-  details,
-  scriptRoot,
-  blockNum,
-  committed,
-  discardCause
+  transactionId: string,
+  details: Uint8Array,
+  blockNum: string,
+  scriptRoot?: Uint8Array,
+  committed?: string,
+  discardCause?: Uint8Array
 ) {
   try {
     let detailsBlob = new Blob([new Uint8Array(details)]);
 
-    let scriptRootBase64 = null;
-    if (scriptRoot !== null) {
-      let scriptRootArray = new Uint8Array(scriptRoot);
-      scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
-    }
-
-    let discardCauseBlob = null;
-    if (discardCause !== null) {
-      discardCauseBlob = new Blob([new Uint8Array(discardCause)]);
-    }
-
     const data = {
       id: transactionId,
       details: detailsBlob,
-      scriptRoot: scriptRootBase64,
+      scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
       blockNum: blockNum,
-      commitHeight: committed ? committed : null,
-      discardCause: discardCauseBlob,
+      commitHeight: committed ? committed : undefined,
+      discardCause: mapOption(
+        discardCause,
+        (discardCause) => new Blob([discardCause])
+      ),
     };
 
     await transactions.put(data);
   } catch (err) {
-    console.error("Failed to insert proven transaction data: ", err.toString());
-    throw err;
+    logDexieError(err, "Failed to insert proven transaction data");
   }
-}
-
-function uint8ArrayToBase64(bytes) {
-  const binary = bytes.reduce(
-    (acc, byte) => acc + String.fromCharCode(byte),
-    ""
-  );
-  return btoa(binary);
 }
