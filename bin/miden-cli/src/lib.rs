@@ -87,7 +87,7 @@ impl From<MidenClientCli> for Cli {
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 enum Behavior {
-    /// The Miden toolchain installer
+    /// The Miden Client CLI.
     MidenClient {
         #[command(flatten)]
         cli: Cli,
