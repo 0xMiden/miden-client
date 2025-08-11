@@ -1,14 +1,10 @@
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{Forest, InOrderIndex, MmrPeaks},
-};
+use miden_objects::Word;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{Forest, InOrderIndex, MmrPeaks};
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
@@ -18,21 +14,29 @@ use crate::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_block_headers, idxdb_get_partial_blockchain_nodes,
-    idxdb_get_partial_blockchain_nodes_all, idxdb_get_partial_blockchain_peaks_by_block_num,
-    idxdb_get_tracked_block_headers, idxdb_insert_block_header,
-    idxdb_insert_partial_blockchain_nodes, idxdb_prune_irrelevant_blocks,
+    idxdb_get_block_headers,
+    idxdb_get_partial_blockchain_nodes,
+    idxdb_get_partial_blockchain_nodes_all,
+    idxdb_get_partial_blockchain_peaks_by_block_num,
+    idxdb_get_tracked_block_headers,
+    idxdb_insert_block_header,
+    idxdb_insert_partial_blockchain_nodes,
+    idxdb_prune_irrelevant_blocks,
 };
 
 mod models;
 use models::{
-    BlockHeaderIdxdbObject, PartialBlockchainNodeIdxdbObject, PartialBlockchainPeaksIdxdbObject,
+    BlockHeaderIdxdbObject,
+    PartialBlockchainNodeIdxdbObject,
+    PartialBlockchainPeaksIdxdbObject,
 };
 
 pub mod utils;
 use utils::{
-    SerializedBlockHeaderData, SerializedPartialBlockchainNodeData,
-    process_partial_blockchain_nodes_from_js_value, serialize_block_header,
+    SerializedBlockHeaderData,
+    SerializedPartialBlockchainNodeData,
+    process_partial_blockchain_nodes_from_js_value,
+    serialize_block_header,
     serialize_partial_blockchain_node,
 };
 

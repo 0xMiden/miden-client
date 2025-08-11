@@ -1,7 +1,8 @@
 use miden_objects::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
 
-use super::{felt::Felt, word::Word};
+use super::felt::Felt;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -47,5 +48,11 @@ impl From<&NativeTransactionId> for TransactionId {
 impl From<TransactionId> for NativeTransactionId {
     fn from(transaction_id: TransactionId) -> Self {
         transaction_id.0
+    }
+}
+
+impl From<&TransactionId> for NativeTransactionId {
+    fn from(id: &TransactionId) -> Self {
+        id.0
     }
 }

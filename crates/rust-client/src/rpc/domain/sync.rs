@@ -1,16 +1,16 @@
 use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::AccountId,
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::MmrDelta,
-    note::NoteId,
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::account::AccountId;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::MmrDelta;
+use miden_objects::note::NoteId;
+use miden_objects::transaction::TransactionId;
 
-use super::{note::CommittedNote, transaction::TransactionInclusion};
-use crate::rpc::{RpcError, domain::MissingFieldHelper, generated as proto};
+use super::note::CommittedNote;
+use super::transaction::TransactionInclusion;
+use crate::rpc::domain::MissingFieldHelper;
+use crate::rpc::{RpcError, generated as proto};
 
 // STATE SYNC INFO
 // ================================================================================================

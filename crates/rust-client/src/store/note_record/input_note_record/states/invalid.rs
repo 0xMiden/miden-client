@@ -1,14 +1,15 @@
 use alloc::string::ToString;
 
-use miden_objects::{
-    Word,
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_objects::transaction::TransactionId;
 
 use super::{
-    CommittedNoteState, ConsumedExternalNoteState, InputNoteState, NoteStateHandler,
+    CommittedNoteState,
+    ConsumedExternalNoteState,
+    InputNoteState,
+    NoteStateHandler,
     UnverifiedNoteState,
 };
 use crate::store::NoteRecordError;

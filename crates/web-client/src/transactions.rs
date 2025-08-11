@@ -1,12 +1,12 @@
 use miden_client::transaction::{
-    TransactionRecord as NativeTransactionRecord, TransactionScript as NativeTransactionScript,
+    TransactionRecord as NativeTransactionRecord,
+    TransactionScript as NativeTransactionScript,
 };
 use wasm_bindgen::prelude::*;
 
-use super::models::{
-    transaction_filter::TransactionFilter, transaction_record::TransactionRecord,
-    transaction_script::TransactionScript,
-};
+use super::models::transaction_filter::TransactionFilter;
+use super::models::transaction_record::TransactionRecord;
+use super::models::transaction_script::TransactionScript;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]

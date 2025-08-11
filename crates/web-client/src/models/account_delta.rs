@@ -1,9 +1,9 @@
 use miden_objects::account::AccountDelta as NativeAccountDelta;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    account_storage_delta::AccountStorageDelta, account_vault_delta::AccountVaultDelta, felt::Felt,
-};
+use super::account_storage_delta::AccountStorageDelta;
+use super::account_vault_delta::AccountVaultDelta;
+use super::felt::Felt;
 
 #[derive(Clone)]
 #[wasm_bindgen]

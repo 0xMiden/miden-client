@@ -1,4 +1,6 @@
-use miden_client::{Word, store::NoteExportType, utils::Serializable};
+use miden_client::Word;
+use miden_client::store::NoteExportType;
+use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 
 use crate::{WebClient, js_error_with_context};

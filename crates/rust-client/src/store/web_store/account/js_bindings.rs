@@ -1,4 +1,5 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
@@ -59,8 +60,8 @@ extern "C" {
         vault_root: String,
         nonce: String,
         committed: bool,
-        account_seed: Option<Vec<u8>>,
         commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountAuth)]

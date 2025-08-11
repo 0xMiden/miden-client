@@ -20,26 +20,20 @@
 //! notes. For more advanced usage, see the documentation of individual methods in the [`Store`]
 //! trait.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::TransactionId;
 
-use crate::{
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -65,8 +59,13 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
-    OutputNoteState, input_note_states,
+    InputNoteRecord,
+    InputNoteState,
+    NoteExportType,
+    NoteRecordError,
+    OutputNoteRecord,
+    OutputNoteState,
+    input_note_states,
 };
 
 // STORE TRAIT

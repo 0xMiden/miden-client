@@ -1,7 +1,10 @@
 use miden_objects::note::PartialNote as NativePartialNote;
 use wasm_bindgen::prelude::*;
 
-use super::{note_assets::NoteAssets, note_id::NoteId, note_metadata::NoteMetadata, word::Word};
+use super::note_assets::NoteAssets;
+use super::note_id::NoteId;
+use super::note_metadata::NoteMetadata;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

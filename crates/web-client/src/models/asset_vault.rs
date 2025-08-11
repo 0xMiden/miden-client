@@ -1,7 +1,9 @@
 use miden_objects::asset::AssetVault as NativeAssetVault;
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, fungible_asset::FungibleAsset, word::Word};
+use super::account_id::AccountId;
+use super::fungible_asset::FungibleAsset;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

@@ -1,15 +1,14 @@
-use miden_client::{Word, store::OutputNoteRecord};
+use miden_client::Word;
+use miden_client::store::OutputNoteRecord;
 use miden_objects::note::{NoteId, NoteScript as NativeNoteScript};
 use wasm_bindgen::prelude::*;
 
 use super::models::note_script::NoteScript;
-use crate::{
-    WebClient, js_error_with_context,
-    models::{
-        account_id::AccountId, consumable_note_record::ConsumableNoteRecord,
-        input_note_record::InputNoteRecord, note_filter::NoteFilter,
-    },
-};
+use crate::models::account_id::AccountId;
+use crate::models::consumable_note_record::ConsumableNoteRecord;
+use crate::models::input_note_record::InputNoteRecord;
+use crate::models::note_filter::NoteFilter;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {

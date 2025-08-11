@@ -1,32 +1,32 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    account::AccountId,
-    block::BlockNumber,
-    note::{NoteId, NoteTag},
-};
+use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{NoteId, NoteTag};
 use miden_tx::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{
-    WebStore,
-    chain_data::utils::{SerializedPartialBlockchainNodeData, serialize_partial_blockchain_node},
-    note::utils::{serialize_input_note, serialize_output_note},
-    transaction::utils::serialize_transaction_record,
+use super::WebStore;
+use super::chain_data::utils::{
+    SerializedPartialBlockchainNodeData,
+    serialize_partial_blockchain_node,
 };
-use crate::{
-    store::StoreError,
-    sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate},
-};
+use super::note::utils::{serialize_input_note, serialize_output_note};
+use super::transaction::utils::serialize_transaction_record;
+use crate::store::StoreError;
+use crate::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 
 mod js_bindings;
 use js_bindings::{
-    JsAccountUpdate, JsStateSyncUpdate, idxdb_add_note_tag, idxdb_apply_state_sync,
-    idxdb_get_note_tags, idxdb_get_sync_height, idxdb_remove_note_tag,
+    JsAccountUpdate,
+    JsStateSyncUpdate,
+    idxdb_add_note_tag,
+    idxdb_apply_state_sync,
+    idxdb_get_note_tags,
+    idxdb_get_sync_height,
+    idxdb_remove_note_tag,
 };
 
 mod models;

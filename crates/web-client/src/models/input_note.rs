@@ -1,10 +1,10 @@
 use miden_objects::transaction::InputNote as NativeInputNote;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    note::Note, note_id::NoteId, note_inclusion_proof::NoteInclusionProof,
-    note_location::NoteLocation,
-};
+use super::note::Note;
+use super::note_id::NoteId;
+use super::note_inclusion_proof::NoteInclusionProof;
+use super::note_location::NoteLocation;
 
 #[derive(Clone)]
 #[wasm_bindgen]

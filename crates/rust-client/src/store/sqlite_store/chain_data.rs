@@ -1,24 +1,22 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{collections::BTreeMap, rc::Rc, string::String, vec::Vec};
-use std::{collections::BTreeSet, num::NonZeroUsize};
+use alloc::collections::BTreeMap;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::vec::Vec;
+use std::collections::BTreeSet;
+use std::num::NonZeroUsize;
 
-use miden_objects::{
-    Word,
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{Forest, InOrderIndex, MmrPeaks},
-};
+use miden_objects::Word;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{Forest, InOrderIndex, MmrPeaks};
 use miden_tx::utils::{Deserializable, Serializable};
-use rusqlite::{
-    Connection, OptionalExtension, Transaction, params, params_from_iter, types::Value,
-};
+use rusqlite::types::Value;
+use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_iter};
 
 use super::SqliteStore;
-use crate::{
-    insert_sql,
-    store::{BlockRelevance, PartialBlockchainFilter, StoreError},
-    subst,
-};
+use crate::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
+use crate::{insert_sql, subst};
 
 struct SerializedBlockHeaderData {
     block_num: u32,
@@ -352,15 +350,12 @@ mod test {
     use alloc::vec::Vec;
 
     use miden_lib::transaction::TransactionKernel;
-    use miden_objects::{
-        block::BlockHeader,
-        crypto::merkle::{Forest, MmrPeaks},
-    };
+    use miden_objects::block::BlockHeader;
+    use miden_objects::crypto::merkle::{Forest, MmrPeaks};
 
-    use crate::store::{
-        Store,
-        sqlite_store::{SqliteStore, tests::create_test_store},
-    };
+    use crate::store::Store;
+    use crate::store::sqlite_store::SqliteStore;
+    use crate::store::sqlite_store::tests::create_test_store;
 
     async fn insert_dummy_block_headers(store: &mut SqliteStore) -> Vec<BlockHeader> {
         let block_headers: Vec<BlockHeader> = (0..5)
