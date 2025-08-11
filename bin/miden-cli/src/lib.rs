@@ -93,8 +93,10 @@ enum Behavior {
         cli: Cli,
     },
 
-    /// Used when the Miden Client CLI is called under a different name, like it
-    /// is the case in [Midenup](https://github.com/0xMiden/midenup).
+    /// Used when the Miden Client CLI is called under a different name, like
+    /// when it is called from [Midenup](https://github.com/0xMiden/midenup).
+    /// NOTE: Vec<OsString> holds the "raw" arguments passed to the command
+    /// line, analogous to `argv`.
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
