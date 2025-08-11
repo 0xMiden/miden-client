@@ -24,7 +24,6 @@ rand = { workspace = true }
 async-trait        = { version = "0.1" }
 miden-lib          = { default-features = false, features = ["testing"], workspace = true }
 tokio              = { workspace = true }
-winter-maybe-async = { features = ["async"], version = "0.12" }
 
 [[test]]
 name = "integration"

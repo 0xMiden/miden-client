@@ -998,10 +998,9 @@ impl AlwaysFailingProver {
     }
 }
 
-#[maybe_async_trait]
+#[async_trait::async_trait(?Send)]
 impl TransactionProver for AlwaysFailingProver {
-    #[maybe_async]
-    fn prove(
+    async fn prove(
         &self,
         _tx_witness: TransactionWitness,
     ) -> Result<ProvenTransaction, TransactionProverError> {

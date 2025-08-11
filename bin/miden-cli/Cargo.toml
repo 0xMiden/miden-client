@@ -1,4 +1,3 @@
-
 [package]
 authors.workspace      = true
 categories             = ["command-line-utilities"]

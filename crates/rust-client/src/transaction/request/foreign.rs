@@ -7,13 +7,7 @@ use miden_objects::account::{AccountId, PartialAccount, PartialStorage, PartialS
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;
-use miden_tx::utils::{
-    ByteWriter,
-    Deserializable,
-    DeserializationError,
-    Serializable,
-    SliceReader,
-};
+use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
 use crate::rpc::domain::account::{AccountProof, AccountStorageRequirements, StateHeaders};
@@ -140,31 +134,24 @@ impl TryFrom<AccountProof> for AccountInputs {
             storage_slots,
         }) = state_headers
         {
-            let mut partial_maps = Vec::default();
-            for (_, proofs) in storage_slots {
-                // TODO: Remove this unwrap (and the one on the constructor)
-                let partial_storage_map: PartialStorageMap =
-                    PartialSmt::from_proofs(proofs).unwrap().into();
-                partial_maps.push(partial_storage_map);
+            // discard slot indices - not needed for execution
+            let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
+            for (_, slots) in storage_slots {
+                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(slots)?);
+                storage_map_proofs.push(storage_map);
             }
-
-            // TODO: Remove this hack - we can't see the partialsmt root without proofs afaik
-            let mut bytes = Vec::new();
-            bytes.write(account_header.vault_root());
-            bytes.write_usize(0);
-            bytes.write_usize(0);
-
-            let mut r = SliceReader::new(&bytes);
-            let hacked = PartialSmt::read_from(&mut r).unwrap();
 
             return Ok(AccountInputs::new(
                 PartialAccount::new(
                     account_header.id(),
                     account_header.nonce(),
                     code,
-                    PartialStorage::new(storage_header, partial_maps).unwrap(),
-                    // We don't use vault information so we leave it empty
-                    PartialVault::new(hacked),
+                    PartialStorage::new(storage_header, storage_map_proofs.into_iter())?,
+                    PartialVault::new(PartialSmt::new()), /* We don't use
+                                                           * vault
+                                                           * information so we
+                                                           * leave it
+                                                           * empty */
                 ),
                 witness,
             ));
