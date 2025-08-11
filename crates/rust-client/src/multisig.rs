@@ -40,12 +40,12 @@ impl<AUTH: TransactionAuthenticator + 'static> DerefMut for MultisigClient<AUTH>
 }
 
 impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
-    pub fn setup_account(&mut self, approvers: Vec<PublicKey>, threshold: u32) -> Account {
+    pub fn setup_account(&mut self, approvers: Vec<PublicKey>, threshold: u32) -> (Account, Word) {
         let mut init_seed = [0u8; 32];
         self.rng().fill_bytes(&mut init_seed);
 
         let multisig_auth_component = AuthMultisigRpoFalcon512::new(threshold, approvers).unwrap();
-        let (multisig_account, _) = AccountBuilder::new(init_seed)
+        let (multisig_account, seed) = AccountBuilder::new(init_seed)
             .with_auth_component(multisig_auth_component)
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(AccountStorageMode::Public)
@@ -53,7 +53,7 @@ impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
             .build()
             .unwrap();
 
-        multisig_account
+        (multisig_account, seed)
     }
 }
 
@@ -122,29 +122,27 @@ mod tests {
 
     use super::*;
     use crate::testing::common::{
-        TestClientKeyStore,
-        create_test_client,
-        insert_new_fungible_faucet,
-        insert_new_wallet,
-        mint_note,
-        wait_for_node,
+        TestClientKeyStore, insert_new_fungible_faucet, insert_new_wallet, mint_note, wait_for_node,
     };
+    use crate::testing::mock::MockRpcApi;
+    use crate::tests::create_test_client;
     use crate::transaction::TransactionRequestBuilder;
 
     type TestMultisigClient = MultisigClient<TestClientKeyStore>;
 
-    async fn setup_multisig_client() -> (TestMultisigClient, TestClientKeyStore) {
-        let (client, keystore) = create_test_client().await;
-        (MultisigClient::new(client), keystore)
+    async fn setup_multisig_client() -> (TestMultisigClient, MockRpcApi, TestClientKeyStore) {
+        let (client, mock_rpc_api, keystore) = create_test_client().await;
+        (MultisigClient::new(client), mock_rpc_api, keystore)
     }
 
     #[tokio::test]
     async fn multisig() {
-        let (mut signer_a_client, authenticator_a) = create_test_client().await;
+        let (mut signer_a_client, _, authenticator_a) = create_test_client().await;
         wait_for_node(&mut signer_a_client).await;
-        let (mut signer_b_client, authenticator_b) = create_test_client().await;
+        let (mut signer_b_client, _, authenticator_b) = create_test_client().await;
 
-        let (mut coordinator_client, coordinator_keystore) = setup_multisig_client().await;
+        let (mut coordinator_client, mock_rpc_api, coordinator_keystore) =
+            setup_multisig_client().await;
 
         let (_, _, secret_key_a) =
             insert_new_wallet(&mut signer_a_client, AccountStorageMode::Private, &authenticator_a)
@@ -158,9 +156,13 @@ mod tests {
                 .unwrap();
         let pub_key_b = secret_key_b.public_key();
 
-        let multisig_account = coordinator_client.setup_account(vec![pub_key_a, pub_key_b], 2);
+        let (multisig_account, seed) =
+            coordinator_client.setup_account(vec![pub_key_a, pub_key_b], 2);
 
-        coordinator_client.add_account(&multisig_account, None, false).await.unwrap();
+        coordinator_client
+            .add_account(&multisig_account, Some(seed), false)
+            .await
+            .unwrap();
 
         // we insert the faucet to the coordinator client for convenience
         let (faucet_account, ..) = insert_new_fungible_faucet(
@@ -179,6 +181,9 @@ mod tests {
             NoteType::Private,
         )
         .await;
+
+        mock_rpc_api.prove_block();
+        coordinator_client.sync_state().await.unwrap();
 
         // create a transaction to consume the note by the multisig account
         let salt = Word::empty();
