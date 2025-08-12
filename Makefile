@@ -64,7 +64,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn lint
+	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
