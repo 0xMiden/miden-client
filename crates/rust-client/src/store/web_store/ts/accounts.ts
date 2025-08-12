@@ -1,3 +1,5 @@
+// TODO: Re-enable this lint in another issue/PR.
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import {
   accountCodes,
   accountStorages,
@@ -12,7 +14,7 @@ import { logDexieError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
   try {
-    let allIds = new Set(); // Use a Set to ensure uniqueness
+    const allIds = new Set(); // Use a Set to ensure uniqueness
 
     // Iterate over each account entry
     await accounts.each((account) => {
@@ -28,7 +30,7 @@ export async function getAccountIds() {
 export async function getAllAccountHeaders() {
   try {
     // Use a Map to track the latest record for each id based on nonce
-    const latestRecordsMap = new Map();
+    const latestRecordsMap: Map<string, IAccount> = new Map();
 
     await accounts.each((record) => {
       const existingRecord = latestRecordsMap.get(record.id);
@@ -44,7 +46,7 @@ export async function getAllAccountHeaders() {
     const latestRecords = Array.from(latestRecordsMap.values());
 
     const resultObject = await Promise.all(
-      latestRecords.map(async (record) => {
+      latestRecords.map((record) => {
         let accountSeedBase64: string | null = null;
         if (record.accountSeed) {
           const seedAsBytes = new Uint8Array(record.accountSeed);
@@ -61,7 +63,7 @@ export async function getAllAccountHeaders() {
           codeRoot: record.codeRoot || "",
           accountSeed: accountSeedBase64, // null or base64 string
           locked: record.locked,
-          committed: record.committed ?? true, // Use actual value or default
+          committed: record.committed, // Use actual value or default
           accountCommitment: record.accountCommitment || "", // Keep original field name
         };
       })
@@ -96,7 +98,7 @@ export async function getAccountHeader(accountId: string) {
     });
 
     // The first record is the most recent one due to the sorting
-    const mostRecentRecord = sortedRecords[0];
+    const mostRecentRecord: IAccount | undefined = sortedRecords[0];
 
     if (mostRecentRecord === undefined) {
       return null;
@@ -137,15 +139,19 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
       .equals(accountCommitment)
       .toArray();
 
+    if (allMatchingRecords.length == 0) {
+      return undefined;
+    }
+
     // There should be only one match
-    const matchingRecord = allMatchingRecords[0];
+    const matchingRecord: IAccount | undefined = allMatchingRecords[0];
 
     if (matchingRecord === undefined) {
       console.log("No account header record found for given commitment.");
       return null;
     }
 
-    let accountSeedBase64 = null;
+    let accountSeedBase64: string | undefined = undefined;
     if (matchingRecord.accountSeed) {
       accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
     }
@@ -262,21 +268,22 @@ export async function getAccountAssetVault(vaultRoot: string) {
 export function getAccountAuthByPubKey(pubKey: string) {
   // Added type
   // Try to get the account auth from the cache
-  let cachedSecretKey = ACCOUNT_AUTH_MAP.get(pubKey);
+  const cachedSecretKey = ACCOUNT_AUTH_MAP.get(pubKey);
 
   // If it's not in the cache, throw an error
   if (!cachedSecretKey) {
     throw new Error("Account auth not found in cache.");
   }
 
-  let data = {
+  const data = {
     secretKey: cachedSecretKey,
   };
 
   return data;
 }
 
-var ACCOUNT_AUTH_MAP = new Map<string, string>(); // Added types for Map
+// eslint-disable-next-line no-var
+var ACCOUNT_AUTH_MAP = new Map<string, string>();
 export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
   // Added type
   try {
@@ -440,7 +447,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
       return null; // No records found
     }
 
-    let codeRoots = foreignAccounts.map((account) => account.codeRoot);
+    const codeRoots = foreignAccounts.map((account) => account.codeRoot);
 
     const accountCode = await accountCodes
       .where("root")
@@ -448,7 +455,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
       .toArray();
 
     const processedCode = foreignAccounts
-      .map(async (foreignAccount) => {
+      .map((foreignAccount) => {
         const matchingCode = accountCode.find(
           (code) => code.root === foreignAccount.codeRoot
         );

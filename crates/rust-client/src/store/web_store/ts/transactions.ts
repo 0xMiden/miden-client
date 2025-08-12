@@ -24,9 +24,7 @@ export async function getTransactions(filter: string) {
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter(
-          (tx) => tx.commitHeight === undefined || tx.commitHeight === null
-        )
+        .filter((tx) => tx.commitHeight === undefined)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -60,9 +58,11 @@ export async function getTransactions(filter: string) {
       .toArray();
 
     // Create a map of scriptRoot to script for quick lookup
-    const scriptMap = new Map();
+    const scriptMap: Map<string, Blob> = new Map();
     scripts.forEach((script) => {
-      scriptMap.set(script.scriptRoot, script.txScript);
+      if (script.txScript) {
+        scriptMap.set(script.scriptRoot, script.txScript);
+      }
     });
 
     const processedTransactions = await Promise.all(
@@ -73,24 +73,25 @@ export async function getTransactions(filter: string) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
 
           if (txScript) {
-            let txScriptArrayBuffer = await txScript.arrayBuffer();
-            let txScriptArray = new Uint8Array(txScriptArrayBuffer);
+            const txScriptArrayBuffer = await txScript.arrayBuffer();
+            const txScriptArray = new Uint8Array(txScriptArrayBuffer);
             txScriptBase64 = uint8ArrayToBase64(txScriptArray);
           }
         }
 
         if (transactionRecord.discardCause) {
-          let discardCauseArrayBuffer =
+          const discardCauseArrayBuffer =
             await transactionRecord.discardCause.arrayBuffer();
-          let discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
+          const discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
           discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
         }
 
-        let detailsArrayBuffer = await transactionRecord.details.arrayBuffer();
-        let detailsArray = new Uint8Array(detailsArrayBuffer);
-        let detailsBase64 = uint8ArrayToBase64(detailsArray);
+        const detailsArrayBuffer =
+          await transactionRecord.details.arrayBuffer();
+        const detailsArray = new Uint8Array(detailsArrayBuffer);
+        const detailsBase64 = uint8ArrayToBase64(detailsArray);
 
-        let data: ProcessedTransaction = {
+        const data: ProcessedTransaction = {
           id: transactionRecord.id,
           details: detailsBase64,
           scriptRoot: transactionRecord.scriptRoot,
@@ -105,9 +106,8 @@ export async function getTransactions(filter: string) {
     );
 
     return processedTransactions;
-  } catch (err: any) {
-    console.error("Failed to get transactions: ", err.toString());
-    throw err;
+  } catch (err) {
+    logDexieError(err, "Failed to get transactions");
   }
 }
 
@@ -117,7 +117,7 @@ export async function insertTransactionScript(
 ) {
   try {
     // check if script root already exists
-    let record = await transactionScripts
+    const record = await transactionScripts
       .where("scriptRoot")
       .equals(scriptRoot)
       .first();
@@ -126,12 +126,8 @@ export async function insertTransactionScript(
       return;
     }
 
-    if (!scriptRoot) {
-      throw new Error("Script root must be provided");
-    }
-
-    let scriptRootArray = new Uint8Array(scriptRoot);
-    let scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
+    const scriptRootArray = new Uint8Array(scriptRoot);
+    const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
 
     const data: ITransactionScript = {
       scriptRoot: scriptRootBase64,
@@ -161,7 +157,7 @@ export async function upsertTransactionRecord(
   discardCause?: Uint8Array
 ) {
   try {
-    let detailsBlob = new Blob([new Uint8Array(details)]);
+    const detailsBlob = new Blob([new Uint8Array(details)]);
 
     const data = {
       id: transactionId,
@@ -171,7 +167,7 @@ export async function upsertTransactionRecord(
       commitHeight: committed ? committed : undefined,
       discardCause: mapOption(
         discardCause,
-        (discardCause) => new Blob([discardCause])
+        (discardCause) => new Blob([discardCause as BlobPart])
       ),
     };
 

@@ -1,4 +1,5 @@
 import Dexie from "dexie";
+import { logDexieError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
 
@@ -8,8 +9,8 @@ export async function openDatabase(): Promise<boolean> {
     await db.open();
     console.log("Database opened successfully");
     return true;
-  } catch (err: any) {
-    console.error("Failed to open database: ", err.toString());
+  } catch (err) {
+    logDexieError(err, "Failed to open database");
     return false;
   }
 }
@@ -86,7 +87,7 @@ export interface IInputNote {
   inputs: Blob;
   scriptRoot: string;
   nullifier: string;
-  createdAt: BigInt;
+  createdAt: bigint;
 }
 
 export interface IOutputNote {
@@ -96,7 +97,7 @@ export interface IOutputNote {
   metadata: Blob;
   stateDiscriminant: string;
   nullifier: string;
-  expectedHeight: BigInt;
+  expectedHeight: bigint;
   state: Blob;
 }
 
@@ -187,7 +188,9 @@ function indexes(...items: string[]): string {
 
 db.on("populate", () => {
   // Populate the stateSync table with default values
-  stateSync.put({ id: 1, blockNum: "0" } as IStateSync);
+  stateSync
+    .put({ id: 1, blockNum: "0" } as IStateSync)
+    .catch((err: unknown) => logDexieError(err, "Failed to populate DB"));
 });
 
 const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);

@@ -9,9 +9,9 @@
     "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "outDir": "./js",
+    "outDir": "../js",
     "strict": true
   },
-  "include": ["./ts/*.ts", "./ts/*.d.ts"],
-  "exclude": ["./js"]
+  "include": ["./*.ts", "./*.d.ts", "./eslint.config.mjs"],
+  "exclude": ["../js"]
 }

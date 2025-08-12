@@ -5,4 +5,6 @@ js/types.*
 js/sync.*
 js/schema.*
 js/utils.*
+js/transactions.*
+js/eslint.*
 tsconfig.tsbuildinfo

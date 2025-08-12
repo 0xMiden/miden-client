@@ -8,6 +8,7 @@ export const mapOption = <T, U>(
   return value != undefined ? func(value) : undefined;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logDexieError = (error: any, errorContext?: string) => {
   if (error instanceof Dexie.DexieError) {
     if (errorContext) {
@@ -17,16 +18,26 @@ export const logDexieError = (error: any, errorContext?: string) => {
     } else {
       console.error(`Indexdb error: (${error.name}): ${error.message}`);
     }
-    mapOption(error.stack, (stack) => console.error(`Stacktrace: \n ${stack}`));
-    mapOption(error.inner, (innerException) => logDexieError(innerException));
-    throw error;
-  } else {
+    mapOption(error.stack, (stack) => {
+      console.error(`Stacktrace: \n ${stack}`);
+    });
+    mapOption(error.inner, (innerException) =>
+      logDexieError(innerException as Error)
+    );
+  } else if (error instanceof Error) {
     console.error(
       `Unexpected error while accessing indexdb: ${error.toString()}`
     );
-    mapOption(error.stack, (stack) => console.error(`Stacktrace: n\ ${stack}`));
-    throw error;
+    mapOption(error.stack, (stack) => {
+      console.error(`Stacktrace: ${stack}`);
+    });
+  } else {
+    console.error(
+      `Got an exception with a non-error value, as JSON: \n ${JSON.stringify(error)}. As String \n ${String(error)} `
+    );
+    console.trace();
   }
+  throw error;
 };
 
 export const uint8ArrayToBase64 = (bytes: Uint8Array) => {
