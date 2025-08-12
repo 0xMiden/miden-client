@@ -143,11 +143,11 @@ install: ## Install the CLI binary
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary and client library in release mode
-	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release
-	cargo build --package testing-remote-prover --release
+	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release --locked
+	cargo build --package testing-remote-prover --release --locked
 
 build-wasm: rust-client-ts-build ## Build the client library for wasm32
-	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
+	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked $(FEATURES_WEB_CLIENT)
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
