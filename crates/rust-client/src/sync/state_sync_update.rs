@@ -1,24 +1,18 @@
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::AccountId,
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteId, Nullifier},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::account::AccountId;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteId, Nullifier};
+use miden_objects::transaction::TransactionId;
 
 use super::SyncSummary;
-use crate::{
-    account::Account,
-    note::{NoteUpdateTracker, NoteUpdateType},
-    rpc::domain::transaction::TransactionInclusion,
-    transaction::{DiscardCause, TransactionRecord, TransactionStatus},
-};
+use crate::account::Account;
+use crate::note::{NoteUpdateTracker, NoteUpdateType};
+use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 // STATE SYNC UPDATE
 // ================================================================================================

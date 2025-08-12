@@ -1,9 +1,10 @@
 use miden_objects::transaction::TransactionArgs as NativeTransactionArgs;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    advice_inputs::AdviceInputs, note_id::NoteId, transaction_script::TransactionScript, word::Word,
-};
+use super::advice_inputs::AdviceInputs;
+use super::note_id::NoteId;
+use super::transaction_script::TransactionScript;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

@@ -1,14 +1,10 @@
-use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    AccountIdError, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
-};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::{AccountIdError, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
@@ -18,23 +14,38 @@ use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_fetch_and_cache_account_auth_by_pub_key, idxdb_get_account_asset_vault,
-    idxdb_get_account_code, idxdb_get_account_header, idxdb_get_account_header_by_commitment,
-    idxdb_get_account_headers, idxdb_get_account_ids, idxdb_get_account_storage,
-    idxdb_get_foreign_account_code, idxdb_lock_account, idxdb_undo_account_states,
+    idxdb_fetch_and_cache_account_auth_by_pub_key,
+    idxdb_get_account_asset_vault,
+    idxdb_get_account_code,
+    idxdb_get_account_header,
+    idxdb_get_account_header_by_commitment,
+    idxdb_get_account_headers,
+    idxdb_get_account_ids,
+    idxdb_get_account_storage,
+    idxdb_get_foreign_account_code,
+    idxdb_lock_account,
+    idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
 
 mod models;
 use models::{
-    AccountAuthIdxdbObject, AccountCodeIdxdbObject, AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject, AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
+    AccountAuthIdxdbObject,
+    AccountCodeIdxdbObject,
+    AccountRecordIdxdbObject,
+    AccountStorageIdxdbObject,
+    AccountVaultIdxdbObject,
+    ForeignAccountCodeIdxdbObject,
 };
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault, insert_account_code, insert_account_record, insert_account_storage,
-    parse_account_record_idxdb_object, update_account,
+    insert_account_asset_vault,
+    insert_account_code,
+    insert_account_record,
+    insert_account_storage,
+    parse_account_record_idxdb_object,
+    update_account,
 };
 
 impl WebStore {
@@ -61,10 +72,8 @@ impl WebStore {
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account headers: {js_error:?}",))
         })?;
-
         let account_headers_idxdb: Vec<AccountRecordIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
-
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
             .into_iter()
             .map(parse_account_record_idxdb_object)
@@ -156,7 +165,6 @@ impl WebStore {
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account code: {js_error:?}",))
         })?;
-
         let account_code_idxdb: AccountCodeIdxdbObject = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 

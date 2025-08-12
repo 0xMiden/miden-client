@@ -1,6 +1,8 @@
 import { transactions, transactionScripts } from "./schema.js";
 
 const IDS_FILTER_PREFIX = "Ids:";
+const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
+
 export async function getTransactions(filter) {
   let transactionRecords;
 
@@ -23,6 +25,20 @@ export async function getTransactions(filter) {
       } else {
         transactionRecords = [];
       }
+    } else if (filter.startsWith(EXPIRED_BEFORE_FILTER_PREFIX)) {
+      const blockNumString = filter.substring(
+        EXPIRED_BEFORE_FILTER_PREFIX.length
+      );
+      const blockNum = parseInt(blockNumString);
+
+      transactionRecords = await transactions
+        .filter(
+          (tx) =>
+            tx.blockNum < blockNum &&
+            tx.commitHeight === null &&
+            tx.discardCause === null
+        )
+        .toArray();
     } else {
       transactionRecords = await transactions.toArray();
     }
@@ -158,7 +174,7 @@ export async function upsertTransactionRecord(
     }
 
     let discardCauseBlob = null;
-    if (discardCause !== null) {
+    if (discardCause) {
       discardCauseBlob = new Blob([new Uint8Array(discardCause)]);
     }
 

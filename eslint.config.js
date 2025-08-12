@@ -25,6 +25,7 @@ module.exports = [
   },
   {
     files: ["**/*.ts", "**/*.tsx"],
+    ignores: ["crates/rust-client/*"],
     languageOptions: {
       parser: require("@typescript-eslint/parser"),
       parserOptions: {
@@ -37,5 +38,18 @@ module.exports = [
     rules: {
       camelcase: ["error", { properties: "always" }],
     },
+  },
+  {
+    files: ["crates/rust-client/src/store/web_store/ts/*"],
+    ignores: ["**/*.test.ts"],
+    languageOptions: {
+      parser: require("@typescript-eslint/parser"),
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+        project: "crates/rust-client/src/store/web_store/tsconfig.json",
+      },
+    },
+    rules: { camelcase: ["error", { properties: "always" }] },
   },
 ];

@@ -1,12 +1,14 @@
-use miden_objects::{Word as NativeWord, crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey};
-use rand::{SeedableRng, rngs::StdRng};
+use miden_objects::Word as NativeWord;
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::{
-    models::{public_key::PublicKey, signature::Signature, word::Word},
-    utils::{deserialize_from_uint8array, serialize_to_uint8array},
-};
+use crate::models::public_key::PublicKey;
+use crate::models::signature::Signature;
+use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 pub struct SecretKey(NativeSecretKey);

@@ -1,20 +1,23 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{Word, block::BlockNumber, transaction::TransactionScript};
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::transaction::TransactionScript;
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{WebStore, account::utils::update_account, note::utils::apply_note_updates_tx};
-use crate::{
-    store::{StoreError, TransactionFilter},
-    transaction::{
-        DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
-        TransactionStoreUpdate,
-    },
+use super::WebStore;
+use super::account::utils::update_account;
+use super::note::utils::apply_note_updates_tx;
+use crate::store::{StoreError, TransactionFilter};
+use crate::transaction::{
+    DiscardCause,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
+    TransactionStoreUpdate,
 };
 
 mod js_bindings;

@@ -1,21 +1,20 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::collections::BTreeSet;
+use alloc::vec::Vec;
 
-use miden_objects::{Word, block::BlockNumber, note::NoteTag};
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::NoteTag;
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
-use crate::{
-    insert_sql,
-    store::{
-        StoreError,
-        sqlite_store::{note::apply_note_updates_tx, transaction::upsert_transaction_record},
-    },
-    subst,
-    sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate},
-};
+use crate::store::StoreError;
+use crate::store::sqlite_store::note::apply_note_updates_tx;
+use crate::store::sqlite_store::transaction::upsert_transaction_record;
+use crate::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use crate::{insert_sql, subst};
 
 impl SqliteStore {
     pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {

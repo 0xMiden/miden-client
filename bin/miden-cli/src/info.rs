@@ -1,9 +1,12 @@
 use std::fs;
 
-use miden_client::{Client, auth::TransactionAuthenticator, store::NoteFilter};
+use miden_client::Client;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
-use crate::{errors::CliError, load_config_file};
+use crate::errors::CliError;
+use crate::load_config_file;
 
 pub async fn print_client_info<AUTH: TransactionAuthenticator + 'static>(
     client: &Client<AUTH>,

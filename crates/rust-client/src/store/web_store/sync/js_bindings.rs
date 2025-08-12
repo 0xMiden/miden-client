@@ -1,22 +1,18 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{Word, account::Account};
+use miden_objects::Word;
+use miden_objects::account::Account;
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
 use super::flattened_vec::FlattenedU8Vec;
-use crate::store::web_store::{
-    note::utils::{SerializedInputNoteData, SerializedOutputNoteData},
-    transaction::utils::SerializedTransactionData,
-};
+use crate::store::web_store::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
+use crate::store::web_store::transaction::utils::SerializedTransactionData;
 
 // Sync IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/sync.js")]
-
 extern "C" {
     // GETS
     // ================================================================================================

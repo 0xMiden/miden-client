@@ -1,24 +1,32 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use js_sys::{Array, Promise};
-use miden_objects::{Word, note::Nullifier};
+use miden_objects::Word;
+use miden_objects::note::Nullifier;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::WebStore;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, StoreError,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_input_notes, idxdb_get_input_notes_from_ids, idxdb_get_input_notes_from_nullifiers,
-    idxdb_get_output_notes, idxdb_get_output_notes_from_ids,
-    idxdb_get_output_notes_from_nullifiers, idxdb_get_unspent_input_note_nullifiers,
+    idxdb_get_input_notes,
+    idxdb_get_input_notes_from_ids,
+    idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_output_notes,
+    idxdb_get_output_notes_from_ids,
+    idxdb_get_output_notes_from_nullifiers,
+    idxdb_get_unspent_input_note_nullifiers,
 };
 
 mod models;

@@ -2,10 +2,10 @@ use miden_client::store::AccountRecord;
 use miden_objects::account::Account as NativeAccount;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient, js_error_with_context,
-    models::{account::Account, account_header::AccountHeader, account_id::AccountId},
-};
+use crate::models::account::Account;
+use crate::models::account_header::AccountHeader;
+use crate::models::account_id::AccountId;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {

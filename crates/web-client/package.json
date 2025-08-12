@@ -1,6 +1,6 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.11.0-next.12",
+  "version": "0.11.0-next.14",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden",
@@ -18,7 +18,8 @@
     "../LICENSE.md"
   ],
   "scripts": {
-    "build": "rimraf dist && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
+    "build-rust-client-js": "cd ../rust-client/src/store/web_store && yarn install && yarn tsc --build --force",
+    "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "test": "node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs --grep \"with remote prover\" --invert",
     "test:remote_prover": "npm install && cross-env MIDEN_WEB_DEV=true npm run build && cross-env REMOTE_PROVER=true node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs -g \"with remote prover\"",

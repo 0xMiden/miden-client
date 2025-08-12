@@ -1,13 +1,13 @@
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-};
-use core::{error::Error, num::TryFromIntError};
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use core::error::Error;
+use core::num::TryFromIntError;
 
-use miden_objects::{
-    NoteError, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
-    utils::DeserializationError,
-};
+use miden_objects::NoteError;
+use miden_objects::account::AccountId;
+use miden_objects::crypto::merkle::MerkleError;
+use miden_objects::note::NoteId;
+use miden_objects::utils::DeserializationError;
 use thiserror::Error;
 
 // RPC ERROR

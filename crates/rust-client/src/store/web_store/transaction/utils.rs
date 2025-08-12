@@ -1,22 +1,16 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    block::BlockNumber,
-    transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript},
-};
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript};
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
-use crate::{
-    store::StoreError,
-    transaction::{TransactionDetails, TransactionRecord, TransactionStatus},
-};
+use crate::store::StoreError;
+use crate::transaction::{TransactionDetails, TransactionRecord, TransactionStatus};
 
 // TYPES
 // ================================================================================================

@@ -1,22 +1,21 @@
 use clap::ValueEnum;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
-use miden_client::{
-    Client, ClientError, IdPrefixFetchError,
-    asset::Asset,
-    auth::TransactionAuthenticator,
-    note::{
-        NoteConsumability, NoteInputs, NoteMetadata, WellKnownNote, get_input_note_with_id_prefix,
-    },
-    store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord},
+use miden_client::asset::Asset;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::note::{
+    NoteConsumability,
+    NoteInputs,
+    NoteMetadata,
+    WellKnownNote,
+    get_input_note_with_id_prefix,
 };
+use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
+use miden_client::{Client, ClientError, IdPrefixFetchError};
 use miden_objects::PrettyPrint;
 
-use crate::{
-    Parser, create_dynamic_table,
-    errors::CliError,
-    get_output_note_with_id_prefix,
-    utils::{load_faucet_details_map, parse_account_id},
-};
+use crate::errors::CliError;
+use crate::utils::{load_faucet_details_map, parse_account_id};
+use crate::{Parser, create_dynamic_table, get_output_note_with_id_prefix};
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum NoteFilter {

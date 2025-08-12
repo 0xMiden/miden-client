@@ -1,19 +1,19 @@
-use std::{fs::File, io::Write, path::PathBuf};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
-use miden_client::{
-    Client, Word,
-    account::{Account, AccountFile},
-    auth::TransactionAuthenticator,
-    store::NoteExportType,
-    transaction::AccountInterface,
-    utils::Serializable,
-};
+use miden_client::account::{Account, AccountFile};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::store::NoteExportType;
+use miden_client::transaction::AccountInterface;
+use miden_client::utils::Serializable;
+use miden_client::{Client, Word};
 use miden_lib::AuthScheme;
 use tracing::info;
 
-use crate::{
-    CliKeyStore, Parser, errors::CliError, get_output_note_with_id_prefix, utils::parse_account_id,
-};
+use crate::errors::CliError;
+use crate::utils::parse_account_id;
+use crate::{CliKeyStore, Parser, get_output_note_with_id_prefix};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Export client output notes, or account data")]

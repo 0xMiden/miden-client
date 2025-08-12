@@ -1,20 +1,15 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
-use miden_client::{
-    Client, ZERO,
-    account::{Account, AccountId, AccountType, StorageSlot},
-    asset::Asset,
-    rpc::{NodeRpcClient, TonicRpcClient},
-};
+use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
+use miden_client::asset::Asset;
+use miden_client::rpc::{NodeRpcClient, TonicRpcClient};
+use miden_client::{Client, ZERO};
 use miden_objects::PrettyPrint;
 
-use crate::{
-    CLIENT_BINARY_NAME,
-    config::CliConfig,
-    create_dynamic_table,
-    errors::CliError,
-    utils::{load_config_file, load_faucet_details_map, parse_account_id, update_config},
-};
+use crate::config::CliConfig;
+use crate::errors::CliError;
+use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id, update_config};
+use crate::{CLIENT_BINARY_NAME, create_dynamic_table};
 
 // ACCOUNT COMMAND
 // ================================================================================================

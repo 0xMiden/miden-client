@@ -1,9 +1,7 @@
 use std::str::FromStr;
 
-use miden_objects::{
-    Felt as NativeFelt, NetworkIdError,
-    account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId},
-};
+use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
+use miden_objects::{Felt as NativeFelt, NetworkIdError};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

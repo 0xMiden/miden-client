@@ -1,27 +1,24 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Felt, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
-    utils::Deserializable,
-};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::utils::Deserializable;
+use miden_objects::{Felt, Word};
 use miden_tx::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{
-    js_bindings::{
-        idxdb_get_account_auth_by_pub_key, idxdb_insert_account_asset_vault,
-        idxdb_insert_account_auth, idxdb_insert_account_code, idxdb_insert_account_record,
-        idxdb_insert_account_storage,
-    },
-    models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject},
+use super::js_bindings::{
+    idxdb_get_account_auth_by_pub_key,
+    idxdb_insert_account_asset_vault,
+    idxdb_insert_account_auth,
+    idxdb_insert_account_code,
+    idxdb_insert_account_record,
+    idxdb_insert_account_storage,
 };
+use super::models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject};
 use crate::store::{AccountStatus, StoreError};
 
 pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
@@ -93,8 +90,8 @@ pub async fn insert_account_record(
         vault_root,
         nonce,
         committed,
-        account_seed,
         commitment,
+        account_seed,
     );
     JsFuture::from(promise).await?;
 

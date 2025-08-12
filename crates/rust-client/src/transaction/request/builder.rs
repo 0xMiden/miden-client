@@ -1,24 +1,31 @@
 //! Contains structures and functions related to transaction creation.
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    string::ToString,
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
 use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
-use miden_objects::{
-    Felt, FieldElement, NoteError, Word,
-    account::AccountId,
-    asset::{Asset, FungibleAsset},
-    block::BlockNumber,
-    crypto::merkle::{InnerNodeInfo, MerkleStore},
-    note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, NoteType, PartialNote},
-    transaction::{OutputNote, TransactionScript},
-    vm::AdviceMap,
+use miden_objects::account::AccountId;
+use miden_objects::asset::{Asset, FungibleAsset};
+use miden_objects::block::BlockNumber;
+use miden_objects::crypto::merkle::{InnerNodeInfo, MerkleStore};
+use miden_objects::note::{
+    Note,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
+    PartialNote,
 };
+use miden_objects::transaction::{OutputNote, TransactionScript};
+use miden_objects::vm::AdviceMap;
+use miden_objects::{Felt, FieldElement, NoteError, Word};
 
 use super::{
-    ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
+    ForeignAccount,
+    NoteArgs,
+    TransactionRequest,
+    TransactionRequestError,
     TransactionScriptTemplate,
 };
 use crate::ClientRng;

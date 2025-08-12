@@ -1,27 +1,28 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
-use std::{collections::BTreeMap, rc::Rc};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use std::collections::BTreeMap;
+use std::rc::Rc;
 
-use miden_objects::{
-    AccountError, Felt, Word, WordError,
-    account::{
-        Account, AccountCode, AccountHeader, AccountId, AccountStorage, StorageMap, StorageSlot,
-    },
-    asset::{Asset, AssetVault},
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    StorageMap,
+    StorageSlot,
 };
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::{AccountError, Felt, Word, WordError};
 use miden_tx::utils::{Deserializable, Serializable};
-use rusqlite::{Connection, Params, Transaction, named_params, params, types::Value};
+use rusqlite::types::Value;
+use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
-use crate::{
-    insert_sql,
-    store::{AccountRecord, AccountStatus, StoreError},
-    subst,
-};
+use crate::store::{AccountRecord, AccountStatus, StoreError};
+use crate::{insert_sql, subst};
 
 // TYPES
 // ================================================================================================
@@ -557,14 +558,13 @@ fn query_account_headers(
 #[cfg(test)]
 mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_objects::{
-        EMPTY_WORD,
-        account::{AccountCode, AccountComponent},
-        crypto::dsa::rpo_falcon512::PublicKey,
-        testing::account_component::BASIC_WALLET_CODE,
-    };
+    use miden_objects::EMPTY_WORD;
+    use miden_objects::account::{AccountCode, AccountComponent};
+    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
 
-    use crate::store::sqlite_store::{SqliteStore, tests::create_test_store};
+    use crate::store::sqlite_store::SqliteStore;
+    use crate::store::sqlite_store::tests::create_test_store;
 
     #[tokio::test]
     async fn account_code_insertion_no_duplicates() {

@@ -7,31 +7,33 @@
 //! **Note:** This implementation is only available when targeting WebAssembly with the `web_store`
 //! feature enabled.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::Nullifier,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::Nullifier;
 use tonic::async_trait;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::{
-    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
-use crate::{
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 #[cfg(not(target_arch = "wasm32"))]
 compile_error!("The `idxdb` feature is only supported when targeting wasm32.");
@@ -45,7 +47,7 @@ pub mod sync;
 pub mod transaction;
 
 // Initialize IndexedDB
-#[wasm_bindgen(module = "/src/store/web_store/js/schema.js")]
+#[wasm_bindgen(module = "/src/store/web_store/ts/schema.ts")]
 extern "C" {
     #[wasm_bindgen(js_name = openDatabase)]
     fn setup_indexed_db() -> js_sys::Promise;

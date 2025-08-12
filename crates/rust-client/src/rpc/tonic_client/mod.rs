@@ -1,33 +1,34 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Word,
-    account::{Account, AccountCode, AccountDelta, AccountId},
-    block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
-    utils::Deserializable,
-};
-use miden_tx::utils::{Serializable, sync::RwLock};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
+use miden_objects::utils::Deserializable;
+use miden_tx::utils::Serializable;
+use miden_tx::utils::sync::RwLock;
 use tracing::info;
 
+use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::note::FetchedNote;
+use super::domain::nullifier::NullifierUpdate;
 use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint,
+    FetchedAccount,
+    NodeRpcClient,
+    NodeRpcClientEndpoint,
+    NoteSyncInfo,
+    RpcError,
     StateSyncInfo,
-    domain::{
-        account::{AccountProof, AccountProofs, AccountUpdateSummary},
-        note::FetchedNote,
-        nullifier::NullifierUpdate,
-    },
     generated as proto,
 };
-use crate::{rpc::errors::RpcConversionError, transaction::ForeignAccount};
+use crate::rpc::errors::RpcConversionError;
+use crate::transaction::ForeignAccount;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;

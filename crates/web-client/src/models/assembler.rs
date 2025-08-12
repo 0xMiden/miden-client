@@ -1,10 +1,9 @@
-use miden_objects::{
-    assembly::{Assembler as NativeAssembler, Library as NativeLibrary},
-    note::NoteScript as NativeNoteScript,
-};
+use miden_objects::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
+use miden_objects::note::NoteScript as NativeNoteScript;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{library::Library, note_script::NoteScript};
+use crate::models::library::Library;
+use crate::models::note_script::NoteScript;
 
 #[wasm_bindgen]
 pub struct Assembler(NativeAssembler);

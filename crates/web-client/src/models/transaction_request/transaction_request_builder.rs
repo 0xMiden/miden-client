@@ -1,30 +1,33 @@
 use miden_client::transaction::{
-    ForeignAccount as NativeForeignAccount, NoteArgs as NativeNoteArgs,
+    ForeignAccount as NativeForeignAccount,
+    NoteArgs as NativeNoteArgs,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
 };
-use miden_objects::{
-    Word as NativeWord,
-    note::{
-        Note as NativeNote, NoteDetails as NativeNoteDetails, NoteId as NativeNoteId,
-        NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag,
-    },
-    transaction::{OutputNote as NativeOutputNote, TransactionScript as NativeTransactionScript},
-    vm::AdviceMap as NativeAdviceMap,
+use miden_objects::Word as NativeWord;
+use miden_objects::note::{
+    Note as NativeNote,
+    NoteDetails as NativeNoteDetails,
+    NoteId as NativeNoteId,
+    NoteRecipient as NativeNoteRecipient,
+    NoteTag as NativeNoteTag,
 };
+use miden_objects::transaction::{
+    OutputNote as NativeOutputNote,
+    TransactionScript as NativeTransactionScript,
+};
+use miden_objects::vm::AdviceMap as NativeAdviceMap;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{
-    advice_map::AdviceMap,
-    foreign_account::ForeignAccount,
-    note_recipient::RecipientArray,
-    output_note::OutputNotesArray,
-    transaction_request::{
-        TransactionRequest, note_and_args::NoteAndArgsArray,
-        note_details_and_tag::NoteDetailsAndTagArray, note_id_and_args::NoteIdAndArgsArray,
-    },
-    transaction_script::TransactionScript,
-    word::Word,
-};
+use crate::models::advice_map::AdviceMap;
+use crate::models::foreign_account::ForeignAccount;
+use crate::models::note_recipient::RecipientArray;
+use crate::models::output_note::OutputNotesArray;
+use crate::models::transaction_request::TransactionRequest;
+use crate::models::transaction_request::note_and_args::NoteAndArgsArray;
+use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTagArray;
+use crate::models::transaction_request::note_id_and_args::NoteIdAndArgsArray;
+use crate::models::transaction_script::TransactionScript;
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]

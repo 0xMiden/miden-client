@@ -1,10 +1,8 @@
 use alloc::string::ToString;
 
-use miden_objects::{
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, NoteMetadata},
-    transaction::TransactionId,
-};
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
+use miden_objects::transaction::TransactionId;
 
 use super::{InputNoteState, NoteStateHandler};
 use crate::store::NoteRecordError;

@@ -64,7 +64,7 @@ describe("import from seed", () => {
     const faucet = await createNewFaucet();
 
     const result = await fundAccountFromFaucet(initialWallet.id, faucet.id);
-    const initialBalance = result.targetAccountBalanace;
+    const initialBalance = result.targetAccountBalance;
 
     const { commitment: initialCommitment } = await getAccount(
       initialWallet.id
@@ -108,7 +108,7 @@ describe("import public account by id", () => {
       walletSeed,
     });
     const faucet = await createNewFaucet();
-    const { targetAccountBalanace: initialBalance } =
+    const { targetAccountBalance: initialBalance } =
       await fundAccountFromFaucet(initialWallet.id, faucet.id);
     const { commitment: initialCommitment } = await getAccount(
       initialWallet.id

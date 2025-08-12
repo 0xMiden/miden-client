@@ -1,10 +1,10 @@
 use miden_client::utils::Serializable;
-use miden_objects::{
-    Felt as NativeFelt, Word as NativeWord, account::AuthSecretKey as NativeAuthSecretKey,
-};
+use miden_objects::account::AuthSecretKey as NativeAuthSecretKey;
+use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
-use super::{felt::Felt, word::Word};
+use super::felt::Felt;
+use super::word::Word;
 
 #[derive(Clone, Debug)]
 #[wasm_bindgen]

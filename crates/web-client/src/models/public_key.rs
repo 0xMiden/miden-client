@@ -1,11 +1,11 @@
-use miden_objects::{Word as NativeWord, crypto::dsa::rpo_falcon512::PublicKey as NativePublicKey};
+use miden_objects::Word as NativeWord;
+use miden_objects::crypto::dsa::rpo_falcon512::PublicKey as NativePublicKey;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::{
-    models::{signature::Signature, word::Word},
-    utils::{deserialize_from_uint8array, serialize_to_uint8array},
-};
+use crate::models::signature::Signature;
+use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Copy, Clone)]
