@@ -1,19 +1,25 @@
-// @ts-check
-
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   eslint.configs.recommended,
-  tseslint.configs.strictTypeChecked,
+  tseslint.configs.recommendedTypeChecked,
   {
+    // Apply type-checked rules ONLY to TypeScript files
+    files: ["**/*.ts"],
     languageOptions: {
       parserOptions: {
-        projectService: true,
-        allowDefaultProject: ["eslint.config.mjs"],
-        project: "./tsconfig.json",
+        project: ["./tsconfig.json"],
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-    ignores: ["**/**.js", "**/node_modules/**"],
+  },
+  {
+    // Global ignore patterns (relative to project root)
+    ignores: [
+      "js/**", // Ignore entire js directory
+      "**/node_modules/**",
+      "**/*.mjs",
+    ],
   }
 );
