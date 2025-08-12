@@ -32,6 +32,7 @@ use super::{
     Store,
     TransactionFilter,
 };
+use crate::note::NoteUpdateTracker;
 use crate::store::StoreError;
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -147,9 +148,15 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| SqliteStore::apply_transaction(conn, &tx_update))
-            .await
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::apply_transaction(conn, &tx_update, &note_updates)
+        })
+        .await
     }
 
     async fn get_input_notes(

@@ -32,6 +32,7 @@ use super::{
     StoreError,
     TransactionFilter,
 };
+use crate::note::NoteUpdateTracker;
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
@@ -101,8 +102,12 @@ impl Store for WebStore {
         self.get_transactions(transaction_filter).await
     }
 
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
-        self.apply_transaction(tx_update).await
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError> {
+        self.apply_transaction(tx_update, note_updates).await
     }
 
     // NOTES

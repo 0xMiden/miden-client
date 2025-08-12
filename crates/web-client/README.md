@@ -126,14 +126,14 @@ const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
     noteIdToConsume,
 ]);
 
-// Execute and prove the transaction client side
-const consumeTransactionResult = await webClient.newTransaction(
+// Execute the transaction client side
+const consumeTransactionUpdate = await webClient.newTransaction(
     account,
     consumeTransactionRequest
 );
 
-// Submit the transaction to the node
-await webClient.submitTransaction(consumeTransactionResult);
+// Submit the transaction to the node and store it locally
+await webClient.submitTransaction(consumeTransactionUpdate);
 
 // Need to sync state again (in a loop) until the node verifies the transaction
 await syncState()

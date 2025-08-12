@@ -68,11 +68,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest = new window.TransactionRequestBuilder().build();
 
-    let txResult = await client.newTransaction(foreignAccountId, txRequest);
+    let txUpdate = await client.newTransaction(foreignAccountId, txRequest);
 
-    let txId = txResult.executedTransaction().id();
+    let txId = txUpdate.executedTransaction().id();
 
-    await client.submitTransaction(txResult);
+    await client.submitTransaction(txUpdate);
 
     await window.helpers.waitForTransaction(txId.toHex());
 
@@ -130,9 +130,9 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       .withForeignAccounts([foreignAccount])
       .build();
 
-    let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);
+    let txUpdate2 = await client.newTransaction(newAccount.id(), txRequest2);
 
-    await client.submitTransaction(txResult2);
+    await client.submitTransaction(txUpdate2);
   });
 };
 

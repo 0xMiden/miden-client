@@ -26,24 +26,29 @@ const mockChainTest = async (testingPage: Page) => {
       BigInt(1000)
     );
 
-    const mintTransactionResult = await client.newTransaction(
+    const mintTransactionUpdate = await client.newTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
 
-    await client.submitTransaction(mintTransactionResult);
+    await client.submitTransaction(mintTransactionUpdate);
     await client.proveBlock();
     await client.syncState();
 
     const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintTransactionResult.createdNotes().notes()[0].id().toString(),
+      mintTransactionUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()[0]
+        .id()
+        .toString(),
     ]);
-    const consumeTransactionResult = await client.newTransaction(
+    const consumeTransactionUpdate = await client.newTransaction(
       account.id(),
       consumeTransactionRequest
     );
 
-    await client.submitTransaction(consumeTransactionResult);
+    await client.submitTransaction(consumeTransactionUpdate);
     await client.proveBlock();
     await client.syncState();
 

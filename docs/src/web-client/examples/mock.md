@@ -12,12 +12,12 @@ try {
     const mockWebClient = await MockWebClient.createClient();
 
     // Running a mint transaction (assuming the client was setup previously)
-    const mintTransactionResult = await mockWebClient.newTransaction(
+    const mintTransactionUpdate = await mockWebClient.newTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
 
-    await mockWebClient.submitTransaction(mintTransactionResult);
+    await mockWebClient.submitTransaction(mintTransactionUpdate);
     await mockWebClient.proveBlock(); // Creates a new block that will include the submitted transaction
     await mockWebClient.syncState();
 

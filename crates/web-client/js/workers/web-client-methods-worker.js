@@ -83,17 +83,17 @@ const methodHandlers = {
       new Uint8Array(serializedTransactionRequest)
     );
 
-    const transactionResult = await wasmWebClient.newTransaction(
+    const transactionUpdate = await wasmWebClient.newTransaction(
       accountId,
       transactionRequest
     );
-    const serializedTransactionResult = transactionResult.serialize();
-    return serializedTransactionResult.buffer;
+    const serializedTransactionUpdate = transactionUpdate.serialize();
+    return serializedTransactionUpdate.buffer;
   },
   [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    const [serializedTransactionResult, serializedProver] = args;
-    const transactionResult = wasm.TransactionResult.deserialize(
-      new Uint8Array(serializedTransactionResult)
+    const [serializedTransactionUpdate, serializedProver] = args;
+    const transactionUpdate = wasm.TransactionStoreUpdate.deserialize(
+      new Uint8Array(serializedTransactionUpdate)
     );
 
     let prover = undefined;
@@ -111,7 +111,7 @@ const methodHandlers = {
     }
 
     // Call the unified submit_transaction method with an optional prover.
-    await wasmWebClient.submitTransaction(transactionResult, prover);
+    await wasmWebClient.submitTransaction(transactionUpdate, prover);
     return;
   },
   [MethodName.SYNC_STATE]: async () => {
