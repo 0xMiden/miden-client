@@ -27,10 +27,6 @@ struct Args {
     #[arg(short, long, default_value = "http://localhost:57291")]
     rpc_endpoint: Url,
 
-    /// The path to the store directory, it will use a temporary directory if not provided.
-    #[arg(short, long)]
-    store_path: Option<PathBuf>,
-
     /// The path to the keystore directory, it will use a temporary directory if not provided.
     #[arg(short, long)]
     keystore_path: Option<PathBuf>,
@@ -48,7 +44,7 @@ impl From<Args> for ClientConfig {
             Some(args.rpc_endpoint.port().unwrap()),
         );
         let timeout_ms = args.timeout;
-        let store_path = args.store_path.unwrap_or_else(create_test_store_path);
+        let store_path = create_test_store_path();
         let auth_path = args.keystore_path.unwrap_or_else(create_test_auth_path);
 
         ClientConfig::new(endpoint, timeout_ms, store_path, auth_path)

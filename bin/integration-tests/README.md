@@ -25,7 +25,6 @@ miden-client-integration-tests [OPTIONS]
 ### Command-Line Options
 
 - `-r, --rpc-endpoint <URL>` - The URL of the RPC endpoint to use (default: `http://localhost:57291`)
-- `-s, --store-path <PATH>` - The path to the store directory (uses temporary directory if not provided)
 - `-k, --keystore-path <PATH>` - The path to the keystore directory (uses temporary directory if not provided)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
 - `-h, --help` - Show help information
@@ -43,9 +42,9 @@ Run tests against a custom RPC endpoint:
 miden-client-integration-tests --rpc-endpoint http://192.168.1.100:57291
 ```
 
-Run tests with custom timeout and store paths:
+Run tests with custom timeout:
 ```bash
-miden-client-integration-tests --timeout 30000 --store-path /tmp/miden-store --keystore-path /tmp/miden-keystore
+miden-client-integration-tests --timeout 30000 --keystore-path /tmp/miden-keystore
 ```
 
 Show help:
