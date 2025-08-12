@@ -9,10 +9,10 @@ use crate::WebClient;
 
 #[wasm_bindgen]
 impl WebClient {
-    /// Creates a new client with a mocked RPC API. Useful for testing purposes and proof-of-concept
+    /// Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
     /// applications as it uses a mock chain that simulates the behavior of a real node.
-    #[wasm_bindgen(js_name = "createMockedClient")]
-    pub async fn create_mocked_client(
+    #[wasm_bindgen(js_name = "createMockClient")]
+    pub async fn create_mock_client(
         &mut self,
         seed: Option<Vec<u8>>,
         serialized_mock_chain: Option<Vec<u8>>,
@@ -40,7 +40,7 @@ impl WebClient {
             .as_ref()
             .map(|api| api.mock_chain.read().to_bytes())
             .ok_or_else(|| {
-                JsValue::from_str("Mock chain is not initialized. Create a mocked client first.")
+                JsValue::from_str("Mock chain is not initialized. Create a mock client first.")
             })
     }
 

@@ -3,7 +3,7 @@ import { testingPage } from "./mocha.global.setup.mjs";
 
 const mockChainTest = async () => {
   return await testingPage.evaluate(async () => {
-    const client = await window.WebClientMock.createClient();
+    const client = await window.MockWebClient.createClient();
     await client.syncState();
 
     const account = await client.newWallet(

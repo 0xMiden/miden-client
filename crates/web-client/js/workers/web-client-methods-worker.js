@@ -124,7 +124,7 @@ const methodHandlers = {
 methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   let [serializedMockChain] = args;
   serializedMockChain = new Uint8Array(serializedMockChain);
-  await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
 
   return await methodHandlers[MethodName.SYNC_STATE]();
 };
@@ -133,7 +133,7 @@ methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
   let serializedMockChain = args.pop();
   serializedMockChain = new Uint8Array(serializedMockChain);
   wasmWebClient = new wasm.WebClient();
-  await wasmWebClient.createMockedClient(wasmSeed, serializedMockChain);
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
 
   await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
 

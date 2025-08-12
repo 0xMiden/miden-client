@@ -427,24 +427,24 @@ Object.getOwnPropertyNames(WasmWebClient).forEach((prop) => {
   }
 });
 
-export class WebClientMock extends WebClient {
+export class MockWebClient extends WebClient {
   constructor(seed) {
     super(null, seed);
   }
 
   /**
-   * Factory method to create a WebClient with a mock for testing purposes.
+   * Factory method to create a WebClient with a mock chain for testing purposes.
    *
    * @param serializedMockChain - Serialized mock chain data (optional). Will use an empty chain if not provided.
    * @param seed - The seed for the account (optional).
-   * @returns A promise that resolves to a mocked WebClient.
+   * @returns A promise that resolves to a MockWebClient.
    */
   static async createClient(serializedMockChain, seed) {
     // Construct the instance (synchronously).
-    const instance = new WebClientMock(seed);
+    const instance = new MockWebClient(seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createMockedClient(seed, serializedMockChain);
+    await instance.wasmWebClient.createMockClient(seed, serializedMockChain);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -520,10 +520,7 @@ export class WebClientMock extends WebClient {
       serializedMockChain = new Uint8Array(serializedMockChain);
 
       this.wasmWebClient = new WasmWebClient();
-      await this.wasmWebClient.createMockedClient(
-        this.seed,
-        serializedMockChain
-      );
+      await this.wasmWebClient.createMockClient(this.seed, serializedMockChain);
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
