@@ -161,8 +161,8 @@ export async function applyStateSync(stateUpdate) {
       upsertTransactionRecord(
         transactionRecord.id,
         transactionRecord.details,
-        transactionRecord.scriptRoot,
         transactionRecord.blockNum,
+        transactionRecord.scriptRoot,
         transactionRecord.commitHeight,
         transactionRecord.discardCause
       ),

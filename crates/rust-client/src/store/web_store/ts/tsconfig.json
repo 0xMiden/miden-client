@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
+    "checkJs": false,
     "incremental": true,
     "sourceMap": true,
     "noEmitOnError": true,
     "removeComments": false,
     "target": "ESNext",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "outDir": "../js",
     "strict": true
   },

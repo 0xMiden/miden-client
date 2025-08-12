@@ -47,7 +47,7 @@ export async function getAllAccountHeaders() {
 
     const resultObject = await Promise.all(
       latestRecords.map((record) => {
-        let accountSeedBase64: string | null = null;
+        let accountSeedBase64: string | undefined = undefined;
         if (record.accountSeed) {
           const seedAsBytes = new Uint8Array(record.accountSeed);
           if (seedAsBytes.length > 0) {
@@ -104,7 +104,7 @@ export async function getAccountHeader(accountId: string) {
       return null;
     }
 
-    let accountSeedBase64: string | null = null;
+    let accountSeedBase64: string | undefined = undefined;
 
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64

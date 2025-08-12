@@ -237,3 +237,9 @@ impl Store for WebStore {
         self.get_unspent_input_note_nullifiers().await
     }
 }
+
+#[wasm_bindgen(module = "/src/store/web_store/js/utils.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = logDexieError)]
+    fn log_dexie_error(error: JsValue, error_context: alloc::string::String);
+}

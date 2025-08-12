@@ -10,7 +10,7 @@ import { logDexieError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 interface ProcessedTransaction {
   scriptRoot?: string;
   discardCause?: string;
-  details: string;
+  details?: string;
   id: string;
   txScript?: string;
   blockNum: string;
