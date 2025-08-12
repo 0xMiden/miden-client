@@ -15,9 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client  = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client" }
-miden-lib     = { default-features = false, features = ["testing"], workspace = true }
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
+miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client" }
 
 # External dependencies
 async-trait        = { workspace = true }

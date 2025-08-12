@@ -28,6 +28,7 @@
 //!
 //! Additionally, the crate re-exports several utility modules:
 //!
+//! - **Assembly:** Types for working with Miden Assembly.
 //! - **Assets:** Types and utilities for working with assets.
 //! - **Auth:** Authentication-related types and functionalities.
 //! - **Blocks:** Types for handling block headers.
@@ -142,6 +143,18 @@ mod errors;
 // RE-EXPORTS
 // ================================================================================================
 
+/// Provides types and utilities for working with Miden Assembly.
+pub mod assembly {
+    pub use miden_objects::assembly::{
+        Assembler,
+        DefaultSourceManager,
+        Library,
+        LibraryPath,
+        Module,
+        ModuleKind,
+    };
+}
+
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
     pub use miden_objects::account::delta::{
@@ -177,13 +190,17 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
         InOrderIndex,
         LeafIndex,
         MerklePath,
+        MerkleStore,
+        MerkleTree,
         MmrDelta,
         MmrPeaks,
         MmrProof,
+        NodeIndex,
         SmtLeaf,
         SmtProof,
     };
@@ -191,13 +208,14 @@ pub mod crypto {
 }
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
+pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
 /// Provides various utilities that are commonly used throughout the Miden
 /// client library.
 pub mod utils {
+    pub use miden_lib::utils::word_to_masm_push_string;
     pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
     pub use miden_tx::utils::{
         ByteReader,

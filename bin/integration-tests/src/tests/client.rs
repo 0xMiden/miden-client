@@ -1,9 +1,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use miden_client::account::AccountId;
+use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -17,16 +19,14 @@ use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
+    ProvenTransaction,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
     TransactionStatus,
+    TransactionWitness,
 };
 use miden_client::{ClientError, ONE};
-use miden_objects::account::AccountStorageMode;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::note::{NoteFile, NoteType};
-use miden_objects::transaction::{ProvenTransaction, TransactionWitness};
 use winter_maybe_async::maybe_async_trait;
 
 pub async fn client_builder_initializes_client_with_endpoint(client_config: ClientConfig) {

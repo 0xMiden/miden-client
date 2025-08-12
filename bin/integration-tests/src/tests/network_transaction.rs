@@ -1,7 +1,16 @@
 use std::sync::Arc;
 use std::vec;
 
+use miden_client::account::component::AccountComponent;
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageSlot};
+use miden_client::assembly::{
+    Assembler,
+    DefaultSourceManager,
+    Library,
+    LibraryPath,
+    Module,
+    ModuleKind,
+};
 use miden_client::note::NoteTag;
 use miden_client::testing::common::{
     TestClient,
@@ -13,18 +22,13 @@ use miden_client::testing::common::{
 };
 use miden_client::testing::config::ClientConfig;
 use miden_client::testing::note::NoteBuilder;
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder, TransactionScript};
-use miden_client::{Felt, Word, ZERO};
-use miden_lib::transaction::TransactionKernel;
-use miden_objects::account::AccountComponent;
-use miden_objects::assembly::{
-    Assembler,
-    DefaultSourceManager,
-    Library,
-    LibraryPath,
-    Module,
-    ModuleKind,
+use miden_client::transaction::{
+    OutputNote,
+    TransactionKernel,
+    TransactionRequestBuilder,
+    TransactionScript,
 };
+use miden_client::{Felt, Word, ZERO};
 use rand::RngCore;
 
 // HELPERS

@@ -1,11 +1,9 @@
-use miden_client::account::Account;
-use miden_client::note::{Note, build_swap_tag};
+use miden_client::account::{Account, AccountStorageMode};
+use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
 use miden_client::testing::common::*;
 use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
-use miden_objects::account::AccountStorageMode;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::note::{NoteDetails, NoteFile, NoteType};
 
 // SWAP FULLY ONCHAIN
 // ================================================================================================

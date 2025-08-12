@@ -118,6 +118,7 @@ pub use miden_objects::transaction::{
     ProvenTransaction,
     TransactionId,
     TransactionScript,
+    TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
