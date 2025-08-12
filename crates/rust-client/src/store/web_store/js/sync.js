@@ -190,8 +190,8 @@ export async function applyStateSync(stateUpdate) {
         accountUpdate.assetVaultRoot,
         accountUpdate.nonce,
         accountUpdate.committed,
-        accountUpdate.accountSeed,
-        accountUpdate.accountCommitment
+        accountUpdate.accountCommitment,
+        accountUpdate.accountSeed
       ),
     ];
   });

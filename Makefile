@@ -17,6 +17,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
+RUST_CLIENT_DIR=crates/rust-client
 
 # --- Linting -------------------------------------------------------------------------------------
 
@@ -26,7 +27,7 @@ clippy: ## Run Clippy with configs. We need two separate commands because the `t
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
-clippy-wasm: ## Run Clippy for the miden-client-web package
+clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets $(FEATURES_WEB_CLIENT) -- -D warnings
 
 .PHONY: fix
@@ -74,7 +75,7 @@ book: ## Builds the book & serves documentation site
 	mdbook serve --open docs
 
 .PHONY: typedoc
-typedoc: ## Generate web client package documentation.
+typedoc: rust-client-ts-build ## Generate web client package documentation.
 	@cd crates/web-client && \
 	npm run build-dev && \
 	yarn typedoc
@@ -152,8 +153,12 @@ build: ## Build the CLI binary and client library in release mode
 	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release
 	cargo build --package testing-remote-prover --release
 
-build-wasm: ## Build the client library for wasm32
+build-wasm: rust-client-ts-build ## Build the client library for wasm32
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
+
+.PHONY: rust-client-ts-build
+rust-client-ts-build:
+	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn tsc --build --force
 
 # --- Check ---------------------------------------------------------------------------------------
 
@@ -187,5 +192,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
+	yarn --cwd $(RUST_CLIENT_DIR)/src/store/web_store --silent
 	yarn --silent
+	yarn
 	@echo "Development tools installation complete!"

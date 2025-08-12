@@ -147,9 +147,7 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
 
-    let (mut client_2, authenticator_2) =
-        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
-            .await;
+    let (mut client_2, authenticator_2) = create_test_client(client_config).await;
     let (client_2_account, _seed, _) =
         insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2)
             .await
@@ -169,8 +167,11 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
     client_2.sync_state().await.unwrap();
 
-    // If the verification is requested before execution then the import should fail
-    assert!(client_2.import_note(NoteFile::NoteId(note.id())).await.is_err());
+    // Importing a public note before it's committed onchain should fail
+    assert!(matches!(
+        client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap_err(),
+        ClientError::NoteNotFoundOnChain(_)
+    ));
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
     // Use client 1 to wait until a couple of blocks have passed
@@ -182,12 +183,12 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
     client_2.import_note(NoteFile::NoteId(note.clone().id())).await.unwrap();
     client_2.sync_state().await.unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    // If imported after execution and syncing then the inclusion proof should be Some
+    assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
+
     assert!(
         new_sync_data.block_num > input_note.inclusion_proof().unwrap().location().block_num() + 1
     );
-
-    // If imported after execution and syncing then the inclusion proof should be Some
-    assert!(input_note.inclusion_proof().is_some());
 
     // If client 2 successfully consumes the note, we confirm we have MMR and block header data
     let tx_id =
@@ -206,7 +207,7 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
     let note: InputNoteRecord =
         tx_request.expected_output_own_notes().pop().unwrap().clone().into();
 
-    // Import an uncommitted note without verification
+    // Import the node before it's committed onchain works if we have full `NoteDetails`
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
         .import_note(NoteFile::NoteDetails {
@@ -218,8 +219,8 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
         .unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
 
-    // If imported before execution then the inclusion proof should be None
-    assert!(input_note.inclusion_proof().is_none());
+    // If imported before execution, the note should be imported in `Expected` state
+    assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
 
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
     client_2.sync_state().await.unwrap();
@@ -227,7 +228,7 @@ pub async fn import_expected_notes(client_config: ClientConfig) {
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
-    assert!(input_note.inclusion_proof().is_some());
+    assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
     let tx_id =
@@ -287,9 +288,7 @@ pub async fn import_expected_notes_from_the_past_as_committed(client_config: Cli
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
 
-    let (mut client_2, _) =
-        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
-            .await;
+    let (mut client_2, _) = create_test_client(client_config).await;
 
     wait_for_node(&mut client_2).await;
 
@@ -310,9 +309,24 @@ pub async fn import_expected_notes_from_the_past_as_committed(client_config: Cli
 
     // Use client 1 to wait until a couple of blocks have passed
     wait_for_blocks(&mut client_1, 3).await;
+
+    // importing the note before client_2 is synced will result in a note with `Expected` state
+    let note_id = client_2
+        .import_note(NoteFile::NoteDetails {
+            details: note.clone().into(),
+            after_block_num: block_height_before,
+            tag: Some(note.metadata().unwrap().tag()),
+        })
+        .await
+        .unwrap();
+
+    let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
+
+    assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
+
     client_2.sync_state().await.unwrap();
 
-    // If the verification is requested before execution then the import should fail
+    // import the note after syncing the client
     let note_id = client_2
         .import_note(NoteFile::NoteDetails {
             details: note.clone().into(),
@@ -328,6 +342,7 @@ pub async fn import_expected_notes_from_the_past_as_committed(client_config: Cli
     let client_1_note = client_1.get_input_note(note_id).await.unwrap().unwrap();
 
     assert_eq!(imported_note.state(), client_1_note.state());
+    assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
 }
 
 pub async fn get_account_update(client_config: ClientConfig) {

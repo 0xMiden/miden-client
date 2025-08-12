@@ -18,8 +18,16 @@ export async function getAccountIds() {
     });
 
     return Array.from(allIds); // Convert back to array to return a list of unique IDs
-  } catch (error) {
-    console.error("Failed to retrieve account IDs: ", error.toString());
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error("Failed to retrieve account IDs: ", error.toString());
+    } else {
+      console.error(
+        "Failed to retrieve account IDs: Unexpected value thrown: ",
+        String(error)
+      );
+    }
     throw error;
   }
 }
@@ -55,26 +63,37 @@ export async function getAllAccountHeaders() {
         return {
           id: record.id,
           nonce: record.nonce,
-          vaultRoot: record.vaultRoot,
-          storageRoot: record.storageRoot,
-          codeRoot: record.codeRoot,
-          accountSeed: accountSeedBase64, // Now correctly formatted as Base64
+          vaultRoot: record.vaultRoot, // Fallback if missing
+          storageRoot: record.storageRoot || "",
+          codeRoot: record.codeRoot || "",
+          accountSeed: accountSeedBase64, // null or base64 string
           locked: record.locked,
+          committed: record.committed ?? true, // Use actual value or default
+          accountCommitment: record.accountCommitment || "", // Keep original field name
         };
       })
     );
 
     return resultObject;
-  } catch (error) {
-    console.error(
-      "Error fetching all latest account headers:",
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        "Error fetching all latest account headers:",
+        error.toString()
+      );
+    } else {
+      console.error(
+        "Error fetching all latest account headers: Unexpected value thrown:",
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getAccountHeader(accountId) {
+export async function getAccountHeader(accountId: string) {
+  // Added type for accountId
   try {
     // Fetch all records matching the given id
     const allMatchingRecords = await accounts
@@ -98,6 +117,10 @@ export async function getAccountHeader(accountId) {
     // The first record is the most recent one due to the sorting
     const mostRecentRecord = sortedRecords[0];
 
+    if (mostRecentRecord === undefined) {
+      return null;
+    }
+
     let accountSeedBase64 = null;
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
@@ -116,16 +139,25 @@ export async function getAccountHeader(accountId) {
       locked: mostRecentRecord.locked,
     };
     return AccountHeader;
-  } catch (error) {
-    console.error(
-      `Error fetching account header for ID ${accountId}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account header for ID ${accountId}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account header for ID ${accountId}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getAccountHeaderByCommitment(accountCommitment) {
+export async function getAccountHeaderByCommitment(accountCommitment: string) {
+  // Added type
   try {
     // Fetch all records matching the given commitment
     const allMatchingRecords = await accounts
@@ -133,13 +165,13 @@ export async function getAccountHeaderByCommitment(accountCommitment) {
       .equals(accountCommitment)
       .toArray();
 
-    if (allMatchingRecords.length === 0) {
+    // There should be only one match
+    const matchingRecord = allMatchingRecords[0];
+
+    if (matchingRecord === undefined) {
       console.log("No account header record found for given commitment.");
       return null;
     }
-
-    // There should be only one match
-    const matchingRecord = allMatchingRecords[0];
 
     let accountSeedBase64 = null;
     if (matchingRecord.accountSeed) {
@@ -159,16 +191,25 @@ export async function getAccountHeaderByCommitment(accountCommitment) {
       locked: matchingRecord.locked,
     };
     return AccountHeader;
-  } catch (error) {
-    console.error(
-      `Error fetching account header for commitment ${accountCommitment}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account header for commitment ${accountCommitment}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account header for commitment ${accountCommitment}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getAccountCode(codeRoot) {
+export async function getAccountCode(codeRoot: string) {
+  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountCodes
@@ -176,13 +217,13 @@ export async function getAccountCode(codeRoot) {
       .equals(codeRoot)
       .toArray();
 
-    if (allMatchingRecords.length === 0) {
+    // The first record is the only one due to the uniqueness constraint
+    const codeRecord = allMatchingRecords[0];
+
+    if (codeRecord === undefined) {
       console.log("No records found for given code root.");
       return null;
     }
-
-    // The first record is the only one due to the uniqueness constraint
-    const codeRecord = allMatchingRecords[0];
 
     // Convert the code Blob to an ArrayBuffer
     const codeArrayBuffer = await codeRecord.code.arrayBuffer();
@@ -193,16 +234,25 @@ export async function getAccountCode(codeRoot) {
       root: codeRecord.root,
       code: codeBase64,
     };
-  } catch (error) {
-    console.error(
-      `Error fetching account code for root ${codeRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account code for root ${codeRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account code for root ${codeRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getAccountStorage(storageRoot) {
+export async function getAccountStorage(storageRoot: string) {
+  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountStorages
@@ -210,13 +260,13 @@ export async function getAccountStorage(storageRoot) {
       .equals(storageRoot)
       .toArray();
 
-    if (allMatchingRecords.length === 0) {
+    // The first record is the only one due to the uniqueness constraint
+    const storageRecord = allMatchingRecords[0];
+
+    if (storageRecord === undefined) {
       console.log("No records found for given storage root.");
       return null;
     }
-
-    // The first record is the only one due to the uniqueness constraint
-    const storageRecord = allMatchingRecords[0];
 
     // Convert the module Blob to an ArrayBuffer
     const storageArrayBuffer = await storageRecord.slots.arrayBuffer();
@@ -226,16 +276,25 @@ export async function getAccountStorage(storageRoot) {
       root: storageRecord.root,
       storage: storageBase64,
     };
-  } catch (error) {
-    console.error(
-      `Error fetching account storage for root ${storageRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account storage for root ${storageRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account storage for root ${storageRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getAccountAssetVault(vaultRoot) {
+export async function getAccountAssetVault(vaultRoot: string) {
+  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountVaults
@@ -243,13 +302,13 @@ export async function getAccountAssetVault(vaultRoot) {
       .equals(vaultRoot)
       .toArray();
 
-    if (allMatchingRecords.length === 0) {
+    // The first record is the only one due to the uniqueness constraint
+    const vaultRecord = allMatchingRecords[0];
+
+    if (vaultRecord === undefined) {
       console.log("No records found for given vault root.");
       return null;
     }
-
-    // The first record is the only one due to the uniqueness constraint
-    const vaultRecord = allMatchingRecords[0];
 
     // Convert the assets Blob to an ArrayBuffer
     const assetsArrayBuffer = await vaultRecord.assets.arrayBuffer();
@@ -260,16 +319,25 @@ export async function getAccountAssetVault(vaultRoot) {
       root: vaultRecord.root,
       assets: assetsBase64,
     };
-  } catch (error) {
-    console.error(
-      `Error fetching account vault for root ${vaultRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account vault for root ${vaultRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account vault for root ${vaultRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export function getAccountAuthByPubKey(pubKey) {
+export function getAccountAuthByPubKey(pubKey: string) {
+  // Added type
   // Try to get the account auth from the cache
   let cachedSecretKey = ACCOUNT_AUTH_MAP.get(pubKey);
 
@@ -285,8 +353,9 @@ export function getAccountAuthByPubKey(pubKey) {
   return data;
 }
 
-var ACCOUNT_AUTH_MAP = new Map();
-export async function fetchAndCacheAccountAuthByPubKey(pubKey) {
+var ACCOUNT_AUTH_MAP = new Map<string, string>(); // Added types for Map
+export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
+  // Added type
   try {
     // Fetch all records matching the given id
     const allMatchingRecords = await accountAuths
@@ -294,13 +363,13 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey) {
       .equals(pubKey)
       .toArray();
 
-    if (allMatchingRecords.length === 0) {
+    // The first record is the only one due to the uniqueness constraint
+    const authRecord = allMatchingRecords[0];
+
+    if (authRecord === undefined) {
       console.log("No account auth records found for given account ID.");
       return null; // No records found
     }
-
-    // The first record is the only one due to the uniqueness constraint
-    const authRecord = allMatchingRecords[0];
 
     // Store the auth info in the map
     ACCOUNT_AUTH_MAP.set(authRecord.pubKey, authRecord.secretKey);
@@ -308,18 +377,26 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey) {
     return {
       secretKey: authRecord.secretKey,
     };
-  } catch (error) {
-    console.error(
-      `Error fetching account auth for pubKey ${pubKey}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error fetching account auth for pubKey ${pubKey}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error fetching account auth for pubKey ${pubKey}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
 // INSERT FUNCTIONS
 
-export async function insertAccountCode(codeRoot, code) {
+export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
     // Create a Blob from the ArrayBuffer
     const codeBlob = new Blob([new Uint8Array(code)]);
@@ -332,16 +409,27 @@ export async function insertAccountCode(codeRoot, code) {
 
     // Perform the insert using Dexie
     await accountCodes.put(data);
-  } catch (error) {
-    console.error(
-      `Error inserting code with root: ${codeRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error inserting code with root: ${codeRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error inserting code with root: ${codeRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function insertAccountStorage(storageRoot, storageSlots) {
+export async function insertAccountStorage(
+  storageRoot: string,
+  storageSlots: Uint8Array
+) {
   try {
     const storageSlotsBlob = new Blob([new Uint8Array(storageSlots)]);
 
@@ -353,16 +441,27 @@ export async function insertAccountStorage(storageRoot, storageSlots) {
 
     // Perform the insert using Dexie
     await accountStorages.put(data);
-  } catch (error) {
-    console.error(
-      `Error inserting storage with root: ${storageRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error inserting storage with root: ${storageRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error inserting storage with root: ${storageRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function insertAccountAssetVault(vaultRoot, assets) {
+export async function insertAccountAssetVault(
+  vaultRoot: string,
+  assets: Uint8Array
+) {
   try {
     const assetsBlob = new Blob([new Uint8Array(assets)]);
 
@@ -374,24 +473,32 @@ export async function insertAccountAssetVault(vaultRoot, assets) {
 
     // Perform the insert using Dexie
     await accountVaults.put(data);
-  } catch (error) {
-    console.error(
-      `Error inserting vault with root: ${vaultRoot}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error inserting vault with root: ${vaultRoot}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error inserting vault with root: ${vaultRoot}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
 export async function insertAccountRecord(
-  accountId,
-  codeRoot,
-  storageRoot,
-  vaultRoot,
-  nonce,
-  committed,
-  accountSeed,
-  commitment
+  accountId: string,
+  codeRoot: string,
+  storageRoot: string,
+  vaultRoot: string,
+  nonce: string,
+  committed: boolean,
+  commitment: string,
+  accountSeed?: Uint8Array
 ) {
   try {
     let accountSeedBlob = null;
@@ -411,16 +518,23 @@ export async function insertAccountRecord(
       accountCommitment: commitment,
       locked: false,
     };
-
     // Perform the insert using Dexie
     await accounts.add(data);
-  } catch (error) {
-    console.error(`Error inserting account: ${accountId}:`, error.toString());
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(`Error inserting account: ${accountId}:`, error.toString());
+    } else {
+      console.error(
+        `Error inserting account: ${accountId}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function insertAccountAuth(pubKey, secretKey) {
+export async function insertAccountAuth(pubKey: string, secretKey: string) {
   try {
     // Prepare the data object to insert
     const data = {
@@ -430,16 +544,27 @@ export async function insertAccountAuth(pubKey, secretKey) {
 
     // Perform the insert using Dexie
     await accountAuths.add(data);
-  } catch (error) {
-    console.error(
-      `Error inserting auth for account: ${accountId}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error(
+        `Error inserting account auth for pubKey: ${pubKey}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error inserting account auth for pubKey: ${pubKey}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function upsertForeignAccountCode(accountId, code, codeRoot) {
+export async function upsertForeignAccountCode(
+  accountId: string,
+  code: Uint8Array,
+  codeRoot: string
+) {
   try {
     await insertAccountCode(codeRoot, code);
 
@@ -449,16 +574,21 @@ export async function upsertForeignAccountCode(accountId, code, codeRoot) {
     };
 
     await foreignAccountCode.put(data);
-  } catch (error) {
-    console.error(
-      `Error updating foreign account code: (${accountId}, ${codeRoot}):`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(`Error inserting account: ${accountId}:`, error.toString());
+    } else {
+      console.error(
+        `Error inserting account: ${accountId}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function getForeignAccountCode(accountIds) {
+export async function getForeignAccountCode(accountIds: string[]) {
   try {
     const foreignAccounts = await foreignAccountCode
       .where("accountId")
@@ -477,55 +607,85 @@ export async function getForeignAccountCode(accountIds) {
       .anyOf(codeRoots)
       .toArray();
 
-    const processedCode = foreignAccounts.map(async (foreignAccount) => {
-      const matchingCode = accountCode.find(
-        (code) => code.root === foreignAccount.codeRoot
-      );
+    const processedCode = foreignAccounts
+      .map(async (foreignAccount) => {
+        const matchingCode = accountCode.find(
+          (code) => code.root === foreignAccount.codeRoot
+        );
 
-      // Convert the code Blob to an ArrayBuffer
-      const codeArrayBuffer = await matchingCode.code.arrayBuffer();
-      const codeArray = new Uint8Array(codeArrayBuffer);
-      const codeBase64 = uint8ArrayToBase64(codeArray);
+        if (matchingCode === undefined) {
+          return undefined;
+        }
 
-      return {
-        accountId: foreignAccount.accountId,
-        code: codeBase64,
-      };
-    });
+        // Convert the code Blob to an ArrayBuffer
+        const codeArrayBuffer = await matchingCode.code.arrayBuffer();
+        const codeArray = new Uint8Array(codeArrayBuffer);
+        const codeBase64 = uint8ArrayToBase64(codeArray);
+
+        return {
+          accountId: foreignAccount.accountId,
+          code: codeBase64,
+        };
+      })
+      .filter((matchingCode) => matchingCode !== undefined);
     return processedCode;
-  } catch (error) {
-    console.error("Error fetching foreign account code:", error.toString());
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error("Error fetching foreign account code:", error.toString());
+    } else {
+      console.error(
+        "Error fetching foreign account code: Unexpected value thrown:",
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-export async function lockAccount(accountId) {
+export async function lockAccount(accountId: string) {
   try {
     await accounts.where("id").equals(accountId).modify({ locked: true });
-  } catch (error) {
-    console.error(`Error locking account: ${accountId}:`, error.toString());
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(`Error locking account: ${accountId}:`, error.toString());
+    } else {
+      console.error(
+        `Error locking account: ${accountId}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
 // Delete functions
 
-export async function undoAccountStates(accountCommitments) {
+export async function undoAccountStates(accountCommitments: string[]) {
   try {
     await accounts
       .where("accountCommitment")
       .anyOf(accountCommitments)
       .delete();
-  } catch (error) {
-    console.error(
-      `Error undoing account states: ${accountCommitments}:`,
-      error.toString()
-    );
+  } catch (error: unknown) {
+    // Add unknown type
+    if (error instanceof Error) {
+      console.error(
+        `Error undoing account states: ${accountCommitments}:`,
+        error.toString()
+      );
+    } else {
+      console.error(
+        `Error undoing account states: ${accountCommitments}: Unexpected value thrown:`,
+        String(error)
+      );
+    }
     throw error;
   }
 }
 
-function uint8ArrayToBase64(bytes) {
+function uint8ArrayToBase64(bytes: Uint8Array) {
   const binary = bytes.reduce(
     (acc, byte) => acc + String.fromCharCode(byte),
     ""

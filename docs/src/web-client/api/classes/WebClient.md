@@ -126,9 +126,9 @@
 
 > **exportStore**(): `Promise`\<`any`\>
 
-Retrieves the entire underlying web store and returns it as a JsValue
+Retrieves the entire underlying web store and returns it as a `JsValue`
 
-Meant to be used in conjunction with the force_import_store method
+Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 

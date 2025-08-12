@@ -526,7 +526,7 @@ interface ConsumeTransactionResult {
   transactionId: string;
   nonce: string | undefined;
   numConsumedNotes: number;
-  targetAccountBalanace: string;
+  targetAccountBalance: string;
 }
 
 export const consumeTransaction = async (
@@ -572,7 +572,7 @@ export const consumeTransaction = async (
           .toHex(),
         nonce: consumeTransactionResult.accountDelta().nonceDelta().toString(),
         numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
-        targetAccountBalanace: changedTargetAccount
+        targetAccountBalance: changedTargetAccount
           .vault()
           .getBalance(faucetId)
           .toString(),
@@ -690,7 +690,7 @@ export const mintAndConsumeTransaction = async (
             .nonceDelta()
             .toString(),
           numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
-          targetAccountBalanace: changedTargetAccount
+          targetAccountBalance: changedTargetAccount
             .vault()
             .getBalance(faucetAccountId)
             .toString(),

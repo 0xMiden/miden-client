@@ -13,7 +13,6 @@ use crate::store::web_store::transaction::utils::SerializedTransactionData;
 
 // Sync IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/sync.js")]
-
 extern "C" {
     // GETS
     // ================================================================================================

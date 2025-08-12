@@ -18,6 +18,16 @@
 
 ***
 
+### id()
+
+> **id**(): [`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountId`](AccountId.md)
+
+***
+
 ### isEmpty()
 
 > **isEmpty**(): `boolean`
@@ -38,6 +48,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### storage()
 
 > **storage**(): [`AccountStorageDelta`](AccountStorageDelta.md)
@@ -55,3 +75,19 @@
 #### Returns
 
 [`AccountVaultDelta`](AccountVaultDelta.md)
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `AccountDelta`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`AccountDelta`

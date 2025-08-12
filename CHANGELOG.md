@@ -13,20 +13,24 @@
 * `NoteScript` now has a `toString` method that prints its own MAST source [(#1082)](https://github.com/0xMiden/miden-client/pull/1082).
 * Added a `NoteScript` getter for the Web Client `Note` model ([#1135](https://github.com/0xMiden/miden-client/pull/1135/)).
 * [BREAKING] Changed `OnNoteReceived` from closure to trait object ([#1080](https://github.com/0xMiden/miden-client/pull/1080)).
+* [BREAKING] `insertAccountRecord` changed the order of some parameters [(#1068)](https://github.com/0xMiden/miden-client/pull/1068).
+* The rust-client has now a simple TypeScript setup for its JS code [(#1068)](https://github.com/0xMiden/miden-client/pull/1068).
 * Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
+* Exposes additional `TransactionFilter` filters in Web Client ([#1114](https://github.com/0xMiden/miden-client/pull/1114))
 * Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
 
 ### Features
 
 * Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
-* Added `TokenSymbol` Type to Web Client (#1046).
 * Implemented missing endpoints for the `MockRpcApi` (#1074).
-* Added ability to convert `Word` to `U64` array and `Felt` array in Web Client (([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
+* Added ability to convert `Word` to `U64` array and `Felt` array in Web Client ([#1041](https://github.com/0xMiden/miden-client/pull/1041)).
 * Added `TokenSymbol` type to Web Client ([#1046](https://github.com/0xMiden/miden-client/pull/1046)).
 * [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
 * Added authentication arguments support to `TransactionRequest` ([#1121](https://github.com/0xMiden/miden-client/pull/1121)).
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
-  
+* Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141))
+* Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115))
+
 ## 0.10.1 (2025-07-26)
 
 * Avoid passing unneeded nodes to `PartialMmr::from_parts` (#1081).
