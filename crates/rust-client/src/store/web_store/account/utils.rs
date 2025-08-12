@@ -65,7 +65,7 @@ pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsVa
 
     let account_auth_idxdb: Option<AccountAuthIdxdbObject> =
         from_value(js_secret_key).map_err(|err| {
-            JsValue::from_str(&format!("error: failed to deserialize secret key : {err}"))
+            JsValue::from_str(&format!("error: failed to deserialize secret key: {err}"))
         })?;
 
     match account_auth_idxdb {

@@ -21,9 +21,9 @@ miden-objects = { default-features = false, features = ["testing"], workspace = 
 rand = { workspace = true }
 
 [dev-dependencies]
-async-trait        = { version = "0.1" }
-miden-lib          = { default-features = false, features = ["testing"], workspace = true }
-tokio              = { workspace = true }
+async-trait = { version = "0.1" }
+miden-lib   = { default-features = false, features = ["testing"], workspace = true }
+tokio       = { workspace = true }
 
 [[test]]
 name = "integration"

@@ -23,14 +23,14 @@ use super::KeyStoreError;
 /// The keystore requires an RNG component for generating Falcon signatures at the moment of
 /// transaction signing.
 #[derive(Debug, Clone)]
-pub struct FilesystemKeyStore<R: Rng> {
+pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
     /// The directory where the keys are stored and read from.
     keys_directory: PathBuf,
 }
 
-impl<R: Rng> FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     pub fn with_rng(keys_directory: PathBuf, rng: R) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
             std::fs::create_dir_all(&keys_directory).map_err(|err| {

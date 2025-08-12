@@ -26,7 +26,6 @@ use miden_objects::account::AccountStorageMode;
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::note::{NoteFile, NoteType};
 use miden_objects::transaction::{ProvenTransaction, TransactionWitness};
-use winter_maybe_async::maybe_async_trait;
 
 mod custom_transactions_tests;
 mod fpi_tests;
@@ -998,7 +997,7 @@ impl AlwaysFailingProver {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl TransactionProver for AlwaysFailingProver {
     async fn prove(
         &self,
