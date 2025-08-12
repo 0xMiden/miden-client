@@ -15,7 +15,7 @@ use miden_objects::account::{
     StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::{AccountError, Felt, Word, WordError};
+use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
@@ -58,7 +58,7 @@ impl SqliteStore {
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
         query_account_headers(
             conn,
-            "nonce = (SELECT MAX(b.nonce) FROM accounts b WHERE b.id = id)",
+            "nonce = (SELECT MAX(b.nonce) FROM accounts b WHERE b.id = a.id)",
             params![],
         )
     }
@@ -190,7 +190,7 @@ impl SqliteStore {
             account_ids.into_iter().map(|id| Value::from(id.to_hex())).collect();
         const QUERY: &str = "
             SELECT account_id, code
-            FROM foreign_account_code JOIN account_code ON code_commitment = code_commitment
+            FROM foreign_account_code JOIN account_code ON foreign_account_code.code_commitment = account_code.commitment
             WHERE account_id IN rarray(?)";
 
         conn.prepare(QUERY)?
@@ -270,10 +270,11 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         account_hashes: &[Word],
     ) -> Result<(), StoreError> {
-        const QUERY: &str = "DELETE FROM accounts WHERE account_commitment = ?";
-        for account_id in account_hashes {
-            tx.execute(QUERY, params![account_id.to_hex()])?;
-        }
+        const QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+
+        let params = account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>();
+        tx.execute(QUERY, params![Rc::new(params)])?;
+
         Ok(())
     }
 
@@ -441,12 +442,12 @@ fn query_storage_slots(
         .into_iter()
         .map(|value| {
             if let Some(map) = storage_maps.remove(&value) {
-                Ok(StorageSlot::Map(map))
+                StorageSlot::Map(map)
             } else {
-                Ok(StorageSlot::Value(value))
+                StorageSlot::Value(value)
             }
         })
-        .collect::<Result<Vec<StorageSlot>, WordError>>()?)
+        .collect())
 }
 
 fn query_storage_maps(
@@ -529,7 +530,7 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts WHERE ";
+        FROM accounts a WHERE ";
     let query = format!("{SELECT_QUERY}{where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {

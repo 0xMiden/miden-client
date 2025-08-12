@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
 // Account IndexedDB Operations
-#[wasm_bindgen(module = "/src/store/web_store/ts/accounts.ts")]
+#[wasm_bindgen(module = "/src/store/web_store/js/accounts.js")]
 extern "C" {
     // GETS
     // ================================================================================================

@@ -47,7 +47,7 @@ pub mod sync;
 pub mod transaction;
 
 // Initialize IndexedDB
-#[wasm_bindgen(module = "/src/store/web_store/ts/schema.ts")]
+#[wasm_bindgen(module = "/src/store/web_store/js/schema.js")]
 extern "C" {
     #[wasm_bindgen(js_name = openDatabase)]
     fn setup_indexed_db() -> js_sys::Promise;
