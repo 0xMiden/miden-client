@@ -77,13 +77,12 @@ use core::fmt::{self};
 
 use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
 use miden_objects::assembly::DefaultSourceManager;
-use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteTag};
 use miden_objects::transaction::{AccountInputs, TransactionArgs};
-use miden_objects::{AssetError, Felt, Word};
+use miden_objects::{Felt, Word};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use miden_tx::{DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{DataStore, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
@@ -93,16 +92,13 @@ use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    StoreError,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
+use crate::transaction::transaction_stage::TransactionStages;
 
 mod request;
+mod transaction_stage;
 
 // RE-EXPORTS
 // ================================================================================================
@@ -110,34 +106,18 @@ mod request;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionId,
-    TransactionScript,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionId, TransactionScript,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
-    TransactionProver,
-    TransactionProverError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
+    TransactionProver, TransactionProverError,
 };
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT
@@ -518,9 +498,6 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        // Validates the transaction request before executing
-        self.validate_request(account_id, &transaction_request).await?;
-
         // Ensure authenticated notes have their inclusion proofs (a.k.a they're in a committed
         // state)
         let authenticated_input_note_ids: Vec<NoteId> =
@@ -541,18 +518,7 @@ where
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.build_input_notes(authenticated_note_records)?;
-
-        let output_recipients =
-            transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
-
-        let future_notes: Vec<(NoteDetails, NoteTag)> =
-            transaction_request.expected_future_notes().cloned().collect();
-
-        let tx_script = transaction_request.build_transaction_script(
-            &self.get_account_interface(account_id).await?,
-            self.in_debug_mode().into(),
-        )?;
+        let input_notes = transaction_request.build_input_notes(authenticated_note_records)?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
@@ -560,50 +526,30 @@ where
         let (fpi_block_num, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
-        let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
-
-        let data_store = ClientDataStore::new(self.store.clone());
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
-
-        let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
-
         let block_num = if let Some(block_num) = fpi_block_num {
             block_num
         } else {
             self.store.get_sync_height().await?
         };
 
-        // TODO: Refactor this to get account code only?
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
-        data_store.mast_store().load_account_code(account.code());
+        let account = self.try_get_account(account_id).await?.into();
 
-        if ignore_invalid_notes {
-            // Remove invalid notes
-            notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
-        }
+        let data_store = ClientDataStore::new(self.store.clone());
 
-        // Execute the transaction and get the witness
-        let executed_transaction = self
-            .build_executor(&data_store)?
+        let mut transaction_stages =
+            TransactionStages::new(self.rpc_api.clone(), self.max_block_number_delta);
+
+        transaction_stages
             .execute_transaction(
-                account_id,
+                account,
+                transaction_request,
+                foreign_account_inputs,
+                input_notes,
+                &data_store,
+                &self.build_executor(&data_store)?,
                 block_num,
-                notes,
-                tx_args,
-                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
-            .await?;
-
-        validate_executed_transaction(&executed_transaction, &output_recipients)?;
-
-        TransactionResult::new(executed_transaction, future_notes)
+            .await
     }
 
     /// Proves the specified transaction using a local prover, submits it to the network, and saves
@@ -857,210 +803,6 @@ where
         ))
     }
 
-    /// Helper to get the account outgoing assets.
-    ///
-    /// Any outgoing assets resulting from executing note scripts but not present in expected output
-    /// notes wouldn't be included.
-    fn get_outgoing_assets(
-        transaction_request: &TransactionRequest,
-    ) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-        // Get own notes assets
-        let mut own_notes_assets = match transaction_request.script_template() {
-            Some(TransactionScriptTemplate::SendNotes(notes)) => notes
-                .iter()
-                .map(|note| (note.id(), note.assets().clone()))
-                .collect::<BTreeMap<_, _>>(),
-            _ => BTreeMap::default(),
-        };
-        // Get transaction output notes assets
-        let mut output_notes_assets = transaction_request
-            .expected_output_own_notes()
-            .into_iter()
-            .map(|note| (note.id(), note.assets().clone()))
-            .collect::<BTreeMap<_, _>>();
-
-        // Merge with own notes assets and delete duplicates
-        output_notes_assets.append(&mut own_notes_assets);
-
-        // Create a map of the fungible and non-fungible assets in the output notes
-        let outgoing_assets =
-            output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
-
-        collect_assets(outgoing_assets)
-    }
-
-    /// Helper to get the account incoming assets.
-    async fn get_incoming_assets(
-        &self,
-        transaction_request: &TransactionRequest,
-    ) -> Result<(BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>), TransactionRequestError>
-    {
-        // Get incoming asset notes excluding unauthenticated ones
-        let incoming_notes_ids: Vec<_> = transaction_request
-            .input_notes()
-            .iter()
-            .filter_map(|(note_id, _)| {
-                if transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .any(|note| note.id() == *note_id)
-                {
-                    None
-                } else {
-                    Some(*note_id)
-                }
-            })
-            .collect();
-
-        let store_input_notes = self
-            .get_input_notes(NoteFilter::List(incoming_notes_ids))
-            .await
-            .map_err(|err| TransactionRequestError::NoteNotFound(err.to_string()))?;
-
-        let all_incoming_assets =
-            store_input_notes.iter().flat_map(|note| note.assets().iter()).chain(
-                transaction_request
-                    .unauthenticated_input_notes()
-                    .iter()
-                    .flat_map(|note| note.assets().iter()),
-            );
-
-        Ok(collect_assets(all_incoming_assets))
-    }
-
-    async fn validate_basic_account_request(
-        &self,
-        transaction_request: &TransactionRequest,
-        account: &Account,
-    ) -> Result<(), ClientError> {
-        // Get outgoing assets
-        let (fungible_balance_map, non_fungible_set) =
-            Client::<AUTH>::get_outgoing_assets(transaction_request);
-
-        // Get incoming assets
-        let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
-            self.get_incoming_assets(transaction_request).await?;
-
-        // Check if the account balance plus incoming assets is greater than or equal to the
-        // outgoing fungible assets
-        for (faucet_id, amount) in fungible_balance_map {
-            let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
-            let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
-            if account_asset_amount + incoming_balance < amount {
-                return Err(ClientError::AssetError(
-                    AssetError::FungibleAssetAmountNotSufficient {
-                        minuend: account_asset_amount,
-                        subtrahend: amount,
-                    },
-                ));
-            }
-        }
-
-        // Check if the account balance plus incoming assets is greater than or equal to the
-        // outgoing non fungible assets
-        for non_fungible in non_fungible_set {
-            match account.vault().has_non_fungible_asset(non_fungible) {
-                Ok(true) => (),
-                Ok(false) => {
-                    // Check if the non fungible asset is in the incoming assets
-                    if !incoming_non_fungible_balance_set.contains(&non_fungible) {
-                        return Err(ClientError::AssetError(
-                            AssetError::NonFungibleFaucetIdTypeMismatch(
-                                non_fungible.faucet_id_prefix(),
-                            ),
-                        ));
-                    }
-                },
-                _ => {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(
-                            non_fungible.faucet_id_prefix(),
-                        ),
-                    ));
-                },
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Validates that the specified transaction request can be executed by the specified account.
-    ///
-    /// This does't guarantee that the transaction will succeed, but it's useful to avoid submitting
-    /// transactions that are guaranteed to fail. Some of the validations include:
-    /// - That the account has enough balance to cover the outgoing assets.
-    /// - That the client is not too far behind the chain tip.
-    pub async fn validate_request(
-        &mut self,
-        account_id: AccountId,
-        transaction_request: &TransactionRequest,
-    ) -> Result<(), ClientError> {
-        if let Some(max_block_number_delta) = self.max_block_number_delta {
-            let current_chain_tip =
-                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
-
-            if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
-                return Err(ClientError::RecencyConditionError(
-                    "The client is too far behind the chain tip to execute the transaction"
-                        .to_string(),
-                ));
-            }
-        }
-
-        let account: Account = self.try_get_account(account_id).await?.into();
-
-        if account.is_faucet() {
-            // TODO(SantiagoPittella): Add faucet validations.
-            Ok(())
-        } else {
-            self.validate_basic_account_request(transaction_request, &account).await
-        }
-    }
-
-    async fn get_valid_input_notes(
-        &self,
-        account_id: AccountId,
-        mut input_notes: InputNotes<InputNote>,
-        tx_args: TransactionArgs,
-    ) -> Result<InputNotes<InputNote>, ClientError> {
-        loop {
-            let data_store = ClientDataStore::new(self.store.clone());
-
-            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
-                .check_notes_consumability(
-                    account_id,
-                    self.store.get_sync_height().await?,
-                    input_notes.clone(),
-                    tx_args.clone(),
-                    Arc::new(DefaultSourceManager::default()),
-                )
-                .await?;
-
-            if let NoteAccountExecution::Failure { failed_note_id, .. } = execution {
-                let filtered_input_notes = InputNotes::new(
-                    input_notes.into_iter().filter(|note| note.id() != failed_note_id).collect(),
-                )
-                .expect("Created from a valid input notes list");
-
-                input_notes = filtered_input_notes;
-            } else {
-                break;
-            }
-        }
-
-        Ok(input_notes)
-    }
-
-    /// Retrieves the account interface for the specified account.
-    pub(crate) async fn get_account_interface(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountInterface, ClientError> {
-        let account: Account = self.try_get_account(account_id).await?.into();
-
-        Ok(AccountInterface::from(&account))
-    }
-
     /// Returns foreign account inputs for the required foreign accounts specified by the
     /// transaction request.
     ///
@@ -1186,27 +928,6 @@ impl<AUTH: TransactionAuthenticator + 'static> Client<AUTH> {
 // HELPERS
 // ================================================================================================
 
-fn collect_assets<'a>(
-    assets: impl Iterator<Item = &'a Asset>,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-    let mut fungible_balance_map = BTreeMap::new();
-    let mut non_fungible_set = BTreeSet::new();
-
-    assets.for_each(|asset| match asset {
-        Asset::Fungible(fungible) => {
-            fungible_balance_map
-                .entry(fungible.faucet_id())
-                .and_modify(|balance| *balance += fungible.amount())
-                .or_insert(fungible.amount());
-        },
-        Asset::NonFungible(non_fungible) => {
-            non_fungible_set.insert(*non_fungible);
-        },
-    });
-
-    (fungible_balance_map, non_fungible_set)
-}
-
 /// Extracts notes from [`OutputNotes`].
 /// Used for:
 /// - Checking the relevance of notes to save them as input notes.
@@ -1225,52 +946,20 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
         })
 }
 
-/// Validates that the executed transaction's output recipients match what was expected in the
-/// transaction request.
-fn validate_executed_transaction(
-    executed_transaction: &ExecutedTransaction,
-    expected_output_recipients: &[NoteRecipient],
-) -> Result<(), ClientError> {
-    let tx_output_recipient_digests = executed_transaction
-        .output_notes()
-        .iter()
-        .filter_map(|n| n.recipient().map(NoteRecipient::digest))
-        .collect::<Vec<_>>();
-
-    let missing_recipient_digest: Vec<Word> = expected_output_recipients
-        .iter()
-        .filter_map(|recipient| {
-            (!tx_output_recipient_digests.contains(&recipient.digest()))
-                .then_some(recipient.digest())
-        })
-        .collect();
-
-    if !missing_recipient_digest.is_empty() {
-        return Err(ClientError::MissingOutputRecipients(missing_recipient_digest));
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::transaction::TransactionKernel;
     use miden_objects::Word;
     use miden_objects::account::{
-        AccountBuilder,
-        AccountComponent,
-        AuthSecretKey,
-        StorageMap,
-        StorageSlot,
+        AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot,
     };
     use miden_objects::asset::{Asset, FungibleAsset};
     use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
     use miden_objects::note::NoteType;
     use miden_objects::testing::account_component::BASIC_WALLET_CODE;
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     };
     use miden_tx::utils::{Deserializable, Serializable};
