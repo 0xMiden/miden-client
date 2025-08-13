@@ -288,7 +288,9 @@ pub async fn import_expected_notes_from_the_past_as_committed(client_config: Cli
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1).await;
 
-    let (mut client_2, _) = create_test_client(client_config).await;
+    let (mut client_2, _) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
 
     wait_for_node(&mut client_2).await;
 

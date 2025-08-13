@@ -1,10 +1,9 @@
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use clap::Parser;
 use futures::FutureExt;
 use miden_client::rpc::Endpoint;
-use miden_client::testing::config::{ClientConfig, create_test_auth_path, create_test_store_path};
+use miden_client::testing::config::ClientConfig;
 use url::Url;
 
 use crate::tests::client::*;
@@ -27,10 +26,6 @@ struct Args {
     #[arg(short, long, default_value = "http://localhost:57291")]
     rpc_endpoint: Url,
 
-    /// The path to the keystore directory, it will use a temporary directory if not provided.
-    #[arg(short, long)]
-    keystore_path: Option<PathBuf>,
-
     /// Timeout for the RPC requests in milliseconds.
     #[arg(short, long, default_value = "10000")]
     timeout: u64,
@@ -44,10 +39,8 @@ impl From<Args> for ClientConfig {
             Some(args.rpc_endpoint.port().unwrap()),
         );
         let timeout_ms = args.timeout;
-        let store_path = create_test_store_path();
-        let auth_path = args.keystore_path.unwrap_or_else(create_test_auth_path);
 
-        ClientConfig::new(endpoint, timeout_ms, store_path, auth_path)
+        ClientConfig::new(endpoint, timeout_ms)
     }
 }
 

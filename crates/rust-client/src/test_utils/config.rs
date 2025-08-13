@@ -14,17 +14,12 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn new(
-        rpc_endpoint: Endpoint,
-        rpc_timeout: u64,
-        store_config: PathBuf,
-        auth_path: PathBuf,
-    ) -> Self {
+    pub fn new(rpc_endpoint: Endpoint, rpc_timeout: u64) -> Self {
         Self {
             rpc_endpoint,
             rpc_timeout,
-            store_config,
-            auth_path,
+            auth_path: create_test_auth_path(),
+            store_config: create_test_store_path(),
         }
     }
 
@@ -66,10 +61,7 @@ impl Default for ClientConfig {
 
         let timeout_ms = 10000;
 
-        let auth_path = temp_dir().join(format!("keystore-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&auth_path).unwrap();
-
-        Self::new(endpoint, timeout_ms, create_test_store_path(), auth_path)
+        Self::new(endpoint, timeout_ms)
     }
 }
 
