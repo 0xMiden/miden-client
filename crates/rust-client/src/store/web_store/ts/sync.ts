@@ -287,25 +287,27 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   // below, since every operation here (or at least, most of them), is done in a nested transaction.
   // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
   return await db.transaction("rw", tablesToAccess, async (tx) => {
+    // Everything is under a single promise since otherwise the tx expires.
     await Promise.all([
       inputNotesWriteOp,
       outputNotesWriteOp,
       transactionWriteOp,
       accountUpdatesWriteOp,
+      updateSyncHeight(tx, blockNum),
+      updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
+      updateCommittedNoteTags(tx, committedNoteIds),
+      Promise.all(
+        newBlockHeaders.map((newBlockHeader, i) => {
+          return updateBlockHeader(
+            tx,
+            newBlockNums[i],
+            newBlockHeader,
+            partialBlockchainPeaks[i],
+            blockHasRelevantNotes[i] == 1
+          );
+        })
+      ),
     ]);
-    // Update to the new block number
-    await updateSyncHeight(tx, blockNum);
-    for (let i = 0; i < newBlockHeaders.length; i++) {
-      await updateBlockHeader(
-        tx,
-        newBlockNums[i],
-        newBlockHeaders[i],
-        partialBlockchainPeaks[i],
-        blockHasRelevantNotes[i] == 1 // blockHasRelevantNotes is a u8 array, so we convert it to boolean
-      );
-    }
-    await updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes);
-    await updateCommittedNoteTags(tx, committedNoteIds);
   });
 }
 
