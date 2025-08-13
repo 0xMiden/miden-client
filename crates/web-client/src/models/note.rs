@@ -8,6 +8,7 @@ use miden_objects::note::NoteAssets as NativeNoteAssets;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
@@ -17,7 +18,9 @@ use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
 use super::note_type::NoteType;
+use super::word::Word;
 use crate::js_error_with_context;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -32,6 +35,14 @@ impl Note {
         note_recipient: &NoteRecipient,
     ) -> Note {
         Note(NativeNote::new(note_assets.into(), note_metadata.into(), note_recipient.into()))
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<Note, JsValue> {
+        deserialize_from_uint8array::<NativeNote>(bytes).map(Note)
     }
 
     pub fn id(&self) -> NoteId {
