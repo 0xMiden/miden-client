@@ -21,7 +21,7 @@ import {
   insertAccountAssetVault,
   insertAccountRecord,
 } from "./accounts.js";
-import { logDexieError, uint8ArrayToBase64 } from "./utils.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
 
 export async function getNoteTags() {
@@ -38,7 +38,7 @@ export async function getNoteTags() {
 
     return processedRecords;
   } catch (error) {
-    logDexieError(error, "Error fetch tag record");
+    logWebStoreError(error, "Error fetch tag record");
   }
 }
 
@@ -54,7 +54,7 @@ export async function getSyncHeight() {
       return null;
     }
   } catch (error) {
-    logDexieError(error, "Error fetching sync height");
+    logWebStoreError(error, "Error fetching sync height");
   }
 }
 
@@ -72,7 +72,7 @@ export async function addNoteTag(
       sourceAccountId: sourceAccountId ? sourceAccountId : "",
     });
   } catch (error) {
-    logDexieError(error, "Failed to add note tag");
+    logWebStoreError(error, "Failed to add note tag");
   }
 }
 
@@ -93,7 +93,7 @@ export async function removeNoteTag(
       })
       .delete();
   } catch (error) {
-    logDexieError(error, "Failed to remove note tag");
+    logWebStoreError(error, "Failed to remove note tag");
   }
 }
 
@@ -340,7 +340,7 @@ async function updateSyncHeight(
   try {
     await tx.stateSync.update(1, { blockNum: blockNum });
   } catch (error) {
-    logDexieError(error, "Failed to update sync height");
+    logWebStoreError(error, "Failed to update sync height");
   }
 }
 
@@ -370,7 +370,7 @@ async function updateBlockHeader(
       await tx.blockHeaders.add(data);
     }
   } catch (err) {
-    logDexieError(err, "Failed to insert block header");
+    logWebStoreError(err, "Failed to insert block header");
   }
 }
 
@@ -399,7 +399,7 @@ async function updatePartialBlockchainNodes(
     // Use bulkPut to add/overwrite the entries
     await tx.partialBlockchainNodes.bulkPut(data);
   } catch (err) {
-    logDexieError(err, "Failed to update partial blockchain nodes");
+    logWebStoreError(err, "Failed to update partial blockchain nodes");
   }
 }
 
@@ -414,7 +414,7 @@ async function updateCommittedNoteTags(
       await tx.tags.where("source_note_id").equals(noteId).delete();
     }
   } catch (error) {
-    logDexieError(error, "Failed to pudate committed note tags");
+    logWebStoreError(error, "Failed to pudate committed note tags");
   }
 }
 

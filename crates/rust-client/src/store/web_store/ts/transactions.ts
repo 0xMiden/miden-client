@@ -5,7 +5,7 @@ import {
   transactionScripts,
 } from "./schema.js";
 import { Dexie } from "dexie";
-import { logDexieError, mapOption, uint8ArrayToBase64 } from "./utils.js";
+import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
   scriptRoot?: string;
@@ -107,7 +107,7 @@ export async function getTransactions(filter: string) {
 
     return processedTransactions;
   } catch (err) {
-    logDexieError(err, "Failed to get transactions");
+    logWebStoreError(err, "Failed to get transactions");
   }
 }
 
@@ -141,7 +141,7 @@ export async function insertTransactionScript(
   } catch (error) {
     // Check if the error is because the record already exists
     if (!(error instanceof Dexie.ConstraintError)) {
-      logDexieError(error, "Failed to insert transaction script");
+      logWebStoreError(error, "Failed to insert transaction script");
     }
   }
 }
@@ -173,6 +173,6 @@ export async function upsertTransactionRecord(
 
     await transactions.put(data);
   } catch (err) {
-    logDexieError(err, "Failed to insert proven transaction data");
+    logWebStoreError(err, "Failed to insert proven transaction data");
   }
 }

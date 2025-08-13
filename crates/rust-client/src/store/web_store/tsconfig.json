@@ -12,6 +12,6 @@
     "outDir": "./js",
     "strict": true
   },
-  "include": ["./ts/**/*", "js/notes.js"],
+  "include": ["./ts/**/*", "ts/notes.ts"],
   "exclude": ["./js/**/*"]
 }

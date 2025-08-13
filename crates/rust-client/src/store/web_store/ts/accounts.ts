@@ -1,5 +1,5 @@
 // TODO: Re-enable this lint in another issue/PR.
- 
+
 import {
   accountCodes,
   accountStorages,
@@ -9,7 +9,7 @@ import {
   foreignAccountCode,
   IAccount,
 } from "./schema.js";
-import { logDexieError, uint8ArrayToBase64 } from "./utils.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 // GET FUNCTIONS
 export async function getAccountIds() {
@@ -23,7 +23,7 @@ export async function getAccountIds() {
 
     return Array.from(allIds); // Convert back to array to return a list of unique IDs
   } catch (error) {
-    logDexieError(error, "Error while fetching account IDs");
+    logWebStoreError(error, "Error while fetching account IDs");
   }
 }
 
@@ -71,7 +71,7 @@ export async function getAllAccountHeaders() {
 
     return resultObject;
   } catch (error) {
-    logDexieError(error, "Error while fetching account headers");
+    logWebStoreError(error, "Error while fetching account headers");
   }
 }
 
@@ -123,7 +123,7 @@ export async function getAccountHeader(accountId: string) {
     };
     return AccountHeader;
   } catch (error) {
-    logDexieError(
+    logWebStoreError(
       error,
       `Error while fetching account header for id: ${accountId}`
     );
@@ -166,7 +166,7 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
     };
     return AccountHeader;
   } catch (error) {
-    logDexieError(
+    logWebStoreError(
       error,
       `Error fetching account header for commitment ${accountCommitment}`
     );
@@ -197,7 +197,7 @@ export async function getAccountCode(codeRoot: string) {
       code: codeBase64,
     };
   } catch (error) {
-    logDexieError(error, `Error fetching account code for root ${codeRoot}`);
+    logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
   }
 }
 
@@ -227,7 +227,7 @@ export async function getAccountStorage(storageRoot: string) {
       storage: storageBase64,
     };
   } catch (error) {
-    logDexieError(
+    logWebStoreError(
       error,
       `Error fetching account storage for root ${storageRoot}`
     );
@@ -261,7 +261,10 @@ export async function getAccountAssetVault(vaultRoot: string) {
       assets: assetsBase64,
     };
   } catch (error) {
-    logDexieError(error, `Error fetching account vault for root ${vaultRoot}`);
+    logWebStoreError(
+      error,
+      `Error fetching account vault for root ${vaultRoot}`
+    );
   }
 }
 
@@ -308,7 +311,7 @@ export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
       secretKey: authRecord.secretKey,
     };
   } catch (error) {
-    logDexieError(error, `Error fetching account auth for pubKey ${pubKey}`);
+    logWebStoreError(error, `Error fetching account auth for pubKey ${pubKey}`);
   }
 }
 
@@ -325,7 +328,7 @@ export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
     // Perform the insert using Dexie
     await accountCodes.put(data);
   } catch (error) {
-    logDexieError(error, `Error inserting code with root: ${codeRoot}`);
+    logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
   }
 }
 
@@ -345,7 +348,10 @@ export async function insertAccountStorage(
     // Perform the insert using Dexie
     await accountStorages.put(data);
   } catch (error) {
-    logDexieError(error, `Error inserting storage with root: ${storageRoot}`);
+    logWebStoreError(
+      error,
+      `Error inserting storage with root: ${storageRoot}`
+    );
   }
 }
 
@@ -365,7 +371,7 @@ export async function insertAccountAssetVault(
     // Perform the insert using Dexie
     await accountVaults.put(data);
   } catch (error) {
-    logDexieError(error, `Error inserting vault with root: ${vaultRoot}`);
+    logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
   }
 }
 
@@ -394,7 +400,7 @@ export async function insertAccountRecord(
 
     await accounts.add(data as IAccount);
   } catch (error) {
-    logDexieError(error, `Error inserting account: ${accountId}`);
+    logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
 }
 
@@ -409,7 +415,10 @@ export async function insertAccountAuth(pubKey: string, secretKey: string) {
     // Perform the insert using Dexie
     await accountAuths.add(data);
   } catch (error) {
-    logDexieError(error, `Error inserting account auth for pubKey: ${pubKey}`);
+    logWebStoreError(
+      error,
+      `Error inserting account auth for pubKey: ${pubKey}`
+    );
   }
 }
 
@@ -428,7 +437,7 @@ export async function upsertForeignAccountCode(
 
     await foreignAccountCode.put(data);
   } catch (error) {
-    logDexieError(
+    logWebStoreError(
       error,
       `Error upserting foreign account code for account: ${accountId}`
     );
@@ -474,7 +483,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
       .filter((matchingCode) => matchingCode !== undefined);
     return processedCode;
   } catch (error) {
-    logDexieError(error, "Error fetching foreign account code");
+    logWebStoreError(error, "Error fetching foreign account code");
   }
 }
 
@@ -482,7 +491,7 @@ export async function lockAccount(accountId: string) {
   try {
     await accounts.where("id").equals(accountId).modify({ locked: true });
   } catch (error) {
-    logDexieError(error, `Error locking account: ${accountId}`);
+    logWebStoreError(error, `Error locking account: ${accountId}`);
   }
 }
 
@@ -494,7 +503,7 @@ export async function undoAccountStates(accountCommitments: string[]) {
       .anyOf(accountCommitments)
       .delete();
   } catch (error) {
-    logDexieError(
+    logWebStoreError(
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );

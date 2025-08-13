@@ -1,5 +1,5 @@
 import Dexie from "dexie";
-import { logDexieError } from "./utils.js";
+import { logWebStoreError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
 
@@ -10,7 +10,7 @@ export async function openDatabase(): Promise<boolean> {
     console.log("Database opened successfully");
     return true;
   } catch (err) {
-    logDexieError(err, "Failed to open database");
+    logWebStoreError(err, "Failed to open database");
     return false;
   }
 }
@@ -190,7 +190,7 @@ db.on("populate", () => {
   // Populate the stateSync table with default values
   stateSync
     .put({ id: 1, blockNum: "0" } as IStateSync)
-    .catch((err: unknown) => logDexieError(err, "Failed to populate DB"));
+    .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
 });
 
 const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);

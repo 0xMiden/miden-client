@@ -8,8 +8,10 @@ export const mapOption = <T, U>(
   return value != undefined ? func(value) : undefined;
 };
 
+// Anything can be thrown as an error in raw JS (also the TS compiler can't type-check exceptions),
+// so we allow it here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const logDexieError = (error: any, errorContext?: string) => {
+export const logWebStoreError = (error: any, errorContext?: string) => {
   if (error instanceof Dexie.DexieError) {
     if (errorContext) {
       console.error(
@@ -22,7 +24,7 @@ export const logDexieError = (error: any, errorContext?: string) => {
       console.error(`Stacktrace: \n ${stack}`);
     });
     mapOption(error.inner, (innerException) =>
-      logDexieError(innerException as Error)
+      logWebStoreError(innerException as Error)
     );
   } else if (error instanceof Error) {
     console.error(

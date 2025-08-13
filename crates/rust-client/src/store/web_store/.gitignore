@@ -8,4 +8,6 @@ js/utils.*
 js/transactions.*
 js/eslint.*
 js/notes.*
+js/js
+js/ts
 tsconfig.tsbuildinfo
