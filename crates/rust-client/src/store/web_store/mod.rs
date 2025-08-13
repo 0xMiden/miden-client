@@ -21,16 +21,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::{
-    AccountRecord,
-    AccountStatus,
-    BlockRelevance,
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    PartialBlockchainFilter,
-    Store,
-    StoreError,
-    TransactionFilter,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -240,6 +232,6 @@ impl Store for WebStore {
 
 #[wasm_bindgen(module = "/src/store/web_store/js/utils.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = logDexieError)]
-    fn log_dexie_error(error: JsValue, error_context: alloc::string::String);
+    #[wasm_bindgen(js_name = logWebStoreError)]
+    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
 }
