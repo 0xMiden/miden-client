@@ -68,9 +68,9 @@ impl SqliteStore {
 
         let conn = pool.get().await.map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
-        let _ = conn
-            .interact(apply_migrations)
+        conn.interact(apply_migrations)
             .await
+            .map_err(|e| StoreError::DatabaseError(e.to_string()))?
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
         Ok(SqliteStore { pool })
