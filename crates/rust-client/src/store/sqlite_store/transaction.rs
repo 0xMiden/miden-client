@@ -3,11 +3,14 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use miden_objects::Word;
 use miden_objects::block::BlockNumber;
+use miden_objects::crypto::merkle::MerkleStore;
 use miden_objects::crypto::utils::{Deserializable, Serializable};
 use miden_objects::transaction::{ToInputNoteCommitments, TransactionScript};
+use miden_tx::utils::sync::RwLock;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
@@ -127,6 +130,7 @@ impl SqliteStore {
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
     pub fn apply_transaction(
         conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
@@ -176,8 +180,10 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
+        let mut merkle_store = merkle_store.write();
         Self::apply_account_delta(
             &tx,
+            &mut merkle_store,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
