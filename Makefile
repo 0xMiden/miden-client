@@ -11,7 +11,6 @@ help: ## Show description of all commands
 # protobuf files.
 CODEGEN=CODEGEN=1
 
-FEATURES_WEB_CLIENT=
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -28,7 +27,7 @@ clippy: ## Run Clippy with configs. We need two separate commands because the `t
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
-	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets $(FEATURES_WEB_CLIENT) -- -D warnings
+	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
 fix: ## Run Fix with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
@@ -37,7 +36,7 @@ fix: ## Run Fix with configs. We need two separate commands because the `testing
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the miden-client-web package
-	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets $(FEATURES_WEB_CLIENT)
+	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
 
 .PHONY: format
 format: ## Run format using nightly toolchain
@@ -147,7 +146,7 @@ build: ## Build the CLI binary and client library in release mode
 	cargo build --package testing-remote-prover --release --locked
 
 build-wasm: rust-client-ts-build ## Build the client library for wasm32
-	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked $(FEATURES_WEB_CLIENT)
+	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
@@ -161,7 +160,7 @@ check: ## Build the CLI binary and client library in release mode
 
 .PHONY: check-wasm
 check-wasm: ## Build the client library for wasm32
-	cargo check --package miden-client-web --target wasm32-unknown-unknown $(FEATURES_WEB_CLIENT)
+	cargo check --package miden-client-web --target wasm32-unknown-unknown
 
 ## --- Setup --------------------------------------------------------------------------------------
 
