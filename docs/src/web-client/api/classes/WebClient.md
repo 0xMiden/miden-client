@@ -105,11 +105,11 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
-### createMockedClient()
+### createMockClient()
 
-> **createMockedClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
+> **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
 
-Creates a new client with a mocked RPC API. Useful for testing purposes and proof-of-concept
+Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
 applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Parameters
