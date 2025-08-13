@@ -760,7 +760,7 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts a WHERE ";
+        FROM accounts WHERE ";
     let query = format!("{SELECT_QUERY}{where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
