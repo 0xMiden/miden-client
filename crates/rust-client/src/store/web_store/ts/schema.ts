@@ -112,7 +112,7 @@ export interface IStateSync {
 }
 
 export interface IBlockHeader {
-  blockNum: number;
+  blockNum: string;
   header: Blob;
   partialBlockchainPeaks: Blob;
   hasClientNotes: string;
@@ -126,8 +126,8 @@ export interface IPartialBlockchainNode {
 export interface ITag {
   id?: number;
   tag: string;
-  sourceNoteId: string;
-  sourceAccountId: string;
+  sourceNoteId?: string;
+  sourceAccountId?: string;
 }
 
 export interface IForeignAccountCode {
@@ -147,7 +147,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, number>;
+  blockHeaders: Dexie.Table<IBlockHeader, string>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
@@ -206,7 +206,7 @@ const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
 const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
 const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
 const stateSync = db.table<IStateSync, number>(Table.StateSync);
-const blockHeaders = db.table<IBlockHeader, number>(Table.BlockHeaders);
+const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
 const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
   Table.PartialBlockchainNodes
 );

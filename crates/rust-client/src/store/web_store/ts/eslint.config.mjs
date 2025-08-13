@@ -5,21 +5,17 @@ export default tseslint.config(
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {
-    // Apply type-checked rules ONLY to TypeScript files
     files: ["**/*.ts"],
     languageOptions: {
       parserOptions: {
-        project: ["./tsconfig.json"],
+        project: ["../tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    // This can be a bit annoying since we're used to use `let` coming from rust, but we can add it back.
+    rules: { "prefer-const": "off" },
   },
   {
-    // Global ignore patterns (relative to project root)
-    ignores: [
-      "js/**", // Ignore entire js directory
-      "**/node_modules/**",
-      "**/*.mjs",
-    ],
+    ignores: ["js/**", "**/node_modules/**", "**/*.mjs", "ts/notes.js"],
   }
 );

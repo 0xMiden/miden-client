@@ -7,4 +7,5 @@ js/schema.*
 js/utils.*
 js/transactions.*
 js/eslint.*
+js/notes.*
 tsconfig.tsbuildinfo

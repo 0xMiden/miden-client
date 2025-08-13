@@ -1,5 +1,4 @@
 import { blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
-
 // INSERT FUNCTIONS
 export async function insertBlockHeader(
   blockNum,
@@ -12,21 +11,17 @@ export async function insertBlockHeader(
     const partialBlockchainPeaksBlob = new Blob([
       new Uint8Array(partialBlockchainPeaks),
     ]);
-
     const data = {
       blockNum: blockNum,
       header: headerBlob,
       partialBlockchainPeaks: partialBlockchainPeaksBlob,
       hasClientNotes: hasClientNotes.toString(),
     };
-
     const existingBlockHeader = await blockHeaders.get(blockNum);
-
     if (!existingBlockHeader) {
       await blockHeaders.add(data);
     } else {
       console.log("Block header already exists, checking for update.");
-
       // Update the hasClientNotes if the existing value is false
       if (existingBlockHeader.hasClientNotes === "false" && hasClientNotes) {
         await blockHeaders.update(blockNum, {
@@ -42,24 +37,20 @@ export async function insertBlockHeader(
     throw err;
   }
 }
-
 export async function insertPartialBlockchainNodes(ids, nodes) {
   try {
     // Check if the arrays are not of the same length
     if (ids.length !== nodes.length) {
       throw new Error("ids and nodes arrays must be of the same length");
     }
-
     if (ids.length === 0) {
       return;
     }
-
     // Create array of objects with id and node
     const data = nodes.map((node, index) => ({
       id: ids[index],
       node: node,
     }));
-
     // Use bulkPut to add/overwrite the entries
     await partialBlockchainNodes.bulkPut(data);
   } catch (err) {
@@ -70,12 +61,10 @@ export async function insertPartialBlockchainNodes(ids, nodes) {
     throw err;
   }
 }
-
 // GET FUNCTIONS
 export async function getBlockHeaders(blockNumbers) {
   try {
     const results = await blockHeaders.bulkGet(blockNumbers);
-
     const processedResults = await Promise.all(
       results.map(async (result, index) => {
         if (result === undefined) {
@@ -84,7 +73,6 @@ export async function getBlockHeaders(blockNumbers) {
           const headerArrayBuffer = await result.header.arrayBuffer();
           const headerArray = new Uint8Array(headerArrayBuffer);
           const headerBase64 = uint8ArrayToBase64(headerArray);
-
           const partialBlockchainPeaksArrayBuffer =
             await result.partialBlockchainPeaks.arrayBuffer();
           const partialBlockchainPeaksArray = new Uint8Array(
@@ -93,7 +81,6 @@ export async function getBlockHeaders(blockNumbers) {
           const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
             partialBlockchainPeaksArray
           );
-
           return {
             blockNum: result.blockNum,
             header: headerBase64,
@@ -103,14 +90,12 @@ export async function getBlockHeaders(blockNumbers) {
         }
       })
     );
-
     return processedResults;
   } catch (err) {
     console.error("Failed to get block headers: ", err.toString());
     throw err;
   }
 }
-
 export async function getTrackedBlockHeaders() {
   try {
     // Fetch all records matching the given root
@@ -118,14 +103,12 @@ export async function getTrackedBlockHeaders() {
       .where("hasClientNotes")
       .equals("true")
       .toArray();
-
     // Process all records with async operations
     const processedRecords = await Promise.all(
       allMatchingRecords.map(async (record) => {
         const headerArrayBuffer = await record.header.arrayBuffer();
         const headerArray = new Uint8Array(headerArrayBuffer);
         const headerBase64 = uint8ArrayToBase64(headerArray);
-
         const partialBlockchainPeaksArrayBuffer =
           await record.partialBlockchainPeaks.arrayBuffer();
         const partialBlockchainPeaksArray = new Uint8Array(
@@ -134,7 +117,6 @@ export async function getTrackedBlockHeaders() {
         const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
           partialBlockchainPeaksArray
         );
-
         return {
           blockNum: record.blockNum,
           header: headerBase64,
@@ -143,18 +125,15 @@ export async function getTrackedBlockHeaders() {
         };
       })
     );
-
     return processedRecords;
   } catch (err) {
     console.error("Failed to get tracked block headers: ", err.toString());
     throw err;
   }
 }
-
 export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
   try {
     const blockHeader = await blockHeaders.get(blockNum);
-
     const partialBlockchainPeaksArrayBuffer =
       await blockHeader.partialBlockchainPeaks.arrayBuffer();
     const partialBlockchainPeaksArray = new Uint8Array(
@@ -163,7 +142,6 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
     const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
       partialBlockchainPeaksArray
     );
-
     return {
       peaks: partialBlockchainPeaksBase64,
     };
@@ -172,7 +150,6 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
     throw err;
   }
 }
-
 export async function getPartialBlockchainNodesAll() {
   try {
     const partialBlockchainNodesAll = await partialBlockchainNodes.toArray();
@@ -182,22 +159,18 @@ export async function getPartialBlockchainNodesAll() {
     throw err;
   }
 }
-
 export async function getPartialBlockchainNodes(ids) {
   try {
     const results = await partialBlockchainNodes.bulkGet(ids);
-
     return results;
   } catch (err) {
     console.error("Failed to get partial blockchain nodes: ", err.toString());
     throw err;
   }
 }
-
 export async function pruneIrrelevantBlocks() {
   try {
     const syncHeight = await stateSync.get(1);
-
     const allMatchingRecords = await blockHeaders
       .where("hasClientNotes")
       .equals("false")
@@ -206,14 +179,12 @@ export async function pruneIrrelevantBlocks() {
           record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
       )
       .toArray();
-
     await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
   } catch (err) {
     console.error("Failed to prune irrelevant blocks: ", err.toString());
     throw err;
   }
 }
-
 function uint8ArrayToBase64(bytes) {
   const binary = bytes.reduce(
     (acc, byte) => acc + String.fromCharCode(byte),
@@ -221,3 +192,5 @@ function uint8ArrayToBase64(bytes) {
   );
   return btoa(binary);
 }
+//# sourceMappingURL=chainData.js.map
+//# sourceMappingURL=chainData.js.map

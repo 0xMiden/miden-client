@@ -21,6 +21,8 @@ import {
   insertAccountAssetVault,
   insertAccountRecord,
 } from "./accounts.js";
+import { logDexieError, uint8ArrayToBase64 } from "./utils.js";
+import { Transaction } from "dexie";
 
 export async function getNoteTags() {
   try {
@@ -28,16 +30,15 @@ export async function getNoteTags() {
 
     let processedRecords = records.map((record) => {
       record.sourceNoteId =
-        record.sourceNoteId == "" ? null : record.sourceNoteId;
+        record.sourceNoteId == "" ? undefined : record.sourceNoteId;
       record.sourceAccountId =
-        record.sourceAccountId == "" ? null : record.sourceAccountId;
+        record.sourceAccountId == "" ? undefined : record.sourceAccountId;
       return record;
     });
 
     return processedRecords;
   } catch (error) {
-    console.error("Error fetching tag record:", error.toString());
-    throw error;
+    logDexieError(error, "Error fetch tag record");
   }
 }
 
@@ -53,12 +54,15 @@ export async function getSyncHeight() {
       return null;
     }
   } catch (error) {
-    console.error("Error fetching sync height:", error.toString());
-    throw error;
+    logDexieError(error, "Error fetching sync height");
   }
 }
 
-export async function addNoteTag(tag, sourceNoteId, sourceAccountId) {
+export async function addNoteTag(
+  tag: Uint8Array,
+  sourceNoteId: string,
+  sourceAccountId: string
+) {
   try {
     let tagArray = new Uint8Array(tag);
     let tagBase64 = uint8ArrayToBase64(tagArray);
@@ -67,13 +71,16 @@ export async function addNoteTag(tag, sourceNoteId, sourceAccountId) {
       sourceNoteId: sourceNoteId ? sourceNoteId : "",
       sourceAccountId: sourceAccountId ? sourceAccountId : "",
     });
-  } catch (err) {
-    console.error("Failed to add note tag: ", err.toString());
-    throw err;
+  } catch (error) {
+    logDexieError(error, "Failed to add note tag");
   }
 }
 
-export async function removeNoteTag(tag, sourceNoteId, sourceAccountId) {
+export async function removeNoteTag(
+  tag: Uint8Array,
+  sourceNoteId?: string,
+  sourceAccountId?: string
+) {
   try {
     let tagArray = new Uint8Array(tag);
     let tagBase64 = uint8ArrayToBase64(tagArray);
@@ -85,17 +92,93 @@ export async function removeNoteTag(tag, sourceNoteId, sourceAccountId) {
         sourceAccountId: sourceAccountId ? sourceAccountId : "",
       })
       .delete();
-  } catch (err) {
-    console.log("Failed to remove note tag: ", err.toString());
-    throw err;
+  } catch (error) {
+    logDexieError(error, "Failed to remove note tag");
   }
+}
+
+interface FlattenedU8Vec {
+  data(): Uint8Array;
+  lengths(): number[];
+}
+
+interface SerializedInputNoteData {
+  noteId: string;
+  noteAssets: any;
+  serialNumber: string;
+  inputs: any;
+  noteScriptRoot: string;
+  noteScript: any;
+  nullifier: string;
+  createdAt: number;
+  stateDiscriminant: number;
+  state: any;
+}
+
+interface SerializedOutputNoteData {
+  noteId: string;
+  noteAssets: any;
+  recipientDigest: string;
+  metadata: any;
+  nullifier: string;
+  expectedHeight: number;
+  stateDiscriminant: number;
+  state: any;
+}
+
+interface SerializedTransactionData {
+  id: string;
+  details: any;
+  blockNum: string;
+  scriptRoot: Uint8Array;
+  commitHeight: string;
+  discardCause?: Uint8Array;
+  txScript?: Uint8Array;
+}
+
+interface JsAccountUpdate {
+  storageRoot: string;
+  storageSlots: Uint8Array;
+  assetVaultRoot: string;
+  assetBytes: Uint8Array;
+  accountId: string;
+  codeRoot: string;
+  committed: boolean;
+  nonce: string;
+  accountCommitment: string;
+  accountSeed?: Uint8Array;
+}
+
+interface JsStateSyncUpdate {
+  blockNum: string;
+  flattenedNewBlockHeaders: FlattenedU8Vec;
+  flattenedPartialBlockChainPeaks: FlattenedU8Vec;
+  newBlockNums: string[];
+  blockHasRelevantNotes: Uint8Array;
+  serializedNodeIds: string[];
+  serializedNodes: string[];
+  committedNoteIds: string[];
+  serializedInputNotes: SerializedInputNoteData[];
+  serializedOutputNotes: SerializedOutputNoteData[];
+  accountUpdates: JsAccountUpdate[];
+  transactionUpdates: SerializedTransactionData[];
+}
+
+interface NoteTag {
+  tag: string;
+  sourceNoteId: string | null;
+  sourceAccountId: string | null;
+}
+
+interface SyncHeight {
+  blockNum: number;
 }
 
 /*
  * Takes a `JsStateSyncUpdate` object and writes the state update into the store.
  * @param {JsStateSyncUpdate}
  */
-export async function applyStateSync(stateUpdate) {
+export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   const {
     blockNum, // Target block number for this sync
     flattenedNewBlockHeaders, // Serialized block headers to be reconstructed
@@ -198,11 +281,7 @@ export async function applyStateSync(stateUpdate) {
 
   let accountUpdatesWriteOp = Promise.all(accountUpdates);
 
-  // Write everything in a single transaction, this transaction will atomically do the operations
-  // below, since every operation here (or at least, most of them), is done in a nested transaction.
-  // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
-  return await db.transaction(
-    "rw",
+  const tablesToAccess = [
     stateSync,
     inputNotes,
     outputNotes,
@@ -210,6 +289,22 @@ export async function applyStateSync(stateUpdate) {
     blockHeaders,
     partialBlockchainNodes,
     tags,
+  ];
+
+  // Write everything in a single transaction, this transaction will atomically do the operations
+  // below, since every operation here (or at least, most of them), is done in a nested transaction.
+  // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
+  return await db.transaction(
+    "rw",
+    [
+      stateSync,
+      inputNotes,
+      outputNotes,
+      transactions,
+      blockHeaders,
+      partialBlockchainNodes,
+      tags,
+    ],
     async (tx) => {
       await Promise.all([
         inputNotesWriteOp,
@@ -238,21 +333,23 @@ export async function applyStateSync(stateUpdate) {
   );
 }
 
-async function updateSyncHeight(tx, blockNum) {
+async function updateSyncHeight(
+  tx: Transaction & { stateSync: typeof stateSync },
+  blockNum: string
+) {
   try {
     await tx.stateSync.update(1, { blockNum: blockNum });
   } catch (error) {
-    console.error("Failed to update sync height: ", error.toString());
-    throw error;
+    logDexieError(error, "Failed to update sync height");
   }
 }
 
 async function updateBlockHeader(
-  tx,
-  blockNum,
-  blockHeader,
-  partialBlockchainPeaks,
-  hasClientNotes
+  tx: Transaction & { blockHeaders: typeof blockHeaders },
+  blockNum: string,
+  blockHeader: Uint8Array,
+  partialBlockchainPeaks: Uint8Array,
+  hasClientNotes: boolean
 ) {
   try {
     const headerBlob = new Blob([new Uint8Array(blockHeader)]);
@@ -273,12 +370,15 @@ async function updateBlockHeader(
       await tx.blockHeaders.add(data);
     }
   } catch (err) {
-    console.error("Failed to insert block header: ", err.toString());
-    throw err;
+    logDexieError(err, "Failed to insert block header");
   }
 }
 
-async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
+async function updatePartialBlockchainNodes(
+  tx: Transaction & { partialBlockchainNodes: typeof partialBlockchainNodes },
+  nodeIndexes: string[],
+  nodes: string[]
+) {
   try {
     // Check if the arrays are not of the same length
     if (nodeIndexes.length !== nodes.length) {
@@ -299,15 +399,14 @@ async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
     // Use bulkPut to add/overwrite the entries
     await tx.partialBlockchainNodes.bulkPut(data);
   } catch (err) {
-    console.error(
-      "Failed to update partial blockchain nodes: ",
-      err.toString()
-    );
-    throw err;
+    logDexieError(err, "Failed to update partial blockchain nodes");
   }
 }
 
-async function updateCommittedNoteTags(tx, inputNoteIds) {
+async function updateCommittedNoteTags(
+  tx: Transaction & { tags: typeof tags },
+  inputNoteIds: string[]
+) {
   try {
     for (let i = 0; i < inputNoteIds.length; i++) {
       const noteId = inputNoteIds[i];
@@ -315,26 +414,18 @@ async function updateCommittedNoteTags(tx, inputNoteIds) {
       await tx.tags.where("source_note_id").equals(noteId).delete();
     }
   } catch (error) {
-    throw error;
+    logDexieError(error, "Failed to pudate committed note tags");
   }
 }
 
-function uint8ArrayToBase64(bytes) {
-  const binary = bytes.reduce(
-    (acc, byte) => acc + String.fromCharCode(byte),
-    ""
-  );
-  return btoa(binary);
-}
-
 // Helper function to reconstruct arrays from flattened data
-function reconstructFlattenedVec(flattenedVec) {
+function reconstructFlattenedVec(flattenedVec: FlattenedU8Vec) {
   const data = flattenedVec.data();
   const lengths = flattenedVec.lengths();
 
   let index = 0;
-  const result = [];
-  lengths.forEach((length) => {
+  const result: Uint8Array[] = [];
+  lengths.forEach((length: number) => {
     result.push(data.slice(index, index + length));
     index += length;
   });
