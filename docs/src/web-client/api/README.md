@@ -32,6 +32,7 @@
 - [AssemblerUtils](classes/AssemblerUtils.md)
 - [AssetVault](classes/AssetVault.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
+- [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
 - [ConsumableNoteRecord](classes/ConsumableNoteRecord.md)
 - [ExecutedTransaction](classes/ExecutedTransaction.md)
@@ -106,6 +107,7 @@
 - [TransactionScriptInputPair](classes/TransactionScriptInputPair.md)
 - [TransactionScriptInputPairArray](classes/TransactionScriptInputPairArray.md)
 - [TransactionStatus](classes/TransactionStatus.md)
+- [TransactionSummary](classes/TransactionSummary.md)
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
 
