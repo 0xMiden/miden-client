@@ -1,13 +1,7 @@
 # Ignore generated build files, eventually we should
 # add the whole js folder here.
-js/accounts.*
-js/types.*
-js/sync.*
-js/schema.*
-js/utils.*
-js/transactions.*
-js/eslint.*
-js/notes.*
-js/js
-js/ts
+js
+!js/chainData.js
+!js/export.js
+!js/import.js
 tsconfig.tsbuildinfo
