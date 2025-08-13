@@ -85,6 +85,7 @@ impl NodeBuilder {
     // --------------------------------------------------------------------------------------------
 
     /// Starts all node components and returns a handle to manage them.
+    #[allow(clippy::too_many_lines)]
     pub async fn start(self) -> Result<NodeHandle> {
         miden_node_utils::logging::setup_tracing(
             miden_node_utils::logging::OpenTelemetry::Disabled,
