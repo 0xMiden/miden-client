@@ -19,7 +19,7 @@ CREATE TABLE account_code (
 CREATE TABLE account_storage (
     commitment TEXT NOT NULL,               -- commitment to the account storage
     slot_index UNSIGNED BIG INT NOT NULL,   -- index of the slot in the storage
-    slot_value TEXT NULL,                   -- value of the slot, if the slot is a map it contains the root
+    slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
     PRIMARY KEY (commitment, slot_index)
 );
 
@@ -55,8 +55,8 @@ CREATE TABLE foreign_account_code(
 
 -- Create accounts table
 CREATE TABLE accounts (
-    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
+    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     code_commitment TEXT NOT NULL,              -- Commitment to the account code
     storage_commitment TEXT NOT NULL,           -- Commitment to the account storage
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.

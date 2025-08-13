@@ -58,7 +58,7 @@ impl SqliteStore {
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
         query_account_headers(
             conn,
-            "nonce = (SELECT MAX(b.nonce) FROM accounts b WHERE b.id = a.id)",
+            "nonce = (SELECT MAX(max.nonce) FROM accounts max WHERE max.id = accounts.id)",
             params![],
         )
     }
@@ -105,9 +105,7 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?)?;
 
-        let Some(account_code) =
-            query_account_code(conn, "commitment = ?", params![header.code_commitment().to_hex()])?
-        else {
+        let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
             return Ok(None);
         };
 
@@ -504,15 +502,14 @@ fn query_vault_assets(
 
 fn query_account_code(
     conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
+    commitment: Word,
 ) -> Result<Option<AccountCode>, StoreError> {
-    // TODO: this function will probably be refactored to return multiple mast forests
-    const CODE_QUERY: &str = "SELECT code FROM account_code WHERE ";
+    // TODO: this function will probably be refactored to receive more complex where clauses and
+    // return multiple mast forests
+    const CODE_QUERY: &str = "SELECT code FROM account_code WHERE commitment = ?";
 
-    let query = format!("{CODE_QUERY}{where_clause}");
-    conn.prepare(&query)?
-        .query_map(params, |row| {
+    conn.prepare(CODE_QUERY)?
+        .query_map(params![commitment.to_hex()], |row| {
             let code: Vec<u8> = row.get(0)?;
             Ok(code)
         })?
@@ -530,7 +527,7 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts a WHERE ";
+        FROM accounts WHERE ";
     let query = format!("{SELECT_QUERY}{where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
