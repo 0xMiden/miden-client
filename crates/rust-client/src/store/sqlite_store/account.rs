@@ -6,16 +6,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    NonFungibleDeltaAction,
-    StorageMap,
-    StorageSlot,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    NonFungibleDeltaAction, StorageMap, StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
 use miden_objects::{AccountError, Felt, Word};
@@ -215,6 +207,34 @@ impl SqliteStore {
                 )
             })
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
+    }
+
+    pub fn get_account_vault(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<AssetVault, StoreError> {
+        let assets = query_vault_assets(
+            conn,
+            "root = (SELECT vault_root FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+            params![account_id.to_hex()],
+        )?;
+
+        Ok(AssetVault::new(&assets)?)
+    }
+
+    pub fn get_account_storage(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError> {
+        let slots = query_storage_slots(
+            conn,
+            "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+            params![account_id.to_hex()],
+        )?
+        .into_values()
+        .collect();
+
+        Ok(AccountStorage::new(slots)?)
     }
 
     // HELPERS
