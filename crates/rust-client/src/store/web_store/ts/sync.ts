@@ -97,6 +97,8 @@ export async function removeNoteTag(
   }
 }
 
+// TODO: The interfaces below are already defined in Rust, we should look into something that keeps
+// types in sync between Rust and Typescript (#1083).
 interface FlattenedU8Vec {
   data(): Uint8Array;
   lengths(): number[];
@@ -104,31 +106,31 @@ interface FlattenedU8Vec {
 
 interface SerializedInputNoteData {
   noteId: string;
-  noteAssets: any;
+  noteAssets: Uint8Array;
   serialNumber: string;
-  inputs: any;
+  inputs: Uint8Array;
   noteScriptRoot: string;
-  noteScript: any;
+  noteScript: Uint8Array;
   nullifier: string;
-  createdAt: number;
+  createdAt: string;
   stateDiscriminant: number;
-  state: any;
+  state: Uint8Array;
 }
 
 interface SerializedOutputNoteData {
   noteId: string;
-  noteAssets: any;
+  noteAssets: Uint8Array;
   recipientDigest: string;
-  metadata: any;
-  nullifier: string;
+  metadata: Uint8Array;
+  nullifier?: string;
   expectedHeight: number;
   stateDiscriminant: number;
-  state: any;
+  state: Uint8Array;
 }
 
 interface SerializedTransactionData {
   id: string;
-  details: any;
+  details: Uint8Array;
   blockNum: string;
   scriptRoot: Uint8Array;
   commitHeight: string;
@@ -164,16 +166,6 @@ interface JsStateSyncUpdate {
   transactionUpdates: SerializedTransactionData[];
 }
 
-interface NoteTag {
-  tag: string;
-  sourceNoteId: string | null;
-  sourceAccountId: string | null;
-}
-
-interface SyncHeight {
-  blockNum: number;
-}
-
 /*
  * Takes a `JsStateSyncUpdate` object and writes the state update into the store.
  * @param {JsStateSyncUpdate}
@@ -201,85 +193,85 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   );
   // Create promises to insert each input note. Each note will have its own transaction,
   // and therefore, nested inside the final transaction inside this function.
-  serializedInputNotes.map((note) => {
-    return upsertInputNote(
-      note.noteId,
-      note.noteAssets,
-      note.serialNumber,
-      note.inputs,
-      note.noteScriptRoot,
-      note.noteScript,
-      note.nullifier,
-      note.createdAt,
-      note.stateDiscriminant,
-      note.state
-    );
-  });
+  let inputNotesWriteOp = Promise.all(
+    serializedInputNotes.map((note) => {
+      return upsertInputNote(
+        note.noteId,
+        note.noteAssets,
+        note.serialNumber,
+        note.inputs,
+        note.noteScriptRoot,
+        note.noteScript,
+        note.nullifier,
+        note.createdAt,
+        note.stateDiscriminant,
+        note.state
+      );
+    })
+  );
 
   // See comment above, the same thing applies here, but for Output Notes.
-  serializedOutputNotes.map((note) => {
-    return upsertOutputNote(
-      note.noteId,
-      note.noteAssets,
-      note.recipientDigest,
-      note.metadata,
-      note.nullifier,
-      note.expectedHeight,
-      note.stateDiscriminant,
-      note.state
-    );
-  });
-
-  // Fit insert operations into a single promise.
-  let inputNotesWriteOp = Promise.all(serializedInputNotes);
-  let outputNotesWriteOp = Promise.all(serializedOutputNotes);
+  let outputNotesWriteOp = Promise.all(
+    serializedOutputNotes.map((note) => {
+      return upsertOutputNote(
+        note.noteId,
+        note.noteAssets,
+        note.recipientDigest,
+        note.metadata,
+        note.nullifier,
+        note.expectedHeight,
+        note.stateDiscriminant,
+        note.state
+      );
+    })
+  );
 
   // Promises to insert each transaction update.
-  transactionUpdates.flatMap((transactionRecord) => {
-    [
-      insertTransactionScript(
-        transactionRecord.scriptRoot,
-        transactionRecord.txScript
-      ),
-      upsertTransactionRecord(
-        transactionRecord.id,
-        transactionRecord.details,
-        transactionRecord.blockNum,
-        transactionRecord.scriptRoot,
-        transactionRecord.commitHeight,
-        transactionRecord.discardCause
-      ),
-    ];
-  });
-
-  // Fit the upsert transactions into a single promise
-  let transactionWriteOp = Promise.all(transactionUpdates);
+  let transactionWriteOp = Promise.all(
+    transactionUpdates.map((transactionRecord) => {
+      return Promise.all([
+        insertTransactionScript(
+          transactionRecord.scriptRoot,
+          transactionRecord.txScript
+        ),
+        upsertTransactionRecord(
+          transactionRecord.id,
+          transactionRecord.details,
+          transactionRecord.blockNum,
+          transactionRecord.scriptRoot,
+          transactionRecord.commitHeight,
+          transactionRecord.discardCause
+        ),
+      ]);
+    })
+  );
 
   // Promises to insert each account update.
-  accountUpdates.flatMap((accountUpdate) => {
-    return [
-      insertAccountStorage(
-        accountUpdate.storageRoot,
-        accountUpdate.storageSlots
-      ),
-      insertAccountAssetVault(
-        accountUpdate.assetVaultRoot,
-        accountUpdate.assetBytes
-      ),
-      insertAccountRecord(
-        accountUpdate.accountId,
-        accountUpdate.codeRoot,
-        accountUpdate.storageRoot,
-        accountUpdate.assetVaultRoot,
-        accountUpdate.nonce,
-        accountUpdate.committed,
-        accountUpdate.accountCommitment,
-        accountUpdate.accountSeed
-      ),
-    ];
-  });
 
-  let accountUpdatesWriteOp = Promise.all(accountUpdates);
+  let accountUpdatesWriteOp = Promise.all(
+    accountUpdates.flatMap((accountUpdate) => {
+      return [
+        insertAccountStorage(
+          accountUpdate.storageRoot,
+          accountUpdate.storageSlots
+        ),
+        insertAccountAssetVault(
+          accountUpdate.assetVaultRoot,
+          accountUpdate.assetBytes
+        ),
+        insertAccountRecord(
+          accountUpdate.accountId,
+          accountUpdate.codeRoot,
+          accountUpdate.storageRoot,
+          accountUpdate.assetVaultRoot,
+          accountUpdate.nonce,
+          accountUpdate.committed,
+          accountUpdate.accountCommitment,
+          accountUpdate.accountSeed
+        ),
+      ];
+    })
+  );
 
   const tablesToAccess = [
     stateSync,
@@ -294,43 +286,27 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   // Write everything in a single transaction, this transaction will atomically do the operations
   // below, since every operation here (or at least, most of them), is done in a nested transaction.
   // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
-  return await db.transaction(
-    "rw",
-    [
-      stateSync,
-      inputNotes,
-      outputNotes,
-      transactions,
-      blockHeaders,
-      partialBlockchainNodes,
-      tags,
-    ],
-    async (tx) => {
-      await Promise.all([
-        inputNotesWriteOp,
-        outputNotesWriteOp,
-        transactionWriteOp,
-        accountUpdatesWriteOp,
-      ]);
-      // Update to the new block number
-      await updateSyncHeight(tx, blockNum);
-      for (let i = 0; i < newBlockHeaders.length; i++) {
-        await updateBlockHeader(
-          tx,
-          newBlockNums[i],
-          newBlockHeaders[i],
-          partialBlockchainPeaks[i],
-          blockHasRelevantNotes[i] == 1 // blockHasRelevantNotes is a u8 array, so we convert it to boolean
-        );
-      }
-      await updatePartialBlockchainNodes(
+  return await db.transaction("rw", tablesToAccess, async (tx) => {
+    await Promise.all([
+      inputNotesWriteOp,
+      outputNotesWriteOp,
+      transactionWriteOp,
+      accountUpdatesWriteOp,
+    ]);
+    // Update to the new block number
+    await updateSyncHeight(tx, blockNum);
+    for (let i = 0; i < newBlockHeaders.length; i++) {
+      await updateBlockHeader(
         tx,
-        serializedNodeIds,
-        serializedNodes
+        newBlockNums[i],
+        newBlockHeaders[i],
+        partialBlockchainPeaks[i],
+        blockHasRelevantNotes[i] == 1 // blockHasRelevantNotes is a u8 array, so we convert it to boolean
       );
-      await updateCommittedNoteTags(tx, committedNoteIds);
     }
-  );
+    await updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes);
+    await updateCommittedNoteTags(tx, committedNoteIds);
+  });
 }
 
 async function updateSyncHeight(

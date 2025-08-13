@@ -1,5 +1,3 @@
-// TODO: Re-enable this lint in another issue/PR.
-
 import {
   accountCodes,
   accountStorages,
