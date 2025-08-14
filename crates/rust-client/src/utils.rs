@@ -8,8 +8,14 @@ use core::num::ParseIntError;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
-    bytes_to_hex_string, hex_to_bytes,
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+    ToHex,
+    bytes_to_hex_string,
+    hex_to_bytes,
 };
 
 use crate::alloc::borrow::ToOwned;
@@ -66,7 +72,7 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 
     // Validate that the parts are valid numbers
     for part in &parts {
-        part.parse::<u64>().map_err(|err| TokenParseError::ParseU64(err.into()))?;
+        part.parse::<u64>().map_err(TokenParseError::ParseU64)?;
     }
 
     // Get the integer part
@@ -93,7 +99,7 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
     let combined = format!("{}{}", integer_part, &fractional_part[0..n_decimals.into()]);
 
     // Convert the combined string to an integer
-    combined.parse::<u64>().map_err(|err| TokenParseError::ParseU64(err.into()))
+    combined.parse::<u64>().map_err(TokenParseError::ParseU64)
 }
 
 // TESTS
@@ -101,7 +107,7 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{base_units_to_tokens, tokens_to_base_units};
+    use crate::utils::{TokenParseError, base_units_to_tokens, tokens_to_base_units};
 
     #[test]
     fn convert_tokens_to_base_units() {
@@ -113,10 +119,16 @@ mod tests {
         assert_eq!(tokens_to_base_units("0", 3).unwrap(), 0);
         assert_eq!(tokens_to_base_units("1234", 8).unwrap(), 123_400_000_000);
         assert_eq!(tokens_to_base_units("1", 0).unwrap(), 1);
-        assert!(matches!(tokens_to_base_units("1.1", 0), Err((_, _))),);
-        assert!(matches!(tokens_to_base_units("18446744.073709551615", 11), Err((_, _))),);
-        assert!(matches!(tokens_to_base_units("123u3.23", 4), Err((_, _))),);
-        assert!(matches!(tokens_to_base_units("2.k3", 4), Err((_, _))),);
+        assert!(matches!(
+            tokens_to_base_units("1.1", 0),
+            Err(TokenParseError::TooManyDecimals(0))
+        ),);
+        assert!(matches!(
+            tokens_to_base_units("18446744.073709551615", 11),
+            Err(TokenParseError::TooManyDecimals(11))
+        ),);
+        assert!(matches!(tokens_to_base_units("123u3.23", 4), Err(TokenParseError::ParseU64(_))),);
+        assert!(matches!(tokens_to_base_units("2.k3", 4), Err(TokenParseError::ParseU64(_))),);
         assert_eq!(tokens_to_base_units("12.345000", 4).unwrap(), 123_450);
         assert!(tokens_to_base_units("0.0001.00000001", 12).is_err());
     }
