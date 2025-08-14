@@ -146,8 +146,6 @@ export async function insertTransactionScript(
   }
 }
 
-// FIXME: Add to changelog that these parameters
-// have change order.
 export async function upsertTransactionRecord(
   transactionId: string,
   details: Uint8Array,
