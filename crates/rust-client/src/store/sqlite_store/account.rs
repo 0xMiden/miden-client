@@ -435,9 +435,9 @@ fn query_storage_slots(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_value, slot_type FROM account_storage WHERE ";
+    const STORAGE_QUERY: &str = "SELECT slot_value, slot_type FROM account_storage";
 
-    let query = format!("{STORAGE_QUERY}{where_clause}");
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
     let storage_values = conn
         .prepare(&query)?
         .query_map(params, |row| {
@@ -472,8 +472,8 @@ fn query_storage_maps(
     where_clause: &str,
     params: impl Params,
 ) -> Result<BTreeMap<Word, StorageMap>, StoreError> {
-    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries WHERE ";
-    let query = format!("{STORAGE_MAP_SELECT}{where_clause}");
+    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries";
+    let query = format!("{STORAGE_MAP_SELECT} WHERE {where_clause}");
 
     let map_entries = conn
         .prepare(&query)?
@@ -504,9 +504,9 @@ fn query_vault_assets(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<Asset>, StoreError> {
-    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults WHERE ";
+    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults";
 
-    let query = format!("{VAULT_QUERY}{where_clause}");
+    let query = format!("{VAULT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
             let asset: String = row.get(0)?;
@@ -546,8 +546,8 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts WHERE ";
-    let query = format!("{SELECT_QUERY}{where_clause}");
+        FROM accounts";
+    let query = format!("{SELECT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
             let id: String = row.get(0)?;
