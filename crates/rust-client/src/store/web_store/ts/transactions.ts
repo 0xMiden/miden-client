@@ -18,13 +18,14 @@ interface ProcessedTransaction {
 }
 
 const IDS_FILTER_PREFIX = "Ids:";
+const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
 export async function getTransactions(filter: string) {
   let transactionRecords: ITransaction[] = [];
 
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter((tx) => tx.commitHeight === undefined)
+        .filter((tx) => tx.commitHeight == undefined)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -38,6 +39,20 @@ export async function getTransactions(filter: string) {
       } else {
         transactionRecords = [];
       }
+    } else if (filter.startsWith(EXPIRED_BEFORE_FILTER_PREFIX)) {
+      const blockNumString = filter.substring(
+        EXPIRED_BEFORE_FILTER_PREFIX.length
+      );
+      const blockNum = parseInt(blockNumString);
+
+      transactionRecords = await transactions
+        .filter(
+          (tx) =>
+            parseInt(tx.blockNum, 10) < blockNum &&
+            tx.commitHeight === null &&
+            tx.discardCause === null
+        )
+        .toArray();
     } else {
       transactionRecords = await transactions.toArray();
     }
