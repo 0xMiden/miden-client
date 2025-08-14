@@ -10,10 +10,9 @@ use miden_client::transaction::{
     ForeignAccount,
     TransactionKernel,
     TransactionRequestBuilder,
-    TransactionScript,
 };
 use miden_client::utils::word_to_masm_push_string;
-use miden_client::{Felt, Word};
+use miden_client::{Felt, ScriptBuilder, Word};
 
 // FPI TESTS
 // ================================================================================================
@@ -186,7 +185,7 @@ pub async fn nested_fpi_calls(client_config: ClientConfig) {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
+    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script).unwrap();
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -269,7 +268,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
+    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed

@@ -61,7 +61,7 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
         &self,
         client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -102,7 +102,7 @@ struct CliNoteSummary {
 
 // LIST NOTES
 // ================================================================================================
-async fn list_notes<AUTH: TransactionAuthenticator>(
+async fn list_notes<AUTH: TransactionAuthenticator + Sync>(
     client: Client<AUTH>,
     filter: ClientNoteFilter,
 ) -> Result<(), CliError> {
@@ -128,7 +128,7 @@ async fn list_notes<AUTH: TransactionAuthenticator>(
 // SHOW NOTE
 // ================================================================================================
 #[allow(clippy::too_many_lines)]
-async fn show_note<AUTH: TransactionAuthenticator>(
+async fn show_note<AUTH: TransactionAuthenticator + Sync>(
     client: Client<AUTH>,
     note_id: String,
     with_code: bool,
@@ -299,7 +299,7 @@ async fn show_note<AUTH: TransactionAuthenticator>(
 
 // LIST CONSUMABLE INPUT NOTES
 // ================================================================================================
-async fn list_consumable_notes<AUTH: TransactionAuthenticator>(
+async fn list_consumable_notes<AUTH: TransactionAuthenticator + Sync>(
     client: Client<AUTH>,
     account_id: Option<&String>,
 ) -> Result<(), CliError> {

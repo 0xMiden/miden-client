@@ -22,13 +22,8 @@ use miden_client::testing::common::{
 };
 use miden_client::testing::config::ClientConfig;
 use miden_client::testing::note::NoteBuilder;
-use miden_client::transaction::{
-    OutputNote,
-    TransactionKernel,
-    TransactionRequestBuilder,
-    TransactionScript,
-};
-use miden_client::{Felt, Word, ZERO};
+use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
+use miden_client::{Felt, ScriptBuilder, Word, ZERO};
 use rand::RngCore;
 
 // HELPERS
@@ -78,15 +73,16 @@ async fn deploy_counter_contract(
 
     client.add_account(&acc, Some(seed), false).await.unwrap();
 
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
-    let tx_script = TransactionScript::compile(
-        "use.external_contract::counter_contract
+    let mut script_builder = ScriptBuilder::new(true);
+    script_builder.link_dynamic_library(&library).unwrap();
+    let tx_script = script_builder
+        .compile_tx_script(
+            "use.external_contract::counter_contract
         begin
             call.counter_contract::increment_count
         end",
-        assembler.with_dynamic_library(&library).unwrap(),
-    )
-    .unwrap();
+        )
+        .unwrap();
 
     // Build a transaction request with the custom script
     let tx_increment_request =
@@ -141,7 +137,6 @@ async fn get_counter_contract_account(
 
     (account, seed, library)
 }
-
 // TESTS
 // ================================================================================================
 

@@ -4,14 +4,13 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::string::ToString;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_objects::account::AuthSecretKey;
 use miden_objects::{Felt, Word};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
-use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
 use rand::{Rng, SeedableRng};
 
@@ -24,14 +23,14 @@ use super::KeyStoreError;
 /// The keystore requires an RNG component for generating Falcon signatures at the moment of
 /// transaction signing.
 #[derive(Debug, Clone)]
-pub struct FilesystemKeyStore<R: Rng> {
+pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
     /// The directory where the keys are stored and read from.
     keys_directory: PathBuf,
 }
 
-impl<R: Rng> FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     pub fn with_rng(keys_directory: PathBuf, rng: R) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
             std::fs::create_dir_all(&keys_directory).map_err(|err| {
@@ -116,7 +115,7 @@ impl FilesystemKeyStore<rand::rngs::StdRng> {
     }
 }
 
-impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// Gets a signature over a message, given a public key.
     ///
     /// The public key should correspond to one of the keys tracked by the keystore.
@@ -124,12 +123,12 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: Word,
         signing_info: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
-        let mut rng = self.rng.write();
+        let mut rng = self.rng.write().expect("poisoned lock");
 
         let message = signing_info.to_commitment();
 

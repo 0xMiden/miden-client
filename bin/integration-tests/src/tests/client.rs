@@ -27,7 +27,6 @@ use miden_client::transaction::{
     TransactionWitness,
 };
 use miden_client::{ClientError, ONE};
-use winter_maybe_async::maybe_async_trait;
 
 pub async fn client_builder_initializes_client_with_endpoint(client_config: ClientConfig) {
     let (endpoint, _, store_config, auth_path) = client_config.into_parts();
@@ -997,10 +996,9 @@ impl AlwaysFailingProver {
     }
 }
 
-#[maybe_async_trait]
+#[async_trait::async_trait]
 impl TransactionProver for AlwaysFailingProver {
-    #[maybe_async]
-    fn prove(
+    async fn prove(
         &self,
         _tx_witness: TransactionWitness,
     ) -> Result<ProvenTransaction, TransactionProverError> {

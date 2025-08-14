@@ -83,6 +83,7 @@ before(async () => {
         FungibleAsset,
         FungibleAssetDelta,
         Library,
+        InputNoteRecord,
         Note,
         NoteAndArgs,
         NoteAndArgsArray,
@@ -154,6 +155,7 @@ before(async () => {
       window.ForeignAccount = ForeignAccount;
       window.FungibleAsset = FungibleAsset;
       window.FungibleAssetDelta = FungibleAssetDelta;
+      window.InputNoteRecord = InputNoteRecord;
       window.Library = Library;
       window.Note = Note;
       window.NoteAndArgs = NoteAndArgs;

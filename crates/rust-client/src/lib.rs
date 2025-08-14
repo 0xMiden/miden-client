@@ -241,7 +241,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-use miden_lib::utils::ScriptBuilder;
+pub use miden_lib::utils::ScriptBuilder;
 use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
