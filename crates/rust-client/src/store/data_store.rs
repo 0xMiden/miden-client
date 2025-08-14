@@ -80,6 +80,7 @@ impl DataStore for ClientDataStore {
                     err,
                 )
             })?;
+
         Ok((account, seed, block_header, partial_blockchain))
     }
 }
