@@ -18,13 +18,14 @@ interface ProcessedTransaction {
 }
 
 const IDS_FILTER_PREFIX = "Ids:";
+const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
 export async function getTransactions(filter: string) {
   let transactionRecords: ITransaction[] = [];
 
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter((tx) => tx.commitHeight === undefined)
+        .filter((tx) => tx.commitHeight == undefined)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -38,6 +39,20 @@ export async function getTransactions(filter: string) {
       } else {
         transactionRecords = [];
       }
+    } else if (filter.startsWith(EXPIRED_BEFORE_FILTER_PREFIX)) {
+      const blockNumString = filter.substring(
+        EXPIRED_BEFORE_FILTER_PREFIX.length
+      );
+      const blockNum = parseInt(blockNumString);
+
+      transactionRecords = await transactions
+        .filter(
+          (tx) =>
+            tx.blockNum < blockNum &&
+            tx.commitHeight == undefined &&
+            tx.discardCause == undefined
+        )
+        .toArray();
     } else {
       transactionRecords = await transactions.toArray();
     }
@@ -96,7 +111,7 @@ export async function getTransactions(filter: string) {
           details: detailsBase64,
           scriptRoot: transactionRecord.scriptRoot,
           txScript: txScriptBase64,
-          blockNum: transactionRecord.blockNum,
+          blockNum: transactionRecord.blockNum.toString(),
           commitHeight: transactionRecord.commitHeight,
           discardCause: discardCauseBase64,
         };
@@ -161,7 +176,7 @@ export async function upsertTransactionRecord(
       id: transactionId,
       details: detailsBlob,
       scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
-      blockNum: blockNum,
+      blockNum: parseInt(blockNum, 10),
       commitHeight: committed ? committed : undefined,
       discardCause: mapOption(
         discardCause,

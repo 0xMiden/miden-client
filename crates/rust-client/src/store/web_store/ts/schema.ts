@@ -68,7 +68,7 @@ export interface IAccount {
 export interface ITransaction {
   id: string;
   details: Blob;
-  blockNum: string;
+  blockNum: number;
   scriptRoot?: string;
   commitHeight?: string;
   discardCause?: Blob | null;
