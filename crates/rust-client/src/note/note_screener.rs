@@ -6,17 +6,11 @@ use core::fmt;
 use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
-use miden_objects::assembly::DefaultSourceManager;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::transaction::{InputNote, InputNotes};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{
-    NoteAccountExecution,
-    NoteConsumptionChecker,
-    TransactionExecutor,
-    TransactionExecutorError,
-};
+use miden_tx::{NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError};
 use thiserror::Error;
 use tonic::async_trait;
 
@@ -66,7 +60,7 @@ pub struct NoteScreener<AUTH> {
 
 impl<AUTH> NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
         Self { store, authenticator }
@@ -141,17 +135,15 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
-
-        if let NoteAccountExecution::Success = consumption_checker
+        let note_execution_check = consumption_checker
             .check_notes_consumability(
                 account.id(),
                 self.store.get_sync_height().await?,
                 input_notes,
                 tx_args,
-                Arc::new(DefaultSourceManager::default()),
             )
-            .await?
-        {
+            .await?;
+        if !note_execution_check.successful.is_empty() {
             return Ok(Some(NoteRelevance::Now));
         }
 
@@ -190,7 +182,7 @@ where
 #[async_trait(?Send)]
 impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator,
+    AUTH: TransactionAuthenticator + Sync,
 {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
@@ -200,10 +192,7 @@ where
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>
-    where
-        AUTH: TransactionAuthenticator,
-    {
+    ) -> Result<NoteUpdateAction, ClientError> {
         let note_id = *committed_note.note_id();
 
         let input_note_present =

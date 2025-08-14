@@ -25,7 +25,7 @@ use tracing::debug;
 use crate::commands::account::maybe_set_default_account;
 use crate::errors::CliError;
 use crate::utils::load_config_file;
-use crate::{CLIENT_BINARY_NAME, CliKeyStore};
+use crate::{CliKeyStore, client_binary_name};
 
 // CLI TYPES
 // ================================================================================================
@@ -98,7 +98,7 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -130,7 +130,8 @@ impl NewWalletCmd {
 
         println!("Successfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}",
+            "To view account details execute {} account -s {account_address}",
+            client_binary_name().display()
         );
 
         maybe_set_default_account(&mut current_config, new_account.id())?;
@@ -171,7 +172,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + 'static>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -193,7 +194,8 @@ impl NewAccountCmd {
 
         println!("Successfully created new account.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
+            "To view account details execute {} account -s {account_address}",
+            client_binary_name().display()
         );
 
         Ok(())
@@ -245,7 +247,7 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 ///
 /// The created account will have a Falcon-based auth component, additional to any specified
 /// component.
-async fn create_client_account<AUTH: TransactionAuthenticator + 'static>(
+async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -302,7 +304,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + 'static>(
+async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {

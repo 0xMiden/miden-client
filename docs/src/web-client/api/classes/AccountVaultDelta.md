@@ -8,6 +8,16 @@
 
 ## Methods
 
+### addedFungibleAssets()
+
+> **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+
+#### Returns
+
+[`FungibleAsset`](FungibleAsset.md)[]
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -35,3 +45,39 @@
 #### Returns
 
 `boolean`
+
+***
+
+### removedFungibleAssets()
+
+> **removedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+
+#### Returns
+
+[`FungibleAsset`](FungibleAsset.md)[]
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `AccountVaultDelta`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`AccountVaultDelta`

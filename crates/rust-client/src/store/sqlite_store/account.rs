@@ -5,12 +5,20 @@ use alloc::vec::Vec;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    StorageMap,
+    StorageSlot,
+};
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
-use rusqlite::{Connection, Transaction, named_params, params};
+use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::store::{AccountRecord, AccountStatus, StoreError};
@@ -18,16 +26,15 @@ use crate::{insert_sql, subst};
 
 // TYPES
 // ================================================================================================
-type SerializedAccountData = (String, String, String, String, Value, bool, String);
-type SerializedAccountsParts = (String, u64, String, String, String, Option<Vec<u8>>, bool);
-
-type SerializedAccountVaultData = (String, Vec<u8>);
-
-type SerializedAccountCodeData = (String, Vec<u8>);
-
-type SerializedAccountStorageData = (String, Vec<u8>);
-
-type SerializedFullAccountParts = (String, u64, Option<Vec<u8>>, Vec<u8>, Vec<u8>, Vec<u8>, bool);
+struct SerializedHeaderData {
+    id: String,
+    nonce: u64,
+    vault_root: String,
+    storage_commitment: String,
+    code_commitment: String,
+    account_seed: Option<Vec<u8>>,
+    locked: bool,
+}
 
 impl SqliteStore {
     // ACCOUNTS
@@ -49,30 +56,23 @@ impl SqliteStore {
     pub(super) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        const QUERY: &str = "SELECT a.id, a.nonce, a.vault_root, a.storage_root, a.code_root, a.account_seed, a.locked \
-            FROM accounts a \
-            WHERE a.nonce = (SELECT MAX(b.nonce) FROM accounts b WHERE b.id = a.id)";
-
-        conn.prepare(QUERY)?
-            .query_map([], parse_accounts_columns)
-            .expect("no binding parameters used in query")
-            .map(|result| Ok(result?).and_then(parse_accounts))
-            .collect()
+        query_account_headers(
+            conn,
+            "nonce = (SELECT MAX(max.nonce) FROM accounts max WHERE max.id = accounts.id)",
+            params![],
+        )
     }
 
     pub(crate) fn get_account_header(
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
-        const QUERY: &str = "SELECT id, nonce, vault_root, storage_root, code_root, account_seed, locked \
-            FROM accounts WHERE id = ? \
-            ORDER BY nonce DESC \
-            LIMIT 1";
-        conn.prepare(QUERY)?
-            .query_map(params![account_id.to_hex()], parse_accounts_columns)?
-            .map(|result| Ok(result?).and_then(parse_accounts))
-            .next()
-            .transpose()
+        Ok(query_account_headers(
+            conn,
+            "id = ? ORDER BY nonce DESC LIMIT 1",
+            params![account_id.to_hex()],
+        )?
+        .pop())
     }
 
     pub(crate) fn get_account_header_by_commitment(
@@ -80,37 +80,39 @@ impl SqliteStore {
         account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str: String = account_commitment.to_string();
-        const QUERY: &str = "SELECT id, nonce, vault_root, storage_root, code_root, account_seed, locked \
-            FROM accounts WHERE account_commitment = ?";
-
-        conn.prepare(QUERY)?
-            .query_map(params![account_commitment_str], parse_accounts_columns)?
-            .map(|result| {
-                let result = result?;
-                Ok(parse_accounts(result)?.0)
-            })
-            .next()
-            .map_or(Ok(None), |result| result.map(Some))
+        Ok(
+            query_account_headers(conn, "account_commitment = ?", params![account_commitment_str])?
+                .pop()
+                .map(|(header, _)| header),
+        )
     }
 
     pub(crate) fn get_account(
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        const QUERY: &str = "SELECT accounts.id, accounts.nonce, accounts.account_seed, account_code.code, account_storage.slots, account_vaults.assets, accounts.locked \
-                            FROM accounts \
-                            JOIN account_code ON accounts.code_root = account_code.root \
-                            JOIN account_storage ON accounts.storage_root = account_storage.root \
-                            JOIN account_vaults ON accounts.vault_root = account_vaults.root \
-                            WHERE accounts.id = ? \
-                            ORDER BY accounts.nonce DESC \
-                            LIMIT 1";
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+            return Ok(None);
+        };
 
-        conn.prepare(QUERY)?
-            .query_map(params![account_id.to_hex()], parse_account_columns)?
-            .map(|result| Ok(result?).and_then(parse_account))
-            .next()
-            .transpose()
+        let assets = query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])?;
+
+        let vault = AssetVault::new(&assets)?;
+
+        let storage = AccountStorage::new(query_storage_slots(
+            conn,
+            "commitment = ?",
+            params![header.storage_commitment().to_hex()],
+        )?)?;
+
+        let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
+            return Ok(None);
+        };
+
+        Ok(Some(AccountRecord::new(
+            Account::from_parts(header.id(), vault, storage, account_code, header.nonce()),
+            status,
+        )))
     }
 
     pub(crate) fn insert_account(
@@ -120,10 +122,14 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 
-        insert_account_code(&tx, account.code())?;
-        insert_account_storage(&tx, account.storage())?;
-        insert_account_asset_vault(&tx, account.vault())?;
-        insert_account_record(&tx, account, account_seed)?;
+        Self::insert_account_code(&tx, account.code())?;
+        Self::insert_storage_slots(
+            &tx,
+            account.storage().commitment(),
+            account.storage().slots().iter(),
+        )?;
+        Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
+        Self::insert_account_header(&tx, &account.into(), account_seed)?;
 
         Ok(tx.commit()?)
     }
@@ -154,7 +160,7 @@ impl SqliteStore {
         }
 
         let tx = conn.transaction()?;
-        update_account(&tx, new_account_state)?;
+        Self::update_account_state(&tx, new_account_state)?;
         Ok(tx.commit()?)
     }
 
@@ -165,11 +171,12 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 
-        const QUERY: &str = insert_sql!(foreign_account_code { account_id, code_root } | REPLACE);
+        const QUERY: &str =
+            insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
 
         tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])?;
 
-        insert_account_code(&tx, code)?;
+        Self::insert_account_code(&tx, code)?;
         Ok(tx.commit()?)
     }
 
@@ -181,7 +188,7 @@ impl SqliteStore {
             account_ids.into_iter().map(|id| Value::from(id.to_hex())).collect();
         const QUERY: &str = "
             SELECT account_id, code
-            FROM foreign_account_code JOIN account_code ON code_root = code_root
+            FROM foreign_account_code JOIN account_code ON foreign_account_code.code_commitment = account_code.commitment
             WHERE account_id IN rarray(?)";
 
         conn.prepare(QUERY)?
@@ -203,137 +210,191 @@ impl SqliteStore {
             })
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
     }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Update previously-existing account after a transaction execution.
+    ///
+    /// Because the Client retrieves the account by account ID before applying the delta, we don't
+    /// need to check that it exists here. This inserts a new row into the accounts table.
+    /// We can later identify the proper account state by looking at the nonce.
+    pub(super) fn update_account_state(
+        tx: &Transaction<'_>,
+        new_account_state: &Account,
+    ) -> Result<(), StoreError> {
+        Self::insert_storage_slots(
+            tx,
+            new_account_state.storage().commitment(),
+            new_account_state.storage().slots().iter(),
+        )?;
+        Self::insert_assets(
+            tx,
+            new_account_state.vault().root(),
+            new_account_state.vault().assets(),
+        )?;
+        Self::insert_account_header(tx, &new_account_state.into(), None)
+    }
+
+    /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
+    /// data).
+    pub(super) fn lock_account_on_unexpected_commitment(
+        tx: &Transaction<'_>,
+        account_id: &AccountId,
+        mismatched_digest: &Word,
+    ) -> Result<(), StoreError> {
+        // Mismatched digests may be due to stale network data. If the mismatched digest is
+        // tracked in the db and corresponds to the mismatched account, it means we
+        // got a past update and shouldn't lock the account.
+        const QUERY: &str = "UPDATE accounts SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM accounts WHERE id = :account_id AND account_commitment = :digest)";
+        tx.execute(
+            QUERY,
+            named_params! {
+                ":account_id": account_id.to_hex(),
+                ":digest": mismatched_digest.to_string()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Removes account states with the specified hashes from the database.
+    ///
+    /// This is used to rollback account changes when a transaction is discarded,
+    /// effectively undoing the account state changes that were applied by the transaction.
+    ///
+    /// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
+    /// implementation to handle transaction rollbacks.
+    pub(super) fn undo_account_state(
+        tx: &Transaction<'_>,
+        account_hashes: &[Word],
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
+
+        let params = account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>();
+        tx.execute(QUERY, params![Rc::new(params)])?;
+
+        Ok(())
+    }
+
+    /// Inserts a new account record into the database.
+    fn insert_account_header(
+        tx: &Transaction<'_>,
+        account: &AccountHeader,
+        account_seed: Option<Word>,
+    ) -> Result<(), StoreError> {
+        let id: String = account.id().to_hex();
+        let code_commitment = account.code_commitment().to_string();
+        let storage_commitment = account.storage_commitment().to_string();
+        let vault_root = account.vault_root().to_string();
+        let nonce = u64_to_value(account.nonce().as_int());
+        let commitment = account.commitment().to_string();
+
+        let account_seed = account_seed.map(|seed| seed.to_bytes());
+
+        const QUERY: &str = insert_sql!(
+            accounts {
+                id,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                account_commitment,
+                locked
+            } | REPLACE
+        );
+
+        tx.execute(
+            QUERY,
+            params![
+                id,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                commitment,
+                false,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Inserts an [`AccountCode`].
+    fn insert_account_code(
+        tx: &Transaction<'_>,
+        account_code: &AccountCode,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
+        tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])?;
+        Ok(())
+    }
+
+    fn insert_storage_slots<'a>(
+        tx: &Transaction<'_>,
+        commitment: Word,
+        account_storage: impl Iterator<Item = &'a StorageSlot>,
+    ) -> Result<(), StoreError> {
+        for (index, slot) in account_storage.enumerate() {
+            const QUERY: &str =
+                insert_sql!(account_storage { commitment, slot_index, slot_value } | IGNORE);
+
+            tx.execute(QUERY, params![commitment.to_hex(), index, slot.value().to_hex()])?;
+
+            if let StorageSlot::Map(map) = slot {
+                const MAP_QUERY: &str =
+                    insert_sql!(storage_map_entries { root, key, value } | IGNORE);
+                for (key, value) in map.entries() {
+                    // Insert each entry of the storage map
+                    tx.execute(
+                        MAP_QUERY,
+                        params![map.root().to_hex(), key.to_hex(), value.to_hex()],
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn insert_assets(
+        tx: &Transaction<'_>,
+        root: Word,
+        assets: impl Iterator<Item = Asset>,
+    ) -> Result<(), StoreError> {
+        for asset in assets {
+            const QUERY: &str =
+                insert_sql!(account_vaults { root, faucet_id_prefix, asset } | IGNORE);
+            tx.execute(
+                QUERY,
+                params![
+                    root.to_hex(),
+                    asset.faucet_id_prefix().to_hex(),
+                    Word::from(asset).to_hex(),
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 // HELPERS
 // ================================================================================================
 
-/// Update previously-existing account after a transaction execution.
-///
-/// Because the Client retrieves the account by account ID before applying the delta, we don't
-/// need to check that it exists here. This inserts a new row into the accounts table.
-/// We can later identify the proper account state by looking at the nonce.
-pub(crate) fn update_account(
-    tx: &Transaction<'_>,
-    new_account_state: &Account,
-) -> Result<(), StoreError> {
-    insert_account_storage(tx, new_account_state.storage())?;
-    insert_account_asset_vault(tx, new_account_state.vault())?;
-    insert_account_record(tx, new_account_state, None)
-}
-
-pub(super) fn insert_account_record(
-    tx: &Transaction<'_>,
-    account: &Account,
-    account_seed: Option<Word>,
-) -> Result<(), StoreError> {
-    let (id, code_root, storage_root, vault_root, nonce, committed, commitment) =
-        serialize_account(account);
-
-    let account_seed = account_seed.map(|seed| seed.to_bytes());
-
-    const QUERY: &str = insert_sql!(
-        accounts {
-            id,
-            code_root,
-            storage_root,
-            vault_root,
-            nonce,
-            committed,
-            account_seed,
-            account_commitment,
-            locked
-        } | REPLACE
-    );
-
-    tx.execute(
-        QUERY,
-        params![
-            id,
-            code_root,
-            storage_root,
-            vault_root,
-            nonce,
-            committed,
-            account_seed,
-            commitment,
-            false,
-        ],
-    )?;
-    Ok(())
-}
-
-/// Inserts an [`AccountCode`].
-fn insert_account_code(tx: &Transaction<'_>, account_code: &AccountCode) -> Result<(), StoreError> {
-    let (code_root, code) = serialize_account_code(account_code);
-    const QUERY: &str = insert_sql!(account_code { root, code } | IGNORE);
-    tx.execute(QUERY, params![code_root, code])?;
-    Ok(())
-}
-
-/// Inserts an [`AccountStorage`].
-pub(super) fn insert_account_storage(
-    tx: &Transaction<'_>,
-    account_storage: &AccountStorage,
-) -> Result<(), StoreError> {
-    let (storage_root, storage_slots) = serialize_account_storage(account_storage);
-    const QUERY: &str = insert_sql!(account_storage { root, slots } | IGNORE);
-    tx.execute(QUERY, params![storage_root, storage_slots])?;
-    Ok(())
-}
-
-/// Inserts an [`AssetVault`].
-pub(super) fn insert_account_asset_vault(
-    tx: &Transaction<'_>,
-    asset_vault: &AssetVault,
-) -> Result<(), StoreError> {
-    let (vault_root, assets) = serialize_account_asset_vault(asset_vault);
-    const QUERY: &str = insert_sql!(account_vaults { root, assets } | IGNORE);
-    tx.execute(QUERY, params![vault_root, assets])?;
-    Ok(())
-}
-
-/// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
-/// data).
-pub(super) fn lock_account_on_unexpected_commitment(
-    tx: &Transaction<'_>,
-    account_id: &AccountId,
-    mismatched_digest: &Word,
-) -> Result<(), StoreError> {
-    // Mismatched digests may be due to stale network data. If the mismatched digest is
-    // tracked in the db and corresponds to the mismatched account, it means we
-    // got a past update and shouldn't lock the account.
-    const QUERY: &str = "UPDATE accounts SET locked = true WHERE id = :account_id AND NOT EXISTS (SELECT 1 FROM accounts WHERE id = :account_id AND account_commitment = :digest)";
-    tx.execute(
-        QUERY,
-        named_params! {
-            ":account_id": account_id.to_hex(),
-            ":digest": mismatched_digest.to_string()
-        },
-    )?;
-    Ok(())
-}
-
-/// Parse accounts columns from the provided row into native types.
-pub(super) fn parse_accounts_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedAccountsParts, rusqlite::Error> {
-    let id: String = row.get(0)?;
-    let nonce: u64 = column_value_as_u64(row, 1)?;
-    let vault_root: String = row.get(2)?;
-    let storage_root: String = row.get(3)?;
-    let code_root: String = row.get(4)?;
-    let account_seed: Option<Vec<u8>> = row.get(5)?;
-    let locked: bool = row.get(6)?;
-    Ok((id, nonce, vault_root, storage_root, code_root, account_seed, locked))
-}
-
-/// Parse an account from the provided parts.
-pub(super) fn parse_accounts(
-    serialized_account_parts: SerializedAccountsParts,
+/// Parse an account header from the provided serialized data.
+fn parse_accounts(
+    serialized_account_parts: SerializedHeaderData,
 ) -> Result<(AccountHeader, AccountStatus), StoreError> {
-    let (id, nonce, vault_root, storage_root, code_root, account_seed, locked) =
-        serialized_account_parts;
+    let SerializedHeaderData {
+        id,
+        nonce,
+        vault_root,
+        storage_commitment,
+        code_commitment,
+        account_seed,
+        locked,
+    } = serialized_account_parts;
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
 
     let status = match (account_seed, locked) {
@@ -347,109 +408,149 @@ pub(super) fn parse_accounts(
             AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
             Felt::new(nonce),
             Word::try_from(&vault_root)?,
-            Word::try_from(&storage_root)?,
-            Word::try_from(&code_root)?,
+            Word::try_from(&storage_commitment)?,
+            Word::try_from(&code_commitment)?,
         ),
         status,
     ))
 }
 
-/// Parse an account from the provided parts.
-pub(super) fn parse_account(
-    serialized_account_parts: SerializedFullAccountParts,
-) -> Result<AccountRecord, StoreError> {
-    let (id, nonce, account_seed, code, storage, assets, locked) = serialized_account_parts;
-    let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed)).transpose()?;
-    let account_id: AccountId =
-        AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic");
-    let account_code = AccountCode::from_bytes(&code)?;
-    let account_storage = AccountStorage::read_from_bytes(&storage)?;
-    let account_assets: Vec<Asset> = Vec::<Asset>::read_from_bytes(&assets)?;
-    let account = Account::from_parts(
-        account_id,
-        AssetVault::new(&account_assets)?,
-        account_storage,
-        account_code,
-        Felt::new(nonce),
-    );
+fn query_storage_slots(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<Vec<StorageSlot>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_value FROM account_storage WHERE ";
 
-    let status = match (account_seed, locked) {
-        (_, true) => AccountStatus::Locked,
-        (Some(seed), _) => AccountStatus::New { seed },
-        _ => AccountStatus::Tracked,
-    };
+    let query = format!("{STORAGE_QUERY}{where_clause}");
+    let storage_values = conn
+        .prepare(&query)?
+        .query_map(params, |row| {
+            let value: String = row.get(0)?;
+            Ok(value)
+        })?
+        .map(|result| Ok(Word::try_from(result?)?))
+        .collect::<Result<Vec<Word>, StoreError>>()?;
 
-    Ok(AccountRecord::new(account, status))
+    let params: Vec<Value> = storage_values.iter().map(|root| Value::from(root.to_hex())).collect();
+
+    let mut storage_maps = query_storage_maps(conn, "root IN rarray(?)", [Rc::new(params)])?;
+
+    Ok(storage_values
+        .into_iter()
+        .map(|value| {
+            if let Some(map) = storage_maps.remove(&value) {
+                StorageSlot::Map(map)
+            } else {
+                StorageSlot::Value(value)
+            }
+        })
+        .collect())
 }
 
-/// Serialized the provided account into database compatible types.
-// TODO: review the clippy exemption.
-fn serialize_account(account: &Account) -> SerializedAccountData {
-    let id: String = account.id().to_hex();
-    let code_root = account.code().commitment().to_string();
-    let commitment_root = account.storage().commitment().to_string();
-    let vault_root = account.vault().root().to_string();
-    let committed = account.is_public();
-    let nonce = u64_to_value(account.nonce().as_int());
-    let commitment = account.commitment().to_string();
+fn query_storage_maps(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<BTreeMap<Word, StorageMap>, StoreError> {
+    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries WHERE ";
+    let query = format!("{STORAGE_MAP_SELECT}{where_clause}");
 
-    (id, code_root, commitment_root, vault_root, nonce, committed, commitment)
-}
+    let map_entries = conn
+        .prepare(&query)?
+        .query_map(params, |row| {
+            let root: String = row.get(0)?;
+            let key: String = row.get(1)?;
+            let value: String = row.get(2)?;
 
-/// Serialize the provided `account_code` into database compatible types.
-fn serialize_account_code(account_code: &AccountCode) -> SerializedAccountCodeData {
-    let commitment = account_code.commitment().to_string();
-    let code = account_code.to_bytes();
+            Ok((root, key, value))
+        })?
+        .map(|result| {
+            let (root, key, value) = result?;
+            Ok((Word::try_from(root)?, Word::try_from(key)?, Word::try_from(value)?))
+        })
+        .collect::<Result<Vec<(Word, Word, Word)>, StoreError>>()?;
 
-    (commitment, code)
-}
-
-/// Serialize the provided `account_storage` into database compatible types.
-fn serialize_account_storage(account_storage: &AccountStorage) -> SerializedAccountStorageData {
-    let commitment = account_storage.commitment().to_string();
-    let storage = account_storage.to_bytes();
-
-    (commitment, storage)
-}
-
-/// Serialize the provided `asset_vault` into database compatible types.
-fn serialize_account_asset_vault(asset_vault: &AssetVault) -> SerializedAccountVaultData {
-    let commitment = asset_vault.root().to_string();
-    let assets = asset_vault.assets().collect::<Vec<Asset>>().to_bytes();
-    (commitment, assets)
-}
-
-/// Parse accounts parts from the provided row into native types.
-pub(super) fn parse_account_columns(
-    row: &rusqlite::Row<'_>,
-) -> Result<SerializedFullAccountParts, rusqlite::Error> {
-    let id: String = row.get(0)?;
-    let nonce: u64 = column_value_as_u64(row, 1)?;
-    let account_seed: Option<Vec<u8>> = row.get(2)?;
-    let code: Vec<u8> = row.get(3)?;
-    let storage: Vec<u8> = row.get(4)?;
-    let assets: Vec<u8> = row.get(5)?;
-    let locked: bool = row.get(6)?;
-
-    Ok((id, nonce, account_seed, code, storage, assets, locked))
-}
-
-/// Removes account states with the specified hashes from the database.
-///
-/// This is used to rollback account changes when a transaction is discarded,
-/// effectively undoing the account state changes that were applied by the transaction.
-///
-/// Note: This is not part of the Store trait and is only used internally by the `SQLite` store
-/// implementation to handle transaction rollbacks.
-pub(crate) fn undo_account_state(
-    tx: &Transaction<'_>,
-    account_hashes: &[Word],
-) -> Result<(), StoreError> {
-    const QUERY: &str = "DELETE FROM accounts WHERE account_commitment = ?";
-    for account_id in account_hashes {
-        tx.execute(QUERY, params![account_id.to_hex()])?;
+    let mut maps = BTreeMap::new();
+    for (root, key, value) in map_entries {
+        let map = maps.entry(root).or_insert_with(StorageMap::new);
+        map.insert(key, value);
     }
-    Ok(())
+
+    Ok(maps)
+}
+
+fn query_vault_assets(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<Vec<Asset>, StoreError> {
+    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults WHERE ";
+
+    let query = format!("{VAULT_QUERY}{where_clause}");
+    conn.prepare(&query)?
+        .query_map(params, |row| {
+            let asset: String = row.get(0)?;
+            Ok(asset)
+        })?
+        .map(|result| {
+            let word = Word::try_from(result?)?;
+            Ok(Asset::try_from(word)?)
+        })
+        .collect::<Result<Vec<Asset>, StoreError>>()
+}
+
+fn query_account_code(
+    conn: &Connection,
+    commitment: Word,
+) -> Result<Option<AccountCode>, StoreError> {
+    // TODO: this function will probably be refactored to receive more complex where clauses and
+    // return multiple mast forests
+    const CODE_QUERY: &str = "SELECT code FROM account_code WHERE commitment = ?";
+
+    conn.prepare(CODE_QUERY)?
+        .query_map(params![commitment.to_hex()], |row| {
+            let code: Vec<u8> = row.get(0)?;
+            Ok(code)
+        })?
+        .map(|result| {
+            let bytes = result?;
+            Ok(AccountCode::from_bytes(&bytes)?)
+        })
+        .next()
+        .transpose()
+}
+
+fn query_account_headers(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+    const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
+        FROM accounts WHERE ";
+    let query = format!("{SELECT_QUERY}{where_clause}");
+    conn.prepare(&query)?
+        .query_map(params, |row| {
+            let id: String = row.get(0)?;
+            let nonce: u64 = column_value_as_u64(row, 1)?;
+            let vault_root: String = row.get(2)?;
+            let storage_commitment: String = row.get(3)?;
+            let code_commitment: String = row.get(4)?;
+            let account_seed: Option<Vec<u8>> = row.get(5)?;
+            let locked: bool = row.get(6)?;
+
+            Ok(SerializedHeaderData {
+                id,
+                nonce,
+                vault_root,
+                storage_commitment,
+                code_commitment,
+                account_seed,
+                locked,
+            })
+        })?
+        .map(|result| parse_accounts(result?))
+        .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
 #[cfg(test)]
@@ -460,7 +561,7 @@ mod tests {
     use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::testing::account_component::BASIC_WALLET_CODE;
 
-    use crate::store::sqlite_store::account::insert_account_code;
+    use crate::store::sqlite_store::SqliteStore;
     use crate::store::sqlite_store::tests::create_test_store;
 
     #[tokio::test]
@@ -486,14 +587,14 @@ mod tests {
                 assert_eq!(actual, 0);
 
                 // First insertion generates a new row
-                insert_account_code(&tx, &account_code).unwrap();
+                SqliteStore::insert_account_code(&tx, &account_code).unwrap();
                 actual = tx
                     .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
                     .unwrap();
                 assert_eq!(actual, 1);
 
                 // Second insertion passes but does not generate a new row
-                assert!(insert_account_code(&tx, &account_code).is_ok());
+                assert!(SqliteStore::insert_account_code(&tx, &account_code).is_ok());
                 actual = tx
                     .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
                     .unwrap();

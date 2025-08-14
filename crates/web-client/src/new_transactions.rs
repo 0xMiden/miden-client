@@ -24,13 +24,13 @@ impl WebClient {
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionResult, JsValue> {
-        self.fetch_and_cache_account_auth_by_account_id(account_id).await?;
-
         if let Some(client) = self.get_mut_inner() {
-            let native_transaction_execution_result: NativeTransactionResult = client
-                .new_transaction(account_id.into(), transaction_request.into())
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to create new transaction"))?;
+            let native_transaction_execution_result: NativeTransactionResult =
+                Box::pin(client.new_transaction(account_id.into(), transaction_request.into()))
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to create new transaction")
+                    })?;
 
             Ok(native_transaction_execution_result.into())
         } else {
@@ -49,17 +49,21 @@ impl WebClient {
         if let Some(client) = self.get_mut_inner() {
             match prover {
                 Some(p) => {
-                    client
-                        .submit_transaction_with_prover(native_transaction_result, p.get_prover())
-                        .await
-                        .map_err(|err| {
-                            js_error_with_context(err, "failed to submit transaction with prover")
-                        })?;
+                    Box::pin(
+                        client.submit_transaction_with_prover(
+                            native_transaction_result,
+                            p.get_prover(),
+                        ),
+                    )
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to submit transaction with prover")
+                    })?;
                 },
                 None => {
-                    client.submit_transaction(native_transaction_result).await.map_err(|err| {
-                        js_error_with_context(err, "failed to submit transaction")
-                    })?;
+                    Box::pin(client.submit_transaction(native_transaction_result)).await.map_err(
+                        |err| js_error_with_context(err, "failed to submit transaction"),
+                    )?;
                 },
             }
             Ok(())
