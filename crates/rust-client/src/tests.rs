@@ -9,26 +9,44 @@ use std::sync::Arc;
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512,
+        faucets::BasicFungibleFaucet,
+        interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
     transaction::TransactionKernel,
 };
 use miden_objects::account::{
-    Account, AccountBuilder, AccountCode, AccountHeader, AccountId, AccountStorageMode,
-    AccountType, AuthSecretKey,
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    AuthSecretKey,
 };
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-    NoteRecipient, NoteTag, NoteType,
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -52,15 +70,30 @@ use crate::store::sqlite_store::SqliteStore;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::sync::NoteTagSource;
 use crate::testing::common::{
-    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
-    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
-    consume_notes, execute_failing_tx, execute_tx, mint_and_consume, mint_note,
-    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    TestClientKeyStore,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    execute_failing_tx,
+    execute_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
 };
 use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
-    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder,
-    TransactionRequestError, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use crate::{ClientError, DebugMode};
 
@@ -1923,34 +1956,58 @@ async fn swap_chain_test() {
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await;
+    let key_pair = SecretKey::with_rng(client.rng());
+    let pub_key = key_pair.public_key();
 
-    let account_id = regular_account.id();
-    let faucet_account_id = faucet_account_header.id();
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
 
-    let note = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await.1;
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
 
-    consume_notes(&mut client, account_id, &[note]).await;
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
-    let storage = client.store.get_account_storage(account_id).await.unwrap();
-    let vault = client.store.get_account_vault(account_id).await.unwrap();
-
-    assert_eq!(account.storage().commitment(), storage.commitment());
-    assert_eq!(account.vault().root(), vault.root());
-
-    let (asset, proof) = client
-        .store
-        .get_account_asset(account_id, faucet_account_id.prefix())
-        .await
-        .unwrap()
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_component(BasicWallet)
+        .build()
         .unwrap();
 
-    //TODO: Also check a storage map proof
-    assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path())
+    client.add_account(&account, Some(seed), false).await.unwrap();
+
+    let account_id = account.id();
+
+    for _ in 0..10 {
+        let faucet_account =
+            insert_new_fungible_faucet(&mut client, AccountStorageMode::Public, &keystore)
+                .await
+                .unwrap()
+                .0;
+
+        let faucet_account_id = faucet_account.id();
+
+        let note = mint_note(&mut client, account_id, faucet_account_id, NoteType::Private).await.1;
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        consume_notes(&mut client, account_id, &[note]).await;
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let storage = client.store.get_account_storage(account_id).await.unwrap();
+        let vault = client.store.get_account_vault(account_id).await.unwrap();
+
+        assert_eq!(account.storage().commitment(), storage.commitment());
+        assert_eq!(account.vault().root(), vault.root());
+
+        let (asset, proof) = client
+            .store
+            .get_account_asset(account_id, faucet_account_id.prefix())
+            .await
+            .unwrap()
+            .unwrap();
+
+        //TODO: Also check a storage map proof
+        assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path());
+    }
 }

@@ -2,10 +2,13 @@
 
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
+use std::sync::Arc;
 
 use miden_objects::Word;
 use miden_objects::block::BlockNumber;
+use miden_objects::crypto::merkle::MerkleStore;
 use miden_objects::note::NoteTag;
+use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
@@ -97,6 +100,7 @@ impl SqliteStore {
 
     pub(super) fn apply_state_sync(
         conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
         state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
@@ -165,8 +169,9 @@ impl SqliteStore {
         Self::undo_account_state(&tx, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
+        let mut merkle_store = merkle_store.write();
         for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, account)?;
+            Self::update_account_state(&tx, &mut merkle_store, account)?;
         }
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
