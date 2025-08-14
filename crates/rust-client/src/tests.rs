@@ -2007,15 +2007,9 @@ async fn account_id_bug() {
 
     client.add_account(&account, Some(seed), false).await.unwrap();
 
-    let faucet_account =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap()
-            .0;
+    let tx_request = TransactionRequestBuilder::new().build().unwrap();
+    execute_tx(&mut client, account_id, tx_request).await;
 
-    let faucet_account_id = faucet_account.id();
-
-    mint_and_consume(&mut client, account_id, faucet_account_id, NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 }
