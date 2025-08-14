@@ -36,6 +36,8 @@ pub fn base_units_to_tokens(units: u64, decimals: u8) -> String {
     }
 }
 
+/// Errors that can occur when parsing a token represented as a decimal number in
+/// a string into base units.
 #[derive(thiserror::Error, Debug)]
 pub enum TokenParseError {
     #[error("Number of decimals {0} must be less than or equal to {max_decimals}", max_decimals = BasicFungibleFaucet::MAX_DECIMALS)]
