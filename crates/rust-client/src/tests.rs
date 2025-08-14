@@ -9,54 +9,54 @@ use std::sync::Arc;
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::AuthRpoFalcon512,
-        faucets::BasicFungibleFaucet,
-        interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
     transaction::TransactionKernel,
 };
-use miden_objects::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    AuthSecretKey,
-};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
-};
-use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-};
 use miden_objects::testing::note::NoteBuilder;
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, FieldElement, ONE, Word, ZERO};
+use miden_objects::{
+    account::{
+        Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
+        AccountStorageMode, AccountType, AuthSecretKey, StorageMap, StorageSlot,
+    },
+    assembly::Assembler,
+};
+use miden_objects::{
+    assembly::DefaultSourceManager,
+    asset::{Asset, FungibleAsset, TokenSymbol},
+};
+use miden_objects::{
+    assembly::LibraryPath,
+    note::{
+        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
+        NoteRecipient, NoteTag, NoteType,
+    },
+};
+use miden_objects::{
+    assembly::Module,
+    crypto::rand::{FeltRng, RpoRandomCoin},
+};
+use miden_objects::{
+    assembly::ModuleKind,
+    crypto::dsa::rpo_falcon512::{PublicKey, SecretKey},
+};
+use miden_objects::{
+    testing::account_id::{
+        ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
+    },
+    transaction::TransactionScript,
+};
 use miden_testing::{MockChain, MockChainBuilder};
-use miden_tx::TransactionExecutorError;
 use miden_tx::utils::{Deserializable, Serializable};
+use miden_tx::{TransactionExecutorError, utils::word_to_masm_push_string};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
 use uuid::Uuid;
@@ -70,30 +70,15 @@ use crate::store::sqlite_store::SqliteStore;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::sync::NoteTagSource;
 use crate::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    execute_failing_tx,
-    execute_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
+    consume_notes, execute_failing_tx, execute_tx, mint_and_consume, mint_note,
+    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
 };
 use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder,
+    TransactionRequestError, TransactionStatus,
 };
 use crate::{ClientError, DebugMode};
 
@@ -1950,4 +1935,162 @@ async fn swap_chain_test() {
             .unwrap(),
         1
     );
+}
+
+const MAP_KEY: [Felt; 4] = [Felt::new(42), Felt::new(42), Felt::new(42), Felt::new(42)];
+
+#[tokio::test]
+async fn storage_and_vault_proofs() {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    let mut storage_map = StorageMap::new();
+    storage_map
+        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into());
+
+    let bump_item_component = AccountComponent::compile(
+        format!(
+            "export.bump_map_item
+                    # map key
+                    push.{map_key}
+                    # item index
+                    push.0
+                    # => [index, KEY]
+                    exec.::miden::account::get_map_item
+                    add.1
+                    push.{map_key}
+                    push.0
+                    # => [index, KEY, BUMPED_VALUE]
+                    exec.::miden::account::set_map_item
+                    dropw
+                    # => [OLD_VALUE]
+                    dupw
+                    push.0
+                    # Set a new item each time as the value keeps changing
+                    exec.::miden::account::set_map_item
+                    dropw dropw
+                end",
+            map_key = word_to_masm_push_string(&MAP_KEY.into())
+        ),
+        TransactionKernel::assembler(),
+        vec![StorageSlot::Map(storage_map)],
+    )
+    .unwrap()
+    .with_supports_all_types();
+
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            format!(
+                "export.bump_map_item
+                    # map key
+                    push.{map_key}
+                    # item index
+                    push.0
+                    # => [index, KEY]
+                    exec.::miden::account::get_map_item
+                    add.1
+                    push.{map_key}
+                    push.0
+                    # => [index, KEY, BUMPED_VALUE]
+                    exec.::miden::account::set_map_item
+                    dropw
+                    # => [OLD_VALUE]
+                    dupw
+                    push.0
+                    # Set a new item each time as the value keeps changing
+                    exec.::miden::account::set_map_item
+                    dropw dropw
+                end",
+                map_key = word_to_masm_push_string(&MAP_KEY.into())
+            ),
+            &source_manager,
+        )
+        .unwrap();
+    let library = assembler.clone().assemble_library([module]).unwrap();
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let tx_script = TransactionScript::compile(
+        "use.external_contract::bump_item_contract
+            begin
+                call.bump_item_contract::bump_map_item
+            end",
+        assembler.with_dynamic_library(&library).unwrap(),
+    )
+    .unwrap();
+
+    let key_pair = SecretKey::new();
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_component(BasicWallet)
+        .with_component(bump_item_component)
+        .build()
+        .unwrap();
+
+    println!("Account id version: {:?}", account.id().version());
+
+    client.add_account(&account, Some(seed), false).await.unwrap();
+
+    let account_id = account.id();
+
+    for _ in 0..10 {
+        let faucet_account =
+            insert_new_fungible_faucet(&mut client, AccountStorageMode::Public, &keystore)
+                .await
+                .unwrap()
+                .0;
+
+        let faucet_account_id = faucet_account.id();
+
+        mint_and_consume(&mut client, account_id, faucet_account_id, NoteType::Public).await;
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        let tx_request = TransactionRequestBuilder::new()
+            .custom_script(tx_script.clone())
+            .build()
+            .unwrap();
+        execute_tx(&mut client, account_id, tx_request).await;
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let storage = client.store.get_account_storage(account_id).await.unwrap();
+        let vault = client.store.get_account_vault(account_id).await.unwrap();
+
+        assert_eq!(account.storage().commitment(), storage.commitment());
+        assert_eq!(account.vault().root(), vault.root());
+
+        let (asset, proof) = client
+            .store
+            .get_account_asset(account_id, faucet_account_id.prefix())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path());
+        //TODO: Also check a storage map proof
+        let (value, proof) = client
+            .store
+            .get_account_map_item(account_id, 1, MAP_KEY.into())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
+            panic!("Expected a map storage slot");
+        };
+
+        assert_eq!(value, map.get(&MAP_KEY.into()));
+        assert_eq!(&proof, map.open(&MAP_KEY.into()).path());
+    }
 }
