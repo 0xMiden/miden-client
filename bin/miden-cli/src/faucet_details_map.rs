@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::asset::FungibleAsset;
-use miden_lib::account::faucets::BasicFungibleFaucet;
+use miden_client::utils::{base_units_to_tokens, tokens_to_base_units};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
@@ -116,7 +116,9 @@ impl FaucetDetailsMap {
                 ))?;
 
             // Convert from decimal to integer.
-            let amount = parse_number_as_base_units(amount, *faucet_decimals)?;
+            let amount = tokens_to_base_units(amount, *faucet_decimals).map_err(|err| {
+                CliError::Parse(err.into(), "Failed to parse tokens to base units".to_string())
+            })?;
 
             (parse_account_id(client, id).await?, amount)
         };
@@ -143,7 +145,7 @@ impl FaucetDetailsMap {
                     token_symbol.clone(),
                 ))?
                 .decimals;
-            let amount = format_amount_from_faucet_units(asset.amount(), decimals);
+            let amount = base_units_to_tokens(asset.amount(), decimals);
 
             Ok((token_symbol, amount))
         } else {
@@ -155,113 +157,4 @@ impl FaucetDetailsMap {
             ))
         }
     }
-}
-
-/// Converts an amount in the faucet base units to the token's decimals.
-fn format_amount_from_faucet_units(units: u64, decimals: u8) -> String {
-    let units_str = units.to_string();
-    let len = units_str.len();
-
-    if decimals as usize >= len {
-        // Handle cases where the number of decimals is greater than the length of units
-        "0.".to_owned() + &"0".repeat(decimals as usize - len) + &units_str
-    } else {
-        // Insert the decimal point at the correct position
-        let integer_part = &units_str[..len - decimals as usize];
-        let fractional_part = &units_str[len - decimals as usize..];
-        format!("{integer_part}.{fractional_part}")
-    }
-}
-
-/// Converts a decimal number, represented as a string, into an integer by shifting
-/// the decimal point to the right by a specified number of decimal places.
-fn parse_number_as_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, CliError> {
-    if n_decimals > BasicFungibleFaucet::MAX_DECIMALS {
-        return Err(CliError::Parse(
-            format!(
-                "Number of decimals must be less than or equal to {}",
-                BasicFungibleFaucet::MAX_DECIMALS
-            )
-            .into(),
-            "Faucet maximum decimals".to_string(),
-        ));
-    }
-
-    // Split the string on the decimal point
-    let parts: Vec<&str> = decimal_str.split('.').collect();
-
-    if parts.len() > 2 {
-        return Err(CliError::Parse(
-            "More than one decimal point".into(),
-            "Decimals format".to_string(),
-        ));
-    }
-
-    // Validate that the parts are valid numbers
-    for part in &parts {
-        part.parse::<u64>()
-            .map_err(|err| CliError::Parse(err.into(), "Failed to parse u64".to_string()))?;
-    }
-
-    // Get the integer part
-    let integer_part = parts[0];
-
-    // Get the fractional part; remove trailing zeros
-    let mut fractional_part = if parts.len() > 1 {
-        parts[1].trim_end_matches('0').to_string()
-    } else {
-        String::new()
-    };
-
-    // Check if the fractional part has more than N decimals
-    if fractional_part.len() > n_decimals.into() {
-        return Err(CliError::Parse(
-            format!("Amount has more than {n_decimals} decimal places").into(),
-            "Failed to parse fractional part".to_string(),
-        ));
-    }
-
-    // Add extra zeros if the fractional part is shorter than N decimals
-    while fractional_part.len() < n_decimals.into() {
-        fractional_part.push('0');
-    }
-
-    // Combine the integer and padded fractional part
-    let combined = format!("{}{}", integer_part, &fractional_part[0..n_decimals.into()]);
-
-    // Convert the combined string to an integer
-    combined
-        .parse::<u64>()
-        .map_err(|err| CliError::Parse(err.into(), "Failed to parse u64".to_string()))
-}
-
-// HELPER TESTS
-// ================================================================================================
-
-#[test]
-fn parsing_number_as_base_units() {
-    assert_eq!(parse_number_as_base_units("18446744.073709551615", 12).unwrap(), u64::MAX);
-    assert_eq!(parse_number_as_base_units("7531.2468", 8).unwrap(), 753_124_680_000);
-    assert_eq!(parse_number_as_base_units("7531.2468", 4).unwrap(), 75_312_468);
-    assert_eq!(parse_number_as_base_units("0", 3).unwrap(), 0);
-    assert_eq!(parse_number_as_base_units("0", 3).unwrap(), 0);
-    assert_eq!(parse_number_as_base_units("0", 3).unwrap(), 0);
-    assert_eq!(parse_number_as_base_units("1234", 8).unwrap(), 123_400_000_000);
-    assert_eq!(parse_number_as_base_units("1", 0).unwrap(), 1);
-    assert!(matches!(parse_number_as_base_units("1.1", 0), Err(CliError::Parse(_, _))),);
-    assert!(matches!(
-        parse_number_as_base_units("18446744.073709551615", 11),
-        Err(CliError::Parse(_, _))
-    ),);
-    assert!(matches!(parse_number_as_base_units("123u3.23", 4), Err(CliError::Parse(_, _))),);
-    assert!(matches!(parse_number_as_base_units("2.k3", 4), Err(CliError::Parse(_, _))),);
-    assert_eq!(parse_number_as_base_units("12.345000", 4).unwrap(), 123_450);
-    assert!(parse_number_as_base_units("0.0001.00000001", 12).is_err());
-}
-
-#[test]
-fn formatting_amount_from_faucet_units() {
-    assert_eq!(format_amount_from_faucet_units(u64::MAX, 12), "18446744.073709551615");
-    assert_eq!(format_amount_from_faucet_units(753_124_680_000, 8), "7531.24680000");
-    assert_eq!(format_amount_from_faucet_units(75_312_468, 4), "7531.2468");
 }
