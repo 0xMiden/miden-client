@@ -7,11 +7,12 @@ import {
   foreignAccountCode,
   IAccount,
 } from "./schema.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 // GET FUNCTIONS
 export async function getAccountIds() {
   try {
-    let allIds = new Set(); // Use a Set to ensure uniqueness
+    const allIds = new Set(); // Use a Set to ensure uniqueness
 
     // Iterate over each account entry
     await accounts.each((account) => {
@@ -19,24 +20,15 @@ export async function getAccountIds() {
     });
 
     return Array.from(allIds); // Convert back to array to return a list of unique IDs
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error("Failed to retrieve account IDs: ", error.toString());
-    } else {
-      console.error(
-        "Failed to retrieve account IDs: Unexpected value thrown: ",
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, "Error while fetching account IDs");
   }
 }
 
 export async function getAllAccountHeaders() {
   try {
     // Use a Map to track the latest record for each id based on nonce
-    const latestRecordsMap = new Map();
+    const latestRecordsMap: Map<string, IAccount> = new Map();
 
     await accounts.each((record) => {
       const existingRecord = latestRecordsMap.get(record.id);
@@ -52,8 +44,8 @@ export async function getAllAccountHeaders() {
     const latestRecords = Array.from(latestRecordsMap.values());
 
     const resultObject = await Promise.all(
-      latestRecords.map(async (record) => {
-        let accountSeedBase64: string | null = null;
+      latestRecords.map((record) => {
+        let accountSeedBase64: string | undefined = undefined;
         if (record.accountSeed) {
           const seedAsBytes = new Uint8Array(record.accountSeed);
           if (seedAsBytes.length > 0) {
@@ -69,27 +61,15 @@ export async function getAllAccountHeaders() {
           codeRoot: record.codeRoot || "",
           accountSeed: accountSeedBase64, // null or base64 string
           locked: record.locked,
-          committed: record.committed ?? true, // Use actual value or default
+          committed: record.committed, // Use actual value or default
           accountCommitment: record.accountCommitment || "", // Keep original field name
         };
       })
     );
 
     return resultObject;
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        "Error fetching all latest account headers:",
-        error.toString()
-      );
-    } else {
-      console.error(
-        "Error fetching all latest account headers: Unexpected value thrown:",
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, "Error while fetching account headers");
   }
 }
 
@@ -115,13 +95,13 @@ export async function getAccountHeader(accountId: string) {
     });
 
     // The first record is the most recent one due to the sorting
-    const mostRecentRecord = sortedRecords[0];
+    const mostRecentRecord: IAccount | undefined = sortedRecords[0];
 
     if (mostRecentRecord === undefined) {
       return null;
     }
 
-    let accountSeedBase64: string | null = null;
+    let accountSeedBase64: string | undefined = undefined;
 
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
@@ -139,20 +119,11 @@ export async function getAccountHeader(accountId: string) {
       locked: mostRecentRecord.locked,
     };
     return AccountHeader;
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account header for ID ${accountId}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account header for ID ${accountId}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error while fetching account header for id: ${accountId}`
+    );
   }
 }
 
@@ -164,15 +135,19 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
       .equals(accountCommitment)
       .toArray();
 
+    if (allMatchingRecords.length == 0) {
+      return undefined;
+    }
+
     // There should be only one match
-    const matchingRecord = allMatchingRecords[0];
+    const matchingRecord: IAccount | undefined = allMatchingRecords[0];
 
     if (matchingRecord === undefined) {
       console.log("No account header record found for given commitment.");
       return null;
     }
 
-    let accountSeedBase64 = null;
+    let accountSeedBase64: string | undefined = undefined;
     if (matchingRecord.accountSeed) {
       accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
     }
@@ -186,20 +161,11 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
       locked: matchingRecord.locked,
     };
     return AccountHeader;
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account header for commitment ${accountCommitment}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account header for commitment ${accountCommitment}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error fetching account header for commitment ${accountCommitment}`
+    );
   }
 }
 
@@ -225,20 +191,8 @@ export async function getAccountCode(codeRoot: string) {
       root: codeRecord.root,
       code: codeBase64,
     };
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account code for root ${codeRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account code for root ${codeRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
   }
 }
 
@@ -266,20 +220,11 @@ export async function getAccountStorage(storageRoot: string) {
       root: storageRecord.root,
       storage: storageBase64,
     };
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account storage for root ${storageRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account storage for root ${storageRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error fetching account storage for root ${storageRoot}`
+    );
   }
 }
 
@@ -308,63 +253,37 @@ export async function getAccountAssetVault(vaultRoot: string) {
       root: vaultRecord.root,
       assets: assetsBase64,
     };
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error fetching account vault for root ${vaultRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error fetching account vault for root ${vaultRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error fetching account vault for root ${vaultRoot}`
+    );
   }
 }
 
 export async function getAccountAuthByPubKey(pubKey: string) {
-  try {
-    // Try to get the account auth from the store
-    const accountSecretKey = await accountAuths
-      .where("pubKey")
-      .equals(pubKey)
-      .first();
+  // Try to get the account auth from the store
+  const accountSecretKey = await accountAuths
+    .where("pubKey")
+    .equals(pubKey)
+    .first();
 
-    // If it's not in the store, throw an error
-    if (!accountSecretKey) {
-      throw new Error("Account auth not found in store.");
-    }
-
-    let data = {
-      secretKey: accountSecretKey.secretKey,
-    };
-
-    return data;
-  } catch (e: unknown) {
-    if (e instanceof Error) {
-      console.error(`Error fetching account auth for pubKey ${pubKey}:`, e);
-      if (e.name === "NotFoundError") throw e;
-      throw new Error("Failed to get account auth by pubKey.", { cause: e });
-    }
-    // TODO: We should add helper functions for handling errors in a consistent way
-    const wrapped = new Error(String(e));
-    console.error(
-      `Error fetching account auth for pubKey ${pubKey}:`,
-      wrapped.message
-    );
-    throw wrapped;
+  // If it's not in the cache, throw an error
+  if (!accountSecretKey) {
+    throw new Error("Account auth not found in cache.");
   }
+
+  const data = {
+    secretKey: accountSecretKey.secretKey,
+  };
+
+  return data;
 }
 
 // INSERT FUNCTIONS
 
 export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
-    // Create a Blob from the ArrayBuffer
-
     // Prepare the data object to insert
     const data = {
       root: codeRoot, // Using codeRoot as the key
@@ -373,20 +292,8 @@ export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
 
     // Perform the insert using Dexie
     await accountCodes.put(data);
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error inserting code with root: ${codeRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error inserting code with root: ${codeRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
   }
 }
 
@@ -405,20 +312,11 @@ export async function insertAccountStorage(
 
     // Perform the insert using Dexie
     await accountStorages.put(data);
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error inserting storage with root: ${storageRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error inserting storage with root: ${storageRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting storage with root: ${storageRoot}`
+    );
   }
 }
 
@@ -437,20 +335,8 @@ export async function insertAccountAssetVault(
 
     // Perform the insert using Dexie
     await accountVaults.put(data);
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error inserting vault with root: ${vaultRoot}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error inserting vault with root: ${vaultRoot}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
   }
 }
 export async function insertAccountRecord(
@@ -477,17 +363,8 @@ export async function insertAccountRecord(
     };
 
     await accounts.add(data as IAccount);
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(`Error inserting account: ${accountId}:`, error.toString());
-    } else {
-      console.error(
-        `Error inserting account: ${accountId}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
 }
 
@@ -501,19 +378,11 @@ export async function insertAccountAuth(pubKey: string, secretKey: string) {
 
     // Perform the insert using Dexie
     await accountAuths.add(data);
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error(
-        `Error inserting account auth for pubKey: ${pubKey}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error inserting account auth for pubKey: ${pubKey}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting account auth for pubKey: ${pubKey}`
+    );
   }
 }
 
@@ -531,17 +400,11 @@ export async function upsertForeignAccountCode(
     };
 
     await foreignAccountCode.put(data);
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(`Error inserting account: ${accountId}:`, error.toString());
-    } else {
-      console.error(
-        `Error inserting account: ${accountId}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error upserting foreign account code for account: ${accountId}`
+    );
   }
 }
 
@@ -557,7 +420,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
       return null; // No records found
     }
 
-    let codeRoots = foreignAccounts.map((account) => account.codeRoot);
+    const codeRoots = foreignAccounts.map((account) => account.codeRoot);
 
     const accountCode = await accountCodes
       .where("root")
@@ -565,7 +428,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
       .toArray();
 
     const processedCode = foreignAccounts
-      .map(async (foreignAccount) => {
+      .map((foreignAccount) => {
         const matchingCode = accountCode.find(
           (code) => code.root === foreignAccount.codeRoot
         );
@@ -583,66 +446,30 @@ export async function getForeignAccountCode(accountIds: string[]) {
       })
       .filter((matchingCode) => matchingCode !== undefined);
     return processedCode;
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error("Error fetching foreign account code:", error.toString());
-    } else {
-      console.error(
-        "Error fetching foreign account code: Unexpected value thrown:",
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, "Error fetching foreign account code");
   }
 }
 
 export async function lockAccount(accountId: string) {
   try {
     await accounts.where("id").equals(accountId).modify({ locked: true });
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(`Error locking account: ${accountId}:`, error.toString());
-    } else {
-      console.error(
-        `Error locking account: ${accountId}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(error, `Error locking account: ${accountId}`);
   }
 }
 
 // Delete functions
-
 export async function undoAccountStates(accountCommitments: string[]) {
   try {
     await accounts
       .where("accountCommitment")
       .anyOf(accountCommitments)
       .delete();
-  } catch (error: unknown) {
-    // Add unknown type
-    if (error instanceof Error) {
-      console.error(
-        `Error undoing account states: ${accountCommitments}:`,
-        error.toString()
-      );
-    } else {
-      console.error(
-        `Error undoing account states: ${accountCommitments}: Unexpected value thrown:`,
-        String(error)
-      );
-    }
-    throw error;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error undoing account states: ${accountCommitments.join(",")}`
+    );
   }
-}
-
-function uint8ArrayToBase64(bytes: Uint8Array) {
-  const binary = bytes.reduce(
-    (acc, byte) => acc + String.fromCharCode(byte),
-    ""
-  );
-  return btoa(binary);
 }
