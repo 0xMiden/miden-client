@@ -261,45 +261,23 @@ export async function getAccountAssetVault(vaultRoot: string) {
   }
 }
 
-export function getAccountAuthByPubKey(pubKey: string) {
-  // Added type
-  // Try to get the account auth from the cache
-  const cachedSecretKey = ACCOUNT_AUTH_MAP.get(pubKey);
+export async function getAccountAuthByPubKey(pubKey: string) {
+  // Try to get the account auth from the store
+  const accountSecretKey = await accountAuths
+    .where("pubKey")
+    .equals(pubKey)
+    .first();
 
   // If it's not in the cache, throw an error
-  if (!cachedSecretKey) {
+  if (!accountSecretKey) {
     throw new Error("Account auth not found in cache.");
   }
 
   const data = {
-    secretKey: cachedSecretKey,
+    secretKey: accountSecretKey.secretKey,
   };
 
   return data;
-}
-
-// eslint-disable-next-line no-var
-var ACCOUNT_AUTH_MAP = new Map<string, string>();
-export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
-  // Added type
-  try {
-    // Try to get the account auth from the store
-    const accountSecretKey = await accountAuths
-      .where("pubKey")
-      .equals(pubKey)
-      .first();
-
-    // If it's not in the store, throw an error
-    if (!accountSecretKey) {
-      throw new Error("Account auth not found in store.");
-    }
-
-    let data = {
-      secretKey: accountSecretKey.secretKey,
-    };
-  } catch (error) {
-    logWebStoreError(error, `Error fetching account auth for pubKey ${pubKey}`);
-  }
 }
 
 // INSERT FUNCTIONS

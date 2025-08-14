@@ -47,7 +47,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix toml clippy fix-wasm clippy-wasm typos-check ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: format fix toml clippy fix-wasm clippy-wasm typos-check rust-client-ts-lint ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
