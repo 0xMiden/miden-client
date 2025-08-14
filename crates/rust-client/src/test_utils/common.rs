@@ -1,8 +1,6 @@
 use std::boxed::Box;
-use std::env::temp_dir;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
 use std::println;
 use std::string::ToString;
 use std::sync::Arc;
@@ -18,7 +16,6 @@ use miden_objects::transaction::{OutputNote, TransactionId};
 use miden_objects::{Felt, FieldElement};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
-use toml::Table;
 use uuid::Uuid;
 
 use crate::account::component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet};
@@ -28,11 +25,12 @@ use crate::builder::ClientBuilder;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
 use crate::note::{Note, create_p2id_note};
-use crate::rpc::{Endpoint, RpcError, TonicRpcClient};
+use crate::rpc::{RpcError, TonicRpcClient};
 use crate::store::sqlite_store::SqliteStore;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use crate::testing::config::ClientConfig;
 use crate::transaction::{
     NoteArgs,
     TransactionRequest,
@@ -49,8 +47,6 @@ pub type TestClient = Client<TestClientKeyStore>;
 // ================================================================================================
 pub const ACCOUNT_ID_REGULAR: u128 = ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 
-pub const TEST_CLIENT_RPC_CONFIG_FILE: &str = include_str!("./config/miden-client-rpc.toml");
-
 /// Constant that represents the number of blocks until the p2ide can be recalled. If this value is
 /// too low, some tests might fail due to expected recall failures not happening.
 pub const RECALL_HEIGHT_DELTA: u32 = 50;
@@ -64,9 +60,10 @@ pub const RECALL_HEIGHT_DELTA: u32 = 50;
 ///
 /// Panics if there is no config file at `TEST_CLIENT_CONFIG_FILE_PATH`, or if it cannot be
 /// deserialized.
-pub async fn create_test_client_builder() -> (ClientBuilder<TestClientKeyStore>, TestClientKeyStore)
-{
-    let (rpc_endpoint, rpc_timeout, store_config, auth_path) = get_client_config();
+pub async fn create_test_client_builder(
+    client_config: ClientConfig,
+) -> (ClientBuilder<TestClientKeyStore>, TestClientKeyStore) {
+    let (rpc_endpoint, rpc_timeout, store_config, auth_path) = client_config.into_parts();
 
     let store = {
         let sqlite_store = SqliteStore::new(store_config).await.unwrap();
@@ -100,44 +97,14 @@ pub async fn create_test_client_builder() -> (ClientBuilder<TestClientKeyStore>,
 ///
 /// Panics if there is no config file at `TEST_CLIENT_CONFIG_FILE_PATH`, or if it cannot be
 /// deserialized.
-pub async fn create_test_client() -> (TestClient, TestClientKeyStore) {
-    let (builder, keystore) = create_test_client_builder().await;
+pub async fn create_test_client(client_config: ClientConfig) -> (TestClient, TestClientKeyStore) {
+    let (builder, keystore) = create_test_client_builder(client_config).await;
 
     let mut client = builder.build().await.unwrap();
 
     client.sync_state().await.unwrap();
 
     (client, keystore)
-}
-
-/// Retrieves the client configuration from the `TEST_CLIENT_RPC_CONFIG_FILE`.
-pub fn get_client_config() -> (Endpoint, u64, PathBuf, PathBuf) {
-    let rpc_config_toml = TEST_CLIENT_RPC_CONFIG_FILE.parse::<Table>().unwrap();
-    let rpc_endpoint_toml = rpc_config_toml["endpoint"].as_table().unwrap();
-
-    let protocol = rpc_endpoint_toml["protocol"].as_str().unwrap().to_string();
-    let host = rpc_endpoint_toml["host"].as_str().unwrap().to_string();
-    let port = if rpc_endpoint_toml.contains_key("port") {
-        rpc_endpoint_toml["port"].as_integer().map(|port| u16::try_from(port).unwrap())
-    } else {
-        None
-    };
-
-    let endpoint = Endpoint::new(protocol, host, port);
-
-    let timeout_ms = u64::try_from(rpc_config_toml["timeout"].as_integer().unwrap()).unwrap();
-
-    let auth_path = temp_dir().join(format!("keystore-{}", Uuid::new_v4()));
-    std::fs::create_dir_all(&auth_path).unwrap();
-
-    (endpoint, timeout_ms, create_test_store_path(), auth_path)
-}
-
-/// Creates a temporary path for the store.
-pub fn create_test_store_path() -> std::path::PathBuf {
-    let mut temp_file = temp_dir();
-    temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
-    temp_file
 }
 
 /// Inserts a new wallet account into the client and into the keystore.

@@ -81,6 +81,7 @@ pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
     Note,
     NoteAssets,
+    NoteDetails,
     NoteExecutionHint,
     NoteExecutionMode,
     NoteFile,

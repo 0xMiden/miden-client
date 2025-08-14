@@ -30,14 +30,7 @@ idxdb = [
 ]
 sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = [
-  "dep:miden-testing",
-  "dep:toml",
-  "dep:uuid",
-  "miden-lib/testing",
-  "miden-objects/testing",
-  "miden-tx/testing",
-]
+testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 
@@ -64,7 +57,6 @@ rusqlite_migration    = { optional = true, version = "2.1" }
 serde                 = { optional = true, workspace = true }
 serde-wasm-bindgen    = { optional = true, version = "0.6" }
 thiserror             = { workspace = true }
-toml                  = { optional = true, version = "0.8" }
 tonic                 = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
 tonic-web-wasm-client = { default-features = false, optional = true, version = "0.7" }
 tracing               = { workspace = true }
