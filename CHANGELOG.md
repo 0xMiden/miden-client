@@ -21,6 +21,7 @@
 * Exposes additional `TransactionFilter` filters in Web Client ([#1114](https://github.com/0xMiden/miden-client/pull/1114))
 * Refactored internal structure of account vault and storage Sqlite tables ([#1128](https://github.com/0xMiden/miden-client/pull/1128)).
 * [BREAKING] Fixed `createP2IDNote` and `createP2IDENote` convenience functions in the Web Client ([#1142](https://github.com/0xMiden/miden-client/pull/1142)).
+* Reexported utils to parse token amounts as base units ([#1161](https://github.com/0xMiden/miden-client/pull/1161))
 
 ### Features
 

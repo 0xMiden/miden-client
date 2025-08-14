@@ -1,10 +1,11 @@
+//! Provides various utilities that are commonly used throughout the Miden
+//! client library.
+
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::num::ParseIntError;
 
 use miden_lib::account::faucets::BasicFungibleFaucet;
-/// Provides various utilities that are commonly used throughout the Miden
-/// client library.
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
     ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
