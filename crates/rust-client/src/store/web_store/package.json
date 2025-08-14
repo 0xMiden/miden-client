@@ -7,7 +7,7 @@
     "typescript": "^5.9.2"
   },
   "scripts": {
-    "build": "yarn tsc --build --force ./tsconfig.json",
+    "build": "yarn tsc --build ./tsconfig.json",
     "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts"
   },
   "devDependencies": {
