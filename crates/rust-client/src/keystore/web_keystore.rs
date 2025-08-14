@@ -39,10 +39,10 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+    async fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         let pub_key_str = pub_key.to_hex();
-        let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).map_err(|_| {
-            KeyStoreError::StorageError("Failed to get item from local storage".to_string())
+        let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).await.map_err(|err| {
+            KeyStoreError::StorageError(format!("failed to get item from local storage: {err:?}"))
         })?;
 
         let secret_key_bytes = hex::decode(secret_key_hex).map_err(|err| {
@@ -65,16 +65,20 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: Word,
         signing_inputs: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
         let message = signing_inputs.to_commitment();
-        let mut rng = self.rng.write();
+
         let secret_key = self
             .get_key(pub_key)
+            .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
+
+        let mut rng = self.rng.write();
+
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)

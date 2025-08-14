@@ -5,10 +5,9 @@ use miden_client::testing::common::*;
 use miden_client::transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word};
 use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::utils::word_to_masm_push_string;
+use miden_lib::utils::{ScriptBuilder, word_to_masm_push_string};
 use miden_objects::account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
-use miden_objects::transaction::TransactionScript;
 use miden_objects::vm::AdviceInputs;
 
 // FPI TESTS
@@ -186,7 +185,7 @@ async fn nested_fpi_calls() {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
+    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script).unwrap();
     client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed
@@ -269,7 +268,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode) {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = TransactionScript::compile(tx_script, TransactionKernel::assembler()).unwrap();
+    let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script).unwrap();
     _ = client.sync_state().await.unwrap();
 
     // Wait for a couple of blocks so that the account gets committed

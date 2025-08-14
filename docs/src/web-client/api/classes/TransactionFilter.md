@@ -28,6 +28,22 @@
 
 ***
 
+### expiredBefore()
+
+> `static` **expiredBefore**(`block_num`): `TransactionFilter`
+
+#### Parameters
+
+##### block\_num
+
+`number`
+
+#### Returns
+
+`TransactionFilter`
+
+***
+
 ### ids()
 
 > `static` **ids**(`ids`): `TransactionFilter`

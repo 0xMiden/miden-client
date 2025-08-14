@@ -16,6 +16,12 @@ pub struct SubmitProvenTransactionResponse {
     #[prost(fixed32, tag = "1")]
     pub block_height: u32,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct SubmitProvenBatchResponse {
+    /// The node's current block height.
+    #[prost(fixed32, tag = "1")]
+    pub block_height: u32,
+}
 /// Request to subscribe to mempool events.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct MempoolSubscriptionRequest {
@@ -226,6 +232,42 @@ pub mod api_client {
                 .insert(
                     GrpcMethod::new("block_producer.Api", "SubmitProvenTransaction"),
                 );
+            self.inner.unary(req, path, codec).await
+        }
+        /// Submits a proven batch to the Miden network.
+        ///
+        /// The batch may include transactions which were are:
+        ///
+        ///   - already in the mempool i.e. previously successfully submitted
+        ///   - will be submitted to the mempool in the future
+        ///   - won't be submitted to the mempool at all
+        ///
+        /// All transactions in the batch but not in the mempool must build on the current mempool
+        /// state following normal transaction submission rules.
+        pub async fn submit_proven_batch(
+            &mut self,
+            request: impl tonic::IntoRequest<
+                super::super::transaction::ProvenTransactionBatch,
+            >,
+        ) -> std::result::Result<
+            tonic::Response<super::SubmitProvenBatchResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/block_producer.Api/SubmitProvenBatch",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("block_producer.Api", "SubmitProvenBatch"));
             self.inner.unary(req, path, codec).await
         }
         /// Subscribe to mempool events.

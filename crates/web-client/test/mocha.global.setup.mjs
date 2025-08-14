@@ -63,6 +63,9 @@ before(async () => {
         Account,
         AccountBuilder,
         AccountComponent,
+        AccountDelta,
+        AccountStorageDelta,
+        AccountVaultDelta,
         AccountHeader,
         AccountId,
         AccountStorageMode,
@@ -72,12 +75,15 @@ before(async () => {
         Assembler,
         AssemblerUtils,
         AuthSecretKey,
+        BasicFungibleFaucetComponent,
         ConsumableNoteRecord,
         Felt,
         FeltArray,
         ForeignAccount,
         FungibleAsset,
+        FungibleAssetDelta,
         Library,
+        InputNoteRecord,
         Note,
         NoteAndArgs,
         NoteAndArgsArray,
@@ -130,6 +136,9 @@ before(async () => {
       window.Account = Account;
       window.AccountBuilder = AccountBuilder;
       window.AccountComponent = AccountComponent;
+      window.AccountDelta = AccountDelta;
+      window.AccountStorageDelta = AccountStorageDelta;
+      window.AccountVaultDelta = AccountVaultDelta;
       window.AccountHeader = AccountHeader;
       window.AccountId = AccountId;
       window.AccountStorageMode = AccountStorageMode;
@@ -139,11 +148,14 @@ before(async () => {
       window.Assembler = Assembler;
       window.AssemblerUtils = AssemblerUtils;
       window.AuthSecretKey = AuthSecretKey;
+      window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
       window.ConsumableNoteRecord = ConsumableNoteRecord;
       window.Felt = Felt;
       window.FeltArray = FeltArray;
       window.ForeignAccount = ForeignAccount;
       window.FungibleAsset = FungibleAsset;
+      window.FungibleAssetDelta = FungibleAssetDelta;
+      window.InputNoteRecord = InputNoteRecord;
       window.Library = Library;
       window.Note = Note;
       window.NoteAndArgs = NoteAndArgs;

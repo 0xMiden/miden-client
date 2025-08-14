@@ -9,7 +9,7 @@ use miden_objects::PrettyPrint;
 use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id, update_config};
-use crate::{CLIENT_BINARY_NAME, create_dynamic_table};
+use crate::{client_binary_name, create_dynamic_table};
 
 // ACCOUNT COMMAND
 // ================================================================================================
@@ -319,7 +319,10 @@ pub(crate) fn maybe_set_default_account(
 
     let account_id = account_id.to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
     println!("Setting account {account_id} as the default account ID.");
-    println!("You can unset it with `{CLIENT_BINARY_NAME} account --default none`.");
+    println!(
+        "You can unset it with `{} account --default none`.",
+        client_binary_name().display()
+    );
     current_config.default_account_id = Some(account_id);
 
     Ok(())

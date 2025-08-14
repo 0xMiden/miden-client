@@ -24,7 +24,7 @@ pub struct CliConfig {
     pub store_filepath: PathBuf,
     /// Path to the directory that contains the secret key files.
     pub secret_keys_directory: PathBuf,
-    /// Address of the Miden node to connect to.
+    /// Default address to be used when executing transaction in case none is provided.
     pub default_account_id: Option<String>,
     /// Path to the file containing the token symbol map.
     pub token_symbol_map_filepath: PathBuf,

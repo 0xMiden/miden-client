@@ -74,7 +74,6 @@ export async function getAllAccountHeaders() {
 }
 
 export async function getAccountHeader(accountId: string) {
-  // Added type for accountId
   try {
     // Fetch all records matching the given id
     const allMatchingRecords = await accounts
@@ -129,7 +128,6 @@ export async function getAccountHeader(accountId: string) {
 }
 
 export async function getAccountHeaderByCommitment(accountCommitment: string) {
-  // Added type
   try {
     // Fetch all records matching the given commitment
     const allMatchingRecords = await accounts
@@ -172,7 +170,6 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
 }
 
 export async function getAccountCode(codeRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountCodes
@@ -200,7 +197,6 @@ export async function getAccountCode(codeRoot: string) {
 }
 
 export async function getAccountStorage(storageRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountStorages
@@ -233,7 +229,6 @@ export async function getAccountStorage(storageRoot: string) {
 }
 
 export async function getAccountAssetVault(vaultRoot: string) {
-  // Added type
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountVaults
@@ -288,25 +283,19 @@ var ACCOUNT_AUTH_MAP = new Map<string, string>();
 export async function fetchAndCacheAccountAuthByPubKey(pubKey: string) {
   // Added type
   try {
-    // Fetch all records matching the given id
-    const allMatchingRecords = await accountAuths
+    // Try to get the account auth from the store
+    const accountSecretKey = await accountAuths
       .where("pubKey")
       .equals(pubKey)
-      .toArray();
+      .first();
 
-    // The first record is the only one due to the uniqueness constraint
-    const authRecord = allMatchingRecords[0];
-
-    if (authRecord === undefined) {
-      console.log("No account auth records found for given account ID.");
-      return null; // No records found
+    // If it's not in the store, throw an error
+    if (!accountSecretKey) {
+      throw new Error("Account auth not found in store.");
     }
 
-    // Store the auth info in the map
-    ACCOUNT_AUTH_MAP.set(authRecord.pubKey, authRecord.secretKey);
-
-    return {
-      secretKey: authRecord.secretKey,
+    let data = {
+      secretKey: accountSecretKey.secretKey,
     };
   } catch (error) {
     logWebStoreError(error, `Error fetching account auth for pubKey ${pubKey}`);
@@ -372,7 +361,6 @@ export async function insertAccountAssetVault(
     logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
   }
 }
-
 export async function insertAccountRecord(
   accountId: string,
   codeRoot: string,

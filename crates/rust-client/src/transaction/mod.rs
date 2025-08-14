@@ -39,7 +39,7 @@
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
 //! async fn create_and_submit_transaction<
 //!     R: rand::Rng,
-//!     AUTH: TransactionAuthenticator + 'static,
+//!     AUTH: TransactionAuthenticator + Sync + 'static,
 //! >(
 //!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
@@ -69,6 +69,7 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::sync::Arc;
@@ -80,10 +81,11 @@ use miden_objects::assembly::DefaultSourceManager;
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::{AccountInputs, TransactionArgs};
+use miden_objects::transaction::{AccountInputs, TransactionArgs, TransactionWitness};
 use miden_objects::{AssetError, Felt, Word};
+use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use miden_tx::{DataStore, NoteAccountExecution, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
@@ -126,7 +128,6 @@ pub use miden_tx::{
     LocalTransactionProver,
     ProvingOptions,
     TransactionExecutorError,
-    TransactionProver,
     TransactionProverError,
 };
 pub use request::{
@@ -142,6 +143,38 @@ pub use request::{
 
 // TRANSACTION RESULT
 // ================================================================================================
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+pub trait TransactionProver {
+    async fn prove(
+        &self,
+        tx_result: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError>;
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl TransactionProver for LocalTransactionProver {
+    async fn prove(
+        &self,
+        witness: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        LocalTransactionProver::prove(self, witness)
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl TransactionProver for RemoteTransactionProver {
+    async fn prove(
+        &self,
+        witness: TransactionWitness,
+    ) -> Result<ProvenTransaction, TransactionProverError> {
+        let fut = RemoteTransactionProver::prove(self, witness);
+        fut.await
+    }
+}
 
 /// Represents the result of executing a transaction by the client.
 ///
@@ -484,7 +517,7 @@ impl TransactionStoreUpdate {
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + 'static,
+    AUTH: TransactionAuthenticator + Sync + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
@@ -801,6 +834,7 @@ where
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         for note in notes_from_output(executed_tx.output_notes()) {
+            // TODO: check_relevance() should have the option to take multiple notes
             let account_relevance = note_screener.check_relevance(note).await?;
             if !account_relevance.is_empty() {
                 let metadata = *note.metadata();
@@ -1032,20 +1066,24 @@ where
                     self.store.get_sync_height().await?,
                     input_notes.clone(),
                     tx_args.clone(),
-                    Arc::new(DefaultSourceManager::default()),
                 )
                 .await?;
 
-            if let NoteAccountExecution::Failure { failed_note_id, .. } = execution {
-                let filtered_input_notes = InputNotes::new(
-                    input_notes.into_iter().filter(|note| note.id() != failed_note_id).collect(),
-                )
-                .expect("Created from a valid input notes list");
-
-                input_notes = filtered_input_notes;
-            } else {
+            if execution.failed.is_empty() {
                 break;
             }
+
+            let failed_note_ids: BTreeSet<NoteId> =
+                execution.failed.iter().map(|n| n.note.id()).collect();
+            let filtered_input_notes = InputNotes::new(
+                input_notes
+                    .into_iter()
+                    .filter(|note| !failed_note_ids.contains(&note.id()))
+                    .collect(),
+            )
+            .expect("Created from a valid input notes list");
+
+            input_notes = filtered_input_notes;
         }
 
         Ok(input_notes)
@@ -1144,7 +1182,7 @@ where
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
-    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore>(
+    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore + Sync>(
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
@@ -1160,7 +1198,7 @@ where
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl<AUTH: TransactionAuthenticator + 'static> Client<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
@@ -1254,6 +1292,8 @@ fn validate_executed_transaction(
 
 #[cfg(test)]
 mod test {
+    use alloc::boxed::Box;
+
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::transaction::TransactionKernel;
     use miden_objects::Word;
@@ -1281,7 +1321,7 @@ mod test {
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {
-        let (mut client, _, keystore) = create_test_client().await;
+        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
         let asset_1: Asset =
             FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
                 .unwrap()
@@ -1324,7 +1364,7 @@ mod test {
             )
             .unwrap();
 
-        let tx_result = client.new_transaction(account.id(), tx_request).await.unwrap();
+        let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
         assert!(
             tx_result
                 .created_notes()
@@ -1333,7 +1373,7 @@ mod test {
                 .is_some_and(|assets| assets.num_assets() == 2)
         );
         // Prove and apply transaction
-        client.testing_apply_transaction(tx_result.clone()).await.unwrap();
+        Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
 
         // Test serialization
         let bytes: std::vec::Vec<u8> = tx_result.to_bytes();

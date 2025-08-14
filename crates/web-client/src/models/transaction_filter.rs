@@ -23,6 +23,11 @@ impl TransactionFilter {
     pub fn uncommitted() -> TransactionFilter {
         TransactionFilter(NativeTransactionFilter::Uncommitted)
     }
+
+    #[wasm_bindgen(js_name = "expiredBefore")]
+    pub fn expired_before(block_num: u32) -> TransactionFilter {
+        TransactionFilter(NativeTransactionFilter::ExpiredBefore(block_num.into()))
+    }
 }
 
 // CONVERSIONS

@@ -3,6 +3,7 @@ import {
   Account,
   AccountBuilder,
   AccountComponent,
+  AccountDelta,
   AccountHeader,
   AccountId,
   AccountStorageMode,
@@ -12,11 +13,13 @@ import {
   Assembler,
   AssemblerUtils,
   AuthSecretKey,
+  BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
   Felt,
   FeltArray,
   ForeignAccount,
   FungibleAsset,
+  InputNoteRecord,
   Library,
   Note,
   NoteAssets,
@@ -67,20 +70,28 @@ declare global {
     Account: typeof Account;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
+    AccountDelta: typeof AccountDelta;
+    AccountStorageDelta: typeof AccountStorageDelta;
+    AccountVaultDelta: typeof AccountVaultDelta;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
+    AccountStorageDelta: typeof AccountStorageDelta;
     AccountStorageMode: typeof AccountStorageMode;
     AccountStorageRequirements: typeof AccountStorageRequirements;
     AccountType: typeof AccountType;
+    AccountVaultDelta: typeof AccountVaultDelta;
     AdviceMap: typeof AdviceMap;
     Assembler: typeof Assembler;
     AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
+    BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
     ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
+    FungibleAssetDelta: typeof FungibleAssetDelta;
+    InputNoteRecord: typeof InputNoteRecord;
     Library: typeof Library;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;
