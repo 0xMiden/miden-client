@@ -7,6 +7,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::public_key::PublicKey;
 use crate::models::signature::Signature;
+use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -40,6 +41,13 @@ impl SecretKey {
         let mut rng = StdRng::from_os_rng();
         let signature = self.0.sign_with_rng(native_message, &mut rng);
         Ok(signature.into())
+    }
+
+    #[wasm_bindgen(js_name = "signSigningInputs")]
+    pub fn sign_signing_inputs(&self, signing_inputs: &SigningInputs) -> Signature {
+        let mut rng = StdRng::from_os_rng();
+        let native_word = signing_inputs.to_commitment().into();
+        self.0.sign_with_rng(native_word, &mut rng).into()
     }
 
     pub fn serialize(&self) -> Uint8Array {

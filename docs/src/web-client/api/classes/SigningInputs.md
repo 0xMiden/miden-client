@@ -24,22 +24,6 @@
 
 ***
 
-### sign()
-
-> **sign**(`secret_key`): [`Signature`](Signature.md)
-
-#### Parameters
-
-##### secret\_key
-
-[`SecretKey`](SecretKey.md)
-
-#### Returns
-
-[`Signature`](Signature.md)
-
-***
-
 ### toCommitment()
 
 > **toCommitment**(): [`Word`](Word.md)
@@ -57,26 +41,6 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
-
-***
-
-### verify()
-
-> **verify**(`public_key`, `signature`): `boolean`
-
-#### Parameters
-
-##### public\_key
-
-[`PublicKey`](PublicKey.md)
-
-##### signature
-
-[`Signature`](Signature.md)
-
-#### Returns
-
-`boolean`
 
 ***
 

@@ -96,7 +96,7 @@ describe("secret key", () => {
   });
 });
 
-describe.only("signing inputs", () => {
+describe("signing inputs", () => {
   it("should be able to sign and verify an arbitrary array of felts", async () => {
     const { isValid, isValidOther } = await testingPage.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
@@ -108,12 +108,13 @@ describe.only("signing inputs", () => {
         new window.Felt(4n),
       ];
       const signingInputs = window.SigningInputs.newArbitrary(message);
-      const signature = signingInputs.sign(secretKey);
-      const isValid = signingInputs.verify(secretKey.publicKey(), signature);
-      const isValidOther = signingInputs.verify(
-        otherSecretKey.publicKey(),
-        signature
-      );
+      const signature = secretKey.signSigningInputs(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifySigningInputs(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifySigningInputs(signingInputs, signature);
 
       return { isValid, isValidOther };
     });
@@ -127,12 +128,13 @@ describe.only("signing inputs", () => {
       const otherSecretKey = window.SecretKey.withRng();
       const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
       const signingInputs = window.SigningInputs.newBlind(message);
-      const signature = signingInputs.sign(secretKey);
-      const isValid = signingInputs.verify(secretKey.publicKey(), signature);
-      const isValidOther = signingInputs.verify(
-        otherSecretKey.publicKey(),
-        signature
-      );
+      const signature = secretKey.signSigningInputs(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifySigningInputs(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifySigningInputs(signingInputs, signature);
 
       return { isValid, isValidOther };
     });
