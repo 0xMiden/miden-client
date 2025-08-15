@@ -18,7 +18,6 @@ use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
 use super::note_type::NoteType;
-use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
