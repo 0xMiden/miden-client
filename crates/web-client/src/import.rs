@@ -84,8 +84,8 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "failed to import public account"))
     }
 
-    #[wasm_bindgen(js_name = "importNote")]
-    pub async fn import_note(&mut self, note_bytes: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = "importNoteFile")]
+    pub async fn import_note_file(&mut self, note_bytes: JsValue) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let note_bytes_result: Vec<u8> =
                 from_value(note_bytes).map_err(|err| err.to_string())?;
