@@ -36,6 +36,7 @@ impl SecretKey {
         self.0.public_key().into()
     }
 
+    // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto 0.16
     pub fn sign(&self, message: &Word) -> Result<Signature, JsValue> {
         let native_message: NativeWord = message.into();
         let mut rng = StdRng::from_os_rng();
@@ -43,6 +44,7 @@ impl SecretKey {
         Ok(signature.into())
     }
 
+    // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto0.16
     #[wasm_bindgen(js_name = "signSigningInputs")]
     pub fn sign_signing_inputs(&self, signing_inputs: &SigningInputs) -> Signature {
         let mut rng = StdRng::from_os_rng();
