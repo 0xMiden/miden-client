@@ -24,7 +24,6 @@
 * [BREAKING] Fixed `createP2IDNote` and `createP2IDENote` convenience functions in the Web Client ([#1142](https://github.com/0xMiden/miden-client/pull/1142)).
 * [BREAKING] Rename `export/importNote` to `export/importNoteFile`, expose serialization functions for `Note` in Web Client ([#1159](https://github.com/0xMiden/miden-client/pull/1159)).
 
-
 ### Features
 
 * Added Ability to Convert Word to U64 Array and Felt Array in Web Client (#1041).
