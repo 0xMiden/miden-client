@@ -2,6 +2,14 @@
 
 This document describes the current state of the organization of integration tests, along with info on how to run them.
 
+## Prerequisite
+
+Run following commands to installs Rust + Node tools required by the Makefile
+
+```bash
+make install-tools
+```
+
 ## Running integration tests
 
 There are commands provided in the `Makefile` to make running them easier. To run the current integration test, you should run:

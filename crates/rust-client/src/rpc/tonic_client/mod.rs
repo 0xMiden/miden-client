@@ -92,8 +92,9 @@ impl TonicRpcClient {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
-    /// Sets the genesis commitment for the client and reconnects to the node providing the
-    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// Sets the genesis commitment for the client. If the client is already connected, it will be
+    /// updated to use the new commitment on subsequent requests. If the client is not connected,
+    /// the commitment will be used when it connects. If the genesis commitment is already set,
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
         if self.genesis_commitment.read().is_some() {
@@ -101,8 +102,17 @@ impl NodeRpcClient for TonicRpcClient {
             return Ok(());
         }
 
-        *self.genesis_commitment.write() = Some(commitment);
-        self.connect().await
+        self.genesis_commitment.write().replace(commitment);
+
+        // If a client is connected, we replace it with a new one with the updated
+        // genesis commitment. The new client will reuse the same underlying connection.
+        let mut client_guard = self.client.write();
+        if let Some(client) = client_guard.as_ref() {
+            let new_client = client.with_genesis_commitment(commitment);
+            client_guard.replace(new_client);
+        }
+
+        Ok(())
     }
 
     async fn submit_proven_transaction(
@@ -486,6 +496,8 @@ impl NodeRpcClient for TonicRpcClient {
 mod tests {
     use std::boxed::Box;
 
+    use miden_objects::Word;
+
     use super::TonicRpcClient;
     use crate::rpc::{Endpoint, NodeRpcClient};
 
@@ -510,5 +522,48 @@ mod tests {
         let client = TonicRpcClient::new(endpoint, 10000);
         let client: Box<TonicRpcClient> = client.into();
         tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_sets_the_commitment_when_its_not_already_set() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        let commitment = Word::default();
+        client.set_genesis_commitment(commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
+        use miden_objects::Felt;
+
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        let initial_commitment = Word::default();
+        client.set_genesis_commitment(initial_commitment).await.unwrap();
+
+        let new_commitment =
+            Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        client.set_genesis_commitment(new_commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_updates_the_client_if_already_connected() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        // "Connect" the client
+        client.connect().await.unwrap();
+
+        let commitment = Word::default();
+        client.set_genesis_commitment(commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
+        assert!(client.client.read().as_ref().is_some());
     }
 }
