@@ -187,15 +187,12 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             partial_storage_smts,
         } = self;
 
-        let partial_storage_smts = Result::<BTreeMap<_, _>, _>::from_iter(
-            partial_storage_smts.into_iter().map(|entry| {
-                Ok::<_, crate::rpc::RpcError>((
-                    u8::try_from(entry.storage_slot)
-                        .map_err(crate::rpc::RpcError::SlotOutOfBounds)?,
-                    PartialSmt::read_from_bytes(&entry.partial_smt)?,
-                ))
-            }),
-        )?;
+        let partial_storage_smts = partial_storage_smts.into_iter().map(|entry| {
+            Ok::<_, crate::rpc::RpcError>((
+                u8::try_from(entry.storage_slot).map_err(crate::rpc::RpcError::SlotOutOfBounds)?,
+                PartialSmt::read_from_bytes(&entry.partial_smt)?,
+            ))
+        });
         let account_header = header
             .ok_or(
                 proto::rpc_store::account_proofs::account_proof::AccountStateHeader::missing_field(
@@ -225,7 +222,8 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
         };
 
         let mut storage_slot_proofs: BTreeMap<u8, Vec<SmtProof>> = BTreeMap::new();
-        for (slot, partial_smt) in partial_storage_smts {
+        for result in partial_storage_smts {
+            let (slot, partial_smt) = result?;
             for (key, _value) in partial_smt.entries() {
                 let proof = partial_smt.open(key)?;
                 storage_slot_proofs.entry(slot).or_default().push(proof);
