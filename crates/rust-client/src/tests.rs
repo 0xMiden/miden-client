@@ -3,6 +3,7 @@ use std::boxed::Box;
 use std::collections::BTreeSet;
 use std::env::temp_dir;
 use std::println;
+use std::string::ToString;
 use std::sync::Arc;
 
 // TESTS
@@ -21,11 +22,14 @@ use miden_objects::account::{
     Account,
     AccountBuilder,
     AccountCode,
+    AccountComponent,
     AccountHeader,
     AccountId,
     AccountStorageMode,
     AccountType,
     AuthSecretKey,
+    StorageMap,
+    StorageSlot,
 };
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
@@ -1991,4 +1995,47 @@ async fn swap_chain_test() {
             .unwrap(),
         1
     );
+}
+
+#[tokio::test]
+async fn empty_storage_map() {
+    let (mut client, _, keystore) = create_test_client().await;
+
+    let storage_map = StorageMap::new();
+
+    let component = AccountComponent::compile(
+        "export.dummy
+                nop
+            end"
+        .to_string(),
+        TransactionKernel::assembler(),
+        vec![StorageSlot::Map(storage_map)],
+    )
+    .unwrap()
+    .with_supports_all_types();
+
+    let key_pair = SecretKey::new();
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_component(BasicWallet)
+        .with_component(component)
+        .build()
+        .unwrap();
+
+    let account_id = account.id();
+
+    client.add_account(&account, Some(seed), false).await.unwrap();
+
+    let fetched_account = client.get_account(account_id).await.unwrap().unwrap();
+
+    assert_eq!(account.storage(), fetched_account.account().storage());
 }

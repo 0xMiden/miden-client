@@ -13,6 +13,7 @@ use miden_objects::account::{
     AccountStorage,
     StorageMap,
     StorageSlot,
+    StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::{AccountError, Felt, Word};
@@ -336,10 +337,24 @@ impl SqliteStore {
         account_storage: impl Iterator<Item = &'a StorageSlot>,
     ) -> Result<(), StoreError> {
         for (index, slot) in account_storage.enumerate() {
-            const QUERY: &str =
-                insert_sql!(account_storage { commitment, slot_index, slot_value } | IGNORE);
+            const QUERY: &str = insert_sql!(
+                account_storage {
+                    commitment,
+                    slot_index,
+                    slot_value,
+                    slot_type
+                } | IGNORE
+            );
 
-            tx.execute(QUERY, params![commitment.to_hex(), index, slot.value().to_hex()])?;
+            tx.execute(
+                QUERY,
+                params![
+                    commitment.to_hex(),
+                    index,
+                    slot.value().to_hex(),
+                    slot.slot_type().to_bytes()
+                ],
+            )?;
 
             if let StorageSlot::Map(map) = slot {
                 const MAP_QUERY: &str =
@@ -420,30 +435,34 @@ fn query_storage_slots(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_value FROM account_storage WHERE ";
+    const STORAGE_QUERY: &str = "SELECT slot_value, slot_type FROM account_storage";
 
-    let query = format!("{STORAGE_QUERY}{where_clause}");
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
     let storage_values = conn
         .prepare(&query)?
         .query_map(params, |row| {
             let value: String = row.get(0)?;
-            Ok(value)
+            let slot_type: Vec<u8> = row.get(1)?;
+            Ok((value, slot_type))
         })?
-        .map(|result| Ok(Word::try_from(result?)?))
-        .collect::<Result<Vec<Word>, StoreError>>()?;
+        .map(|result| {
+            let (value, slot_type) = result?;
+            Ok((Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
+        })
+        .collect::<Result<Vec<(Word, StorageSlotType)>, StoreError>>()?;
 
-    let params: Vec<Value> = storage_values.iter().map(|root| Value::from(root.to_hex())).collect();
+    let params: Vec<Value> =
+        storage_values.iter().map(|(root, _)| Value::from(root.to_hex())).collect();
 
     let mut storage_maps = query_storage_maps(conn, "root IN rarray(?)", [Rc::new(params)])?;
 
     Ok(storage_values
         .into_iter()
-        .map(|value| {
-            if let Some(map) = storage_maps.remove(&value) {
-                StorageSlot::Map(map)
-            } else {
-                StorageSlot::Value(value)
-            }
+        .map(|(value, slot_type)| match slot_type {
+            StorageSlotType::Value => StorageSlot::Value(value),
+            StorageSlotType::Map => {
+                StorageSlot::Map(storage_maps.remove(&value).unwrap_or_default())
+            },
         })
         .collect())
 }
@@ -453,8 +472,8 @@ fn query_storage_maps(
     where_clause: &str,
     params: impl Params,
 ) -> Result<BTreeMap<Word, StorageMap>, StoreError> {
-    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries WHERE ";
-    let query = format!("{STORAGE_MAP_SELECT}{where_clause}");
+    const STORAGE_MAP_SELECT: &str = "SELECT root, key, value FROM storage_map_entries";
+    let query = format!("{STORAGE_MAP_SELECT} WHERE {where_clause}");
 
     let map_entries = conn
         .prepare(&query)?
@@ -485,9 +504,9 @@ fn query_vault_assets(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<Asset>, StoreError> {
-    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults WHERE ";
+    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults";
 
-    let query = format!("{VAULT_QUERY}{where_clause}");
+    let query = format!("{VAULT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
             let asset: String = row.get(0)?;
@@ -527,8 +546,8 @@ fn query_account_headers(
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     const SELECT_QUERY: &str = "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-        FROM accounts WHERE ";
-    let query = format!("{SELECT_QUERY}{where_clause}");
+        FROM accounts";
+    let query = format!("{SELECT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)?
         .query_map(params, |row| {
             let id: String = row.get(0)?;
