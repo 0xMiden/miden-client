@@ -5,6 +5,7 @@ import {
   accountAuths,
   accounts,
   foreignAccountCode,
+  IAccount,
 } from "./schema.js";
 
 // GET FUNCTIONS
@@ -52,12 +53,12 @@ export async function getAllAccountHeaders() {
 
     const resultObject = await Promise.all(
       latestRecords.map(async (record) => {
-        let accountSeedBase64 = null;
+        let accountSeedBase64: string | null = null;
         if (record.accountSeed) {
-          // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-          let accountSeedArrayBuffer = await record.accountSeed.arrayBuffer();
-          let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-          accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+          const seedAsBytes = new Uint8Array(record.accountSeed);
+          if (seedAsBytes.length > 0) {
+            accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
+          }
         }
 
         return {
@@ -120,13 +121,13 @@ export async function getAccountHeader(accountId: string) {
       return null;
     }
 
-    let accountSeedBase64 = null;
+    let accountSeedBase64: string | null = null;
+
     if (mostRecentRecord.accountSeed) {
       // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      let accountSeedArrayBuffer =
-        await mostRecentRecord.accountSeed.arrayBuffer();
-      let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-      accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+      if (mostRecentRecord.accountSeed.length > 0) {
+        accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
+      }
     }
     const AccountHeader = {
       id: mostRecentRecord.id,
@@ -173,11 +174,7 @@ export async function getAccountHeaderByCommitment(accountCommitment: string) {
 
     let accountSeedBase64 = null;
     if (matchingRecord.accountSeed) {
-      // Ensure accountSeed is processed as a Uint8Array and converted to Base64
-      let accountSeedArrayBuffer =
-        await matchingRecord.accountSeed.arrayBuffer();
-      let accountSeedArray = new Uint8Array(accountSeedArrayBuffer);
-      accountSeedBase64 = uint8ArrayToBase64(accountSeedArray);
+      accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
     }
     const AccountHeader = {
       id: matchingRecord.id,
@@ -223,10 +220,7 @@ export async function getAccountCode(codeRoot: string) {
     }
 
     // Convert the code Blob to an ArrayBuffer
-    const codeArrayBuffer = await codeRecord.code.arrayBuffer();
-    const codeArray = new Uint8Array(codeArrayBuffer);
-    const codeBase64 = uint8ArrayToBase64(codeArray);
-
+    const codeBase64 = uint8ArrayToBase64(codeRecord.code);
     return {
       root: codeRecord.root,
       code: codeBase64,
@@ -370,12 +364,11 @@ export async function getAccountAuthByPubKey(pubKey: string) {
 export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
     // Create a Blob from the ArrayBuffer
-    const codeBlob = new Blob([new Uint8Array(code)]);
 
     // Prepare the data object to insert
     const data = {
       root: codeRoot, // Using codeRoot as the key
-      code: codeBlob,
+      code,
     };
 
     // Perform the insert using Dexie
@@ -460,7 +453,6 @@ export async function insertAccountAssetVault(
     throw error;
   }
 }
-
 export async function insertAccountRecord(
   accountId: string,
   codeRoot: string,
@@ -469,28 +461,22 @@ export async function insertAccountRecord(
   nonce: string,
   committed: boolean,
   commitment: string,
-  accountSeed?: Uint8Array
+  accountSeed: Uint8Array | undefined
 ) {
   try {
-    let accountSeedBlob = null;
-    if (accountSeed) {
-      accountSeedBlob = new Blob([new Uint8Array(accountSeed)]);
-    }
-
-    // Prepare the data object to insert
     const data = {
-      id: accountId, // Using accountId as the key
-      codeRoot: codeRoot,
-      storageRoot: storageRoot,
-      vaultRoot: vaultRoot,
-      nonce: nonce,
-      committed: committed,
-      accountSeed: accountSeedBlob,
+      id: accountId,
+      codeRoot,
+      storageRoot,
+      vaultRoot,
+      nonce,
+      committed,
+      accountSeed,
       accountCommitment: commitment,
       locked: false,
     };
-    // Perform the insert using Dexie
-    await accounts.add(data);
+
+    await accounts.add(data as IAccount);
   } catch (error: unknown) {
     // Add unknown type
     if (error instanceof Error) {
@@ -588,10 +574,7 @@ export async function getForeignAccountCode(accountIds: string[]) {
           return undefined;
         }
 
-        // Convert the code Blob to an ArrayBuffer
-        const codeArrayBuffer = await matchingCode.code.arrayBuffer();
-        const codeArray = new Uint8Array(codeArrayBuffer);
-        const codeBase64 = uint8ArrayToBase64(codeArray);
+        const codeBase64 = uint8ArrayToBase64(matchingCode.code);
 
         return {
           accountId: foreignAccount.accountId,

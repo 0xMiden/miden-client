@@ -92,6 +92,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### createP2IDENote()
 
 > `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `aux`): `Note`
@@ -157,6 +167,22 @@
 ##### aux
 
 [`Felt`](Felt.md)
+
+#### Returns
+
+`Note`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `Note`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
 
 #### Returns
 
