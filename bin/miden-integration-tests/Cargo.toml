@@ -1,0 +1,23 @@
+[package]
+authors.workspace      = true
+description            = "Binary for running Miden integration tests"
+edition.workspace      = true
+license.workspace      = true
+name                   = "miden-integration-tests"
+publish                = false
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[dependencies]
+# Workspace dependencies
+miden-client-tests = { path = "../../tests" }
+
+# External dependencies
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+tokio = { workspace = true }
+nextest-runner = "0.85.0"
+camino = "1.1"
+num_cpus = "1.0"

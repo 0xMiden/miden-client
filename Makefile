@@ -106,7 +106,7 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
+	cd tests && cargo run --bin miden-integration-tests --release
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -118,8 +118,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	cd tests && cargo run --bin miden-integration-tests --release
+	cd tests && cargo run --bin miden-integration-tests --release -- --run-ignored -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover

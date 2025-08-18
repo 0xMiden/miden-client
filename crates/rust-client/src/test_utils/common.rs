@@ -110,9 +110,16 @@ pub async fn create_test_client() -> (TestClient, TestClientKeyStore) {
     (client, keystore)
 }
 
-/// Retrieves the client configuration from the `TEST_CLIENT_RPC_CONFIG_FILE`.
+/// Retrieves the client configuration from the `TEST_CLIENT_RPC_CONFIG_FILE` or environment override.
 pub fn get_client_config() -> (Endpoint, u64, PathBuf, PathBuf) {
-    let rpc_config_toml = TEST_CLIENT_RPC_CONFIG_FILE.parse::<Table>().unwrap();
+    let rpc_config_toml = if let Ok(override_config) = std::env::var("MIDEN_CLIENT_RPC_CONFIG_OVERRIDE") {
+        // Use configuration from environment variable (set by CLI)
+        override_config.parse::<Table>().unwrap()
+    } else {
+        // Use default configuration file
+        TEST_CLIENT_RPC_CONFIG_FILE.parse::<Table>().unwrap()
+    };
+    
     let rpc_endpoint_toml = rpc_config_toml["endpoint"].as_table().unwrap();
 
     let protocol = rpc_endpoint_toml["protocol"].as_str().unwrap().to_string();
