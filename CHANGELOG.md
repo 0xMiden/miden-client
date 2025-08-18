@@ -23,7 +23,7 @@
 * Refactored internal structure of account vault and storage Sqlite tables ([#1128](https://github.com/0xMiden/miden-client/pull/1128)).
 * [BREAKING] Fixed `createP2IDNote` and `createP2IDENote` convenience functions in the Web Client ([#1142](https://github.com/0xMiden/miden-client/pull/1142)).
 * [BREAKING] Rename `export/importNote` to `export/importNoteFile`, expose serialization functions for `Note` in Web Client ([#1159](https://github.com/0xMiden/miden-client/pull/1159)).
-* [BREAKING] Change protobuf `AccountStateHeader` definition for reduced redundency ([#1167](https://github.com/0xMiden/miden-client/pull/1167))
+* [BREAKING] Change protobuf `AccountStateHeader` definition for reduced redundancy ([#1167](https://github.com/0xMiden/miden-client/pull/1167))
 
 ### Features
 
