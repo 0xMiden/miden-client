@@ -128,9 +128,9 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### exportNote()
+### exportNoteFile()
 
-> **exportNote**(`note_id`, `export_type`): `Promise`\<`any`\>
+> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<`any`\>
 
 #### Parameters
 
@@ -352,9 +352,9 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### importNote()
+### importNoteFile()
 
-> **importNote**(`note_bytes`): `Promise`\<`any`\>
+> **importNoteFile**(`note_bytes`): `Promise`\<`any`\>
 
 #### Parameters
 
