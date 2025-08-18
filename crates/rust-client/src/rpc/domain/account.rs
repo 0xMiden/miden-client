@@ -175,16 +175,27 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
         account_id: AccountId,
         known_account_codes: &BTreeMap<Word, AccountCode>,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
+        use miden_objects::crypto::merkle::PartialSmt;
+
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
-        use crate::rpc::generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof;
 
         let proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             header,
             storage_header,
             account_code,
-            storage_maps,
+            partial_storage_smts,
         } = self;
+
+        let partial_storage_smts = Result::<BTreeMap<_, _>, _>::from_iter(
+            partial_storage_smts.into_iter().map(|entry| {
+                Ok::<_, crate::rpc::RpcError>((
+                    u8::try_from(entry.storage_slot)
+                        .map_err(crate::rpc::RpcError::SlotOutOfBounds)?,
+                    PartialSmt::read_from_bytes(&entry.partial_smt)?,
+                ))
+            }),
+        )?;
         let account_header = header
             .ok_or(
                 proto::rpc_store::account_proofs::account_proof::AccountStateHeader::missing_field(
@@ -213,20 +224,11 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             }
         };
 
-        // Get map values into slot |-> (key, value, proof) mapping
         let mut storage_slot_proofs: BTreeMap<u8, Vec<SmtProof>> = BTreeMap::new();
-        for StorageSlotMapProof { storage_slot, smt_proof } in storage_maps {
-            let proof = SmtProof::read_from_bytes(&smt_proof)?;
-            match storage_slot_proofs
-                .get_mut(&(u8::try_from(storage_slot).expect("there are no more than 256 slots")))
-            {
-                Some(list) => list.push(proof),
-                None => {
-                    _ = storage_slot_proofs.insert(
-                        u8::try_from(storage_slot).expect("only 256 storage slots"),
-                        vec![proof],
-                    );
-                },
+        for (slot, partial_smt) in partial_storage_smts {
+            for (key, _value) in partial_smt.entries() {
+                let proof = partial_smt.open(key)?;
+                storage_slot_proofs.entry(slot).or_default().push(proof);
             }
         }
 
