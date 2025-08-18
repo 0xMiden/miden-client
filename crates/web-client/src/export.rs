@@ -1,12 +1,12 @@
 use miden_client::Word;
-use miden_client::account::{Account, AccountFile, AccountId};
+use miden_client::account::{Account, AccountFile};
 use miden_client::store::NoteExportType;
 use miden_client::transaction::AccountInterface;
 use miden_client::utils::Serializable;
 use miden_lib::AuthScheme;
-use miden_lib::account::auth::NoAuth;
 use wasm_bindgen::prelude::*;
 
+use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -64,20 +64,11 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "exportAccount")]
-    pub async fn export_account(&mut self, account_id: String) -> Result<JsValue, JsValue> {
+    pub async fn export_account(&mut self, account_id: AccountId) -> Result<JsValue, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let account_id = if account_id.starts_with("0x") {
-                AccountId::from_hex(&account_id)
-                    .map_err(|err| js_error_with_context(err, "failed to parse the account id"))?
-            } else {
-                AccountId::from_bech32(&account_id)
-                    .map_err(|err| js_error_with_context(err, "failed to parse the account id"))?
-                    .1
-            };
-
             let account = client
-                .get_account(account_id)
+                .get_account(account_id.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get account for account id"))?
                 .ok_or(JsValue::from_str("No account found"))?;
@@ -94,6 +85,7 @@ impl WebClient {
                 key_pairs.push(
                     keystore
                         .get_key(pub_key)
+                        .await
                         .map_err(|err| {
                             js_error_with_context(err, "failed to get public key for account")
                         })?
@@ -115,16 +107,14 @@ impl WebClient {
     }
 }
 
-/// Gets the public key from the storage of an account. This will only work if the account is
-/// created by the CLI as it expects the account to have the `RpoFalcon512` authentication scheme.
-pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
+fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
     let mut pub_keys = vec![];
     let interface: AccountInterface = account.into();
 
     for auth in interface.auth() {
         match auth {
             AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
-            NoAuth => {},
+            AuthScheme::NoAuth => {},
         }
     }
 

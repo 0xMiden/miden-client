@@ -2,7 +2,15 @@
 
 import { expect } from "chai";
 import { testingPage } from "./mocha.global.setup.mjs";
-import { clearStore, createNewFaucet, createNewWallet, fundAccountFromFaucet, getAccountBalance, setupWalletAndFaucet, StorageMode } from "./webClientTestUtils";
+import {
+  clearStore,
+  createNewFaucet,
+  createNewWallet,
+  fundAccountFromFaucet,
+  getAccountBalance,
+  setupWalletAndFaucet,
+  StorageMode,
+} from "./webClientTestUtils";
 
 const exportDb = async () => {
   return await testingPage.evaluate(async () => {
@@ -35,10 +43,11 @@ const getAccount = async (accountId: string) => {
 const exportAccount = async (accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
-    const accountBytes = client.exportAccount(_accountId);
+    const accountId = window.AccountId.fromHex(_accountId);
+    const accountBytes = client.exportAccount(accountId);
     return accountBytes;
   }, accountId);
-}
+};
 
 const importAccount = async (accountBytes: any) => {
   return await testingPage.evaluate(async (_accountBytes) => {
@@ -79,21 +88,19 @@ describe("export and import account", () => {
     });
     const faucet = await createNewFaucet();
 
-    const { targetAccountBalance: initialBalance } = await fundAccountFromFaucet(initialWallet.id, faucet.id);
+    const { targetAccountBalance: initialBalance } =
+      await fundAccountFromFaucet(initialWallet.id, faucet.id);
     const { accountCommitment: initialCommitment } = await getAccount(
       initialWallet.id
     );
-
-    console.log("initialCommitment", initialCommitment);
-    console.log(initialWallet)
     const exportedAccount = await exportAccount(initialWallet.id);
-    console.log("exportedAccount", exportedAccount);
     await clearStore();
 
     await importAccount(exportedAccount);
 
-    const { accountCommitment: restoredCommitment } =
-      await getAccount(initialWallet.id);
+    const { accountCommitment: restoredCommitment } = await getAccount(
+      initialWallet.id
+    );
 
     const restoredBalance = await getAccountBalance(
       initialWallet.id,
@@ -101,6 +108,6 @@ describe("export and import account", () => {
     );
 
     expect(restoredCommitment).to.equal(initialCommitment);
-    expect(restoredBalance).to.equal(initialBalance);
-  })
-})
+    expect(restoredBalance.toString()).to.equal(initialBalance);
+  });
+});
