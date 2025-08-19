@@ -1,7 +1,6 @@
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use crate::js_error_with_context;
 use crate::models::assembler::Assembler;
 use crate::models::word::Word;
 
@@ -15,11 +14,11 @@ impl TransactionScript {
         self.0.root().into()
     }
 
-    pub fn compile(script_code: &str, assembler: &Assembler) -> Result<TransactionScript, JsValue> {
-        let native_tx_script = NativeTransactionScript::compile(script_code, assembler.into())
-            .map_err(|err| js_error_with_context(err, "failed to compile transaction script"))?;
+    // TODO: Replace this for ScriptBuilder
+    pub fn compile(script_code: &str, assembler: Assembler) -> Result<TransactionScript, JsValue> {
+        let tx_script: TransactionScript = assembler.compile_transaction_script(script_code)?;
 
-        Ok(TransactionScript(native_tx_script))
+        Ok(tx_script)
     }
 }
 

@@ -23,6 +23,7 @@ export {
   ForeignAccount,
   FungibleAsset,
   FungibleAssetDelta,
+  InputNoteRecord,
   InputNoteState,
   Library,
   NewSwapTransactionResult,

@@ -20,6 +20,7 @@ CREATE TABLE account_storage (
     commitment TEXT NOT NULL,               -- commitment to the account storage
     slot_index UNSIGNED BIG INT NOT NULL,   -- index of the slot in the storage
     slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
+    slot_type BLOB NOT NULL,                -- type of the slot, serialized
     PRIMARY KEY (commitment, slot_index)
 );
 

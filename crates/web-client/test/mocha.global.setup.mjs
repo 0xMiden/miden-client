@@ -83,6 +83,7 @@ before(async () => {
         FungibleAsset,
         FungibleAssetDelta,
         Library,
+        InputNoteRecord,
         Note,
         NoteAndArgs,
         NoteAndArgsArray,
@@ -123,6 +124,7 @@ before(async () => {
         TransactionScriptInputPairArray,
         Word,
         WebClient,
+        MockWebClient,
       } = await import("./index.js");
       let rpcUrl = `http://localhost:${rpcPort}`;
       let proverUrl = null;
@@ -154,6 +156,7 @@ before(async () => {
       window.ForeignAccount = ForeignAccount;
       window.FungibleAsset = FungibleAsset;
       window.FungibleAssetDelta = FungibleAssetDelta;
+      window.InputNoteRecord = InputNoteRecord;
       window.Library = Library;
       window.Note = Note;
       window.NoteAndArgs = NoteAndArgs;
@@ -194,6 +197,7 @@ before(async () => {
       window.TransactionScriptInputPair = TransactionScriptInputPair;
       window.TransactionScriptInputPairArray = TransactionScriptInputPairArray;
       window.WebClient = WebClient;
+      window.MockWebClient = MockWebClient;
       window.Word = Word;
 
       // Create a namespace for helper functions

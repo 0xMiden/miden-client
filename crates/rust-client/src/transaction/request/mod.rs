@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_lib::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_lib::transaction::TransactionKernel;
+use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
@@ -18,14 +18,7 @@ use miden_objects::transaction::{
     TransactionScript,
 };
 use miden_objects::vm::AdviceMap;
-use miden_objects::{
-    AccountError,
-    Felt,
-    NoteError,
-    TransactionInputError,
-    TransactionScriptError,
-    Word,
-};
+use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
 
@@ -328,8 +321,7 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => Ok(account_interface
                 .build_send_notes_script(notes, self.expiration_delta, in_debug_mode.into())?),
             None => {
-                let empty_script =
-                    TransactionScript::compile("begin nop end", TransactionKernel::assembler())?;
+                let empty_script = ScriptBuilder::new(true).compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },
@@ -357,7 +349,7 @@ impl Serializable for TransactionRequest {
         }
         self.expected_output_recipients.write_into(target);
         self.expected_future_notes.write_into(target);
-        self.advice_map.clone().into_iter().collect::<Vec<_>>().write_into(target);
+        self.advice_map.write_into(target);
         self.merkle_store.write_into(target);
         self.foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
@@ -392,9 +384,7 @@ impl Deserializable for TransactionRequest {
         let expected_output_recipients = BTreeMap::<Word, NoteRecipient>::read_from(source)?;
         let expected_future_notes = BTreeMap::<NoteId, (NoteDetails, NoteTag)>::read_from(source)?;
 
-        let mut advice_map = AdviceMap::new();
-        let advice_vec = Vec::<(Word, Vec<Felt>)>::read_from(source)?;
-        advice_map.extend(advice_vec);
+        let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
         let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
         let expiration_delta = Option::<u16>::read_from(source)?;
@@ -465,6 +455,8 @@ pub enum TransactionRequestError {
     NoteCreationError(#[from] NoteError),
     #[error("pay to id note doesn't contain at least one asset")]
     P2IDNoteWithoutAsset,
+    #[error("error building script: {0}")]
+    ScriptBuilderError(#[from] ScriptBuilderError),
     #[error("transaction script template error: {0}")]
     ScriptTemplateError(String),
     #[error("storage slot {0} not found in account ID {1}")]

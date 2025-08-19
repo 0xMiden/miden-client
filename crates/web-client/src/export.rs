@@ -7,8 +7,8 @@ use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = "exportNote")]
-    pub async fn export_note(
+    #[wasm_bindgen(js_name = "exportNoteFile")]
+    pub async fn export_note_file(
         &mut self,
         note_id: String,
         export_type: String,
