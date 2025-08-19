@@ -136,8 +136,8 @@ impl TryFrom<AccountProof> for AccountInputs {
         {
             // discard slot indices - not needed for execution
             let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
-            for (_, slots) in storage_slots {
-                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(slots)?);
+            for (_, partial_smt) in storage_slots {
+                let storage_map = PartialStorageMap::new(partial_smt);
                 storage_map_proofs.push(storage_map);
             }
 

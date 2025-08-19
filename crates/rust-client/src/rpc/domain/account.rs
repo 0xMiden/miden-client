@@ -11,7 +11,7 @@ use miden_objects::account::{
     AccountStorageHeader,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
-use miden_objects::crypto::merkle::{MerklePath, SmtProof};
+use miden_objects::crypto::merkle::{MerklePath, PartialSmt};
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
@@ -215,26 +215,28 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             }
         };
 
-        let mut storage_slot_proofs: BTreeMap<u8, Vec<SmtProof>> = BTreeMap::new();
-        let partial_storage_smts = partial_storage_smts.into_iter().map(|entry| {
-            let slot =
-                u8::try_from(entry.storage_slot).map_err(crate::rpc::RpcError::SlotOutOfBounds)?;
-            let partial_smt = PartialSmt::read_from_bytes(&entry.partial_smt)?;
-            Ok::<_, crate::rpc::RpcError>((slot, partial_smt))
-        });
-        for result in partial_storage_smts {
-            let (slot, partial_smt) = result?;
+        let partial_storage_smts = Result::<BTreeMap<u8, PartialSmt>, _>::from_iter(
+            partial_storage_smts.into_iter().map(|entry| {
+                let slot = u8::try_from(entry.storage_slot)
+                    .map_err(crate::rpc::RpcError::SlotOutOfBounds)?;
+                let partial_smt = PartialSmt::read_from_bytes(&entry.partial_smt)?;
+                Ok::<_, crate::rpc::RpcError>((slot, partial_smt))
+            }),
+        )?;
+
+        partial_storage_smts.iter().try_for_each(|(_slot, partial_smt)| {
             for (key, _value) in partial_smt.entries() {
-                let proof = partial_smt.open(key)?;
-                storage_slot_proofs.entry(slot).or_default().push(proof);
+                // validate all required inner nodes of the merkle path for the specific leaf exist
+                let _proof = partial_smt.open(key)?;
             }
-        }
+            Ok::<_, crate::rpc::RpcError>(())
+        })?;
 
         Ok(StateHeaders {
             account_header,
             storage_header,
             code,
-            storage_slots: storage_slot_proofs,
+            storage_slots: partial_storage_smts,
         })
     }
 }
@@ -252,7 +254,7 @@ pub struct StateHeaders {
     pub account_header: AccountHeader,
     pub storage_header: AccountStorageHeader,
     pub code: AccountCode,
-    pub storage_slots: BTreeMap<StorageSlotIndex, Vec<SmtProof>>,
+    pub storage_slots: BTreeMap<StorageSlotIndex, PartialSmt>,
 }
 
 /// Represents a proof of existence of an account's state at a specific block number.
