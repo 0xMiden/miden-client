@@ -334,12 +334,14 @@ impl SqliteStore {
                 INSERT OR IGNORE INTO account_storage (
                     commitment,
                     slot_index,
-                    slot_value
+                    slot_value,
+                    slot_type
                 )
                 SELECT
                     ?, -- new commitment
                     slot_index,
-                    slot_value
+                    slot_value,
+                    slot_type
                 FROM account_storage
                 WHERE commitment = (SELECT storage_commitment FROM accounts WHERE account_commitment = ?)
                 ";
