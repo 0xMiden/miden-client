@@ -308,7 +308,7 @@ impl SqliteStore {
 
         if init_account_header.vault_root() != final_account_header.vault_root() {
             const VAULT_QUERY: &str = "
-                INSERT OR IGNORE INTO account_vaults (
+                INSERT INTO account_vaults (
                     root,
                     faucet_id_prefix,
                     asset
@@ -331,7 +331,7 @@ impl SqliteStore {
 
         if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
             const STORAGE_QUERY: &str = "
-                INSERT OR IGNORE INTO account_storage (
+                INSERT INTO account_storage (
                     commitment,
                     slot_index,
                     slot_value,
