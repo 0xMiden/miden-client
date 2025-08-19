@@ -35,11 +35,8 @@ miden-remote-prover-client = { branch = "next", default-features = false, featur
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-testing = { branch = "next", default-features = false, features = [
-  "async",
 ], git = "https://github.com/0xMiden/miden-base" }
-miden-tx = { branch = "next", default-features = false, features = [
-  "async",
-], git = "https://github.com/0xMiden/miden-base" }
+miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 async-trait = "0.1"

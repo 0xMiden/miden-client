@@ -36,28 +36,20 @@ impl AccountVaultDelta {
     #[wasm_bindgen(js_name = "addedFungibleAssets")]
     pub fn added_fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
-            .added_assets()
-            .filter_map(|asset| {
-                if asset.is_fungible() {
-                    Some(asset.unwrap_fungible().into())
-                } else {
-                    None
-                }
-            })
+            .fungible()
+            .iter()
+            .filter(|&(_, &value)| value >= 0)
+            .map(|(faucet_id, &diff)| FungibleAsset::new(&faucet_id.into(), diff.unsigned_abs()))
             .collect()
     }
 
     #[wasm_bindgen(js_name = "removedFungibleAssets")]
     pub fn removed_fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
-            .removed_assets()
-            .filter_map(|asset| {
-                if asset.is_fungible() {
-                    Some(asset.unwrap_fungible().into())
-                } else {
-                    None
-                }
-            })
+            .fungible()
+            .iter()
+            .filter(|&(_, &value)| value < 0)
+            .map(|(faucet_id, &diff)| FungibleAsset::new(&faucet_id.into(), diff.unsigned_abs()))
             .collect()
     }
 }

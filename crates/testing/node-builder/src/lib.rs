@@ -24,7 +24,9 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_objects::account::{Account, AccountFile, AuthSecretKey};
 use miden_objects::asset::TokenSymbol;
+use miden_objects::block::FeeParameters;
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_objects::{Felt, ONE};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
@@ -83,6 +85,7 @@ impl NodeBuilder {
     // --------------------------------------------------------------------------------------------
 
     /// Starts all node components and returns a handle to manage them.
+    #[allow(clippy::too_many_lines)]
     pub async fn start(self) -> Result<NodeHandle> {
         miden_node_utils::logging::setup_tracing(
             miden_node_utils::logging::OpenTelemetry::Disabled,
@@ -109,7 +112,13 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
+        let genesis_state = GenesisState::new(
+            vec![account_file.account],
+            FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
+                .unwrap(),
+            version,
+            timestamp,
+        );
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)

@@ -92,9 +92,19 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### createP2IDENote()
 
-> `static` **createP2IDENote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `recall_height`, `aux`): `Note`
+> `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `aux`): `Note`
 
 #### Parameters
 
@@ -110,17 +120,17 @@
 
 [`NoteAssets`](NoteAssets.md)
 
+##### reclaim\_height
+
+`number`
+
+##### timelock\_height
+
+`number`
+
 ##### note\_type
 
 [`NoteType`](../enumerations/NoteType.md)
-
-##### serial\_num
-
-[`Word`](Word.md)
-
-##### recall\_height
-
-`number`
 
 ##### aux
 
@@ -134,7 +144,7 @@
 
 ### createP2IDNote()
 
-> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `serial_num`, `aux`): `Note`
+> `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `aux`): `Note`
 
 #### Parameters
 
@@ -154,13 +164,25 @@
 
 [`NoteType`](../enumerations/NoteType.md)
 
-##### serial\_num
-
-[`Word`](Word.md)
-
 ##### aux
 
 [`Felt`](Felt.md)
+
+#### Returns
+
+`Note`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `Note`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
 
 #### Returns
 

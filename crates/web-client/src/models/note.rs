@@ -1,14 +1,14 @@
-use miden_client::note::{
-    NoteExecutionHint as NativeNoteExecutionHint,
-    NoteInputs as NativeNoteInputs,
-    NoteMetadata as NativeNoteMetadata,
-    NoteRecipient as NativeNoteRecipient,
-    NoteTag as NativeNoteTag,
-    WellKnownNote,
-};
-use miden_lib::note::utils;
-use miden_objects::note::Note as NativeNote;
+use miden_client::note::Note as NativeNote;
+use miden_lib::note::{create_p2id_note, create_p2ide_note};
+use miden_objects::Felt as NativeFelt;
+use miden_objects::asset::Asset as NativeAsset;
+use miden_objects::block::BlockNumber as NativeBlockNumber;
+use miden_objects::crypto::rand::RpoRandomCoin;
+use miden_objects::note::NoteAssets as NativeNoteAssets;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
@@ -18,7 +18,8 @@ use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
 use super::note_type::NoteType;
-use super::word::Word;
+use crate::js_error_with_context;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -33,6 +34,14 @@ impl Note {
         note_recipient: &NoteRecipient,
     ) -> Note {
         Note(NativeNote::new(note_assets.into(), note_metadata.into(), note_recipient.into()))
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<Note, JsValue> {
+        deserialize_from_uint8array::<NativeNote>(bytes).map(Note)
     }
 
     pub fn id(&self) -> NoteId {
@@ -61,22 +70,26 @@ impl Note {
         target: &AccountId,
         assets: &NoteAssets,
         note_type: NoteType,
-        serial_num: &Word,
         aux: &Felt,
-    ) -> Self {
-        let recipient = utils::build_p2id_recipient(target.into(), serial_num.into()).unwrap();
-        let tag = NativeNoteTag::from_account_id(target.into());
+    ) -> Result<Self, JsValue> {
+        let mut rng = StdRng::from_os_rng();
+        let coin_seed: [u64; 4] = rng.random();
+        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
 
-        let metadata = NativeNoteMetadata::new(
+        let native_note_assets: NativeNoteAssets = assets.into();
+        let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
+
+        let native_note = create_p2id_note(
             sender.into(),
+            target.into(),
+            native_assets,
             note_type.into(),
-            tag,
-            NativeNoteExecutionHint::always(),
             (*aux).into(),
+            &mut rng,
         )
-        .unwrap();
+        .map_err(|err| js_error_with_context(err, "create p2id note"))?;
 
-        NativeNote::new(assets.into(), metadata, recipient).into()
+        Ok(native_note.into())
     }
 
     #[wasm_bindgen(js_name = "createP2IDENote")]
@@ -84,34 +97,31 @@ impl Note {
         sender: &AccountId,
         target: &AccountId,
         assets: &NoteAssets,
+        reclaim_height: Option<u32>,
+        timelock_height: Option<u32>,
         note_type: NoteType,
-        serial_num: &Word,
-        recall_height: u32,
         aux: &Felt,
-    ) -> Self {
-        let note_script = WellKnownNote::P2IDE.script();
+    ) -> Result<Self, JsValue> {
+        let mut rng = StdRng::from_os_rng();
+        let coin_seed: [u64; 4] = rng.random();
+        let mut rng = RpoRandomCoin::new(coin_seed.map(NativeFelt::new).into());
 
-        let inputs = NativeNoteInputs::new(vec![
-            target.suffix().into(),
-            target.prefix().into(),
-            recall_height.into(),
-        ])
-        .unwrap();
+        let native_note_assets: NativeNoteAssets = assets.into();
+        let native_assets: Vec<NativeAsset> = native_note_assets.iter().copied().collect();
 
-        let recipient = NativeNoteRecipient::new(serial_num.into(), note_script, inputs);
-
-        let tag = NativeNoteTag::from_account_id(target.into());
-
-        let metadata = NativeNoteMetadata::new(
+        let native_note = create_p2ide_note(
             sender.into(),
+            target.into(),
+            native_assets,
+            reclaim_height.map(NativeBlockNumber::from),
+            timelock_height.map(NativeBlockNumber::from),
             note_type.into(),
-            tag,
-            NativeNoteExecutionHint::always(),
             (*aux).into(),
+            &mut rng,
         )
-        .unwrap();
+        .map_err(|err| js_error_with_context(err, "create p2ide note"))?;
 
-        NativeNote::new(assets.into(), metadata, recipient).into()
+        Ok(native_note.into())
     }
 }
 
