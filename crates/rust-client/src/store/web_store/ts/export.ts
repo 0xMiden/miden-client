@@ -1,46 +1,56 @@
 import { db } from "../js/schema.js";
 import { uint8ArrayToBase64 } from "./utils.js";
-async function recursivelyTransformForExport(
-  obj: Uint8Array
-): Promise<number[]>;
-async function recursivelyTransformForExport(
-  obj: Blob
-): Promise<{ __type: "Blob"; data: string }>;
-async function recursivelyTransformForExport<T>(
-  obj: T[]
-): Promise<Awaited<ReturnType<typeof recursivelyTransformForExport>>[]>;
-async function recursivelyTransformForExport<T extends Record<string, any>>(
-  obj: T
-): Promise<{
-  [K in keyof T]: Awaited<ReturnType<typeof recursivelyTransformForExport>>;
-}>;
-async function recursivelyTransformForExport<T>(obj: T): Promise<T>;
+type TransformableInput =
+  | { type: "Uint8Array"; value: Uint8Array }
+  | { type: "Blob"; value: Blob }
+  | { type: "Array"; value: any[] }
+  | { type: "Record"; value: Record<string, any> }
+  | { type: "Primitive"; value: any };
 
-// Implementation
-async function recursivelyTransformForExport(obj: any): Promise<any> {
-  if (obj instanceof Uint8Array) {
-    return Array.from(obj);
+async function recursivelyTransformForExport(
+  obj: TransformableInput
+): Promise<any> {
+  switch (obj.type) {
+    case "Uint8Array":
+      return Array.from(obj.value);
+    case "Blob":
+      const blobBuffer = await obj.value.arrayBuffer();
+      return {
+        __type: "Blob" as const,
+        data: uint8ArrayToBase64(new Uint8Array(blobBuffer)),
+      };
+    case "Array":
+      return await Promise.all(
+        obj.value.map((v) =>
+          recursivelyTransformForExport({ type: getInputType(v), value: v })
+        )
+      );
+    case "Record":
+      const entries = await Promise.all(
+        Object.entries(obj.value).map(async ([key, value]) => [
+          key,
+          await recursivelyTransformForExport({
+            type: getInputType(value),
+            value,
+          }),
+        ])
+      );
+      return Object.fromEntries(entries);
+    case "Primitive":
+      return obj.value;
   }
-  if (obj instanceof Blob) {
-    const blobBuffer = await obj.arrayBuffer();
-    return {
-      __type: "Blob" as const,
-      data: uint8ArrayToBase64(new Uint8Array(blobBuffer)),
-    };
-  }
-  if (Array.isArray(obj)) {
-    return await Promise.all(obj.map(recursivelyTransformForExport));
-  }
-  if (obj && typeof obj === "object") {
-    const entries = await Promise.all(
-      Object.entries(obj).map(async ([key, value]) => [
-        key,
-        await recursivelyTransformForExport(value),
-      ])
-    );
-    return Object.fromEntries(entries);
-  }
-  return obj;
+}
+
+function getInputType(value: any): TransformableInput["type"] {
+  if (value instanceof Uint8Array) return "Uint8Array";
+  if (value instanceof Blob) return "Blob";
+  if (Array.isArray(value)) return "Array";
+  if (value && typeof value === "object") return "Record";
+  return "Primitive";
+}
+
+export async function transformForExport(obj: any): Promise<any> {
+  return recursivelyTransformForExport({ type: getInputType(obj), value: obj });
 }
 
 export async function exportStore() {
@@ -48,9 +58,7 @@ export async function exportStore() {
 
   for (const table of db.tables) {
     const records = await table.toArray();
-    dbJson[table.name] = await Promise.all(
-      records.map(recursivelyTransformForExport)
-    );
+    dbJson[table.name] = await Promise.all(records.map(transformForExport));
   }
 
   return JSON.stringify(dbJson);
