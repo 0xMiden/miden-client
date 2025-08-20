@@ -16,6 +16,7 @@ use miden_lib::{
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
+    testing::mock_account::MockAccountExt,
     transaction::TransactionKernel,
 };
 use miden_objects::account::{
@@ -57,7 +58,7 @@ use miden_objects::testing::account_id::{
 use miden_objects::testing::note::NoteBuilder;
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
-use miden_objects::{EMPTY_WORD, Felt, FieldElement, ONE, Word, ZERO};
+use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder};
 use miden_tx::TransactionExecutorError;
 use miden_tx::utils::{Deserializable, Serializable};
@@ -397,9 +398,7 @@ async fn insert_same_account_twice_fails() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        Felt::new(2),
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-        TransactionKernel::testing_assembler(),
     );
 
     assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
@@ -413,9 +412,7 @@ async fn account_code() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        Felt::ZERO,
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-        TransactionKernel::testing_assembler(),
     );
 
     let account_code = account.code();
@@ -437,9 +434,7 @@ async fn get_account_by_id() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        Felt::new(10),
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-        TransactionKernel::assembler(),
     );
 
     client.add_account(&account, Some(Word::default()), false).await.unwrap();
