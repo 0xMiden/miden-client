@@ -179,6 +179,7 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
         InOrderIndex,
         LeafIndex,
