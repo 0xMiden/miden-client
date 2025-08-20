@@ -1,2 +1,7 @@
-import * as wasmModule from "../Cargo.toml";
-export default wasmModule;
+async function loadWasm() {
+  if (!import.meta.env.SSR) {
+    const wasmModule = await import("../Cargo.toml");
+  }
+  return wasmModule;
+}
+export default loadWasm;
