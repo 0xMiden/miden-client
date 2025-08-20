@@ -69,8 +69,9 @@ export interface ITransaction {
   details: Blob;
   scriptRoot: string;
   blockNum: number;
-  commitHeight: number;
-  discardCause: Blob | null;
+  committed: number;
+  discarded: number;
+  status: Blob;
 }
 
 export interface ITransactionScript {

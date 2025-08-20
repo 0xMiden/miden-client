@@ -14,9 +14,21 @@
 
 ***
 
+### committed
+
+> **committed**: `boolean`
+
+***
+
 ### details
 
 > **details**: `Uint8Array`
+
+***
+
+### discarded
+
+> **discarded**: `boolean`
 
 ***
 
@@ -24,59 +36,13 @@
 
 > **id**: `string`
 
+***
+
+### status
+
+> **status**: `Uint8Array`
+
 ## Accessors
-
-### commitHeight
-
-#### Get Signature
-
-> **get** **commitHeight**(): `string`
-
-##### Returns
-
-`string`
-
-#### Set Signature
-
-> **set** **commitHeight**(`value`): `void`
-
-##### Parameters
-
-###### value
-
-`string`
-
-##### Returns
-
-`void`
-
-***
-
-### discardCause
-
-#### Get Signature
-
-> **get** **discardCause**(): `Uint8Array`
-
-##### Returns
-
-`Uint8Array`
-
-#### Set Signature
-
-> **set** **discardCause**(`value`): `void`
-
-##### Parameters
-
-###### value
-
-`Uint8Array`
-
-##### Returns
-
-`void`
-
-***
 
 ### scriptRoot
 

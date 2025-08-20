@@ -163,8 +163,9 @@ export async function applyStateSync(stateUpdate) {
         transactionRecord.details,
         transactionRecord.scriptRoot,
         transactionRecord.blockNum,
-        transactionRecord.commitHeight,
-        transactionRecord.discardCause
+        transactionRecord.committed,
+        transactionRecord.discarded,
+        transactionRecord.status
       ),
     ];
   });

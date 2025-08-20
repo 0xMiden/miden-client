@@ -26,7 +26,8 @@ extern "C" {
         details: Vec<u8>,
         script_root: Option<Vec<u8>>,
         block_num: String,
-        committed: Option<String>,
-        discard_cause: Option<Vec<u8>>,
+        committed: u8,
+        discarded: u8,
+        status: Vec<u8>,
     ) -> js_sys::Promise;
 }

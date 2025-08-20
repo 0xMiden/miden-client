@@ -583,9 +583,11 @@ async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync
 
     match (first_tx.status.clone(), second_tx.status.clone(), third_tx.status.clone()) {
         (
-            TransactionStatus::Committed(first_tx_commit_height),
-            TransactionStatus::Committed(second_tx_commit_height),
-            TransactionStatus::Committed(third_tx_commit_height),
+            TransactionStatus::Committed { block_number: first_tx_commit_height, .. },
+            TransactionStatus::Committed {
+                block_number: second_tx_commit_height, ..
+            },
+            TransactionStatus::Committed { block_number: third_tx_commit_height, .. },
         ) => {
             assert!(first_tx_commit_height < second_tx_commit_height);
             assert!(second_tx_commit_height < third_tx_commit_height);

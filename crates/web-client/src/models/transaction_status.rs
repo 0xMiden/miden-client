@@ -11,8 +11,11 @@ impl TransactionStatus {
         TransactionStatus(NativeTransactionStatus::Pending)
     }
 
-    pub fn committed(block_num: u32) -> TransactionStatus {
-        TransactionStatus(NativeTransactionStatus::Committed(block_num.into()))
+    pub fn committed(block_num: u32, commit_timestamp: u64) -> TransactionStatus {
+        TransactionStatus(NativeTransactionStatus::Committed {
+            block_number: block_num.into(),
+            commit_timestamp,
+        })
     }
 
     pub fn discarded(cause: &str) -> TransactionStatus {
@@ -28,7 +31,7 @@ impl TransactionStatus {
 
     #[wasm_bindgen(js_name = "isCommitted")]
     pub fn is_committed(&self) -> bool {
-        matches!(self.0, NativeTransactionStatus::Committed(_))
+        matches!(self.0, NativeTransactionStatus::Committed { .. })
     }
 
     #[wasm_bindgen(js_name = "isDiscarded")]
@@ -39,7 +42,7 @@ impl TransactionStatus {
     #[wasm_bindgen(js_name = "getBlockNum")]
     pub fn get_block_num(&self) -> Option<u32> {
         match self.0 {
-            NativeTransactionStatus::Committed(block_num) => Some(block_num.as_u32()),
+            NativeTransactionStatus::Committed { block_number, .. } => Some(block_number.as_u32()),
             _ => None,
         }
     }

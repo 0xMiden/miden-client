@@ -285,13 +285,20 @@ impl TransactionRecord {
 
     /// Updates (if necessary) the transaction status to signify that the transaction was
     /// committed. Will return true if the record was modified, false otherwise.
-    pub fn commit_transaction(&mut self, commit_height: BlockNumber) -> bool {
+    pub fn commit_transaction(
+        &mut self,
+        commit_height: BlockNumber,
+        commit_timestamp: u64,
+    ) -> bool {
         match self.status {
             TransactionStatus::Pending => {
-                self.status = TransactionStatus::Committed(commit_height);
+                self.status = TransactionStatus::Committed {
+                    block_number: commit_height,
+                    commit_timestamp,
+                };
                 true
             },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
         }
     }
 
@@ -303,7 +310,7 @@ impl TransactionRecord {
                 self.status = TransactionStatus::Discarded(cause);
                 true
             },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
         }
     }
 }
@@ -327,6 +334,8 @@ pub struct TransactionDetails {
     pub submission_height: BlockNumber,
     /// Block number at which the transaction is set to expire.
     pub expiration_block_num: BlockNumber,
+    /// Timestamp indicating when the transaction was created by the client.
+    pub creation_timestamp: u64,
 }
 
 impl Serializable for TransactionDetails {
@@ -339,6 +348,7 @@ impl Serializable for TransactionDetails {
         self.block_num.write_into(target);
         self.submission_height.write_into(target);
         self.expiration_block_num.write_into(target);
+        self.creation_timestamp.write_into(target);
     }
 }
 
@@ -352,6 +362,7 @@ impl Deserializable for TransactionDetails {
         let block_num = BlockNumber::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
         let expiration_block_num = BlockNumber::read_from(source)?;
+        let creation_timestamp = source.read_u64()?;
 
         Ok(Self {
             account_id,
@@ -362,6 +373,7 @@ impl Deserializable for TransactionDetails {
             block_num,
             submission_height,
             expiration_block_num,
+            creation_timestamp,
         })
     }
 }
@@ -427,7 +439,12 @@ pub enum TransactionStatus {
     /// Transaction has been submitted but not yet committed.
     Pending,
     /// Transaction has been committed and included at the specified block number.
-    Committed(BlockNumber),
+    Committed {
+        /// Block number at which the transaction was committed.
+        block_number: BlockNumber,
+        /// Timestamp indicating when the transaction was committed.
+        commit_timestamp: u64,
+    },
     /// Transaction has been discarded and isn't included in the node.
     Discarded(DiscardCause),
 }
@@ -436,10 +453,45 @@ impl fmt::Display for TransactionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TransactionStatus::Pending => write!(f, "Pending"),
-            TransactionStatus::Committed(block_number) => {
+            TransactionStatus::Committed { block_number, .. } => {
                 write!(f, "Committed (Block: {block_number})")
             },
             TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
+        }
+    }
+}
+
+impl Serializable for TransactionStatus {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            TransactionStatus::Pending => target.write_u8(0),
+            TransactionStatus::Committed { block_number, commit_timestamp } => {
+                target.write_u8(1);
+                block_number.write_into(target);
+                commit_timestamp.write_into(target);
+            },
+            TransactionStatus::Discarded(cause) => {
+                target.write_u8(2);
+                cause.write_into(target);
+            },
+        }
+    }
+}
+
+impl Deserializable for TransactionStatus {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(TransactionStatus::Pending),
+            1 => {
+                let block_number = BlockNumber::read_from(source)?;
+                let commit_timestamp = source.read_u64()?;
+                Ok(TransactionStatus::Committed { block_number, commit_timestamp })
+            },
+            2 => {
+                let cause = DiscardCause::read_from(source)?;
+                Ok(TransactionStatus::Discarded(cause))
+            },
+            _ => Err(DeserializationError::InvalidValue("Invalid transaction status".to_string())),
         }
     }
 }

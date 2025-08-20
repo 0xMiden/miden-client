@@ -9,9 +9,7 @@ export async function getTransactions(filter) {
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter(
-          (tx) => tx.commitHeight === undefined || tx.commitHeight === null
-        )
+        .filter((tx) => !tx.committed)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -33,10 +31,7 @@ export async function getTransactions(filter) {
 
       transactionRecords = await transactions
         .filter(
-          (tx) =>
-            tx.blockNum < blockNum &&
-            tx.commitHeight === null &&
-            tx.discardCause === null
+          (tx) => tx.blockNum < blockNum && !tx.committed && !tx.discarded
         )
         .toArray();
     } else {
@@ -76,18 +71,15 @@ export async function getTransactions(filter) {
           }
         }
 
-        if (transactionRecord.discardCause) {
-          let discardCauseArrayBuffer =
-            await transactionRecord.discardCause.arrayBuffer();
-          let discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
-          let discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
-          transactionRecord.discardCause = discardCauseBase64;
-        }
-
         let detailsArrayBuffer = await transactionRecord.details.arrayBuffer();
         let detailsArray = new Uint8Array(detailsArrayBuffer);
         let detailsBase64 = uint8ArrayToBase64(detailsArray);
         transactionRecord.details = detailsBase64;
+
+        let statusArrayBuffer = await transactionRecord.status.arrayBuffer();
+        let statusArray = new Uint8Array(statusArrayBuffer);
+        let statusBase64 = uint8ArrayToBase64(statusArray);
+        transactionRecord.status = statusBase64;
 
         let data = {
           id: transactionRecord.id,
@@ -97,12 +89,7 @@ export async function getTransactions(filter) {
             : null,
           txScript: txScriptBase64,
           blockNum: transactionRecord.blockNum,
-          commitHeight: transactionRecord.commitHeight
-            ? transactionRecord.commitHeight
-            : null,
-          discardCause: transactionRecord.discardCause
-            ? transactionRecord.discardCause
-            : null,
+          status: transactionRecord.status,
         };
 
         return data;
@@ -162,10 +149,12 @@ export async function upsertTransactionRecord(
   scriptRoot,
   blockNum,
   committed,
-  discardCause
+  discarded,
+  status
 ) {
   try {
     let detailsBlob = new Blob([new Uint8Array(details)]);
+    let statusBlob = new Blob([new Uint8Array(status)]);
 
     let scriptRootBase64 = null;
     if (scriptRoot !== null) {
@@ -173,18 +162,14 @@ export async function upsertTransactionRecord(
       scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
     }
 
-    let discardCauseBlob = null;
-    if (discardCause) {
-      discardCauseBlob = new Blob([new Uint8Array(discardCause)]);
-    }
-
     const data = {
       id: transactionId,
       details: detailsBlob,
       scriptRoot: scriptRootBase64,
       blockNum: blockNum,
-      commitHeight: committed ? committed : null,
-      discardCause: discardCauseBlob,
+      committed,
+      discarded,
+      status: statusBlob,
     };
 
     await transactions.put(data);
