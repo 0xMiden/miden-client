@@ -28,7 +28,10 @@ pub(crate) mod api_client_wrapper {
     pub type WasmClient = tonic_web_wasm_client::Client;
     pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
     #[derive(Clone)]
-    pub struct ApiClient(pub(crate) InnerClient);
+    pub struct ApiClient {
+        pub(crate) client: InnerClient,
+        wasm_client: WasmClient,
+    }
 
     impl ApiClient {
         /// Connects to the Miden node API using the provided URL and genesis commitment.
@@ -42,7 +45,19 @@ pub(crate) mod api_client_wrapper {
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
             let interceptor = accept_header_interceptor(genesis_commitment);
-            Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
+            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
+            Ok(ApiClient { client, wasm_client })
+        }
+
+        /// Returns a new `ApiClient` with an updated genesis commitment.
+        /// This creates a new client that shares the same underlying channel.
+        pub fn with_genesis_commitment(&self, genesis_commitment: Word) -> Self {
+            let interceptor = accept_header_interceptor(Some(genesis_commitment));
+            let client = ProtoClient::with_interceptor(self.wasm_client.clone(), interceptor);
+            ApiClient {
+                client,
+                wasm_client: self.wasm_client.clone(),
+            }
         }
     }
 }
@@ -66,7 +81,10 @@ pub(crate) mod api_client_wrapper {
 
     pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
     #[derive(Clone)]
-    pub struct ApiClient(pub(crate) InnerClient);
+    pub struct ApiClient {
+        pub(crate) client: InnerClient,
+        channel: Channel,
+    }
 
     impl ApiClient {
         /// Connects to the Miden node API using the provided URL, timeout and genesis commitment.
@@ -92,7 +110,16 @@ pub(crate) mod api_client_wrapper {
             let interceptor = accept_header_interceptor(genesis_commitment);
 
             // Return the connected client.
-            Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
+            let client = ProtoClient::with_interceptor(channel.clone(), interceptor);
+            Ok(ApiClient { client, channel })
+        }
+
+        /// Returns a new `ApiClient` with an updated genesis commitment.
+        /// This creates a new client that shares the same underlying channel.
+        pub fn with_genesis_commitment(&self, genesis_commitment: Word) -> Self {
+            let interceptor = accept_header_interceptor(Some(genesis_commitment));
+            let client = ProtoClient::with_interceptor(self.channel.clone(), interceptor);
+            ApiClient { client, channel: self.channel.clone() }
         }
     }
 }
@@ -100,13 +127,13 @@ pub(crate) mod api_client_wrapper {
 impl Deref for ApiClient {
     type Target = InnerClient;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.client
     }
 }
 
 impl DerefMut for ApiClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.client
     }
 }
 
