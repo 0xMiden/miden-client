@@ -138,5 +138,6 @@ mod tests {
         assert_eq!(base_units_to_tokens(u64::MAX, 12), "18446744.073709551615");
         assert_eq!(base_units_to_tokens(753_124_680_000, 8), "7531.24680000");
         assert_eq!(base_units_to_tokens(75_312_468, 4), "7531.2468");
+        assert_eq!(base_units_to_tokens(75_312_468, 0), "75312468");
     }
 }
