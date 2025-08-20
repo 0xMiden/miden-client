@@ -86,6 +86,9 @@
 
 > **createClient**(`node_url`?, `seed`?): `Promise`\<`any`\>
 
+Creates a new client with the given node URL and optional seed.
+If `node_url` is `None`, it defaults to the testnet endpoint.
+
 #### Parameters
 
 ##### node\_url?
@@ -102,9 +105,32 @@
 
 ***
 
-### exportNote()
+### createMockClient()
 
-> **exportNote**(`note_id`, `export_type`): `Promise`\<`any`\>
+> **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
+
+Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
+applications as it uses a mock chain that simulates the behavior of a real node.
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+##### serialized\_mock\_chain?
+
+`Uint8Array`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### exportNoteFile()
+
+> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<`any`\>
 
 #### Parameters
 
@@ -326,9 +352,9 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### importNote()
+### importNoteFile()
 
-> **importNote**(`note_bytes`): `Promise`\<`any`\>
+> **importNoteFile**(`note_bytes`): `Promise`\<`any`\>
 
 #### Parameters
 
@@ -596,6 +622,16 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### proveBlock()
+
+> **proveBlock**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -609,6 +645,18 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### serializeMockChain()
+
+> **serializeMockChain**(): `Uint8Array`
+
+Returns the inner serialized mock chain if it exists.
+
+#### Returns
+
+`Uint8Array`
 
 ***
 
@@ -655,6 +703,16 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### usesMockChain()
+
+> **usesMockChain**(): `boolean`
+
+#### Returns
+
+`boolean`
 
 ***
 
