@@ -144,7 +144,7 @@ install-tests: ## Install the tests binary
 
 # --- Building ------------------------------------------------------------------------------------
 
-build: ## Build the CLI binary and client library in release mode
+build: ## Build the CLI binary, client library and tests binary in release mode
 	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release --locked
 	cargo build --package testing-remote-prover --release --locked
 
