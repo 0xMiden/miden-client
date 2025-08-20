@@ -545,8 +545,7 @@ mod tests {
         let initial_commitment = Word::default();
         client.set_genesis_commitment(initial_commitment).await.unwrap();
 
-        let new_commitment =
-            Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
         client.set_genesis_commitment(new_commitment).await.unwrap();
 
         assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);

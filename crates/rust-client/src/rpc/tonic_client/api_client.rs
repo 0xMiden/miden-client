@@ -119,10 +119,7 @@ pub(crate) mod api_client_wrapper {
         pub fn with_genesis_commitment(&self, genesis_commitment: Word) -> Self {
             let interceptor = accept_header_interceptor(Some(genesis_commitment));
             let client = ProtoClient::with_interceptor(self.channel.clone(), interceptor);
-            ApiClient {
-                client,
-                channel: self.channel.clone(),
-            }
+            ApiClient { client, channel: self.channel.clone() }
         }
     }
 }
