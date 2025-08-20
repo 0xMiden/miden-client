@@ -1,5 +1,5 @@
 use miden_client::Word;
-use miden_client::account::{Account, AccountFile};
+use miden_client::account::{Account, AccountFile, get_public_keys_from_account};
 use miden_client::store::NoteExportType;
 use miden_client::transaction::AccountInterface;
 use miden_client::utils::Serializable;
@@ -105,18 +105,4 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
-}
-
-fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
-    let mut pub_keys = vec![];
-    let interface: AccountInterface = account.into();
-
-    for auth in interface.auth() {
-        match auth {
-            AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
-            AuthScheme::NoAuth => {},
-        }
-    }
-
-    pub_keys
 }

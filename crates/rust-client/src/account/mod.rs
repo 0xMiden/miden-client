@@ -37,7 +37,9 @@
 
 use alloc::vec::Vec;
 
+use miden_lib::AuthScheme;
 use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::interface::AccountInterface;
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
@@ -310,6 +312,25 @@ pub fn build_wallet_id(
         .build()?;
 
     Ok(account.id())
+}
+
+/// Gets the public key from the storage of an account. The function is required to create an
+/// `AccountFile` for exporting accounts in the cli and the web client.
+///
+/// # Arguments
+/// - `account`: The Accounts from which to extract the public keys.
+pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
+    let mut pub_keys = vec![];
+    let interface: AccountInterface = account.into();
+
+    for auth in interface.auth() {
+        match auth {
+            AuthScheme::NoAuth => {},
+            AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
+        }
+    }
+
+    pub_keys
 }
 
 // TESTS
