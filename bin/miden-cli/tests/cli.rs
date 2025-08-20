@@ -33,9 +33,18 @@ use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};
 use miden_client_cli::CliKeyStore;
+use miden_objects::address::Address;
 use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
+
+fn account_id_from_address(bech32: &str) -> AccountId {
+    let address = Address::from_bech32(bech32).unwrap().1;
+    match address {
+        Address::AccountId(account_id_address) => account_id_address.id(),
+        _ => panic!("Input account ID {address:?} is not an ID based address"),
+    }
+}
 
 // CLI TESTS
 // ================================================================================================
@@ -344,18 +353,8 @@ async fn cli_export_import_account() {
 
     // Ensure the account was imported
     let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await.0;
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&faucet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&wallet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
+    assert!(client_2.get_account(account_id_from_address(&faucet_id)).await.is_ok());
+    assert!(client_2.get_account(account_id_from_address(&wallet_id)).await.is_ok());
 
     sync_cli(&temp_dir_2);
 

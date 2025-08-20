@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
+use miden_objects::address::{AccountIdAddress, Address};
 use miden_objects::{Felt as NativeFelt, NetworkIdError};
 use wasm_bindgen::prelude::*;
 
@@ -28,8 +29,13 @@ impl AccountId {
 
     #[wasm_bindgen(js_name = "fromBech32")]
     pub fn from_bech32(bech32: &str) -> AccountId {
-        let (_, native_account_id) = NativeAccountId::from_bech32(bech32).unwrap();
-        AccountId(native_account_id)
+        let Address::AccountId(account_id_address) =
+            Address::from_bech32(bech32).expect("expected a valid bech32 address").1
+        else {
+            panic!("expected an account ID address");
+        };
+
+        AccountId(account_id_address.id())
     }
 
     #[wasm_bindgen(js_name = "isFaucet")]
@@ -60,7 +66,8 @@ impl AccountId {
                 "wrong network id, for a custom network id, use to bech32Custom",
             )
         })?;
-        Ok(self.0.to_bech32(network_id))
+        let address: Address = AccountIdAddress::new(self.0).into();
+        Ok(address.to_bech32(network_id))
     }
 
     /// Turn this Account ID into its bech32 string representation. This method accepts a custom
@@ -69,7 +76,8 @@ impl AccountId {
     pub fn to_bech32_custom(&self, custom_network_id: &str) -> Result<String, JsValue> {
         let network_id = NativeNetworkId::from_str(custom_network_id)
             .map_err(|err| js_error_with_context(err, "given network id is not valid"))?;
-        Ok(self.0.to_bech32(network_id))
+        let address: Address = AccountIdAddress::new(self.0).into();
+        Ok(address.to_bech32(network_id))
     }
 
     pub fn prefix(&self) -> Felt {

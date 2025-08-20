@@ -147,11 +147,9 @@ impl TryFrom<AccountProof> for AccountInputs {
                     account_header.nonce(),
                     code,
                     PartialStorage::new(storage_header, storage_map_proofs.into_iter())?,
-                    PartialVault::new(PartialSmt::new()), /* We don't use
-                                                           * vault
-                                                           * information so we
-                                                           * leave it
-                                                           * empty */
+                    // We don't use vault information so we leave it empty
+                    PartialVault::new(PartialSmt::new())
+                        .expect("Empty partial vault shouldn't fail"),
                 ),
                 witness,
             ));

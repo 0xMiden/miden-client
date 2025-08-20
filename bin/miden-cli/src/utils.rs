@@ -6,6 +6,7 @@ use figment::Figment;
 use figment::providers::{Format, Toml};
 use miden_client::Client;
 use miden_client::account::AccountId;
+use miden_objects::address::{AccountIdAddress, Address};
 use tracing::info;
 
 use super::config::CliConfig;
@@ -66,13 +67,19 @@ pub(crate) async fn parse_account_id<AUTH>(
         .map_err(|_| CliError::Input(format!("Input account ID {account_id} is neither a valid Account ID nor a hex prefix of a known Account ID")))?
         .id())
     } else {
-        Ok(AccountId::from_bech32(account_id)
+        let address = Address::from_bech32(account_id)
             .map_err(|_| {
                 CliError::Input(format!(
-                    "Input account ID {account_id} is not a valid bech32 encoded Account ID"
+                    "Input account ID {account_id} is not a valid account address"
                 ))
             })?
-            .1)
+            .1;
+        match address {
+            Address::AccountId(account_id_address) => Ok(account_id_address.id()),
+            _ => Err(CliError::Input(format!(
+                "Input account ID {address:?} is not an ID based address"
+            ))),
+        }
     }
 }
 
@@ -115,4 +122,9 @@ fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
     let (config, _) = load_config_file()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
+}
+
+pub fn account_id_to_address(account_id: AccountId, cli_config: &CliConfig) -> String {
+    let address: Address = AccountIdAddress::new(account_id).into();
+    address.to_bech32(cli_config.rpc.endpoint.0.to_network_id())
 }

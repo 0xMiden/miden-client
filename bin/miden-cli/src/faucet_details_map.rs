@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 use crate::load_config_file;
-use crate::utils::parse_account_id;
+use crate::utils::{account_id_to_address, parse_account_id};
 
 /// Stores the detail information of a faucet to be stored in the token symbol map file.
 #[derive(Debug, Serialize, Deserialize)]
@@ -152,7 +152,7 @@ impl FaucetDetailsMap {
             let (cli_config, _) = load_config_file()?;
 
             Ok((
-                asset.faucet_id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
+                account_id_to_address(asset.faucet_id(), &cli_config),
                 asset.amount().to_string(),
             ))
         }

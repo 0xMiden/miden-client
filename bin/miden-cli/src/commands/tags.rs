@@ -3,6 +3,7 @@ use miden_client::note::{NoteExecutionMode, NoteTag};
 use tracing::info;
 
 use crate::errors::CliError;
+use crate::utils::account_id_to_address;
 use crate::{Parser, create_dynamic_table, load_config_file};
 
 #[derive(Default, Debug, Parser, Clone)]
@@ -48,10 +49,9 @@ async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 
     for tag in tags {
         let source = match tag.source {
-            miden_client::sync::NoteTagSource::Account(account_id) => format!(
-                "Account({})",
-                account_id.to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
-            ),
+            miden_client::sync::NoteTagSource::Account(account_id) => {
+                format!("Account({})", account_id_to_address(account_id, &cli_config))
+            },
             miden_client::sync::NoteTagSource::Note(note_id) => format!("Note({note_id})"),
             miden_client::sync::NoteTagSource::User => "User".to_string(),
         };

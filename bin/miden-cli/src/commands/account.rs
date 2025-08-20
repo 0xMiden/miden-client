@@ -8,7 +8,13 @@ use miden_objects::PrettyPrint;
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id, update_config};
+use crate::utils::{
+    account_id_to_address,
+    load_config_file,
+    load_faucet_details_map,
+    parse_account_id,
+    update_config,
+};
 use crate::{client_binary_name, create_dynamic_table};
 
 // ACCOUNT COMMAND
@@ -107,7 +113,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Re
             .to_string();
 
         table.add_row(vec![
-            acc.id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
+            account_id_to_address(acc.id(), cli_config),
             acc.id().to_hex(),
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
@@ -132,7 +138,7 @@ pub async fn show_account<AUTH>(
     let account = if let Some(account) = client.get_account(account_id).await? {
         account.into()
     } else {
-        let bech32_id = account_id.to_bech32(cli_config.rpc.endpoint.0.to_network_id()?);
+        let bech32_id = account_id_to_address(account_id, cli_config);
         println!("Account {bech32_id} is not tracked by the client. Fetching from the network...",);
 
         let rpc_client =
@@ -236,7 +242,7 @@ fn print_summary_table(account: &Account, cli_config: &CliConfig) -> Result<(), 
 
     table.add_row(vec![
         Cell::new("Address"),
-        Cell::new(account.id().to_bech32(cli_config.rpc.endpoint.0.to_network_id()?)),
+        Cell::new(account_id_to_address(account.id(), cli_config)),
     ]);
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
@@ -317,7 +323,7 @@ pub(crate) fn maybe_set_default_account(
 
     set_default_account(Some(account_id))?;
 
-    let account_id = account_id.to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
+    let account_id = account_id_to_address(account_id, current_config);
     println!("Setting account {account_id} as the default account ID.");
     println!(
         "You can unset it with `{} account --default none`.",
