@@ -2,13 +2,11 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use miden_client::Client;
 use miden_client::account::{Account, AccountFile, get_public_keys_from_account};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::NoteExportType;
-use miden_client::transaction::AccountInterface;
 use miden_client::utils::Serializable;
-use miden_client::{Client, Word};
-use miden_lib::AuthScheme;
 use tracing::info;
 
 use crate::errors::CliError;

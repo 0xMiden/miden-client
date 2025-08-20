@@ -1,9 +1,7 @@
 use miden_client::Word;
 use miden_client::account::{Account, AccountFile, get_public_keys_from_account};
 use miden_client::store::NoteExportType;
-use miden_client::transaction::AccountInterface;
 use miden_client::utils::Serializable;
-use miden_lib::AuthScheme;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -94,11 +92,10 @@ impl WebClient {
             }
 
             let account_data = AccountFile::new(account, account_seed, key_pairs);
-            let mut account_file_bytes = vec![];
-            account_data.write_into(&mut account_file_bytes);
 
-            let serialized_input_note_bytes = serde_wasm_bindgen::to_value(&account_file_bytes)
-                .map_err(|_| JsValue::from_str("Serialization error"))?;
+            let serialized_input_note_bytes =
+                serde_wasm_bindgen::to_value(&account_data.to_bytes())
+                    .map_err(|_| JsValue::from_str("Serialization error"))?;
 
             Ok(serialized_input_note_bytes)
         } else {

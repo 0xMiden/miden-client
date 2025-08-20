@@ -128,6 +128,22 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### exportAccount()
+
+> **exportAccount**(`account_id`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### exportNoteFile()
 
 > **exportNoteFile**(`note_id`, `export_type`): `Promise`\<`any`\>
