@@ -65,7 +65,7 @@ impl Default for ClientConfig {
     }
 }
 
-pub(crate) fn create_test_store_path() -> PathBuf {
+pub fn create_test_store_path() -> PathBuf {
     let mut temp_file = temp_dir();
     temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
     temp_file

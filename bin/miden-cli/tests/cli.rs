@@ -28,7 +28,7 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::testing::config::ClientConfig;
+use miden_client::testing::config::create_test_store_path;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};
@@ -68,8 +68,9 @@ fn init_without_params() {
 
 #[test]
 fn init_with_params() {
-    let client_config = ClientConfig::default().with_rpc_endpoint(Endpoint::devnet());
-    let temp_dir = init_cli_with_store_path(&client_config);
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::devnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Assert the config file contains the specified contents
     let mut config_path = temp_dir.clone();
@@ -78,18 +79,12 @@ fn init_with_params() {
     let mut config_file_str = String::new();
     config_file.read_to_string(&mut config_file_str).unwrap();
 
-    assert!(config_file_str.contains(client_config.store_config.to_str().unwrap()));
+    assert!(config_file_str.contains(store_path.to_str().unwrap()));
     assert!(config_file_str.contains("devnet"));
 
     // Trying to init twice should result in an error
     let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
-    init_cmd.args([
-        "init",
-        "--network",
-        "devnet",
-        "--store-path",
-        client_config.store_config.to_str().unwrap(),
-    ]);
+    init_cmd.args(["init", "--network", "devnet", "--store-path", store_path.to_str().unwrap()]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
@@ -419,8 +414,9 @@ async fn consume_unauthenticated_note() {
 
 #[tokio::test]
 async fn init_with_devnet() {
-    let temp_dir =
-        init_cli_with_store_path(&ClientConfig::default().with_rpc_endpoint(Endpoint::devnet()));
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::devnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Check in the config file that the network is devnet
     let mut config_path = temp_dir.clone();
@@ -434,8 +430,9 @@ async fn init_with_devnet() {
 
 #[tokio::test]
 async fn init_with_testnet() {
-    let temp_dir =
-        init_cli_with_store_path(&ClientConfig::default().with_rpc_endpoint(Endpoint::testnet()));
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::testnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Check in the config file that the network is testnet
     let mut config_path = temp_dir.clone();
@@ -506,7 +503,7 @@ async fn debug_mode_outputs_logs() {
     };
 
     // Import the note into the CLI
-    let temp_dir = init_cli_with_store_path(&ClientConfig::default());
+    let (_, temp_dir, _) = init_cli();
 
     // Serialize the note
     let note_path = temp_dir.join(NOTE_FILENAME);
@@ -542,15 +539,20 @@ async fn debug_mode_outputs_logs() {
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
-    let client_config = ClientConfig::default();
-    let temp_dir = init_cli_with_store_path(&client_config);
-    let endpoint = client_config.rpc_endpoint();
-    (client_config.store_config, temp_dir, endpoint)
+    // Try to read from env first or default to localhost
+    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
+        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
+        Err(_) => Endpoint::localhost(),
+    };
+
+    let store_path = create_test_store_path();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
+    (store_path, temp_dir, endpoint)
 }
 
 /// Initializes a CLI with the given network and store path and returns the temp directory where
 /// the CLI is running.
-fn init_cli_with_store_path(client_config: &ClientConfig) -> PathBuf {
+fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
@@ -559,9 +561,9 @@ fn init_cli_with_store_path(client_config: &ClientConfig) -> PathBuf {
     init_cmd.args([
         "init",
         "--network",
-        client_config.rpc_endpoint().to_string().as_str(),
+        endpoint.to_string().as_str(),
         "--store-path",
-        client_config.store_config.to_str().unwrap(),
+        store_path.to_str().unwrap(),
     ]);
     init_cmd.current_dir(&temp_dir).assert().success();
 
