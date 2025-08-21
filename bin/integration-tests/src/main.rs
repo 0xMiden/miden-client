@@ -78,8 +78,12 @@ async fn run_test<F, Fut>(
 }
 
 async fn run_tests(client_config: &ClientConfig) {
-    println!("  Starting Miden Client Integration Tests...");
-    println!("==============================================");
+    println!("Starting Miden client integration tests");
+    println!("==========================================================");
+    println!("Using:");
+    println!(" - RPC endpoint: {}", client_config.rpc_endpoint);
+    println!(" - Timeout: {}ms", client_config.rpc_timeout);
+    println!("==========================================================");
 
     let failed_tests = Arc::new(Mutex::new(Vec::new()));
 
