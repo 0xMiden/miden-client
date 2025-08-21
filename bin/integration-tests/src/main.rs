@@ -38,7 +38,12 @@ async fn main() {
 )]
 struct Args {
     /// The URL of the RPC endpoint to use.
-    #[arg(short, long, default_value = "http://localhost:57291")]
+    #[arg(
+        short,
+        long,
+        default_value = "http://localhost:57291",
+        env = "TEST_MIDEN_RPC_ENDPOINT"
+    )]
     rpc_endpoint: Url,
 
     /// Timeout for the RPC requests in milliseconds.

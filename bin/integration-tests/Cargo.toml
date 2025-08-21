@@ -23,7 +23,7 @@ miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../..
 
 # External dependencies
 async-trait = { workspace = true }
-clap        = { features = ["derive"], version = "4.0" }
+clap        = { features = ["derive", "env"], version = "4.0" }
 futures     = { version = "0.3" }
 rand        = { workspace = true }
 tokio       = { workspace = true }

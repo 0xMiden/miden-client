@@ -46,15 +46,15 @@ impl ClientConfig {
 impl Default for ClientConfig {
     /// Creates a default client config.
     ///
-    /// The RPC endpoint is read from the `MIDEN_RPC_ENDPOINT` environment variable, or defaults to
-    /// `localhost` if the environment variable is not set.
+    /// The RPC endpoint is read from the `TEST_MIDEN_RPC_ENDPOINT` environment variable, or
+    /// defaults to `localhost` if the environment variable is not set.
     ///
     /// The timeout is set to 10 seconds.
     ///
     /// The store and auth paths are a temporary directory.
     fn default() -> Self {
         // Try to read from env first or default to localhost
-        let endpoint = match std::env::var("MIDEN_RPC_ENDPOINT") {
+        let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
             Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
             Err(_) => Endpoint::localhost(),
         };
