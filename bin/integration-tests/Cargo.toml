@@ -13,6 +13,10 @@ version.workspace      = true
 name = "miden-client-integration-tests"
 path = "src/main.rs"
 
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+
 [dependencies]
 # Workspace dependencies
 miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client" }
@@ -24,6 +28,9 @@ futures     = { version = "0.3" }
 rand        = { workspace = true }
 tokio       = { workspace = true }
 url         = { version = "2.5.4" }
+
+[dev-dependencies]
+tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["async-trait"]
