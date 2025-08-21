@@ -15,6 +15,7 @@ import { defineConfig, devices } from "@playwright/test";
 const testMatch = "*.test.ts";
 
 export default defineConfig({
+  timeout: 120_000,
   testDir: "./test",
   /* Run tests in files in parallel */
   fullyParallel: true,

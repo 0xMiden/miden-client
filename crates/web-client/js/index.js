@@ -1,8 +1,5 @@
 import wasm from "../dist/wasm.js";
-import * as MidenClient from "../dist/crates/miden_client_web.d.ts";
 import { MethodName, WorkerAction } from "./constants.js";
-
-const WasmWebClient = MidenClient.WebClient;
 
 const {
   Account,
@@ -70,6 +67,7 @@ const {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
+  WebClient: WasmWebClient, // Alias the WASM-exported WebClient
 } = wasm;
 
 export {
