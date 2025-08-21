@@ -11,6 +11,9 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+
+const testMatch = "*.test.ts";
+
 export default defineConfig({
   testDir: "./test",
   /* Run tests in files in parallel */
@@ -75,7 +78,7 @@ export default defineConfig({
   // FIXME: Modulairze test server constants (localhost, port)
   webServer: {
     command: "npx http-server ./dist -p 8080",
-    url: "http://localhost:8080",
+    url: "http://127.0.0.1:8080",
     reuseExistingServer: true,
   },
 });

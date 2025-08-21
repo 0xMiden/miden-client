@@ -1,5 +1,5 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import { expect, Page } from "@playwright/test";
+import test from "./playwright.global.setup";
 import { TokenSymbol } from "../dist/crates/miden_client_web";
 import { create } from "domain";
 
@@ -11,6 +11,7 @@ interface createNewTokenSymbolResult {
 }
 
 export const createNewTokenSymbol = async (
+  testingPage: Page,
   symbol: string
 ): Promise<createNewTokenSymbolResult> => {
   return await testingPage.evaluate(async (symbol) => {
@@ -23,26 +24,30 @@ export const createNewTokenSymbol = async (
   }, symbol);
 };
 
-describe("new token symbol", () => {
-  it("creates a new token symbol", async () => {
+test.describe("new token symbol", () => {
+  test("creates a new token symbol", async ({ page }) => {
     const tokenSymbol = "MIDEN";
-    const result = await createNewTokenSymbol(tokenSymbol);
+    const result = await createNewTokenSymbol(page, tokenSymbol);
 
-    expect(result.symbolAsString).to.equal(tokenSymbol);
+    expect(result.symbolAsString).toStrictEqual(tokenSymbol);
   });
 
-  it("thrown an error when creating a token symbol with an empty string", async () => {
+  test("thrown an error when creating a token symbol with an empty string", async ({
+    page,
+  }) => {
     const tokenSymbol = "";
 
-    await expect(createNewTokenSymbol(tokenSymbol)).to.be.rejectedWith(
+    expect(createNewTokenSymbol(page, tokenSymbol)).toThrow(
       "failed to create token symbol: token symbol should have length between 1 and 6 characters, but 0 was provided"
     );
   });
 
-  it("thrown an error when creating a token symbol with more than 6 characters", async () => {
+  test("thrown an error when creating a token symbol with more than 6 characters", async ({
+    page,
+  }) => {
     const tokenSymbol = "MIDENTOKEN";
 
-    await expect(createNewTokenSymbol(tokenSymbol)).to.be.rejectedWith(
+    expect(createNewTokenSymbol(page, tokenSymbol)).toThrow(
       "failed to create token symbol: token symbol should have length between 1 and 6 characters, but 10 was provided"
     );
   });

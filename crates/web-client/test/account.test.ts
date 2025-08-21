@@ -24,7 +24,7 @@ export const getAccountOneMatch = async (
 
     return {
       commitmentOfCreatedAccount: newAccount.commitment().toHex(),
-      commitmentOfGetAccountResult: result.commitment().toHex(),
+      commitmentOfGetAccountResult: result!.commitment().toHex(),
       isAccountType: result instanceof window.Account,
     };
   });

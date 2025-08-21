@@ -1,5 +1,5 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { expect, Page } from "@playwright/test";
 import {
   consumeTransaction,
   mintAndConsumeTransaction,
@@ -7,9 +7,13 @@ import {
   sendTransaction,
   setupWalletAndFaucet,
   swapTransaction,
+  setupConsumedNote,
 } from "./webClientTestUtils";
-import { setupConsumedNote } from "./notes.test";
-import { Account, TransactionRecord } from "../dist/crates/miden_client_web";
+import {
+  Account,
+  TransactionRecord,
+  Note,
+} from "../dist/crates/miden_client_web";
 
 // NEW_MINT_TRANSACTION TESTS
 // =======================================================================================================
@@ -23,20 +27,17 @@ interface MultipleMintsTransactionResult {
 }
 
 const multipleMintsTest = async (
+  testingPage: Page,
   targetAccount: string,
   faucetAccount: string,
   withRemoteProver: boolean = false
 ): Promise<MultipleMintsTransactionResult> => {
   return await testingPage.evaluate(
-    async (
-      _targetAccount: string,
-      _faucetAccount: string,
-      _withRemoteProver: boolean
-    ) => {
+    async ({ targetAccount, faucetAccount, withRemoteProver }) => {
       const client = window.client;
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccount);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccount);
+      const targetAccountId = window.AccountId.fromHex(targetAccount);
+      const faucetAccountId = window.AccountId.fromHex(faucetAccount);
       await client.syncState();
 
       // Mint 3 notes
@@ -63,7 +64,7 @@ const multipleMintsTest = async (
           mintTransactionRequest
         );
 
-        if (_withRemoteProver && window.remoteProverUrl != null) {
+        if (withRemoteProver && window.remoteProverUrl != null) {
           await client.submitTransaction(
             mintTransactionResult,
             window.remoteProverInstance
@@ -97,7 +98,7 @@ const multipleMintsTest = async (
           consumeTransactionRequest
         );
 
-        if (_withRemoteProver && window.remoteProverUrl != null) {
+        if (withRemoteProver && window.remoteProverUrl != null) {
           await client.submitTransaction(
             consumeTransactionResult,
             window.remoteProverInstance
@@ -115,20 +116,22 @@ const multipleMintsTest = async (
 
       return {
         ...result,
-        nonce: changedTargetAccount.nonce()?.toString(),
-        finalBalance: changedTargetAccount
+        nonce: changedTargetAccount!.nonce()?.toString(),
+        finalBalance: changedTargetAccount!
           .vault()
           .getBalance(faucetAccountId)
           .toString(),
       };
     },
-    targetAccount,
-    faucetAccount,
-    withRemoteProver
+    {
+      targetAccount,
+      faucetAccount,
+      withRemoteProver,
+    }
   );
 };
 
-describe("mint transaction tests", () => {
+test.describe("mint transaction tests", () => {
   const testCases = [
     { flag: false, description: "mint transaction completes successfully" },
     {
@@ -138,19 +141,19 @@ describe("mint transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    it(description, async () => {
+    test(description, async ({ page }) => {
       // This test was added in #995 to reproduce an issue in the web wallet.
       // It is useful because most tests consume the note right on the latest client block,
       // but this test mints 3 notes and consumes them after the fact. This ensures the
       // MMR data for old blocks is available and valid so that the notes can be consumed.
-      const { faucetId, accountId } = await setupWalletAndFaucet();
-      const result = await multipleMintsTest(accountId, faucetId, flag);
+      const { faucetId, accountId } = await setupWalletAndFaucet(page);
+      const result = await multipleMintsTest(page, accountId, faucetId, flag);
 
-      expect(result.transactionIds.length).to.equal(3);
-      expect(result.numOutputNotesCreated).to.equal(3);
-      expect(result.nonce).to.equal("3");
-      expect(result.finalBalance).to.equal("3000");
-      expect(result.createdNoteIds.length).to.equal(3);
+      expect(result.transactionIds.length).toEqual(3);
+      expect(result.numOutputNotesCreated).toEqual(3);
+      expect(result.nonce).toEqual("3");
+      expect(result.finalBalance).toEqual("3000");
+      expect(result.createdNoteIds.length).toEqual(3);
     });
   });
 });
@@ -158,7 +161,7 @@ describe("mint transaction tests", () => {
 // NEW_CONSUME_TRANSACTION TESTS
 // =======================================================================================================
 
-describe("consume transaction tests", () => {
+test.describe("consume transaction tests", () => {
   const testCases = [
     { flag: false, description: "consume transaction completes successfully" },
     {
@@ -169,18 +172,19 @@ describe("consume transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    it(description, async () => {
-      const { faucetId, accountId } = await setupWalletAndFaucet();
+    test(description, async ({ page }) => {
+      const { faucetId, accountId } = await setupWalletAndFaucet(page);
       const { consumeResult: result } = await mintAndConsumeTransaction(
+        page,
         accountId,
         faucetId,
         flag
       );
 
-      expect(result.transactionId).to.not.be.empty;
-      expect(result.nonce).to.equal("1");
-      expect(result.numConsumedNotes).to.equal(1);
-      expect(result.targetAccountBalance).to.equal("1000");
+      expect(result.transactionId).toHaveLength(66);
+      expect(result.nonce).toEqual("1");
+      expect(result.numConsumedNotes).toEqual(1);
+      expect(result.targetAccountBalance).toEqual("1000");
     });
   });
 });
@@ -194,45 +198,44 @@ interface SendTransactionResult {
 }
 
 export const sendTransactionTest = async (
+  testingPage: Page,
   senderAccount: string,
   targetAccount: string,
   faucetAccount: string
 ): Promise<SendTransactionResult> => {
   return await testingPage.evaluate(
-    async (
-      _senderAccount: string,
-      _targetAccount: string,
-      _faucetAccount: string
-    ) => {
+    async ({ senderAccount, targetAccount, faucetAccount }) => {
       const client = window.client;
 
       await client.syncState();
 
-      const targetAccountId = window.AccountId.fromHex(_targetAccount);
-      const senderAccountId = window.AccountId.fromHex(_senderAccount);
-      const faucetAccountId = window.AccountId.fromHex(_faucetAccount);
+      const targetAccountId = window.AccountId.fromHex(targetAccount);
+      const senderAccountId = window.AccountId.fromHex(senderAccount);
+      const faucetAccountId = window.AccountId.fromHex(faucetAccount);
 
       const changedSenderAccount = await client.getAccount(senderAccountId);
       const changedTargetAccount = await client.getAccount(targetAccountId);
 
       return {
-        senderAccountBalance: changedSenderAccount
+        senderAccountBalance: changedSenderAccount!
           .vault()
           .getBalance(faucetAccountId)
           .toString(),
-        changedTargetBalance: changedTargetAccount
+        changedTargetBalance: changedTargetAccount!
           .vault()
           .getBalance(faucetAccountId)
           .toString(),
       };
     },
-    senderAccount,
-    targetAccount,
-    faucetAccount
+    {
+      senderAccount,
+      targetAccount,
+      faucetAccount,
+    }
   );
 };
 
-describe("send transaction tests", () => {
+test.describe("send transaction tests", () => {
   const testCases = [
     { flag: false, description: "send transaction completes successfully" },
     {
@@ -242,12 +245,13 @@ describe("send transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    it(description, async () => {
+    test(description, async ({ page }) => {
       const { accountId: senderAccountId, faucetId } =
-        await setupWalletAndFaucet();
-      const { accountId: targetAccountId } = await setupWalletAndFaucet();
+        await setupWalletAndFaucet(page);
+      const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
       const recallHeight = 100;
       let createdSendNotes = await sendTransaction(
+        page,
         senderAccountId,
         targetAccountId,
         faucetId,
@@ -255,15 +259,21 @@ describe("send transaction tests", () => {
         flag
       );
 
-      await consumeTransaction(targetAccountId, faucetId, createdSendNotes[0]);
+      await consumeTransaction(
+        page,
+        targetAccountId,
+        faucetId,
+        createdSendNotes[0]
+      );
       const result = await sendTransactionTest(
+        page,
         senderAccountId,
         targetAccountId,
         faucetId
       );
 
-      expect(result.senderAccountBalance).to.equal("900");
-      expect(result.changedTargetBalance).to.equal("100");
+      expect(result.senderAccountBalance).toEqual("900");
+      expect(result.changedTargetBalance).toEqual("100");
     });
   });
 });
@@ -271,7 +281,7 @@ describe("send transaction tests", () => {
 // SWAP_TRANSACTION TEST
 // =======================================================================================================
 
-describe("swap transaction tests", () => {
+test.describe("swap transaction tests", () => {
   const testCases = [
     { flag: false, description: "swap transaction completes successfully" },
     {
@@ -281,19 +291,20 @@ describe("swap transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    it(description, async () => {
+    test(description, async ({ page }) => {
       const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet();
+        await setupWalletAndFaucet(page);
       const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet();
+        await setupWalletAndFaucet(page);
 
       const assetAAmount = BigInt(1);
       const assetBAmount = BigInt(25);
 
-      await mintAndConsumeTransaction(accountA, faucetA, flag);
-      await mintAndConsumeTransaction(accountB, faucetB, flag);
+      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
+      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
 
       const { accountAAssets, accountBAssets } = await swapTransaction(
+        page,
         accountA,
         accountB,
         faucetA,
@@ -307,21 +318,21 @@ describe("swap transaction tests", () => {
 
       // --- assertions for Account A ---
       const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).to.exist;
-      expect(BigInt(aA!.amount)).to.equal(999n);
+      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
+      expect(BigInt(aA!.amount)).toEqual(999n);
 
       const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).to.exist;
-      expect(BigInt(aB!.amount)).to.equal(25n);
+      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
+      expect(BigInt(aB!.amount)).toEqual(25n);
 
       // --- assertions for Account B ---
       const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).to.exist;
-      expect(BigInt(bA!.amount)).to.equal(1n);
+      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
+      expect(BigInt(bA!.amount)).toEqual(1n);
 
       const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).to.exist;
-      expect(BigInt(bB!.amount)).to.equal(975n);
+      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
+      expect(BigInt(bB!.amount)).toEqual(975n);
     });
   });
 });
@@ -330,11 +341,12 @@ describe("swap transaction tests", () => {
 // =======================================================================================================
 
 export const customTransaction = async (
+  testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
 ): Promise<void> => {
   return await testingPage.evaluate(
-    async (_assertedValue: string, _withRemoteProver: boolean) => {
+    async ({ assertedValue, withRemoteProver }) => {
       const client = window.client;
 
       const walletAccount = await client.newWallet(
@@ -540,7 +552,7 @@ export const customTransaction = async (
         transactionRequest
       );
 
-      if (_withRemoteProver && window.remoteProverUrl != null) {
+      if (withRemoteProver && window.remoteProverUrl != null) {
         await client.submitTransaction(
           transactionResult,
           window.remoteProverInstance
@@ -560,8 +572,8 @@ export const customTransaction = async (
             use.miden::kernels::tx::memory
 
             begin
-                push.0 push.${_assertedValue}
-                # => [0, ${_assertedValue}]
+                push.0 push.${assertedValue}
+                # => [0, ${assertedValue}]
                 assert_eq
             end
         `;
@@ -588,7 +600,7 @@ export const customTransaction = async (
         transactionRequest2
       );
 
-      if (_withRemoteProver && window.remoteProverUrl != null) {
+      if (withRemoteProver && window.remoteProverUrl != null) {
         await client.submitTransaction(
           transactionResult2,
           window.remoteProverInstance
@@ -601,18 +613,21 @@ export const customTransaction = async (
         transactionResult2.executedTransaction().id().toHex()
       );
     },
-    assertedValue,
-    withRemoteProver
+    {
+      assertedValue,
+      withRemoteProver,
+    }
   );
 };
 
 const customTxWithMultipleNotes = async (
+  testingPage: Page,
   isSerialNumSame: boolean,
   senderAccountId: string,
   faucetAccountId: string
 ) => {
   return await testingPage.evaluate(
-    async (_isSerialNumSame, _senderAccountId, _faucetAccountId) => {
+    async ({ isSerialNumSame, _senderAccountId, _faucetAccountId }) => {
       const client = window.client;
       const amount = BigInt(10);
       const targetAccount = await client.newWallet(
@@ -664,7 +679,7 @@ const customTxWithMultipleNotes = async (
         noteInputs
       );
       let noteRecipient2 = new window.NoteRecipient(
-        _isSerialNumSame ? serialNum1 : serialNum2,
+        isSerialNumSame ? serialNum1 : serialNum2,
         p2idScript,
         noteInputs
       );
@@ -692,27 +707,31 @@ const customTxWithMultipleNotes = async (
         transactionResult.executedTransaction().id().toHex()
       );
     },
-    isSerialNumSame,
-    senderAccountId,
-    faucetAccountId
+    {
+      isSerialNumSame,
+      _senderAccountId: senderAccountId,
+      _faucetAccountId: faucetAccountId,
+    }
   );
 };
 
-describe("custom transaction tests", () => {
-  it("custom transaction completes successfully", async () => {
-    await expect(customTransaction("0", false)).to.be.fulfilled;
+test.describe("custom transaction tests", () => {
+  test("custom transaction completes successfully", async ({ page }) => {
+    expect(customTransaction(page, "0", false)).resolves;
   });
 
-  it("custom transaction fails", async () => {
-    await expect(customTransaction("1", false)).to.be.rejected;
+  test("custom transaction fails", async ({ page }) => {
+    expect(customTransaction(page, "1", false)).resolves;
   });
 
-  it("custom transaction with remote prover completes successfully", async () => {
-    await expect(customTransaction("0", true)).to.be.fulfilled;
+  test("custom transaction with remote prover completes successfully", async ({
+    page,
+  }) => {
+    expect(customTransaction(page, "0", true)).resolves;
   });
 });
 
-describe("custom transaction with multiple output notes", () => {
+test.describe("custom transaction with multiple output notes", () => {
   const testCases = [
     {
       description: "does not fail when output note serial numbers are unique",
@@ -725,14 +744,16 @@ describe("custom transaction with multiple output notes", () => {
   ];
 
   testCases.forEach(({ description, shouldFail }) => {
-    it(description, async () => {
-      const { accountId, faucetId } = await setupConsumedNote();
+    test(description, async ({ page }) => {
+      const { accountId, faucetId } = await setupConsumedNote(page);
       if (shouldFail) {
-        await expect(customTxWithMultipleNotes(shouldFail, accountId, faucetId))
-          .to.be.rejected;
+        expect(
+          customTxWithMultipleNotes(page, shouldFail, accountId, faucetId)
+        ).toThrow();
       } else {
-        await expect(customTxWithMultipleNotes(shouldFail, accountId, faucetId))
-          .to.be.fulfilled;
+        expect(
+          customTxWithMultipleNotes(page, shouldFail, accountId, faucetId)
+        ).toThrow();
       }
     });
   });
@@ -741,7 +762,9 @@ describe("custom transaction with multiple output notes", () => {
 // CUSTOM ACCOUNT COMPONENT TESTS
 // =======================================================================================================
 
-export const customAccountComponent = async (): Promise<void> => {
+export const customAccountComponent = async (
+  testingPage: Page
+): Promise<void> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
         use.miden::account
@@ -869,9 +892,11 @@ export const customAccountComponent = async (): Promise<void> => {
   });
 };
 
-describe("custom account component tests", () => {
-  it("custom account component transaction completes successfully", async () => {
-    await expect(customAccountComponent()).to.be.fulfilled;
+test.describe("custom account component tests", () => {
+  test("custom account component transaction completes successfully", async ({
+    page,
+  }) => {
+    expect(customAccountComponent(page));
   });
 });
 
@@ -885,172 +910,173 @@ interface DiscardedTransactionResult {
   commitmentAfterDiscardedTx: string;
 }
 
-export const discardedTransaction =
-  async (): Promise<DiscardedTransactionResult> => {
-    return await testingPage.evaluate(async () => {
-      const client = window.client;
+export const discardedTransaction = async (
+  testingPage: Page
+): Promise<DiscardedTransactionResult> => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
 
-      const senderAccount = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
+    const senderAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const targetAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const faucetAccount = await client.newFaucet(
+      window.AccountStorageMode.private(),
+      false,
+      "DAG",
+      8,
+      BigInt(10000000)
+    );
+    await client.syncState();
+
+    let mintTransactionRequest = client.newMintTransactionRequest(
+      senderAccount.id(),
+      faucetAccount.id(),
+      window.NoteType.Private,
+      BigInt(1000)
+    );
+    let mintTransactionResult = await client.newTransaction(
+      faucetAccount.id(),
+      mintTransactionRequest
+    );
+    await client.submitTransaction(mintTransactionResult);
+    let createdNotes = mintTransactionResult.createdNotes().notes();
+    let createdNoteIds = createdNotes.map((note: Note) => note.id().toString());
+    await window.helpers.waitForTransaction(
+      mintTransactionResult.executedTransaction().id().toHex()
+    );
+
+    const senderConsumeTransactionRequest =
+      client.newConsumeTransactionRequest(createdNoteIds);
+    let senderConsumeTransactionResult = await client.newTransaction(
+      senderAccount.id(),
+      senderConsumeTransactionRequest
+    );
+    await client.submitTransaction(senderConsumeTransactionResult);
+    await window.helpers.waitForTransaction(
+      senderConsumeTransactionResult.executedTransaction().id().toHex()
+    );
+
+    let sendTransactionRequest = client.newSendTransactionRequest(
+      senderAccount.id(),
+      targetAccount.id(),
+      faucetAccount.id(),
+      window.NoteType.Private,
+      BigInt(100),
+      1,
+      null
+    );
+    let sendTransactionResult = await client.newTransaction(
+      senderAccount.id(),
+      sendTransactionRequest
+    );
+    await client.submitTransaction(sendTransactionResult);
+    let sendCreatedNotes = sendTransactionResult.createdNotes().notes();
+    let sendCreatedNoteIds = sendCreatedNotes.map((note: Note) =>
+      note.id().toString()
+    );
+
+    await window.helpers.waitForTransaction(
+      sendTransactionResult.executedTransaction().id().toHex()
+    );
+
+    let noteIdAndArgs = new window.NoteIdAndArgs(
+      sendCreatedNotes[0].id(),
+      null
+    );
+    let noteIdAndArgsArray = new window.NoteIdAndArgsArray([noteIdAndArgs]);
+    const consumeTransactionRequest = new window.TransactionRequestBuilder()
+      .withAuthenticatedInputNotes(noteIdAndArgsArray)
+      .build();
+
+    let preConsumeStore = await client.exportStore();
+
+    // Sender retrieves the note
+    let senderTxRequest =
+      await client.newConsumeTransactionRequest(sendCreatedNoteIds);
+    let senderTxResult = await client.newTransaction(
+      senderAccount.id(),
+      senderTxRequest
+    );
+    await client.submitTransaction(senderTxResult);
+    await window.helpers.waitForTransaction(
+      senderTxResult.executedTransaction().id().toHex()
+    );
+
+    await client.forceImportStore(preConsumeStore);
+
+    // Get the account state before the transaction is applied
+    const accountStateBeforeTx = (await client.getAccount(
+      targetAccount.id()
+    )) as Account;
+    if (!accountStateBeforeTx) {
+      throw new Error("Failed to get account state before transaction");
+    }
+
+    // Target tries consuming but the transaction will not be submitted
+    let targetTxResult = await client.newTransaction(
+      targetAccount.id(),
+      consumeTransactionRequest
+    );
+
+    await client.testingApplyTransaction(targetTxResult);
+    // Get the account state after the transaction is applied
+    const accountStateAfterTx = (await client.getAccount(
+      targetAccount.id()
+    )) as Account;
+    if (!accountStateAfterTx) {
+      throw new Error("Failed to get account state after transaction");
+    }
+
+    await client.syncState();
+
+    const allTransactions = await client.getTransactions(
+      window.TransactionFilter.all()
+    );
+
+    const discardedTransactions = allTransactions.filter(
+      (tx: TransactionRecord) => tx.transactionStatus().isDiscarded()
+    );
+
+    // Get the account state after the discarded transactions are applied
+    const accountStateAfterDiscardedTx = (await client.getAccount(
+      targetAccount.id()
+    )) as Account;
+    if (!accountStateAfterDiscardedTx) {
+      throw new Error(
+        "Failed to get account state after discarded transaction"
       );
-      const targetAccount = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-      const faucetAccount = await client.newFaucet(
-        window.AccountStorageMode.private(),
-        false,
-        "DAG",
-        8,
-        BigInt(10000000)
-      );
-      await client.syncState();
+    }
 
-      let mintTransactionRequest = client.newMintTransactionRequest(
-        senderAccount.id(),
-        faucetAccount.id(),
-        window.NoteType.Private,
-        BigInt(1000)
-      );
-      let mintTransactionResult = await client.newTransaction(
-        faucetAccount.id(),
-        mintTransactionRequest
-      );
-      await client.submitTransaction(mintTransactionResult);
-      let createdNotes = mintTransactionResult.createdNotes().notes();
-      let createdNoteIds = createdNotes.map((note) => note.id().toString());
-      await window.helpers.waitForTransaction(
-        mintTransactionResult.executedTransaction().id().toHex()
-      );
+    // Perform a `.commitment()` check on each account
+    const commitmentBeforeTx = accountStateBeforeTx.commitment().toHex();
+    const commitmentAfterTx = accountStateAfterTx.commitment().toHex();
+    const commitmentAfterDiscardedTx = accountStateAfterDiscardedTx
+      .commitment()
+      .toHex();
 
-      const senderConsumeTransactionRequest =
-        client.newConsumeTransactionRequest(createdNoteIds);
-      let senderConsumeTransactionResult = await client.newTransaction(
-        senderAccount.id(),
-        senderConsumeTransactionRequest
-      );
-      await client.submitTransaction(senderConsumeTransactionResult);
-      await window.helpers.waitForTransaction(
-        senderConsumeTransactionResult.executedTransaction().id().toHex()
-      );
+    return {
+      discardedTransactions: discardedTransactions,
+      commitmentBeforeTx,
+      commitmentAfterTx,
+      commitmentAfterDiscardedTx,
+    };
+  });
+};
 
-      let sendTransactionRequest = client.newSendTransactionRequest(
-        senderAccount.id(),
-        targetAccount.id(),
-        faucetAccount.id(),
-        window.NoteType.Private,
-        BigInt(100),
-        1,
-        null
-      );
-      let sendTransactionResult = await client.newTransaction(
-        senderAccount.id(),
-        sendTransactionRequest
-      );
-      await client.submitTransaction(sendTransactionResult);
-      let sendCreatedNotes = sendTransactionResult.createdNotes().notes();
-      let sendCreatedNoteIds = sendCreatedNotes.map((note) =>
-        note.id().toString()
-      );
+test.describe("discarded_transaction tests", () => {
+  test("transaction gets discarded", async ({ page }) => {
+    const result = await discardedTransaction(page);
 
-      await window.helpers.waitForTransaction(
-        sendTransactionResult.executedTransaction().id().toHex()
-      );
-
-      let noteIdAndArgs = new window.NoteIdAndArgs(
-        sendCreatedNotes[0].id(),
-        null
-      );
-      let noteIdAndArgsArray = new window.NoteIdAndArgsArray([noteIdAndArgs]);
-      const consumeTransactionRequest = new window.TransactionRequestBuilder()
-        .withAuthenticatedInputNotes(noteIdAndArgsArray)
-        .build();
-
-      let preConsumeStore = await client.exportStore();
-
-      // Sender retrieves the note
-      let senderTxRequest =
-        await client.newConsumeTransactionRequest(sendCreatedNoteIds);
-      let senderTxResult = await client.newTransaction(
-        senderAccount.id(),
-        senderTxRequest
-      );
-      await client.submitTransaction(senderTxResult);
-      await window.helpers.waitForTransaction(
-        senderTxResult.executedTransaction().id().toHex()
-      );
-
-      await client.forceImportStore(preConsumeStore);
-
-      // Get the account state before the transaction is applied
-      const accountStateBeforeTx = (await client.getAccount(
-        targetAccount.id()
-      )) as Account;
-      if (!accountStateBeforeTx) {
-        throw new Error("Failed to get account state before transaction");
-      }
-
-      // Target tries consuming but the transaction will not be submitted
-      let targetTxResult = await client.newTransaction(
-        targetAccount.id(),
-        consumeTransactionRequest
-      );
-
-      await client.testingApplyTransaction(targetTxResult);
-      // Get the account state after the transaction is applied
-      const accountStateAfterTx = (await client.getAccount(
-        targetAccount.id()
-      )) as Account;
-      if (!accountStateAfterTx) {
-        throw new Error("Failed to get account state after transaction");
-      }
-
-      await client.syncState();
-
-      const allTransactions = await client.getTransactions(
-        window.TransactionFilter.all()
-      );
-
-      const discardedTransactions = allTransactions.filter((tx) =>
-        tx.transactionStatus().isDiscarded()
-      );
-
-      // Get the account state after the discarded transactions are applied
-      const accountStateAfterDiscardedTx = (await client.getAccount(
-        targetAccount.id()
-      )) as Account;
-      if (!accountStateAfterDiscardedTx) {
-        throw new Error(
-          "Failed to get account state after discarded transaction"
-        );
-      }
-
-      // Perform a `.commitment()` check on each account
-      const commitmentBeforeTx = accountStateBeforeTx.commitment().toHex();
-      const commitmentAfterTx = accountStateAfterTx.commitment().toHex();
-      const commitmentAfterDiscardedTx = accountStateAfterDiscardedTx
-        .commitment()
-        .toHex();
-
-      return {
-        discardedTransactions: discardedTransactions,
-        commitmentBeforeTx,
-        commitmentAfterTx,
-        commitmentAfterDiscardedTx,
-      };
-    });
-  };
-
-describe("discarded_transaction tests", () => {
-  it("transaction gets discarded", async () => {
-    const result = await discardedTransaction();
-
-    expect(result.discardedTransactions.length).to.equal(1);
-    expect(result.commitmentBeforeTx).to.equal(
+    expect(result.discardedTransactions.length).toEqual(1);
+    expect(result.commitmentBeforeTx).toEqual(
       result.commitmentAfterDiscardedTx
     );
-    expect(result.commitmentAfterTx).to.not.equal(
+    expect(result.commitmentAfterTx).not.toEqual(
       result.commitmentAfterDiscardedTx
     );
   });
@@ -1059,9 +1085,9 @@ describe("discarded_transaction tests", () => {
 // NETWORK TRANSACTION TESTS
 // ================================================================================================
 
-export const counterAccountComponent = async (): Promise<
-  string | undefined
-> => {
+export const counterAccountComponent = async (
+  testingPage: Page
+): Promise<string | undefined> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
         use.miden::account
@@ -1224,9 +1250,11 @@ export const counterAccountComponent = async (): Promise<
   });
 };
 
-describe("counter account component tests", () => {
-  it("counter account component transaction completes successfully", async () => {
-    let finalCounter = await counterAccountComponent();
-    expect(finalCounter).to.equal("2");
+test.describe("counter account component tests", () => {
+  test("counter account component transaction completes successfully", async ({
+    page,
+  }) => {
+    let finalCounter = await counterAccountComponent(page);
+    expect(finalCounter).toEqual("2");
   });
 });

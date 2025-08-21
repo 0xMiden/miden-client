@@ -1,4 +1,6 @@
+// @ts-nocheck
 import { test as base } from "@playwright/test";
+import { MockWebClient } from "../js";
 
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
@@ -8,7 +10,7 @@ export const test = base.extend<{ forEachTest: void }>({
     async ({ page }, use) => {
       // This code runs before every test.
       await page.goto("http://localhost:8080");
-
+      await page.waitForFunction(() => window.wasmInitialized === true);
       await page.evaluate(async (MIDEN_NODE_PORT) => {
         const {
           Account,
@@ -74,12 +76,13 @@ export const test = base.extend<{ forEachTest: void }>({
           TransactionScriptInputPairArray,
           Word,
           WebClient,
-        } = await import("./index.js");
+        } = await import("../js/index.js");
         let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
-        let proverUrl = null;
-        const client = await WebClient.createClient(rpcUrl);
+        let proverUrl = undefined;
+        const client = await WebClient.createClient(rpcUrl, "");
 
         window.client = client;
+        window.mockedClient = await MockWebClient.createClient(rpcUrl, "");
         window.Account = Account;
         window.AccountBuilder = AccountBuilder;
         window.AccountComponent = AccountComponent;
@@ -205,11 +208,9 @@ export const test = base.extend<{ forEachTest: void }>({
           window.client = client;
           await window.client.syncState();
         };
-        console.log("RETURNING!");
       }, MIDEN_NODE_PORT);
       await use();
       // This code runs after every test.
-      console.log("Last URL:", page.url());
     },
     { auto: true },
   ], // automatically starts for every test.

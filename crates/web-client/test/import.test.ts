@@ -1,5 +1,5 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { Page, expect } from "@playwright/test";
 import {
   clearStore,
   createNewFaucet,
@@ -11,31 +11,34 @@ import {
 } from "./webClientTestUtils";
 
 const importWalletFromSeed = async (
+  page: Page,
   walletSeed: Uint8Array,
   mutable: boolean
 ) => {
   const serializedWalletSeed = Array.from(walletSeed);
-  return await testingPage.evaluate(
-    async (_serializedWalletSeed, _mutable) => {
+  return await page.evaluate(
+    async ({ serializedWalletSeed, mutable }) => {
       const client = window.client;
       await client.syncState();
-      const _walletSeed = new Uint8Array(_serializedWalletSeed);
+      const _walletSeed = new Uint8Array(serializedWalletSeed);
       const account = await client.importPublicAccountFromSeed(
-        _walletSeed,
-        _mutable
+        walletSeed,
+        mutable
       );
       return {
         accountId: account.id().toString(),
         accountCommitment: account.commitment().toHex(),
       };
     },
-    serializedWalletSeed,
-    mutable
+    {
+      serializedWalletSeed,
+      mutable,
+    }
   );
 };
 
-const importAccountById = async (accountId: string) => {
-  return await testingPage.evaluate(async (id) => {
+const importAccountById = async (page: Page, accountId: string) => {
+  return await page.evaluate(async (id) => {
     const client = window.client;
     const _accountId = window.AccountId.fromHex(id);
     await client.importAccountById(_accountId);
@@ -47,89 +50,101 @@ const importAccountById = async (accountId: string) => {
   }, accountId);
 };
 
-describe("import from seed", () => {
-  it("should import same public account from seed", async () => {
+test.describe("import from seed", () => {
+  test("should import same public account from seed", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
 
-    const initialWallet = await createNewWallet({
+    const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
       walletSeed,
     });
 
-    const faucet = await createNewFaucet();
+    const faucet = await createNewFaucet(page);
 
-    const result = await fundAccountFromFaucet(initialWallet.id, faucet.id);
+    const result = await fundAccountFromFaucet(
+      page,
+      initialWallet.id,
+      faucet.id
+    );
     const initialBalance = result.targetAccountBalance;
 
     const { commitment: initialCommitment } = await getAccount(
+      page,
       initialWallet.id
     );
 
     // Deleting the account
-    await clearStore();
+    await clearStore(page);
 
     const { accountId: restoredAccountId } = await importWalletFromSeed(
+      page,
       walletSeed,
       mutable
     );
 
-    expect(restoredAccountId).to.equal(initialWallet.id);
+    expect(restoredAccountId).toEqual(initialWallet.id);
 
     const { commitment: restoredAccountCommitment } = await getAccount(
+      page,
       initialWallet.id
     );
 
     const restoredBalance = await getAccountBalance(
+      page,
       initialWallet.id,
       faucet.id
     );
 
-    expect(restoredBalance.toString()).to.equal(initialBalance);
-    expect(restoredAccountCommitment).to.equal(initialCommitment);
+    expect(restoredBalance!.toString()).toEqual(initialBalance);
+    expect(restoredAccountCommitment).toEqual(initialCommitment);
   });
 });
 
-describe("import public account by id", () => {
-  it("should import public account from id", async () => {
+test.describe("import public account by id", () => {
+  test("should import public account from id", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
 
-    const initialWallet = await createNewWallet({
+    const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
       walletSeed,
     });
-    const faucet = await createNewFaucet();
+    const faucet = await createNewFaucet(page);
     const { targetAccountBalance: initialBalance } =
-      await fundAccountFromFaucet(initialWallet.id, faucet.id);
+      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
     const { commitment: initialCommitment } = await getAccount(
+      page,
       initialWallet.id
     );
 
-    await clearStore();
+    await clearStore(page);
 
     const { accountId: restoredAccountId } = await importAccountById(
+      page,
       initialWallet.id
     );
-    expect(restoredAccountId).to.equal(initialWallet.id);
+    expect(restoredAccountId).toEqual(initialWallet.id);
 
     const { commitment: restoredAccountCommitment } = await getAccount(
+      page,
       initialWallet.id
     );
     const restoredBalance = await getAccountBalance(
+      page,
       initialWallet.id,
       faucet.id
     );
 
-    expect(restoredBalance.toString()).to.equal(initialBalance);
-    expect(restoredAccountCommitment).to.equal(initialCommitment);
+    expect(restoredBalance!.toString()).toEqual(initialBalance);
+    expect(restoredAccountCommitment).toEqual(initialCommitment);
   });
 });

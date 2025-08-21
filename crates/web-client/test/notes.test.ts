@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
 import {
   badHexId,
   consumeTransaction,
@@ -7,50 +7,19 @@ import {
   mintTransaction,
   sendTransaction,
   setupWalletAndFaucet,
+  getInputNote,
+  setupConsumedNote,
+  getInputNotes,
+  setupMintedNote,
 } from "./webClientTestUtils";
+import { Page } from "@playwright/test";
+import {
+  ConsumableNoteRecord,
+  NoteConsumability,
+} from "../dist/crates/miden_client_web";
 
-const getInputNote = async (noteId: string) => {
-  return await testingPage.evaluate(async (_noteId) => {
-    const client = window.client;
-    const note = await client.getInputNote(_noteId);
-    return {
-      noteId: note ? note.id().toString() : undefined,
-    };
-  }, noteId);
-};
-
-// TODO: Figure out a way to easily pass NoteFilters into the tests
-const getInputNotes = async () => {
-  return await testingPage.evaluate(async () => {
-    const client = window.client;
-    const filter = new window.NoteFilter(window.NoteFilterTypes.All);
-    const notes = await client.getInputNotes(filter);
-    return {
-      noteIds: notes.map((note) => note.id().toString()),
-    };
-  });
-};
-
-const setupMintedNote = async () => {
-  const { accountId, faucetId } = await setupWalletAndFaucet();
-  const { createdNoteId } = await mintTransaction(accountId, faucetId);
-
-  return { createdNoteId, accountId, faucetId };
-};
-
-export const setupConsumedNote = async () => {
-  const { createdNoteId, accountId, faucetId } = await setupMintedNote();
-  await consumeTransaction(accountId, faucetId, createdNoteId);
-
-  return {
-    consumedNoteId: createdNoteId,
-    accountId: accountId,
-    faucetId: faucetId,
-  };
-};
-
-const getConsumableNotes = async (accountId?: string) => {
-  return await testingPage.evaluate(async (_accountId) => {
+const getConsumableNotes = async (testingPage: Page, accountId?: string) => {
+  return await testingPage.evaluate(async (_accountId?: string) => {
     const client = window.client;
     let records;
     if (_accountId) {
@@ -61,7 +30,7 @@ const getConsumableNotes = async (accountId?: string) => {
       records = await client.getConsumableNotes();
     }
 
-    return records.map((record) => ({
+    return records.map((record: ConsumableNoteRecord) => ({
       noteId: record.inputNoteRecord().id().toString(),
       consumability: record.noteConsumability().map((c) => ({
         accountId: c.accountId().toString(),
@@ -71,84 +40,95 @@ const getConsumableNotes = async (accountId?: string) => {
   }, accountId);
 };
 
-describe("get_input_note", () => {
-  it("retrieve input note that does not exist", async () => {
-    await setupWalletAndFaucet();
-    const { noteId } = await getInputNote(badHexId);
-    await expect(noteId).to.be.undefined;
+test.describe("get_input_note", () => {
+  test("retrieve input note that does not exist", async ({ page }) => {
+    await setupWalletAndFaucet(page);
+    const { noteId } = await getInputNote(badHexId, page);
+    expect(noteId).to.be.undefined;
   });
 
-  it("retrieve an input note that does exist", async () => {
-    const { consumedNoteId } = await setupConsumedNote();
+  test("retrieve an input note that does exist", async ({ page }) => {
+    const { consumedNoteId } = await setupConsumedNote(page);
 
-    const { noteId } = await getInputNote(consumedNoteId);
+    const { noteId } = await getInputNote(consumedNoteId, page);
     expect(noteId).to.equal(consumedNoteId);
   });
 });
 
-describe("get_input_notes", () => {
-  it("note exists, note filter all", async () => {
-    const { consumedNoteId } = await setupConsumedNote();
-    const { noteIds } = await getInputNotes();
+test.describe("get_input_notes", () => {
+  test("note exists, note filter all", async ({ page }) => {
+    const { consumedNoteId } = await setupConsumedNote(page);
+    const { noteIds } = await getInputNotes(page);
     expect(noteIds).to.have.lengthOf.at.least(1);
     expect(noteIds).to.include(consumedNoteId);
   });
 });
 
-describe("get_consumable_notes", () => {
-  it("filter by account", async () => {
+test.describe("get_consumable_notes", () => {
+  test("filter by account", async ({ page }) => {
     const { createdNoteId: noteId1, accountId: accountId1 } =
-      await setupMintedNote();
+      await setupMintedNote(page);
 
-    const result = await getConsumableNotes(accountId1);
+    const result = await getConsumableNotes(page, accountId1);
     expect(result).to.have.lengthOf(1);
-    result.forEach((record) => {
-      expect(record.consumability).to.have.lengthOf(1);
-      expect(record.consumability[0].accountId).to.equal(accountId1);
-      expect(record.noteId).to.equal(noteId1);
-      expect(record.consumability[0].consumableAfterBlock).to.be.undefined;
+    result.forEach((record: ConsumableNoteRecord) => {
+      expect(record.noteConsumability()).to.have.lengthOf(1);
+      expect(record.noteConsumability()[0].accountId).to.equal(accountId1);
+      expect(record.noteConsumability()).to.equal(noteId1);
+      expect(record.noteConsumability()[0].consumableAfterBlock).to.be
+        .undefined;
     });
   });
 
-  it("no filter by account", async () => {
+  test("no filter by account", async ({ page }) => {
     const { createdNoteId: noteId1, accountId: accountId1 } =
-      await setupMintedNote();
+      await setupMintedNote(page);
     const { createdNoteId: noteId2, accountId: accountId2 } =
-      await setupMintedNote();
+      await setupMintedNote(page);
 
-    const result = await getConsumableNotes();
-    expect(result.map((r) => r.noteId)).to.include.members([noteId1, noteId2]);
-    expect(result.map((r) => r.consumability[0].accountId)).to.include.members([
-      accountId1,
-      accountId2,
-    ]);
+    const result = await getConsumableNotes(page);
+    expect(
+      result.map((r: ConsumableNoteRecord) => r.inputNoteRecord().id)
+    ).to.include.members([noteId1, noteId2]);
+    expect(
+      result.map(
+        (r: ConsumableNoteRecord) => r.noteConsumability()[0].accountId
+      )
+    ).to.include.members([accountId1, accountId2]);
     expect(result).to.have.lengthOf(2);
-    const consumableRecord1 = result.find((r) => r.noteId === noteId1);
-    const consumableRecord2 = result.find((r) => r.noteId === noteId2);
+    const consumableRecord1 = result.find(
+      (r: ConsumableNoteRecord) =>
+        r.inputNoteRecord().id().toString() === noteId1
+    );
+    const consumableRecord2 = result.find(
+      (r: ConsumableNoteRecord) =>
+        r.inputNoteRecord().id().toString() === noteId2
+    );
 
-    consumableRecord1!!.consumability.forEach((c) => {
-      expect(c.accountId).to.equal(accountId1);
+    consumableRecord1!!.consumability.forEach((c: ConsumableNoteRecord) => {
+      expect(c.inputNoteRecord().id().toString()).to.equal(accountId1);
     });
 
-    consumableRecord2!!.consumability.forEach((c) => {
-      expect(c.accountId).to.equal(accountId2);
+    consumableRecord2!!.consumability.forEach((c: ConsumableNoteRecord) => {
+      expect(c.inputNoteRecord().id().toString()).to.equal(accountId2);
     });
   });
 
-  it("p2ide consume after block", async () => {
+  test("p2ide consume after block", async ({ page }) => {
     const { accountId: senderAccountId, faucetId } =
-      await setupWalletAndFaucet();
-    const { accountId: targetAccountId } = await setupWalletAndFaucet();
-    const recallHeight = (await getSyncHeight()) + 30;
+      await setupWalletAndFaucet(page);
+    const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
+    const recallHeight = (await getSyncHeight(page)) + 30;
     await sendTransaction(
+      page,
       senderAccountId,
       targetAccountId,
       faucetId,
       recallHeight
     );
 
-    const consumableRecipient = await getConsumableNotes(targetAccountId);
-    const consumableSender = await getConsumableNotes(senderAccountId);
+    const consumableRecipient = await getConsumableNotes(page, targetAccountId);
+    const consumableSender = await getConsumableNotes(page, senderAccountId);
     expect(consumableSender).to.have.lengthOf(1);
     expect(consumableSender[0].consumability[0].consumableAfterBlock).to.equal(
       recallHeight
@@ -159,22 +139,25 @@ describe("get_consumable_notes", () => {
   });
 });
 
-describe("createP2IDNote and createP2IDENote", () => {
-  it("should create a proper consumable p2id note from the createP2IDNote function", async () => {
-    const { accountId: senderId, faucetId } = await setupWalletAndFaucet();
-    const { accountId: targetId } = await setupWalletAndFaucet();
+test.describe("createP2IDNote and createP2IDENote", () => {
+  test("should create a proper consumable p2id note from the createP2IDNote function", async ({
+    page,
+  }) => {
+    const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
+    const { accountId: targetId } = await setupWalletAndFaucet(page);
 
     const { createdNoteId } = await mintTransaction(
+      page,
       senderId,
       faucetId,
       false,
       true
     );
 
-    await consumeTransaction(senderId, faucetId, createdNoteId, false);
+    await consumeTransaction(page, senderId, faucetId, createdNoteId, false);
 
-    const result = await testingPage.evaluate(
-      async (_senderId: string, _targetId: string, _faucetId: string) => {
+    const result = await page.evaluate(
+      async ({ _senderId, _targetId, _faucetId }) => {
         let client = window.client;
 
         let senderAccountId = window.AccountId.fromHex(_senderId);
@@ -246,30 +229,35 @@ describe("createP2IDNote and createP2IDENote", () => {
           targetAccountBalance: targetAccountBalance,
         };
       },
-      senderId,
-      targetId,
-      faucetId
+      {
+        _senderId: senderId,
+        _targetId: senderId,
+        _faucetId: faucetId,
+      }
     );
 
     expect(result.senderAccountBalance).to.equal("990");
     expect(result.targetAccountBalance).to.equal("10");
   });
 
-  it("should create a proper consumable p2ide note from the createP2IDENote function", async () => {
-    const { accountId: senderId, faucetId } = await setupWalletAndFaucet();
-    const { accountId: targetId } = await setupWalletAndFaucet();
+  test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
+    page,
+  }) => {
+    const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
+    const { accountId: targetId } = await setupWalletAndFaucet(page);
 
     const { createdNoteId } = await mintTransaction(
+      page,
       senderId,
       faucetId,
       false,
       true
     );
 
-    await consumeTransaction(senderId, faucetId, createdNoteId, false);
+    await consumeTransaction(page, senderId, faucetId, createdNoteId, false);
 
-    const result = await testingPage.evaluate(
-      async (_senderId: string, _targetId: string, _faucetId: string) => {
+    const result = await page.evaluate(
+      async ({ _senderId, _targetId, _faucetId }) => {
         let client = window.client;
 
         console.log(_senderId, _targetId, _faucetId);
@@ -344,9 +332,11 @@ describe("createP2IDNote and createP2IDENote", () => {
           targetAccountBalance: targetAccountBalance,
         };
       },
-      senderId,
-      targetId,
-      faucetId
+      {
+        _senderId: senderId,
+        _targetId: targetId,
+        _faucetId: faucetId,
+      }
     );
 
     expect(result.senderAccountBalance).to.equal("990");
@@ -355,6 +345,6 @@ describe("createP2IDNote and createP2IDENote", () => {
 });
 
 // TODO:
-describe("get_output_note", () => {});
+test.describe("get_output_note", () => {});
 
-describe("get_output_notes", () => {});
+test.describe("get_output_notes", () => {});
