@@ -25,6 +25,7 @@ testing = ["miden-client/testing"]
 # Workspace dependencies
 miden-client = { default-features = false, features = [
   "idxdb",
+  "testing",
   "web-tonic",
 ], path = "../rust-client", version = "0.11" }
 
@@ -39,7 +40,6 @@ wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
-miden-client  = { default-features = false, features = ["idxdb", "testing", "web-tonic"], path = "../rust-client" }
 miden-lib     = { default-features = false, features = ["testing"], workspace = true }
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
