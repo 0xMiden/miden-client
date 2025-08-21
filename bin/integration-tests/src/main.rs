@@ -249,7 +249,7 @@ async fn run_tests(client_config: &ClientConfig) {
     run_test("swap_private", swap_transaction::swap_private, &failed_tests, client_config).await;
 
     // Print summary
-    println!("\n=== TEST SUMMARY ===");
+    println!("\n====================== TEST SUMMARY ======================");
     if failed_tests.lock().unwrap().is_empty() {
         println!("All tests passed!");
     } else {
