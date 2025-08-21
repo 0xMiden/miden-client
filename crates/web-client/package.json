@@ -27,6 +27,7 @@
     "test:clean": "npm install && MIDEN_WEB_DEV=true npm run build && node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/mocha.global.setup.mjs --grep \"with remote prover\" --invert"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/chai": "^4.3.17",

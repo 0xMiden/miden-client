@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import { Page } from "@playwright/test";
+import test from "./playwright.global.setup";
 
 // GET_ACCOUNT TESTS
 // =======================================================================================================
@@ -10,30 +11,33 @@ interface GetAccountSuccessResult {
   isAccountType: boolean | undefined;
 }
 
-export const getAccountOneMatch =
-  async (): Promise<GetAccountSuccessResult> => {
-    return await testingPage.evaluate(async () => {
-      const client = window.client;
-      const newAccount = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-      const result = await client.getAccount(newAccount.id());
+export const getAccountOneMatch = async (
+  page: Page
+): Promise<GetAccountSuccessResult> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    const newAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const result = await client.getAccount(newAccount.id());
 
-      return {
-        commitmentOfCreatedAccount: newAccount.commitment().toHex(),
-        commitmentOfGetAccountResult: result.commitment().toHex(),
-        isAccountType: result instanceof window.Account,
-      };
-    });
-  };
+    return {
+      commitmentOfCreatedAccount: newAccount.commitment().toHex(),
+      commitmentOfGetAccountResult: result.commitment().toHex(),
+      isAccountType: result instanceof window.Account,
+    };
+  });
+};
 
 interface GetAccountFailureResult {
   commitmentOfGetAccountResult: string | undefined;
 }
 
-export const getAccountNoMatch = async (): Promise<GetAccountFailureResult> => {
-  return await testingPage.evaluate(async () => {
+export const getAccountNoMatch = async (
+  page: Page
+): Promise<GetAccountFailureResult> => {
+  return await page.evaluate(async () => {
     const client = window.client;
     const nonExistingAccountId = window.TestUtils.createMockAccountId();
 
@@ -47,9 +51,9 @@ export const getAccountNoMatch = async (): Promise<GetAccountFailureResult> => {
   });
 };
 
-describe("get_account tests", () => {
-  it("retrieves an existing account", async () => {
-    const result = await getAccountOneMatch();
+test.describe("get_account tests", () => {
+  test("retrieves an existing account", async ({ page }) => {
+    const result = await getAccountOneMatch(page);
 
     expect(result.commitmentOfCreatedAccount).to.equal(
       result.commitmentOfGetAccountResult
@@ -57,8 +61,10 @@ describe("get_account tests", () => {
     expect(result.isAccountType).to.be.true;
   });
 
-  it("returns error attempting to retrieve a non-existing account", async () => {
-    const result = await getAccountNoMatch();
+  test("returns error attempting to retrieve a non-existing account", async ({
+    page,
+  }) => {
+    const result = await getAccountNoMatch(page);
 
     expect(result.commitmentOfGetAccountResult).to.be.undefined;
   });
@@ -73,67 +79,69 @@ interface GetAccountsSuccessResult {
   resultTypes: boolean[];
 }
 
-export const getAccountsManyMatches =
-  async (): Promise<GetAccountsSuccessResult> => {
-    return await testingPage.evaluate(async () => {
-      const client = window.client;
-      const newAccount1 = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-      const newAccount2 = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-      const commitmentsOfCreatedAccounts = [
-        newAccount1.commitment().toHex(),
-        newAccount2.commitment().toHex(),
-      ];
+export const getAccountsManyMatches = async (
+  page: Page
+): Promise<GetAccountsSuccessResult> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    const newAccount1 = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const newAccount2 = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const commitmentsOfCreatedAccounts = [
+      newAccount1.commitment().toHex(),
+      newAccount2.commitment().toHex(),
+    ];
 
-      const result = await client.getAccounts();
+    const result = await client.getAccounts();
 
-      const commitmentsOfGetAccountsResult = [];
-      const resultTypes = [];
+    const commitmentsOfGetAccountsResult = [];
+    const resultTypes = [];
 
-      for (let i = 0; i < result.length; i++) {
-        commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
-        resultTypes.push(result[i] instanceof window.AccountHeader);
-      }
+    for (let i = 0; i < result.length; i++) {
+      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      resultTypes.push(result[i] instanceof window.AccountHeader);
+    }
 
-      return {
-        commitmentsOfCreatedAccounts: commitmentsOfCreatedAccounts,
-        commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
-        resultTypes: resultTypes,
-      };
-    });
-  };
+    return {
+      commitmentsOfCreatedAccounts: commitmentsOfCreatedAccounts,
+      commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
+      resultTypes: resultTypes,
+    };
+  });
+};
 
-export const getAccountsNoMatches =
-  async (): Promise<GetAccountsSuccessResult> => {
-    return await testingPage.evaluate(async () => {
-      const client = window.client;
+export const getAccountsNoMatches = async (
+  page: Page
+): Promise<GetAccountsSuccessResult> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
 
-      const result = await client.getAccounts();
+    const result = await client.getAccounts();
 
-      const commitmentsOfGetAccountsResult = [];
-      const resultTypes = [];
+    const commitmentsOfGetAccountsResult = [];
+    const resultTypes = [];
 
-      for (let i = 0; i < result.length; i++) {
-        commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
-        resultTypes.push(result[i] instanceof window.AccountHeader);
-      }
+    for (let i = 0; i < result.length; i++) {
+      commitmentsOfGetAccountsResult.push(result[i].commitment().toHex());
+      resultTypes.push(result[i] instanceof window.AccountHeader);
+    }
 
-      return {
-        commitmentsOfCreatedAccounts: [],
-        commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
-        resultTypes: resultTypes,
-      };
-    });
-  };
+    return {
+      commitmentsOfCreatedAccounts: [],
+      commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
+      resultTypes: resultTypes,
+    };
+  });
+};
 
-describe("getAccounts tests", () => {
-  it("retrieves all existing accounts", async () => {
-    const result = await getAccountsManyMatches();
+test.describe("getAccounts tests", () => {
+  test("retrieves all existing accounts", async ({ page }) => {
+    const result = await getAccountsManyMatches(page);
 
     for (let address of result.commitmentsOfGetAccountsResult) {
       expect(result.commitmentsOfCreatedAccounts.includes(address)).to.be.true;
@@ -141,8 +149,8 @@ describe("getAccounts tests", () => {
     expect(result.resultTypes).to.deep.equal([true, true]);
   });
 
-  it("returns empty array when no accounts exist", async () => {
-    const result = await getAccountsNoMatches();
+  test("returns empty array when no accounts exist", async ({ page }) => {
+    const result = await getAccountsNoMatches(page);
 
     expect(result.commitmentsOfCreatedAccounts.length).to.equal(0);
     expect(result.commitmentsOfGetAccountsResult.length).to.equal(0);
