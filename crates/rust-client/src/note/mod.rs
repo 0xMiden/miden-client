@@ -63,6 +63,8 @@ use alloc::vec::Vec;
 use miden_objects::account::AccountId;
 use miden_tx::auth::TransactionAuthenticator;
 
+use crate::rpc::RpcError;
+use crate::rpc::domain::note::FetchedNote;
 use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
 use crate::{Client, ClientError, IdPrefixFetchError};
 
@@ -171,6 +173,20 @@ where
             .check_relevance(&note.clone().try_into()?)
             .await
             .map_err(Into::into)
+    }
+
+    /// Returns `FetchedNote` for given [`NoteId`]. Returns `None` if the note is not found.
+    pub async fn get_fetched_note(
+        &self,
+        note_id: NoteId,
+    ) -> Result<Option<FetchedNote>, ClientError> {
+        let result = self.rpc_api.get_note_by_id(note_id).await;
+
+        match result {
+            Ok(fetched_note) => Ok(Some(fetched_note)),
+            Err(RpcError::NoteNotFound(_)) => Ok(None),
+            Err(err) => Err(ClientError::RpcError(err)),
+        }
     }
 
     /// Retrieves the input note given a [`NoteId`]. Returns `None` if the note is not found.
