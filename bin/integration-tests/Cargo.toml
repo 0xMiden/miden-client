@@ -20,10 +20,8 @@ miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../..
 # External dependencies
 async-trait = { workspace = true }
 clap        = { features = ["derive"], version = "4.0" }
-futures     = { version = "0.3" }
+num_cpus    = { version = "1.0" }
 rand        = { workspace = true }
+regex       = { version = "1.0" }
 tokio       = { workspace = true }
 url         = { version = "2.5.4" }
-
-[package.metadata.cargo-machete]
-ignored = ["async-trait"]
