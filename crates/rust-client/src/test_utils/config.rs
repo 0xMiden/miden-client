@@ -65,13 +65,13 @@ impl Default for ClientConfig {
     }
 }
 
-pub fn create_test_store_path() -> PathBuf {
+pub(crate) fn create_test_store_path() -> PathBuf {
     let mut temp_file = temp_dir();
     temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
     temp_file
 }
 
-pub fn create_test_auth_path() -> PathBuf {
+pub(crate) fn create_test_auth_path() -> PathBuf {
     let auth_path = temp_dir().join(format!("keystore-{}", Uuid::new_v4()));
     std::fs::create_dir_all(&auth_path).unwrap();
     auth_path
