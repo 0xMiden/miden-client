@@ -433,14 +433,14 @@ export const createNewWallet = async (
   }: createNewWalletParams
 ): Promise<NewAccountTestResult> => {
   // Serialize initSeed for Puppeteer
-  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : null;
-  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : null;
+  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : "";
+  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : "";
 
   return await testingPage.evaluate(
     async ({
       storageMode,
       mutable,
-      serializeWalletSeed,
+      _serializedWalletSeed,
       isolatedClient,
     }: createNewWalletParams) => {
       if (isolatedClient) {
@@ -453,8 +453,8 @@ export const createNewWallet = async (
       }
 
       let _walletSeed;
-      if (serializedWalletSeed) {
-        walletSeed = new Uint8Array(serializedWalletSeed);
+      if (_serializedWalletSeed) {
+        walletSeed = new Uint8Array(_serializedWalletSeed);
       }
 
       let client = window.client;
@@ -485,7 +485,7 @@ export const createNewWallet = async (
       mutable: mutable,
       serializedClientSeed: serializedClientSeed,
       isolatedClient: isolatedClient,
-      serializedWalletSeed: serializedWalletSeed,
+      _serializedWalletSeed: serializedWalletSeed,
     }
   );
 };

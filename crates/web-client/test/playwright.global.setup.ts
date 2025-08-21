@@ -80,12 +80,10 @@ export const test = base.extend<{ forEachTest: void }>({
         let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
         let proverUrl = undefined;
         const client = await WebClient.createClient(rpcUrl, undefined);
-        console.log("BEFORE CLIENT");
 
         window.client = client;
         // FIXME: Check why this fails
-        // window.mockedClient = await MockWebClient.createClient(rpcUrl, "");
-        console.log("AFTER CLIENT", client.toString());
+        // window.mockedClient = await MockWebClient.createClient(rpcUrl, undefined);
         window.Account = Account;
         window.AccountBuilder = AccountBuilder;
         window.AccountComponent = AccountComponent;

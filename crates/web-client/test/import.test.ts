@@ -22,7 +22,7 @@ const importWalletFromSeed = async (
       await client.syncState();
       const _walletSeed = new Uint8Array(serializedWalletSeed);
       const account = await client.importPublicAccountFromSeed(
-        walletSeed,
+        _walletSeed,
         mutable
       );
       return {
