@@ -17,6 +17,19 @@ use crate::tests::{
 
 mod tests;
 
+// MAIN
+// ================================================================================================
+
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
+
+    run_tests(&args.into()).await;
+}
+
+// ARGS
+// ================================================================================================
+
 #[derive(Parser)]
 #[command(
     name = "miden-client-integration-tests",
@@ -46,6 +59,20 @@ impl From<Args> for ClientConfig {
     }
 }
 
+/// Runs a test function and prints the result.
+///
+/// # Arguments
+///
+/// * `name` - The name of the test.
+/// * `test_fn` - The test function to run.
+/// * `failed_tests` - A reference to a vector of failed tests.
+/// * `client_config` - The client configuration.
+///
+/// Works by wrapping the test function in a `std::panic::AssertUnwindSafe` and catching any panics.
+/// If the test function panics, the panic is caught and the test is considered failed.
+/// If the test function succeeds, the test is considered passed.
+///
+/// The test function is expected to return a `Future` that resolves when the test is complete.
 async fn run_test<F, Fut>(
     name: &str,
     test_fn: F,
@@ -77,6 +104,11 @@ async fn run_test<F, Fut>(
     }
 }
 
+/// Runs all the tests sequentially.
+///
+/// # Arguments
+///
+/// * `client_config` - The client configuration.
 async fn run_tests(client_config: &ClientConfig) {
     println!("Starting Miden client integration tests");
     println!("==========================================================");
@@ -259,11 +291,4 @@ async fn run_tests(client_config: &ClientConfig) {
         }
         std::process::exit(1);
     }
-}
-
-#[tokio::main]
-async fn main() {
-    let args = Args::parse();
-
-    run_tests(&args.into()).await;
 }
