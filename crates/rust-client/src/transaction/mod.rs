@@ -121,7 +121,7 @@ pub use miden_objects::transaction::{
     TransactionId,
     TransactionScript,
 };
-pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_objects::vm::{AdviceInputs, AdviceMap, Program};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
     DataStoreError,
