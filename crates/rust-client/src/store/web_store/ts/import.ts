@@ -1,3 +1,8 @@
+// Disabling any checks since this file mostly deals
+// with importing DB types.
+/* eslint-disable  @typescript-eslint/no-explicit-any */
+/* eslint-disable  @typescript-eslint/no-unsafe-return */
+/* eslint-disable  @typescript-eslint/no-unsafe-assignment */
 import { db, openDatabase } from "../js/schema.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =
@@ -19,16 +24,17 @@ async function recursivelyTransformForImport(
         )
       );
     case "Object":
-      const entries = await Promise.all(
-        Object.entries(obj.value).map(async ([key, value]) => [
-          key,
-          await recursivelyTransformForImport({
-            type: getImportType(value),
-            value,
-          }),
-        ])
+      return Object.fromEntries(
+        await Promise.all(
+          Object.entries(obj.value).map(async ([key, value]) => [
+            key,
+            await recursivelyTransformForImport({
+              type: getImportType(value),
+              value,
+            }),
+          ])
+        )
       );
-      return Object.fromEntries(entries);
     case "Primitive":
       return obj.value;
   }

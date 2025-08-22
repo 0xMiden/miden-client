@@ -1,7 +1,16 @@
 use std::sync::Arc;
 use std::vec;
 
+use miden_client::account::component::AccountComponent;
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageSlot};
+use miden_client::assembly::{
+    Assembler,
+    DefaultSourceManager,
+    Library,
+    LibraryPath,
+    Module,
+    ModuleKind,
+};
 use miden_client::note::NoteTag;
 use miden_client::testing::common::{
     TestClient,
@@ -11,20 +20,10 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
+use miden_client::testing::config::ClientConfig;
 use miden_client::testing::note::NoteBuilder;
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Felt, Word, ZERO};
-use miden_lib::transaction::TransactionKernel;
-use miden_lib::utils::ScriptBuilder;
-use miden_objects::account::AccountComponent;
-use miden_objects::assembly::{
-    Assembler,
-    DefaultSourceManager,
-    Library,
-    LibraryPath,
-    Module,
-    ModuleKind,
-};
+use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
+use miden_client::{Felt, ScriptBuilder, Word, ZERO};
 use rand::RngCore;
 
 // HELPERS
@@ -138,14 +137,12 @@ async fn get_counter_contract_account(
 
     (account, seed, library)
 }
-
 // TESTS
 // ================================================================================================
 
-#[tokio::test]
-async fn counter_contract_ntx() {
+pub async fn counter_contract_ntx(client_config: ClientConfig) {
     const BUMP_NOTE_NUMBER: u64 = 5;
-    let (mut client, keystore) = create_test_client().await;
+    let (mut client, keystore) = create_test_client(client_config).await;
     client.sync_state().await.unwrap();
 
     let (network_account, library) =
@@ -215,9 +212,8 @@ async fn counter_contract_ntx() {
     );
 }
 
-#[tokio::test]
-async fn recall_note_before_ntx_consumes_it() {
-    let (mut client, keystore) = create_test_client().await;
+pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
+    let (mut client, keystore) = create_test_client(client_config).await;
     client.sync_state().await.unwrap();
 
     let (network_account, library) =

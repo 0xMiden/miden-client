@@ -1,3 +1,8 @@
+// Disabling any checks since this file mostly deals
+// with exporting DB types.
+/* eslint-disable  @typescript-eslint/no-explicit-any */
+/* eslint-disable  @typescript-eslint/no-unsafe-return */
+/* eslint-disable  @typescript-eslint/no-unsafe-assignment */
 import { db } from "../js/schema.js";
 import { uint8ArrayToBase64 } from "./utils.js";
 type TransformableInput =
@@ -14,10 +19,9 @@ async function recursivelyTransformForExport(
     case "Uint8Array":
       return Array.from(obj.value);
     case "Blob":
-      const blobBuffer = await obj.value.arrayBuffer();
       return {
         __type: "Blob" as const,
-        data: uint8ArrayToBase64(new Uint8Array(blobBuffer)),
+        data: uint8ArrayToBase64(new Uint8Array(await obj.value.arrayBuffer())),
       };
     case "Array":
       return await Promise.all(
@@ -26,16 +30,17 @@ async function recursivelyTransformForExport(
         )
       );
     case "Record":
-      const entries = await Promise.all(
-        Object.entries(obj.value).map(async ([key, value]) => [
-          key,
-          await recursivelyTransformForExport({
-            type: getInputType(value),
-            value,
-          }),
-        ])
+      return Object.fromEntries(
+        await Promise.all(
+          Object.entries(obj.value).map(async ([key, value]) => [
+            key,
+            await recursivelyTransformForExport({
+              type: getInputType(value),
+              value,
+            }),
+          ])
+        )
       );
-      return Object.fromEntries(entries);
     case "Primitive":
       return obj.value;
   }

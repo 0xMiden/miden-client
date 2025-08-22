@@ -86,6 +86,9 @@
 
 > **createClient**(`node_url`?, `seed`?): `Promise`\<`any`\>
 
+Creates a new client with the given node URL and optional seed.
+If `node_url` is `None`, it defaults to the testnet endpoint.
+
 #### Parameters
 
 ##### node\_url?
@@ -95,6 +98,45 @@
 ##### seed?
 
 `Uint8Array`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### createMockClient()
+
+> **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
+
+Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
+applications as it uses a mock chain that simulates the behavior of a real node.
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+##### serialized\_mock\_chain?
+
+`Uint8Array`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### exportAccountFile()
+
+> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
 
 #### Returns
 
@@ -294,22 +336,6 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### importAccount()
-
-> **importAccount**(`account_bytes`): `Promise`\<`any`\>
-
-#### Parameters
-
-##### account\_bytes
-
-`any`
-
-#### Returns
-
-`Promise`\<`any`\>
-
-***
-
 ### importAccountById()
 
 > **importAccountById**(`account_id`): `Promise`\<`any`\>
@@ -319,6 +345,22 @@ Meant to be used in conjunction with the `force_import_store` method
 ##### account\_id
 
 [`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### importAccountFile()
+
+> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_bytes
+
+`any`
 
 #### Returns
 
@@ -596,6 +638,16 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### proveBlock()
+
+> **proveBlock**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -609,6 +661,18 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### serializeMockChain()
+
+> **serializeMockChain**(): `Uint8Array`
+
+Returns the inner serialized mock chain if it exists.
+
+#### Returns
+
+`Uint8Array`
 
 ***
 
@@ -655,6 +719,16 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`void`\>
+
+***
+
+### usesMockChain()
+
+> **usesMockChain**(): `boolean`
+
+#### Returns
+
+`boolean`
 
 ***
 

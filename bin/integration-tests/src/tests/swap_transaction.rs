@@ -1,21 +1,21 @@
-use miden_client::account::Account;
-use miden_client::note::{Note, build_swap_tag};
+use miden_client::account::{Account, AccountStorageMode};
+use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
 use miden_client::testing::common::*;
+use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
-use miden_objects::account::AccountStorageMode;
-use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::note::{NoteDetails, NoteFile, NoteType};
 
 // SWAP FULLY ONCHAIN
 // ================================================================================================
 
-#[tokio::test]
-async fn swap_fully_onchain() {
+pub async fn swap_fully_onchain(client_config: ClientConfig) {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
-    let (mut client1, authenticator_1) = create_test_client().await;
+    let (mut client1, authenticator_1) = create_test_client(client_config.clone()).await;
     wait_for_node(&mut client1).await;
-    let (mut client2, authenticator_2) = create_test_client().await;
+    let (mut client2, authenticator_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
 
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();
@@ -181,13 +181,14 @@ async fn swap_fully_onchain() {
     }
 }
 
-#[tokio::test]
-async fn swap_private() {
+pub async fn swap_private(client_config: ClientConfig) {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
-    let (mut client1, authenticator_1) = create_test_client().await;
+    let (mut client1, authenticator_1) = create_test_client(client_config.clone()).await;
     wait_for_node(&mut client1).await;
-    let (mut client2, authenticator_2) = create_test_client().await;
+    let (mut client2, authenticator_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
 
     client1.sync_state().await.unwrap();
     client2.sync_state().await.unwrap();
