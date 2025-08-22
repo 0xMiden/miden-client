@@ -3,7 +3,7 @@
 /* eslint-disable  @typescript-eslint/no-explicit-any */
 /* eslint-disable  @typescript-eslint/no-unsafe-return */
 /* eslint-disable  @typescript-eslint/no-unsafe-assignment */
-import { db, openDatabase } from "../js/schema.js";
+import { db, openDatabase } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =
   | { type: "Blob"; value: { __type: "Blob"; data: string } }

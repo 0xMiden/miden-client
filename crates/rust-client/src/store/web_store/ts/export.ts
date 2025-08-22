@@ -1,9 +1,8 @@
-// Disabling any checks since this file mostly deals
-// with exporting DB types.
+// Disabling `any` checks since this file mostly deals with exporting DB types.
 /* eslint-disable  @typescript-eslint/no-explicit-any */
 /* eslint-disable  @typescript-eslint/no-unsafe-return */
 /* eslint-disable  @typescript-eslint/no-unsafe-assignment */
-import { db } from "../js/schema.js";
+import { db } from "./schema.js";
 import { uint8ArrayToBase64 } from "./utils.js";
 type TransformableInput =
   | { type: "Uint8Array"; value: Uint8Array }
