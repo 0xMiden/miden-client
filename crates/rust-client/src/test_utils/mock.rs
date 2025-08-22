@@ -17,7 +17,7 @@ use miden_objects::account::{
 };
 use miden_objects::asset::Asset;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
-use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
+use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, PartialSmt, SmtProof};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_objects::{LexicographicWord, Word};
@@ -389,7 +389,7 @@ impl NodeRpcClient for MockRpcApi {
                                 .iter()
                                 .map(|map_key| storage_map.open(map_key))
                                 .collect::<Vec<_>>();
-                            storage_slots.insert(*index, proofs);
+                            storage_slots.insert(*index, PartialSmt::from_proofs(proofs)?);
                         } else {
                             panic!("Storage slot at index {} is not a map", index);
                         }
