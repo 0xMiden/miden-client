@@ -344,9 +344,10 @@ export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
-): Promise<void> => {
+): Promise<boolean> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
+      debugger;
       const client = window.client;
 
       const walletAccount = await client.newWallet(
@@ -717,17 +718,17 @@ const customTxWithMultipleNotes = async (
 
 test.describe("custom transaction tests", () => {
   test("custom transaction completes successfully", async ({ page }) => {
-    expect(customTransaction(page, "0", false)).resolves;
+    await expect(customTransaction(page, "0", false)).resolves.toBeUndefined();
   });
 
   test("custom transaction fails", async ({ page }) => {
-    expect(customTransaction(page, "1", false)).resolves;
+    await expect(customTransaction(page, "1", false)).rejects.toThrow();
   });
 
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
-    expect(customTransaction(page, "0", true)).resolves;
+    await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
   });
 });
 
@@ -747,13 +748,13 @@ test.describe("custom transaction with multiple output notes", () => {
     test(description, async ({ page }) => {
       const { accountId, faucetId } = await setupConsumedNote(page);
       if (shouldFail) {
-        expect(
+        await expect(
           customTxWithMultipleNotes(page, shouldFail, accountId, faucetId)
-        ).toThrow();
+        ).rejects.toThrow();
       } else {
-        expect(
+        await expect(
           customTxWithMultipleNotes(page, shouldFail, accountId, faucetId)
-        ).toThrow();
+        ).resolves.toBeUndefined();
       }
     });
   });
@@ -896,7 +897,7 @@ test.describe("custom account component tests", () => {
   test("custom account component transaction completes successfully", async ({
     page,
   }) => {
-    expect(customAccountComponent(page));
+    await expect(customAccountComponent(page)).resolves.toBeUndefined();
   });
 });
 
