@@ -1,26 +1,28 @@
-use miden_client::ZERO;
-use miden_client::note::NoteExecutionHint;
-use miden_client::store::NoteFilter;
-use miden_client::testing::common::*;
-use miden_client::transaction::{InputNote, TransactionRequest, TransactionRequestBuilder};
-use miden_client::utils::{Deserializable, Serializable};
-use miden_objects::account::{AccountId, AccountStorageMode};
-use miden_objects::asset::FungibleAsset;
-use miden_objects::crypto::hash::rpo::Rpo256;
-use miden_objects::crypto::merkle::{MerkleStore, MerkleTree, NodeIndex};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
-use miden_objects::note::{
+use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::asset::FungibleAsset;
+use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, RpoRandomCoin};
+use miden_client::note::{
     Note,
     NoteAssets,
+    NoteExecutionHint,
     NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteTag,
     NoteType,
 };
-use miden_objects::transaction::OutputNote;
-use miden_objects::vm::AdviceMap;
-use miden_objects::{Felt, Word};
+use miden_client::store::NoteFilter;
+use miden_client::testing::common::*;
+use miden_client::testing::config::ClientConfig;
+use miden_client::transaction::{
+    AdviceMap,
+    InputNote,
+    OutputNote,
+    TransactionRequest,
+    TransactionRequestBuilder,
+};
+use miden_client::utils::{Deserializable, Serializable};
+use miden_client::{Felt, Word, ZERO};
 
 // CUSTOM TRANSACTION REQUEST
 // ================================================================================================
@@ -49,9 +51,8 @@ const NOTE_ARGS: [Felt; 8] = [
     Felt::new(9),
 ];
 
-#[tokio::test]
-async fn transaction_request() {
-    let (mut client, authenticator) = create_test_client().await;
+pub async fn transaction_request(client_config: ClientConfig) {
+    let (mut client, authenticator) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     client.sync_state().await.unwrap();
@@ -141,9 +142,8 @@ async fn transaction_request() {
     assert!(input_note.is_consumed());
 }
 
-#[tokio::test]
-async fn merkle_store() {
-    let (mut client, authenticator) = create_test_client().await;
+pub async fn merkle_store(client_config: ClientConfig) {
+    let (mut client, authenticator) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     client.sync_state().await.unwrap();
@@ -230,16 +230,19 @@ async fn merkle_store() {
     client.sync_state().await.unwrap();
 }
 
-#[tokio::test]
-async fn onchain_notes_sync_with_tag() {
+pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) {
     // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = create_test_client().await;
+    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
     // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, keystore_2) = create_test_client().await;
+    let (mut client_2, keystore_2) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     // Client 3 will be the control client. We won't add any tags and expect the note not to be
     // fetched
-    let (mut client_3, ..) = create_test_client().await;
+    let (mut client_3, ..) =
+        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
+            .await;
     wait_for_node(&mut client_3).await;
 
     // Create accounts
@@ -333,7 +336,7 @@ fn create_custom_note(
 
     let mem_addr: u32 = 1000;
 
-    let note_script = include_str!("asm/custom_p2id.masm")
+    let note_script = include_str!("../asm/custom_p2id.masm")
         .replace("{expected_note_arg_1}", &expected_note_args[0..=3].join("."))
         .replace("{expected_note_arg_2}", &expected_note_args[4..=7].join("."))
         .replace("{mem_address}", &mem_addr.to_string())

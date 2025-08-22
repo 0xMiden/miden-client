@@ -1,4 +1,5 @@
-import wasm from "../dist/wasm.js";
+import loadWasm from "../dist/wasm.js";
+const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 
 const {

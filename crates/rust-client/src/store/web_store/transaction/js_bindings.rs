@@ -24,8 +24,8 @@ extern "C" {
     pub fn idxdb_upsert_transaction_record(
         transaction_id: String,
         details: Vec<u8>,
-        script_root: Option<Vec<u8>>,
         block_num: String,
+        script_root: Option<Vec<u8>>,
         committed: Option<String>,
         discard_cause: Option<Vec<u8>>,
     ) -> js_sys::Promise;

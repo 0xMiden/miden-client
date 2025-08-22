@@ -1,9 +1,16 @@
 // TODO: Rename this / figure out rebasing with the other featuer which has import tests
 
-import { expect } from "chai";
 import test from "./playwright.global.setup";
-import { Page } from "@playwright/test";
-import { clearStore, setupWalletAndFaucet } from "./webClientTestUtils";
+import { Page, expect } from "@playwright/test";
+import {
+  clearStore,
+  createNewFaucet,
+  createNewWallet,
+  fundAccountFromFaucet,
+  getAccountBalance,
+  setupWalletAndFaucet,
+  StorageMode,
+} from "./webClientTestUtils";
 
 const exportDb = async (page: Page) => {
   return await page.evaluate(async () => {
@@ -33,6 +40,23 @@ const getAccount = async (accountId: string, page: Page) => {
   }, accountId);
 };
 
+const exportAccount = async (accountId: string) => {
+  return await testingPage.evaluate(async (_accountId) => {
+    const client = window.client;
+    const accountId = window.AccountId.fromHex(_accountId);
+    const accountBytes = client.exportAccountFile(accountId);
+    return accountBytes;
+  }, accountId);
+};
+
+const importAccount = async (accountBytes: any) => {
+  return await testingPage.evaluate(async (_accountBytes) => {
+    const client = window.client;
+    await client.importAccountFile(_accountBytes);
+    return;
+  }, accountBytes);
+};
+
 test.describe("export and import the db", () => {
   test("export db with an account, find the account when re-importing", async ({
     page,
@@ -48,5 +72,45 @@ test.describe("export and import the db", () => {
     const { accountCommitment } = await getAccount(accountId, page);
 
     expect(accountCommitment).to.equal(initialAccountCommitment);
+  });
+});
+
+test.describe("export and import account", () => {
+  test("should export and import a private account", async () => {
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    const mutable = false;
+    const storageMode = StorageMode.PRIVATE;
+
+    const initialWallet = await createNewWallet(page, {
+      storageMode,
+      mutable,
+      walletSeed,
+    });
+    const faucet = await createNewFaucet(page);
+
+    const { targetAccountBalance: initialBalance } =
+      await fundAccountFromFaucet(initialWallet.id, faucet.id);
+    const { accountCommitment: initialCommitment } = await getAccount(
+      initialWallet.id
+    );
+    const exportedAccount = await exportAccount(initialWallet.id);
+    await clearStore(page);
+
+    await importAccount(exportedAccount);
+
+    const { accountCommitment: restoredCommitment } = await getAccount(
+      initialWallet.id
+    );
+
+    const restoredBalance = await getAccountBalance(
+      page,
+      initialWallet.id,
+      faucet.id
+    );
+
+    expect(restoredCommitment).toEqual(initialCommitment);
+    expect(restoredBalance.toString()).toEqual(initialBalance);
   });
 });
