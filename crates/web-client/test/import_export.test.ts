@@ -40,7 +40,7 @@ const getAccount = async (accountId: string, page: Page) => {
   }, accountId);
 };
 
-const exportAccount = async (accountId: string) => {
+const exportAccount = async (testingPage: Page, accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
@@ -49,7 +49,7 @@ const exportAccount = async (accountId: string) => {
   }, accountId);
 };
 
-const importAccount = async (accountBytes: any) => {
+const importAccount = async (testingPage: Page, accountBytes: any) => {
   return await testingPage.evaluate(async (_accountBytes) => {
     const client = window.client;
     await client.importAccountFile(_accountBytes);
@@ -71,12 +71,12 @@ test.describe("export and import the db", () => {
 
     const { accountCommitment } = await getAccount(accountId, page);
 
-    expect(accountCommitment).to.equal(initialAccountCommitment);
+    expect(accountCommitment).toEqual(initialAccountCommitment);
   });
 });
 
 test.describe("export and import account", () => {
-  test("should export and import a private account", async () => {
+  test("should export and import a private account", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
@@ -91,17 +91,19 @@ test.describe("export and import account", () => {
     const faucet = await createNewFaucet(page);
 
     const { targetAccountBalance: initialBalance } =
-      await fundAccountFromFaucet(initialWallet.id, faucet.id);
+      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
     const { accountCommitment: initialCommitment } = await getAccount(
-      initialWallet.id
+      initialWallet.id,
+      page
     );
-    const exportedAccount = await exportAccount(initialWallet.id);
+    const exportedAccount = await exportAccount(page, initialWallet.id);
     await clearStore(page);
 
-    await importAccount(exportedAccount);
+    await importAccount(page, exportedAccount);
 
     const { accountCommitment: restoredCommitment } = await getAccount(
-      initialWallet.id
+      initialWallet.id,
+      page
     );
 
     const restoredBalance = await getAccountBalance(

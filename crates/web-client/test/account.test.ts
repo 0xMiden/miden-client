@@ -1,6 +1,4 @@
-// @ts-nocheck
-import { expect } from "chai";
-import { Page } from "@playwright/test";
+import { Page, expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
 // GET_ACCOUNT TESTS
@@ -56,10 +54,10 @@ test.describe("get_account tests", () => {
   test("retrieves an existing account", async ({ page }) => {
     const result = await getAccountOneMatch(page);
 
-    expect(result.commitmentOfCreatedAccount).to.equal(
+    expect(result.commitmentOfCreatedAccount).toEqual(
       result.commitmentOfGetAccountResult
     );
-    expect(result.isAccountType).to.be.true;
+    expect(result.isAccountType).toBe(true);
   });
 
   test("returns error attempting to retrieve a non-existing account", async ({
@@ -67,7 +65,7 @@ test.describe("get_account tests", () => {
   }) => {
     const result = await getAccountNoMatch(page);
 
-    expect(result.commitmentOfGetAccountResult).to.be.undefined;
+    expect(result.commitmentOfGetAccountResult).toBeUndefined();
   });
 });
 
@@ -145,16 +143,16 @@ test.describe("getAccounts tests", () => {
     const result = await getAccountsManyMatches(page);
 
     for (let address of result.commitmentsOfGetAccountsResult) {
-      expect(result.commitmentsOfCreatedAccounts.includes(address)).to.be.true;
+      expect(result.commitmentsOfCreatedAccounts.includes(address)).toBe(true);
     }
-    expect(result.resultTypes).to.deep.equal([true, true]);
+    expect(result.resultTypes).toEqual([true, true]);
   });
 
   test("returns empty array when no accounts exist", async ({ page }) => {
     const result = await getAccountsNoMatches(page);
 
-    expect(result.commitmentsOfCreatedAccounts.length).to.equal(0);
-    expect(result.commitmentsOfGetAccountsResult.length).to.equal(0);
-    expect(result.resultTypes.length).to.equal(0);
+    expect(result.commitmentsOfCreatedAccounts.length).toEqual(0);
+    expect(result.commitmentsOfGetAccountsResult.length).toEqual(0);
+    expect(result.resultTypes.length).toEqual(0);
   });
 });
