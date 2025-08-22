@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
 use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
-use miden_objects::address::{AccountIdAddress, Address, AddressInterface};
+use miden_objects::address::{
+    AccountIdAddress,
+    Address,
+    AddressInterface as NativeAccountInterface,
+};
 use miden_objects::{Felt as NativeFelt, NetworkIdError};
 use wasm_bindgen::prelude::*;
 
@@ -17,6 +21,11 @@ pub enum NetworkId {
     Mainnet = "mm",
     Testnet = "mtst",
     Devnet = "mdev",
+}
+
+#[wasm_bindgen]
+pub enum AccountInterface {
+    BasicWallet,
 }
 
 #[wasm_bindgen]
@@ -59,24 +68,34 @@ impl AccountId {
     /// testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
     /// `Self::to_bech_32_custom`.
     #[wasm_bindgen(js_name = "toBech32")]
-    pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
+    pub fn to_bech32(
+        &self,
+        network_id: NetworkId,
+        account_interface: AccountInterface,
+    ) -> Result<String, JsValue> {
         let network_id = network_id.try_into().map_err(|err| {
             js_error_with_context(
                 err,
                 "wrong network id, for a custom network id, use to bech32Custom",
             )
         })?;
-        let address: Address = AccountIdAddress::new(self.0).into();
+
+        let address: Address = AccountIdAddress::new(self.0, account_interface.into()).into();
         Ok(address.to_bech32(network_id))
     }
 
     /// Turn this Account ID into its bech32 string representation. This method accepts a custom
     /// network ID.
     #[wasm_bindgen(js_name = "toBech32Custom")]
-    pub fn to_bech32_custom(&self, custom_network_id: &str) -> Result<String, JsValue> {
+    pub fn to_bech32_custom(
+        &self,
+        custom_network_id: &str,
+        account_interface: AccountInterface,
+    ) -> Result<String, JsValue> {
         let network_id = NativeNetworkId::from_str(custom_network_id)
             .map_err(|err| js_error_with_context(err, "given network id is not valid"))?;
-        let address: Address = AccountIdAddress::new(self.0).into();
+
+        let address: Address = AccountIdAddress::new(self.0, account_interface.into()).into();
         Ok(address.to_bech32(network_id))
     }
 
@@ -128,6 +147,14 @@ impl TryFrom<NetworkId> for NativeNetworkId {
             NetworkId::__Invalid => Err(NetworkIdError::NetworkIdParseError(
                 "expected either a devnet, mainnet or testnet network ID".into(),
             )),
+        }
+    }
+}
+
+impl From<AccountInterface> for NativeAccountInterface {
+    fn from(account_interface: AccountInterface) -> Self {
+        match account_interface {
+            AccountInterface::BasicWallet => NativeAccountInterface::BasicWallet,
         }
     }
 }
