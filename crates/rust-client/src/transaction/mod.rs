@@ -81,7 +81,7 @@ use miden_objects::assembly::DefaultSourceManager;
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::{AccountInputs, TransactionArgs, TransactionWitness};
+use miden_objects::transaction::{AccountInputs, TransactionArgs};
 use miden_objects::{AssetError, Felt, Word};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -120,6 +120,7 @@ pub use miden_objects::transaction::{
     ProvenTransaction,
     TransactionId,
     TransactionScript,
+    TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
@@ -609,7 +610,7 @@ where
 
         if ignore_invalid_notes {
             // Remove invalid notes
-            notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
+            notes = self.get_valid_input_notes(account, notes, tx_args.clone()).await?;
         }
 
         // Execute the transaction and get the witness
@@ -1034,16 +1035,17 @@ where
 
     async fn get_valid_input_notes(
         &self,
-        account_id: AccountId,
+        account: Account,
         mut input_notes: InputNotes<InputNote>,
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
 
+            data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
                 .check_notes_consumability(
-                    account_id,
+                    account.id(),
                     self.store.get_sync_height().await?,
                     input_notes.clone(),
                     tx_args.clone(),
@@ -1288,7 +1290,6 @@ mod test {
     use miden_objects::asset::{Asset, FungibleAsset};
     use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
     use miden_objects::note::NoteType;
-    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
     use miden_objects::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -1317,7 +1318,10 @@ mod test {
         keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
 
         let wallet_component = AccountComponent::compile(
-            BASIC_WALLET_CODE,
+            "
+                export.::miden::contracts::wallets::basic::receive_asset
+                export.::miden::contracts::wallets::basic::move_asset_to_note
+            ",
             TransactionKernel::assembler(),
             vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
         )

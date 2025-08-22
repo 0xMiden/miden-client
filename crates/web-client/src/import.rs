@@ -13,8 +13,11 @@ use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = "importAccount")]
-    pub async fn import_account(&mut self, account_bytes: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = "importAccountFile")]
+    pub async fn import_account_file(
+        &mut self,
+        account_bytes: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let account_bytes_result: Vec<u8> =

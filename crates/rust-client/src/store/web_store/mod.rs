@@ -249,3 +249,9 @@ impl Store for WebStore {
         self.get_account_storage(account_id).await
     }
 }
+
+#[wasm_bindgen(module = "/src/store/web_store/js/utils.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = logWebStoreError)]
+    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
+}

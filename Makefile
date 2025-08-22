@@ -47,7 +47,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
 
 .PHONY: lint
-lint: format fix toml clippy fix-wasm clippy-wasm typos-check ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: format fix toml clippy fix-wasm clippy-wasm typos-check rust-client-ts-lint ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -60,6 +60,10 @@ toml-check: ## Runs Format for all TOML files but only in check mode
 .PHONY: typos-check
 typos-check: ## Run typos to check for spelling mistakes
 	@typos --config ./.typos.toml
+
+.PHONY: rust-client-ts-lint
+rust-client-ts-lint:
+	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -139,9 +143,12 @@ stop-prover: ## Stop prover process
 install: ## Install the CLI binary
 	cargo install --path bin/miden-cli --locked
 
+install-tests: ## Install the tests binary
+	cargo install --path bin/integration-tests --locked
+
 # --- Building ------------------------------------------------------------------------------------
 
-build: ## Build the CLI binary and client library in release mode
+build: ## Build the CLI binary, client library and tests binary in release mode
 	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release --locked
 	cargo build --package testing-remote-prover --release --locked
 
@@ -150,7 +157,7 @@ build-wasm: rust-client-ts-build ## Build the client library for wasm32
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn tsc --build --force
+	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 
