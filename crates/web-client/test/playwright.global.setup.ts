@@ -75,6 +75,7 @@ export const test = base.extend<{ forEachTest: void }>({
           TransactionScriptInputPairArray,
           Word,
           WebClient,
+          MockWebClient,
         } = await import("./index.js");
         console.log("AFTER IMPORT");
         let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
@@ -82,8 +83,6 @@ export const test = base.extend<{ forEachTest: void }>({
         const client = await WebClient.createClient(rpcUrl, undefined);
 
         window.client = client;
-        // FIXME: Check why this fails
-        // window.mockedClient = await MockWebClient.createClient(rpcUrl, undefined);
         window.Account = Account;
         window.AccountBuilder = AccountBuilder;
         window.AccountComponent = AccountComponent;
@@ -148,6 +147,7 @@ export const test = base.extend<{ forEachTest: void }>({
           TransactionScriptInputPairArray;
         window.WebClient = WebClient;
         window.Word = Word;
+        window.MockWebClient = MockWebClient;
 
         // Create a namespace for helper functions
         window.helpers = window.helpers || {};

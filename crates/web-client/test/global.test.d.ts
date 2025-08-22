@@ -66,7 +66,7 @@ import { MockWebClient, WebClient } from "../js";
 declare global {
   interface Window {
     client: WebClient & WasmWebClient;
-    mockedClient: MockWebClient;
+    MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;

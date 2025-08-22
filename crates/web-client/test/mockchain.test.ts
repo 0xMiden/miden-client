@@ -1,11 +1,10 @@
 // @ts-nocheck
-import { expect } from "chai";
 import test from "./playwright.global.setup";
-import { Page } from "@playwright/test";
+import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
-    const client = await window.mockedWebClient.createClient();
+    const client = await window.MockWebClient.createClient();
     await client.syncState();
 
     const account = await client.newWallet(
@@ -61,7 +60,7 @@ test.describe("mock chain tests", () => {
   test("send transaction with mock chain completes successfully", async ({
     page,
   }) => {
-    let finalBalance = await mockChainTest();
+    let finalBalance = await mockChainTest(page);
     expect(finalBalance).toEqual("1000");
   });
 });

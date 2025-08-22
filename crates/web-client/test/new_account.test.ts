@@ -75,15 +75,15 @@ test.describe("new_wallet tests", () => {
     });
 
     // This should fail, as the wallet is already tracked within the same browser context
-    expect(
-      createNewWallet(page, {
+    await expect(async () => {
+      await createNewWallet(page, {
         storageMode: StorageMode.PUBLIC,
         mutable: false,
         clientSeed: clientSeed2,
         isolatedClient: true,
         walletSeed: walletSeed,
-      })
-    ).toThrowError(/failed to insert new wallet/);
+      });
+    }).rejects.toThrowError(/failed to insert new wallet/);
   });
 });
 
@@ -167,13 +167,13 @@ test.describe("new_faucet tests", () => {
         8,
         BigInt(10000000)
       )
-    ).toThrowError("Non-fungible faucets are not supported yet");
+    ).rejects.toThrowError("Non-fungible faucets are not supported yet");
   });
 
   test("throws an error when attempting to create a faucet with an invalid token symbol", async ({
     page,
   }) => {
-    expect(
+    await expect(
       createNewFaucet(
         page,
         StorageMode.PUBLIC,
@@ -182,7 +182,7 @@ test.describe("new_faucet tests", () => {
         8,
         BigInt(10000000)
       )
-    ).toThrow(
+    ).rejects.toThrow(
       `token symbol should have length between 1 and 6 characters, but 13 was provided`
     );
   });

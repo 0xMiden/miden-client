@@ -441,12 +441,13 @@ export const createNewWallet = async (
       storageMode,
       mutable,
       _serializedWalletSeed,
+      _serializedClientSeed,
       isolatedClient,
     }: createNewWalletParams) => {
       if (isolatedClient) {
         // Reconstruct Uint8Array inside the browser context
-        const _clientSeed = serializedClientSeed
-          ? new Uint8Array(serializedClientSeed)
+        const _clientSeed = _serializedClientSeed
+          ? new Uint8Array(_serializedClientSeed)
           : undefined;
 
         await window.helpers.refreshClient(_clientSeed);
@@ -483,7 +484,7 @@ export const createNewWallet = async (
     {
       storageMode: storageMode,
       mutable: mutable,
-      serializedClientSeed: serializedClientSeed,
+      _serializedClientSeed: serializedClientSeed,
       isolatedClient: isolatedClient,
       _serializedWalletSeed: serializedWalletSeed,
     }

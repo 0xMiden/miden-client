@@ -37,7 +37,7 @@ test.describe("new token symbol", () => {
   }) => {
     const tokenSymbol = "";
 
-    expect(createNewTokenSymbol(page, tokenSymbol)).toThrow(
+    await expect(createNewTokenSymbol(page, tokenSymbol)).rejects.toThrow(
       "failed to create token symbol: token symbol should have length between 1 and 6 characters, but 0 was provided"
     );
   });
@@ -47,7 +47,7 @@ test.describe("new token symbol", () => {
   }) => {
     const tokenSymbol = "MIDENTOKEN";
 
-    expect(createNewTokenSymbol(page, tokenSymbol)).toThrow(
+    await expect(createNewTokenSymbol(page, tokenSymbol)).rejects.toThrow(
       "failed to create token symbol: token symbol should have length between 1 and 6 characters, but 10 was provided"
     );
   });
