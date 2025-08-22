@@ -15,8 +15,6 @@ import {
   Note,
 } from "../dist/crates/miden_client_web";
 
-test.describe.configure({ mode: "parallel" });
-
 // NEW_MINT_TRANSACTION TESTS
 // =======================================================================================================
 

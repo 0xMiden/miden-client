@@ -433,8 +433,8 @@ export const createNewWallet = async (
   }: createNewWalletParams
 ): Promise<NewAccountTestResult> => {
   // Serialize initSeed for Puppeteer
-  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : "";
-  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : "";
+  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : undefined;
+  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : undefined;
 
   return await testingPage.evaluate(
     async ({
@@ -454,7 +454,7 @@ export const createNewWallet = async (
 
       let _walletSeed;
       if (_serializedWalletSeed) {
-        walletSeed = new Uint8Array(_serializedWalletSeed);
+        _walletSeed = new Uint8Array(_serializedWalletSeed);
       }
 
       let client = window.client;
@@ -553,7 +553,7 @@ export const getAccountBalance = async (
   faucetId: string
 ) => {
   return await testingPage.evaluate(
-    async ({ accountId, faucetId, testingPage }) => {
+    async ({ accountId, faucetId }) => {
       const client = window.client;
       const account = await client.getAccount(
         window.AccountId.fromHex(accountId)
@@ -569,7 +569,6 @@ export const getAccountBalance = async (
     {
       accountId,
       faucetId,
-      testingPage,
     }
   );
 };

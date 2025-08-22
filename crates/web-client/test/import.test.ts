@@ -15,12 +15,10 @@ const importWalletFromSeed = async (
   walletSeed: Uint8Array,
   mutable: boolean
 ) => {
-  const serializedWalletSeed = Array.from(walletSeed);
   return await page.evaluate(
-    async ({ serializedWalletSeed, mutable }) => {
+    async ({ _walletSeed, mutable }) => {
       const client = window.client;
       await client.syncState();
-      const _walletSeed = new Uint8Array(serializedWalletSeed);
       const account = await client.importPublicAccountFromSeed(
         _walletSeed,
         mutable
@@ -31,7 +29,7 @@ const importWalletFromSeed = async (
       };
     },
     {
-      serializedWalletSeed,
+      _walletSeed: walletSeed,
       mutable,
     }
   );
