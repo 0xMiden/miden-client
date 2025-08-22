@@ -127,6 +127,7 @@ pub mod rpc;
 pub mod store;
 pub mod sync;
 pub mod transaction;
+pub mod utils;
 
 #[cfg(feature = "std")]
 pub mod builder;
@@ -144,6 +145,7 @@ mod errors;
 
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
+    pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
         AccountVaultDelta,
         FungibleAssetDelta,
@@ -177,6 +179,7 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
         InOrderIndex,
         LeafIndex,
@@ -195,28 +198,13 @@ pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
-/// Provides various utilities that are commonly used throughout the Miden
-/// client library.
-pub mod utils {
-    pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
-    pub use miden_tx::utils::{
-        ByteReader,
-        ByteWriter,
-        Deserializable,
-        DeserializationError,
-        Serializable,
-        ToHex,
-        bytes_to_hex_string,
-        hex_to_bytes,
-    };
-}
-
 /// Provides test utilities for working with accounts and account IDs
 /// within the Miden network. This module is only available when the `testing` feature is
 /// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_objects::testing::*;
+    pub use miden_testing::*;
 
     pub use crate::test_utils::*;
 }
