@@ -1,7 +1,7 @@
 use miden_client::Word;
-use miden_client::account::{Account, AccountFile, get_public_keys_from_account};
+use miden_client::account::AccountFile;
 use miden_client::store::NoteExportType;
-use miden_client::utils::Serializable;
+use miden_client::utils::{Serializable, get_public_keys_from_account};
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -61,21 +61,26 @@ impl WebClient {
         Ok(export)
     }
 
-    #[wasm_bindgen(js_name = "exportAccount")]
-    pub async fn export_account(&mut self, account_id: AccountId) -> Result<JsValue, JsValue> {
-        let keystore = self.keystore.clone();
+    #[wasm_bindgen(js_name = "exportAccountFile")]
+    pub async fn export_account_file(&mut self, account_id: AccountId) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to get account for account id"))?
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        &format!(
+                            "failed to get account for account id: {}",
+                            account_id.to_string()
+                        ),
+                    )
+                })?
                 .ok_or(JsValue::from_str("No account found"))?;
 
+            let keystore = self.keystore.clone().expect("Keystore not initialized");
             let account_seed = account.seed().copied();
-
-            let account: Account = account.into();
-
-            let keystore = keystore.expect("KeyStore should be initialised");
+            let account = account.into();
 
             let mut key_pairs = vec![];
 

@@ -44,7 +44,7 @@ const exportAccount = async (accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
-    const accountBytes = client.exportAccount(accountId);
+    const accountBytes = client.exportAccountFile(accountId);
     return accountBytes;
   }, accountId);
 };
@@ -52,7 +52,7 @@ const exportAccount = async (accountId: string) => {
 const importAccount = async (accountBytes: any) => {
   return await testingPage.evaluate(async (_accountBytes) => {
     const client = window.client;
-    await client.importAccount(_accountBytes);
+    await client.importAccountFile(_accountBytes);
     return;
   }, accountBytes);
 };
