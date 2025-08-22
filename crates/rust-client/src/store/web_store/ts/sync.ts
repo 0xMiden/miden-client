@@ -18,8 +18,8 @@ import { upsertInputNote, upsertOutputNote } from "./notes.js";
 
 import {
   insertAccountStorage,
-  insertAccountAssetVault,
   insertAccountRecord,
+  insertVaultAssets,
 } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
@@ -142,7 +142,7 @@ interface JsAccountUpdate {
   storageRoot: string;
   storageSlots: Uint8Array;
   assetVaultRoot: string;
-  assetBytes: Uint8Array;
+  assets: JsVaultAsset[];
   accountId: string;
   codeRoot: string;
   committed: boolean;
@@ -164,6 +164,12 @@ interface JsStateSyncUpdate {
   serializedOutputNotes: SerializedOutputNoteData[];
   accountUpdates: JsAccountUpdate[];
   transactionUpdates: SerializedTransactionData[];
+}
+
+export interface JsVaultAsset {
+  root: string;
+  faucetIdPrefix: string;
+  asset: string;
 }
 
 /*
@@ -255,10 +261,7 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
           accountUpdate.storageRoot,
           accountUpdate.storageSlots
         ),
-        insertAccountAssetVault(
-          accountUpdate.assetVaultRoot,
-          accountUpdate.assetBytes
-        ),
+        insertVaultAssets(accountUpdate.assets),
         insertAccountRecord(
           accountUpdate.accountId,
           accountUpdate.codeRoot,
