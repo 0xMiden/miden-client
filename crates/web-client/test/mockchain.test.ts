@@ -1,7 +1,8 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+// @ts-nocheck
+import test from "./playwright.global.setup";
+import { Page, expect } from "@playwright/test";
 
-const mockChainTest = async () => {
+const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
     const client = await window.MockWebClient.createClient();
     await client.syncState();
@@ -55,9 +56,11 @@ const mockChainTest = async () => {
   });
 };
 
-describe("mock chain tests", () => {
-  it("send transaction with mock chain completes successfully", async () => {
-    let finalBalance = await mockChainTest();
-    expect(finalBalance).to.equal("1000");
+test.describe("mock chain tests", () => {
+  test("send transaction with mock chain completes successfully", async ({
+    page,
+  }) => {
+    let finalBalance = await mockChainTest(page);
+    expect(finalBalance).toEqual("1000");
   });
 });

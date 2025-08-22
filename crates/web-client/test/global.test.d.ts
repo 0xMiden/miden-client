@@ -1,4 +1,5 @@
 import { Page } from "puppeteer";
+import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
   AccountBuilder,
@@ -57,15 +58,16 @@ import {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
-  WebClient,
   NoteAndArgs,
   NoteAndArgsArray,
 } from "../dist/index";
+import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: WebClient;
-    remoteProverUrl: string;
+    client: WebClient & WasmWebClient;
+    MockWebClient: typeof MockWebClient;
+    remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
     AccountBuilder: typeof AccountBuilder;
@@ -148,6 +150,6 @@ declare global {
   }
 }
 
-declare module "./mocha.global.setup.mjs" {
+declare module "./playwright.global.setup" {
   export const testingPage: Page;
 }

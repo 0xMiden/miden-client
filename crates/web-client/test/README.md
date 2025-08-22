@@ -23,7 +23,7 @@ within the context of the web page.
 
 ## Writing tests
 
-1. The test setup in `mocha.global.setup.mjs` should expose the `create_client` function which can be used inside tests.
+1. The test setup in `playwright.global.setup` should expose the `create_client` function which can be used inside tests.
    - Any further setup of wasm code should be done in this file and similarly expose a function for testing here
 1. `webClientTestUtils.js` should contain all interfaces for interacting with the web client. If further methods need to be added, follow existing patterns which use the exposed `testingPage` and pass through any required arguments to the page execution. Example:
 
@@ -60,7 +60,7 @@ export const webClientCall = async (arg1, arg2) => {
 
 ## Debugging
 
-1. When inside of a `page.evaluate` , console logs are being sent to the servers console rather than your IDE's. You can uncomment the line as seen below in the `mocha.global.setup.mjs`:
+1. When inside of a `page.evaluate` , console logs are being sent to the servers console rather than your IDE's. You can uncomment the line as seen below in the `playwright.global.setup`:
 
 ```
     page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));

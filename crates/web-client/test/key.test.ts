@@ -1,9 +1,9 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { expect } from "@playwright/test";
 
-describe("signature", () => {
-  it("should produce a valid signature", async () => {
-    const isValid = await testingPage.evaluate(() => {
+test.describe("signature", () => {
+  test("should produce a valid signature", async ({ page }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const message = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
@@ -13,11 +13,11 @@ describe("signature", () => {
 
       return isValid;
     });
-    expect(isValid).to.be.true;
+    expect(isValid).toEqual(true);
   });
 
-  it("should not verify the wrong message", async () => {
-    const isValid = await testingPage.evaluate(() => {
+  test("should not verify the wrong message", async ({ page }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const message = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
@@ -30,11 +30,13 @@ describe("signature", () => {
 
       return isValid;
     });
-    expect(isValid).to.be.false;
+    expect(isValid).toEqual(false);
   });
 
-  it("should not verify the signature of a different key", async () => {
-    const isValid = await testingPage.evaluate(() => {
+  test("should not verify the signature of a different key", async ({
+    page,
+  }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const message = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
@@ -45,11 +47,13 @@ describe("signature", () => {
 
       return isValid;
     });
-    expect(isValid).to.be.false;
+    expect(isValid).toEqual(false);
   });
 
-  it("should be able to serialize and deserialize a signature", async () => {
-    const isValid = await testingPage.evaluate(() => {
+  test("should be able to serialize and deserialize a signature", async ({
+    page,
+  }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const message = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
@@ -65,13 +69,15 @@ describe("signature", () => {
 
       return isValid;
     });
-    expect(isValid).to.be.true;
+    expect(isValid).toEqual(true);
   });
 });
 
-describe("public key", () => {
-  it("should be able to serialize and deserialize a public key", async () => {
-    const isValid = await testingPage.evaluate(() => {
+test.describe("public key", () => {
+  test("should be able to serialize and deserialize a public key", async ({
+    page,
+  }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const publicKey = secretKey.publicKey();
       const serializedPublicKey = publicKey.serialize();
@@ -83,13 +89,15 @@ describe("public key", () => {
         serializedDeserializedPublicKey.toString()
       );
     });
-    expect(isValid).to.be.true;
+    expect(isValid).toEqual(true);
   });
 });
 
-describe("secret key", () => {
-  it("should be able to serialize and deserialize a secret key", async () => {
-    const isValid = await testingPage.evaluate(() => {
+test.describe("secret key", () => {
+  test("should be able to serialize and deserialize a secret key", async ({
+    page,
+  }) => {
+    const isValid = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const serializedSecretKey = secretKey.serialize();
       const deserializedSecretKey =
@@ -100,6 +108,6 @@ describe("secret key", () => {
         serializedDeserializedSecretKey.toString()
       );
     });
-    expect(isValid).to.be.true;
+    expect(isValid).toEqual(true);
   });
 });

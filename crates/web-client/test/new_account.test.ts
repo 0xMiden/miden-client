@@ -1,4 +1,5 @@
-import { expect } from "chai";
+import test from "./playwright.global.setup";
+import { expect } from "@playwright/test";
 import {
   createNewFaucet,
   createNewWallet,
@@ -9,7 +10,7 @@ import {
 // new_wallet tests
 // =======================================================================================================
 
-describe("new_wallet tests", () => {
+test.describe("new_wallet tests", () => {
   const testCases = [
     {
       description: "creates a new private, immutable wallet",
@@ -38,23 +39,25 @@ describe("new_wallet tests", () => {
   ];
 
   testCases.forEach(({ description, storageMode, mutable, expected }) => {
-    it(description, async () => {
-      const result = await createNewWallet({ storageMode, mutable });
+    test(description, async ({ page }) => {
+      const result = await createNewWallet(page, { storageMode, mutable });
 
       isValidAddress(result.id);
-      expect(result.nonce).to.equal("0");
+      expect(result.nonce).toEqual("0");
       isValidAddress(result.vaultCommitment);
       isValidAddress(result.storageCommitment);
       isValidAddress(result.codeCommitment);
-      expect(result.isFaucet).to.equal(false);
-      expect(result.isRegularAccount).to.equal(true);
-      expect(result.isUpdatable).to.equal(expected.isUpdatable);
-      expect(result.isPublic).to.equal(expected.isPublic);
-      expect(result.isNew).to.equal(true);
+      expect(result.isFaucet).toEqual(false);
+      expect(result.isRegularAccount).toEqual(true);
+      expect(result.isUpdatable).toEqual(expected.isUpdatable);
+      expect(result.isPublic).toEqual(expected.isPublic);
+      expect(result.isNew).toEqual(true);
     });
   });
 
-  it("Constructs the same account when given the same init seed", async () => {
+  test("Constructs the same account when given the same init seed", async ({
+    page,
+  }) => {
     const clientSeed1 = new Uint8Array(32);
     const clientSeed2 = new Uint8Array(32);
     const walletSeed = new Uint8Array(32);
@@ -63,7 +66,7 @@ describe("new_wallet tests", () => {
     crypto.getRandomValues(walletSeed);
 
     // Isolate the client instance both times to ensure the outcome is deterministic
-    await createNewWallet({
+    await createNewWallet(page, {
       storageMode: StorageMode.PUBLIC,
       mutable: false,
       clientSeed: clientSeed1,
@@ -72,22 +75,21 @@ describe("new_wallet tests", () => {
     });
 
     // This should fail, as the wallet is already tracked within the same browser context
-    await expect(
-      createNewWallet({
+    await expect(async () => {
+      await createNewWallet(page, {
         storageMode: StorageMode.PUBLIC,
         mutable: false,
         clientSeed: clientSeed2,
         isolatedClient: true,
         walletSeed: walletSeed,
-      })
-    ).to.be.rejectedWith(/failed to insert new wallet/);
+      });
+    }).rejects.toThrowError(/failed to insert new wallet/);
   });
 });
 
 // new_faucet tests
 // =======================================================================================================
-
-describe("new_faucet tests", () => {
+test.describe("new_faucet tests", () => {
   const testCases = [
     {
       description: "creates a new private, fungible faucet",
@@ -129,8 +131,9 @@ describe("new_faucet tests", () => {
       maxSupply,
       expected,
     }) => {
-      it(description, async () => {
+      test(description, async ({ page }) => {
         const result = await createNewFaucet(
+          page,
           storageMode,
           nonFungible,
           tokenSymbol,
@@ -139,35 +142,47 @@ describe("new_faucet tests", () => {
         );
 
         isValidAddress(result.id);
-        expect(result.nonce).to.equal("0");
+        expect(result.nonce).toEqual("0");
         isValidAddress(result.vaultCommitment);
         isValidAddress(result.storageCommitment);
         isValidAddress(result.codeCommitment);
-        expect(result.isFaucet).to.equal(true);
-        expect(result.isRegularAccount).to.equal(false);
-        expect(result.isUpdatable).to.equal(false);
-        expect(result.isPublic).to.equal(expected.isPublic);
-        expect(result.isNew).to.equal(true);
+        expect(result.isFaucet).toEqual(true);
+        expect(result.isRegularAccount).toEqual(false);
+        expect(result.isUpdatable).toEqual(false);
+        expect(result.isPublic).toEqual(expected.isPublic);
+        expect(result.isNew).toEqual(true);
       });
     }
   );
 
-  it("throws an error when attempting to create a non-fungible faucet", async () => {
-    await expect(
-      createNewFaucet(StorageMode.PUBLIC, true, "DAG", 8, BigInt(10000000))
-    ).to.be.rejectedWith("Non-fungible faucets are not supported yet");
-  });
-
-  it("throws an error when attempting to create a faucet with an invalid token symbol", async () => {
+  test("throws an error when attempting to create a non-fungible faucet", async ({
+    page,
+  }) => {
     await expect(
       createNewFaucet(
+        page,
+        StorageMode.PUBLIC,
+        true,
+        "DAG",
+        8,
+        BigInt(10000000)
+      )
+    ).rejects.toThrowError("Non-fungible faucets are not supported yet");
+  });
+
+  test("throws an error when attempting to create a faucet with an invalid token symbol", async ({
+    page,
+  }) => {
+    await expect(
+      createNewFaucet(
+        page,
         StorageMode.PUBLIC,
         false,
         "INVALID_TOKEN",
         8,
         BigInt(10000000)
       )
-    ).to.be.rejectedWith(
+    ).rejects.toThrow(
       `token symbol should have length between 1 and 6 characters, but 13 was provided`
     );
   });

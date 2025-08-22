@@ -1,8 +1,8 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import { Page, expect } from "@playwright/test";
+import test from "./playwright.global.setup";
 
-export const testStandardFpi = async (): Promise<void> => {
-  return await testingPage.evaluate(async () => {
+export const testStandardFpi = async (page: Page): Promise<void> => {
+  return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
 
@@ -136,8 +136,9 @@ export const testStandardFpi = async (): Promise<void> => {
   });
 };
 
-describe("fpi test", () => {
-  it("runs the standard fpi test successfully", async () => {
-    await expect(testStandardFpi()).to.be.fulfilled;
-  }).timeout(50000);
+test.describe("fpi test", () => {
+  test.setTimeout(50000);
+  test("runs the standard fpi test successfully", async ({ page }) => {
+    await expect(testStandardFpi(page)).resolves.toBeUndefined();
+  });
 });

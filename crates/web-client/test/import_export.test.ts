@@ -1,7 +1,7 @@
 // TODO: Rename this / figure out rebasing with the other featuer which has import tests
 
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { Page, expect } from "@playwright/test";
 import {
   clearStore,
   createNewFaucet,
@@ -12,8 +12,8 @@ import {
   StorageMode,
 } from "./webClientTestUtils";
 
-const exportDb = async () => {
-  return await testingPage.evaluate(async () => {
+const exportDb = async (page: Page) => {
+  return await page.evaluate(async () => {
     const client = window.client;
     const db = await client.exportStore();
     const serialized = JSON.stringify(db);
@@ -21,15 +21,15 @@ const exportDb = async () => {
   });
 };
 
-const importDb = async (db: any) => {
-  return await testingPage.evaluate(async (_db) => {
+const importDb = async (db: any, page: Page) => {
+  return await page.evaluate(async (_db) => {
     const client = window.client;
     await client.forceImportStore(_db);
   }, db);
 };
 
-const getAccount = async (accountId: string) => {
-  return await testingPage.evaluate(async (_accountId) => {
+const getAccount = async (accountId: string, page: Page) => {
+  return await page.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
     const account = await client.getAccount(accountId);
@@ -40,7 +40,7 @@ const getAccount = async (accountId: string) => {
   }, accountId);
 };
 
-const exportAccount = async (accountId: string) => {
+const exportAccount = async (testingPage: Page, accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
@@ -49,7 +49,7 @@ const exportAccount = async (accountId: string) => {
   }, accountId);
 };
 
-const importAccount = async (accountBytes: any) => {
+const importAccount = async (testingPage: Page, accountBytes: any) => {
   return await testingPage.evaluate(async (_accountBytes) => {
     const client = window.client;
     await client.importAccountFile(_accountBytes);
@@ -57,57 +57,62 @@ const importAccount = async (accountBytes: any) => {
   }, accountBytes);
 };
 
-describe("export and import the db", () => {
-  it("export db with an account, find the account when re-importing", async () => {
+test.describe("export and import the db", () => {
+  test("export db with an account, find the account when re-importing", async ({
+    page,
+  }) => {
     const { accountCommitment: initialAccountCommitment, accountId } =
-      await setupWalletAndFaucet();
-    const dbDump = await exportDb();
+      await setupWalletAndFaucet(page);
+    const dbDump = await exportDb(page);
 
-    await clearStore();
+    await clearStore(page);
 
-    await importDb(dbDump);
+    await importDb(dbDump, page);
 
-    const { accountCommitment } = await getAccount(accountId);
+    const { accountCommitment } = await getAccount(accountId, page);
 
-    expect(accountCommitment).to.equal(initialAccountCommitment);
+    expect(accountCommitment).toEqual(initialAccountCommitment);
   });
 });
 
-describe("export and import account", () => {
-  it("should export and import a private account", async () => {
+test.describe("export and import account", () => {
+  test("should export and import a private account", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PRIVATE;
 
-    const initialWallet = await createNewWallet({
+    const initialWallet = await createNewWallet(page, {
       storageMode,
       mutable,
       walletSeed,
     });
-    const faucet = await createNewFaucet();
+    const faucet = await createNewFaucet(page);
 
     const { targetAccountBalance: initialBalance } =
-      await fundAccountFromFaucet(initialWallet.id, faucet.id);
+      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
     const { accountCommitment: initialCommitment } = await getAccount(
-      initialWallet.id
+      initialWallet.id,
+      page
     );
-    const exportedAccount = await exportAccount(initialWallet.id);
-    await clearStore();
+    const exportedAccount = await exportAccount(page, initialWallet.id);
+    await clearStore(page);
 
-    await importAccount(exportedAccount);
+    await importAccount(page, exportedAccount);
 
     const { accountCommitment: restoredCommitment } = await getAccount(
-      initialWallet.id
+      initialWallet.id,
+      page
     );
 
     const restoredBalance = await getAccountBalance(
+      page,
       initialWallet.id,
       faucet.id
     );
 
-    expect(restoredCommitment).to.equal(initialCommitment);
-    expect(restoredBalance.toString()).to.equal(initialBalance);
+    expect(restoredCommitment).toEqual(initialCommitment);
+    expect(restoredBalance.toString()).toEqual(initialBalance);
   });
 });
