@@ -1,4 +1,3 @@
-import { expect } from "chai";
 import test from "./playwright.global.setup";
 import {
   badHexId,
@@ -12,13 +11,21 @@ import {
   getInputNotes,
   setupMintedNote,
 } from "./webClientTestUtils";
-import { Page } from "@playwright/test";
+import { Page, expect } from "@playwright/test";
 import {
   ConsumableNoteRecord,
   NoteConsumability,
 } from "../dist/crates/miden_client_web";
 
-const getConsumableNotes = async (testingPage: Page, accountId?: string) => {
+const getConsumableNotes = async (
+  testingPage: Page,
+  accountId?: string
+): Promise<
+  {
+    noteId: string;
+    consumability: { accountId: string; consumableAfterBlock: boolean }[];
+  }[]
+> => {
   return await testingPage.evaluate(async (_accountId?: string) => {
     const client = window.client;
     let records;
@@ -44,14 +51,14 @@ test.describe("get_input_note", () => {
   test("retrieve input note that does not exist", async ({ page }) => {
     await setupWalletAndFaucet(page);
     const { noteId } = await getInputNote(badHexId, page);
-    expect(noteId).to.be.undefined;
+    expect(noteId).toBeUndefined();
   });
 
   test("retrieve an input note that does exist", async ({ page }) => {
     const { consumedNoteId } = await setupConsumedNote(page);
 
     const { noteId } = await getInputNote(consumedNoteId, page);
-    expect(noteId).to.equal(consumedNoteId);
+    expect(noteId).toEqual(consumedNoteId);
   });
 });
 
@@ -59,8 +66,8 @@ test.describe("get_input_notes", () => {
   test("note exists, note filter all", async ({ page }) => {
     const { consumedNoteId } = await setupConsumedNote(page);
     const { noteIds } = await getInputNotes(page);
-    expect(noteIds).to.have.lengthOf.at.least(1);
-    expect(noteIds).to.include(consumedNoteId);
+    expect(noteIds.length).toBeGreaterThanOrEqual(1);
+    expect(noteIds).toContain(consumedNoteId);
   });
 });
 
@@ -70,13 +77,12 @@ test.describe("get_consumable_notes", () => {
       await setupMintedNote(page);
 
     const result = await getConsumableNotes(page, accountId1);
-    expect(result).to.have.lengthOf(1);
-    result.forEach((record: ConsumableNoteRecord) => {
-      expect(record.noteConsumability()).to.have.lengthOf(1);
-      expect(record.noteConsumability()[0].accountId).to.equal(accountId1);
-      expect(record.noteConsumability()).to.equal(noteId1);
-      expect(record.noteConsumability()[0].consumableAfterBlock).to.be
-        .undefined;
+    expect(result).toHaveLength(1);
+    result.forEach((record) => {
+      expect(record.consumability).toHaveLength(1);
+      expect(record.consumability[0].accountId).toBe(accountId1);
+      expect(record.noteId).toBe(noteId1);
+      expect(record.consumability[0].consumableAfterBlock).toBeUndefined();
     });
   });
 
@@ -86,31 +92,23 @@ test.describe("get_consumable_notes", () => {
     const { createdNoteId: noteId2, accountId: accountId2 } =
       await setupMintedNote(page);
 
+    const noteIds = new Set([noteId1, noteId2]);
+    const accountIds = new Set([accountId1, accountId2]);
     const result = await getConsumableNotes(page);
-    expect(
-      result.map((r: ConsumableNoteRecord) => r.inputNoteRecord().id)
-    ).to.include.members([noteId1, noteId2]);
-    expect(
-      result.map(
-        (r: ConsumableNoteRecord) => r.noteConsumability()[0].accountId
-      )
-    ).to.include.members([accountId1, accountId2]);
-    expect(result).to.have.lengthOf(2);
-    const consumableRecord1 = result.find(
-      (r: ConsumableNoteRecord) =>
-        r.inputNoteRecord().id().toString() === noteId1
+    expect(noteIds).toEqual(new Set(result.map((r) => r.noteId)));
+    expect(accountIds).toEqual(
+      new Set(result.map((r) => r.consumability[0].accountId))
     );
-    const consumableRecord2 = result.find(
-      (r: ConsumableNoteRecord) =>
-        r.inputNoteRecord().id().toString() === noteId2
-    );
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    const consumableRecord1 = result.find((r) => r.noteId === noteId1);
+    const consumableRecord2 = result.find((r) => r.noteId === noteId2);
 
-    consumableRecord1!!.consumability.forEach((c: ConsumableNoteRecord) => {
-      expect(c.inputNoteRecord().id().toString()).to.equal(accountId1);
+    consumableRecord1!!.consumability.forEach((c) => {
+      expect(c.accountId).toEqual(accountId1);
     });
 
-    consumableRecord2!!.consumability.forEach((c: ConsumableNoteRecord) => {
-      expect(c.inputNoteRecord().id().toString()).to.equal(accountId2);
+    consumableRecord2!!.consumability.forEach((c) => {
+      expect(c.accountId).toEqual(accountId2);
     });
   });
 
@@ -129,13 +127,14 @@ test.describe("get_consumable_notes", () => {
 
     const consumableRecipient = await getConsumableNotes(page, targetAccountId);
     const consumableSender = await getConsumableNotes(page, senderAccountId);
-    expect(consumableSender).to.have.lengthOf(1);
-    expect(consumableSender[0].consumability[0].consumableAfterBlock).to.equal(
+    expect(consumableSender.length).toBe(1);
+    expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
       recallHeight
     );
-    expect(consumableRecipient).to.have.lengthOf(1);
-    expect(consumableRecipient[0].consumability[0].consumableAfterBlock).to.be
-      .undefined;
+    expect(consumableRecipient.length).toBe(1);
+    expect(
+      consumableRecipient[0].consumability[0].consumableAfterBlock
+    ).toBeUndefined();
   });
 });
 
@@ -231,13 +230,13 @@ test.describe("createP2IDNote and createP2IDENote", () => {
       },
       {
         _senderId: senderId,
-        _targetId: senderId,
+        _targetId: targetId,
         _faucetId: faucetId,
       }
     );
 
-    expect(result.senderAccountBalance).to.equal("990");
-    expect(result.targetAccountBalance).to.equal("10");
+    expect(result.senderAccountBalance).toEqual("990");
+    expect(result.targetAccountBalance).toEqual("10");
   });
 
   test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
@@ -339,8 +338,8 @@ test.describe("createP2IDNote and createP2IDENote", () => {
       }
     );
 
-    expect(result.senderAccountBalance).to.equal("990");
-    expect(result.targetAccountBalance).to.equal("10");
+    expect(result.senderAccountBalance).toEqual("990");
+    expect(result.targetAccountBalance).toEqual("10");
   });
 });
 

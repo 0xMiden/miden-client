@@ -1,4 +1,5 @@
 import { Page } from "puppeteer";
+import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
   AccountBuilder,
@@ -64,7 +65,7 @@ import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: Await<ReturnType<typeof WebClient.createClient>>;
+    client: WebClient & WasmWebClient;
     mockedClient: MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;

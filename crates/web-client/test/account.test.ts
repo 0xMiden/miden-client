@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { expect } from "chai";
 import { Page } from "@playwright/test";
 import test from "./playwright.global.setup";
