@@ -2,10 +2,7 @@
   "name": "@demox-labs/miden-sdk",
   "version": "0.11.0-next.20",
   "description": "Miden Wasm SDK",
-  "collaborators": [
-    "Miden",
-    "Demox Labs <hi@demoxlabs.xyz>"
-  ],
+  "collaborators": ["Miden", "Demox Labs <hi@demoxlabs.xyz>"],
   "type": "module",
   "main": "./dist/index.js",
   "browser": "./dist/index.js",
@@ -13,18 +10,14 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "files": [
-    "dist",
-    "../LICENSE.md"
-  ],
+  "files": ["dist", "../LICENSE.md"],
   "scripts": {
     "build-rust-client-js": "cd ../rust-client/src/store/web_store && yarn install && yarn tsc --build --force",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
-    "test": "node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/playwright.global.setup --grep \"with remote prover\" --invert",
-    "test:remote_prover": "npm install && cross-env MIDEN_WEB_DEV=true npm run build && cross-env REMOTE_PROVER=true node --loader ts-node/esm ./node_modules/mocha/bin/mocha --file ./test/playwright.global.setup -g \"with remote prover\"",
-    "test:logs": "cross-env DEBUG_MODE=true node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/playwright.global.setup",
-    "test:clean": "npm install && MIDEN_WEB_DEV=true npm run build && node --loader ts-node/esm --loader esm ./node_modules/mocha/bin/mocha --file ./test/playwright.global.setup --grep \"with remote prover\" --invert"
+    "test": "yarn playwright test",
+    "test:remote_prover": "yarn install && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true && yarn playwright test",
+    "test:clean": "yarn install && MIDEN_WEB_DEV=true yarn run build && yarn playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
