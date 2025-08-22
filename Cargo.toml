@@ -22,23 +22,23 @@ version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib = { branch = "pgackst-remove-account-id-bech32", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-node-block-producer = { branch = "tomyrd-base-address", git = "https://github.com/0xMiden/miden-node" }
 miden-node-ntx-builder = { branch = "tomyrd-base-address", git = "https://github.com/0xMiden/miden-node" }
 miden-node-proto-build = { branch = "tomyrd-base-address", default-features = false, git = "https://github.com/0xMiden/miden-node" }
 miden-node-rpc = { branch = "tomyrd-base-address", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "tomyrd-base-address", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "tomyrd-base-address", git = "https://github.com/0xMiden/miden-node" }
-miden-objects = { branch = "pgackst-remove-account-id-bech32", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-remote-prover = { branch = "tomyrd-base-address", features = [
   "concurrent",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "tomyrd-base-address", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { branch = "pgackst-remove-account-id-bech32", default-features = false, features = [
+miden-testing = { branch = "next", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
-miden-tx = { branch = "pgackst-remove-account-id-bech32", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 async-trait = "0.1"
