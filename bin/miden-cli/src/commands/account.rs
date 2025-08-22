@@ -3,18 +3,14 @@ use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::rpc::{NodeRpcClient, TonicRpcClient};
+use miden_client::transaction::{AccountComponentInterface, AccountInterface};
 use miden_client::{Client, ZERO};
 use miden_objects::PrettyPrint;
+use miden_objects::address::{AccountIdAddress, Address, AddressInterface};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{
-    account_id_to_address,
-    load_config_file,
-    load_faucet_details_map,
-    parse_account_id,
-    update_config,
-};
+use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id, update_config};
 use crate::{client_binary_name, create_dynamic_table};
 
 // ACCOUNT COMMAND
@@ -103,7 +99,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Re
     let accounts = client.get_account_headers().await?;
 
     let mut table =
-        create_dynamic_table(&["Address", "Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+        create_dynamic_table(&["Account ID", "Address", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let status = client
             .get_account(acc.id())
@@ -113,8 +109,8 @@ async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Re
             .to_string();
 
         table.add_row(vec![
-            account_id_to_address(acc.id(), cli_config),
             acc.id().to_hex(),
+            account_bech_32(acc.id(), &client, cli_config).await?.unwrap_or_default(),
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_int().to_string(),
@@ -138,26 +134,25 @@ pub async fn show_account<AUTH>(
     let account = if let Some(account) = client.get_account(account_id).await? {
         account.into()
     } else {
-        let bech32_id = account_id_to_address(account_id, cli_config);
-        println!("Account {bech32_id} is not tracked by the client. Fetching from the network...",);
+        println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
 
         let rpc_client =
             TonicRpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);
 
         let fetched_account = rpc_client.get_account_details(account_id).await.map_err(|_| {
             CliError::Input(format!(
-                "Unable to fetch account {bech32_id} from the network. It may not exist.",
+                "Unable to fetch account {account_id} from the network. It may not exist.",
             ))
         })?;
 
         let account: Option<Account> = fetched_account.into();
 
         account.ok_or(CliError::Input(format!(
-            "Account {bech32_id} is private and not tracked by the client",
+            "Account {account_id} is private and not tracked by the client",
         )))?
     };
 
-    print_summary_table(&account, cli_config)?;
+    print_summary_table(&account, &client, cli_config).await?;
 
     // Vault Table
     {
@@ -234,7 +229,11 @@ pub async fn show_account<AUTH>(
 // ================================================================================================
 
 /// Prints a summary table with account information.
-fn print_summary_table(account: &Account, cli_config: &CliConfig) -> Result<(), CliError> {
+async fn print_summary_table<AUTH>(
+    account: &Account,
+    client: &Client<AUTH>,
+    cli_config: &CliConfig,
+) -> Result<(), CliError> {
     let mut table = create_dynamic_table(&["Account Information"]);
     table
         .load_preset(presets::UTF8_HORIZONTAL_ONLY)
@@ -242,7 +241,7 @@ fn print_summary_table(account: &Account, cli_config: &CliConfig) -> Result<(), 
 
     table.add_row(vec![
         Cell::new("Address"),
-        Cell::new(account_id_to_address(account.id(), cli_config)),
+        Cell::new(account_bech_32(account.id(), client, cli_config).await?.unwrap_or_default()),
     ]);
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
@@ -323,13 +322,37 @@ pub(crate) fn maybe_set_default_account(
 
     set_default_account(Some(account_id))?;
 
-    let account_id = account_id_to_address(account_id, current_config);
     println!("Setting account {account_id} as the default account ID.");
     println!(
         "You can unset it with `{} account --default none`.",
         client_binary_name().display()
     );
-    current_config.default_account_id = Some(account_id);
+    current_config.default_account_id = Some(account_id.to_hex());
 
     Ok(())
+}
+
+async fn account_bech_32<AUTH>(
+    account_id: AccountId,
+    client: &Client<AUTH>,
+    cli_config: &CliConfig,
+) -> Result<Option<String>, CliError> {
+    let Some(account_record) = client.get_account(account_id).await? else {
+        return Ok(None);
+    };
+
+    let account_interface: AccountInterface = account_record.account().into();
+
+    if !account_interface
+        .components()
+        .iter()
+        .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
+    {
+        return Ok(None);
+    }
+
+    let address = AccountIdAddress::new(account_id, AddressInterface::BasicWallet);
+    Ok(Some(
+        Address::from(address).to_bech32(cli_config.rpc.endpoint.0.to_network_id()),
+    ))
 }

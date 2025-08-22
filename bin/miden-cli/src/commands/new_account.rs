@@ -24,8 +24,7 @@ use tracing::debug;
 
 use crate::commands::account::maybe_set_default_account;
 use crate::errors::CliError;
-use crate::utils::{account_id_to_address, load_config_file};
-use crate::{CliKeyStore, client_binary_name};
+use crate::{CliKeyStore, client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -125,12 +124,12 @@ impl NewWalletCmd {
         .await?;
 
         let (mut current_config, _) = load_config_file()?;
-        let account_address = account_id_to_address(new_account.id(), &current_config);
 
         println!("Successfully created new wallet.");
         println!(
-            "To view account details execute {} account -s {account_address}",
-            client_binary_name().display()
+            "To view account details execute {} account -s {}",
+            client_binary_name().display(),
+            new_account.id().to_hex()
         );
 
         maybe_set_default_account(&mut current_config, new_account.id())?;
@@ -187,13 +186,11 @@ impl NewAccountCmd {
         )
         .await?;
 
-        let (current_config, _) = load_config_file()?;
-        let account_address = account_id_to_address(new_account.id(), &current_config);
-
         println!("Successfully created new account.");
         println!(
-            "To view account details execute {} account -s {account_address}",
-            client_binary_name().display()
+            "To view account details execute {} account -s {}",
+            client_binary_name().display(),
+            new_account.id().to_hex()
         );
 
         Ok(())

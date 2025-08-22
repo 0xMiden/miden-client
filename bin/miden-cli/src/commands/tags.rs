@@ -3,8 +3,7 @@ use miden_client::note::{NoteExecutionMode, NoteTag};
 use tracing::info;
 
 use crate::errors::CliError;
-use crate::utils::account_id_to_address;
-use crate::{Parser, create_dynamic_table, load_config_file};
+use crate::{Parser, create_dynamic_table};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]
@@ -42,7 +41,6 @@ impl TagsCmd {
 // HELPERS
 // ================================================================================================
 async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
-    let (cli_config, _) = load_config_file()?;
     let mut table = create_dynamic_table(&["Tag", "Source"]);
 
     let tags = client.get_note_tags().await?;
@@ -50,7 +48,7 @@ async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     for tag in tags {
         let source = match tag.source {
             miden_client::sync::NoteTagSource::Account(account_id) => {
-                format!("Account({})", account_id_to_address(account_id, &cli_config))
+                format!("Account({})", account_id.to_hex())
             },
             miden_client::sync::NoteTagSource::Note(note_id) => format!("Note({note_id})"),
             miden_client::sync::NoteTagSource::User => "User".to_string(),

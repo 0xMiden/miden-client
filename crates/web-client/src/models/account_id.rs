@@ -66,7 +66,7 @@ impl AccountId {
                 "wrong network id, for a custom network id, use to bech32Custom",
             )
         })?;
-        let address: Address = AccountIdAddress::new(self.0, AddressInterface::BasicWallet).into();
+        let address: Address = AccountIdAddress::new(self.0).into();
         Ok(address.to_bech32(network_id))
     }
 
@@ -76,7 +76,7 @@ impl AccountId {
     pub fn to_bech32_custom(&self, custom_network_id: &str) -> Result<String, JsValue> {
         let network_id = NativeNetworkId::from_str(custom_network_id)
             .map_err(|err| js_error_with_context(err, "given network id is not valid"))?;
-        let address: Address = AccountIdAddress::new(self.0, AddressInterface::BasicWallet).into();
+        let address: Address = AccountIdAddress::new(self.0).into();
         Ok(address.to_bech32(network_id))
     }
 
