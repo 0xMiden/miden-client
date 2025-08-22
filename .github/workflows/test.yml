@@ -58,6 +58,10 @@ jobs:
   integration-tests-web-client:
     name: Run integration tests for web client on ubuntu-latest
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: 4
     steps:
       - uses: actions/checkout@main
       - name: Install Rust
@@ -75,7 +79,12 @@ jobs:
       - name: Start test node
         run: make start-node-background
       - name: Run web client tests
-        run: make integration-test-web-client
+        run: |
+          cd ./crates/web-client
+          yarn install
+          yarn playwright install --with-deps
+          MIDEN_WEB_DEV=true yarn run build
+          yarn playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
       - name: Stop test node
         if: always()
         run: make stop-node
