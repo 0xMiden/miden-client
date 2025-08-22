@@ -1,8 +1,10 @@
 use miden_client::Word;
+use miden_client::account::AccountFile;
 use miden_client::store::NoteExportType;
-use miden_client::utils::Serializable;
+use miden_client::utils::{Serializable, get_public_keys_from_account};
 use wasm_bindgen::prelude::*;
 
+use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -57,5 +59,52 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "failed to export store"))?;
 
         Ok(export)
+    }
+
+    #[wasm_bindgen(js_name = "exportAccountFile")]
+    pub async fn export_account_file(&mut self, account_id: AccountId) -> Result<JsValue, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let account = client
+                .get_account(account_id.into())
+                .await
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        &format!(
+                            "failed to get account for account id: {}",
+                            account_id.to_string()
+                        ),
+                    )
+                })?
+                .ok_or(JsValue::from_str("No account found"))?;
+
+            let keystore = self.keystore.clone().expect("Keystore not initialized");
+            let account_seed = account.seed().copied();
+            let account = account.into();
+
+            let mut key_pairs = vec![];
+
+            for pub_key in get_public_keys_from_account(&account) {
+                key_pairs.push(
+                    keystore
+                        .get_key(pub_key)
+                        .await
+                        .map_err(|err| {
+                            js_error_with_context(err, "failed to get public key for account")
+                        })?
+                        .ok_or(JsValue::from_str("Auth not found for account"))?,
+                );
+            }
+
+            let account_data = AccountFile::new(account, account_seed, key_pairs);
+
+            let serialized_input_note_bytes =
+                serde_wasm_bindgen::to_value(&account_data.to_bytes())
+                    .map_err(|_| JsValue::from_str("Serialization error"))?;
+
+            Ok(serialized_input_note_bytes)
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
     }
 }

@@ -116,7 +116,6 @@ pub(crate) async fn upsert_transaction_record(
     let promise = idxdb_upsert_transaction_record(
         serialized_data.id,
         serialized_data.details,
-        serialized_data.script_root.clone(),
         serialized_data.block_num,
         serialized_data.committed.into(),
         serialized_data.discarded.into(),
