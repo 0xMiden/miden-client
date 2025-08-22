@@ -1,4 +1,3 @@
-use core::panic;
 use std::env::{self, temp_dir};
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -25,11 +24,11 @@ use miden_client::store::sqlite_store::SqliteStore;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
-    TEST_CLIENT_RPC_CONFIG_FILE,
     TestClientKeyStore,
     execute_tx_and_sync,
     insert_new_wallet,
 };
+use miden_client::testing::config::create_test_store_path;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};
@@ -37,8 +36,6 @@ use miden_client_cli::CliKeyStore;
 use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
-use toml::Table;
-use uuid::Uuid;
 
 // CLI TESTS
 // ================================================================================================
@@ -72,7 +69,8 @@ fn init_without_params() {
 #[test]
 fn init_with_params() {
     let store_path = create_test_store_path();
-    let temp_dir = init_cli_with_store_path("devnet", &store_path);
+    let endpoint = Endpoint::devnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Assert the config file contains the specified contents
     let mut config_path = temp_dir.clone();
@@ -117,7 +115,7 @@ async fn mint_with_untracked_account() {
 /// This test tries to run a mint TX using the CLI for an account that isn't tracked.
 #[tokio::test]
 async fn token_symbol_mapping() {
-    let (store_path, temp_dir) = init_cli();
+    let (store_path, temp_dir, endpoint) = init_cli();
 
     // Create faucet account
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
@@ -154,7 +152,7 @@ async fn token_symbol_mapping() {
         .to_string();
 
     let note = {
-        let (client, _) = create_rust_client_with_store_path(&store_path).await;
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await;
         client
             .get_output_note(NoteId::try_from_hex(&note_id).unwrap())
             .await
@@ -181,7 +179,7 @@ const GENESIS_ACCOUNTS_FILENAMES: [&str; 1] = ["account.mac"];
 #[tokio::test]
 #[ignore = "import genesis test gets ignored by default so integration tests can be ran with dockerized and remote nodes where we might not have the genesis data"]
 async fn import_genesis_accounts_can_be_used_for_transactions() {
-    let (store_path, temp_dir) = init_cli();
+    let (store_path, temp_dir, endpoint) = init_cli();
 
     for genesis_account_filename in GENESIS_ACCOUNTS_FILENAMES {
         let mut new_file_path = temp_dir.clone();
@@ -206,7 +204,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() {
     sync_cli(&temp_dir);
 
     let fungible_faucet_account_id = {
-        let (client, _) = create_rust_client_with_store_path(&store_path).await;
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await;
         let accounts = client.get_account_headers().await.unwrap();
 
         let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
@@ -310,8 +308,8 @@ async fn cli_export_import_account() {
     const FAUCET_FILENAME: &str = "test_faucet.mac";
     const WALLET_FILENAME: &str = "test_wallet.wal";
 
-    let temp_dir_1 = init_cli().1;
-    let (store_path_2, temp_dir_2) = init_cli();
+    let (_, temp_dir_1, _) = init_cli();
+    let (store_path_2, temp_dir_2, endpoint_2) = init_cli();
 
     // Create faucet account
     let faucet_id = new_faucet_cli(&temp_dir_1, AccountStorageMode::Private);
@@ -345,7 +343,7 @@ async fn cli_export_import_account() {
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
     // Ensure the account was imported
-    let client_2 = create_rust_client_with_store_path(&store_path_2).await.0;
+    let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await.0;
     assert!(
         client_2
             .get_account(AccountId::from_bech32(&faucet_id).unwrap().1)
@@ -416,7 +414,9 @@ async fn consume_unauthenticated_note() {
 
 #[tokio::test]
 async fn init_with_devnet() {
-    let temp_dir = init_cli_with_store_path("devnet", &create_test_store_path());
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::devnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Check in the config file that the network is devnet
     let mut config_path = temp_dir.clone();
@@ -430,7 +430,9 @@ async fn init_with_devnet() {
 
 #[tokio::test]
 async fn init_with_testnet() {
-    let temp_dir = init_cli_with_store_path("testnet", &create_test_store_path());
+    let store_path = create_test_store_path();
+    let endpoint = Endpoint::testnet();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
 
     // Check in the config file that the network is testnet
     let mut config_path = temp_dir.clone();
@@ -456,8 +458,9 @@ async fn debug_mode_outputs_logs() {
     }
 
     // Create a Client and a custom note
-    let store_path = create_test_store_path();
-    let (mut client, authenticator) = create_rust_client_with_store_path(&store_path).await;
+    let (store_path, _, endpoint) = init_cli();
+    let (mut client, authenticator) =
+        create_rust_client_with_store_path(&store_path, endpoint).await;
     let (account, ..) = insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
         .await
         .unwrap();
@@ -500,7 +503,7 @@ async fn debug_mode_outputs_logs() {
     };
 
     // Import the note into the CLI
-    let temp_dir = init_cli_with_store_path(get_network_from_rpc_config().as_str(), &store_path);
+    let (_, temp_dir, _) = init_cli();
 
     // Serialize the note
     let note_path = temp_dir.join(NOTE_FILENAME);
@@ -533,43 +536,35 @@ async fn debug_mode_outputs_logs() {
 // HELPERS
 // ================================================================================================
 
-/// Derives the network name for the `init` command from the RPC test config file.
-fn get_network_from_rpc_config() -> String {
-    let rpc_config_toml = TEST_CLIENT_RPC_CONFIG_FILE.parse::<Table>().unwrap();
-    let rpc_endpoint_toml = rpc_config_toml["endpoint"].as_table().unwrap();
-
-    let host = rpc_endpoint_toml["host"].as_str().unwrap().to_string();
-
-    if host.contains("devnet") {
-        "devnet".to_string()
-    } else if host.contains("localhost") {
-        "localhost".to_string()
-    } else if host.contains("testnet") {
-        "testnet".to_string()
-    } else {
-        panic!("Unknown network")
-    }
-}
-
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
-fn init_cli() -> (PathBuf, PathBuf) {
-    let store_path = create_test_store_path();
-    let temp_dir = init_cli_with_store_path(get_network_from_rpc_config().as_str(), &store_path);
+fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
+    // Try to read from env first or default to localhost
+    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
+        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
+        Err(_) => Endpoint::localhost(),
+    };
 
-    (store_path, temp_dir)
+    let store_path = create_test_store_path();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
+    (store_path, temp_dir, endpoint)
 }
 
 /// Initializes a CLI with the given network and store path and returns the temp directory where
 /// the CLI is running.
-fn init_cli_with_store_path(network: &str, store_path: &Path) -> PathBuf {
-    let mut temp_dir = temp_dir();
-    temp_dir.push(format!("{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir(temp_dir.clone()).unwrap();
+fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
 
     // Init and create basic wallet on second client
     let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
-    init_cmd.args(["init", "--network", network, "--store-path", store_path.to_str().unwrap()]);
+    init_cmd.args([
+        "init",
+        "--network",
+        endpoint.to_string().as_str(),
+        "--store-path",
+        store_path.to_str().unwrap(),
+    ]);
     init_cmd.current_dir(&temp_dir).assert().success();
 
     temp_dir
@@ -736,30 +731,13 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .to_string()
 }
 
-/// Creates a temporary sqlite store file.
-pub fn create_test_store_path() -> std::path::PathBuf {
-    let mut temp_file = temp_dir();
-    temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
-    temp_file
-}
-
 pub type TestClient = Client<TestClientKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
-async fn create_rust_client_with_store_path(store_path: &Path) -> (TestClient, CliKeyStore) {
-    let rpc_config_toml = TEST_CLIENT_RPC_CONFIG_FILE.parse::<Table>().unwrap();
-    let rpc_endpoint_toml = rpc_config_toml["endpoint"].as_table().unwrap();
-
-    let protocol = rpc_endpoint_toml["protocol"].as_str().unwrap().to_string();
-    let host = rpc_endpoint_toml["host"].as_str().unwrap().to_string();
-    let port = if rpc_endpoint_toml.contains_key("port") {
-        rpc_endpoint_toml["port"].as_integer().map(|port| u16::try_from(port).unwrap())
-    } else {
-        None
-    };
-
-    let endpoint = Endpoint::new(protocol, host, port);
-
+async fn create_rust_client_with_store_path(
+    store_path: &Path,
+    endpoint: Endpoint,
+) -> (TestClient, CliKeyStore) {
     let store = {
         let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await.unwrap();
         std::sync::Arc::new(sqlite_store)

@@ -80,7 +80,7 @@ pub enum ClientError {
     NoteScreenerError(#[from] NoteScreenerError),
     #[error("store error")]
     StoreError(#[from] StoreError),
-    #[error("transaction executor error: {0}")]
+    #[error("transaction executor error")]
     TransactionExecutorError(#[from] TransactionExecutorError),
     #[error("transaction input error")]
     TransactionInputError(#[source] TransactionInputError),

@@ -1,14 +1,18 @@
-use miden_client::account::{Account, StorageSlot};
+use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
 use miden_client::auth::AuthSecretKey;
+use miden_client::crypto::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
-use miden_client::transaction::{ForeignAccount, TransactionKernel, TransactionRequestBuilder};
-use miden_client::{Felt, Word};
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::utils::{ScriptBuilder, word_to_masm_push_string};
-use miden_objects::account::{AccountBuilder, AccountComponent, AccountStorageMode, StorageMap};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
-use miden_objects::vm::AdviceInputs;
+use miden_client::testing::config::ClientConfig;
+use miden_client::transaction::{
+    AdviceInputs,
+    ForeignAccount,
+    TransactionKernel,
+    TransactionRequestBuilder,
+};
+use miden_client::utils::word_to_masm_push_string;
+use miden_client::{Felt, ScriptBuilder, Word};
 
 // FPI TESTS
 // ================================================================================================
@@ -16,19 +20,16 @@ const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::n
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
-#[tokio::test]
-async fn standard_fpi_public() {
-    standard_fpi(AccountStorageMode::Public).await;
+pub async fn standard_fpi_public(client_config: ClientConfig) {
+    standard_fpi(AccountStorageMode::Public, client_config).await;
 }
 
-#[tokio::test]
-async fn standard_fpi_private() {
-    standard_fpi(AccountStorageMode::Private).await;
+pub async fn standard_fpi_private(client_config: ClientConfig) {
+    standard_fpi(AccountStorageMode::Private, client_config).await;
 }
 
-#[tokio::test]
-async fn fpi_execute_program() {
-    let (mut client, mut keystore) = create_test_client().await;
+pub async fn fpi_execute_program(client_config: ClientConfig) {
+    let (mut client, mut keystore) = create_test_client(client_config).await;
     client.sync_state().await.unwrap();
 
     // Deploy a foreign account
@@ -103,9 +104,8 @@ async fn fpi_execute_program() {
     assert_eq!(output_stack, expected_stack);
 }
 
-#[tokio::test]
-async fn nested_fpi_calls() {
-    let (mut client, mut keystore) = create_test_client().await;
+pub async fn nested_fpi_calls(client_config: ClientConfig) {
+    let (mut client, mut keystore) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
@@ -215,8 +215,8 @@ async fn nested_fpi_calls() {
 /// storage. It then deploys the foreign account and creates a native account to execute a
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
-async fn standard_fpi(storage_mode: AccountStorageMode) {
-    let (mut client, mut keystore) = create_test_client().await;
+async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) {
+    let (mut client, mut keystore) = create_test_client(client_config).await;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(

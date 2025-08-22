@@ -2136,7 +2136,6 @@ dependencies = [
  "serde-wasm-bindgen",
  "thiserror 2.0.12",
  "tokio",
- "toml 0.8.23",
  "tonic",
  "tonic-build",
  "tonic-web-wasm-client",
@@ -2171,15 +2170,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "miden-client-tests"
+name = "miden-client-integration-tests"
 version = "0.11.0"
 dependencies = [
  "async-trait",
+ "clap 4.5.43",
+ "futures",
  "miden-client",
- "miden-lib",
- "miden-objects",
  "rand 0.9.2",
  "tokio",
+ "url",
 ]
 
 [[package]]
