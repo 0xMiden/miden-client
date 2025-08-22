@@ -29,7 +29,7 @@ pub enum RpcError {
     NoteNotFound(NoteId),
     #[error("rpc request failed for {0}: {1}")]
     RequestError(String, String),
-    #[error("merkle proof is not conetained")]
+    #[error("merkle proof is not contained")]
     MerkleError(#[from] MerkleError),
     #[error("slot index out of bounds")]
     SlotOutOfBounds(#[source] TryFromIntError),
