@@ -15,9 +15,9 @@
     "build-rust-client-js": "cd ../rust-client/src/store/web_store && yarn install && yarn tsc --build --force",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
-    "test": "yarn playwright test",
-    "test:remote_prover": "yarn install && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true && yarn playwright test",
-    "test:clean": "yarn install && MIDEN_WEB_DEV=true yarn run build && yarn playwright test"
+    "test": "yarn playwright install && yarn playwright test",
+    "test:remote_prover": "yarn install && yarn playwright install && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true && yarn playwright test",
+    "test:clean": "yarn install && yarn playwright install && MIDEN_WEB_DEV=true yarn run build && yarn playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
