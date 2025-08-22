@@ -2,19 +2,36 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    StorageMap,
+    StorageSlot,
+    StorageSlotType,
+};
 use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::{AccountIdError, Word};
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_objects::{AccountIdError, Felt, Word};
+use miden_tx::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
+use crate::store::web_store::account::js_bindings::{
+    idxdb_get_account_storage_maps,
+    idxdb_get_vault_assets,
+};
+use crate::store::web_store::account::models::{
+    AccountAssetIdxdbObject,
+    StorageMapEntryIdxdbObject,
+};
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
+pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use js_bindings::{
-    idxdb_get_account_asset_vault,
     idxdb_get_account_code,
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
@@ -32,7 +49,6 @@ use models::{
     AccountCodeIdxdbObject,
     AccountRecordIdxdbObject,
     AccountStorageIdxdbObject,
-    AccountVaultIdxdbObject,
     ForeignAccountCodeIdxdbObject,
 };
 
@@ -183,26 +199,61 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
         })?;
 
-        let account_storage_idxdb: AccountStorageIdxdbObject = from_value(js_value)
+        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
-        Ok(AccountStorage::read_from_bytes(&account_storage_idxdb.storage)?)
+        let promise = idxdb_get_account_storage_maps(
+            account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
+        );
+        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
+        })?;
+
+        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> = from_value(js_value)
+            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+
+        let mut maps = BTreeMap::new();
+        for entry in account_maps_idxdb {
+            let map = maps.entry(entry.root).or_insert_with(StorageMap::new);
+            map.insert(Word::try_from(entry.key)?, Word::try_from(entry.value)?);
+        }
+
+        let slots: Vec<StorageSlot> = account_storage_idxdb
+            .into_iter()
+            .map(|slot| {
+                let slot_type = StorageSlotType::try_from(Felt::new(slot.slot_type))
+                    .map_err(StoreError::DatabaseError)?;
+                Ok(match slot_type {
+                    StorageSlotType::Value => StorageSlot::Value(Word::try_from(&slot.slot_value)?),
+                    StorageSlotType::Map => {
+                        StorageSlot::Map(maps.remove(&slot.slot_value).unwrap_or_default())
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        Ok(AccountStorage::new(slots)?)
     }
 
-    pub(super) async fn get_vault_assets(
-        &self,
-        commitment: Word,
-    ) -> Result<Vec<Asset>, StoreError> {
-        let commitment_serialized = commitment.to_string();
-
-        let promise = idxdb_get_account_asset_vault(commitment_serialized);
+    pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
+        let promise = idxdb_get_vault_assets(root.to_hex());
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch vault assets: {js_error:?}",))
         })?;
-        let vault_assets_idxdb: AccountVaultIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
+            from_value(js_value).map_err(|err| {
+                StoreError::DatabaseError(format!("failed to deserialize DEBUG {err:?}"))
+            })?;
 
-        Ok(Vec::<Asset>::read_from_bytes(&vault_assets_idxdb.assets)?)
+        let assets = vault_assets_idxdb
+            .into_iter()
+            .map(|asset| {
+                let word = Word::try_from(&asset.asset)?;
+                Ok(Asset::try_from(word)?)
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        Ok(assets)
     }
 
     pub(crate) async fn insert_account(

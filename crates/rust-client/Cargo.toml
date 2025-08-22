@@ -22,6 +22,7 @@ crate-type = ["lib"]
 default = ["std", "tonic/channel"]
 idxdb = [
   "dep:base64",
+  "dep:console_error_panic_hook",
   "dep:getrandom",
   "dep:serde",
   "dep:serde-wasm-bindgen",
@@ -43,27 +44,28 @@ miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
 
 # External dependencies
-anyhow                = { workspace = true }
-async-trait           = { workspace = true }
-base64                = { optional = true, version = "0.22" }
-chrono                = { optional = false, version = "0.4" }
-deadpool              = { default-features = false, features = ["managed", "rt_tokio_1"], optional = true, version = "0.12" }
-deadpool-sync         = { optional = true, version = "0.1" }
-getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
-hex                   = { version = "0.4" }
-prost                 = { default-features = false, features = ["derive"], version = "0.13" }
-rand                  = { workspace = true }
-rusqlite              = { features = ["array", "bundled", "vtab"], optional = true, version = "0.36" }
-rusqlite_migration    = { optional = true, version = "2.1" }
-serde                 = { optional = true, workspace = true }
-serde-wasm-bindgen    = { optional = true, version = "0.6" }
-thiserror             = { workspace = true }
-tonic                 = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
-tonic-web-wasm-client = { default-features = false, optional = true, version = "0.7" }
-tracing               = { workspace = true }
-uuid                  = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
-wasm-bindgen          = { features = ["serde-serialize"], optional = true, version = "0.2" }
-wasm-bindgen-futures  = { optional = true, version = "0.4" }
+anyhow                   = { workspace = true }
+async-trait              = { workspace = true }
+base64                   = { optional = true, version = "0.22" }
+chrono                   = { optional = false, version = "0.4" }
+console_error_panic_hook = { optional = true, version = "0.1" }
+deadpool                 = { default-features = false, features = ["managed", "rt_tokio_1"], optional = true, version = "0.12" }
+deadpool-sync            = { optional = true, version = "0.1" }
+getrandom                = { features = ["wasm_js"], optional = true, version = "0.3" }
+hex                      = { version = "0.4" }
+prost                    = { default-features = false, features = ["derive"], version = "0.13" }
+rand                     = { workspace = true }
+rusqlite                 = { features = ["array", "bundled", "vtab"], optional = true, version = "0.36" }
+rusqlite_migration       = { optional = true, version = "2.1" }
+serde                    = { optional = true, workspace = true }
+serde-wasm-bindgen       = { optional = true, version = "0.6" }
+thiserror                = { workspace = true }
+tonic                    = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
+tonic-web-wasm-client    = { default-features = false, optional = true, version = "0.7" }
+tracing                  = { workspace = true }
+uuid                     = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
+wasm-bindgen             = { features = ["serde-serialize"], optional = true, version = "0.2" }
+wasm-bindgen-futures     = { optional = true, version = "0.4" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }

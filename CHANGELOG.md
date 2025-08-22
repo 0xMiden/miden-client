@@ -5,6 +5,7 @@
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
+* Refactored `WebStore` to store vault and storage as separate elements ([#1184](https://github.com/0xMiden/miden-client/pull/1184)).
 
 ## 0.11.1 (2025-08-31)
 

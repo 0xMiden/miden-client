@@ -1,4 +1,4 @@
-import { accountCodes, accountStorages, accountVaults, accountAuths, accounts, foreignAccountCode, } from "./schema.js";
+import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, foreignAccountCode, storageMapEntries, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
@@ -157,53 +157,51 @@ export async function getAccountCode(codeRoot) {
         logWebStoreError(error, `Error fetching account code for root ${codeRoot}`);
     }
 }
-export async function getAccountStorage(storageRoot) {
+export async function getAccountStorage(storageCommitment) {
     try {
-        // Fetch all records matching the given root
         const allMatchingRecords = await accountStorages
-            .where("root")
-            .equals(storageRoot)
+            .where("commitment")
+            .equals(storageCommitment)
             .toArray();
-        // The first record is the only one due to the uniqueness constraint
-        const storageRecord = allMatchingRecords[0];
-        if (storageRecord === undefined) {
-            console.log("No records found for given storage root.");
-            return null;
-        }
-        // Convert the module Blob to an ArrayBuffer
-        const storageArrayBuffer = await storageRecord.slots.arrayBuffer();
-        const storageArray = new Uint8Array(storageArrayBuffer);
-        const storageBase64 = uint8ArrayToBase64(storageArray);
-        return {
-            root: storageRecord.root,
-            storage: storageBase64,
-        };
+        const slots = allMatchingRecords.map((record) => {
+            return {
+                slotIndex: record.slotIndex,
+                slotValue: record.slotValue,
+                slotType: record.slotType,
+            };
+        });
+        return slots;
     }
     catch (error) {
-        logWebStoreError(error, `Error fetching account storage for root ${storageRoot}`);
+        logWebStoreError(error, `Error fetching account storage for commitment ${storageCommitment}`);
     }
 }
-export async function getAccountAssetVault(vaultRoot) {
+export async function getAccountStorageMaps(roots) {
+    try {
+        const allMatchingRecords = await storageMapEntries
+            .where("root")
+            .anyOf(roots)
+            .toArray();
+        return allMatchingRecords;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error fetching account storage maps for roots ${roots.join(", ")}`);
+    }
+}
+export async function getVaultAssets(vaultRoot) {
     try {
         // Fetch all records matching the given root
-        const allMatchingRecords = await accountVaults
+        const allMatchingRecords = await accountAssets
             .where("root")
             .equals(vaultRoot)
             .toArray();
-        // The first record is the only one due to the uniqueness constraint
-        const vaultRecord = allMatchingRecords[0];
-        if (vaultRecord === undefined) {
-            console.log("No records found for given vault root.");
-            return null;
-        }
-        // Convert the assets Blob to an ArrayBuffer
-        const assetsArrayBuffer = await vaultRecord.assets.arrayBuffer();
-        const assetsArray = new Uint8Array(assetsArrayBuffer);
-        const assetsBase64 = uint8ArrayToBase64(assetsArray);
-        return {
-            root: vaultRecord.root,
-            assets: assetsBase64,
-        };
+        // Map the records to their asset values
+        const assets = allMatchingRecords.map((record) => {
+            return {
+                asset: record.asset,
+            };
+        });
+        return assets;
     }
     catch (error) {
         logWebStoreError(error, `Error fetching account vault for root ${vaultRoot}`);
@@ -239,34 +237,51 @@ export async function insertAccountCode(codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function insertAccountStorage(storageRoot, storageSlots) {
+export async function insertAccountStorage(storageSlots) {
     try {
-        const storageSlotsBlob = new Blob([new Uint8Array(storageSlots)]);
-        // Prepare the data object to insert
-        const data = {
-            root: storageRoot, // Using storageRoot as the key
-            slots: storageSlotsBlob, // Blob created from ArrayBuffer
-        };
-        // Perform the insert using Dexie
-        await accountStorages.put(data);
+        let processedSlots = storageSlots.map((slot) => {
+            return {
+                commitment: slot.commitment,
+                slotIndex: slot.slotIndex,
+                slotValue: slot.slotValue,
+                slotType: slot.slotType,
+            };
+        });
+        await accountStorages.bulkPut(processedSlots);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting storage with root: ${storageRoot}`);
+        logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function insertAccountAssetVault(vaultRoot, assets) {
+export async function insertStorageMapEntries(entries) {
     try {
-        const assetsBlob = new Blob([new Uint8Array(assets)]);
-        // Prepare the data object to insert
-        const data = {
-            root: vaultRoot, // Using vaultRoot as the key
-            assets: assetsBlob,
-        };
-        // Perform the insert using Dexie
-        await accountVaults.put(data);
+        let processedEntries = entries.map((entry) => {
+            return {
+                root: entry.root,
+                key: entry.key,
+                value: entry.value,
+            };
+        });
+        await storageMapEntries.bulkPut(processedEntries);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
+        logWebStoreError(error, `Error inserting storage map entries`);
+    }
+}
+export async function insertVaultAssets(assets) {
+    try {
+        let processedAssets = assets.map((asset) => {
+            return {
+                root: asset.root,
+                vaultKey: asset.vaultKey,
+                faucetIdPrefix: asset.faucetIdPrefix,
+                asset: asset.asset,
+            };
+        });
+        await accountAssets.bulkPut(processedAssets);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting assets`);
     }
 }
 export async function insertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {

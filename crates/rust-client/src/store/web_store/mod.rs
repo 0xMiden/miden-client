@@ -57,6 +57,7 @@ pub struct WebStore {}
 
 impl WebStore {
     pub async fn new() -> Result<WebStore, JsValue> {
+        console_error_panic_hook::set_once();
         JsFuture::from(setup_indexed_db()).await?;
         Ok(WebStore {})
     }
