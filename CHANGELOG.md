@@ -30,6 +30,7 @@
 * Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
 * Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111))
 * Store changes after transaction execution no longer require fetching the whole account state ([#1147](https://github.com/0xMiden/miden-client/pull/1147)).
+* Add support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164))
 
 ### Features
 
