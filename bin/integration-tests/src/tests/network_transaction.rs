@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use std::sync::Arc;
 use std::vec;
 
@@ -68,13 +69,13 @@ const INCR_NONCE_AUTH_CODE: &str = "
 async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-) -> Result<(Account, Library), String> {
+) -> Result<(Account, Library)> {
     let (acc, seed, library) = get_counter_contract_account(client, storage_mode).await;
 
-    client.add_account(&acc, Some(seed), false).await.unwrap();
+    client.add_account(&acc, Some(seed), false).await?;
 
     let mut script_builder = ScriptBuilder::new(true);
-    script_builder.link_dynamic_library(&library).unwrap();
+    script_builder.link_dynamic_library(&library)?;
     let tx_script = script_builder
         .compile_tx_script(
             "use.external_contract::counter_contract
@@ -82,17 +83,17 @@ async fn deploy_counter_contract(
             call.counter_contract::increment_count
         end",
         )
-        .unwrap();
+        ?;
 
     // Build a transaction request with the custom script
     let tx_increment_request =
-        TransactionRequestBuilder::new().custom_script(tx_script).build().unwrap();
+        TransactionRequestBuilder::new().custom_script(tx_script).build()?;
 
     // Execute the transaction locally
-    let tx_result = client.new_transaction(acc.id(), tx_increment_request).await.unwrap();
+    let tx_result = client.new_transaction(acc.id(), tx_increment_request).await?;
     let tx_id = tx_result.executed_transaction().id();
-    client.submit_transaction(tx_result).await.unwrap();
-    wait_for_tx(client, tx_id).await;
+    client.submit_transaction(tx_result).await?;
+    wait_for_tx(client, tx_id).await?;
 
     Ok((acc, library))
 }
@@ -140,36 +141,36 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-pub async fn counter_contract_ntx(client_config: ClientConfig) {
+pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
-    let (mut client, keystore) = create_test_client(client_config).await;
-    client.sync_state().await.unwrap();
+    let (mut client, keystore) = create_test_client(client_config).await?;
+    client.sync_state().await?;
 
     let (network_account, library) =
-        deploy_counter_contract(&mut client, AccountStorageMode::Network).await.unwrap();
+        deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
     assert_eq!(
         client
             .get_account(network_account.id())
             .await
-            .unwrap()
+            ?
             .unwrap()
             .account()
             .storage()
             .get_item(0)
-            .unwrap(),
+            ?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
     let (native_account, _native_seed, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
             .await
-            .unwrap();
+            ?;
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
         .with_dynamic_library(library)
-        .unwrap();
+        .map_err(|e| anyhow!(e))?;
 
     let mut network_notes = vec![];
 
@@ -184,16 +185,16 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) {
                 )
                 .tag(NoteTag::from_account_id(network_account.id()).into())
                 .build(&assembler)
-                .unwrap(),
+                ?,
         ));
     }
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(network_notes)
         .build()
-        .unwrap();
+        ?;
 
-    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await;
+    execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
     wait_for_blocks(&mut client, 2).await;
 
@@ -201,38 +202,39 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) {
         .test_rpc_api()
         .get_account_details(network_account.id())
         .await
-        .unwrap()
+        ?
         .account()
         .cloned()
-        .unwrap();
+        .with_context(|| "Account details not available")?;
 
     assert_eq!(
-        a.storage().get_item(0).unwrap(),
+        a.storage().get_item(0)?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1 + BUMP_NOTE_NUMBER)])
     );
+    Ok(())
 }
 
-pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
-    let (mut client, keystore) = create_test_client(client_config).await;
-    client.sync_state().await.unwrap();
+pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = create_test_client(client_config).await?;
+    client.sync_state().await?;
 
     let (network_account, library) =
-        deploy_counter_contract(&mut client, AccountStorageMode::Network).await.unwrap();
+        deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
     let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public)
         .await
-        .unwrap()
+        ?
         .0;
 
     let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
         .await
-        .unwrap()
+        ?
         .0;
 
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
         .with_dynamic_library(library)
-        .unwrap();
+        .map_err(|e| anyhow!(e))?;
 
     let network_note = NoteBuilder::new(wallet.id(), client.rng())
         .code(
@@ -243,33 +245,33 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
         )
         .tag(NoteTag::from_account_id(network_account.id()).into())
         .build(&assembler)
-        .unwrap();
+        ?;
 
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(network_note.clone())])
         .build()
-        .unwrap();
+        ?;
 
-    let bump_transaction = client.new_transaction(wallet.id(), tx_request).await.unwrap();
-    client.testing_apply_transaction(bump_transaction.clone()).await.unwrap();
+    let bump_transaction = client.new_transaction(wallet.id(), tx_request).await?;
+    client.testing_apply_transaction(bump_transaction.clone()).await?;
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(vec![(network_note, None)])
         .build()
-        .unwrap();
+        ?;
 
     let consume_transaction =
-        client.new_transaction(native_account.id(), tx_request).await.unwrap();
+        client.new_transaction(native_account.id(), tx_request).await?;
 
-    let bump_proof = client.testing_prove_transaction(&bump_transaction).await.unwrap();
-    let consume_proof = client.testing_prove_transaction(&consume_transaction).await.unwrap();
+    let bump_proof = client.testing_prove_transaction(&bump_transaction).await?;
+    let consume_proof = client.testing_prove_transaction(&consume_transaction).await?;
 
     // Submit both transactions
-    client.testing_submit_proven_transaction(bump_proof).await.unwrap();
-    client.testing_submit_proven_transaction(consume_proof).await.unwrap();
+    client.testing_submit_proven_transaction(bump_proof).await?;
+    client.testing_submit_proven_transaction(consume_proof).await?;
 
-    client.testing_apply_transaction(consume_transaction).await.unwrap();
+    client.testing_apply_transaction(consume_transaction).await?;
 
     wait_for_blocks(&mut client, 2).await;
 
@@ -278,12 +280,12 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
         client
             .get_account(network_account.id())
             .await
-            .unwrap()
+            ?
             .unwrap()
             .account()
             .storage()
             .get_item(0)
-            .unwrap(),
+            ?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
@@ -292,12 +294,13 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) {
         client
             .get_account(native_account.id())
             .await
-            .unwrap()
+            ?
             .unwrap()
             .account()
             .storage()
             .get_item(0)
-            .unwrap(),
+            ?,
         Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
     );
+    Ok(())
 }
