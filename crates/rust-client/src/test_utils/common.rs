@@ -8,7 +8,6 @@ use std::time::{Duration, Instant};
 use std::vec::Vec;
 
 use anyhow::{Context, Result};
-
 use miden_objects::account::{Account, AccountId, AccountStorageMode};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
@@ -63,7 +62,8 @@ pub async fn create_test_client_builder(
     let (rpc_endpoint, rpc_timeout, store_config, auth_path) = client_config.into_parts();
 
     let store = {
-        let sqlite_store = SqliteStore::new(store_config).await
+        let sqlite_store = SqliteStore::new(store_config)
+            .await
             .with_context(|| "Failed to create SQLite store")?;
         std::sync::Arc::new(sqlite_store)
     };
@@ -73,39 +73,40 @@ pub async fn create_test_client_builder(
 
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-    let keystore = FilesystemKeyStore::new(auth_path.clone())
-        .with_context(|| format!("Failed to create filesystem keystore at path: {:?}", auth_path))?;
+    let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
+        format!("Failed to create filesystem keystore at path: {:?}", auth_path)
+    })?;
 
-    let builder = ClientBuilder::new()
-        .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-        .rng(Box::new(rng))
-        .store(store)
-        .filesystem_keystore(auth_path.to_str()
-            .with_context(|| format!("Failed to convert auth path to string: {:?}", auth_path))?)
-        .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
+    let builder =
+        ClientBuilder::new()
+            .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
+            .rng(Box::new(rng))
+            .store(store)
+            .filesystem_keystore(auth_path.to_str().with_context(|| {
+                format!("Failed to convert auth path to string: {:?}", auth_path)
+            })?)
+            .in_debug_mode(DebugMode::Enabled)
+            .tx_graceful_blocks(None);
 
     Ok((builder, keystore))
 }
-
 
 /// Creates a `TestClient`, returning a Result.
 ///
 /// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
 /// at a temporary location determined by the store config. The client is synced to the
 /// current state before being returned.
-pub async fn create_test_client(client_config: ClientConfig) -> Result<(TestClient, TestClientKeyStore)> {
+pub async fn create_test_client(
+    client_config: ClientConfig,
+) -> Result<(TestClient, TestClientKeyStore)> {
     let (builder, keystore) = create_test_client_builder(client_config).await?;
 
-    let mut client = builder.build().await
-        .with_context(|| "Failed to build test client")?;
+    let mut client = builder.build().await.with_context(|| "Failed to build test client")?;
 
-    client.sync_state().await
-        .with_context(|| "Failed to sync client state")?;
+    client.sync_state().await.with_context(|| "Failed to sync client state")?;
 
     Ok((client, keystore))
 }
-
 
 /// Inserts a new wallet account into the client and into the keystore.
 pub async fn insert_new_wallet(
@@ -229,7 +230,9 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
     let now = Instant::now();
     println!("Syncing State...");
     loop {
-        client.sync_state().await
+        client
+            .sync_state()
+            .await
             .with_context(|| "Failed to sync client state while waiting for transaction")?;
 
         // Check if executed transaction got committed by the node
@@ -237,7 +240,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             .get_transactions(TransactionFilter::Ids(vec![transaction_id]))
             .await
             .with_context(|| format!("Failed to get transaction with ID: {}", transaction_id))?;
-        
+
         let tracked_transaction = tracked_transactions
             .pop()
             .with_context(|| format!("Transaction with ID {} not found", transaction_id))?;
@@ -277,7 +280,6 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
     }
     Ok(())
 }
-
 
 /// Syncs until `amount_of_blocks` have been created onchain compared to client's sync height
 pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> SyncSummary {
@@ -328,22 +330,29 @@ pub async fn wait_for_node(client: &mut TestClient) {
 pub const MINT_AMOUNT: u64 = 1000;
 pub const TRANSFER_AMOUNT: u64 = 59;
 
-/// Sets up a basic client and returns two basic accounts and a faucet account (in that order), returning a Result.
+/// Sets up a basic client and returns two basic accounts and a faucet account (in that order),
+/// returning a Result.
 pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Account, Account)> {
     // Ensure clean state
-    let account_headers = client.get_account_headers().await
+    let account_headers = client
+        .get_account_headers()
+        .await
         .with_context(|| "Failed to get account headers")?;
     anyhow::ensure!(account_headers.is_empty(), "Expected empty account headers for clean state");
-    
-    let transactions = client.get_transactions(TransactionFilter::All).await
+
+    let transactions = client
+        .get_transactions(TransactionFilter::All)
+        .await
         .with_context(|| "Failed to get transactions")?;
     anyhow::ensure!(transactions.is_empty(), "Expected empty transactions for clean state");
-    
-    let input_notes = client.get_input_notes(NoteFilter::All).await
+
+    let input_notes = client
+        .get_input_notes(NoteFilter::All)
+        .await
         .with_context(|| "Failed to get input notes")?;
     anyhow::ensure!(input_notes.is_empty(), "Expected empty input notes for clean state");
 
@@ -353,23 +362,21 @@ pub async fn setup_two_wallets_and_faucet(
         .with_context(|| "Failed to insert new fungible faucet account")?;
 
     // Create regular accounts
-    let (first_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore).await
+    let (first_basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
+        .await
         .with_context(|| "Failed to insert first basic wallet account")?;
 
-    let (second_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore).await
+    let (second_basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
+        .await
         .with_context(|| "Failed to insert second basic wallet account")?;
 
     println!("Syncing State...");
-    client.sync_state().await
-        .with_context(|| "Failed to sync client state")?;
+    client.sync_state().await.with_context(|| "Failed to sync client state")?;
 
     // Get Faucet and regular accounts
     println!("Fetching Accounts...");
     Ok((first_basic_account, second_basic_account, faucet_account))
 }
-
 
 /// Sets up a basic client and returns a basic account and a faucet account, returning a Result.
 pub async fn setup_wallet_and_faucet(
@@ -381,13 +388,12 @@ pub async fn setup_wallet_and_faucet(
         .await
         .with_context(|| "Failed to insert new fungible faucet account")?;
 
-    let (basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore).await
+    let (basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
+        .await
         .with_context(|| "Failed to insert new wallet account")?;
 
     Ok((basic_account, faucet_account))
 }
-
 
 /// Mints a note from `faucet_account_id` for `basic_account_id` and returns the executed
 /// transaction ID and the note with [`MINT_AMOUNT`] units of the corresponding fungible asset.

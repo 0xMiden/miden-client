@@ -59,14 +59,11 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     client.sync_state().await?;
     // Insert Account
     let (regular_account, _seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            ?;
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
     let (fungible_faucet, _seed, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            ?;
+            .await?;
 
     // Execute mint transaction in order to create custom note
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await;
@@ -100,8 +97,7 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
         .custom_script(tx_script.clone())
         .script_arg(Word::empty())
         .extend_advice_map(advice_map.clone())
-        .build()
-        ?;
+        .build()?;
 
     // This fails because of {asserted_value} having the incorrect number passed in
     assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
@@ -112,8 +108,7 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
         .custom_script(tx_script)
         .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into())
         .extend_advice_map(advice_map)
-        .build()
-        ?;
+        .build()?;
 
     // TEST CUSTOM SCRIPT SERIALIZATION
     let mut buffer = Vec::new();
@@ -151,14 +146,11 @@ pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     client.sync_state().await?;
     // Insert Account
     let (regular_account, _seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            ?;
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
     let (fungible_faucet, _seed, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            ?;
+            .await?;
 
     // Execute mint transaction in order to increase nonce
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await;
@@ -200,10 +192,8 @@ pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     );
 
     for pos in 0..(num_leaves as u64) {
-        let expected_element = merkle_store
-            .get_node(merkle_root, NodeIndex::new(2u8, pos)?)
-            ?
-            .to_hex();
+        let expected_element =
+            merkle_store.get_node(merkle_root, NodeIndex::new(2u8, pos)?)?.to_hex();
         code += format!(
             "
             # get element at index `pos` from the merkle store in mem[1000] and push it to stack
@@ -224,8 +214,7 @@ pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
         .custom_script(tx_script)
         .extend_advice_map(advice_map)
         .extend_merkle_store(merkle_store.inner_nodes())
-        .build()
-        ?;
+        .build()?;
 
     execute_tx_and_sync(&mut client, regular_account.id(), transaction_request).await?;
 
@@ -250,13 +239,9 @@ pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<
 
     // Create accounts
     let (basic_account_1, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            ?;
+        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
 
-    insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
-        .await
-        ?;
+    insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
 
     client_1.sync_state().await?;
     client_2.sync_state().await?;
@@ -278,8 +263,7 @@ pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<
         NoteTag::from_account_id(basic_account_1.id()),
         NoteExecutionHint::None,
         Default::default(),
-    )
-    ?;
+    )?;
     let note_assets = NoteAssets::new(vec![])?;
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -287,26 +271,24 @@ pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<
     // Send transaction and wait for it to be committed
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()
-        ?;
+        .build()?;
 
-    let note = tx_request.expected_output_own_notes().pop()
-        .with_context(|| "No expected output notes found in transaction request")?.clone();
+    let note = tx_request
+        .expected_output_own_notes()
+        .pop()
+        .with_context(|| "No expected output notes found in transaction request")?
+        .clone();
     execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await?;
 
     // Load tag into client 2
-    client_2
-        .add_note_tag(NoteTag::from_account_id(basic_account_1.id()))
-        .await
-        ?;
+    client_2.add_note_tag(NoteTag::from_account_id(basic_account_1.id())).await?;
 
     // Client 2's account should receive the note here:
     client_2.sync_state().await?;
     client_3.sync_state().await?;
 
     // Assert that the note is the same
-    let received_note: InputNote =
-        client_2.get_input_note(note.id()).await?.unwrap().try_into()?;
+    let received_note: InputNote = client_2.get_input_note(note.id()).await?.unwrap().try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
     assert_eq!(received_note.note(), &note);
     assert!(client_3.get_input_notes(NoteFilter::All).await?.is_empty());

@@ -28,43 +28,39 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
 
     // Create faucet account
     let (faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            ?;
+        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
 
     // Create regular accounts
     let (basic_wallet_1, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
-            .await
-            ?;
+        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
 
     // Create regular accounts
     let (basic_wallet_2, ..) =
-        insert_new_wallet(&mut client_3, AccountStorageMode::Private, &keystore_3)
-            .await
-            ?;
+        insert_new_wallet(&mut client_3, AccountStorageMode::Private, &keystore_3).await?;
 
     client_1.sync_state().await?;
     client_2.sync_state().await?;
 
-    let tx_request = TransactionRequestBuilder::new()
-        .build_mint_fungible_asset(
-            FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?,
-            basic_wallet_1.id(),
-            NoteType::Public,
-            client_1.rng(),
-        )
-        ?;
-    let note = tx_request.expected_output_own_notes().pop()
-        .with_context(|| "No expected output notes found in onchain transaction from faucet")?.clone();
+    let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+        FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?,
+        basic_wallet_1.id(),
+        NoteType::Public,
+        client_1.rng(),
+    )?;
+    let note = tx_request
+        .expected_output_own_notes()
+        .pop()
+        .with_context(|| "No expected output notes found in onchain transaction from faucet")?
+        .clone();
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
     // Client 2's account should receive the note here:
     client_2.sync_state().await?;
 
     // Assert that the note is the same
-    let received_note: InputNote =
-        client_2.get_input_note(note.id()).await?
+    let received_note: InputNote = client_2
+        .get_input_note(note.id())
+        .await?
         .with_context(|| format!("Note {} not found in client_2", note.id()))?
         .try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
@@ -83,34 +79,33 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     .await;
 
     let p2id_asset = FungibleAsset::new(faucet_account.id(), TRANSFER_AMOUNT)?;
-    let tx_request = TransactionRequestBuilder::new()
-        .build_pay_to_id(
-            PaymentNoteDescription::new(
-                vec![p2id_asset.into()],
-                basic_wallet_1.id(),
-                basic_wallet_2.id(),
-            ),
-            NoteType::Public,
-            client_2.rng(),
-        )
-        ?;
+    let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
+        PaymentNoteDescription::new(
+            vec![p2id_asset.into()],
+            basic_wallet_1.id(),
+            basic_wallet_2.id(),
+        ),
+        NoteType::Public,
+        client_2.rng(),
+    )?;
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
 
     // Create a note for client 3 that is already consumed before syncing
-    let tx_request = TransactionRequestBuilder::new()
-        .build_pay_to_id(
-            PaymentNoteDescription::new(
-                vec![p2id_asset.into()],
-                basic_wallet_1.id(),
-                basic_wallet_2.id(),
-            )
-            .with_reclaim_height(1.into()),
-            NoteType::Public,
-            client_2.rng(),
+    let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
+        PaymentNoteDescription::new(
+            vec![p2id_asset.into()],
+            basic_wallet_1.id(),
+            basic_wallet_2.id(),
         )
-        ?;
-    let note = tx_request.expected_output_own_notes().pop()
-        .with_context(|| "No expected output notes found in onchain transaction from basic wallet")?.clone();
+        .with_reclaim_height(1.into()),
+        NoteType::Public,
+        client_2.rng(),
+    )?;
+    let note = tx_request
+        .expected_output_own_notes()
+        .pop()
+        .with_context(|| "No expected output notes found in onchain transaction from basic wallet")?
+        .clone();
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
@@ -126,13 +121,11 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
 
     let note = client_3
         .get_input_notes(NoteFilter::Committed)
-        .await
-        ?
+        .await?
         .first()
         .with_context(|| "No committed input notes found")?
         .clone()
-        .try_into()
-        ?;
+        .try_into()?;
 
     let tx_id = consume_notes(&mut client_3, basic_wallet_2.id(), &[note]).await;
     wait_for_tx(&mut client_3, tx_id).await?;
@@ -154,25 +147,21 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client_2).await;
 
     let (faucet_account_header, _, secret_key) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1)
-            .await
-            ?;
+        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
     let (first_regular_account, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1)
-            .await
-            ?;
+        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
 
     let (second_client_first_regular_account, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2)
-            .await
-            ?;
+        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
 
     let target_account_id = first_regular_account.id();
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    let (_, status) = client_1.get_account_header_by_id(faucet_account_id).await?
+    let (_, status) = client_1
+        .get_account_header_by_id(faucet_account_id)
+        .await?
         .with_context(|| format!("Faucet account {} not found", faucet_account_id))?;
     let faucet_seed = status.seed().cloned();
 
@@ -190,16 +179,10 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // between clients
     client_2.sync_state().await?;
 
-    let (client_1_faucet, _) = client_1
-        .get_account_header_by_id(faucet_account_header.id())
-        .await
-        ?
-        .unwrap();
-    let (client_2_faucet, _) = client_2
-        .get_account_header_by_id(faucet_account_header.id())
-        .await
-        ?
-        .unwrap();
+    let (client_1_faucet, _) =
+        client_1.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
+    let (client_2_faucet, _) =
+        client_2.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
@@ -234,16 +217,10 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     )
     .await;
 
-    let (client_1_faucet, _) = client_1
-        .get_account_header_by_id(faucet_account_header.id())
-        .await
-        ?
-        .unwrap();
-    let (client_2_faucet, _) = client_2
-        .get_account_header_by_id(faucet_account_header.id())
-        .await
-        ?
-        .unwrap();
+    let (client_1_faucet, _) =
+        client_1.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
+    let (client_2_faucet, _) =
+        client_2.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
@@ -254,8 +231,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // get initial balances
     let from_account_balance = client_1
         .get_account(from_account_id)
-        .await
-        ?
+        .await?
         .unwrap()
         .account()
         .vault()
@@ -263,8 +239,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .unwrap_or(0);
     let to_account_balance = client_2
         .get_account(to_account_id)
-        .await
-        ?
+        .await?
         .unwrap()
         .account()
         .vault()
@@ -274,17 +249,11 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT)?;
 
     println!("Running P2ID tx...");
-    let tx_request = TransactionRequestBuilder::new()
-        .build_pay_to_id(
-            PaymentNoteDescription::new(
-                vec![Asset::Fungible(asset)],
-                from_account_id,
-                to_account_id,
-            ),
-            NoteType::Public,
-            client_1.rng(),
-        )
-        ?;
+    let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
+        PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id),
+        NoteType::Public,
+        client_1.rng(),
+    )?;
     execute_tx_and_sync(&mut client_1, from_account_id, tx_request).await;
 
     // sync on second client until we receive the note
@@ -297,9 +266,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
 
     // Consume the note
     println!("Consuming note on second client...");
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![notes[0].id()])
-        ?;
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![notes[0].id()])?;
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await;
 
     // sync on first client
@@ -307,14 +274,15 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     client_1.sync_state().await?;
 
     // Check that the client doesn't know who consumed the note
-    let input_note = client_1.get_input_note(notes[0].id()).await?
+    let input_note = client_1
+        .get_input_note(notes[0].id())
+        .await?
         .with_context(|| format!("Input note {} not found", notes[0].id()))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
     let new_from_account_balance = client_1
         .get_account(from_account_id)
-        .await
-        ?
+        .await?
         .unwrap()
         .account()
         .vault()
@@ -322,8 +290,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .unwrap_or(0);
     let new_to_account_balance = client_2
         .get_account(to_account_id)
-        .await
-        ?
+        .await?
         .unwrap()
         .account()
         .vault()
@@ -346,9 +313,7 @@ pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
     client_1.rng().fill_bytes(&mut user_seed);
 
     let (faucet_account_header, ..) =
-        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1)
-            .await
-            ?;
+        insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
     let (first_regular_account, _, secret_key) = insert_new_wallet_with_seed(
         &mut client_1,
@@ -356,8 +321,7 @@ pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
         &keystore_1,
         user_seed,
     )
-    .await
-    ?;
+    .await?;
 
     let target_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -375,16 +339,19 @@ pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
 
     // Import the public account by id
     let built_wallet_id =
-        build_wallet_id(user_seed, secret_key.public_key(), AccountStorageMode::Public, false)
-            ?;
+        build_wallet_id(user_seed, secret_key.public_key(), AccountStorageMode::Public, false)?;
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await?;
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
 
-    let original_account = client_1.get_account(first_regular_account.id()).await?
-        .with_context(|| format!("Original account {} not found in client_1", first_regular_account.id()))?;
-    let imported_account = client_2.get_account(first_regular_account.id()).await?
-        .with_context(|| format!("Imported account {} not found in client_2", first_regular_account.id()))?;
+    let original_account =
+        client_1.get_account(first_regular_account.id()).await?.with_context(|| {
+            format!("Original account {} not found in client_1", first_regular_account.id())
+        })?;
+    let imported_account =
+        client_2.get_account(first_regular_account.id()).await?.with_context(|| {
+            format!("Imported account {} not found in client_2", first_regular_account.id())
+        })?;
     assert_eq!(imported_account.account().commitment(), original_account.account().commitment());
 
     // Now use the wallet in the second client to consume the generated note

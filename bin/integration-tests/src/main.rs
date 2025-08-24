@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -55,16 +56,17 @@ struct Args {
 
 impl Args {
     fn to_client_config(self) -> Result<ClientConfig> {
-        let host = self.rpc_endpoint.host_str()
+        let host = self
+            .rpc_endpoint
+            .host_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid host in RPC endpoint"))?;
-        let port = self.rpc_endpoint.port()
+        let port = self
+            .rpc_endpoint
+            .port()
             .ok_or_else(|| anyhow::anyhow!("Invalid port in RPC endpoint"))?;
-        
-        let endpoint = Endpoint::new(
-            self.rpc_endpoint.scheme().to_string(),
-            host.to_string(),
-            Some(port),
-        );
+
+        let endpoint =
+            Endpoint::new(self.rpc_endpoint.scheme().to_string(), host.to_string(), Some(port));
         let timeout_ms = self.timeout;
 
         Ok(ClientConfig::new(endpoint, timeout_ms))
@@ -104,7 +106,8 @@ async fn run_test<F, Fut>(
         },
         Ok(Err(e)) => {
             println!(" - {name}: FAILED");
-            failed_tests.lock().unwrap().push(format!("{name}: {e}"));
+            let error_report = format_error_report(&e);
+            failed_tests.lock().unwrap().push(format!("{name}:\n{error_report}"));
         },
         Err(panic_info) => {
             println!(" - {name}: FAILED (panic)");
@@ -118,6 +121,33 @@ async fn run_test<F, Fut>(
             failed_tests.lock().unwrap().push(format!("{name}: {msg}"));
         },
     }
+}
+
+/// Formats an error with its full context chain for better debugging
+fn format_error_report(error: &anyhow::Error) -> String {
+    let mut output = String::new();
+
+    // Write the main error
+    writeln!(output, "Error: {}", error).unwrap();
+
+    // Write the error chain
+    let chain: Vec<_> = error.chain().skip(1).collect();
+    if !chain.is_empty() {
+        writeln!(output, "\nCause chain:").unwrap();
+        for (i, cause) in chain.iter().enumerate() {
+            writeln!(output, "  {}: {}", i + 1, cause).unwrap();
+        }
+    }
+
+    // Try to use miette for pretty formatting if available
+    if let Some(miette_error) = error.downcast_ref::<miette::Report>() {
+        writeln!(output, "\nDetailed report:").unwrap();
+        write!(output, "{:?}", miette_error).unwrap_or_else(|_| {
+            write!(output, "(Failed to format miette report)").unwrap();
+        });
+    }
+
+    output
 }
 
 /// Runs all the tests sequentially.
@@ -302,9 +332,11 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         println!("All tests passed!");
         Ok(())
     } else {
-        println!("{} tests failed:", failed_tests.lock().unwrap().len());
-        for failed_test in failed_tests.lock().unwrap().iter() {
-            println!("  - {failed_test}");
+        let failed = failed_tests.lock().unwrap();
+        println!("{} tests failed:", failed.len());
+        for (i, failed_test) in failed.iter().enumerate() {
+            println!("\n[{}] {}", i + 1, failed_test);
+            println!("{}", "─".repeat(80));
         }
         std::process::exit(1);
     }
