@@ -50,7 +50,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     let note = tx_request
         .expected_output_own_notes()
         .pop()
-        .with_context(|| "No expected output notes found in onchain transaction from faucet")?
+        .with_context(|| "no expected output notes found in onchain transaction from faucet")?
         .clone();
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await;
 
@@ -104,7 +104,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     let note = tx_request
         .expected_output_own_notes()
         .pop()
-        .with_context(|| "No expected output notes found in onchain transaction from basic wallet")?
+        .with_context(|| "no expected output notes found in onchain transaction from basic wallet")?
         .clone();
     execute_tx_and_sync(&mut client_2, basic_wallet_1.id(), tx_request).await;
 
@@ -123,7 +123,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
         .get_input_notes(NoteFilter::Committed)
         .await?
         .first()
-        .with_context(|| "No committed input notes found")?
+        .with_context(|| "no committed input notes found")?
         .clone()
         .try_into()?;
 

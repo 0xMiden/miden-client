@@ -276,7 +276,7 @@ pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<
     let note = tx_request
         .expected_output_own_notes()
         .pop()
-        .with_context(|| "No expected output notes found in transaction request")?
+        .with_context(|| "no expected output notes found in transaction request")?
         .clone();
     execute_tx_and_sync(&mut client_1, basic_account_1.id(), tx_request).await?;
 

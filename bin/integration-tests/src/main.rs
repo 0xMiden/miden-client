@@ -125,29 +125,8 @@ async fn run_test<F, Fut>(
 
 /// Formats an error with its full context chain for better debugging
 fn format_error_report(error: &anyhow::Error) -> String {
-    let mut output = String::new();
-
-    // Write the main error
-    writeln!(output, "Error: {}", error).unwrap();
-
-    // Write the error chain
-    let chain: Vec<_> = error.chain().skip(1).collect();
-    if !chain.is_empty() {
-        writeln!(output, "\nCause chain:").unwrap();
-        for (i, cause) in chain.iter().enumerate() {
-            writeln!(output, "  {}: {}", i + 1, cause).unwrap();
-        }
-    }
-
-    // Try to use miette for pretty formatting if available
-    if let Some(miette_error) = error.downcast_ref::<miette::Report>() {
-        writeln!(output, "\nDetailed report:").unwrap();
-        write!(output, "{:?}", miette_error).unwrap_or_else(|_| {
-            write!(output, "(Failed to format miette report)").unwrap();
-        });
-    }
-
-    output
+    let report = miette::Report::new(error);
+    format!("{:?}", report)
 }
 
 /// Runs all the tests sequentially.
@@ -160,7 +139,7 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
     println!("==========================================================");
     println!("Using:");
     println!(" - RPC endpoint: {}", client_config.rpc_endpoint);
-    println!(" - Timeout: {}ms", client_config.rpc_timeout);
+    println!(" - Timeout: {}ms", client_config.rpc_timeout_ms);
     println!("==========================================================");
 
     let failed_tests = Arc::new(Mutex::new(Vec::new()));

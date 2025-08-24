@@ -1149,14 +1149,14 @@ pub async fn unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .await
         .unwrap()
         .pop()
-        .with_context(|| "No nullifier found in check_nullifiers_by_prefix response")?;
+        .with_context(|| "no nullifier found in check_nullifiers_by_prefix response")?;
     let node_nullifier_proof = client
         .test_rpc_api()
         .check_nullifiers(&[nullifier])
         .await
         .unwrap()
         .pop()
-        .with_context(|| "No nullifier proof returned from check_nullifiers RPC API")?;
+        .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());

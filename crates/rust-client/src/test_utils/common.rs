@@ -64,7 +64,7 @@ pub async fn create_test_client_builder(
     let store = {
         let sqlite_store = SqliteStore::new(store_config)
             .await
-            .with_context(|| "Failed to create SQLite store")?;
+            .with_context(|| "failed to create SQLite store")?;
         std::sync::Arc::new(sqlite_store)
     };
 
@@ -101,9 +101,9 @@ pub async fn create_test_client(
 ) -> Result<(TestClient, TestClientKeyStore)> {
     let (builder, keystore) = create_test_client_builder(client_config).await?;
 
-    let mut client = builder.build().await.with_context(|| "Failed to build test client")?;
+    let mut client = builder.build().await.with_context(|| "failed to build test client")?;
 
-    client.sync_state().await.with_context(|| "Failed to sync client state")?;
+    client.sync_state().await.with_context(|| "failed to sync client state")?;
 
     Ok((client, keystore))
 }
@@ -233,15 +233,13 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
         client
             .sync_state()
             .await
-            .with_context(|| "Failed to sync client state while waiting for transaction")?;
+            .with_context(|| "failed to sync client state while waiting for transaction")?;
 
         // Check if executed transaction got committed by the node
-        let mut tracked_transactions = client
+        let tracked_transaction = client
             .get_transactions(TransactionFilter::Ids(vec![transaction_id]))
             .await
-            .with_context(|| format!("Failed to get transaction with ID: {}", transaction_id))?;
-
-        let tracked_transaction = tracked_transactions
+            .with_context(|| format!("Failed to get transaction with ID: {}", transaction_id))?
             .pop()
             .with_context(|| format!("Transaction with ID {} not found", transaction_id))?;
 
@@ -265,7 +263,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             let elapsed = now.elapsed();
             let wait_times_dir = std::path::PathBuf::from("wait_times");
             std::fs::create_dir_all(&wait_times_dir)
-                .with_context(|| "Failed to create wait_times directory")?;
+                .with_context(|| "failed to create wait_times directory")?;
 
             let elapsed_time_file = wait_times_dir.join(format!("wait_time_{}", Uuid::new_v4()));
             let mut file = OpenOptions::new()
@@ -273,9 +271,9 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 .write(true)
                 .truncate(true)
                 .open(elapsed_time_file)
-                .with_context(|| "Failed to create elapsed time file")?;
+                .with_context(|| "failed to create elapsed time file")?;
             writeln!(file, "{:?}", elapsed.as_millis())
-                .with_context(|| "Failed to write elapsed time to file")?;
+                .with_context(|| "failed to write elapsed time to file")?;
         }
     }
     Ok(())
@@ -341,37 +339,37 @@ pub async fn setup_two_wallets_and_faucet(
     let account_headers = client
         .get_account_headers()
         .await
-        .with_context(|| "Failed to get account headers")?;
+        .with_context(|| "failed to get account headers")?;
     anyhow::ensure!(account_headers.is_empty(), "Expected empty account headers for clean state");
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
         .await
-        .with_context(|| "Failed to get transactions")?;
+        .with_context(|| "failed to get transactions")?;
     anyhow::ensure!(transactions.is_empty(), "Expected empty transactions for clean state");
 
     let input_notes = client
         .get_input_notes(NoteFilter::All)
         .await
-        .with_context(|| "Failed to get input notes")?;
+        .with_context(|| "failed to get input notes")?;
     anyhow::ensure!(input_notes.is_empty(), "Expected empty input notes for clean state");
 
     // Create faucet account
     let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
-        .with_context(|| "Failed to insert new fungible faucet account")?;
+        .with_context(|| "failed to insert new fungible faucet account")?;
 
     // Create regular accounts
     let (first_basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
         .await
-        .with_context(|| "Failed to insert first basic wallet account")?;
+        .with_context(|| "failed to insert first basic wallet account")?;
 
     let (second_basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
         .await
-        .with_context(|| "Failed to insert second basic wallet account")?;
+        .with_context(|| "failed to insert second basic wallet account")?;
 
     println!("Syncing State...");
-    client.sync_state().await.with_context(|| "Failed to sync client state")?;
+    client.sync_state().await.with_context(|| "failed to sync client state")?;
 
     // Get Faucet and regular accounts
     println!("Fetching Accounts...");
@@ -386,11 +384,11 @@ pub async fn setup_wallet_and_faucet(
 ) -> Result<(Account, Account)> {
     let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
-        .with_context(|| "Failed to insert new fungible faucet account")?;
+        .with_context(|| "failed to insert new fungible faucet account")?;
 
     let (basic_account, ..) = insert_new_wallet(client, accounts_storage_mode, keystore)
         .await
-        .with_context(|| "Failed to insert new wallet account")?;
+        .with_context(|| "failed to insert new wallet account")?;
 
     Ok((basic_account, faucet_account))
 }

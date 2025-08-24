@@ -361,7 +361,7 @@ async fn deploy_foreign_account(
 
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(secret_key))
-        .with_context(|| "Failed to add key to keystore")?;
+        .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, Some(foreign_seed), false).await?;
 
     println!("Deploying foreign account");
@@ -371,7 +371,7 @@ async fn deploy_foreign_account(
             foreign_account_id,
             TransactionRequestBuilder::new()
                 .build()
-                .with_context(|| "Failed to build transaction request")?,
+                .with_context(|| "failed to build transaction request")?,
         )
         .await?;
     let tx_id = tx.executed_transaction().id();

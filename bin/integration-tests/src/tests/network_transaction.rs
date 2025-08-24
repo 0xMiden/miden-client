@@ -193,7 +193,7 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
         .await?
         .account()
         .cloned()
-        .with_context(|| "Account details not available")?;
+        .with_context(|| "account details not available")?;
 
     assert_eq!(
         a.storage().get_item(0)?,

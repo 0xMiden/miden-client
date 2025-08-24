@@ -128,30 +128,30 @@ impl NodeBuilder {
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
-            .context("Failed to bind to RPC gRPC endpoint")?;
+            .context("failed to bind to RPC gRPC endpoint")?;
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store RPC gRPC endpoint")?;
+            .context("failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store ntx-builder gRPC endpoint")?;
+            .context("failed to bind to store ntx-builder gRPC endpoint")?;
         let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store block-producer gRPC endpoint")?;
+            .context("failed to bind to store block-producer gRPC endpoint")?;
 
         let store_rpc_address = store_rpc_listener
             .local_addr()
-            .context("Failed to retrieve the store's RPC gRPC address")?;
+            .context("failed to retrieve the store's RPC gRPC address")?;
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
-            .context("Failed to retrieve the store's block-producer gRPC address")?;
+            .context("failed to retrieve the store's block-producer gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
-            .context("Failed to retrieve the store's ntx-builder gRPC address")?;
+            .context("failed to retrieve the store's ntx-builder gRPC address")?;
 
         let block_producer_address = available_socket_addr()
             .await
-            .context("Failed to bind to block-producer gRPC endpoint")?;
+            .context("failed to bind to block-producer gRPC endpoint")?;
 
         // Start components
 
@@ -231,7 +231,7 @@ impl NodeBuilder {
     ) -> Result<(Id, SocketAddr)> {
         let store_address = rpc_listener
             .local_addr()
-            .context("Failed to retrieve the store's gRPC address")?;
+            .context("failed to retrieve the store's gRPC address")?;
         Ok((
             join_set
                 .spawn(async move {
@@ -370,6 +370,6 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {
-    let listener = TcpListener::bind("127.0.0.1:0").await.context("Failed to bind to endpoint")?;
-    listener.local_addr().context("Failed to retrieve the address")
+    let listener = TcpListener::bind("127.0.0.1:0").await.context("failed to bind to endpoint")?;
+    listener.local_addr().context("failed to retrieve the address")
 }
