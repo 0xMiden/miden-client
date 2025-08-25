@@ -107,7 +107,7 @@ interface FlattenedU8Vec {
 interface SerializedInputNoteData {
   noteId: string;
   noteAssets: Uint8Array;
-  serialNumber: string;
+  serialNumber: Uint8Array;
   inputs: Uint8Array;
   noteScriptRoot: string;
   noteScript: Uint8Array;

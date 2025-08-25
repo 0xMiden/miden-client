@@ -30,6 +30,7 @@
 * Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
 * Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111))
 * Tracked creation and committed timestamps for `TransactionRecord` ([#1173](https://github.com/0xMiden/miden-client/pull/1173)).
+* Migrated every JS file under `rust-client`'s `WebStore` to use TypeScript ([#1171](https://github.com/0xMiden/miden-client/pull/1171)).
 
 ### Features
 
@@ -42,6 +43,7 @@
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
 * Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141))
 * Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115))
+* Added `SigningInputs` to Web Client ([#1160](https://github.com/0xMiden/miden-client/pull/1160))
 
 ## 0.10.1 (2025-07-26)
 
