@@ -78,8 +78,7 @@ CREATE TABLE transactions (
     details BLOB NOT NULL,                           -- Serialized transaction details
     script_root TEXT,                                -- Transaction script root
     block_num UNSIGNED BIG INT,                      -- Block number for the block against which the transaction was executed.
-    committed BOOL NOT NULL,                         -- True if the transaction was committed, false otherwise
-    discarded BOOL NOT NULL,                         -- True if the transaction was discarded, false otherwise
+    status_variant INT NOT NULL,                     -- Status variant identifier
     status BLOB NOT NULL,                            -- Serialized transaction status
     FOREIGN KEY (script_root) REFERENCES transaction_scripts(script_root),
     PRIMARY KEY (id)

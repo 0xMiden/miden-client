@@ -450,6 +450,22 @@ pub enum TransactionStatus {
     Discarded(DiscardCause),
 }
 
+pub enum TransactionStatusVariant {
+    Pending = 0,
+    Committed = 1,
+    Discarded = 2,
+}
+
+impl TransactionStatus {
+    pub const fn variant(&self) -> TransactionStatusVariant {
+        match self {
+            TransactionStatus::Pending => TransactionStatusVariant::Pending,
+            TransactionStatus::Committed { .. } => TransactionStatusVariant::Committed,
+            TransactionStatus::Discarded(_) => TransactionStatusVariant::Discarded,
+        }
+    }
+}
+
 impl fmt::Display for TransactionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -465,14 +481,14 @@ impl fmt::Display for TransactionStatus {
 impl Serializable for TransactionStatus {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         match self {
-            TransactionStatus::Pending => target.write_u8(0),
+            TransactionStatus::Pending => target.write_u8(self.variant() as u8),
             TransactionStatus::Committed { block_number, commit_timestamp } => {
-                target.write_u8(1);
+                target.write_u8(self.variant() as u8);
                 block_number.write_into(target);
                 commit_timestamp.write_into(target);
             },
             TransactionStatus::Discarded(cause) => {
-                target.write_u8(2);
+                target.write_u8(self.variant() as u8);
                 cause.write_into(target);
             },
         }
@@ -482,13 +498,15 @@ impl Serializable for TransactionStatus {
 impl Deserializable for TransactionStatus {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         match source.read_u8()? {
-            0 => Ok(TransactionStatus::Pending),
-            1 => {
+            variant if variant == TransactionStatusVariant::Pending as u8 => {
+                Ok(TransactionStatus::Pending)
+            },
+            variant if variant == TransactionStatusVariant::Committed as u8 => {
                 let block_number = BlockNumber::read_from(source)?;
                 let commit_timestamp = source.read_u64()?;
                 Ok(TransactionStatus::Committed { block_number, commit_timestamp })
             },
-            2 => {
+            variant if variant == TransactionStatusVariant::Discarded as u8 => {
                 let cause = DiscardCause::read_from(source)?;
                 Ok(TransactionStatus::Discarded(cause))
             },

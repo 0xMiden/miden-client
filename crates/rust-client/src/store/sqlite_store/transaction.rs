@@ -18,6 +18,7 @@ use crate::transaction::{
     TransactionDetails,
     TransactionRecord,
     TransactionStatus,
+    TransactionStatusVariant,
     TransactionStoreUpdate,
 };
 use crate::{insert_sql, subst};
@@ -28,8 +29,7 @@ pub(crate) const UPSERT_TRANSACTION_QUERY: &str = insert_sql!(
         details,
         script_root,
         block_num,
-        committed,
-        discarded,
+        status_variant,
         status
     } | REPLACE
 );
@@ -47,15 +47,20 @@ impl TransactionFilter {
             FROM transactions AS tx LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
         match self {
             TransactionFilter::All => QUERY.to_string(),
-            TransactionFilter::Uncommitted => format!("{QUERY} WHERE NOT tx.committed"),
+            TransactionFilter::Uncommitted => format!(
+                "{QUERY} WHERE tx.status_variant != {}",
+                TransactionStatusVariant::Committed as u8
+            ),
             TransactionFilter::Ids(_) => {
                 // Use SQLite's array parameter binding
                 format!("{QUERY} WHERE tx.id IN rarray(?)")
             },
             TransactionFilter::ExpiredBefore(block_num) => {
                 format!(
-                    "{QUERY} WHERE tx.block_num < {} AND NOT tx.discarded AND NOT tx.committed",
-                    block_num.as_u32()
+                    "{QUERY} WHERE tx.block_num < {} AND tx.status_variant != {} AND tx.status_variant != {}",
+                    block_num.as_u32(),
+                    TransactionStatusVariant::Discarded as u8,
+                    TransactionStatusVariant::Committed as u8
                 )
             },
         }
@@ -76,10 +81,8 @@ struct SerializedTransactionData {
     details: Vec<u8>,
     /// Block number
     block_num: u32,
-    /// Whether the transaction has been committed
-    committed: bool,
-    /// Whether the transaction has been discarded
-    discarded: bool,
+    /// Transaction status variant identifier
+    status_variant: u8,
     /// Serialized transaction status
     status: Vec<u8>,
 }
@@ -191,8 +194,7 @@ pub(crate) fn upsert_transaction_record(
         tx_script,
         details,
         block_num,
-        committed,
-        discarded,
+        status_variant,
         status,
     } = serialize_transaction_data(transaction);
 
@@ -202,7 +204,7 @@ pub(crate) fn upsert_transaction_record(
 
     tx.execute(
         UPSERT_TRANSACTION_QUERY,
-        params![id, details, script_root, block_num, committed, discarded, status],
+        params![id, details, script_root, block_num, status_variant, status],
     )?;
 
     Ok(())
@@ -215,20 +217,13 @@ fn serialize_transaction_data(transaction_record: &TransactionRecord) -> Seriali
     let script_root = transaction_record.script.as_ref().map(|script| script.root().to_bytes());
     let tx_script = transaction_record.script.as_ref().map(TransactionScript::to_bytes);
 
-    let (committed, discarded) = match &transaction_record.status {
-        TransactionStatus::Pending => (false, false),
-        TransactionStatus::Committed { .. } => (true, false),
-        TransactionStatus::Discarded(_) => (false, true),
-    };
-
     SerializedTransactionData {
         id: transaction_id,
         script_root,
         tx_script,
         details: transaction_record.details.to_bytes(),
         block_num: transaction_record.details.block_num.as_u32(),
-        committed,
-        discarded,
+        status_variant: transaction_record.status.variant() as u8,
         status: transaction_record.status.to_bytes(),
     }
 }
