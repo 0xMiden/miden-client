@@ -21,6 +21,10 @@ mod tests;
 // MAIN
 // ================================================================================================
 
+/// Entry point for the integration test binary.
+///
+/// Parses command line arguments, filters tests based on provided criteria, and runs the selected
+/// tests in parallel. Exits with code 1 if any tests fail.
 fn main() {
     let args = Args::parse();
 
@@ -55,6 +59,7 @@ fn main() {
 // ARGS
 // ================================================================================================
 
+/// Command line arguments for the integration test binary.
 #[derive(Parser, Clone)]
 #[command(
     name = "miden-client-integration-tests",
@@ -100,6 +105,7 @@ struct Args {
     exclude: Option<String>,
 }
 
+/// Base configuration derived from command line arguments.
 #[derive(Clone)]
 struct BaseConfig {
     rpc_endpoint: Endpoint,
@@ -107,6 +113,7 @@ struct BaseConfig {
 }
 
 impl From<Args> for BaseConfig {
+    /// Creates a BaseConfig from command line arguments.
     fn from(args: Args) -> Self {
         let endpoint = Endpoint::new(
             args.rpc_endpoint.scheme().to_string(),
@@ -122,12 +129,17 @@ impl From<Args> for BaseConfig {
     }
 }
 
+/// Represents a single test case with its name and category.
 #[derive(Debug, Clone)]
 struct TestCase {
     name: String,
     category: String,
 }
 
+/// Returns all available test cases organized by category.
+///
+/// This function defines the complete list of integration tests available in the test suite,
+/// categorized by functionality area.
 fn get_all_tests() -> Vec<TestCase> {
     vec![
         // CLIENT tests
@@ -276,6 +288,7 @@ fn get_all_tests() -> Vec<TestCase> {
     ]
 }
 
+/// Represents the result of executing a test case.
 #[derive(Debug)]
 struct TestResult {
     name: String,
@@ -286,6 +299,7 @@ struct TestResult {
 }
 
 impl TestResult {
+    /// Creates a TestResult for a passed test.
     fn passed(name: String, category: String, duration: Duration) -> Self {
         Self {
             name,
@@ -296,6 +310,7 @@ impl TestResult {
         }
     }
 
+    /// Creates a TestResult for a failed test with an error message.
     fn failed(name: String, category: String, duration: Duration, error: String) -> Self {
         Self {
             name,
@@ -307,6 +322,10 @@ impl TestResult {
     }
 }
 
+/// Filters the list of tests based on command line arguments.
+///
+/// Applies regex patterns, substring matching, and exclusion filters to select which tests should
+/// be executed.
 fn filter_tests(tests: &[TestCase], args: &Args) -> Vec<TestCase> {
     let mut filtered_tests = tests.to_vec();
 
@@ -336,6 +355,10 @@ fn filter_tests(tests: &[TestCase], args: &Args) -> Vec<TestCase> {
     filtered_tests
 }
 
+/// Prints all available tests organized by category.
+///
+/// Used when the --list flag is provided to show what tests are available without actually running
+/// them.
 fn list_tests(tests: &[TestCase]) {
     println!("Available tests:");
     println!("================");
@@ -355,6 +378,10 @@ fn list_tests(tests: &[TestCase]) {
     println!("\nTotal: {} tests", tests.len());
 }
 
+/// Executes a single test and returns its result.
+///
+/// Creates a new Tokio runtime for the test, handles panics, and measures execution time. Each
+/// test gets its own isolated configuration.
 fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
     let start_time = Instant::now();
 
@@ -454,6 +481,10 @@ fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
     }
 }
 
+/// Runs multiple tests in parallel using a specified number of worker threads.
+///
+/// Uses a shared work queue to distribute tests among worker threads. Provides real-time progress
+/// updates and collects results from all workers.
 fn run_tests_parallel(
     tests: Vec<TestCase>,
     base_config: BaseConfig,
@@ -551,6 +582,10 @@ fn run_tests_parallel(
     Arc::try_unwrap(results).unwrap().into_inner().unwrap()
 }
 
+/// Prints a comprehensive summary of test execution results.
+///
+/// Shows pass/fail counts, failed test details, and timing statistics including average, median,
+/// min, and max execution times.
 fn print_summary(results: &[TestResult], total_duration: Duration) {
     let passed = results.iter().filter(|r| r.passed).count();
     let failed = results.len() - passed;
