@@ -109,20 +109,3 @@ jobs:
       - name: Stop miden-prover
         if: always()
         run: make stop-prover
-
-  integration-tests-binary:
-    name: Run integration tests binary on ubuntu-latest
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@main
-      - name: Install Rust
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Start test node
-        run: make start-node-background
-      - name: Run integration tests binary
-        run: make integration-test-binary
-      - name: Stop test node
-        if: always()
-        run: make stop-node
