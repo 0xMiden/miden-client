@@ -6,6 +6,7 @@
 
 ## Enumerations
 
+- [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
