@@ -1,11 +1,12 @@
 import { blockHeaders, partialBlockchainNodes, stateSync } from "./schema.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 // INSERT FUNCTIONS
 export async function insertBlockHeader(
-  blockNum,
-  header,
-  partialBlockchainPeaks,
-  hasClientNotes
+  blockNum: string,
+  header: Uint8Array,
+  partialBlockchainPeaks: Uint8Array,
+  hasClientNotes: boolean
 ) {
   try {
     const headerBlob = new Blob([new Uint8Array(header)]);
@@ -38,12 +39,14 @@ export async function insertBlockHeader(
       }
     }
   } catch (err) {
-    console.error("Failed to insert block header: ", err.toString());
-    throw err;
+    logWebStoreError(err);
   }
 }
 
-export async function insertPartialBlockchainNodes(ids, nodes) {
+export async function insertPartialBlockchainNodes(
+  ids: string[],
+  nodes: string[]
+) {
   try {
     // Check if the arrays are not of the same length
     if (ids.length !== nodes.length) {
@@ -63,21 +66,17 @@ export async function insertPartialBlockchainNodes(ids, nodes) {
     // Use bulkPut to add/overwrite the entries
     await partialBlockchainNodes.bulkPut(data);
   } catch (err) {
-    console.error(
-      "Failed to insert partial blockchain nodes: ",
-      err.toString()
-    );
-    throw err;
+    logWebStoreError(err, "Failed to insert partial blockchain nodes");
   }
 }
 
 // GET FUNCTIONS
-export async function getBlockHeaders(blockNumbers) {
+export async function getBlockHeaders(blockNumbers: string[]) {
   try {
     const results = await blockHeaders.bulkGet(blockNumbers);
 
     const processedResults = await Promise.all(
-      results.map(async (result, index) => {
+      results.map(async (result) => {
         if (result === undefined) {
           return null;
         } else {
@@ -106,8 +105,7 @@ export async function getBlockHeaders(blockNumbers) {
 
     return processedResults;
   } catch (err) {
-    console.error("Failed to get block headers: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to get block headers");
   }
 }
 
@@ -146,15 +144,18 @@ export async function getTrackedBlockHeaders() {
 
     return processedRecords;
   } catch (err) {
-    console.error("Failed to get tracked block headers: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to get tracked block headers");
   }
 }
 
-export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
+export async function getPartialBlockchainPeaksByBlockNum(blockNum: string) {
   try {
     const blockHeader = await blockHeaders.get(blockNum);
-
+    if (blockHeader == undefined) {
+      return {
+        peaks: undefined,
+      };
+    }
     const partialBlockchainPeaksArrayBuffer =
       await blockHeader.partialBlockchainPeaks.arrayBuffer();
     const partialBlockchainPeaksArray = new Uint8Array(
@@ -168,8 +169,7 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
       peaks: partialBlockchainPeaksBase64,
     };
   } catch (err) {
-    console.error("Failed to get partial blockchain peaks: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to get partial blockchain peaks");
   }
 }
 
@@ -178,19 +178,17 @@ export async function getPartialBlockchainNodesAll() {
     const partialBlockchainNodesAll = await partialBlockchainNodes.toArray();
     return partialBlockchainNodesAll;
   } catch (err) {
-    console.error("Failed to get partial blockchain nodes: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to get partial blockchain nodes");
   }
 }
 
-export async function getPartialBlockchainNodes(ids) {
+export async function getPartialBlockchainNodes(ids: string[]) {
   try {
     const results = await partialBlockchainNodes.bulkGet(ids);
 
     return results;
   } catch (err) {
-    console.error("Failed to get partial blockchain nodes: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to get partial blockchain nodes");
   }
 }
 
@@ -198,26 +196,21 @@ export async function pruneIrrelevantBlocks() {
   try {
     const syncHeight = await stateSync.get(1);
 
+    if (syncHeight == undefined) {
+      throw Error("SyncHeight is undefined -- is the state sync table empty?");
+    }
+
     const allMatchingRecords = await blockHeaders
       .where("hasClientNotes")
       .equals("false")
       .and(
         (record) =>
-          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
+          record.blockNum !== "0" && record.blockNum !== syncHeight.blockNum
       )
       .toArray();
 
     await blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
   } catch (err) {
-    console.error("Failed to prune irrelevant blocks: ", err.toString());
-    throw err;
+    logWebStoreError(err, "Failed to prune irrelevant blocks");
   }
-}
-
-function uint8ArrayToBase64(bytes) {
-  const binary = bytes.reduce(
-    (acc, byte) => acc + String.fromCharCode(byte),
-    ""
-  );
-  return btoa(binary);
 }

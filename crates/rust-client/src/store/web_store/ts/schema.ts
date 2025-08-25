@@ -81,13 +81,14 @@ export interface ITransactionScript {
 
 export interface IInputNote {
   noteId: string;
-  stateDiscriminant: string;
-  assets: string;
+  stateDiscriminant: number;
+  assets: Blob;
   serialNumber: Blob;
   inputs: Blob;
   scriptRoot: string;
   nullifier: string;
-  createdAt: bigint;
+  serializedCreatedAt: string;
+  state: Blob;
 }
 
 export interface IOutputNote {
@@ -95,9 +96,9 @@ export interface IOutputNote {
   recipientDigest: string;
   assets: Blob;
   metadata: Blob;
-  stateDiscriminant: string;
-  nullifier: string;
-  expectedHeight: bigint;
+  stateDiscriminant: number;
+  nullifier?: string;
+  expectedHeight: number;
   state: Blob;
 }
 
