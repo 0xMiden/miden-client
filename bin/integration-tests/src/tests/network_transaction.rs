@@ -131,11 +131,8 @@ async fn get_counter_contract_account(
             COUNTER_CONTRACT,
             &source_manager,
         )
-        .context("failed to parse counter contract module")?;
-    let library = assembler
-        .clone()
-        .assemble_library([module])
-        .context("failed to assemble counter contract library")?;
+        .map_err(|err| anyhow!(err))?;
+    let library = assembler.clone().assemble_library([module]).map_err(|err| anyhow!(err))?;
 
     Ok((account, seed, library))
 }

@@ -74,19 +74,18 @@ pub async fn create_test_client_builder(
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
-        format!("Failed to create filesystem keystore at path: {:?}", auth_path)
+        format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
     })?;
 
-    let builder =
-        ClientBuilder::new()
-            .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-            .rng(Box::new(rng))
-            .store(store)
-            .filesystem_keystore(auth_path.to_str().with_context(|| {
-                format!("Failed to convert auth path to string: {:?}", auth_path)
-            })?)
-            .in_debug_mode(DebugMode::Enabled)
-            .tx_graceful_blocks(None);
+    let builder = ClientBuilder::new()
+        .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
+        .rng(Box::new(rng))
+        .store(store)
+        .filesystem_keystore(auth_path.to_str().with_context(|| {
+            format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
+        })?)
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_graceful_blocks(None);
 
     Ok((builder, keystore))
 }
@@ -237,9 +236,9 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
         let tracked_transaction = client
             .get_transactions(TransactionFilter::Ids(vec![transaction_id]))
             .await
-            .with_context(|| format!("Failed to get transaction with ID: {}", transaction_id))?
+            .with_context(|| format!("failed to get transaction with ID: {transaction_id}"))?
             .pop()
-            .with_context(|| format!("Transaction with ID {} not found", transaction_id))?;
+            .with_context(|| format!("transaction with ID {transaction_id} not found"))?;
 
         match tracked_transaction.status {
             TransactionStatus::Committed(n) => {
@@ -250,7 +249,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 std::thread::sleep(Duration::from_secs(1));
             },
             TransactionStatus::Discarded(cause) => {
-                anyhow::bail!("Transaction was discarded with cause: {:?}", cause);
+                anyhow::bail!("transaction was discarded with cause: {:?}", cause);
             },
         }
 
