@@ -8,16 +8,16 @@ use crate::rpc::Endpoint;
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
     pub rpc_endpoint: Endpoint,
-    pub rpc_timeout: u64,
+    pub rpc_timeout_ms: u64,
     pub store_config: PathBuf,
     pub auth_path: PathBuf,
 }
 
 impl ClientConfig {
-    pub fn new(rpc_endpoint: Endpoint, rpc_timeout: u64) -> Self {
+    pub fn new(rpc_endpoint: Endpoint, rpc_timeout_ms: u64) -> Self {
         Self {
             rpc_endpoint,
-            rpc_timeout,
+            rpc_timeout_ms,
             auth_path: create_test_auth_path(),
             store_config: create_test_store_path(),
         }
@@ -26,7 +26,7 @@ impl ClientConfig {
     pub fn into_parts(&self) -> (Endpoint, u64, PathBuf, PathBuf) {
         (
             self.rpc_endpoint.clone(),
-            self.rpc_timeout,
+            self.rpc_timeout_ms,
             self.store_config.clone(),
             self.auth_path.clone(),
         )
