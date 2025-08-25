@@ -455,8 +455,6 @@ pub struct TransactionStoreUpdate {
     executed_transaction: ExecutedTransaction,
     /// Block number at which the transaction was submitted.
     submission_height: BlockNumber,
-    /// Updated account state after the [`AccountDelta`] has been applied.
-    updated_account: Account,
     /// Information about note changes after the transaction execution.
     note_updates: NoteUpdateTracker,
     /// New note tags to be tracked.
@@ -469,21 +467,18 @@ impl TransactionStoreUpdate {
     /// # Arguments
     /// - `executed_transaction`: The executed transaction details.
     /// - `submission_height`: The block number at which the transaction was submitted.
-    /// - `updated_account`: The updated account state after applying the transaction.
     /// - `note_updates`: The note updates that need to be applied to the store after the
     ///   transaction execution.
     /// - `new_tags`: New note tags that were need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
         submission_height: BlockNumber,
-        updated_account: Account,
         note_updates: NoteUpdateTracker,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
             executed_transaction,
             submission_height,
-            updated_account,
             note_updates,
             new_tags,
         }
@@ -497,11 +492,6 @@ impl TransactionStoreUpdate {
     /// Returns the block number at which the transaction was submitted.
     pub fn submission_height(&self) -> BlockNumber {
         self.submission_height
-    }
-
-    /// Returns the updated account.
-    pub fn updated_account(&self) -> &Account {
-        &self.updated_account
     }
 
     /// Returns the note updates that need to be applied after the transaction execution.
@@ -620,7 +610,7 @@ where
 
         if ignore_invalid_notes {
             // Remove invalid notes
-            notes = self.get_valid_input_notes(account_id, notes, tx_args.clone()).await?;
+            notes = self.get_valid_input_notes(account, notes, tx_args.clone()).await?;
         }
 
         // Execute the transaction and get the witness
@@ -698,24 +688,16 @@ where
         info!("Applying transaction to the local store...");
 
         let account_id = tx_result.executed_transaction().account_id();
-        let account_delta = tx_result.account_delta();
         let account_record = self.try_get_account(account_id).await?;
 
         if account_record.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
         }
 
-        let mut account: Account = account_record.into();
-        account.apply_delta(account_delta)?;
-
-        if self
-            .store
-            .get_account_header_by_commitment(account.commitment())
-            .await?
-            .is_some()
-        {
+        let final_commitment = tx_result.executed_transaction().final_account().commitment();
+        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
             return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
-                account.commitment(),
+                final_commitment,
             )));
         }
 
@@ -739,7 +721,6 @@ where
         let tx_update = TransactionStoreUpdate::new(
             tx_result.into(),
             submission_height,
-            account,
             note_updates,
             new_tags,
         );
@@ -1054,16 +1035,17 @@ where
 
     async fn get_valid_input_notes(
         &self,
-        account_id: AccountId,
+        account: Account,
         mut input_notes: InputNotes<InputNote>,
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
 
+            data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
                 .check_notes_consumability(
-                    account_id,
+                    account.id(),
                     self.store.get_sync_height().await?,
                     input_notes.clone(),
                     tx_args.clone(),
@@ -1308,7 +1290,6 @@ mod test {
     use miden_objects::asset::{Asset, FungibleAsset};
     use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
     use miden_objects::note::NoteType;
-    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
     use miden_objects::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -1337,7 +1318,10 @@ mod test {
         keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
 
         let wallet_component = AccountComponent::compile(
-            BASIC_WALLET_CODE,
+            "
+                export.::miden::contracts::wallets::basic::receive_asset
+                export.::miden::contracts::wallets::basic::move_asset_to_note
+            ",
             TransactionKernel::assembler(),
             vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
         )

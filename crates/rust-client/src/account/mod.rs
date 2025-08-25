@@ -321,24 +321,19 @@ pub mod tests {
     use alloc::vec::Vec;
 
     use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::transaction::TransactionKernel;
+    use miden_lib::testing::mock_account::MockAccountExt;
     use miden_objects::account::{Account, AccountFile, AuthSecretKey};
     use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
     use miden_objects::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     };
-    use miden_objects::{EMPTY_WORD, Felt, Word};
+    use miden_objects::{EMPTY_WORD, Word, ZERO};
 
     use crate::tests::create_test_client;
 
     fn create_account_data(account_id: u128) -> AccountFile {
-        let account = Account::mock(
-            account_id,
-            Felt::new(2),
-            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-            TransactionKernel::testing_assembler(),
-        );
+        let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
 
         AccountFile::new(
             account.clone(),
@@ -365,10 +360,12 @@ pub mod tests {
 
         let account = Account::mock(
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-            Felt::new(0),
             AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-            TransactionKernel::testing_assembler(),
         );
+
+        // The mock account has nonce 1, we need it to be 0 for the test.
+        let (id, vault, storage, code, _) = account.into_parts();
+        let account = Account::from_parts(id, vault, storage, code, ZERO);
 
         assert!(client.add_account(&account, None, false).await.is_err());
         assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());

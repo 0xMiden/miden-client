@@ -129,11 +129,23 @@ impl SqliteStore {
         conn: &mut Connection,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
+        let executed_transaction = tx_update.executed_transaction();
+
+        let updated_fungible_assets = Self::relevant_fungible_assets(
+            conn,
+            &executed_transaction.initial_account().into(),
+            executed_transaction.account_delta(),
+        )?;
+
+        let updated_storage_maps = Self::relevant_storage_maps(
+            conn,
+            &executed_transaction.initial_account().into(),
+            executed_transaction.account_delta(),
+        )?;
+
         let tx = conn.transaction()?;
 
         // Build transaction record
-        let executed_transaction = tx_update.executed_transaction();
-
         let nullifiers: Vec<Word> = executed_transaction
             .input_notes()
             .iter()
@@ -164,7 +176,14 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
-        Self::update_account_state(&tx, tx_update.updated_account())?;
+        Self::apply_account_delta(
+            &tx,
+            &executed_transaction.initial_account().into(),
+            executed_transaction.final_account(),
+            updated_fungible_assets,
+            updated_storage_maps,
+            executed_transaction.account_delta(),
+        )?;
 
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;
