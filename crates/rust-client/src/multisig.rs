@@ -15,17 +15,17 @@ use rand::RngCore;
 use crate::transaction::{TransactionRequest, TransactionResult};
 use crate::{Client, ClientError};
 
-pub struct MultisigClient<AUTH: TransactionAuthenticator + 'static> {
+pub struct MultisigClient<AUTH: TransactionAuthenticator + Sync + 'static> {
     client: Client<AUTH>,
 }
 
-impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> MultisigClient<AUTH> {
     pub fn new(client: Client<AUTH>) -> Self {
         Self { client }
     }
 }
 
-impl<AUTH: TransactionAuthenticator + 'static> Deref for MultisigClient<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> Deref for MultisigClient<AUTH> {
     type Target = Client<AUTH>;
 
     fn deref(&self) -> &Self::Target {
@@ -33,13 +33,13 @@ impl<AUTH: TransactionAuthenticator + 'static> Deref for MultisigClient<AUTH> {
     }
 }
 
-impl<AUTH: TransactionAuthenticator + 'static> DerefMut for MultisigClient<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> DerefMut for MultisigClient<AUTH> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client
     }
 }
 
-impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> MultisigClient<AUTH> {
     pub fn setup_account(&mut self, approvers: Vec<PublicKey>, threshold: u32) -> (Account, Word) {
         let mut init_seed = [0u8; 32];
         self.rng().fill_bytes(&mut init_seed);
@@ -57,7 +57,7 @@ impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
     }
 }
 
-impl<AUTH: TransactionAuthenticator + 'static> MultisigClient<AUTH> {
+impl<AUTH: TransactionAuthenticator + Sync + 'static> MultisigClient<AUTH> {
     /// Propose a multisig transaction. This is expected to "dry-run" and only return
     /// `TransactionSummary`.
     pub async fn propose_multisig_transaction(
@@ -122,7 +122,7 @@ mod tests {
 
     use super::*;
     use crate::testing::common::{
-        TestClientKeyStore, insert_new_fungible_faucet, insert_new_wallet, mint_note, wait_for_node,
+        insert_new_fungible_faucet, insert_new_wallet, mint_note, wait_for_node, wait_for_tx, TestClientKeyStore
     };
     use crate::testing::mock::MockRpcApi;
     use crate::tests::create_test_client;
@@ -174,13 +174,15 @@ mod tests {
         .unwrap();
 
         // mint a note to the multisig account
-        let (_, note) = mint_note(
+        let (tx_id, note) = mint_note(
             &mut coordinator_client,
             multisig_account.id(),
             faucet_account.id(),
             NoteType::Private,
         )
         .await;
+
+        wait_for_tx(&mut coordinator_client, tx_id).await;
 
         mock_rpc_api.prove_block();
         coordinator_client.sync_state().await.unwrap();
@@ -200,8 +202,10 @@ mod tests {
 
         let signing_inputs = SigningInputs::TransactionSummary(Box::new(tx_summary.clone()));
 
-        let signature_a = authenticator_a.get_signature(pub_key_a.into(), &signing_inputs).unwrap();
-        let signature_b = authenticator_b.get_signature(pub_key_b.into(), &signing_inputs).unwrap();
+        let signature_a =
+            authenticator_a.get_signature(pub_key_a.into(), &signing_inputs).await.unwrap();
+        let signature_b =
+            authenticator_b.get_signature(pub_key_b.into(), &signing_inputs).await.unwrap();
 
         let tx_result = coordinator_client
             .new_multisig_transaction(

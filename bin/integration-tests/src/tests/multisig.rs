@@ -1,22 +1,23 @@
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::multisig::MultisigClient;
 use miden_client::testing::common::*;
+use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_objects::Word;
 use miden_objects::account::AccountStorageMode;
 use miden_tx::auth::SigningInputs;
 
 pub async fn setup_multisig_client() -> (MultisigClient<TestClientKeyStore>, TestClientKeyStore) {
-    let (client, keystore) = create_test_client().await;
+    let (client, keystore) = create_test_client(ClientConfig::default()).await;
     let multisig_client = MultisigClient::new(client);
     (multisig_client, keystore)
 }
 
 #[tokio::test]
 async fn multisig() {
-    let (mut signer_a_client, authenticator_a) = create_test_client().await;
+    let (mut signer_a_client, authenticator_a) = create_test_client(ClientConfig::default()).await;
     wait_for_node(&mut signer_a_client).await;
-    let (mut signer_b_client, authenticator_b) = create_test_client().await;
+    let (mut signer_b_client, authenticator_b) = create_test_client(ClientConfig::default()).await;
 
     let (mut coordinator_client, _): (MultisigClient<_>, _) = setup_multisig_client().await;
 
