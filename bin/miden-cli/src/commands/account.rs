@@ -85,7 +85,7 @@ impl AccountCmd {
                 }
             },
             _ => {
-                list_accounts(client, &cli_config).await?;
+                list_accounts(client).await?;
             },
         }
         Ok(())
@@ -95,11 +95,11 @@ impl AccountCmd {
 // LIST ACCOUNTS
 // ================================================================================================
 
-async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Result<(), CliError> {
+async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
     let mut table =
-        create_dynamic_table(&["Account ID", "Address", "Type", "Storage Mode", "Nonce", "Status"]);
+        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let status = client
             .get_account(acc.id())
@@ -110,7 +110,6 @@ async fn list_accounts<AUTH>(client: Client<AUTH>, cli_config: &CliConfig) -> Re
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_bech_32(acc.id(), &client, cli_config).await?.unwrap_or_default(),
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_int().to_string(),
