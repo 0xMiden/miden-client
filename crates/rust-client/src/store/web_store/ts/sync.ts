@@ -132,7 +132,7 @@ interface SerializedTransactionData {
   id: string;
   details: Uint8Array;
   blockNum: string;
-  scriptRoot: string;
+  scriptRoot?: Uint8Array;
   committed: number;
   discarded: number;
   status: Uint8Array;

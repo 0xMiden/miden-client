@@ -26,8 +26,8 @@ pub struct SerializedTransactionData {
     pub tx_script: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: String,
-    pub committed: bool,
-    pub discarded: bool,
+    pub committed: u8,
+    pub discarded: u8,
     pub status: Vec<u8>,
 }
 
@@ -94,8 +94,8 @@ pub(crate) fn serialize_transaction_record(
         tx_script,
         details: transaction_record.details.to_bytes(),
         block_num: transaction_record.details.block_num.as_u32().to_string(),
-        committed,
-        discarded,
+        committed: u8::from(committed),
+        discarded: u8::from(discarded),
         status: transaction_record.status.to_bytes(),
     }
 }
@@ -117,9 +117,10 @@ pub(crate) async fn upsert_transaction_record(
         serialized_data.id,
         serialized_data.details,
         serialized_data.block_num,
-        serialized_data.committed.into(),
-        serialized_data.discarded.into(),
+        serialized_data.committed,
+        serialized_data.discarded,
         serialized_data.status,
+        serialized_data.script_root
     );
     JsFuture::from(promise).await.map_err(|js_error| {
         StoreError::DatabaseError(format!("failed to insert transaction data: {js_error:?}"))

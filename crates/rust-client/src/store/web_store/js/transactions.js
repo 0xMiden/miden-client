@@ -88,6 +88,9 @@ export async function getTransactions(filter) {
     }
 }
 export async function insertTransactionScript(scriptRoot, txScript) {
+    if (!scriptRoot) {
+        return;
+    }
     try {
         // check if script root already exists
         const record = await transactionScripts
@@ -97,8 +100,10 @@ export async function insertTransactionScript(scriptRoot, txScript) {
         if (record) {
             return;
         }
+        const scriptRootArray = new Uint8Array(scriptRoot);
+        const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
         const data = {
-            scriptRoot,
+            scriptRoot: scriptRootBase64,
             txScript: mapOption(txScript, (txScript) => new Blob([new Uint8Array(txScript)])),
         };
         await transactionScripts.add(data);
@@ -111,18 +116,20 @@ export async function insertTransactionScript(scriptRoot, txScript) {
     }
 }
 export async function upsertTransactionRecord(transactionId, details, blockNum, committed, discarded, status, scriptRoot) {
+    console.log("Script root:", scriptRoot);
     try {
         const detailsBlob = new Blob([new Uint8Array(details)]);
         const statusBlob = new Blob([new Uint8Array(status)]);
         const data = {
             id: transactionId,
             details: detailsBlob,
-            scriptRoot,
+            scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
             blockNum: parseInt(blockNum, 10),
             committed,
             discarded,
             status: statusBlob,
         };
+        console.log(JSON.stringify(data));
         await transactions.put(data);
     }
     catch (err) {

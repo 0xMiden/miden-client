@@ -28,5 +28,6 @@ extern "C" {
         committed: u8,
         discarded: u8,
         status: Vec<u8>,
+        scriptRoot: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 }

@@ -68,8 +68,8 @@ export interface IAccount {
 export interface ITransaction {
   id: string;
   details: Blob;
-  scriptRoot: string;
   blockNum: number;
+  scriptRoot?: string;
   committed: number;
   discarded: number;
   status: Blob;
