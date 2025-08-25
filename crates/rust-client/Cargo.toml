@@ -29,18 +29,18 @@ idxdb = [
   "dep:wasm-bindgen-futures",
 ]
 sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
-std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
+std = ["miden-objects/std", "miden-remote-prover/std", "miden-tx/concurrent"]
 testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 
 [dependencies]
 # Miden dependencies
-miden-lib                  = { workspace = true }
-miden-objects              = { workspace = true }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
-miden-testing              = { optional = true, workspace = true }
-miden-tx                   = { workspace = true }
+miden-lib           = { workspace = true }
+miden-objects       = { workspace = true }
+miden-remote-prover = { features = ["client"], workspace = true }
+miden-testing       = { optional = true, workspace = true }
+miden-tx            = { workspace = true }
 
 # External dependencies
 async-trait           = { workspace = true }
