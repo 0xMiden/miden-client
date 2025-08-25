@@ -26,7 +26,7 @@ impl PublicKey {
     }
 
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
-        return self.verify_data(&SigningInputs::new_blind(message), signature);
+        self.verify_data(&SigningInputs::new_blind(message), signature)
     }
 
     #[wasm_bindgen(js_name = "verifyData")]

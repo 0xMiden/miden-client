@@ -50,7 +50,7 @@ use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
 use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountDelta, AccountHeader, AccountId};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
@@ -191,15 +191,6 @@ pub trait NodeRpcClient: Send + Sync {
         account_storage_requests: &BTreeSet<ForeignAccount>,
         known_account_codes: Vec<AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
-
-    /// Fetches the account state delta for the specified account between the specified blocks
-    /// using the `/GetAccountStateDelta` RPC endpoint.
-    async fn get_account_state_delta(
-        &self,
-        account_id: AccountId,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.

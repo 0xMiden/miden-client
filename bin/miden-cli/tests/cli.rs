@@ -344,18 +344,8 @@ async fn cli_export_import_account() {
 
     // Ensure the account was imported
     let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await.0;
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&faucet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&wallet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
+    assert!(client_2.get_account(AccountId::from_hex(&faucet_id).unwrap()).await.is_ok());
+    assert!(client_2.get_account(AccountId::from_hex(&wallet_id).unwrap()).await.is_ok());
 
     sync_cli(&temp_dir_2);
 

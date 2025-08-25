@@ -37,7 +37,7 @@ impl SecretKey {
 
     // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto 0.16
     pub fn sign(&self, message: &Word) -> Signature {
-        return self.sign_data(&SigningInputs::new_blind(message));
+        self.sign_data(&SigningInputs::new_blind(message))
     }
 
     // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto 0.16

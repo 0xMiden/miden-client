@@ -2,25 +2,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::delta::AccountUpdateDetails;
-use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountId,
-    AccountStorageDelta,
-    AccountVaultDelta,
-    FungibleAssetDelta,
-    NonFungibleAssetDelta,
-    NonFungibleDeltaAction,
-    StorageSlot,
-};
-use miden_objects::asset::Asset;
+use miden_objects::Word;
+use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
-use miden_objects::{LexicographicWord, Word};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -445,50 +432,6 @@ impl NodeRpcClient for MockRpcApi {
             .collect())
     }
 
-    /// Returns the account state delta for the specified account ID between the given block range.
-    ///
-    /// If the account was created in the specified block range, it will return a delta including
-    /// the starting state of the account, with its initial storage and vault contents.
-    async fn get_account_state_delta(
-        &self,
-        account_id: AccountId,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError> {
-        let mock_chain = self.mock_chain.read();
-        let proven_blocks = mock_chain
-            .proven_blocks()
-            .iter()
-            .filter(|block| {
-                block.header().block_num() > from_block && block.header().block_num() <= to_block
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let account_deltas = proven_blocks.iter().flat_map(|block| {
-            block.updated_accounts().iter().filter_map(|update| {
-                if update.account_id() == account_id {
-                    match update.details() {
-                        AccountUpdateDetails::Private => None,
-                        AccountUpdateDetails::Delta(delta) => Some(delta.clone()),
-                        AccountUpdateDetails::New(account) => Some(build_starting_delta(account)),
-                    }
-                } else {
-                    None
-                }
-            })
-        });
-
-        let combined_delta = account_deltas
-            .reduce(|mut accumulator, delta| {
-                accumulator.merge(delta).unwrap();
-                accumulator
-            })
-            .unwrap();
-
-        Ok(combined_delta)
-    }
-
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
         let block = self
             .mock_chain
@@ -514,56 +457,6 @@ impl From<MockChain> for MockRpcApi {
 
 // HELPERS
 // ================================================================================================
-
-/// Builds an [`AccountDelta`] from the given [`Account`]. This delta represents the
-/// starting state of the account, including its storage and vault contents.
-fn build_starting_delta(account: &Account) -> AccountDelta {
-    // Build storage delta
-    let mut values = BTreeMap::new();
-    let mut maps = BTreeMap::new();
-    for (slot_idx, slot) in account.storage().clone().into_iter().enumerate() {
-        let slot_idx: u8 = slot_idx.try_into().expect("slot index must fit into `u8`");
-
-        match slot {
-            StorageSlot::Value(value) => {
-                values.insert(slot_idx, value);
-            },
-
-            StorageSlot::Map(map) => {
-                maps.insert(slot_idx, map.into());
-            },
-        }
-    }
-    let storage_delta = AccountStorageDelta::from_parts(values, maps).unwrap();
-
-    // Build vault delta
-    let mut fungible = BTreeMap::new();
-    let mut non_fungible = BTreeMap::new();
-    for asset in account.vault().assets() {
-        match asset {
-            Asset::Fungible(asset) => {
-                fungible.insert(
-                    asset.faucet_id(),
-                    asset
-                        .amount()
-                        .try_into()
-                        .expect("asset amount should be at most i64::MAX by construction"),
-                );
-            },
-
-            Asset::NonFungible(asset) => {
-                non_fungible.insert(LexicographicWord::new(asset), NonFungibleDeltaAction::Add);
-            },
-        }
-    }
-
-    let vault_delta = AccountVaultDelta::new(
-        FungibleAssetDelta::new(fungible).unwrap(),
-        NonFungibleAssetDelta::new(non_fungible),
-    );
-
-    AccountDelta::new(account.id(), storage_delta, vault_delta, account.nonce()).unwrap()
-}
 
 fn build_account_updates(
     mock_chain: &MockChain,

@@ -11,7 +11,6 @@ use miden_client::transaction::{
     TransactionKernel,
     TransactionRequestBuilder,
 };
-use miden_client::utils::word_to_masm_push_string;
 use miden_client::{Felt, ScriptBuilder, Word};
 
 // FPI TESTS
@@ -46,7 +45,7 @@ pub async fn fpi_execute_program(client_config: ClientConfig) {
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY.into())
+            map_key = Word::from(MAP_KEY)
         ),
     )
     .await
@@ -121,7 +120,7 @@ pub async fn nested_fpi_calls(client_config: ClientConfig) {
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY.into())
+            map_key = Word::from(MAP_KEY)
         ),
     )
     .await
@@ -180,7 +179,7 @@ pub async fn nested_fpi_calls(client_config: ClientConfig) {
             push.{fpi_value} add.1 assert_eqw
         end
         ",
-        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
+        fpi_value = Word::from(FPI_STORAGE_VALUE),
         account_id_prefix = outer_foreign_account_id.prefix().as_u64(),
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
@@ -232,7 +231,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
                 exec.::miden::account::get_map_item
                 swapw dropw
             end",
-            map_key = word_to_masm_push_string(&MAP_KEY.into())
+            map_key = Word::from(MAP_KEY)
         ),
     )
     .await
@@ -263,7 +262,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             push.{fpi_value} assert_eqw
         end
         ",
-        fpi_value = word_to_masm_push_string(&FPI_STORAGE_VALUE.into()),
+        fpi_value = Word::from(FPI_STORAGE_VALUE),
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
     );

@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
@@ -429,35 +429,6 @@ impl NodeRpcClient for TonicRpcClient {
         let proofs = response.proofs.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
 
         Ok(proofs)
-    }
-
-    async fn get_account_state_delta(
-        &self,
-        account_id: AccountId,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError> {
-        let request = proto::rpc_store::AccountStateDeltaRequest {
-            account_id: Some(account_id.into()),
-            from_block_num: from_block.as_u32(),
-            to_block_num: to_block.as_u32(),
-        };
-
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api.get_account_state_delta(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountStateDelta.to_string(),
-                err.to_string(),
-            )
-        })?;
-
-        let response = response.into_inner();
-        let delta = AccountDelta::read_from_bytes(&response.delta.ok_or(
-            RpcError::ExpectedDataMissing("GetAccountStateDeltaResponse.delta".to_string()),
-        )?)?;
-
-        Ok(delta)
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {

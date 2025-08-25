@@ -39,6 +39,7 @@ pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
+const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -183,10 +184,18 @@ impl NodeBuilder {
 
         let rpc_id = join_set
             .spawn(async move {
+                let store_url = Url::parse(&format!("http://{store_rpc_address}"))
+                    .context("Failed to parse URL")?;
+                let block_producer_url = Some(
+                    Url::parse(&format!("http://{block_producer_address}"))
+                        .context("Failed to parse URL")?,
+                );
+
                 Rpc {
                     listener: grpc_rpc,
-                    store: store_rpc_address,
-                    block_producer: Some(block_producer_address),
+                    store_url,
+                    block_producer_url,
+                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                 }
                 .serve()
                 .await
@@ -240,6 +249,7 @@ impl NodeBuilder {
                         rpc_listener,
                         block_producer_listener,
                         ntx_builder_listener,
+                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     }
                     .serve()
                     .await
@@ -263,9 +273,12 @@ impl NodeBuilder {
         let block_interval = self.block_interval;
         join_set
             .spawn(async move {
+                let store_url = Url::parse(&format!("http://{store_address}"))
+                    .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,
-                    store_address,
+                    store_url,
+                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
                     block_prover_url: None,
                     batch_interval,
@@ -291,12 +304,18 @@ impl NodeBuilder {
         let store_url =
             Url::parse(&format!("http://{}:{}/", store_address.ip(), store_address.port()))
                 .unwrap();
+        let block_producer_url = Url::parse(&format!(
+            "http://{}:{}/",
+            block_producer_address.ip(),
+            block_producer_address.port()
+        ))
+        .unwrap();
 
         join_set
             .spawn(async move {
                 NetworkTransactionBuilder {
                     store_url,
-                    block_producer_address,
+                    block_producer_url,
                     tx_prover_url: None,
                     ticker_interval: Duration::from_millis(200),
                     bp_checkpoint: production_checkpoint,
