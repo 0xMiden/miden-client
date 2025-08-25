@@ -39,7 +39,7 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
-    async fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
+    pub async fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         let pub_key_str = pub_key.to_hex();
         let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).await.map_err(|err| {
             KeyStoreError::StorageError(format!("failed to get item from local storage: {err:?}"))

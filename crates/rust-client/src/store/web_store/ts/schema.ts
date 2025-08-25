@@ -1,4 +1,5 @@
 import Dexie from "dexie";
+import { logWebStoreError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
 
@@ -8,8 +9,8 @@ export async function openDatabase(): Promise<boolean> {
     await db.open();
     console.log("Database opened successfully");
     return true;
-  } catch (err: any) {
-    console.error("Failed to open database: ", err.toString());
+  } catch (err) {
+    logWebStoreError(err, "Failed to open database");
     return false;
   }
 }
@@ -67,26 +68,27 @@ export interface IAccount {
 export interface ITransaction {
   id: string;
   details: Blob;
-  scriptRoot: string;
   blockNum: number;
-  commitHeight: number;
-  discardCause: Blob | null;
+  scriptRoot?: string;
+  commitHeight?: string;
+  discardCause?: Blob | null;
 }
 
 export interface ITransactionScript {
   scriptRoot: string;
-  script: Blob;
+  txScript?: Blob;
 }
 
 export interface IInputNote {
   noteId: string;
-  stateDiscriminant: string;
-  assets: string;
+  stateDiscriminant: number;
+  assets: Blob;
   serialNumber: Blob;
   inputs: Blob;
   scriptRoot: string;
   nullifier: string;
-  createdAt: BigInt;
+  serializedCreatedAt: string;
+  state: Blob;
 }
 
 export interface IOutputNote {
@@ -94,9 +96,9 @@ export interface IOutputNote {
   recipientDigest: string;
   assets: Blob;
   metadata: Blob;
-  stateDiscriminant: string;
-  nullifier: string;
-  expectedHeight: BigInt;
+  stateDiscriminant: number;
+  nullifier?: string;
+  expectedHeight: number;
   state: Blob;
 }
 
@@ -111,7 +113,7 @@ export interface IStateSync {
 }
 
 export interface IBlockHeader {
-  blockNum: number;
+  blockNum: string;
   header: Blob;
   partialBlockchainPeaks: Blob;
   hasClientNotes: string;
@@ -125,8 +127,8 @@ export interface IPartialBlockchainNode {
 export interface ITag {
   id?: number;
   tag: string;
-  sourceNoteId: string;
-  sourceAccountId: string;
+  sourceNoteId?: string;
+  sourceAccountId?: string;
 }
 
 export interface IForeignAccountCode {
@@ -146,7 +148,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, number>;
+  blockHeaders: Dexie.Table<IBlockHeader, string>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
@@ -187,7 +189,9 @@ function indexes(...items: string[]): string {
 
 db.on("populate", () => {
   // Populate the stateSync table with default values
-  stateSync.put({ id: 1, blockNum: "0" } as IStateSync);
+  stateSync
+    .put({ id: 1, blockNum: "0" } as IStateSync)
+    .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
 });
 
 const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
@@ -203,7 +207,7 @@ const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
 const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
 const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
 const stateSync = db.table<IStateSync, number>(Table.StateSync);
-const blockHeaders = db.table<IBlockHeader, number>(Table.BlockHeaders);
+const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
 const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
   Table.PartialBlockchainNodes
 );

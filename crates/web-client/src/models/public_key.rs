@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::signature::Signature;
+use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -25,8 +26,15 @@ impl PublicKey {
     }
 
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
+        return self.verify_data(&SigningInputs::new_blind(message), signature);
+    }
+
+    #[wasm_bindgen(js_name = "verifyData")]
+    pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
+        let native_public_key: NativePublicKey = self.into();
         let native_signature = signature.into();
-        self.0.verify(message.into(), &native_signature)
+        let native_word = signing_inputs.to_commitment().into();
+        native_public_key.verify(native_word, &native_signature)
     }
 }
 

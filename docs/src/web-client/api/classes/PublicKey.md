@@ -48,6 +48,26 @@
 
 ***
 
+### verifyData()
+
+> **verifyData**(`signing_inputs`, `signature`): `boolean`
+
+#### Parameters
+
+##### signing\_inputs
+
+[`SigningInputs`](SigningInputs.md)
+
+##### signature
+
+[`Signature`](Signature.md)
+
+#### Returns
+
+`boolean`
+
+***
+
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `PublicKey`

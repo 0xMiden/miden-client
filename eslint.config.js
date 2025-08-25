@@ -8,6 +8,9 @@ module.exports = [
       "miden-node/**/*",
       "**/*.d.ts",
       "docs/book/**/*",
+      // TODO: Instead of ignoring the web_store, we should check if we're able to merge that
+      // eslint config file with this one.
+      "crates/rust-client/src/store/web_store/**",
     ],
   },
   {
@@ -38,18 +41,5 @@ module.exports = [
     rules: {
       camelcase: ["error", { properties: "always" }],
     },
-  },
-  {
-    files: ["crates/rust-client/src/store/web_store/ts/*"],
-    ignores: ["**/*.test.ts"],
-    languageOptions: {
-      parser: require("@typescript-eslint/parser"),
-      parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-        project: "crates/rust-client/src/store/web_store/tsconfig.json",
-      },
-    },
-    rules: { camelcase: ["error", { properties: "always" }] },
   },
 ];

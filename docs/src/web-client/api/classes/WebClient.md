@@ -128,6 +128,22 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### exportAccountFile()
+
+> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### exportNoteFile()
 
 > **exportNoteFile**(`note_id`, `export_type`): `Promise`\<`any`\>
@@ -320,22 +336,6 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### importAccount()
-
-> **importAccount**(`account_bytes`): `Promise`\<`any`\>
-
-#### Parameters
-
-##### account\_bytes
-
-`any`
-
-#### Returns
-
-`Promise`\<`any`\>
-
-***
-
 ### importAccountById()
 
 > **importAccountById**(`account_id`): `Promise`\<`any`\>
@@ -345,6 +345,22 @@ Meant to be used in conjunction with the `force_import_store` method
 ##### account\_id
 
 [`AccountId`](AccountId.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### importAccountFile()
+
+> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### account\_bytes
+
+`any`
 
 #### Returns
 
