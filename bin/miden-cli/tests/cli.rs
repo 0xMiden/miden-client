@@ -493,7 +493,9 @@ async fn debug_mode_outputs_logs() {
         .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    execute_tx_and_sync(&mut client, account.id(), transaction_request).await;
+    execute_tx_and_sync(&mut client, account.id(), transaction_request)
+        .await
+        .unwrap();
 
     // Export the note
     let note_file: NoteFile = NoteFile::NoteDetails {

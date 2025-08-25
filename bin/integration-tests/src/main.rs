@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use anyhow::Result;
 use clap::Parser;
 use futures::FutureExt;
 use miden_client::rpc::Endpoint;
@@ -21,10 +22,11 @@ mod tests;
 // ================================================================================================
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = Args::parse();
+    let client_config = args.into_client_config()?;
 
-    run_tests(&args.into()).await;
+    run_tests(&client_config).await
 }
 
 // ARGS
@@ -51,16 +53,22 @@ struct Args {
     timeout: u64,
 }
 
-impl From<Args> for ClientConfig {
-    fn from(args: Args) -> Self {
-        let endpoint = Endpoint::new(
-            args.rpc_endpoint.scheme().to_string(),
-            args.rpc_endpoint.host_str().unwrap().to_string(),
-            Some(args.rpc_endpoint.port().unwrap()),
-        );
-        let timeout_ms = args.timeout;
+impl Args {
+    fn into_client_config(self) -> Result<ClientConfig> {
+        let host = self
+            .rpc_endpoint
+            .host_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid host in RPC endpoint"))?;
+        let port = self
+            .rpc_endpoint
+            .port()
+            .ok_or_else(|| anyhow::anyhow!("Invalid port in RPC endpoint"))?;
 
-        ClientConfig::new(endpoint, timeout_ms)
+        let endpoint =
+            Endpoint::new(self.rpc_endpoint.scheme().to_string(), host.to_string(), Some(port));
+        let timeout_ms = self.timeout;
+
+        Ok(ClientConfig::new(endpoint, timeout_ms))
     }
 }
 
@@ -85,18 +93,23 @@ async fn run_test<F, Fut>(
     client_config: &ClientConfig,
 ) where
     F: FnOnce(ClientConfig) -> Fut,
-    Fut: Future<Output = ()>,
+    Fut: Future<Output = Result<()>>,
 {
     let result = std::panic::AssertUnwindSafe(test_fn(client_config.clone()))
         .catch_unwind()
         .await;
 
     match result {
-        Ok(_) => {
+        Ok(Ok(_)) => {
             println!(" - {name}: PASSED");
         },
-        Err(panic_info) => {
+        Ok(Err(e)) => {
             println!(" - {name}: FAILED");
+            let error_report = format_error_report(e);
+            failed_tests.lock().unwrap().push(format!("{name}:\n{error_report}"));
+        },
+        Err(panic_info) => {
+            println!(" - {name}: FAILED (panic)");
             let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
                 s.to_string()
             } else if let Some(s) = panic_info.downcast_ref::<String>() {
@@ -109,17 +122,33 @@ async fn run_test<F, Fut>(
     }
 }
 
+/// Formats an error with its full chain
+fn format_error_report(error: anyhow::Error) -> String {
+    let mut output = String::new();
+    let mut first = true;
+
+    for err in error.chain() {
+        if !first {
+            output.push_str("\n  Caused by: ");
+        }
+        output.push_str(&format!("{}", err));
+        first = false;
+    }
+
+    output
+}
+
 /// Runs all the tests sequentially.
 ///
 /// # Arguments
 ///
 /// * `client_config` - The client configuration.
-async fn run_tests(client_config: &ClientConfig) {
+async fn run_tests(client_config: &ClientConfig) -> Result<()> {
     println!("Starting Miden client integration tests");
     println!("==========================================================");
     println!("Using:");
     println!(" - RPC endpoint: {}", client_config.rpc_endpoint);
-    println!(" - Timeout: {}ms", client_config.rpc_timeout);
+    println!(" - Timeout: {}ms", client_config.rpc_timeout_ms);
     println!("==========================================================");
 
     let failed_tests = Arc::new(Mutex::new(Vec::new()));
@@ -289,10 +318,13 @@ async fn run_tests(client_config: &ClientConfig) {
     println!("\n====================== TEST SUMMARY ======================");
     if failed_tests.lock().unwrap().is_empty() {
         println!("All tests passed!");
+        Ok(())
     } else {
-        println!("{} tests failed:", failed_tests.lock().unwrap().len());
-        for failed_test in failed_tests.lock().unwrap().iter() {
-            println!("  - {failed_test}");
+        let failed = failed_tests.lock().unwrap();
+        println!("{} tests failed:", failed.len());
+        for (i, failed_test) in failed.iter().enumerate() {
+            println!("\n[{}] {}", i + 1, failed_test);
+            println!("{}", "─".repeat(80));
         }
         std::process::exit(1);
     }

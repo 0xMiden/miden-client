@@ -1011,7 +1011,8 @@ async fn p2id_transfer() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1118,7 +1119,8 @@ async fn p2id_transfer_failing_not_enough_balance() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1161,7 +1163,8 @@ async fn p2ide_transfer_consumed_by_target() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1283,7 +1286,8 @@ async fn p2ide_transfer_consumed_by_sender() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1385,7 +1389,8 @@ async fn p2ide_timelocked() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1455,7 +1460,8 @@ async fn get_consumable_notes() {
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await;
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1552,7 +1558,9 @@ async fn get_output_notes() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
     let _ = client.sync_state().await.unwrap();
     let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await
+            .unwrap();
 
     let from_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1617,7 +1625,9 @@ async fn account_rollback() {
     client.sync_state().await.unwrap();
 
     let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await
+            .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1707,7 +1717,9 @@ async fn subsequent_discarded_transactions() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
     let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore).await;
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore)
+            .await
+            .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1836,7 +1848,9 @@ async fn input_note_checks() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
     let (wallet, faucet) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await;
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
+            .await
+            .unwrap();
 
     let mut mint_notes = vec![];
 
@@ -1926,7 +1940,9 @@ async fn swap_chain_test() {
     let mut account_pairs = vec![];
     for _ in 0..3 {
         let (wallet, faucet) =
-            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
+            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
+                .await
+                .unwrap();
         mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
