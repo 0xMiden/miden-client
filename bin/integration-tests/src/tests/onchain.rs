@@ -179,10 +179,14 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // between clients
     client_2.sync_state().await?;
 
-    let (client_1_faucet, _) =
-        client_1.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
-    let (client_2_faucet, _) =
-        client_2.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
+    let (client_1_faucet, _) = client_1
+        .get_account_header_by_id(faucet_account_header.id())
+        .await?
+        .context("failed to find faucet account in client 1 after sync")?;
+    let (client_2_faucet, _) = client_2
+        .get_account_header_by_id(faucet_account_header.id())
+        .await?
+        .context("failed to find faucet account in client 2 after sync")?;
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
@@ -217,10 +221,14 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     )
     .await;
 
-    let (client_1_faucet, _) =
-        client_1.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
-    let (client_2_faucet, _) =
-        client_2.get_account_header_by_id(faucet_account_header.id()).await?.unwrap();
+    let (client_1_faucet, _) = client_1
+        .get_account_header_by_id(faucet_account_header.id())
+        .await?
+        .context("failed to find faucet account in client 1 after consume transactions")?;
+    let (client_2_faucet, _) = client_2
+        .get_account_header_by_id(faucet_account_header.id())
+        .await?
+        .context("failed to find faucet account in client 2 after consume transactions")?;
 
     assert_eq!(client_1_faucet.commitment(), client_2_faucet.commitment());
 
@@ -232,7 +240,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let from_account_balance = client_1
         .get_account(from_account_id)
         .await?
-        .unwrap()
+        .context("failed to find from account for balance check")?
         .account()
         .vault()
         .get_balance(faucet_account_id)
@@ -240,7 +248,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let to_account_balance = client_2
         .get_account(to_account_id)
         .await?
-        .unwrap()
+        .context("failed to find to account for balance check")?
         .account()
         .vault()
         .get_balance(faucet_account_id)
@@ -277,13 +285,13 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let input_note = client_1
         .get_input_note(notes[0].id())
         .await?
-        .with_context(|| format!("Input note {} not found", notes[0].id()))?;
+        .with_context(|| format!("input note {} not found", notes[0].id()))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
     let new_from_account_balance = client_1
         .get_account(from_account_id)
         .await?
-        .unwrap()
+        .context("failed to find from account after transfer")?
         .account()
         .vault()
         .get_balance(faucet_account_id)
@@ -291,7 +299,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let new_to_account_balance = client_2
         .get_account(to_account_id)
         .await?
-        .unwrap()
+        .context("failed to find to account after transfer")?
         .account()
         .vault()
         .get_balance(faucet_account_id)

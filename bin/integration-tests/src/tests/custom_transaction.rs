@@ -134,7 +134,10 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     wait_for_tx(&mut client, tx_id).await?;
 
     // Assert that the note was consumed on chain
-    let input_note = client.get_input_note(note.id()).await?.unwrap();
+    let input_note = client
+        .get_input_note(note.id())
+        .await?
+        .context("failed to find input note after consume transaction execution")?;
     assert!(input_note.is_consumed());
     Ok(())
 }
@@ -288,7 +291,11 @@ pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<
     client_3.sync_state().await?;
 
     // Assert that the note is the same
-    let received_note: InputNote = client_2.get_input_note(note.id()).await?.unwrap().try_into()?;
+    let received_note: InputNote = client_2
+        .get_input_note(note.id())
+        .await?
+        .context("failed to find input note in client 2 after sync")?
+        .try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
     assert_eq!(received_note.note(), &note);
     assert!(client_3.get_input_notes(NoteFilter::All).await?.is_empty());
@@ -302,7 +309,7 @@ async fn mint_custom_note(
 ) -> Result<Note> {
     // Prepare transaction
     let mut random_coin = RpoRandomCoin::new(Default::default());
-    let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin);
+    let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin)?;
 
     let transaction_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(note.clone())])
@@ -317,7 +324,7 @@ fn create_custom_note(
     faucet_account_id: AccountId,
     target_account_id: AccountId,
     rng: &mut RpoRandomCoin,
-) -> Note {
+) -> Result<Note> {
     let expected_note_args = NOTE_ARGS.iter().map(|x| x.as_int().to_string()).collect::<Vec<_>>();
 
     let mem_addr: u32 = 1000;
@@ -327,11 +334,14 @@ fn create_custom_note(
         .replace("{expected_note_arg_2}", &expected_note_args[4..=7].join("."))
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
-    let note_script = client.script_builder().compile_note_script(&note_script).unwrap();
+    let note_script = client
+        .script_builder()
+        .compile_note_script(&note_script)
+        .context("failed to compile custom note script")?;
 
     let inputs =
         NoteInputs::new(vec![target_account_id.prefix().as_felt(), target_account_id.suffix()])
-            .unwrap();
+            .context("failed to create note inputs")?;
     let serial_num = rng.draw_word();
     let note_metadata = NoteMetadata::new(
         faucet_account_id,
@@ -340,9 +350,13 @@ fn create_custom_note(
         NoteExecutionHint::None,
         Default::default(),
     )
-    .unwrap();
-    let note_assets =
-        NoteAssets::new(vec![FungibleAsset::new(faucet_account_id, 10).unwrap().into()]).unwrap();
+    .context("failed to create note metadata")?;
+    let note_assets = NoteAssets::new(vec![
+        FungibleAsset::new(faucet_account_id, 10)
+            .context("failed to create fungible asset")?
+            .into(),
+    ])
+    .context("failed to create note assets")?;
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
-    Note::new(note_assets, note_metadata, note_recipient)
+    Ok(Note::new(note_assets, note_metadata, note_recipient))
 }

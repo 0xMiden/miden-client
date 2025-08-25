@@ -36,8 +36,10 @@ pub async fn client_builder_initializes_client_with_endpoint(
 
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&endpoint, Some(10_000))
-        .filesystem_keystore(auth_path.to_str().unwrap())
-        .sqlite_store(store_config.to_str().unwrap())
+        .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
+        .sqlite_store(
+            store_config.to_str().context("failed to convert store config path to string")?,
+        )
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;
@@ -137,7 +139,10 @@ pub async fn multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
-    let sender_account = client.get_account(from_account_id).await.unwrap().unwrap();
+    let sender_account = client
+        .get_account(from_account_id)
+        .await?
+        .context("failed to find sender account after  transactions")?;
     assert_eq!(
         sender_account.account().vault().get_balance(faucet_account_id).unwrap(),
         MINT_AMOUNT - (TRANSFER_AMOUNT * 2)

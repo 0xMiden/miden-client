@@ -117,13 +117,21 @@ pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
     // - accountB: 1 BTC, 975 ETH
 
     // first reload the account
-    let account_a: Account = client1.get_account(account_a.id()).await?.unwrap().into();
+    let account_a: Account = client1
+        .get_account(account_a.id())
+        .await?
+        .context("failed to find account A after swap transaction")?
+        .into();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
 
-    let asset_1 = account_a_assets.next().unwrap();
-    let asset_2 = account_a_assets.next().unwrap();
+    let asset_1 = account_a_assets
+        .next()
+        .context("expected first asset in account A;s vault after swap")?;
+    let asset_2 = account_a_assets
+        .next()
+        .context("expected second asset in account A's vault after swap")?;
 
     match (asset_1, asset_2) {
         (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
@@ -143,13 +151,21 @@ pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
         _ => panic!("should only have fungible assets!"),
     }
 
-    let account_b: Account = client2.get_account(account_b.id()).await?.unwrap().into();
+    let account_b: Account = client2
+        .get_account(account_b.id())
+        .await?
+        .context("failed to find account B after swap transaction")?
+        .into();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();
 
-    let asset_1 = account_b_assets.next().unwrap();
-    let asset_2 = account_b_assets.next().unwrap();
+    let asset_1 = account_b_assets
+        .next()
+        .context("expected first asset in account B's vault after swap")?;
+    let asset_2 = account_b_assets
+        .next()
+        .context("expected second asset in account B's vault after swap")?;
 
     match (asset_1, asset_2) {
         (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
@@ -285,13 +301,21 @@ pub async fn swap_private(client_config: ClientConfig) -> Result<()> {
     // - accountB: 1 BTC, 975 ETH
 
     // first reload the account
-    let account_a: Account = client1.get_account(account_a.id()).await?.unwrap().into();
+    let account_a: Account = client1
+        .get_account(account_a.id())
+        .await?
+        .context("failed to find account A after private swap transaction")?
+        .into();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
 
-    let asset_1 = account_a_assets.next().unwrap();
-    let asset_2 = account_a_assets.next().unwrap();
+    let asset_1 = account_a_assets
+        .next()
+        .context("expected first asset in account A's vault after private swap")?;
+    let asset_2 = account_a_assets
+        .next()
+        .context("expected second asset in account A's vault after private swap")?;
 
     match (asset_1, asset_2) {
         (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
@@ -311,13 +335,21 @@ pub async fn swap_private(client_config: ClientConfig) -> Result<()> {
         _ => panic!("should only have fungible assets!"),
     }
 
-    let account_b: Account = client2.get_account(account_b.id()).await?.unwrap().into();
+    let account_b: Account = client2
+        .get_account(account_b.id())
+        .await?
+        .context("failed to find account B after swap transaction")?
+        .into();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();
 
-    let asset_1 = account_b_assets.next().unwrap();
-    let asset_2 = account_b_assets.next().unwrap();
+    let asset_1 = account_b_assets
+        .next()
+        .context("expected first asset in account B's vault after swap")?;
+    let asset_2 = account_b_assets
+        .next()
+        .context("expected second asset in account B's vault after swap")?;
 
     match (asset_1, asset_2) {
         (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))

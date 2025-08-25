@@ -283,8 +283,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
         ForeignAccount::public(foreign_account_id, storage_requirements)
     } else {
         // Get current foreign account current state from the store (after 1st deployment tx)
-        let foreign_account: Account =
-            client.get_account(foreign_account_id).await?.unwrap().into();
+        let foreign_account: Account = client
+            .get_account(foreign_account_id)
+            .await?
+            .context("failed to find foreign account after deploiyng")?
+            .into();
         ForeignAccount::private(foreign_account)
     };
 
@@ -314,7 +317,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
-) -> (Account, Word, Word, SecretKey) {
+) -> Result<(Account, Word, Word, SecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
     storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
@@ -324,7 +327,7 @@ fn foreign_account_with_code(
         TransactionKernel::assembler(),
         vec![StorageSlot::Map(storage_map)],
     )
-    .unwrap()
+    .context("failed to compile foreign account component")?
     .with_supports_all_types();
 
     let secret_key = SecretKey::new();
@@ -335,10 +338,14 @@ fn foreign_account_with_code(
         .with_auth_component(auth_component)
         .storage_mode(storage_mode)
         .build()
-        .unwrap();
+        .context("failed to build foreign account")?;
 
-    let proc_root = get_item_component.mast_forest().procedure_digests().next().unwrap();
-    (account, seed, proc_root, secret_key)
+    let proc_root = get_item_component
+        .mast_forest()
+        .procedure_digests()
+        .next()
+        .context("failed to get procedure root from component MAST forest")?;
+    Ok((account, seed, proc_root, secret_key))
 }
 
 /// Deploys a foreign account to the network with the specified code and storage mode. The account
@@ -356,7 +363,7 @@ async fn deploy_foreign_account(
     code: String,
 ) -> Result<(Account, Word)> {
     let (foreign_account, foreign_seed, proc_root, secret_key) =
-        foreign_account_with_code(storage_mode, code);
+        foreign_account_with_code(storage_mode, code)?;
     let foreign_account_id = foreign_account.id();
 
     keystore

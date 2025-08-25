@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use futures::FutureExt;
 use miden_client::rpc::Endpoint;
@@ -91,13 +91,14 @@ async fn run_test<F, Fut>(
     test_fn: F,
     failed_tests: &Arc<Mutex<Vec<String>>>,
     client_config: &ClientConfig,
-) where
+) -> Result<()>
+where
     F: FnOnce(ClientConfig) -> Fut,
     Fut: Future<Output = Result<()>>,
 {
     let result = std::panic::AssertUnwindSafe(test_fn(client_config.clone()))
         .catch_unwind()
-        .await;
+        .await?;
 
     match result {
         Ok(Ok(_)) => {
@@ -120,6 +121,7 @@ async fn run_test<F, Fut>(
             failed_tests.lock().unwrap().push(format!("{name}: {msg}"));
         },
     }
+    Ok(())
 }
 
 /// Formats an error with its full chain
@@ -160,35 +162,35 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "multiple_tx_on_same_block",
         client::multiple_tx_on_same_block,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_expected_notes",
         client::import_expected_notes,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_expected_note_uncommitted",
         client::import_expected_note_uncommitted,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_expected_notes_from_the_past_as_committed",
         client::import_expected_notes_from_the_past_as_committed,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("get_account_update", client::get_account_update, &failed_tests, client_config).await;
     run_test("sync_detail_values", client::sync_detail_values, &failed_tests, client_config).await;
     run_test(
@@ -197,49 +199,49 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "consume_multiple_expected_notes",
         client::consume_multiple_expected_notes,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_consumed_note_with_proof",
         client::import_consumed_note_with_proof,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_consumed_note_with_id",
         client::import_consumed_note_with_id,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "import_note_with_proof",
         client::import_note_with_proof,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "discarded_transaction",
         client::discarded_transaction,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "custom_transaction_prover",
         client::custom_transaction_prover,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("locked_account", client::locked_account, &failed_tests, client_config).await;
     run_test(
         "expired_transaction_fails",
@@ -247,7 +249,7 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("unused_rpc_api", client::unused_rpc_api, &failed_tests, client_config).await;
     run_test(
         "ignore_invalid_notes",
@@ -255,7 +257,7 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("output_only_note", client::output_only_note, &failed_tests, client_config).await;
     // CUSTOM TRANSACTION
     run_test("merkle_store", custom_transaction::merkle_store, &failed_tests, client_config).await;
@@ -265,14 +267,14 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "transaction_request",
         custom_transaction::transaction_request,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     // FPI
     run_test("standard_fpi_public", fpi::standard_fpi_public, &failed_tests, client_config).await;
     run_test("standard_fpi_private", fpi::standard_fpi_private, &failed_tests, client_config).await;
@@ -285,14 +287,14 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test(
         "recall_note_before_ntx_consumes_it",
         network_transaction::recall_note_before_ntx_consumes_it,
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     // ONCHAIN
     run_test(
         "import_account_by_id",
@@ -300,7 +302,7 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("onchain_accounts", onchain::onchain_accounts, &failed_tests, client_config).await;
     run_test("onchain_notes_flow", onchain::onchain_notes_flow, &failed_tests, client_config).await;
     run_test("incorrect_genesis", onchain::incorrect_genesis, &failed_tests, client_config).await;
@@ -311,16 +313,16 @@ async fn run_tests(client_config: &ClientConfig) -> Result<()> {
         &failed_tests,
         client_config,
     )
-    .await;
+    .await?;
     run_test("swap_private", swap_transaction::swap_private, &failed_tests, client_config).await;
 
     // Print summary
     println!("\n====================== TEST SUMMARY ======================");
-    if failed_tests.lock().unwrap().is_empty() {
+    if failed_tests.lock().expect("posioned lock")?.is_empty() {
         println!("All tests passed!");
         Ok(())
     } else {
-        let failed = failed_tests.lock().unwrap();
+        let failed = failed_tests.lock().expect("poisoned lock")?;
         println!("{} tests failed:", failed.len());
         for (i, failed_test) in failed.iter().enumerate() {
             println!("\n[{}] {}", i + 1, failed_test);

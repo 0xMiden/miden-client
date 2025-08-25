@@ -70,7 +70,7 @@ async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<(Account, Library)> {
-    let (acc, seed, library) = get_counter_contract_account(client, storage_mode).await;
+    let (acc, seed, library) = get_counter_contract_account(client, storage_mode).await?;
 
     client.add_account(&acc, Some(seed), false).await?;
 
@@ -98,18 +98,18 @@ async fn deploy_counter_contract(
 async fn get_counter_contract_account(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-) -> (Account, Word, Library) {
+) -> Result<(Account, Word, Library)> {
     let counter_component = AccountComponent::compile(
         COUNTER_CONTRACT,
         TransactionKernel::assembler(),
         vec![StorageSlot::empty_value()],
     )
-    .unwrap()
+    .context("failed to compile counter contract component")?
     .with_supports_all_types();
 
     let incr_nonce_auth =
         AccountComponent::compile(INCR_NONCE_AUTH_CODE, TransactionKernel::assembler(), vec![])
-            .unwrap()
+            .context("failed to compile increment nonce auth component")?
             .with_supports_all_types();
 
     let mut init_seed = [0u8; 32];
@@ -120,20 +120,24 @@ async fn get_counter_contract_account(
         .with_component(counter_component)
         .with_auth_component(incr_nonce_auth)
         .build()
-        .unwrap();
+        .context("failed to build account with counter contract")?;
 
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new("external_contract::counter_contract").unwrap(),
+            LibraryPath::new("external_contract::counter_contract")
+                .context("failed to create library path for counter contract")?,
             COUNTER_CONTRACT,
             &source_manager,
         )
-        .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
+        .context("failed to parse counter contract module")?;
+    let library = assembler
+        .clone()
+        .assemble_library([module])
+        .context("failed to assemble counter contract library")?;
 
-    (account, seed, library)
+    Ok((account, seed, library))
 }
 // TESTS
 // ================================================================================================
@@ -150,7 +154,7 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
         client
             .get_account(network_account.id())
             .await?
-            .unwrap()
+            .context("failed to find network account after deployment")?
             .account()
             .storage()
             .get_item(0)?,
@@ -258,7 +262,7 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> 
         client
             .get_account(network_account.id())
             .await?
-            .unwrap()
+            .context("failed to find network account after recall test")?
             .account()
             .storage()
             .get_item(0)?,
@@ -270,7 +274,7 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> 
         client
             .get_account(native_account.id())
             .await?
-            .unwrap()
+            .context("failed to find native account after recall test")?
             .account()
             .storage()
             .get_item(0)?,
