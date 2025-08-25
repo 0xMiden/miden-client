@@ -6,7 +6,9 @@ import {
   accounts,
   foreignAccountCode,
   IAccount,
+  IAccountVault,
 } from "./schema.js";
+import { JsVaultAsset } from "./sync.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 // GET FUNCTIONS
@@ -228,7 +230,7 @@ export async function getAccountStorage(storageRoot: string) {
   }
 }
 
-export async function getAccountAssetVault(vaultRoot: string) {
+export async function getVaultAssets(vaultRoot: string) {
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountVaults
@@ -236,24 +238,15 @@ export async function getAccountAssetVault(vaultRoot: string) {
       .equals(vaultRoot)
       .toArray();
 
-    // The first record is the only one due to the uniqueness constraint
-    const vaultRecord = allMatchingRecords[0];
+    // Map the records to their asset values
+    const assets = allMatchingRecords.map((record) => {
+      return {
+        asset: record.asset,
+      };
+    });
 
-    if (vaultRecord === undefined) {
-      console.log("No records found for given vault root.");
-      return null;
-    }
-
-    // Convert the assets Blob to an ArrayBuffer
-    const assetsArrayBuffer = await vaultRecord.assets.arrayBuffer();
-    const assetsArray = new Uint8Array(assetsArrayBuffer);
-    const assetsBase64 = uint8ArrayToBase64(assetsArray);
-
-    return {
-      root: vaultRecord.root,
-      assets: assetsBase64,
-    };
-  } catch (error) {
+    return assets;
+  } catch (error: unknown) {
     logWebStoreError(
       error,
       `Error fetching account vault for root ${vaultRoot}`
@@ -320,23 +313,20 @@ export async function insertAccountStorage(
   }
 }
 
-export async function insertAccountAssetVault(
-  vaultRoot: string,
-  assets: Uint8Array
-) {
+export async function insertVaultAssets(assets: JsVaultAsset[]) {
   try {
-    const assetsBlob = new Blob([new Uint8Array(assets)]);
-
-    // Prepare the data object to insert
-    const data = {
-      root: vaultRoot, // Using vaultRoot as the key
-      assets: assetsBlob,
-    };
-
     // Perform the insert using Dexie
-    await accountVaults.put(data);
-  } catch (error) {
-    logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
+    let processedAssets = assets.map((asset) => {
+      return {
+        root: asset.root,
+        faucetIdPrefix: asset.faucetIdPrefix,
+        asset: asset.asset,
+      } as IAccountVault;
+    });
+
+    await accountVaults.bulkPut(processedAssets);
+  } catch (error: unknown) {
+    logWebStoreError(error, `Error inserting assets`);
   }
 }
 export async function insertAccountRecord(

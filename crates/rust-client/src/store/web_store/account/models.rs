@@ -30,10 +30,8 @@ pub struct AccountStorageIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountVaultIdxdbObject {
-    pub root: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub assets: Vec<u8>,
+pub struct AccountAssetIdxdbObject {
+    pub asset: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
