@@ -80,6 +80,7 @@ pub mod public_key;
 pub mod rpo256;
 pub mod secret_key;
 pub mod signature;
+pub mod signing_inputs;
 pub mod storage_map;
 pub mod storage_slot;
 pub mod sync_summary;
