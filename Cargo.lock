@@ -2328,7 +2328,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "futures",
@@ -2356,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "futures",
@@ -2376,7 +2376,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "hex",
@@ -2396,7 +2396,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "prost",
@@ -2407,7 +2407,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "futures",
@@ -2434,7 +2434,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2465,7 +2465,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2544,7 +2544,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2587,7 +2587,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=tomyrd-account-genesis-error#756209f0a778f979991ca75a5b3b942ab58b17f5"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#7434171ce33eaf8cb58d928193d11fbcb7219a0b"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
