@@ -52,7 +52,7 @@ pub const ACCOUNT_ID_REGULAR: u128 = ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABL
 /// too low, some tests might fail due to expected recall failures not happening.
 pub const RECALL_HEIGHT_DELTA: u32 = 50;
 
-/// Creates a `TestClient` builder and keystore, returning a Result.
+/// Creates a `TestClient` builder and keystore.
 ///
 /// Creates the client builder using the provided `ClientConfig`. The store uses a `SQLite` database
 /// at a temporary location determined by the store config.
@@ -91,7 +91,7 @@ pub async fn create_test_client_builder(
     Ok((builder, keystore))
 }
 
-/// Creates a `TestClient`, returning a Result.
+/// Creates a `TestClient`.
 ///
 /// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
 /// at a temporary location determined by the store config. The client is synced to the
@@ -211,7 +211,7 @@ pub async fn execute_tx(
     transaction_id
 }
 
-/// Executes a transaction and waits for it to be committed, returning a Result.
+/// Executes a transaction and waits for it to be committed.
 pub async fn execute_tx_and_sync(
     client: &mut TestClient,
     account_id: AccountId,
@@ -222,9 +222,7 @@ pub async fn execute_tx_and_sync(
     Ok(())
 }
 
-/// Executes a transaction and waits for it to be committed.
-
-/// Syncs the client and waits for the transaction to be committed, returning a Result.
+/// Syncs the client and waits for the transaction to be committed.
 pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId) -> Result<()> {
     // wait until tx is committed
     let now = Instant::now();
@@ -328,8 +326,7 @@ pub async fn wait_for_node(client: &mut TestClient) {
 pub const MINT_AMOUNT: u64 = 1000;
 pub const TRANSFER_AMOUNT: u64 = 59;
 
-/// Sets up a basic client and returns two basic accounts and a faucet account (in that order),
-/// returning a Result.
+/// Sets up a basic client and returns two basic accounts and a faucet account (in that order).
 pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
@@ -376,7 +373,7 @@ pub async fn setup_two_wallets_and_faucet(
     Ok((first_basic_account, second_basic_account, faucet_account))
 }
 
-/// Sets up a basic client and returns a basic account and a faucet account, returning a Result.
+/// Sets up a basic client and returns a basic account and a faucet account.
 pub async fn setup_wallet_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
