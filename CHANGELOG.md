@@ -42,6 +42,7 @@
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
 * Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141))
 * Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115))
+* Added `SigningInputs` to Web Client ([#1160](https://github.com/0xMiden/miden-client/pull/1160))
 
 ## 0.10.1 (2025-07-26)
 
