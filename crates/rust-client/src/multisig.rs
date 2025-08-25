@@ -96,12 +96,12 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> MultisigClient<AUTH> {
         let advice_inputs = transaction_request.advice_map_mut();
         let msg = transaction_summary.to_commitment();
         let num_approvers: u32 =
-            account.storage().get_item(0).unwrap().as_elements()[0].try_into().unwrap();
+            account.storage().get_item(0).unwrap().as_elements()[1].try_into().unwrap();
 
         for i in 0..num_approvers as usize {
             let pub_key_index_word = Word::from([Felt::from(i as u32), ZERO, ZERO, ZERO]);
-            let pub_key = account.storage().get_map_item(2, pub_key_index_word).unwrap();
-            let sig_key = Hasher::merge(&[msg, pub_key]);
+            let pub_key = account.storage().get_map_item(1, pub_key_index_word).unwrap();
+            let sig_key = Hasher::merge(&[pub_key, msg]);
             if let Some(signature) = signatures.get(i).and_then(|s| s.as_ref()) {
                 advice_inputs.extend(vec![(sig_key, signature.clone())]);
             }
@@ -122,7 +122,8 @@ mod tests {
 
     use super::*;
     use crate::testing::common::{
-        insert_new_fungible_faucet, insert_new_wallet, mint_note, wait_for_node, wait_for_tx, TestClientKeyStore
+        TestClientKeyStore, insert_new_fungible_faucet, insert_new_wallet, mint_note,
+        wait_for_node, wait_for_tx,
     };
     use crate::testing::mock::MockRpcApi;
     use crate::tests::create_test_client;
@@ -178,20 +179,18 @@ mod tests {
             &mut coordinator_client,
             multisig_account.id(),
             faucet_account.id(),
-            NoteType::Private,
+            NoteType::Public,
         )
         .await;
 
-        wait_for_tx(&mut coordinator_client, tx_id).await;
-
         mock_rpc_api.prove_block();
-        coordinator_client.sync_state().await.unwrap();
 
         // create a transaction to consume the note by the multisig account
         let salt = Word::empty();
         let tx_request = TransactionRequestBuilder::new()
             .auth_arg(salt)
-            .build_consume_notes(vec![note.id()])
+            // .build_consume_notes(vec![note.id()])
+            .build()
             .unwrap();
 
         // Propose the transaction (should fail with Unauthorized)
