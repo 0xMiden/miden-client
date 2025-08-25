@@ -2,7 +2,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_objects::Word;
-use miden_objects::block::BlockNumber;
 use miden_objects::transaction::TransactionScript;
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
@@ -13,7 +12,6 @@ use super::account::utils::update_account;
 use super::note::utils::apply_note_updates_tx;
 use crate::store::{StoreError, TransactionFilter};
 use crate::transaction::{
-    DiscardCause,
     TransactionDetails,
     TransactionRecord,
     TransactionStatus,
@@ -57,9 +55,6 @@ impl WebStore {
         let transaction_records: Result<Vec<TransactionRecord>, StoreError> = transactions_idxdb
             .into_iter()
             .map(|tx_idxdb| {
-                let commit_height: Option<BlockNumber> =
-                    tx_idxdb.commit_height.map(|height| height.parse::<u32>().unwrap().into());
-
                 let id: Word = tx_idxdb.id.try_into()?;
 
                 let details = TransactionDetails::read_from_bytes(&tx_idxdb.details)?;
@@ -76,12 +71,7 @@ impl WebStore {
                     None
                 };
 
-                let status = if let Some(cause) = tx_idxdb.discard_cause {
-                    let cause = DiscardCause::read_from_bytes(&cause)?;
-                    TransactionStatus::Discarded(cause)
-                } else {
-                    commit_height.map_or(TransactionStatus::Pending, TransactionStatus::Committed)
-                };
+                let status = TransactionStatus::read_from_bytes(&tx_idxdb.status)?;
 
                 Ok(TransactionRecord { id: id.into(), details, script, status })
             })

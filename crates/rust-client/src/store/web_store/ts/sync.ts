@@ -132,9 +132,10 @@ interface SerializedTransactionData {
   id: string;
   details: Uint8Array;
   blockNum: string;
-  scriptRoot: Uint8Array;
-  commitHeight: string;
-  discardCause?: Uint8Array;
+  scriptRoot: string;
+  committed: number;
+  discarded: number;
+  status: Uint8Array;
   txScript?: Uint8Array;
 }
 
@@ -238,9 +239,10 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
           transactionRecord.id,
           transactionRecord.details,
           transactionRecord.blockNum,
-          transactionRecord.scriptRoot,
-          transactionRecord.commitHeight,
-          transactionRecord.discardCause
+          transactionRecord.committed,
+          transactionRecord.discarded,
+          transactionRecord.status,
+          transactionRecord.scriptRoot
         ),
       ]);
     })

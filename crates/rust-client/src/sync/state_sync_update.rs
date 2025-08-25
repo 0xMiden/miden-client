@@ -154,7 +154,7 @@ impl TransactionUpdateTracker {
     pub fn committed_transactions(&self) -> impl Iterator<Item = &TransactionRecord> {
         self.transactions
             .values()
-            .filter(|tx| matches!(tx.status, TransactionStatus::Committed(_)))
+            .filter(|tx| matches!(tx.status, TransactionStatus::Committed { .. }))
     }
 
     /// Returns a reference to discarded transactions.
@@ -180,10 +180,14 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
-    pub fn apply_transaction_inclusion(&mut self, transaction_inclusion: &TransactionInclusion) {
+    pub fn apply_transaction_inclusion(
+        &mut self,
+        transaction_inclusion: &TransactionInclusion,
+        timestamp: u64,
+    ) {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
-            transaction.commit_transaction(transaction_inclusion.block_num.into());
+            transaction.commit_transaction(transaction_inclusion.block_num.into(), timestamp);
         }
     }
 

@@ -9,12 +9,13 @@ import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
   scriptRoot?: string;
-  discardCause?: string;
   details?: string;
   id: string;
   txScript?: string;
   blockNum: string;
-  commitHeight?: string;
+  committed: number;
+  discarded: number;
+  status?: string;
 }
 
 const IDS_FILTER_PREFIX = "Ids:";
@@ -25,7 +26,7 @@ export async function getTransactions(filter: string) {
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter((tx) => tx.commitHeight == undefined)
+        .filter((tx) => !tx.committed)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -47,10 +48,7 @@ export async function getTransactions(filter: string) {
 
       transactionRecords = await transactions
         .filter(
-          (tx) =>
-            tx.blockNum < blockNum &&
-            tx.commitHeight == undefined &&
-            tx.discardCause == undefined
+          (tx) => tx.blockNum < blockNum && !tx.committed && !tx.discarded
         )
         .toArray();
     } else {
@@ -83,7 +81,6 @@ export async function getTransactions(filter: string) {
     const processedTransactions = await Promise.all(
       transactionRecords.map(async (transactionRecord) => {
         let txScriptBase64: undefined | string = undefined;
-        let discardCauseBase64: string | undefined = undefined;
         if (transactionRecord.scriptRoot) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
 
@@ -94,17 +91,14 @@ export async function getTransactions(filter: string) {
           }
         }
 
-        if (transactionRecord.discardCause) {
-          const discardCauseArrayBuffer =
-            await transactionRecord.discardCause.arrayBuffer();
-          const discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
-          discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
-        }
-
         const detailsArrayBuffer =
           await transactionRecord.details.arrayBuffer();
         const detailsArray = new Uint8Array(detailsArrayBuffer);
         const detailsBase64 = uint8ArrayToBase64(detailsArray);
+
+        const statusArrayBuffer = await transactionRecord.status.arrayBuffer();
+        const statusArray = new Uint8Array(statusArrayBuffer);
+        const statusBase64 = uint8ArrayToBase64(statusArray);
 
         const data: ProcessedTransaction = {
           id: transactionRecord.id,
@@ -112,8 +106,9 @@ export async function getTransactions(filter: string) {
           scriptRoot: transactionRecord.scriptRoot,
           txScript: txScriptBase64,
           blockNum: transactionRecord.blockNum.toString(),
-          commitHeight: transactionRecord.commitHeight,
-          discardCause: discardCauseBase64,
+          committed: transactionRecord.committed,
+          discarded: transactionRecord.discarded,
+          status: statusBase64,
         };
 
         return data;
@@ -127,7 +122,7 @@ export async function getTransactions(filter: string) {
 }
 
 export async function insertTransactionScript(
-  scriptRoot: Uint8Array,
+  scriptRoot: string,
   txScript?: Uint8Array
 ) {
   try {
@@ -141,11 +136,8 @@ export async function insertTransactionScript(
       return;
     }
 
-    const scriptRootArray = new Uint8Array(scriptRoot);
-    const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
-
     const data: ITransactionScript = {
-      scriptRoot: scriptRootBase64,
+      scriptRoot,
       txScript: mapOption(
         txScript,
         (txScript) => new Blob([new Uint8Array(txScript)])
@@ -165,23 +157,23 @@ export async function upsertTransactionRecord(
   transactionId: string,
   details: Uint8Array,
   blockNum: string,
-  scriptRoot?: Uint8Array,
-  committed?: string,
-  discardCause?: Uint8Array
+  committed: number,
+  discarded: number,
+  status: Uint8Array,
+  scriptRoot: string
 ) {
   try {
     const detailsBlob = new Blob([new Uint8Array(details)]);
+    const statusBlob = new Blob([new Uint8Array(status)]);
 
     const data = {
       id: transactionId,
       details: detailsBlob,
-      scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
+      scriptRoot,
       blockNum: parseInt(blockNum, 10),
-      commitHeight: committed ? committed : undefined,
-      discardCause: mapOption(
-        discardCause,
-        (discardCause) => new Blob([discardCause as BlobPart])
-      ),
+      committed,
+      discarded,
+      status: statusBlob,
     };
 
     await transactions.put(data);
