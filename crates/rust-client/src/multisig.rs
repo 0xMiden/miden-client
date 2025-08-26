@@ -122,8 +122,10 @@ mod tests {
 
     use super::*;
     use crate::testing::common::{
-        TestClientKeyStore, insert_new_fungible_faucet, insert_new_wallet, mint_note,
-        wait_for_node, wait_for_tx,
+        TestClientKeyStore,
+        insert_new_fungible_faucet,
+        insert_new_wallet,
+        mint_note,
     };
     use crate::testing::mock::MockRpcApi;
     use crate::tests::create_test_client;
@@ -139,7 +141,6 @@ mod tests {
     #[tokio::test]
     async fn multisig() {
         let (mut signer_a_client, _, authenticator_a) = create_test_client().await;
-        wait_for_node(&mut signer_a_client).await;
         let (mut signer_b_client, _, authenticator_b) = create_test_client().await;
 
         let (mut coordinator_client, mock_rpc_api, coordinator_keystore) =
@@ -175,7 +176,7 @@ mod tests {
         .unwrap();
 
         // mint a note to the multisig account
-        let (tx_id, note) = mint_note(
+        let (_tx_id, note) = mint_note(
             &mut coordinator_client,
             multisig_account.id(),
             faucet_account.id(),
@@ -184,13 +185,20 @@ mod tests {
         .await;
 
         mock_rpc_api.prove_block();
+        mock_rpc_api.prove_block();
+        coordinator_client.sync_state().await.unwrap();
+
+        coordinator_client
+            .import_note(miden_objects::note::NoteFile::NoteId(note.id()))
+            .await
+            .unwrap();
 
         // create a transaction to consume the note by the multisig account
         let salt = Word::empty();
         let tx_request = TransactionRequestBuilder::new()
             .auth_arg(salt)
-            // .build_consume_notes(vec![note.id()])
-            .build()
+            .build_consume_notes(vec![note.id()])
+            // .build()
             .unwrap();
 
         // Propose the transaction (should fail with Unauthorized)
