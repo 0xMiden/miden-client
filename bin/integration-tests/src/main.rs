@@ -133,7 +133,30 @@ impl From<Args> for BaseConfig {
 #[derive(Debug, Clone)]
 struct TestCase {
     name: String,
-    category: String,
+    category: TestCategory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum TestCategory {
+    Client,
+    CustomTransaction,
+    Fpi,
+    NetworkTransaction,
+    Onchain,
+    SwapTransaction,
+}
+
+impl AsRef<str> for TestCategory {
+    fn as_ref(&self) -> &str {
+        match self {
+            TestCategory::Client => "client",
+            TestCategory::CustomTransaction => "custom_transaction",
+            TestCategory::Fpi => "fpi",
+            TestCategory::NetworkTransaction => "network_transaction",
+            TestCategory::Onchain => "onchain",
+            TestCategory::SwapTransaction => "swap_transaction",
+        }
+    }
 }
 
 /// Returns all available test cases organized by category.
@@ -145,145 +168,145 @@ fn get_all_tests() -> Vec<TestCase> {
         // CLIENT tests
         TestCase {
             name: "client_builder_initializes_client_with_endpoint".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "multiple_tx_on_same_block".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_expected_notes".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_expected_note_uncommitted".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_expected_notes_from_the_past_as_committed".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "get_account_update".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "sync_detail_values".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "multiple_transactions_can_be_committed_in_different_blocks_without_sync"
                 .to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "consume_multiple_expected_notes".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_consumed_note_with_proof".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_consumed_note_with_id".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "import_note_with_proof".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "discarded_transaction".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "custom_transaction_prover".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "locked_account".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "expired_transaction_fails".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "unused_rpc_api".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "ignore_invalid_notes".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         TestCase {
             name: "output_only_note".to_string(),
-            category: "client".to_string(),
+            category: TestCategory::Client,
         },
         // CUSTOM TRANSACTION tests
         TestCase {
             name: "merkle_store".to_string(),
-            category: "custom_transaction".to_string(),
+            category: TestCategory::CustomTransaction,
         },
         TestCase {
             name: "onchain_notes_sync_with_tag".to_string(),
-            category: "custom_transaction".to_string(),
+            category: TestCategory::CustomTransaction,
         },
         TestCase {
             name: "transaction_request".to_string(),
-            category: "custom_transaction".to_string(),
+            category: TestCategory::CustomTransaction,
         },
         // FPI tests
         TestCase {
             name: "standard_fpi_public".to_string(),
-            category: "fpi".to_string(),
+            category: TestCategory::Fpi,
         },
         TestCase {
             name: "standard_fpi_private".to_string(),
-            category: "fpi".to_string(),
+            category: TestCategory::Fpi,
         },
         TestCase {
             name: "fpi_execute_program".to_string(),
-            category: "fpi".to_string(),
+            category: TestCategory::Fpi,
         },
         TestCase {
             name: "nested_fpi_calls".to_string(),
-            category: "fpi".to_string(),
+            category: TestCategory::Fpi,
         },
         // NETWORK TRANSACTION tests
         TestCase {
             name: "counter_contract_ntx".to_string(),
-            category: "network_transaction".to_string(),
+            category: TestCategory::NetworkTransaction,
         },
         TestCase {
             name: "recall_note_before_ntx_consumes_it".to_string(),
-            category: "network_transaction".to_string(),
+            category: TestCategory::NetworkTransaction,
         },
         // ONCHAIN tests
         TestCase {
             name: "import_account_by_id".to_string(),
-            category: "onchain".to_string(),
+            category: TestCategory::Onchain,
         },
         TestCase {
             name: "onchain_accounts".to_string(),
-            category: "onchain".to_string(),
+            category: TestCategory::Onchain,
         },
         TestCase {
             name: "onchain_notes_flow".to_string(),
-            category: "onchain".to_string(),
+            category: TestCategory::Onchain,
         },
         TestCase {
             name: "incorrect_genesis".to_string(),
-            category: "onchain".to_string(),
+            category: TestCategory::Onchain,
         },
         // SWAP TRANSACTION tests
         TestCase {
             name: "swap_fully_onchain".to_string(),
-            category: "swap_transaction".to_string(),
+            category: TestCategory::SwapTransaction,
         },
         TestCase {
             name: "swap_private".to_string(),
-            category: "swap_transaction".to_string(),
+            category: TestCategory::SwapTransaction,
         },
     ]
 }
@@ -292,7 +315,7 @@ fn get_all_tests() -> Vec<TestCase> {
 #[derive(Debug)]
 struct TestResult {
     name: String,
-    category: String,
+    category: TestCategory,
     passed: bool,
     duration: Duration,
     error_message: Option<String>,
@@ -300,7 +323,7 @@ struct TestResult {
 
 impl TestResult {
     /// Creates a TestResult for a passed test.
-    fn passed(name: String, category: String, duration: Duration) -> Self {
+    fn passed(name: String, category: TestCategory, duration: Duration) -> Self {
         Self {
             name,
             category,
@@ -311,7 +334,7 @@ impl TestResult {
     }
 
     /// Creates a TestResult for a failed test with an error message.
-    fn failed(name: String, category: String, duration: Duration, error: String) -> Self {
+    fn failed(name: String, category: TestCategory, duration: Duration, error: String) -> Self {
         Self {
             name,
             category,
@@ -363,13 +386,13 @@ fn list_tests(tests: &[TestCase]) {
     println!("Available tests:");
     println!("================");
 
-    let mut tests_by_category: BTreeMap<String, Vec<&TestCase>> = BTreeMap::new();
+    let mut tests_by_category: BTreeMap<TestCategory, Vec<&TestCase>> = BTreeMap::new();
     for test in tests {
         tests_by_category.entry(test.category.clone()).or_default().push(test);
     }
 
     for (category, tests) in tests_by_category {
-        println!("\n{}:", category.to_uppercase());
+        println!("\n{}:", category.as_ref().to_uppercase());
         for test in tests {
             println!("  - {}", test.name);
         }
@@ -382,7 +405,7 @@ fn list_tests(tests: &[TestCase]) {
 ///
 /// Creates a new Tokio runtime for the test, handles panics, and measures execution time. Each
 /// test gets its own isolated configuration.
-fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
+fn run_single_test(test_case: &TestCase, base_config: &BaseConfig) -> TestResult {
     let start_time = Instant::now();
 
     // Create a new runtime for this test
@@ -395,7 +418,7 @@ fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
                 ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout);
 
             // Match the test name to the actual test function
-            match test_name {
+            match test_case.name.as_str() {
                 // CLIENT tests
                 "client_builder_initializes_client_with_endpoint" => {
                     client_builder_initializes_client_with_endpoint(client_config).await
@@ -459,7 +482,7 @@ fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
                 "swap_fully_onchain" => swap_fully_onchain(client_config).await,
                 "swap_private" => swap_private(client_config).await,
 
-                _ => panic!("Unknown test: {}", test_name),
+                _ => panic!("Unknown test: {}", test_case.name),
             }
         })
     }));
@@ -467,7 +490,7 @@ fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
     let duration = start_time.elapsed();
 
     match result {
-        Ok(_) => TestResult::passed(test_name.to_string(), "".to_string(), duration),
+        Ok(_) => TestResult::passed(test_case.name.clone(), test_case.category.clone(), duration),
         Err(panic_info) => {
             let error_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
                 s.to_string()
@@ -476,7 +499,12 @@ fn run_single_test(test_name: &str, base_config: &BaseConfig) -> TestResult {
             } else {
                 "Unknown panic".into()
             };
-            TestResult::failed(test_name.to_string(), "".to_string(), duration, error_msg)
+            TestResult::failed(
+                test_case.name.clone(),
+                test_case.category.clone(),
+                duration,
+                error_msg,
+            )
         },
     }
 }
@@ -521,14 +549,12 @@ fn run_tests_parallel(
                 };
 
                 let test_name = test.name.clone();
-                let test_category = test.category.clone();
 
                 if verbose {
                     println!("[Worker {}] Starting test: {}", worker_id, test_name);
                 }
 
-                let mut result = run_single_test(&test_name, &base_config);
-                result.category = test_category; // Set the category
+                let result = run_single_test(&test, &base_config);
 
                 let status = if result.passed { "PASSED" } else { "FAILED" };
                 let duration_str = if result.duration.as_secs() > 0 {
@@ -540,12 +566,19 @@ fn run_tests_parallel(
                 if verbose {
                     println!(
                         "[Worker {}] {} - {}: {} ({})",
-                        worker_id, test_name, result.category, status, duration_str
+                        worker_id,
+                        test_name,
+                        result.category.as_ref(),
+                        status,
+                        duration_str
                     );
                 } else {
                     println!(
                         " - {} ({}): {} ({})",
-                        test_name, result.category, status, duration_str
+                        test_name,
+                        result.category.as_ref(),
+                        status,
+                        duration_str
                     );
                 }
 
@@ -599,7 +632,7 @@ fn print_summary(results: &[TestResult], total_duration: Duration) {
     if failed > 0 {
         println!("\nFailed tests:");
         for result in results.iter().filter(|r| !r.passed) {
-            println!("  - {} ({})", result.name, result.category);
+            println!("  - {} ({})", result.name, result.category.as_ref());
             if let Some(ref error) = result.error_message {
                 println!("    Error: {}", error);
             }
