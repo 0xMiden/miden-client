@@ -37,7 +37,7 @@ the global `Window` object) which provides a static method `createClient` to cre
  */
 export const webClientCall = async (arg1, arg2) => {
   return await testingPage.evaluate(
-    async (_arg1, _arg2) => {
+    async ({arg1, arg2}) => {
       /** @type {WebClient} */
       // window.client is defined in the setup under
       // playwright.global.setup.ts
@@ -46,8 +46,8 @@ export const webClientCall = async (arg1, arg2) => {
 
       return result;
     },
-    arg1,
-    arg2
+    // Careful! Multiple arguments require to be wrapped inside an object.
+    { arg1, arg2 }
   );
 };
 ```
