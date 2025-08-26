@@ -6,6 +6,7 @@
 
 ## Enumerations
 
+- [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
@@ -35,9 +36,11 @@
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
 - [BlockHeader](classes/BlockHeader.md)
 - [ConsumableNoteRecord](classes/ConsumableNoteRecord.md)
+- [Endpoint](classes/Endpoint.md)
 - [ExecutedTransaction](classes/ExecutedTransaction.md)
 - [Felt](classes/Felt.md)
 - [FeltArray](classes/FeltArray.md)
+- [FetchedNote](classes/FetchedNote.md)
 - [FlattenedU8Vec](classes/FlattenedU8Vec.md)
 - [ForeignAccount](classes/ForeignAccount.md)
 - [FungibleAsset](classes/FungibleAsset.md)
@@ -82,6 +85,7 @@
 - [PartialNote](classes/PartialNote.md)
 - [PublicKey](classes/PublicKey.md)
 - [RecipientArray](classes/RecipientArray.md)
+- [RpcClient](classes/RpcClient.md)
 - [Rpo256](classes/Rpo256.md)
 - [SecretKey](classes/SecretKey.md)
 - [SerializedInputNoteData](classes/SerializedInputNoteData.md)
