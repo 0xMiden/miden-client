@@ -53,11 +53,62 @@ jobs:
         run: make integration-test-full
       - name: Stop test node
         if: always()
-        run: make stop-node
+
+  build-web-client-dist-folder:
+    name: Build Web Client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Rust (needed for WASM build)
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'yarn' # This caches the Yarn dependencies
+
+      - name: Install dependencies
+        run: |
+          cd ./crates/web-client
+          yarn install
+
+      - name: Restore cache - dist folder
+        id: dist-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ./crates/web-client/dist
+          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/pkg/**/*.wasm') }}
+          restore-keys: ${{ runner.os }}-dist-
+
+      - name: Build project
+        if: steps.dist-cache.outputs.cache-hit != 'true'
+        run: |
+          cd ./crates/web-client
+          MIDEN_WEB_DEV=true yarn run build
+
+      - name: Save cache - dist folder
+        if: steps.dist-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ./crates/web-client/dist
+          key: ${{ steps.dist-cache.outputs.cache-key }}
+
+      - name: Upload artifacts for matrix jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client/dist
 
   integration-tests-web-client:
     name: Run integration tests for web client on ubuntu-latest
     runs-on: ubuntu-latest
+    needs: [ build-web-client-dist-folder ]
     strategy:
       matrix:
         shardIndex: [1, 2, 3, 4]
@@ -68,6 +119,13 @@ jobs:
         run: |
           rustup update --no-self-update
           rustup target add wasm32-unknown-unknown
+
+      - name: Fetch dist folder
+        uses: actions/download-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -92,6 +150,7 @@ jobs:
   integration-tests-remote-prover-web-client:
     name: Run integration tests for remote prover on ubuntu-latest
     runs-on: ubuntu-latest
+    needs: [ build-web-client-dist-folder ]
     steps:
       - uses: actions/checkout@main
       - name: Install Rust
@@ -102,6 +161,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Fetch dist folder
+        uses: actions/download-artifact@v4
+        with:
+          name: web-client-artifacts
+          path: ./crates/web-client
+
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
       - name: Add Rust Cache
