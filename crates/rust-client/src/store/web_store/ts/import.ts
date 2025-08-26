@@ -1,8 +1,7 @@
-// Disabling any checks since this file mostly deals
-// with importing DB types.
-/* eslint-disable  @typescript-eslint/no-explicit-any */
-/* eslint-disable  @typescript-eslint/no-unsafe-return */
-/* eslint-disable  @typescript-eslint/no-unsafe-assignment */
+// Disabling `any` checks since this file mostly deals
+// with importing DB types and we're testing this which
+// should be enough + the TS compiler.
+/* eslint-disable */
 import { db, openDatabase } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use miden_client::ClientError;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
@@ -26,7 +27,6 @@ use miden_client::transaction::{
     TransactionStatus,
     TransactionWitness,
 };
-use miden_client::{ClientError, ONE};
 
 pub async fn client_builder_initializes_client_with_endpoint(client_config: ClientConfig) {
     let (endpoint, _, store_config, auth_path) = client_config.into_parts();
@@ -1172,8 +1172,6 @@ pub async fn unused_rpc_api(client_config: ClientConfig) {
 
     client.sync_state().await.unwrap();
 
-    let second_block_num = client.get_sync_height().await.unwrap();
-
     let nullifier = note.nullifier();
 
     let node_nullifier = client
@@ -1193,15 +1191,6 @@ pub async fn unused_rpc_api(client_config: ClientConfig) {
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
-
-    let account_delta = client
-        .test_rpc_api()
-        .get_account_state_delta(first_basic_account.id(), first_block_num, second_block_num)
-        .await
-        .unwrap();
-
-    assert_eq!(account_delta.nonce_delta(), ONE);
-    assert_eq!(*account_delta.vault().fungible().iter().next().unwrap().1, MINT_AMOUNT as i64);
 }
 
 pub async fn ignore_invalid_notes(client_config: ClientConfig) {

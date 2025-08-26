@@ -6,6 +6,7 @@ use figment::Figment;
 use figment::providers::{Format, Toml};
 use miden_client::Client;
 use miden_client::account::AccountId;
+use miden_objects::address::Address;
 use tracing::info;
 
 use super::config::CliConfig;
@@ -66,13 +67,19 @@ pub(crate) async fn parse_account_id<AUTH>(
         .map_err(|_| CliError::Input(format!("Input account ID {account_id} is neither a valid Account ID nor a hex prefix of a known Account ID")))?
         .id())
     } else {
-        Ok(AccountId::from_bech32(account_id)
-            .map_err(|_| {
+        let address = Address::from_bech32(account_id)
+            .map_err(|err| {
                 CliError::Input(format!(
-                    "Input account ID {account_id} is not a valid bech32 encoded Account ID"
+                    "error parsing bech32 address: {err}"
                 ))
             })?
-            .1)
+            .1;
+        match address {
+            Address::AccountId(account_id_address) => Ok(account_id_address.id()),
+            _ => Err(CliError::Input(format!(
+                "Input account ID {address:?} is not an ID based address"
+            ))),
+        }
     }
 }
 
