@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::Result;
 use assert_cmd::Command;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
@@ -93,7 +94,7 @@ fn init_with_params() {
 
 /// This test tries to run a mint TX using the CLI for an account that isn't tracked.
 #[tokio::test]
-async fn mint_with_untracked_account() {
+async fn mint_with_untracked_account() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create faucet account
@@ -110,11 +111,12 @@ async fn mint_with_untracked_account() {
 
     // Sleep for a while to ensure the note is committed on the node
     sync_until_committed_note(&temp_dir);
+    Ok(())
 }
 
 /// This test tries to run a mint TX using the CLI for an account that isn't tracked.
 #[tokio::test]
-async fn token_symbol_mapping() {
+async fn token_symbol_mapping() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
 
     // Create faucet account
@@ -152,16 +154,13 @@ async fn token_symbol_mapping() {
         .to_string();
 
     let note = {
-        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await;
-        client
-            .get_output_note(NoteId::try_from_hex(&note_id).unwrap())
-            .await
-            .unwrap()
-            .unwrap()
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+        client.get_output_note(NoteId::try_from_hex(&note_id)?).await?.unwrap()
     };
 
     assert_eq!(note.assets().num_assets(), 1);
     assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    Ok(())
 }
 
 // IMPORT TESTS
@@ -178,7 +177,7 @@ const GENESIS_ACCOUNTS_FILENAMES: [&str; 1] = ["account.mac"];
 // 4. Runs a mint tx and syncs until the transaction and note are committed
 #[tokio::test]
 #[ignore = "import genesis test gets ignored by default so integration tests can be ran with dockerized and remote nodes where we might not have the genesis data"]
-async fn import_genesis_accounts_can_be_used_for_transactions() {
+async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
 
     for genesis_account_filename in GENESIS_ACCOUNTS_FILENAMES {
@@ -204,8 +203,8 @@ async fn import_genesis_accounts_can_be_used_for_transactions() {
     sync_cli(&temp_dir);
 
     let fungible_faucet_account_id = {
-        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await;
-        let accounts = client.get_account_headers().await.unwrap();
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+        let accounts = client.get_account_headers().await?;
 
         let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
         let faucet_accounts = account_ids.iter().filter(|id| id.is_faucet()).collect::<Vec<_>>();
@@ -230,6 +229,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() {
 
     // Wait until the note is committed on the node
     sync_until_committed_note(&temp_dir);
+    Ok(())
 }
 
 // This tests that it's possible to export and import notes into other CLIs. To do so it:
@@ -239,7 +239,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() {
 // 3. On client A runs a mint transaction, and exports the output note
 // 4. On client B imports the note and consumes it
 #[tokio::test]
-async fn cli_export_import_note() {
+async fn cli_export_import_note() -> Result<()> {
     const NOTE_FILENAME: &str = "test_note.mno";
 
     let temp_dir_1 = init_cli().1;
@@ -301,10 +301,11 @@ async fn cli_export_import_note() {
         &mock_target_id.to_hex(),
         &fungible_faucet_account_id,
     );
+    Ok(())
 }
 
 #[tokio::test]
-async fn cli_export_import_account() {
+async fn cli_export_import_account() -> Result<()> {
     const FAUCET_FILENAME: &str = "test_faucet.mac";
     const WALLET_FILENAME: &str = "test_wallet.wal";
 
@@ -343,19 +344,9 @@ async fn cli_export_import_account() {
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
     // Ensure the account was imported
-    let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await.0;
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&faucet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
-    assert!(
-        client_2
-            .get_account(AccountId::from_bech32(&wallet_id).unwrap().1)
-            .await
-            .is_ok()
-    );
+    let client_2 = create_rust_client_with_store_path(&store_path_2, endpoint_2).await?.0;
+    assert!(client_2.get_account(AccountId::from_hex(&faucet_id)?).await.is_ok());
+    assert!(client_2.get_account(AccountId::from_hex(&wallet_id)?).await.is_ok());
 
     sync_cli(&temp_dir_2);
 
@@ -366,6 +357,7 @@ async fn cli_export_import_account() {
 
     // Consume the note
     consume_note_cli(&temp_dir_2, &wallet_id, &[&note_id]);
+    Ok(())
 }
 
 #[test]
@@ -391,7 +383,7 @@ fn cli_empty_commands() {
 }
 
 #[tokio::test]
-async fn consume_unauthenticated_note() {
+async fn consume_unauthenticated_note() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
@@ -407,13 +399,14 @@ async fn consume_unauthenticated_note() {
 
     // Consume the note, internally this checks that the note was consumed correctly
     consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
+    Ok(())
 }
 
 // DEVNET & TESTNET TESTS
 // ================================================================================================
 
 #[tokio::test]
-async fn init_with_devnet() {
+async fn init_with_devnet() -> Result<()> {
     let store_path = create_test_store_path();
     let endpoint = Endpoint::devnet();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
@@ -426,10 +419,11 @@ async fn init_with_devnet() {
     config_file.read_to_string(&mut config_file_str).unwrap();
 
     assert!(config_file_str.contains(&Endpoint::devnet().to_string()));
+    Ok(())
 }
 
 #[tokio::test]
-async fn init_with_testnet() {
+async fn init_with_testnet() -> Result<()> {
     let store_path = create_test_store_path();
     let endpoint = Endpoint::testnet();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
@@ -442,16 +436,16 @@ async fn init_with_testnet() {
     config_file.read_to_string(&mut config_file_str).unwrap();
 
     assert!(config_file_str.contains(&Endpoint::testnet().to_string()));
+    Ok(())
 }
 
 #[tokio::test]
-async fn debug_mode_outputs_logs() {
+async fn debug_mode_outputs_logs() -> Result<()> {
     // This test tries to execute a transaction with debug mode enabled and checks that the stack
     // state is printed. We need to use the CLI for this because the debug logs are always printed
     // to stdout and we can't capture them in a [`Client`] only test.
     // We use the [`Client`] to create a custom note that will print the stack state and consume it
     // using the CLI to check the stdout.
-
     const NOTE_FILENAME: &str = "test_note.mno";
     unsafe {
         env::set_var("MIDEN_DEBUG", "true");
@@ -460,10 +454,9 @@ async fn debug_mode_outputs_logs() {
     // Create a Client and a custom note
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
-        create_rust_client_with_store_path(&store_path, endpoint).await;
-    let (account, ..) = insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator)
-        .await
-        .unwrap();
+        create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let (account, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
@@ -488,12 +481,11 @@ async fn debug_mode_outputs_logs() {
     let note = Note::new(note_assets, note_metadata, note_recipient);
 
     // Send transaction and wait for it to be committed
-    client.sync_state().await.unwrap();
+    client.sync_state().await?;
     let transaction_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()
-        .unwrap();
-    execute_tx_and_sync(&mut client, account.id(), transaction_request).await;
+        .build()?;
+    execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
     // Export the note
     let note_file: NoteFile = NoteFile::NoteDetails {
@@ -531,6 +523,8 @@ async fn debug_mode_outputs_logs() {
         .assert()
         .success()
         .stdout(contains("Stack state"));
+
+    Ok(())
 }
 
 // HELPERS
@@ -737,9 +731,9 @@ pub type TestClient = Client<TestClientKeyStore>;
 async fn create_rust_client_with_store_path(
     store_path: &Path,
     endpoint: Endpoint,
-) -> (TestClient, CliKeyStore) {
+) -> Result<(TestClient, CliKeyStore)> {
     let store = {
-        let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await.unwrap();
+        let sqlite_store = SqliteStore::new(PathBuf::from(store_path)).await?;
         std::sync::Arc::new(sqlite_store)
     };
 
@@ -748,9 +742,9 @@ async fn create_rust_client_with_store_path(
 
     let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
 
-    let keystore = CliKeyStore::new(temp_dir()).unwrap();
+    let keystore = CliKeyStore::new(temp_dir())?;
 
-    (
+    Ok((
         TestClient::new(
             Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
             rng,
@@ -761,15 +755,13 @@ async fn create_rust_client_with_store_path(
                 MIN_TX_EXECUTION_CYCLES,
                 false,
                 true,
-            )
-            .expect("Default executor's options should always be valid"),
+            )?,
             None,
             None,
         )
-        .await
-        .unwrap(),
+        .await?,
         keystore,
-    )
+    ))
 }
 
 /// Executes a command and asserts that it fails but does not panic.

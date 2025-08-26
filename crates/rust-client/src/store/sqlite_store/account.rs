@@ -578,7 +578,6 @@ mod tests {
     use miden_objects::EMPTY_WORD;
     use miden_objects::account::{AccountCode, AccountComponent};
     use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
-    use miden_objects::testing::account_component::BASIC_WALLET_CODE;
 
     use crate::store::sqlite_store::SqliteStore;
     use crate::store::sqlite_store::tests::create_test_store;
@@ -587,9 +586,16 @@ mod tests {
     async fn account_code_insertion_no_duplicates() {
         let store = create_test_store().await;
         let assembler = miden_lib::transaction::TransactionKernel::assembler();
-        let account_component = AccountComponent::compile(BASIC_WALLET_CODE, assembler, vec![])
-            .unwrap()
-            .with_supports_all_types();
+        let account_component = AccountComponent::compile(
+            "
+                export.::miden::contracts::wallets::basic::receive_asset
+                export.::miden::contracts::wallets::basic::move_asset_to_note
+            ",
+            assembler,
+            vec![],
+        )
+        .unwrap()
+        .with_supports_all_types();
         let account_code = AccountCode::from_components(
             &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
             miden_objects::account::AccountType::RegularAccountUpdatableCode,

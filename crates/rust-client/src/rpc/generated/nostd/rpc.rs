@@ -213,34 +213,6 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProofs"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns delta of the account states in the range from `from_block_num` (exclusive) to
-        /// `to_block_num` (inclusive).
-        pub async fn get_account_state_delta(
-            &mut self,
-            request: impl tonic::IntoRequest<
-                super::super::rpc_store::AccountStateDeltaRequest,
-            >,
-        ) -> core::result::Result<
-            tonic::Response<super::super::rpc_store::AccountStateDelta>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/rpc.Api/GetAccountStateDelta",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("rpc.Api", "GetAccountStateDelta"));
-            self.inner.unary(req, path, codec).await
-        }
         /// Returns raw block data for the specified block number.
         pub async fn get_block_by_number(
             &mut self,
