@@ -78,7 +78,6 @@ export const test = base.extend<{ forEachTest: void }>({
           WebClient,
           MockWebClient,
         } = await import("./index.js");
-        console.log("AFTER IMPORT");
         let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
         let proverUrl = undefined;
         const client = await WebClient.createClient(rpcUrl, undefined);
@@ -154,7 +153,6 @@ export const test = base.extend<{ forEachTest: void }>({
         // Create a namespace for helper functions
         window.helpers = window.helpers || {};
 
-        console.log("REMOTE PROVER URL");
         // Add the remote prover url to window
         window.remoteProverUrl = proverUrl;
         if (window.remoteProverUrl) {
@@ -212,14 +210,11 @@ export const test = base.extend<{ forEachTest: void }>({
           window.client = client;
           await window.client.syncState();
         };
-
-        console.log("SETUP FINISHED");
       }, MIDEN_NODE_PORT);
       await use();
-      // This code runs after every test.
     },
     { auto: true },
-  ], // automatically starts for every test.
+  ],
 });
 
 export default test;
