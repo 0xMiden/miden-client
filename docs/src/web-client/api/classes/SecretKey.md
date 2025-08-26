@@ -54,6 +54,22 @@
 
 ***
 
+### signData()
+
+> **signData**(`signing_inputs`): [`Signature`](Signature.md)
+
+#### Parameters
+
+##### signing\_inputs
+
+[`SigningInputs`](SigningInputs.md)
+
+#### Returns
+
+[`Signature`](Signature.md)
+
+***
+
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `SecretKey`

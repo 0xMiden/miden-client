@@ -51,6 +51,7 @@ export {
   Rpo256,
   SecretKey,
   SerializedAccountHeader,
+  SigningInputs,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,

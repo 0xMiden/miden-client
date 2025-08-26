@@ -42,6 +42,7 @@ import {
   Rpo256,
   SecretKey,
   Signature,
+  SigningInputs,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -118,6 +119,7 @@ declare global {
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
     Signature: typeof Signature;
+    SigningInputs: typeof SigningInputs;
     SlotAndKeys: typeof SlotAndKeys;
     SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
