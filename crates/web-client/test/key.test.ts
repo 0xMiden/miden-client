@@ -104,9 +104,11 @@ test.describe("secret key", () => {
   });
 });
 
-describe("signing inputs", () => {
-  it("should be able to sign and verify an arbitrary array of felts", async () => {
-    const { isValid, isValidOther } = await testingPage.evaluate(() => {
+test.describe("signing inputs", () => {
+  test("should be able to sign and verify an arbitrary array of felts", async ({
+    page,
+  }) => {
+    const { isValid, isValidOther } = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const otherSecretKey = window.SecretKey.withRng();
       const message = Array.from(
@@ -128,8 +130,8 @@ describe("signing inputs", () => {
     expect(isValidOther).to.be.false;
   });
 
-  it("should be able to sign and verify a blind word", async () => {
-    const { isValid, isValidOther } = await testingPage.evaluate(() => {
+  test("should be able to sign and verify a blind word", async ({ page }) => {
+    const { isValid, isValidOther } = await page.evaluate(() => {
       const secretKey = window.SecretKey.withRng();
       const otherSecretKey = window.SecretKey.withRng();
       const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
@@ -144,7 +146,7 @@ describe("signing inputs", () => {
 
       return { isValid, isValidOther };
     });
-    expect(isValid).to.be.true;
-    expect(isValidOther).to.be.false;
+    expect(isValid).toBe(true);
+    expect(isValidOther).toBe(false);
   });
 });
