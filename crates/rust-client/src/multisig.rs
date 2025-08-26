@@ -185,6 +185,7 @@ mod tests {
         .await;
 
         mock_rpc_api.prove_block();
+        // TODO why do we need a second `prove_block`?
         mock_rpc_api.prove_block();
         coordinator_client.sync_state().await.unwrap();
 
