@@ -69,3 +69,4 @@ This will forward logs from the server to your terminal logs
 
 1. When trying to run the tests, if you receive an error about missing browsers,
    install them with: `yarn playwright install` and then run the tests again.
+2. Playwright provides a UI to run tests and debug them, you can use it with: `yarn playwright test --ui`
