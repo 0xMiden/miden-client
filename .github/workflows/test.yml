@@ -53,6 +53,8 @@ jobs:
         run: make integration-test-full
       - name: Stop test node
         if: always()
+        run: |
+          make stop-node
 
   build-web-client-dist-folder:
     name: Build Web Client
@@ -71,7 +73,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: 'yarn' # This caches the Yarn dependencies
 
       - name: Install dependencies
         run: |
