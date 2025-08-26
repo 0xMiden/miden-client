@@ -24,7 +24,7 @@ mod tests;
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let client_config = args.into_client_config()?;
+    let client_config: ClientConfig = args.try_into()?;
 
     run_tests(&client_config).await
 }
@@ -53,22 +53,23 @@ struct Args {
     timeout: u64,
 }
 
-impl Args {
-    fn into_client_config(self) -> Result<ClientConfig> {
-        let host = self
+impl TryFrom<Args> for ClientConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        let host = args
             .rpc_endpoint
             .host_str()
-            .ok_or_else(|| anyhow::anyhow!("Invalid host in RPC endpoint"))?;
-        let port = self
+            .ok_or_else(|| anyhow::anyhow!("invalid host in RPC endpoint"))?;
+        let port = args
             .rpc_endpoint
             .port()
-            .ok_or_else(|| anyhow::anyhow!("Invalid port in RPC endpoint"))?;
+            .ok_or_else(|| anyhow::anyhow!("invalid port in RPC endpoint"))?;
 
         let endpoint =
-            Endpoint::new(self.rpc_endpoint.scheme().to_string(), host.to_string(), Some(port));
-        let timeout_ms = self.timeout;
+            Endpoint::new(args.rpc_endpoint.scheme().to_string(), host.to_string(), Some(port));
 
-        Ok(ClientConfig::new(endpoint, timeout_ms))
+        Ok(ClientConfig::new(endpoint, args.timeout))
     }
 }
 
