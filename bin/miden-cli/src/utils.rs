@@ -68,11 +68,7 @@ pub(crate) async fn parse_account_id<AUTH>(
         .id())
     } else {
         let address = Address::from_bech32(account_id)
-            .map_err(|err| {
-                CliError::Input(format!(
-                    "error parsing bech32 address: {err}"
-                ))
-            })?
+            .map_err(|err| CliError::Input(format!("error parsing bech32 address: {err}")))?
             .1;
         match address {
             Address::AccountId(account_id_address) => Ok(account_id_address.id()),
