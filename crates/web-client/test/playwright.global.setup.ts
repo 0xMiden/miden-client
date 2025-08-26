@@ -58,6 +58,7 @@ export const test = base.extend<{ forEachTest: void }>({
           Rpo256,
           SecretKey,
           Signature,
+          SigningInputs,
           SlotAndKeys,
           SlotAndKeysArray,
           StorageMap,
@@ -129,6 +130,7 @@ export const test = base.extend<{ forEachTest: void }>({
         window.Rpo256 = Rpo256;
         window.SecretKey = SecretKey;
         window.Signature = Signature;
+        window.SigningInputs = SigningInputs;
         window.SlotAndKeys = SlotAndKeys;
         window.SlotAndKeysArray = SlotAndKeysArray;
         window.StorageMap = StorageMap;

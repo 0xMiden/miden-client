@@ -94,7 +94,9 @@ test.describe("basic fungible faucet", () => {
     expect(faucet.maxSupply).toEqual("10000000");
   });
 
-  test("throws an error when creating a basic fungible faucet from a non-faucet account", async ({ page}) => {
+  test("throws an error when creating a basic fungible faucet from a non-faucet account", async ({
+    page,
+  }) => {
     await expect(createWallet(page)).rejects.toThrow(
       "failed to get basic fungible faucet details from account"
     );
