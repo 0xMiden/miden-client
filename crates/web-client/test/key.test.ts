@@ -126,8 +126,8 @@ test.describe("signing inputs", () => {
 
       return { isValid, isValidOther };
     });
-    expect(isValid).to.be.true;
-    expect(isValidOther).to.be.false;
+    expect(isValid).toBe(true);
+    expect(isValidOther).toBe(false);
   });
 
   test("should be able to sign and verify a blind word", async ({ page }) => {
