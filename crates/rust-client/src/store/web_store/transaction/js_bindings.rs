@@ -25,8 +25,7 @@ extern "C" {
         transaction_id: String,
         details: Vec<u8>,
         block_num: String,
-        committed: u8,
-        discarded: u8,
+        statusVariant: u8,
         status: Vec<u8>,
         scriptRoot: Option<Vec<u8>>,
     ) -> js_sys::Promise;

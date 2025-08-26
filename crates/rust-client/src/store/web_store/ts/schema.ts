@@ -70,8 +70,7 @@ export interface ITransaction {
   details: Blob;
   blockNum: number;
   scriptRoot?: string;
-  committed: number;
-  discarded: number;
+  statusVariant: number;
   status: Blob;
 }
 

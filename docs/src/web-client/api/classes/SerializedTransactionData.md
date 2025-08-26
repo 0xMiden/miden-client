@@ -14,21 +14,9 @@
 
 ***
 
-### committed
-
-> **committed**: `boolean`
-
-***
-
 ### details
 
 > **details**: `Uint8Array`
-
-***
-
-### discarded
-
-> **discarded**: `boolean`
 
 ***
 
@@ -41,6 +29,12 @@
 ### status
 
 > **status**: `Uint8Array`
+
+***
+
+### statusVariant
+
+> **statusVariant**: `number`
 
 ## Accessors
 

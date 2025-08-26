@@ -3,12 +3,14 @@ import { Dexie } from "dexie";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 const IDS_FILTER_PREFIX = "Ids:";
 const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
+const STATUS_COMMITTED_VARIANT = 1;
+const STATUS_DISCARDED_VARIANT = 2;
 export async function getTransactions(filter) {
     let transactionRecords = [];
     try {
         if (filter === "Uncommitted") {
             transactionRecords = await transactions
-                .filter((tx) => !tx.committed)
+                .filter((tx) => tx.statusVariant !== STATUS_COMMITTED_VARIANT)
                 .toArray();
         }
         else if (filter.startsWith(IDS_FILTER_PREFIX)) {
@@ -28,7 +30,9 @@ export async function getTransactions(filter) {
             const blockNumString = filter.substring(EXPIRED_BEFORE_FILTER_PREFIX.length);
             const blockNum = parseInt(blockNumString);
             transactionRecords = await transactions
-                .filter((tx) => tx.blockNum < blockNum && !tx.committed && !tx.discarded)
+                .filter((tx) => tx.blockNum < blockNum &&
+                tx.statusVariant !== STATUS_COMMITTED_VARIANT &&
+                tx.statusVariant !== STATUS_DISCARDED_VARIANT)
                 .toArray();
         }
         else {
@@ -75,8 +79,7 @@ export async function getTransactions(filter) {
                 scriptRoot: transactionRecord.scriptRoot,
                 txScript: txScriptBase64,
                 blockNum: transactionRecord.blockNum.toString(),
-                committed: transactionRecord.committed,
-                discarded: transactionRecord.discarded,
+                statusVariant: transactionRecord.statusVariant,
                 status: statusBase64,
             };
             return data;
@@ -115,8 +118,7 @@ export async function insertTransactionScript(scriptRoot, txScript) {
         }
     }
 }
-export async function upsertTransactionRecord(transactionId, details, blockNum, committed, discarded, status, scriptRoot) {
-    console.log("Script root:", scriptRoot);
+export async function upsertTransactionRecord(transactionId, details, blockNum, statusVariant, status, scriptRoot) {
     try {
         const detailsBlob = new Blob([new Uint8Array(details)]);
         const statusBlob = new Blob([new Uint8Array(status)]);
@@ -125,11 +127,9 @@ export async function upsertTransactionRecord(transactionId, details, blockNum, 
             details: detailsBlob,
             scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
             blockNum: parseInt(blockNum, 10),
-            committed,
-            discarded,
+            statusVariant,
             status: statusBlob,
         };
-        console.log(JSON.stringify(data));
         await transactions.put(data);
     }
     catch (err) {

@@ -101,7 +101,7 @@ export async function applyStateSync(stateUpdate) {
     let transactionWriteOp = Promise.all(transactionUpdates.map((transactionRecord) => {
         return Promise.all([
             insertTransactionScript(transactionRecord.scriptRoot, transactionRecord.txScript),
-            upsertTransactionRecord(transactionRecord.id, transactionRecord.details, transactionRecord.blockNum, transactionRecord.committed, transactionRecord.discarded, transactionRecord.status, transactionRecord.scriptRoot),
+            upsertTransactionRecord(transactionRecord.id, transactionRecord.details, transactionRecord.blockNum, transactionRecord.statusVariant, transactionRecord.status, transactionRecord.scriptRoot),
         ]);
     }));
     // Promises to insert each account update.
