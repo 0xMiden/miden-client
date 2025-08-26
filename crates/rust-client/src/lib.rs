@@ -180,7 +180,7 @@ pub mod asset {
 pub mod auth {
     pub use miden_lib::AuthScheme;
     pub use miden_objects::account::AuthSecretKey;
-    pub use miden_tx::auth::{BasicAuthenticator, TransactionAuthenticator};
+    pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
 
 /// Provides types for working with blocks within the Miden network.

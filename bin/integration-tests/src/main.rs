@@ -10,6 +10,7 @@ use crate::tests::{
     client,
     custom_transaction,
     fpi,
+    multisig,
     network_transaction,
     onchain,
     swap_transaction,
@@ -284,6 +285,8 @@ async fn run_tests(client_config: &ClientConfig) {
     )
     .await;
     run_test("swap_private", swap_transaction::swap_private, &failed_tests, client_config).await;
+    // MULTISIG
+    run_test("multisig", multisig::multisig, &failed_tests, client_config).await;
 
     // Print summary
     println!("\n====================== TEST SUMMARY ======================");

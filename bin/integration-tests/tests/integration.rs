@@ -4,6 +4,7 @@ mod integration_tests {
         client,
         custom_transaction,
         fpi,
+        multisig,
         network_transaction,
         onchain,
         swap_transaction,
@@ -182,5 +183,10 @@ mod integration_tests {
     #[tokio::test]
     async fn swap_private() {
         swap_transaction::swap_private(ClientConfig::default()).await;
+    }
+
+    #[tokio::test]
+    async fn multisig() {
+        multisig::multisig(ClientConfig::default()).await;
     }
 }
