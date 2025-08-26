@@ -40,7 +40,7 @@ jobs:
       
   eslint:
     name: "Typescript eslint checks"
-    runts-on: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: make rust-client-ts-lint
