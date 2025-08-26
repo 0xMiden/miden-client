@@ -30,3 +30,4 @@ rand        = { workspace = true }
 regex       = { version = "1.0" }
 tokio       = { workspace = true }
 url         = { version = "2.5.4" }
+uuid        = { version = "1.10" }

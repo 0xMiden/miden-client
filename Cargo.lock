@@ -2184,6 +2184,7 @@ dependencies = [
  "regex",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]

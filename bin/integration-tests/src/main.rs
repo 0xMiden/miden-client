@@ -8,11 +8,11 @@ use std::time::{Duration, Instant};
 use anyhow::anyhow;
 use clap::Parser;
 use miden_client::rpc::Endpoint;
-use miden_client::testing::config::ClientConfig;
 use regex::Regex;
 use url::Url;
 
 use crate::tests::client::*;
+use crate::tests::config::ClientConfig;
 use crate::tests::custom_transaction::*;
 use crate::tests::fpi::*;
 use crate::tests::network_transaction::*;

@@ -83,6 +83,7 @@ use crate::testing::common::{
     assert_account_has_single_asset,
     assert_note_cannot_be_consumed_twice,
     consume_notes,
+    create_test_store_path,
     execute_failing_tx,
     execute_tx,
     mint_and_consume,
@@ -90,7 +91,6 @@ use crate::testing::common::{
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
 };
-use crate::testing::config::create_test_store_path;
 use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
     DiscardCause,

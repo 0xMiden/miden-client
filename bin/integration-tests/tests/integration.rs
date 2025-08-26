@@ -1,5 +1,5 @@
 mod integration_tests {
-    use miden_client::testing::config::ClientConfig;
+    use miden_client_integration_tests::tests::config::ClientConfig;
     use miden_client_integration_tests::tests::{
         client,
         custom_transaction,
