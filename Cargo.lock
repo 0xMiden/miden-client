@@ -2111,6 +2111,7 @@ dependencies = [
 name = "miden-client"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "base64",
  "chrono",
@@ -2150,6 +2151,7 @@ dependencies = [
 name = "miden-client-cli"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "assert_cmd",
  "clap 4.5.43",
  "comfy-table",
@@ -2173,6 +2175,7 @@ dependencies = [
 name = "miden-client-integration-tests"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap 4.5.43",
  "miden-client",

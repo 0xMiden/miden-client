@@ -22,6 +22,7 @@ path = "tests/integration.rs"
 miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client" }
 
 # External dependencies
+anyhow      = { features = ["std"], workspace = true }
 async-trait = { workspace = true }
 clap        = { features = ["derive", "env"], version = "4.0" }
 num_cpus    = { version = "1.0" }

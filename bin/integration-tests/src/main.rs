@@ -490,7 +490,18 @@ fn run_single_test(test_case: &TestCase, base_config: &BaseConfig) -> TestResult
     let duration = start_time.elapsed();
 
     match result {
-        Ok(_) => TestResult::passed(test_case.name.clone(), test_case.category.clone(), duration),
+        Ok(Ok(_)) => {
+            TestResult::passed(test_case.name.clone(), test_case.category.clone(), duration)
+        },
+        Ok(Err(e)) => {
+            let error_msg = format_error_report(e);
+            TestResult::failed(
+                test_case.name.clone(),
+                test_case.category.clone(),
+                duration,
+                error_msg,
+            )
+        },
         Err(panic_info) => {
             let error_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
                 s.to_string()
@@ -509,6 +520,22 @@ fn run_single_test(test_case: &TestCase, base_config: &BaseConfig) -> TestResult
     }
 }
 
+/// Formats an error with its full chain
+fn format_error_report(error: anyhow::Error) -> String {
+    let mut output = String::new();
+    let mut first = true;
+
+    for err in error.chain() {
+        if !first {
+            output.push_str("\n  Caused by: ");
+        }
+        output.push_str(&format!("{}", err));
+        first = false;
+    }
+
+    output
+}
+
 /// Runs multiple tests in parallel using a specified number of worker threads.
 ///
 /// Uses a shared work queue to distribute tests among worker threads. Provides real-time progress
@@ -521,7 +548,11 @@ fn run_tests_parallel(
 ) -> Vec<TestResult> {
     let total_tests = tests.len();
     println!("Running {} tests with {} parallel jobs...", total_tests, jobs);
-    println!("===========================================");
+    println!("==========================================================");
+    println!("Using:");
+    println!(" - RPC endpoint: {}", base_config.rpc_endpoint);
+    println!(" - Timeout: {}ms", base_config.timeout);
+    println!("==========================================================");
 
     let results = Arc::new(Mutex::new(Vec::new()));
     let completed_count = Arc::new(Mutex::new(0usize));
