@@ -36,8 +36,9 @@ miden-testing = { branch = "next", default-features = false, features = [
 miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
+anyhow      = { default-features = false, version = "1.0" }
 async-trait = "0.1"
-miette      = { features = ["fancy"], version = "7.2" }
+miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }

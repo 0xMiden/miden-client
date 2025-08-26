@@ -1039,7 +1039,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2111,6 +2111,7 @@ dependencies = [
 name = "miden-client"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "base64",
  "chrono",
@@ -2150,6 +2151,7 @@ dependencies = [
 name = "miden-client-cli"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "assert_cmd",
  "clap 4.5.43",
  "comfy-table",
@@ -2173,6 +2175,7 @@ dependencies = [
 name = "miden-client-integration-tests"
 version = "0.11.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "clap 4.5.43",
  "futures",
@@ -2328,7 +2331,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "futures",
@@ -2356,7 +2359,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "futures",
@@ -2376,7 +2379,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "hex",
@@ -2396,7 +2399,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "prost",
@@ -2407,7 +2410,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "futures",
@@ -2434,7 +2437,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2465,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2544,7 +2547,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.11.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#8b5292ac2aa8af20ecacf165fbce91197013757f"
+source = "git+https://github.com/0xMiden/miden-node?branch=santiagopittella-merge-remote-prover-crates#689fb94b59d7c27fcde80651931d084b06dc40ef"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4089,7 +4092,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4102,7 +4105,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4622,7 +4625,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix 1.0.8",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5559,7 +5562,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

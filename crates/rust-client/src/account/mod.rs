@@ -41,12 +41,13 @@ use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
     AccountIdError,
-    NetworkIdError,
     AddressError,
+    NetworkIdError,
     account::{
         Account,
         AccountBuilder,
@@ -62,7 +63,7 @@ pub use miden_objects::{
         StorageMap,
         StorageSlot,
     },
-    address::{Address, AddressInterface, AccountIdAddress, AddressType}
+    address::{AccountIdAddress, Address, AddressInterface, AddressType},
 };
 
 use super::Client;

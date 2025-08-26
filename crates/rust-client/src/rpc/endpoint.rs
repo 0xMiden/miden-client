@@ -67,8 +67,10 @@ impl Endpoint {
         } else if self == &Endpoint::devnet() {
             NetworkId::Devnet
         } else if self == &Endpoint::localhost() {
+            // Network ID intended to be used when running a local instance of the node
             NetworkId::new("mlcl").expect("mlcl should be a valid network ID")
         } else {
+            // Default network ID for custom networks when no other match has been found
             NetworkId::new("mcst").expect("mcst should be a valid network ID")
         }
     }

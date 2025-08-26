@@ -13,7 +13,7 @@ miden-node-utils    = { workspace = true }
 miden-remote-prover = { features = ["server"], workspace = true }
 
 # External dependencies
-anyhow             = "1.0"
+anyhow             = { workspace = true }
 tokio              = { features = ["full"], version = "1.0" }
 tokio-stream       = { features = ["net"], version = "0.1" }
 tonic              = { default-features = false, features = ["transport"], version = "0.13" }
