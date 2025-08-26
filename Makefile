@@ -127,8 +127,7 @@ integration-test-full: ## Run the integration test binary with ignored tests inc
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary
-	cargo build --package miden-client-integration-tests --release --locked
-	./target/release/miden-client-integration-tests
+	cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover
