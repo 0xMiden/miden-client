@@ -9,7 +9,6 @@ export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use) => {
       await page.goto("http://localhost:8080");
-      page.on("console", (msg) => console.log(msg));
       await page.evaluate(async (MIDEN_NODE_PORT) => {
         const {
           Account,

@@ -13,19 +13,19 @@ within the context of the web page.
 ## Running tests
 
 1. Install dependencies via `yarn`
-1. Ensure the .wasm is built by running `yarn build`
-1. In crates/web-client run `yarn test` to run all tests
+2. Ensure the .wasm is built by running `yarn build` (use `yarn build-dev` for a shorter build time)
+3. In crates/web-client run `yarn test` to run all tests
 
    - Can alternatively run `yarn test:clean` to run the .wasm build process prior to testing. We provide both paths as the build process can take some time.
 
-1. For running an individual test by name run `yarn test -g <test-name>`
-1. To enable logging from the client to the terminal, run `yarn test:logs` 
+4. To run an individual test by name run `yarn test test/name_of_test_file.ts`.
 
 ## Writing tests
 
-1. The test setup in `playwright.global.setup` should expose the `create_client` function which can be used inside tests.
+1. The test setup in `playwright.global.setup` exposes the `WebClient` class (under
+the global `Window` object) which provides a static method `createClient` to create an instance of the web client.
    - Any further setup of wasm code should be done in this file and similarly expose a function for testing here
-1. `webClientTestUtils.js` should contain all interfaces for interacting with the web client. If further methods need to be added, follow existing patterns which use the exposed `testingPage` and pass through any required arguments to the page execution. Example:
+2. `webClientTestUtils.ts` should contain all interfaces for interacting with the web client. If further methods need to be added, follow existing patterns which use the exposed `page` and pass through any required arguments to the page execution. Example:
 
 ```
 /**
@@ -38,11 +38,9 @@ within the context of the web page.
 export const webClientCall = async (arg1, arg2) => {
   return await testingPage.evaluate(
     async (_arg1, _arg2) => {
-      if (!window.client) {
-        await window.create_client();
-      }
-
       /** @type {WebClient} */
+      // window.client is defined in the setup under
+      // playwright.global.setup.ts
       const client = window.client;
       const result = client.webClientCall(_arg1, _arg2);
 
@@ -55,8 +53,7 @@ export const webClientCall = async (arg1, arg2) => {
 ```
 
 - Add JSDocs to methods. This will allow typing in the `*.test.ts` files.
-- We add the `if (!window.client)` to avoid spinning up clients unnecessarily lengthening test time. This unfortunately cannot be pulled out to a helper method as the testingPage scope does not share the scope of the file.
-- Similarly, the boilerplate for passing args through as shown above is necessary due to scoping.
+- Similarly, the boilerplate for passing args through as shown above is necessary due to scoping and how the testing framework works.
 
 ## Debugging
 
@@ -70,13 +67,5 @@ This will forward logs from the server to your terminal logs
 
 ## Troubleshooting
 
-1. When trying to run the tests, if you receive the following error:
-
-```
-     Error: Could not find Chrome (ver. 128.0.6613.119). This can occur if either
- 1. you did not perform an installation before running the script (e.g. `npx puppeteer browsers install ${browserType}`) or
- 2. your cache path is incorrectly configured (which is: /Users/ignacioamigo/.cache/puppeteer).
-For (2), check out our guide on configuring puppeteer at https://pptr.dev/guides/configuration.
-```
-
-Try running: `npx puppeteer browsers install` and then run the tests again
+1. When trying to run the tests, if you receive an error about missing browsers,
+   install them with: `yarn playwright install` and then run the tests again.
