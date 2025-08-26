@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use miden_client::ClientError;
-use miden_client::ClientError;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
