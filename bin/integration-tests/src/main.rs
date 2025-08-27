@@ -41,7 +41,13 @@ fn main() {
         return;
     }
 
-    let base_config = BaseConfig::from(args.clone());
+    let base_config = match BaseConfig::try_from(args.clone()) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Error: Failed to create configuration: {}", e);
+            std::process::exit(1);
+        },
+    };
     let start_time = Instant::now();
 
     let results = run_tests_parallel(filtered_tests, base_config, args.jobs, args.verbose);
@@ -105,6 +111,24 @@ struct Args {
     exclude: Option<String>,
 }
 
+/// Error type for BaseConfig conversion.
+#[derive(Debug)]
+enum ConfigError {
+    MissingHost,
+    MissingPort,
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::MissingHost => write!(f, "RPC endpoint URL is missing a host"),
+            ConfigError::MissingPort => write!(f, "RPC endpoint URL is missing a port"),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
 /// Base configuration derived from command line arguments.
 #[derive(Clone)]
 struct BaseConfig {
@@ -112,20 +136,22 @@ struct BaseConfig {
     timeout: u64,
 }
 
-impl From<Args> for BaseConfig {
+impl TryFrom<Args> for BaseConfig {
+    type Error = ConfigError;
+
     /// Creates a BaseConfig from command line arguments.
-    fn from(args: Args) -> Self {
-        let endpoint = Endpoint::new(
-            args.rpc_endpoint.scheme().to_string(),
-            args.rpc_endpoint.host_str().unwrap().to_string(),
-            Some(args.rpc_endpoint.port().unwrap()),
-        );
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        let host = args.rpc_endpoint.host_str().ok_or(ConfigError::MissingHost)?.to_string();
+
+        let port = args.rpc_endpoint.port().ok_or(ConfigError::MissingPort)?;
+
+        let endpoint = Endpoint::new(args.rpc_endpoint.scheme().to_string(), host, Some(port));
         let timeout_ms = args.timeout;
 
-        BaseConfig {
+        Ok(BaseConfig {
             rpc_endpoint: endpoint,
             timeout: timeout_ms,
-        }
+        })
     }
 }
 
