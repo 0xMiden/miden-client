@@ -6,8 +6,17 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use miden_objects::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
-    NonFungibleDeltaAction, StorageMap, StorageSlot, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    NonFungibleDeltaAction,
+    StorageMap,
+    StorageSlot,
+    StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
 use miden_objects::{AccountError, Felt, Word};
