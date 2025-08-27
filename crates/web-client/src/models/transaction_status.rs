@@ -46,6 +46,14 @@ impl TransactionStatus {
             _ => None,
         }
     }
+
+    #[wasm_bindgen(js_name = "getCommitTimestamp")]
+    pub fn get_commit_timestamp(&self) -> Option<u64> {
+        match self.0 {
+            NativeTransactionStatus::Committed { commit_timestamp, .. } => Some(commit_timestamp),
+            _ => None,
+        }
+    }
 }
 
 // CONVERSIONS
