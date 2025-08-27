@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -29,7 +31,7 @@ fn main() {
     let args = Args::parse();
 
     let all_tests = get_all_tests();
-    let filtered_tests = filter_tests(&all_tests, &args);
+    let filtered_tests = filter_tests(all_tests, &args);
 
     if args.list {
         list_tests(&filtered_tests);
@@ -155,11 +157,47 @@ impl TryFrom<Args> for BaseConfig {
     }
 }
 
-/// Represents a single test case with its name and category.
-#[derive(Debug, Clone)]
+// TYPE ALIASES
+// ================================================================================================
+
+/// Type alias for a test function that takes a ClientConfig and returns a boxed future
+type TestFunction = Box<
+    dyn Fn(ClientConfig) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> + Send + Sync,
+>;
+
+// TEST CASE
+// ================================================================================================
+
+/// Represents a single test case with its name, category, and associated function.
 struct TestCase {
     name: String,
     category: TestCategory,
+    function: TestFunction,
+}
+
+impl TestCase {
+    /// Creates a new TestCase with the given name, category, and function.
+    fn new<F, Fut>(name: String, category: TestCategory, func: F) -> Self
+    where
+        F: Fn(ClientConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<(), anyhow::Error>> + 'static,
+    {
+        Self {
+            name,
+            category,
+            function: Box::new(move |config| Box::pin(func(config))),
+        }
+    }
+}
+
+impl std::fmt::Debug for TestCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TestCase")
+            .field("name", &self.name)
+            .field("category", &self.category)
+            .field("function", &"<function>")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -192,148 +230,125 @@ impl AsRef<str> for TestCategory {
 fn get_all_tests() -> Vec<TestCase> {
     vec![
         // CLIENT tests
-        TestCase {
-            name: "client_builder_initializes_client_with_endpoint".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "multiple_tx_on_same_block".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_expected_notes".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_expected_note_uncommitted".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_expected_notes_from_the_past_as_committed".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "get_account_update".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "sync_detail_values".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "multiple_transactions_can_be_committed_in_different_blocks_without_sync"
-                .to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "consume_multiple_expected_notes".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_consumed_note_with_proof".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_consumed_note_with_id".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "import_note_with_proof".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "discarded_transaction".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "custom_transaction_prover".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "locked_account".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "expired_transaction_fails".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "unused_rpc_api".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "ignore_invalid_notes".to_string(),
-            category: TestCategory::Client,
-        },
-        TestCase {
-            name: "output_only_note".to_string(),
-            category: TestCategory::Client,
-        },
+        TestCase::new(
+            "client_builder_initializes_client_with_endpoint".to_string(),
+            TestCategory::Client,
+            client_builder_initializes_client_with_endpoint,
+        ),
+        TestCase::new(
+            "multiple_tx_on_same_block".to_string(),
+            TestCategory::Client,
+            multiple_tx_on_same_block,
+        ),
+        TestCase::new(
+            "import_expected_notes".to_string(),
+            TestCategory::Client,
+            import_expected_notes,
+        ),
+        TestCase::new(
+            "import_expected_note_uncommitted".to_string(),
+            TestCategory::Client,
+            import_expected_note_uncommitted,
+        ),
+        TestCase::new(
+            "import_expected_notes_from_the_past_as_committed".to_string(),
+            TestCategory::Client,
+            import_expected_notes_from_the_past_as_committed,
+        ),
+        TestCase::new("get_account_update".to_string(), TestCategory::Client, get_account_update),
+        TestCase::new("sync_detail_values".to_string(), TestCategory::Client, sync_detail_values),
+        TestCase::new(
+            "multiple_transactions_can_be_committed_in_different_blocks_without_sync".to_string(),
+            TestCategory::Client,
+            multiple_transactions_can_be_committed_in_different_blocks_without_sync,
+        ),
+        TestCase::new(
+            "consume_multiple_expected_notes".to_string(),
+            TestCategory::Client,
+            consume_multiple_expected_notes,
+        ),
+        TestCase::new(
+            "import_consumed_note_with_proof".to_string(),
+            TestCategory::Client,
+            import_consumed_note_with_proof,
+        ),
+        TestCase::new(
+            "import_consumed_note_with_id".to_string(),
+            TestCategory::Client,
+            import_consumed_note_with_id,
+        ),
+        TestCase::new(
+            "import_note_with_proof".to_string(),
+            TestCategory::Client,
+            import_note_with_proof,
+        ),
+        TestCase::new(
+            "discarded_transaction".to_string(),
+            TestCategory::Client,
+            discarded_transaction,
+        ),
+        TestCase::new(
+            "custom_transaction_prover".to_string(),
+            TestCategory::Client,
+            custom_transaction_prover,
+        ),
+        TestCase::new("locked_account".to_string(), TestCategory::Client, locked_account),
+        TestCase::new(
+            "expired_transaction_fails".to_string(),
+            TestCategory::Client,
+            expired_transaction_fails,
+        ),
+        TestCase::new("unused_rpc_api".to_string(), TestCategory::Client, unused_rpc_api),
+        TestCase::new(
+            "ignore_invalid_notes".to_string(),
+            TestCategory::Client,
+            ignore_invalid_notes,
+        ),
+        TestCase::new("output_only_note".to_string(), TestCategory::Client, output_only_note),
         // CUSTOM TRANSACTION tests
-        TestCase {
-            name: "merkle_store".to_string(),
-            category: TestCategory::CustomTransaction,
-        },
-        TestCase {
-            name: "onchain_notes_sync_with_tag".to_string(),
-            category: TestCategory::CustomTransaction,
-        },
-        TestCase {
-            name: "transaction_request".to_string(),
-            category: TestCategory::CustomTransaction,
-        },
+        TestCase::new("merkle_store".to_string(), TestCategory::CustomTransaction, merkle_store),
+        TestCase::new(
+            "onchain_notes_sync_with_tag".to_string(),
+            TestCategory::CustomTransaction,
+            onchain_notes_sync_with_tag,
+        ),
+        TestCase::new(
+            "transaction_request".to_string(),
+            TestCategory::CustomTransaction,
+            transaction_request,
+        ),
         // FPI tests
-        TestCase {
-            name: "standard_fpi_public".to_string(),
-            category: TestCategory::Fpi,
-        },
-        TestCase {
-            name: "standard_fpi_private".to_string(),
-            category: TestCategory::Fpi,
-        },
-        TestCase {
-            name: "fpi_execute_program".to_string(),
-            category: TestCategory::Fpi,
-        },
-        TestCase {
-            name: "nested_fpi_calls".to_string(),
-            category: TestCategory::Fpi,
-        },
+        TestCase::new("standard_fpi_public".to_string(), TestCategory::Fpi, standard_fpi_public),
+        TestCase::new("standard_fpi_private".to_string(), TestCategory::Fpi, standard_fpi_private),
+        TestCase::new("fpi_execute_program".to_string(), TestCategory::Fpi, fpi_execute_program),
+        TestCase::new("nested_fpi_calls".to_string(), TestCategory::Fpi, nested_fpi_calls),
         // NETWORK TRANSACTION tests
-        TestCase {
-            name: "counter_contract_ntx".to_string(),
-            category: TestCategory::NetworkTransaction,
-        },
-        TestCase {
-            name: "recall_note_before_ntx_consumes_it".to_string(),
-            category: TestCategory::NetworkTransaction,
-        },
+        TestCase::new(
+            "counter_contract_ntx".to_string(),
+            TestCategory::NetworkTransaction,
+            counter_contract_ntx,
+        ),
+        TestCase::new(
+            "recall_note_before_ntx_consumes_it".to_string(),
+            TestCategory::NetworkTransaction,
+            recall_note_before_ntx_consumes_it,
+        ),
         // ONCHAIN tests
-        TestCase {
-            name: "import_account_by_id".to_string(),
-            category: TestCategory::Onchain,
-        },
-        TestCase {
-            name: "onchain_accounts".to_string(),
-            category: TestCategory::Onchain,
-        },
-        TestCase {
-            name: "onchain_notes_flow".to_string(),
-            category: TestCategory::Onchain,
-        },
-        TestCase {
-            name: "incorrect_genesis".to_string(),
-            category: TestCategory::Onchain,
-        },
+        TestCase::new(
+            "import_account_by_id".to_string(),
+            TestCategory::Onchain,
+            import_account_by_id,
+        ),
+        TestCase::new("onchain_accounts".to_string(), TestCategory::Onchain, onchain_accounts),
+        TestCase::new("onchain_notes_flow".to_string(), TestCategory::Onchain, onchain_notes_flow),
+        TestCase::new("incorrect_genesis".to_string(), TestCategory::Onchain, incorrect_genesis),
         // SWAP TRANSACTION tests
-        TestCase {
-            name: "swap_fully_onchain".to_string(),
-            category: TestCategory::SwapTransaction,
-        },
-        TestCase {
-            name: "swap_private".to_string(),
-            category: TestCategory::SwapTransaction,
-        },
+        TestCase::new(
+            "swap_fully_onchain".to_string(),
+            TestCategory::SwapTransaction,
+            swap_fully_onchain,
+        ),
+        TestCase::new("swap_private".to_string(), TestCategory::SwapTransaction, swap_private),
     ]
 }
 
@@ -375,8 +390,8 @@ impl TestResult {
 ///
 /// Applies regex patterns, substring matching, and exclusion filters to select which tests should
 /// be executed.
-fn filter_tests(tests: &[TestCase], args: &Args) -> Vec<TestCase> {
-    let mut filtered_tests = tests.to_vec();
+fn filter_tests(tests: Vec<TestCase>, args: &Args) -> Vec<TestCase> {
+    let mut filtered_tests = tests;
 
     // Apply filter (regex pattern on test names)
     if let Some(ref filter_pattern) = args.filter {
@@ -443,73 +458,8 @@ fn run_single_test(test_case: &TestCase, base_config: &BaseConfig) -> TestResult
             let client_config =
                 ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout);
 
-            // Match the test name to the actual test function
-            match test_case.name.as_str() {
-                // CLIENT tests
-                "client_builder_initializes_client_with_endpoint" => {
-                    client_builder_initializes_client_with_endpoint(client_config).await
-                },
-                "multiple_tx_on_same_block" => multiple_tx_on_same_block(client_config).await,
-                "import_expected_notes" => import_expected_notes(client_config).await,
-                "import_expected_note_uncommitted" => {
-                    import_expected_note_uncommitted(client_config).await
-                },
-                "import_expected_notes_from_the_past_as_committed" => {
-                    import_expected_notes_from_the_past_as_committed(client_config).await
-                },
-                "get_account_update" => get_account_update(client_config).await,
-                "sync_detail_values" => sync_detail_values(client_config).await,
-                "multiple_transactions_can_be_committed_in_different_blocks_without_sync" => {
-                    multiple_transactions_can_be_committed_in_different_blocks_without_sync(
-                        client_config,
-                    )
-                    .await
-                },
-                "consume_multiple_expected_notes" => {
-                    consume_multiple_expected_notes(client_config).await
-                },
-                "import_consumed_note_with_proof" => {
-                    import_consumed_note_with_proof(client_config).await
-                },
-                "import_consumed_note_with_id" => import_consumed_note_with_id(client_config).await,
-                "import_note_with_proof" => import_note_with_proof(client_config).await,
-                "discarded_transaction" => discarded_transaction(client_config).await,
-                "custom_transaction_prover" => custom_transaction_prover(client_config).await,
-                "locked_account" => locked_account(client_config).await,
-                "expired_transaction_fails" => expired_transaction_fails(client_config).await,
-                "unused_rpc_api" => unused_rpc_api(client_config).await,
-                "ignore_invalid_notes" => ignore_invalid_notes(client_config).await,
-                "output_only_note" => output_only_note(client_config).await,
-
-                // CUSTOM TRANSACTION tests
-                "merkle_store" => merkle_store(client_config).await,
-                "onchain_notes_sync_with_tag" => onchain_notes_sync_with_tag(client_config).await,
-                "transaction_request" => transaction_request(client_config).await,
-
-                // FPI tests
-                "standard_fpi_public" => standard_fpi_public(client_config).await,
-                "standard_fpi_private" => standard_fpi_private(client_config).await,
-                "fpi_execute_program" => fpi_execute_program(client_config).await,
-                "nested_fpi_calls" => nested_fpi_calls(client_config).await,
-
-                // NETWORK TRANSACTION tests
-                "counter_contract_ntx" => counter_contract_ntx(client_config).await,
-                "recall_note_before_ntx_consumes_it" => {
-                    recall_note_before_ntx_consumes_it(client_config).await
-                },
-
-                // ONCHAIN tests
-                "import_account_by_id" => import_account_by_id(client_config).await,
-                "onchain_accounts" => onchain_accounts(client_config).await,
-                "onchain_notes_flow" => onchain_notes_flow(client_config).await,
-                "incorrect_genesis" => incorrect_genesis(client_config).await,
-
-                // SWAP TRANSACTION tests
-                "swap_fully_onchain" => swap_fully_onchain(client_config).await,
-                "swap_private" => swap_private(client_config).await,
-
-                _ => panic!("Unknown test: {}", test_case.name),
-            }
+            // Call the stored test function directly
+            (test_case.function)(client_config).await
         })
     }));
 
