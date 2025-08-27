@@ -20,7 +20,6 @@ pub use miden_tx::utils::{
     ToHex,
     bytes_to_hex_string,
     hex_to_bytes,
-    word_to_masm_push_string,
 };
 
 use crate::alloc::borrow::ToOwned;
@@ -113,17 +112,20 @@ pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, To
 /// # Arguments
 /// - `account`: The Accounts from which to extract the public keys.
 pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
-    let mut pub_keys = vec![];
+    let mut words = vec![];
     let interface: AccountInterface = account.into();
 
     for auth in interface.auth() {
         match auth {
-            AuthScheme::NoAuth => {},
-            AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
+            AuthScheme::NoAuth | AuthScheme::Unknown => {},
+            AuthScheme::RpoFalcon512 { pub_key } => words.push(Word::from(*pub_key)),
+            AuthScheme::RpoFalcon512Multisig { pub_keys, .. } => {
+                words.extend(pub_keys.iter().map(|k| Word::from(*k)));
+            },
         }
     }
 
-    pub_keys
+    words
 }
 
 // TESTS

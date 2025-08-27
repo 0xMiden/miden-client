@@ -1,7 +1,6 @@
 use alloc::string::{String, ToString};
 use core::fmt;
 
-use miden_objects::NetworkIdError;
 use miden_objects::account::NetworkId;
 
 // ENDPOINT
@@ -62,15 +61,17 @@ impl Endpoint {
         self.port
     }
 
-    pub fn to_network_id(&self) -> Result<NetworkId, NetworkIdError> {
+    pub fn to_network_id(&self) -> NetworkId {
         if self == &Endpoint::testnet() {
-            Ok(NetworkId::Testnet)
+            NetworkId::Testnet
         } else if self == &Endpoint::devnet() {
-            Ok(NetworkId::Devnet)
+            NetworkId::Devnet
         } else if self == &Endpoint::localhost() {
-            Ok(NetworkId::new("mlcl")?)
+            // Network ID intended to be used when running a local instance of the node
+            NetworkId::new("mlcl").expect("mlcl should be a valid network ID")
         } else {
-            Ok(NetworkId::new("mcst")?)
+            // Default network ID for custom networks when no other match has been found
+            NetworkId::new("mcst").expect("mcst should be a valid network ID")
         }
     }
 }
