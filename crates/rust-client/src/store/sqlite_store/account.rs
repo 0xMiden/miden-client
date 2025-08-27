@@ -6,17 +6,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    NonFungibleDeltaAction,
-    StorageMap,
-    StorageSlot,
-    StorageSlotType,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    NonFungibleDeltaAction, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
 use miden_objects::{AccountError, Felt, Word};
@@ -218,150 +209,16 @@ impl SqliteStore {
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
     }
 
-    // HELPERS
+    // ACCOUNT DELTA HELPERS
     // --------------------------------------------------------------------------------------------
-
-    /// Update previously-existing account after a transaction execution.
-    ///
-    /// Because the Client retrieves the account by account ID before applying the delta, we don't
-    /// need to check that it exists here. This inserts a new row into the accounts table.
-    /// We can later identify the proper account state by looking at the nonce.
-    pub(super) fn update_account_state(
-        tx: &Transaction<'_>,
-        new_account_state: &Account,
-    ) -> Result<(), StoreError> {
-        Self::insert_storage_slots(
-            tx,
-            new_account_state.storage().commitment(),
-            new_account_state.storage().slots().iter().enumerate(),
-        )?;
-        Self::insert_assets(
-            tx,
-            new_account_state.vault().root(),
-            new_account_state.vault().assets(),
-        )?;
-        Self::insert_account_header(tx, &new_account_state.into(), None)
-    }
-
-    /// Fetches the relevant fungible assets that will be updated by the account delta.
-    pub(super) fn relevant_fungible_assets(
-        conn: &Connection,
-        header: &AccountHeader,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
-        let fungible_faucet_prefixes = delta
-            .vault()
-            .fungible()
-            .iter()
-            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
-            .collect::<Vec<Value>>();
-
-        Ok(query_vault_assets(
-                    conn,
-                    "root = ? AND faucet_id_prefix IN rarray(?)",
-                    params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
-                )?
-                .into_iter()
-                // SAFETY: all retrieved assets should be fungible
-                .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
-                .collect())
-    }
-
-    /// Fetches the relevant storage maps that will be updated by the account delta.
-    pub(super) fn relevant_storage_maps(
-        conn: &Connection,
-        header: &AccountHeader,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<u8, StorageMap>, StoreError> {
-        let updated_map_indexes = delta
-            .storage()
-            .maps()
-            .keys()
-            .map(|k| Value::Integer(i64::from(*k)))
-            .collect::<Vec<Value>>();
-
-        query_storage_slots(
-            conn,
-            "commitment = ? AND slot_index IN rarray(?)",
-            params![header.storage_commitment().to_hex(), Rc::new(updated_map_indexes)],
-        )?
-        .into_iter()
-        .map(|(index, slot)| {
-            let StorageSlot::Map(map) = slot else {
-                return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
-            };
-
-            Ok((index, map))
-        })
-        .collect()
-    }
-
-    /// Inserts the new `final_account_header` to the store and copies over the previous account
-    /// state (vault and storage). This isn't meant to be the whole account update, just the first
-    /// step. The account delta should then be applied to the copied data.
-    fn copy_account_state(
-        tx: &Transaction<'_>,
-        init_account_header: &AccountHeader,
-        final_account_header: &AccountHeader,
-    ) -> Result<(), StoreError> {
-        Self::insert_account_header(tx, final_account_header, None)?;
-
-        if init_account_header.vault_root() != final_account_header.vault_root() {
-            const VAULT_QUERY: &str = "
-                INSERT OR IGNORE INTO account_vaults (
-                    root,
-                    faucet_id_prefix,
-                    asset
-                )
-                SELECT
-                    ?, --new root
-                    faucet_id_prefix,
-                    asset
-                FROM account_vaults
-                WHERE root = (SELECT vault_root FROM accounts WHERE account_commitment = ?)
-                ";
-            tx.execute(
-                VAULT_QUERY,
-                params![
-                    final_account_header.vault_root().to_hex(),
-                    init_account_header.commitment().to_hex()
-                ],
-            )?;
-        }
-
-        if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
-            const STORAGE_QUERY: &str = "
-                INSERT OR IGNORE INTO account_storage (
-                    commitment,
-                    slot_index,
-                    slot_value,
-                    slot_type
-                )
-                SELECT
-                    ?, -- new commitment
-                    slot_index,
-                    slot_value,
-                    slot_type
-                FROM account_storage
-                WHERE commitment = (SELECT storage_commitment FROM accounts WHERE account_commitment = ?)
-                ";
-
-            tx.execute(
-                STORAGE_QUERY,
-                params![
-                    final_account_header.storage_commitment().to_hex(),
-                    init_account_header.commitment().to_hex()
-                ],
-            )?;
-        }
-
-        Ok(())
-    }
 
     /// Applies the account delta to the account state, updating the vault and storage maps.
     ///
-    /// This function needs to receive the previously fetched fungible assets and storage maps that
-    /// will be updated by the delta.
+    /// The apply delta operation strats by copying over the initial account state (vault and
+    /// storage) and then applying the delta on top of it. The storage and vault elements are
+    /// overwritten in the new state. In the cases where the delta depends on previous state (e.g.
+    /// adding or subtracting fungible assets), the previous state needs to be provided via the
+    /// `updated_fungible_assets` and `updated_storage_maps` parameters.
     pub(super) fn apply_account_delta(
         tx: &Transaction<'_>,
         init_account_state: &AccountHeader,
@@ -463,6 +320,148 @@ impl SqliteStore {
         )?;
 
         Ok(())
+    }
+
+    /// Fetches the relevant fungible assets of an account that will be updated by the account
+    /// delta.
+    pub(super) fn get_account_fungible_assets_for_delta(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
+        let fungible_faucet_prefixes = delta
+            .vault()
+            .fungible()
+            .iter()
+            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
+            .collect::<Vec<Value>>();
+
+        Ok(query_vault_assets(
+                    conn,
+                    "root = ? AND faucet_id_prefix IN rarray(?)",
+                    params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
+                )?
+                .into_iter()
+                // SAFETY: all retrieved assets should be fungible
+                .map(|asset| (asset.faucet_id_prefix(), asset.unwrap_fungible()))
+                .collect())
+    }
+
+    /// Fetches the relevant storage maps inside the account's storage that will be updated by the
+    /// account delta.
+    pub(super) fn get_account_storage_maps_for_delta(
+        conn: &Connection,
+        header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<BTreeMap<u8, StorageMap>, StoreError> {
+        let updated_map_indexes = delta
+            .storage()
+            .maps()
+            .keys()
+            .map(|k| Value::Integer(i64::from(*k)))
+            .collect::<Vec<Value>>();
+
+        query_storage_slots(
+            conn,
+            "commitment = ? AND slot_index IN rarray(?)",
+            params![header.storage_commitment().to_hex(), Rc::new(updated_map_indexes)],
+        )?
+        .into_iter()
+        .map(|(index, slot)| {
+            let StorageSlot::Map(map) = slot else {
+                return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+            };
+
+            Ok((index, map))
+        })
+        .collect()
+    }
+
+    /// Inserts the new `final_account_header` to the store and copies over the previous account
+    /// state (vault and storage). This isn't meant to be the whole account update, just the first
+    /// step. The account delta should then be applied to the copied data.
+    fn copy_account_state(
+        tx: &Transaction<'_>,
+        init_account_header: &AccountHeader,
+        final_account_header: &AccountHeader,
+    ) -> Result<(), StoreError> {
+        Self::insert_account_header(tx, final_account_header, None)?;
+
+        if init_account_header.vault_root() != final_account_header.vault_root() {
+            const VAULT_QUERY: &str = "
+                INSERT OR IGNORE INTO account_vaults (
+                    root,
+                    faucet_id_prefix,
+                    asset
+                )
+                SELECT
+                    ?, --new root
+                    faucet_id_prefix,
+                    asset
+                FROM account_vaults
+                WHERE root = (SELECT vault_root FROM accounts WHERE account_commitment = ?)
+                ";
+            tx.execute(
+                VAULT_QUERY,
+                params![
+                    final_account_header.vault_root().to_hex(),
+                    init_account_header.commitment().to_hex()
+                ],
+            )?;
+        }
+
+        if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
+            const STORAGE_QUERY: &str = "
+                INSERT OR IGNORE INTO account_storage (
+                    commitment,
+                    slot_index,
+                    slot_value,
+                    slot_type
+                )
+                SELECT
+                    ?, -- new commitment
+                    slot_index,
+                    slot_value,
+                    slot_type
+                FROM account_storage
+                WHERE commitment = (SELECT storage_commitment FROM accounts WHERE account_commitment = ?)
+                ";
+
+            tx.execute(
+                STORAGE_QUERY,
+                params![
+                    final_account_header.storage_commitment().to_hex(),
+                    init_account_header.commitment().to_hex()
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Update previously-existing account after a transaction execution.
+    ///
+    /// Because the Client retrieves the account by account ID before applying the delta, we don't
+    /// need to check that it exists here. This inserts a new row into the accounts table.
+    /// We can later identify the proper account state by looking at the nonce.
+    pub(super) fn update_account_state(
+        tx: &Transaction<'_>,
+        new_account_state: &Account,
+    ) -> Result<(), StoreError> {
+        Self::insert_storage_slots(
+            tx,
+            new_account_state.storage().commitment(),
+            new_account_state.storage().slots().iter().enumerate(),
+        )?;
+        Self::insert_assets(
+            tx,
+            new_account_state.vault().root(),
+            new_account_state.vault().assets(),
+        )?;
+        Self::insert_account_header(tx, &new_account_state.into(), None)
     }
 
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
