@@ -229,11 +229,7 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   // Promises to insert each transaction update.
   let transactionWriteOp = Promise.all(
     transactionUpdates.map((transactionRecord) => {
-      return Promise.all([
-        insertTransactionScript(
-          transactionRecord.scriptRoot,
-          transactionRecord.txScript
-        ),
+      let promises = [
         upsertTransactionRecord(
           transactionRecord.id,
           transactionRecord.details,
@@ -242,7 +238,18 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
           transactionRecord.status,
           transactionRecord.scriptRoot
         ),
-      ]);
+      ];
+
+      if (transactionRecord.scriptRoot && transactionRecord.txScript) {
+        promises.push(
+          insertTransactionScript(
+            transactionRecord.scriptRoot,
+            transactionRecord.txScript
+          )
+        );
+      }
+
+      return Promise.all(promises);
     })
   );
 

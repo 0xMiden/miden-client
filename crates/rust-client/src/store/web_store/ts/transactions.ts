@@ -127,13 +127,9 @@ export async function getTransactions(filter: string) {
 }
 
 export async function insertTransactionScript(
-  scriptRoot?: Uint8Array,
-  txScript?: Uint8Array
+  scriptRoot: Uint8Array,
+  txScript: Uint8Array
 ) {
-  if (!scriptRoot) {
-    return;
-  }
-
   try {
     // check if script root already exists
     const record = await transactionScripts
