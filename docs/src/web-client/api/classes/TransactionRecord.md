@@ -28,6 +28,16 @@
 
 ***
 
+### creationTimestamp()
+
+> **creationTimestamp**(): `bigint`
+
+#### Returns
+
+`bigint`
+
+***
+
 ### finalAccountState()
 
 > **finalAccountState**(): [`Word`](Word.md)

@@ -2,6 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_objects::Word;
+use miden_objects::account::Account;
 use miden_objects::transaction::TransactionScript;
 use miden_tx::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
@@ -92,7 +93,17 @@ impl WebStore {
         .await?;
 
         // Account Data
-        update_account(tx_update.updated_account()).await.map_err(|err| {
+        // TODO: This should be refactored to avoid fetching the whole account state.
+        let delta = tx_update.executed_transaction().account_delta();
+        let mut account: Account = self
+            .get_account(delta.id())
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(delta.id()))?
+            .into();
+
+        account.apply_delta(delta)?;
+
+        update_account(&account).await.map_err(|err| {
             StoreError::DatabaseError(format!("failed to update account: {err:?}"))
         })?;
 

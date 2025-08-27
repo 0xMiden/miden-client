@@ -28,6 +28,16 @@
 
 ***
 
+### getCommitTimestamp()
+
+> **getCommitTimestamp**(): `bigint`
+
+#### Returns
+
+`bigint`
+
+***
+
 ### isCommitted()
 
 > **isCommitted**(): `boolean`
