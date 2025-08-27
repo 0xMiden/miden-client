@@ -177,13 +177,13 @@ struct TestCase {
 
 impl TestCase {
     /// Creates a new TestCase with the given name, category, and function.
-    fn new<F, Fut>(name: String, category: TestCategory, func: F) -> Self
+    fn new<F, Fut>(name: &str, category: TestCategory, func: F) -> Self
     where
         F: Fn(ClientConfig) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<(), anyhow::Error>> + 'static,
     {
         Self {
-            name,
+            name: name.to_string(),
             category,
             function: Box::new(move |config| Box::pin(func(config))),
         }
@@ -231,124 +231,84 @@ fn get_all_tests() -> Vec<TestCase> {
     vec![
         // CLIENT tests
         TestCase::new(
-            "client_builder_initializes_client_with_endpoint".to_string(),
+            "client_builder_initializes_client_with_endpoint",
             TestCategory::Client,
             client_builder_initializes_client_with_endpoint,
         ),
+        TestCase::new("multiple_tx_on_same_block", TestCategory::Client, multiple_tx_on_same_block),
+        TestCase::new("import_expected_notes", TestCategory::Client, import_expected_notes),
         TestCase::new(
-            "multiple_tx_on_same_block".to_string(),
-            TestCategory::Client,
-            multiple_tx_on_same_block,
-        ),
-        TestCase::new(
-            "import_expected_notes".to_string(),
-            TestCategory::Client,
-            import_expected_notes,
-        ),
-        TestCase::new(
-            "import_expected_note_uncommitted".to_string(),
+            "import_expected_note_uncommitted",
             TestCategory::Client,
             import_expected_note_uncommitted,
         ),
         TestCase::new(
-            "import_expected_notes_from_the_past_as_committed".to_string(),
+            "import_expected_notes_from_the_past_as_committed",
             TestCategory::Client,
             import_expected_notes_from_the_past_as_committed,
         ),
-        TestCase::new("get_account_update".to_string(), TestCategory::Client, get_account_update),
-        TestCase::new("sync_detail_values".to_string(), TestCategory::Client, sync_detail_values),
+        TestCase::new("get_account_update", TestCategory::Client, get_account_update),
+        TestCase::new("sync_detail_values", TestCategory::Client, sync_detail_values),
         TestCase::new(
-            "multiple_transactions_can_be_committed_in_different_blocks_without_sync".to_string(),
+            "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
             TestCategory::Client,
             multiple_transactions_can_be_committed_in_different_blocks_without_sync,
         ),
         TestCase::new(
-            "consume_multiple_expected_notes".to_string(),
+            "consume_multiple_expected_notes",
             TestCategory::Client,
             consume_multiple_expected_notes,
         ),
         TestCase::new(
-            "import_consumed_note_with_proof".to_string(),
+            "import_consumed_note_with_proof",
             TestCategory::Client,
             import_consumed_note_with_proof,
         ),
         TestCase::new(
-            "import_consumed_note_with_id".to_string(),
+            "import_consumed_note_with_id",
             TestCategory::Client,
             import_consumed_note_with_id,
         ),
-        TestCase::new(
-            "import_note_with_proof".to_string(),
-            TestCategory::Client,
-            import_note_with_proof,
-        ),
-        TestCase::new(
-            "discarded_transaction".to_string(),
-            TestCategory::Client,
-            discarded_transaction,
-        ),
-        TestCase::new(
-            "custom_transaction_prover".to_string(),
-            TestCategory::Client,
-            custom_transaction_prover,
-        ),
-        TestCase::new("locked_account".to_string(), TestCategory::Client, locked_account),
-        TestCase::new(
-            "expired_transaction_fails".to_string(),
-            TestCategory::Client,
-            expired_transaction_fails,
-        ),
-        TestCase::new("unused_rpc_api".to_string(), TestCategory::Client, unused_rpc_api),
-        TestCase::new(
-            "ignore_invalid_notes".to_string(),
-            TestCategory::Client,
-            ignore_invalid_notes,
-        ),
-        TestCase::new("output_only_note".to_string(), TestCategory::Client, output_only_note),
+        TestCase::new("import_note_with_proof", TestCategory::Client, import_note_with_proof),
+        TestCase::new("discarded_transaction", TestCategory::Client, discarded_transaction),
+        TestCase::new("custom_transaction_prover", TestCategory::Client, custom_transaction_prover),
+        TestCase::new("locked_account", TestCategory::Client, locked_account),
+        TestCase::new("expired_transaction_fails", TestCategory::Client, expired_transaction_fails),
+        TestCase::new("unused_rpc_api", TestCategory::Client, unused_rpc_api),
+        TestCase::new("ignore_invalid_notes", TestCategory::Client, ignore_invalid_notes),
+        TestCase::new("output_only_note", TestCategory::Client, output_only_note),
         // CUSTOM TRANSACTION tests
-        TestCase::new("merkle_store".to_string(), TestCategory::CustomTransaction, merkle_store),
+        TestCase::new("merkle_store", TestCategory::CustomTransaction, merkle_store),
         TestCase::new(
-            "onchain_notes_sync_with_tag".to_string(),
+            "onchain_notes_sync_with_tag",
             TestCategory::CustomTransaction,
             onchain_notes_sync_with_tag,
         ),
-        TestCase::new(
-            "transaction_request".to_string(),
-            TestCategory::CustomTransaction,
-            transaction_request,
-        ),
+        TestCase::new("transaction_request", TestCategory::CustomTransaction, transaction_request),
         // FPI tests
-        TestCase::new("standard_fpi_public".to_string(), TestCategory::Fpi, standard_fpi_public),
-        TestCase::new("standard_fpi_private".to_string(), TestCategory::Fpi, standard_fpi_private),
-        TestCase::new("fpi_execute_program".to_string(), TestCategory::Fpi, fpi_execute_program),
-        TestCase::new("nested_fpi_calls".to_string(), TestCategory::Fpi, nested_fpi_calls),
+        TestCase::new("standard_fpi_public", TestCategory::Fpi, standard_fpi_public),
+        TestCase::new("standard_fpi_private", TestCategory::Fpi, standard_fpi_private),
+        TestCase::new("fpi_execute_program", TestCategory::Fpi, fpi_execute_program),
+        TestCase::new("nested_fpi_calls", TestCategory::Fpi, nested_fpi_calls),
         // NETWORK TRANSACTION tests
         TestCase::new(
-            "counter_contract_ntx".to_string(),
+            "counter_contract_ntx",
             TestCategory::NetworkTransaction,
             counter_contract_ntx,
         ),
         TestCase::new(
-            "recall_note_before_ntx_consumes_it".to_string(),
+            "recall_note_before_ntx_consumes_it",
             TestCategory::NetworkTransaction,
             recall_note_before_ntx_consumes_it,
         ),
         // ONCHAIN tests
-        TestCase::new(
-            "import_account_by_id".to_string(),
-            TestCategory::Onchain,
-            import_account_by_id,
-        ),
-        TestCase::new("onchain_accounts".to_string(), TestCategory::Onchain, onchain_accounts),
-        TestCase::new("onchain_notes_flow".to_string(), TestCategory::Onchain, onchain_notes_flow),
-        TestCase::new("incorrect_genesis".to_string(), TestCategory::Onchain, incorrect_genesis),
+        TestCase::new("import_account_by_id", TestCategory::Onchain, import_account_by_id),
+        TestCase::new("onchain_accounts", TestCategory::Onchain, onchain_accounts),
+        TestCase::new("onchain_notes_flow", TestCategory::Onchain, onchain_notes_flow),
+        TestCase::new("incorrect_genesis", TestCategory::Onchain, incorrect_genesis),
         // SWAP TRANSACTION tests
-        TestCase::new(
-            "swap_fully_onchain".to_string(),
-            TestCategory::SwapTransaction,
-            swap_fully_onchain,
-        ),
-        TestCase::new("swap_private".to_string(), TestCategory::SwapTransaction, swap_private),
+        TestCase::new("swap_fully_onchain", TestCategory::SwapTransaction, swap_fully_onchain),
+        TestCase::new("swap_private", TestCategory::SwapTransaction, swap_private),
     ]
 }
 
