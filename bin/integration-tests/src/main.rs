@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use anyhow::anyhow;
 use clap::Parser;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::config::ClientConfig;
@@ -113,24 +114,6 @@ struct Args {
     exclude: Option<String>,
 }
 
-/// Error type for BaseConfig conversion.
-#[derive(Debug)]
-enum ConfigError {
-    MissingHost,
-    MissingPort,
-}
-
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConfigError::MissingHost => write!(f, "RPC endpoint URL is missing a host"),
-            ConfigError::MissingPort => write!(f, "RPC endpoint URL is missing a port"),
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}
-
 /// Base configuration derived from command line arguments.
 #[derive(Clone)]
 struct BaseConfig {
@@ -139,13 +122,20 @@ struct BaseConfig {
 }
 
 impl TryFrom<Args> for BaseConfig {
-    type Error = ConfigError;
+    type Error = anyhow::Error;
 
     /// Creates a BaseConfig from command line arguments.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
-        let host = args.rpc_endpoint.host_str().ok_or(ConfigError::MissingHost)?.to_string();
+        let host = args
+            .rpc_endpoint
+            .host_str()
+            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
+            .to_string();
 
-        let port = args.rpc_endpoint.port().ok_or(ConfigError::MissingPort)?;
+        let port = args
+            .rpc_endpoint
+            .port()
+            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
 
         let endpoint = Endpoint::new(args.rpc_endpoint.scheme().to_string(), host, Some(port));
         let timeout_ms = args.timeout;
