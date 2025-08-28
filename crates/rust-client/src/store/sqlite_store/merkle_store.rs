@@ -1,7 +1,7 @@
 use miden_objects::Word;
 use miden_objects::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SmtLeaf};
 
 use crate::store::StoreError;
 
@@ -11,15 +11,7 @@ pub fn get_asset_proof(
     vault_root: Word,
     asset: &Asset,
 ) -> Result<MerklePath, StoreError> {
-    Ok(merkle_store
-        .get_path(
-            vault_root,
-            NodeIndex::new(
-                miden_objects::crypto::merkle::SMT_DEPTH,
-                asset.vault_key()[3].as_int(),
-            )?, // Is this conversion exposed in any way?
-        )?
-        .path)
+    Ok(merkle_store.get_path(vault_root, get_node_index(asset.vault_key())?)?.path)
 }
 
 /// Updates the merkle store with the new asset values.
@@ -29,16 +21,13 @@ pub fn update_asset_nodes(
     assets: impl Iterator<Item = Asset>,
 ) -> Result<Word, StoreError> {
     for asset in assets {
-        root =
-            merkle_store
-                .set_node(
-                    root,
-                    NodeIndex::new(SMT_DEPTH, asset.vault_key()[3].as_int())?, /* Is this conversion exposed
-                                                                                * in any way? */
-                    SmtLeaf::Single((asset.vault_key(), asset.into())).hash(), /* Is this conversion exposed
-                                                                                * in any way? */
-                )?
-                .root;
+        root = merkle_store
+            .set_node(
+                root,
+                get_node_index(asset.vault_key())?,
+                get_node_value(asset.vault_key(), asset.into()),
+            )?
+            .root;
     }
 
     Ok(root)
@@ -56,12 +45,7 @@ pub fn get_storage_map_item_proof(
     key: Word,
 ) -> Result<MerklePath, StoreError> {
     let hashed_key = StorageMap::hash_key(key);
-    Ok(merkle_store
-        .get_path(
-            map_root,
-            NodeIndex::new(miden_objects::crypto::merkle::SMT_DEPTH, hashed_key[3].as_int())?, // Is this conversion exposed in any way?
-        )?
-        .path)
+    Ok(merkle_store.get_path(map_root, get_node_index(hashed_key)?)?.path)
 }
 
 /// Updates the merkle store with the new storage map entries.
@@ -73,14 +57,7 @@ pub fn update_storage_map_nodes(
     for (key, value) in entries {
         let hashed_key = StorageMap::hash_key(key);
         root = merkle_store
-            .set_node(
-                root,
-                NodeIndex::new(SMT_DEPTH, hashed_key[3].as_int())?, /* Is this conversion
-                                                                     * exposed
-                                                                     * in any way? */
-                SmtLeaf::Single((hashed_key, value)).hash(), /* Is this conversion exposed
-                                                              * in any way? */
-            )?
+            .set_node(root, get_node_index(hashed_key)?, get_node_value(hashed_key, value))?
             .root;
     }
 
@@ -100,4 +77,26 @@ pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &Accoun
     for map in maps {
         merkle_store.extend(map.inner_nodes());
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Builds the merkle node index for the given key.
+///
+/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] is structured internally.
+/// It has a set depth and uses the third felt as the position. The reason we want to copy the smt's
+/// internal structure is so that merkle paths and roots match. For more information, see the
+/// [`miden_objects::crypto::merkle::Smt`] documentation and implementation.
+fn get_node_index(key: Word) -> Result<NodeIndex, StoreError> {
+    Ok(NodeIndex::new(miden_objects::crypto::merkle::SMT_DEPTH, key[3].as_int())?)
+}
+
+/// Builds the merkle node value for the given key and value.
+///
+/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] generates the values for
+/// its internal merkle tree. It generates an [`SmtLeaf`] from the key and value, and then hashes it
+/// to produce the node value.
+fn get_node_value(key: Word, value: Word) -> Word {
+    SmtLeaf::Single((key, value)).hash()
 }
