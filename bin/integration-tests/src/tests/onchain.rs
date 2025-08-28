@@ -4,6 +4,7 @@ use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::AuthSecretKey;
 use miden_client::note::{NoteFile, NoteType};
+use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::*;
 use miden_client::testing::config::ClientConfig;
@@ -388,6 +389,8 @@ pub async fn incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     // because the genesis commitment in the request header does not match the one in the node.
     let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
 
-    assert!(result.is_err());
-    Ok(())
+    match result.unwrap_err() {
+        RpcError::AcceptHeaderError(AcceptHeaderError::UnsupportedMediaRange) => Ok(()),
+        _ => panic!("expected accept header error"),
+    }
 }
