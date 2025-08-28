@@ -32,6 +32,7 @@ use crate::transaction::ForeignAccount;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
+use api_client::accept_header_value;
 
 // TONIC RPC CLIENT
 // ================================================================================================
@@ -115,7 +116,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let api_response = rpc_api.submit_proven_transaction(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
                 err.to_string(),
@@ -139,7 +148,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let api_response = rpc_api.get_block_header_by_number(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
                 err.to_string(),
@@ -181,7 +198,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let api_response = rpc_api.get_notes_by_id(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
                 err.to_string(),
@@ -218,7 +243,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_state(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.sync_state(req).await.map_err(|err| {
             RpcError::RequestError(NodeRpcClientEndpoint::SyncState.to_string(), err.to_string())
         })?;
         response.into_inner().try_into()
@@ -240,7 +273,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.get_account_details(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::GetAccountDetails.to_string(),
                 err.to_string(),
@@ -312,8 +353,16 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
         let response = rpc_api
-            .get_account_proofs(request)
+            .get_account_proofs(req)
             .await
             .map_err(|err| {
                 RpcError::RequestError(
@@ -374,7 +423,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_notes(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.sync_notes(req).await.map_err(|err| {
             RpcError::RequestError(NodeRpcClientEndpoint::SyncNotes.to_string(), err.to_string())
         })?;
 
@@ -394,7 +451,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.check_nullifiers_by_prefix(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
                 err.to_string(),
@@ -418,7 +483,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.check_nullifiers(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::CheckNullifiers.to_string(),
                 err.to_string(),
@@ -436,7 +509,15 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
+        let mut req = tonic::Request::new(request);
+        let accept = accept_header_value(*self.genesis_commitment.read());
+        req.metadata_mut().insert(
+            "accept",
+            tonic::metadata::AsciiMetadataValue::try_from(accept)
+                .expect("valid accept header value"),
+        );
+
+        let response = rpc_api.get_block_by_number(req).await.map_err(|err| {
             RpcError::RequestError(
                 NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
                 err.to_string(),

@@ -74,6 +74,10 @@ where
     /// currently not available.
     ///
     /// If relevance can't be determined, the screener defaults to setting the note as consumable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if store access fails or transaction execution checks fail.
     pub async fn check_relevance(
         &self,
         note: &Note,

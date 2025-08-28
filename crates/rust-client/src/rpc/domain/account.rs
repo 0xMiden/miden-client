@@ -266,6 +266,11 @@ pub struct AccountProof {
 
 impl AccountProof {
     /// Creates a new [`AccountProof`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided headers are inconsistent with the witness
+    /// (account commitment, account id, or code commitment mismatch).
     pub fn new(
         account_witness: AccountWitness,
         state_headers: Option<StateHeaders>,

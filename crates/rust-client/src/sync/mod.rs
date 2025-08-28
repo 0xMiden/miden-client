@@ -95,6 +95,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Returns the block number of the last state sync block.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store cannot be accessed.
     pub async fn get_sync_height(&self) -> Result<BlockNumber, ClientError> {
         self.store.get_sync_height().await.map_err(Into::into)
     }
@@ -118,6 +122,15 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if internal assumptions about block number conversions fail (e.g., converting
+    /// a tracked block number to `u32`). These are considered unreachable due to prior checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if RPC calls fail or store updates cannot be applied.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 

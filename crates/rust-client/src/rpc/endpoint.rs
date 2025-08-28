@@ -61,6 +61,12 @@ impl Endpoint {
         self.port
     }
 
+    /// Returns the [`NetworkId`] associated with this endpoint.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if a hardcoded network identifier string is invalid. This is considered
+    /// unreachable in production, as the strings are validated constants.
     pub fn to_network_id(&self) -> NetworkId {
         if self == &Endpoint::testnet() {
             NetworkId::Testnet

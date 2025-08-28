@@ -6,7 +6,6 @@ use api_client_wrapper::{ApiClient, InnerClient};
 use miden_objects::Word;
 use tonic::metadata::AsciiMetadataValue;
 use tonic::metadata::errors::InvalidMetadataValue;
-use tonic::service::Interceptor;
 
 // WEB CLIENT
 // ================================================================================================
@@ -19,30 +18,30 @@ pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
     use miden_objects::Word;
-    use tonic::service::interceptor::InterceptedService;
-
-    use super::{MetadataInterceptor, accept_header_interceptor};
+    use super::accept_header_value;
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
     pub type WasmClient = tonic_web_wasm_client::Client;
-    pub type InnerClient = ProtoClient<InterceptedService<WasmClient, MetadataInterceptor>>;
+    pub type InnerClient = ProtoClient<WasmClient>;
     #[derive(Clone)]
     pub struct ApiClient(pub(crate) InnerClient);
 
     impl ApiClient {
         /// Connects to the Miden node API using the provided URL and genesis commitment.
         ///
-        /// The client is configured with an interceptor that sets all requisite request metadata.
+        /// The client is configured with required request metadata on each call.
         #[allow(clippy::unused_async)]
         pub async fn new_client(
             endpoint: String,
             _timeout_ms: u64,
             genesis_commitment: Option<Word>,
         ) -> Result<ApiClient, RpcError> {
-            let wasm_client = WasmClient::new(endpoint);
-            let interceptor = accept_header_interceptor(genesis_commitment);
-            Ok(ApiClient(ProtoClient::with_interceptor(wasm_client, interceptor)))
+            let mut wasm_client = WasmClient::new(endpoint);
+            // Pre-set default headers if supported (wasm client exposes set_header)
+            let accept = accept_header_value(genesis_commitment);
+            wasm_client.set_header("accept", accept);
+            Ok(ApiClient(ProtoClient::new(wasm_client)))
         }
     }
 }
@@ -57,21 +56,20 @@ pub(crate) mod api_client_wrapper {
     use core::time::Duration;
 
     use miden_objects::Word;
-    use tonic::service::interceptor::InterceptedService;
     use tonic::transport::Channel;
 
-    use super::{MetadataInterceptor, accept_header_interceptor};
+    use super::accept_header_value;
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
-    pub type InnerClient = ProtoClient<InterceptedService<Channel, MetadataInterceptor>>;
+    pub type InnerClient = ProtoClient<Channel>;
     #[derive(Clone)]
     pub struct ApiClient(pub(crate) InnerClient);
 
     impl ApiClient {
         /// Connects to the Miden node API using the provided URL, timeout and genesis commitment.
         ///
-        /// The client is configured with an interceptor that sets all requisite request metadata.
+        /// The client is configured with required request metadata on each call.
         pub async fn new_client(
             endpoint: String,
             timeout_ms: u64,
@@ -88,11 +86,9 @@ pub(crate) mod api_client_wrapper {
                 .await
                 .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
 
-            // Set up the accept metadata interceptor.
-            let interceptor = accept_header_interceptor(genesis_commitment);
-
             // Return the connected client.
-            Ok(ApiClient(ProtoClient::with_interceptor(channel, interceptor)))
+            let client = ProtoClient::new(channel).max_decoding_message_size(usize::MAX);
+            Ok(ApiClient(client))
         }
     }
 }
@@ -110,49 +106,17 @@ impl DerefMut for ApiClient {
     }
 }
 
-// INTERCEPTOR
+// HEADER VALUE
 // ================================================================================================
 
-/// Interceptor designed to inject required metadata into all [`ApiClient`] requests.
-#[derive(Default, Clone)]
-pub struct MetadataInterceptor {
-    metadata: alloc::collections::BTreeMap<&'static str, AsciiMetadataValue>,
-}
-
-impl MetadataInterceptor {
-    /// Adds or overwrites metadata to the interceptor.
-    pub fn with_metadata(
-        mut self,
-        key: &'static str,
-        value: String,
-    ) -> Result<Self, InvalidMetadataValue> {
-        self.metadata.insert(key, AsciiMetadataValue::try_from(value)?);
-        Ok(self)
-    }
-}
-
-impl Interceptor for MetadataInterceptor {
-    fn call(&mut self, request: tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
-        let mut request = request;
-        for (key, value) in &self.metadata {
-            request.metadata_mut().insert(*key, value.clone());
-        }
-        Ok(request)
-    }
-}
-
-/// Returns the HTTP header [`MetadataInterceptor`] that is expected by Miden RPC.
-/// The interceptor sets the `accept` header to the Miden API version and optionally includes the
-/// genesis commitment.
-fn accept_header_interceptor(genesis_digest: Option<Word>) -> MetadataInterceptor {
+/// Returns the value to be used for the HTTP `accept` header expected by Miden RPC.
+/// The value sets the Miden API version and optionally includes the genesis commitment.
+pub(crate) fn accept_header_value(genesis_digest: Option<Word>) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let mut accept_value = format!("application/vnd.miden; version={version}");
     if let Some(commitment) = genesis_digest {
         write!(accept_value, "; genesis={}", commitment.to_hex())
             .expect("valid hex representation of Word");
     }
-
-    MetadataInterceptor::default()
-        .with_metadata("accept", accept_value)
-        .expect("valid key/value metadata for interceptor")
+    accept_value
 }

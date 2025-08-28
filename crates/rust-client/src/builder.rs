@@ -179,6 +179,11 @@ where
     /// - Returns an error if no RPC client or endpoint was provided.
     /// - Returns an error if the store cannot be instantiated.
     /// - Returns an error if the keystore is not specified or fails to initialize.
+    ///
+    /// # Panics
+    ///
+    /// Panics if default execution options are invalid. This is considered unreachable since the
+    /// provided constants are validated internally.
     #[allow(clippy::unused_async, unused_mut)]
     pub async fn build(mut self) -> Result<Client<AUTH>, ClientError> {
         // Determine the RPC client to use.

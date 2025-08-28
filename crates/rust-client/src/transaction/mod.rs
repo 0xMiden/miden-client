@@ -190,6 +190,10 @@ pub struct TransactionResult {
 impl TransactionResult {
     /// Screens the output notes to store and track the relevant ones, and instantiates a
     /// [`TransactionResult`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if post-execution validation fails.
     pub fn new(
         transaction: ExecutedTransaction,
         future_notes: Vec<(NoteDetails, NoteTag)>,
@@ -584,6 +588,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if accessing the store fails.
     pub async fn get_transactions(
         &self,
         filter: TransactionFilter,
@@ -804,6 +812,11 @@ where
     /// resulting stack. Advice inputs and foreign accounts can be provided for the execution.
     ///
     /// The transaction will use the current sync height as the block reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if foreign account retrieval fails, the account cannot be
+    /// found, or the execution fails.
     pub async fn execute_program(
         &mut self,
         account_id: AccountId,
@@ -1310,6 +1323,11 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
             OutputNote::Full(n) => n,
             // The following todo!() applies until we have a way to support flows where we have
             // partial details of the note
+            //
+            // # Panics
+            //
+            // This code path is currently unreachable by design and will panic until
+            // partial details are supported.
             OutputNote::Header(_) | OutputNote::Partial(_) => {
                 todo!("For now, all details should be held in OutputNote::Fulls")
             },

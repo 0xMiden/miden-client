@@ -24,11 +24,19 @@ impl<AUTH> Client<AUTH> {
     /// Note: Tags for accounts that are being tracked by the client are managed automatically by
     /// the client and don't need to be added here. That is, notes for managed accounts will be
     /// retrieved automatically by the client when syncing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying store access fails.
     pub async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, ClientError> {
         self.store.get_note_tags().await.map_err(Into::into)
     }
 
     /// Adds a note tag for the client to track. This tag's source will be marked as `User`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if persisting the tag to the store fails.
     pub async fn add_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
         match self
             .store
@@ -46,6 +54,10 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Removes a note tag for the client to track. Only tags added by the user can be removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if removing the tag from the store fails.
     pub async fn remove_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
         if self
             .store

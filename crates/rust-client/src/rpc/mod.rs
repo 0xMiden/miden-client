@@ -101,6 +101,11 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response cannot be decoded.
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
@@ -112,6 +117,11 @@ pub trait NodeRpcClient: Send + Sync {
     /// of the return tuple should always be Some(MmrProof).
     ///
     /// When `None` is provided, returns info regarding the latest block.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response is missing required data or cannot be decoded.
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -120,6 +130,11 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response cannot be decoded into a [`ProvenBlock`].
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
@@ -127,6 +142,10 @@ pub trait NodeRpcClient: Send + Sync {
     /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
     /// [`miden_objects::note::NoteMetadata`], whereas for [`miden_objects::note::NoteType::Public`]
     /// notes, the return data includes all details.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the response cannot be decoded.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
@@ -141,6 +160,11 @@ pub trait NodeRpcClient: Send + Sync {
     ///   serves as a "note group" filter. Notice that you can't filter by a specific note ID.
     /// - `nullifiers_tags` similar to `note_tags`, is a list of tags used to filter the nullifiers
     ///   corresponding to some notes the client is interested in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response is missing required data or cannot be decoded.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
@@ -152,12 +176,22 @@ pub trait NodeRpcClient: Send + Sync {
     /// endpoint.
     ///
     /// - `account_id` is the ID of the wanted account.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// the response is missing required data, or the account cannot be decoded.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError>;
 
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
     /// - `block_num` is the last block number known by the client.
     /// - `note_tags` is a list of tags used to filter the notes the client is interested in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response cannot be decoded into a [`NoteSyncInfo`].
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
@@ -170,6 +204,11 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response cannot be decoded.
     async fn check_nullifiers_by_prefix(
         &self,
         prefix: &[u16],
@@ -178,6 +217,11 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
     /// `/CheckNullifiers` RPC endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// or the response cannot be decoded into SMT proofs.
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
@@ -186,6 +230,11 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `code_commitments` parameter is a list of known code commitments
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// one of the tracked accounts is not found in the node, the method will return an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent, the node responds with an error,
+    /// required data is missing in the response, or the response cannot be decoded.
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
@@ -198,6 +247,11 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::check_nullifiers_by_prefix`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying call to [`NodeRpcClient::check_nullifiers_by_prefix`]
+    /// fails.
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
@@ -216,6 +270,11 @@ pub trait NodeRpcClient: Send + Sync {
     /// in the returned list.
     ///
     /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying call to [`NodeRpcClient::get_notes_by_id`] fails
+    /// or a note cannot be decoded.
     async fn get_public_note_records(
         &self,
         note_ids: &[NoteId],
@@ -247,6 +306,10 @@ pub trait NodeRpcClient: Send + Sync {
     /// stored locally and that it wants to check for updates. If an account is private or didn't
     /// change, it is ignored and will not be included in the returned list.
     /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying calls to [`NodeRpcClient::get_account_details`] fail.
     async fn get_updated_public_accounts(
         &self,
         local_accounts: &[&AccountHeader],

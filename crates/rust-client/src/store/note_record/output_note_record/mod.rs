@@ -189,6 +189,11 @@ impl OutputNoteRecord {
     /// [`OutputNote::Full`] or [`OutputNote::Partial`] and always fail the conversion if it's
     /// [`OutputNote::Header`]. This also mean that `output_note.try_from()` can also be used as a
     /// way to filter the full and partial output notes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided `output_note` is a header-only variant and thus
+    /// lacks sufficient information to build an [`OutputNoteRecord`].
     pub fn try_from_output_note(
         output_note: OutputNote,
         expected_height: BlockNumber,
@@ -348,6 +353,12 @@ impl OutputNoteState {
         }
     }
 
+    /// Handles the transition when an inclusion proof is received for this state, returning the
+    /// new state if it changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an inclusion proof is received that conflicts with an existing proof.
     pub fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
@@ -378,6 +389,13 @@ impl OutputNoteState {
         }
     }
 
+    /// Handles the transition when a nullifier is received for this state, returning the new state
+    /// if it changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state cannot transition to a consumed state (e.g., recipient is
+    /// missing).
     pub fn nullifier_received(
         &self,
         block_height: u32,

@@ -16,6 +16,10 @@ use crate::{Client, ClientError};
 impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store cannot be accessed or the RPC request fails.
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
         let genesis = match self.store.get_block_header_by_num(0.into()).await? {
             Some((block, _)) => block,
@@ -45,6 +49,10 @@ impl<AUTH> Client<AUTH> {
     /// Builds the current view of the chain's [`PartialMmr`]. Because we want to add all new
     /// authentication nodes that could come from applying the MMR updates, we need to track all
     /// known leaves thus far.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading the current sync height or blockchain data from the store fails.
     pub(crate) async fn build_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         let current_block_num = self.store.get_sync_height().await?;
 
@@ -85,6 +93,10 @@ impl<AUTH> Client<AUTH> {
     ///
     /// If the store already contains MMR data for the requested block number, the request isn't
     /// done and the stored block header is returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the RPC request fails or the store operations fail.
     pub(crate) async fn get_and_store_authenticated_block(
         &self,
         block_num: BlockNumber,
