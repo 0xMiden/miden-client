@@ -827,6 +827,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::vec::Vec;
 
+    use anyhow::Context;
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
     use miden_objects::account::{
@@ -857,7 +858,7 @@ mod tests {
     use crate::store::sqlite_store::tests::create_test_store;
 
     #[tokio::test]
-    async fn account_code_insertion_no_duplicates() {
+    async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
         let store = create_test_store().await;
         let assembler = miden_lib::transaction::TransactionKernel::assembler();
         let account_component = AccountComponent::compile(
@@ -867,53 +868,47 @@ mod tests {
             ",
             assembler,
             vec![],
-        )
-        .unwrap()
+        )?
         .with_supports_all_types();
         let account_code = AccountCode::from_components(
             &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
             miden_objects::account::AccountType::RegularAccountUpdatableCode,
-        )
-        .unwrap();
+        )?;
+
         store
             .interact_with_connection(move |conn| {
-                let tx = conn.transaction().unwrap();
+                let tx = conn.transaction()?;
 
                 // Table is empty at the beginning
-                let mut actual: usize = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .unwrap();
+                let mut actual: usize =
+                    tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))?;
                 assert_eq!(actual, 0);
 
                 // First insertion generates a new row
-                SqliteStore::insert_account_code(&tx, &account_code).unwrap();
-                actual = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .unwrap();
+                SqliteStore::insert_account_code(&tx, &account_code)?;
+                actual = tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))?;
                 assert_eq!(actual, 1);
 
                 // Second insertion passes but does not generate a new row
                 assert!(SqliteStore::insert_account_code(&tx, &account_code).is_ok());
-                actual = tx
-                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .unwrap();
+                actual = tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))?;
                 assert_eq!(actual, 1);
 
                 Ok(())
             })
-            .await
-            .unwrap();
+            .await?;
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_additions() {
+    async fn test_apply_account_delta_additions() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),
             vec![StorageSlot::empty_value(), StorageSlot::empty_map()],
-        )
-        .unwrap()
+        )?
         .with_supports_all_types();
 
         // Create and insert an account
@@ -921,9 +916,8 @@ mod tests {
             .account_type(AccountType::RegularAccountImmutableCode)
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
-            .build()
-            .unwrap();
-        store.insert_account(&account, Some(seed)).await.unwrap();
+            .build()?;
+        store.insert_account(&account, Some(seed)).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
@@ -931,38 +925,28 @@ mod tests {
 
         let vault_delta = AccountVaultDelta::from_iters(
             vec![
-                FungibleAsset::new(
-                    AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap(),
-                    100,
-                )
-                .unwrap()
-                .into(),
-                NonFungibleAsset::new(
-                    &NonFungibleAssetDetails::new(
-                        AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)
-                            .unwrap()
-                            .prefix(),
-                        NON_FUNGIBLE_ASSET_DATA.into(),
-                    )
-                    .unwrap(),
-                )
-                .unwrap()
+                FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+                    .into(),
+                NonFungibleAsset::new(&NonFungibleAssetDetails::new(
+                    AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?.prefix(),
+                    NON_FUNGIBLE_ASSET_DATA.into(),
+                )?)?
                 .into(),
             ],
             [],
         );
 
-        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE).unwrap();
+        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE)?;
 
         let mut account_after_delta = account.clone();
-        account_after_delta.apply_delta(&delta).unwrap();
+        account_after_delta.apply_delta(&delta)?;
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
 
         store
             .interact_with_connection(move |conn| {
-                let tx = conn.transaction().unwrap();
+                let tx = conn.transaction()?;
 
                 SqliteStore::apply_account_delta(
                     &tx,
@@ -971,22 +955,26 @@ mod tests {
                     BTreeMap::default(),
                     BTreeMap::default(),
                     &delta,
-                )
-                .unwrap();
+                )?;
 
-                tx.commit().unwrap();
+                tx.commit()?;
                 Ok(())
             })
-            .await
-            .unwrap();
+            .await?;
 
-        let updated_account: Account = store.get_account(account_id).await.unwrap().unwrap().into();
+        let updated_account: Account = store
+            .get_account(account_id)
+            .await?
+            .context("failed to find inserted account")?
+            .into();
 
         assert_eq!(updated_account, account_after_delta);
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_removals() {
+    async fn test_apply_account_delta_removals() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let mut dummy_map = StorageMap::new();
@@ -995,26 +983,17 @@ mod tests {
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),
             vec![StorageSlot::Value([ZERO, ZERO, ZERO, ONE].into()), StorageSlot::Map(dummy_map)],
-        )
-        .unwrap()
+        )?
         .with_supports_all_types();
 
         // Create and insert an account
         let assets: Vec<Asset> = vec![
-            FungibleAsset::new(
-                AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap(),
-                100,
-            )
-            .unwrap()
-            .into(),
-            NonFungibleAsset::new(
-                &NonFungibleAssetDetails::new(
-                    AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET).unwrap().prefix(),
-                    NON_FUNGIBLE_ASSET_DATA.into(),
-                )
-                .unwrap(),
-            )
-            .unwrap()
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+                .into(),
+            NonFungibleAsset::new(&NonFungibleAssetDetails::new(
+                AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?.prefix(),
+                NON_FUNGIBLE_ASSET_DATA.into(),
+            )?)?
             .into(),
         ];
         let account = AccountBuilder::new([0; 32])
@@ -1022,9 +1001,8 @@ mod tests {
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .with_assets(assets.clone())
-            .build_existing()
-            .unwrap();
-        store.insert_account(&account, None).await.unwrap();
+            .build_existing()?;
+        store.insert_account(&account, None).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, EMPTY_WORD);
@@ -1032,10 +1010,10 @@ mod tests {
 
         let vault_delta = AccountVaultDelta::from_iters([], assets.clone());
 
-        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE).unwrap();
+        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE)?;
 
         let mut account_after_delta = account.clone();
-        account_after_delta.apply_delta(&delta).unwrap();
+        account_after_delta.apply_delta(&delta)?;
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
@@ -1046,15 +1024,13 @@ mod tests {
                     conn,
                     &(&account).into(),
                     &delta,
-                )
-                .unwrap();
+                )?;
                 let storage_maps = SqliteStore::get_account_storage_maps_for_delta(
                     conn,
                     &(&account).into(),
                     &delta,
-                )
-                .unwrap();
-                let tx = conn.transaction().unwrap();
+                )?;
+                let tx = conn.transaction()?;
 
                 SqliteStore::apply_account_delta(
                     &tx,
@@ -1063,23 +1039,27 @@ mod tests {
                     fungible_assets,
                     storage_maps,
                     &delta,
-                )
-                .unwrap();
+                )?;
 
-                tx.commit().unwrap();
+                tx.commit()?;
                 Ok(())
             })
-            .await
-            .unwrap();
+            .await?;
 
-        let updated_account: Account = store.get_account(account_id).await.unwrap().unwrap().into();
+        let updated_account: Account = store
+            .get_account(account_id)
+            .await?
+            .context("failed to find inserted account")?
+            .into();
 
         assert_eq!(updated_account, account_after_delta);
         assert!(updated_account.vault().is_empty());
-        assert_eq!(updated_account.storage().get_item(1).unwrap(), EMPTY_WORD);
+        assert_eq!(updated_account.storage().get_item(1)?, EMPTY_WORD);
         let StorageSlot::Map(ref updated_map) = updated_account.storage().slots()[2] else {
             panic!("Expected map slot");
         };
         assert_eq!(updated_map.entries().count(), 0);
+
+        Ok(())
     }
 }
