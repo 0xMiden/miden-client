@@ -35,8 +35,8 @@ impl WebClient {
                     return Err(JsValue::from_str(&format!(
                         "Invalid export type: {}. Expected one of: Id | Full | Details",
                         if other.is_empty() { "<empty>" } else { other }
-                    )))
-                }
+                    )));
+                },
             };
 
             let note_file = output_note.into_note_file(&export_type).map_err(|err| {
