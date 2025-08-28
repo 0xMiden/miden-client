@@ -593,6 +593,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_transactions(
         &self,
         filter: TransactionFilter,
@@ -711,6 +715,13 @@ where
 
     /// Proves the specified transaction using a local prover, submits it to the network, and saves
     /// the transaction into the local database for tracking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Transaction proving fails
+    /// - Network submission fails
+    /// - Database storage fails
     pub async fn submit_transaction(
         &mut self,
         tx_result: TransactionResult,
@@ -720,6 +731,13 @@ where
 
     /// Proves the specified transaction using the provided prover, submits it to the network, and
     /// saves the transaction into the local database for tracking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Transaction proving fails
+    /// - Network submission fails
+    /// - Database storage fails
     pub async fn submit_transaction_with_prover(
         &mut self,
         tx_result: TransactionResult,

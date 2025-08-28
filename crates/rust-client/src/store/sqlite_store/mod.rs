@@ -60,6 +60,13 @@ impl SqliteStore {
     // --------------------------------------------------------------------------------------------
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The database pool cannot be created
+    /// - The database connection fails
+    /// - Database initialization fails
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
         let sqlite_pool_manager = SqlitePoolManager::new(database_filepath.clone());
         let pool = Pool::builder(sqlite_pool_manager)
@@ -331,6 +338,10 @@ impl Store for SqliteStore {
 ///
 /// `Sqlite` uses `i64` as its internal representation format, and so when retrieving
 /// we need to make sure we cast as `u64` to get the original value
+///
+/// # Errors
+///
+/// Returns an error if the column value cannot be retrieved or converted.
 pub fn column_value_as_u64<I: rusqlite::RowIndex>(
     row: &rusqlite::Row<'_>,
     index: I,

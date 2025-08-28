@@ -148,6 +148,11 @@ impl TransactionRequest {
     /// In this context "own notes" refers to notes that are expected to be created directly by the
     /// transaction script, rather than notes that are created as a result of consuming other
     /// notes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if a recipient is not found in the expected output recipients map
+    /// (which should never happen if the transaction request is properly constructed).
     pub fn expected_output_own_notes(&self) -> Vec<Note> {
         match &self.script_template {
             Some(TransactionScriptTemplate::SendNotes(notes)) => notes

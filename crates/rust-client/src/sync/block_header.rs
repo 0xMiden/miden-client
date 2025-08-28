@@ -16,6 +16,13 @@ use crate::{Client, ClientError};
 impl<AUTH> Client<AUTH> {
     /// Attempts to retrieve the genesis block from the store. If not found,
     /// it requests it from the node and store it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The store operation fails
+    /// - The node request fails
+    /// - The genesis block cannot be retrieved or stored
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
         let genesis = match self.store.get_block_header_by_num(0.into()).await? {
             Some((block, _)) => block,

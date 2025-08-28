@@ -33,6 +33,10 @@ impl ForeignAccount {
     /// Creates a new [`ForeignAccount::Public`]. The account's components (code, storage header and
     /// inclusion proof) will be retrieved at execution time, alongside particular storage slot
     /// maps correspondent to keys passed in `indices`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the account ID is not a public account.
     pub fn public(
         account_id: AccountId,
         storage_requirements: AccountStorageRequirements,
@@ -46,6 +50,10 @@ impl ForeignAccount {
 
     /// Creates a new [`ForeignAccount::Private`]. A proof of the account's inclusion will be
     /// retrieved at execution time.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the account ID is a public account.
     pub fn private(account: impl Into<PartialAccount>) -> Result<Self, TransactionRequestError> {
         let partial_account: PartialAccount = account.into();
         if partial_account.id().is_public() {
