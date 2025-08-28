@@ -52,7 +52,7 @@ compile_error!("features `sqlite` and `idxdb` are mutually exclusive");
 #[cfg(feature = "sqlite")]
 pub mod sqlite_store;
 
-#[cfg(feature = "idxdb")]
+#[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
 pub mod web_store;
 
 mod account;

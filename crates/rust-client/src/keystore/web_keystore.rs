@@ -1,3 +1,5 @@
+#![cfg(all(feature = "idxdb", target_arch = "wasm32"))]
+
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -8,6 +10,7 @@ use rand::Rng;
 
 use super::KeyStoreError;
 use crate::auth::{AuthSecretKey, TransactionAuthenticator};
+#[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
 use crate::store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth};
 use crate::utils::RwLock;
 use crate::{AuthenticationError, Felt, Word};
@@ -20,12 +23,13 @@ pub struct WebKeyStore<R: Rng> {
     rng: Arc<RwLock<R>>,
 }
 
-impl<R: Rng> WebKeyStore<R> {
+impl<R: Rng + Send + Sync> WebKeyStore<R> {
     /// Creates a new instance of the web keystore with the provided RNG.
     pub fn new(rng: R) -> Self {
         WebKeyStore { rng: Arc::new(RwLock::new(rng)) }
     }
 
+    #[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match &key {
             AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()).to_hex(),
@@ -39,6 +43,7 @@ impl<R: Rng> WebKeyStore<R> {
         Ok(())
     }
 
+    #[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
     pub async fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         let pub_key_str = pub_key.to_hex();
         let secret_key_hex = get_account_auth_by_pub_key(pub_key_str).await.map_err(|err| {
@@ -57,7 +62,7 @@ impl<R: Rng> WebKeyStore<R> {
     }
 }
 
-impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
+impl<R: Rng + Send + Sync> TransactionAuthenticator for WebKeyStore<R> {
     /// Gets a signature over a message, given a public key.
     ///
     /// The public key should correspond to one of the keys tracked by the keystore.

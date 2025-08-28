@@ -4,16 +4,12 @@ use core::ops::{Deref, DerefMut};
 
 use api_client_wrapper::{ApiClient, InnerClient};
 use miden_objects::Word;
-use tonic::metadata::AsciiMetadataValue;
-use tonic::metadata::errors::InvalidMetadataValue;
+// (no additional tonic metadata imports needed here)
 
 // WEB CLIENT
 // ================================================================================================
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
-compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
-
-#[cfg(feature = "web-tonic")]
+#[cfg(all(feature = "web-tonic", target_arch = "wasm32"))]
 pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
@@ -35,12 +31,9 @@ pub(crate) mod api_client_wrapper {
         pub async fn new_client(
             endpoint: String,
             _timeout_ms: u64,
-            genesis_commitment: Option<Word>,
+            _genesis_commitment: Option<Word>,
         ) -> Result<ApiClient, RpcError> {
-            let mut wasm_client = WasmClient::new(endpoint);
-            // Pre-set default headers if supported (wasm client exposes set_header)
-            let accept = accept_header_value(genesis_commitment);
-            wasm_client.set_header("accept", accept);
+            let wasm_client = WasmClient::new(endpoint);
             Ok(ApiClient(ProtoClient::new(wasm_client)))
         }
     }
@@ -49,7 +42,7 @@ pub(crate) mod api_client_wrapper {
 // CLIENT
 // ================================================================================================
 
-#[cfg(feature = "tonic")]
+#[cfg(all(feature = "tonic", not(target_arch = "wasm32")))]
 pub(crate) mod api_client_wrapper {
     use alloc::boxed::Box;
     use alloc::string::String;

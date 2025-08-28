@@ -15,7 +15,7 @@ mod fs_keystore;
 #[cfg(feature = "std")]
 pub use fs_keystore::FilesystemKeyStore;
 
-#[cfg(feature = "idxdb")]
+#[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
 mod web_keystore;
-#[cfg(feature = "idxdb")]
+#[cfg(all(feature = "idxdb", target_arch = "wasm32"))]
 pub use web_keystore::WebKeyStore;
