@@ -127,9 +127,8 @@ impl GrpcError {
     /// <https://github.com/grpc/grpc/blob/master/doc/statuscodes.md#status-codes-and-their-use-in-grpc>
     pub fn from_code(code: i32, message: Option<String>) -> Self {
         match code {
-            0 => Self::Unknown("OK status received as error".to_string()),
             1 => Self::Cancelled,
-            2 => Self::Unknown(message.unwrap_or_else(|| "Unknown error".to_string())),
+            2 => Self::Unknown(message.unwrap_or_default()),
             3 => Self::InvalidArgument,
             4 => Self::DeadlineExceeded,
             5 => Self::NotFound,
