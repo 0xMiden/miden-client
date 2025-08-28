@@ -431,37 +431,6 @@ impl NodeRpcClient for TonicRpcClient {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::boxed::Box;
-
-    use super::TonicRpcClient;
-    use crate::rpc::{Endpoint, NodeRpcClient};
-
-    fn assert_send_sync<T: Send + Sync>() {}
-
-    #[test]
-    fn is_send_sync() {
-        assert_send_sync::<TonicRpcClient>();
-        assert_send_sync::<Box<dyn NodeRpcClient>>();
-    }
-
-    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
-    async fn dyn_trait_send_fut(client: Box<dyn NodeRpcClient>) {
-        // This won't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
-        let res = client.get_block_header_by_number(None, false).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn future_is_send() {
-        let endpoint = &Endpoint::devnet();
-        let client = TonicRpcClient::new(endpoint, 10000);
-        let client: Box<TonicRpcClient> = client.into();
-        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
-    }
-}
-
 // ERRORS
 // ================================================================================================
 
@@ -499,5 +468,36 @@ impl From<&Status> for GrpcError {
             tonic::Code::Unauthenticated => GrpcError::Unauthenticated,
             _ => GrpcError::Unknown(format!("{:?}: {}", status.code(), status.message())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::boxed::Box;
+
+    use super::TonicRpcClient;
+    use crate::rpc::{Endpoint, NodeRpcClient};
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn is_send_sync() {
+        assert_send_sync::<TonicRpcClient>();
+        assert_send_sync::<Box<dyn NodeRpcClient>>();
+    }
+
+    // Function that returns a `Send` future from a dynamic trait that must be `Sync`.
+    async fn dyn_trait_send_fut(client: Box<dyn NodeRpcClient>) {
+        // This won't compile if `get_block_header_by_number` doesn't return a `Send+Sync` future.
+        let res = client.get_block_header_by_number(None, false).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn future_is_send() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+        let client: Box<TonicRpcClient> = client.into();
+        tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
     }
 }
