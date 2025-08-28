@@ -30,7 +30,7 @@ impl From<NoteIdAndArgs> for (NativeNoteId, Option<NativeNoteArgs>) {
 
 impl From<&NoteIdAndArgs> for (NativeNoteId, Option<NativeNoteArgs>) {
     fn from(note_id_and_args: &NoteIdAndArgs) -> Self {
-        let native_note_id: NativeNoteId = note_id_and_args.note_id.clone().into();
+        let native_note_id: NativeNoteId = note_id_and_args.note_id.into();
         let native_args: Option<NativeNoteArgs> =
             note_id_and_args.args.clone().map(|args| args.clone().into());
         (native_note_id, native_args)

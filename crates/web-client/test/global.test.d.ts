@@ -15,6 +15,7 @@ import {
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
+  Endpoint,
   Felt,
   FeltArray,
   ForeignAccount,
@@ -28,6 +29,7 @@ import {
   NoteExecutionMode,
   NoteFilter,
   NoteFilterTypes,
+  NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
   NoteInputs,
@@ -39,6 +41,7 @@ import {
   OutputNotesArray,
   PublicKey,
   Rpo256,
+  RpcClient,
   SecretKey,
   Signature,
   SigningInputs,
@@ -87,6 +90,7 @@ declare global {
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
+    Endpoint: typeof Endpoint;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
     ForeignAccount: typeof ForeignAccount;
@@ -103,6 +107,7 @@ declare global {
     NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFilterTypes: typeof NoteFilterTypes;
+    NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
     NoteInputs: typeof NoteInputs;
@@ -133,6 +138,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
     createClient: () => Promise<void>;

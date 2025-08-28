@@ -63,7 +63,7 @@ use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder};
 use miden_tx::TransactionExecutorError;
-use miden_tx::utils::{Deserializable, Serializable, word_to_masm_push_string};
+use miden_tx::utils::{Deserializable, Serializable};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
 
@@ -2080,7 +2080,7 @@ async fn storage_and_vault_proofs() {
         .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into());
 
     let bump_item_component = AccountComponent::compile(
-        BUMP_MAP_CODE.replace("{map_key}", word_to_masm_push_string(&MAP_KEY.into()).as_str()),
+        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
         TransactionKernel::assembler(),
         vec![StorageSlot::Map(storage_map)],
     )
@@ -2093,7 +2093,7 @@ async fn storage_and_vault_proofs() {
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
             LibraryPath::new("external_contract::bump_item_contract").unwrap(),
-            BUMP_MAP_CODE.replace("{map_key}", word_to_masm_push_string(&MAP_KEY.into()).as_str()),
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
             &source_manager,
         )
         .unwrap();

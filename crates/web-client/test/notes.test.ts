@@ -81,8 +81,35 @@ describe("get_input_note", () => {
   it("retrieve an input note that does exist", async () => {
     const { consumedNoteId } = await setupConsumedNote();
 
+    // Test both the existing client method and new RpcClient
     const { noteId } = await getInputNote(consumedNoteId);
     expect(noteId).to.equal(consumedNoteId);
+
+    // Test RpcClient.getNotesById
+    const rpcResult = await testingPage.evaluate(
+      async (_consumedNoteId: string) => {
+        // NOTE: this assumes the node is running on localhost
+        const endpoint = new window.Endpoint("http://localhost:57291");
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const noteId = window.NoteId.fromHex(_consumedNoteId);
+        const fetchedNotes = await rpcClient.getNotesById([noteId]);
+
+        return fetchedNotes.map((note) => ({
+          noteId: note.noteId.toString(),
+          hasMetadata: !!note.metadata,
+          noteType: note.noteType,
+          hasInputNote: !!note.inputNote,
+        }));
+      },
+      consumedNoteId
+    );
+
+    // Assert on FetchedNote properties
+    expect(rpcResult).to.have.lengthOf(1);
+    expect(rpcResult[0].noteId).to.equal(consumedNoteId);
+    expect(rpcResult[0].hasMetadata).to.be.true;
+    expect(rpcResult[0].hasInputNote).to.be.false; // Private notes don't include input_note
   });
 });
 
