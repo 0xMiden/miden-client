@@ -112,6 +112,12 @@ pub enum GrpcError {
     Unimplemented,
     #[error("unauthenticated request")]
     Unauthenticated,
+    #[error("operation was aborted")]
+    Aborted,
+    #[error("operation was attempted past the valid range")]
+    OutOfRange,
+    #[error("unrecoverable data loss or corruption")]
+    DataLoss,
     #[error("unknown error: {0}")]
     Unknown(String),
 }
@@ -131,12 +137,12 @@ impl GrpcError {
             7 => Self::PermissionDenied,
             8 => Self::ResourceExhausted,
             9 => Self::FailedPrecondition,
-            10 => Self::Unknown(message.unwrap_or_else(|| "Aborted".to_string())),
-            11 => Self::Unknown(message.unwrap_or_else(|| "Out of range".to_string())),
+            10 => Self::Aborted,
+            11 => Self::OutOfRange,
             12 => Self::Unimplemented,
             13 => Self::Internal,
             14 => Self::Unavailable,
-            15 => Self::Unknown(message.unwrap_or_else(|| "Data loss".to_string())),
+            15 => Self::DataLoss,
             16 => Self::Unauthenticated,
             _ => Self::Unknown(
                 message.unwrap_or_else(|| format!("Unknown gRPC status code: {code}")),
