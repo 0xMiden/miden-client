@@ -46,6 +46,7 @@ pub mod auth_secret_key;
 pub mod basic_fungible_faucet_component;
 pub mod block_header;
 pub mod consumable_note_record;
+pub mod endpoint;
 pub mod executed_transaction;
 pub mod felt;
 pub mod foreign_account;

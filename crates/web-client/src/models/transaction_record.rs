@@ -55,6 +55,11 @@ impl TransactionRecord {
     pub fn transaction_status(&self) -> TransactionStatus {
         self.0.status.clone().into()
     }
+
+    #[wasm_bindgen(js_name = "creationTimestamp")]
+    pub fn creation_timestamp(&self) -> u64 {
+        self.0.details.creation_timestamp
+    }
 }
 
 // CONVERSIONS

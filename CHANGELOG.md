@@ -16,9 +16,9 @@
 * [BREAKING] Changed `OnNoteReceived` from closure to trait object ([#1080](https://github.com/0xMiden/miden-client/pull/1080)).
 * [BREAKING] `insertAccountRecord` changed the order of some parameters [(#1068)](https://github.com/0xMiden/miden-client/pull/1068).
 * The rust-client has now a simple TypeScript setup for its JS code [(#1068)](https://github.com/0xMiden/miden-client/pull/1068).
-* Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107)
-* Account related records are now directly stored as Uint8Arrays instead of using Blobs, this fixes a bug with Webkit-based browsers [(#1137)](https://github.com/0xMiden/miden-client/pull/1137)
-* Exposes additional `TransactionFilter` filters in Web Client ([#1114](https://github.com/0xMiden/miden-client/pull/1114))
+* Exposed signatures and serialization for public keys and secret keys [(#1107)](https://github.com/0xMiden/miden-client/pull/1107).
+* Account related records are now directly stored as Uint8Arrays instead of using Blobs, this fixes a bug with Webkit-based browsers [(#1137)](https://github.com/0xMiden/miden-client/pull/1137).
+* Exposes additional `TransactionFilter` filters in Web Client ([#1114](https://github.com/0xMiden/miden-client/pull/1114)).
 * Refactored internal structure of account vault and storage Sqlite tables ([#1128](https://github.com/0xMiden/miden-client/pull/1128)).
 * [BREAKING] Fixed `createP2IDNote` and `createP2IDENote` convenience functions in the Web Client ([#1142](https://github.com/0xMiden/miden-client/pull/1142)).
 * [BREAKING] Use typescript for web_store files: transactions.js & sync.js; add some utils to avoid error-related boilerplate [(#1151)](https://github.com/0xMiden/miden-client/pull/1151). Breaking change: `upsertTransactionRecord` has changed the order of its parameters.
@@ -26,11 +26,14 @@
 * [BREAKING] Rename `export/importNote` to `export/importNoteFile`, expose serialization functions for `Note` in Web Client ([#1159](https://github.com/0xMiden/miden-client/pull/1159)).
 * Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111)).
 * Added support for `MockRpcApi` to web client ([#1096](https://github.com/0xMiden/miden-client/pull/1096)).
-* [BREAKING] The WASM import has been changed into an async function to avoid issues with top-level awaits and some vite projects. ([#1172])(<https://github.com/0xMiden/miden-client/pull/1172>)
+* [BREAKING] The WASM import has been changed into an async function to avoid issues with top-level awaits and some vite projects. ([#1172])(<https://github.com/0xMiden/miden-client/pull/1172>).
 * Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
-* Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111))
+* Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111)).
 * Every JS file under `rust-client's` `web store` is now using Typescript ([#1171](https://github.com/0xMiden/miden-client/pull/1171)).
 * [BREAKING] Removed `AccountId` to bech32 conversions and the `get_account_state_delta` RPC endpoint  ([#1177](https://github.com/0xMiden/miden-client/pull/1177)).
+* Store changes after transaction execution no longer require fetching the whole account state ([#1147](https://github.com/0xMiden/miden-client/pull/1147)).
+* Tracked creation and committed timestamps for `TransactionRecord` ([#1173](https://github.com/0xMiden/miden-client/pull/1173)).
+* [BREAKING] Changed `exportNoteFile` to fail fast on invalid export type ([#1198](https://github.com/0xMiden/miden-client/pull/1198)).
 
 ### Features
 
@@ -41,9 +44,10 @@
 * [BREAKING] Added genesis commitment header to `TonicRpcClient` requests (#1045).
 * Added authentication arguments support to `TransactionRequest` ([#1121](https://github.com/0xMiden/miden-client/pull/1121)).
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
-* Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141))
-* Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115))
-* Added `SigningInputs` to Web Client ([#1160](https://github.com/0xMiden/miden-client/pull/1160))
+* Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141)).
+* Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115)).
+* Added `SigningInputs` to Web Client ([#1160](https://github.com/0xMiden/miden-client/pull/1160)).
+* Added an `RpcClient` to the Web Client, with a `getNotesById` call ([#1191](https://github.com/0xMiden/miden-client/pull/1191)).
 
 ## 0.10.1 (2025-07-26)
 
