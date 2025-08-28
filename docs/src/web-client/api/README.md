@@ -6,6 +6,7 @@
 
 ## Enumerations
 
+- [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
@@ -88,6 +89,7 @@
 - [SerializedOutputNoteData](classes/SerializedOutputNoteData.md)
 - [SerializedTransactionData](classes/SerializedTransactionData.md)
 - [Signature](classes/Signature.md)
+- [SigningInputs](classes/SigningInputs.md)
 - [SlotAndKeys](classes/SlotAndKeys.md)
 - [StorageMap](classes/StorageMap.md)
 - [StorageSlot](classes/StorageSlot.md)

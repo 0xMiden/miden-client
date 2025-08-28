@@ -43,6 +43,7 @@ miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
 
 # External dependencies
+anyhow                = { workspace = true }
 async-trait           = { workspace = true }
 base64                = { optional = true, version = "0.22" }
 chrono                = { optional = false, version = "0.4" }

@@ -1,7 +1,4 @@
 # Ignore generated build files, eventually we should
 # add the whole js folder here.
 js
-!js/chainData.js
-!js/export.js
-!js/import.js
 tsconfig.tsbuildinfo

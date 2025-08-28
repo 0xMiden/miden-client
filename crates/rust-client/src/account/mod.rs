@@ -45,6 +45,7 @@ use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
 // ================================================================================================
 pub use miden_objects::{
     AccountIdError,
+    AddressError,
     NetworkIdError,
     account::{
         Account,
@@ -61,6 +62,7 @@ pub use miden_objects::{
         StorageMap,
         StorageSlot,
     },
+    address::{AccountIdAddress, Address, AddressInterface, AddressType},
 };
 
 use super::Client;

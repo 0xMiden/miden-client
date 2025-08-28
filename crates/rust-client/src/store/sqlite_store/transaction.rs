@@ -135,13 +135,13 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
 
-        let updated_fungible_assets = Self::relevant_fungible_assets(
+        let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
             conn,
             &executed_transaction.initial_account().into(),
             executed_transaction.account_delta(),
         )?;
 
-        let updated_storage_maps = Self::relevant_storage_maps(
+        let updated_storage_maps = Self::get_account_storage_maps_for_delta(
             conn,
             &executed_transaction.initial_account().into(),
             executed_transaction.account_delta(),

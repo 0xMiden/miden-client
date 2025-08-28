@@ -29,6 +29,8 @@
 * [BREAKING] The WASM import has been changed into an async function to avoid issues with top-level awaits and some vite projects. ([#1172])(<https://github.com/0xMiden/miden-client/pull/1172>)
 * Added the `miden-client-integration-tests` binary for running integration tests against a remote node ([#1075](https://github.com/0xMiden/miden-client/pull/1075)).
 * Added a `exportAccount` method in Web Client ([#1111](https://github.com/0xMiden/miden-client/pull/1111))
+* Every JS file under `rust-client's` `web store` is now using Typescript ([#1171](https://github.com/0xMiden/miden-client/pull/1171)).
+* [BREAKING] Removed `AccountId` to bech32 conversions and the `get_account_state_delta` RPC endpoint  ([#1177](https://github.com/0xMiden/miden-client/pull/1177)).
 * Store changes after transaction execution no longer require fetching the whole account state ([#1147](https://github.com/0xMiden/miden-client/pull/1147)).
 * Add support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164))
 
@@ -43,6 +45,7 @@
 * Added bindings for retrieving storage `AccountDelta` in the web client ([#1098](https://github.com/0xMiden/miden-client/pull/1098)).
 * Added `multicall` support for the CLI ([#1141](https://github.com/0xMiden/miden-client/pull/1141))
 * Added `TransactionSummary`, `AccountDelta`, and `BasicFungibleFaucet` types to Web Client ([#1115](https://github.com/0xMiden/miden-client/pull/1115))
+* Added `SigningInputs` to Web Client ([#1160](https://github.com/0xMiden/miden-client/pull/1160))
 
 ## 0.10.1 (2025-07-26)
 
