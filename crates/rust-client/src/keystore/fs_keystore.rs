@@ -31,6 +31,11 @@ pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
 }
 
 impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
+    /// Creates a new [`FilesystemKeyStore`] with the specified RNG.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the keys directory cannot be created.
     pub fn with_rng(keys_directory: PathBuf, rng: R) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
             std::fs::create_dir_all(&keys_directory).map_err(|err| {
@@ -45,6 +50,12 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     }
 
     /// Adds a secret key to the keystore.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The key file cannot be created or written to
+    /// - There is an I/O error while writing the key
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match key {
             AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()),
@@ -72,6 +83,13 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     }
 
     /// Retrieves a secret key from the keystore given its public key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The key file cannot be opened or read
+    /// - The key data cannot be decoded from hex
+    /// - The key bytes cannot be deserialized
     pub fn get_key(&self, pub_key: Word) -> Result<Option<AuthSecretKey>, KeyStoreError> {
         let filename = hash_pub_key(pub_key);
 
@@ -107,6 +125,10 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
 // type annotations.
 impl FilesystemKeyStore<rand::rngs::StdRng> {
     /// Creates a new [`FilesystemKeyStore`] using [`rand::rngs::StdRng`] as the RNG.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the keys directory cannot be created.
     pub fn new(keys_directory: PathBuf) -> Result<Self, KeyStoreError> {
         use rand::rngs::StdRng;
         let rng = StdRng::from_os_rng();

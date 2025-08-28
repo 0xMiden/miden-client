@@ -190,6 +190,10 @@ pub struct TransactionResult {
 impl TransactionResult {
     /// Screens the output notes to store and track the relevant ones, and instantiates a
     /// [`TransactionResult`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction result cannot be created.
     pub fn new(
         transaction: ExecutedTransaction,
         future_notes: Vec<(NoteDetails, NoteTag)>,
@@ -389,6 +393,11 @@ pub enum DiscardCause {
 }
 
 impl DiscardCause {
+    /// Converts a string to a [`DiscardCause`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DeserializationError` if the string does not match any known discard cause.
     pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
         match cause {
             "Expired" => Ok(DiscardCause::Expired),

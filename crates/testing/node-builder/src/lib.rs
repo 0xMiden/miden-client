@@ -86,6 +86,20 @@ impl NodeBuilder {
     // --------------------------------------------------------------------------------------------
 
     /// Starts all node components and returns a handle to manage them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tracing setup fails
+    /// - Genesis account creation fails
+    /// - File operations fail
+    /// - Any of the node components fail to start
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if:
+    /// - The current timestamp is before the Unix epoch
+    /// - The timestamp cannot fit into a u32
     #[allow(clippy::too_many_lines)]
     pub async fn start(self) -> Result<NodeHandle> {
         miden_node_utils::logging::setup_tracing(
@@ -340,6 +354,10 @@ pub struct NodeHandle {
 
 impl NodeHandle {
     /// Stops all node components.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the node components fail to stop properly.
     pub async fn stop(self) -> Result<()> {
         self.rpc_handle.abort();
         self.block_producer_handle.abort();

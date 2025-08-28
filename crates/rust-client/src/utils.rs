@@ -62,6 +62,15 @@ pub enum TokenParseError {
 
 /// Converts a decimal number, represented as a string, into an integer by shifting
 /// the decimal point to the right by a specified number of decimal places.
+///
+/// # Errors
+///
+/// Returns a `TokenParseError` if:
+/// - The number of decimals exceeds the maximum allowed
+/// - The string contains multiple decimal points
+/// - The string contains invalid number format
+/// - The fractional part has too many decimal places
+/// - The resulting value would overflow a u64
 pub fn tokens_to_base_units(decimal_str: &str, n_decimals: u8) -> Result<u64, TokenParseError> {
     if n_decimals > BasicFungibleFaucet::MAX_DECIMALS {
         return Err(TokenParseError::MaxDecimals(n_decimals));

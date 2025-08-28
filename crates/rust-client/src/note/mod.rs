@@ -131,6 +131,13 @@ where
     /// The note screener runs a series of checks to determine whether the note can be executed as
     /// part of a transaction for a specific account. If the specific account ID can consume it (ie,
     /// if it's compatible with the account), it will be returned as part of the result list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The store operation fails
+    /// - Note conversion fails
+    /// - The note screening process fails
     pub async fn get_consumable_notes(
         &self,
         account_id: Option<AccountId>,
@@ -163,6 +170,12 @@ where
     /// The note screener runs a series of checks to determine whether the note can be executed as
     /// part of a transaction for a specific account. If the specific account ID can consume it (ie,
     /// if it's compatible with the account), it will be returned as part of the result list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Note conversion fails
+    /// - The note screening process fails
     pub async fn get_note_consumability(
         &self,
         note: InputNoteRecord,
@@ -175,6 +188,10 @@ where
     }
 
     /// Retrieves the input note given a [`NoteId`]. Returns `None` if the note is not found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_input_note(
         &self,
         note_id: NoteId,
@@ -186,6 +203,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Returns output notes managed by this client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_output_notes(
         &self,
         filter: NoteFilter,
@@ -194,6 +215,10 @@ where
     }
 
     /// Retrieves the output note given a [`NoteId`]. Returns `None` if the note is not found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_output_note(
         &self,
         note_id: NoteId,
@@ -210,6 +235,11 @@ where
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
+///
+/// # Panics
+///
+/// This function will panic if the internal logic fails (which should never happen as the vector
+/// is guaranteed to have exactly one element at the point of unwrapping).
 pub async fn get_input_note_with_id_prefix<AUTH>(
     client: &Client<AUTH>,
     note_id_prefix: &str,

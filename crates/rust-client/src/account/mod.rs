@@ -215,6 +215,10 @@ impl<AUTH> Client<AUTH> {
     /// statuses.
     ///
     /// Said accounts' state is the state after the last performed sync.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_account_headers(
         &self,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, ClientError> {
@@ -224,6 +228,10 @@ impl<AUTH> Client<AUTH> {
     /// Retrieves a full [`AccountRecord`] object for the specified `account_id`. This result
     /// represents data for the latest state known to the client, alongside its status. Returns
     /// `None` if the account ID is not found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_account(
         &self,
         account_id: AccountId,
@@ -235,6 +243,10 @@ impl<AUTH> Client<AUTH> {
     /// Returns `None` if the account ID is not found.
     ///
     /// Said account's state is the state according to the last sync performed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_account_header_by_id(
         &self,
         account_id: AccountId,
@@ -355,6 +367,11 @@ pub mod tests {
         accounts
     }
 
+    /// Tests the ability to add accounts to the client.
+    ///
+    /// # Panics
+    ///
+    /// This test will panic if the assertions fail or if the test client cannot be created.
     #[tokio::test]
     pub async fn try_add_account() {
         // generate test client
