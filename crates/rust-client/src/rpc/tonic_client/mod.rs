@@ -453,21 +453,7 @@ impl RpcError {
 
 impl From<&Status> for GrpcError {
     fn from(status: &Status) -> Self {
-        match status.code() {
-            tonic::Code::NotFound => GrpcError::NotFound,
-            tonic::Code::InvalidArgument => GrpcError::InvalidArgument,
-            tonic::Code::PermissionDenied => GrpcError::PermissionDenied,
-            tonic::Code::AlreadyExists => GrpcError::AlreadyExists,
-            tonic::Code::ResourceExhausted => GrpcError::ResourceExhausted,
-            tonic::Code::FailedPrecondition => GrpcError::FailedPrecondition,
-            tonic::Code::Cancelled => GrpcError::Cancelled,
-            tonic::Code::DeadlineExceeded => GrpcError::DeadlineExceeded,
-            tonic::Code::Unavailable => GrpcError::Unavailable,
-            tonic::Code::Internal => GrpcError::Internal,
-            tonic::Code::Unimplemented => GrpcError::Unimplemented,
-            tonic::Code::Unauthenticated => GrpcError::Unauthenticated,
-            _ => GrpcError::Unknown(format!("{:?}: {}", status.code(), status.message())),
-        }
+        GrpcError::from_code(status.code() as i32, Some(status.message().to_string()))
     }
 }
 

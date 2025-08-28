@@ -116,11 +116,40 @@ pub enum GrpcError {
     Unknown(String),
 }
 
+impl GrpcError {
+    /// Creates a `GrpcError` from a gRPC status code following the official specification
+    /// <https://github.com/grpc/grpc/blob/master/doc/statuscodes.md#status-codes-and-their-use-in-grpc>
+    pub fn from_code(code: i32, message: Option<String>) -> Self {
+        match code {
+            0 => Self::Unknown("OK status received as error".to_string()),
+            1 => Self::Cancelled,
+            2 => Self::Unknown(message.unwrap_or_else(|| "Unknown error".to_string())),
+            3 => Self::InvalidArgument,
+            4 => Self::DeadlineExceeded,
+            5 => Self::NotFound,
+            6 => Self::AlreadyExists,
+            7 => Self::PermissionDenied,
+            8 => Self::ResourceExhausted,
+            9 => Self::FailedPrecondition,
+            10 => Self::Unknown(message.unwrap_or_else(|| "Aborted".to_string())),
+            11 => Self::Unknown(message.unwrap_or_else(|| "Out of range".to_string())),
+            12 => Self::Unimplemented,
+            13 => Self::Internal,
+            14 => Self::Unavailable,
+            15 => Self::Unknown(message.unwrap_or_else(|| "Data loss".to_string())),
+            16 => Self::Unauthenticated,
+            _ => Self::Unknown(
+                message.unwrap_or_else(|| format!("Unknown gRPC status code: {code}")),
+            ),
+        }
+    }
+}
+
 // ACCEPT HEADER ERROR
 // ================================================================================================
 
 // TODO: Once the node returns structure error information, replace this with a more structure
-// approach.
+// approach. See miden-client/#1129 for more information.
 
 /// Errors that can occur during accept header validation.
 #[derive(Debug, Error)]
