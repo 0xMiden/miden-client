@@ -240,32 +240,35 @@ impl SqliteStore {
         // modified.
         Self::copy_account_state(tx, init_account_state, final_account_state)?;
 
-        // Apply vault delta. This map will contain all updated assets, both fungible and
-        // non-fungible.
-        let mut updated_assets: BTreeMap<AccountIdPrefix, Asset> = BTreeMap::new();
+        // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
+        // fungible and non-fungible.
+        let mut updated_assets: BTreeMap<Word, Asset> = BTreeMap::new();
+        let mut removed_vault_keys: Vec<Word> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
         for (faucet_id, delta) in delta.vault().fungible().iter() {
             let delta_asset = FungibleAsset::new(*faucet_id, delta.unsigned_abs())?;
 
-            match updated_fungible_assets.remove(&faucet_id.prefix()) {
+            let asset = match updated_fungible_assets.remove(&faucet_id.prefix()) {
                 Some(asset) => {
                     // If the asset exists, update it accordingly.
                     if *delta >= 0 {
-                        updated_assets
-                            .insert(faucet_id.prefix(), Asset::Fungible(asset.add(delta_asset)?));
+                        asset.add(delta_asset)?
                     } else {
-                        updated_assets
-                            .insert(faucet_id.prefix(), Asset::Fungible(asset.sub(delta_asset)?));
+                        asset.sub(delta_asset)?
                     }
                 },
                 None => {
                     // If the asset doesn't exist, we add it to the map to be inserted.
-                    if *delta > 0 {
-                        updated_assets.insert(faucet_id.prefix(), Asset::Fungible(delta_asset));
-                    }
+                    delta_asset
                 },
+            };
+
+            if asset.amount() > 0 {
+                updated_assets.insert(asset.vault_key(), Asset::Fungible(asset));
+            } else {
+                removed_vault_keys.push(asset.vault_key());
             }
         }
 
@@ -279,20 +282,23 @@ impl SqliteStore {
         updated_assets.extend(
             added_nonfungible_assets
                 .into_iter()
-                .map(|(asset, _)| (asset.faucet_id_prefix(), Asset::NonFungible(*asset))),
+                .map(|(asset, _)| (asset.vault_key(), Asset::NonFungible(*asset))),
         );
 
+        removed_vault_keys
+            .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
+
         const DELETE_QUERY: &str =
-            "DELETE FROM account_vaults WHERE root = ? AND faucet_id_prefix IN rarray(?)";
+            "DELETE FROM account_vaults WHERE root = ? AND vault_key IN rarray(?)";
 
         tx.execute(
             DELETE_QUERY,
             params![
                 final_account_state.vault_root().to_hex(),
                 Rc::new(
-                    removed_nonfungible_assets
-                        .iter()
-                        .map(|(asset, _)| Value::Text(asset.faucet_id_prefix().to_hex()))
+                    removed_vault_keys
+                        .into_iter()
+                        .map(|k| Value::from(k.to_hex()))
                         .collect::<Vec<Value>>(),
                 ),
             ],
@@ -400,11 +406,13 @@ impl SqliteStore {
             const VAULT_QUERY: &str = "
                 INSERT OR IGNORE INTO account_vaults (
                     root,
+                    vault_key,
                     faucet_id_prefix,
                     asset
                 )
                 SELECT
                     ?, --new root
+                    vault_key,
                     faucet_id_prefix,
                     asset
                 FROM account_vaults
@@ -615,11 +623,12 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         for asset in assets {
             const QUERY: &str =
-                insert_sql!(account_vaults { root, faucet_id_prefix, asset } | REPLACE);
+                insert_sql!(account_vaults { root, vault_key, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![
                     root.to_hex(),
+                    asset.vault_key().to_hex(),
                     asset.faucet_id_prefix().to_hex(),
                     Word::from(asset).to_hex(),
                 ],
@@ -815,11 +824,35 @@ fn query_account_headers(
 
 #[cfg(test)]
 mod tests {
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_objects::EMPTY_WORD;
-    use miden_objects::account::{AccountCode, AccountComponent};
-    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+    use std::collections::BTreeMap;
+    use std::vec::Vec;
 
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::account::components::basic_wallet_library;
+    use miden_objects::account::{
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountComponent,
+        AccountDelta,
+        AccountHeader,
+        AccountId,
+        AccountStorageDelta,
+        AccountType,
+        AccountVaultDelta,
+        StorageMap,
+        StorageSlot,
+    };
+    use miden_objects::asset::{Asset, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails};
+    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+    };
+    use miden_objects::testing::constants::NON_FUNGIBLE_ASSET_DATA;
+    use miden_objects::{EMPTY_WORD, ONE, ZERO};
+
+    use crate::store::Store;
     use crate::store::sqlite_store::SqliteStore;
     use crate::store::sqlite_store::tests::create_test_store;
 
@@ -870,5 +903,183 @@ mod tests {
             })
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_apply_account_delta_additions() {
+        let store = create_test_store().await;
+
+        let dummy_component = AccountComponent::new(
+            basic_wallet_library(),
+            vec![StorageSlot::empty_value(), StorageSlot::empty_map()],
+        )
+        .unwrap()
+        .with_supports_all_types();
+
+        // Create and insert an account
+        let (account, seed) = AccountBuilder::new([0; 32])
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_component(dummy_component)
+            .build()
+            .unwrap();
+        store.insert_account(&account, Some(seed)).await.unwrap();
+
+        let mut storage_delta = AccountStorageDelta::new();
+        storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
+        storage_delta.set_map_item(2, [ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into());
+
+        let vault_delta = AccountVaultDelta::from_iters(
+            vec![
+                FungibleAsset::new(
+                    AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap(),
+                    100,
+                )
+                .unwrap()
+                .into(),
+                NonFungibleAsset::new(
+                    &NonFungibleAssetDetails::new(
+                        AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)
+                            .unwrap()
+                            .prefix(),
+                        NON_FUNGIBLE_ASSET_DATA.into(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap()
+                .into(),
+            ],
+            [],
+        );
+
+        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE).unwrap();
+
+        let mut account_after_delta = account.clone();
+        account_after_delta.apply_delta(&delta).unwrap();
+
+        let account_id = account.id();
+        let final_state: AccountHeader = (&account_after_delta).into();
+
+        store
+            .interact_with_connection(move |conn| {
+                let tx = conn.transaction().unwrap();
+
+                SqliteStore::apply_account_delta(
+                    &tx,
+                    &account.into(),
+                    &final_state,
+                    BTreeMap::default(),
+                    BTreeMap::default(),
+                    &delta,
+                )
+                .unwrap();
+
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let updated_account: Account = store.get_account(account_id).await.unwrap().unwrap().into();
+
+        assert_eq!(updated_account, account_after_delta);
+    }
+
+    #[tokio::test]
+    async fn test_apply_account_delta_removals() {
+        let store = create_test_store().await;
+
+        let mut dummy_map = StorageMap::new();
+        dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into());
+
+        let dummy_component = AccountComponent::new(
+            basic_wallet_library(),
+            vec![StorageSlot::Value([ZERO, ZERO, ZERO, ONE].into()), StorageSlot::Map(dummy_map)],
+        )
+        .unwrap()
+        .with_supports_all_types();
+
+        // Create and insert an account
+        let assets: Vec<Asset> = vec![
+            FungibleAsset::new(
+                AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap(),
+                100,
+            )
+            .unwrap()
+            .into(),
+            NonFungibleAsset::new(
+                &NonFungibleAssetDetails::new(
+                    AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET).unwrap().prefix(),
+                    NON_FUNGIBLE_ASSET_DATA.into(),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .into(),
+        ];
+        let account = AccountBuilder::new([0; 32])
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_component(dummy_component)
+            .with_assets(assets.clone())
+            .build_existing()
+            .unwrap();
+        store.insert_account(&account, None).await.unwrap();
+
+        let mut storage_delta = AccountStorageDelta::new();
+        storage_delta.set_item(1, EMPTY_WORD);
+        storage_delta.set_map_item(2, [ONE, ZERO, ZERO, ZERO].into(), EMPTY_WORD);
+
+        let vault_delta = AccountVaultDelta::from_iters([], assets.clone());
+
+        let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE).unwrap();
+
+        let mut account_after_delta = account.clone();
+        account_after_delta.apply_delta(&delta).unwrap();
+
+        let account_id = account.id();
+        let final_state: AccountHeader = (&account_after_delta).into();
+
+        store
+            .interact_with_connection(move |conn| {
+                let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
+                    conn,
+                    &(&account).into(),
+                    &delta,
+                )
+                .unwrap();
+                let storage_maps = SqliteStore::get_account_storage_maps_for_delta(
+                    conn,
+                    &(&account).into(),
+                    &delta,
+                )
+                .unwrap();
+                let tx = conn.transaction().unwrap();
+
+                SqliteStore::apply_account_delta(
+                    &tx,
+                    &account.into(),
+                    &final_state,
+                    fungible_assets,
+                    storage_maps,
+                    &delta,
+                )
+                .unwrap();
+
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let updated_account: Account = store.get_account(account_id).await.unwrap().unwrap().into();
+
+        assert_eq!(updated_account, account_after_delta);
+        assert!(updated_account.vault().is_empty());
+        assert_eq!(updated_account.storage().get_item(1).unwrap(), EMPTY_WORD);
+        let StorageSlot::Map(ref updated_map) = updated_account.storage().slots()[2] else {
+            panic!("Expected map slot");
+        };
+        assert_eq!(updated_map.entries().count(), 0);
     }
 }
