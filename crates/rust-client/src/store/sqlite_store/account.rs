@@ -139,23 +139,26 @@ impl SqliteStore {
         account: &Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
-        let mut merkle_store = merkle_store.write();
         let tx = conn.transaction()?;
 
         Self::insert_account_code(&tx, account.code())?;
 
-        insert_storage_map_nodes(&mut merkle_store, account.storage());
         Self::insert_storage_slots(
             &tx,
             account.storage().commitment(),
             account.storage().slots().iter().enumerate(),
         )?;
 
-        insert_asset_nodes(&mut merkle_store, account.vault());
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
 
-        Ok(tx.commit()?)
+        tx.commit()?;
+
+        let mut merkle_store = merkle_store.write();
+        insert_storage_map_nodes(&mut merkle_store, account.storage());
+        insert_asset_nodes(&mut merkle_store, account.vault());
+
+        Ok(())
     }
 
     pub(crate) fn update_account(
