@@ -307,28 +307,31 @@ impl SqliteStore {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<Option<(Word, MerklePath)>, StoreError> {
+    ) -> Result<(Word, MerklePath), StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let Some((root, map)) = query_storage_maps(
+        let Some(slot) = query_storage_slots(
             conn,
-            "root = (SELECT slot_value FROM account_storage WHERE commitment = ? AND slot_index = ?) AND key = ?",
-            params![header.storage_commitment().to_hex(), index, key.to_hex()],
+            "commitment = ? AND slot_index = ?",
+            params![header.storage_commitment().to_hex(), index],
         )?
-        .into_iter()
-        .next() else {
-            return Ok(None);
+        .remove(&index) else {
+            return Err(StoreError::AccountStorageNotFound(header.storage_commitment()));
+        };
+
+        let StorageSlot::Map(map) = slot else {
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };
 
         let item = map.get(&key);
 
         let merkle_store = merkle_store.read();
 
-        let merkle_path = get_storage_map_item_proof(&merkle_store, root, key)?;
+        let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
 
-        Ok(Some((item, merkle_path)))
+        Ok((item, merkle_path))
     }
 
     // ACCOUNT DELTA HELPERS

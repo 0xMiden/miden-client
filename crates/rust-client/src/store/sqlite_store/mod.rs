@@ -391,7 +391,7 @@ impl Store for SqliteStore {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<Option<(Word, MerklePath)>, StoreError> {
+    ) -> Result<(Word, MerklePath), StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {

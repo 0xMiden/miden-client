@@ -25,7 +25,6 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::Word;
 use miden_objects::account::{
     Account,
     AccountCode,
@@ -40,6 +39,7 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
+use miden_objects::{AccountError, Word};
 
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -362,16 +362,16 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<Option<(Word, MerklePath)>, StoreError> {
+    ) -> Result<(Word, MerklePath), StoreError> {
         let storage = self.get_account_storage(account_id).await?;
         let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
-            return Ok(None);
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };
 
         let value = map.get(&key);
         let path = map.open(&key).into_parts().0;
 
-        Ok(Some((value, path)))
+        Ok((value, path))
     }
 }
 
