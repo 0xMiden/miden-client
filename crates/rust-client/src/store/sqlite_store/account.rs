@@ -171,6 +171,12 @@ impl SqliteStore {
         Ok(tx.commit()?)
     }
 
+    /// Inserts or updates code for a foreign account and ensures its code bytes are stored.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database operation fails (e.g., statement execution fails or
+    /// a transaction cannot be committed).
     pub fn upsert_foreign_account_code(
         conn: &mut Connection,
         account_id: AccountId,
@@ -187,6 +193,16 @@ impl SqliteStore {
         Ok(tx.commit()?)
     }
 
+    /// Retrieves code for the given list of account IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading rows or parsing stored values fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the query is constructed incorrectly with binding parameters; this is unreachable
+    /// in production since the query is static and validated by tests.
     pub fn get_foreign_account_code(
         conn: &mut Connection,
         account_ids: Vec<AccountId>,

@@ -393,6 +393,11 @@ pub enum DiscardCause {
 }
 
 impl DiscardCause {
+    /// Parses a discard cause from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input string doesn't match a known variant.
     pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
         match cause {
             "Expired" => Ok(DiscardCause::Expired),
@@ -710,6 +715,10 @@ where
 
     /// Proves the specified transaction using a local prover, submits it to the network, and saves
     /// the transaction into the local database for tracking.
+    /// # Errors
+    ///
+    /// Returns an error if proving the transaction or submitting to the node fails, or if
+    /// applying the local store update fails.
     pub async fn submit_transaction(
         &mut self,
         tx_result: TransactionResult,
@@ -719,6 +728,9 @@ where
 
     /// Proves the specified transaction using the provided prover, submits it to the network, and
     /// saves the transaction into the local database for tracking.
+    /// # Errors
+    ///
+    /// Returns an error if proving or submitting fails, or if updating the store fails.
     pub async fn submit_transaction_with_prover(
         &mut self,
         tx_result: TransactionResult,
@@ -730,6 +742,9 @@ where
     }
 
     /// Proves the specified transaction result using the provided prover.
+    /// # Errors
+    ///
+    /// Returns an error if the provided prover fails to generate a proof.
     async fn prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
@@ -745,6 +760,9 @@ where
         Ok(proven_transaction)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the RPC client fails to submit the transaction.
     async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
@@ -756,6 +774,10 @@ where
         Ok(block_num)
     }
 
+    /// # Errors
+    ///
+    /// Returns an error if the account is locked, a duplicate commitment is detected, or
+    /// persisting the transaction updates to the store fails.
     async fn apply_transaction(
         &self,
         submission_height: BlockNumber,
@@ -1089,6 +1111,10 @@ where
     /// transactions that are guaranteed to fail. Some of the validations include:
     /// - That the account has enough balance to cover the outgoing assets.
     /// - That the client is not too far behind the chain tip.
+    /// # Errors
+    ///
+    /// Returns an error if RPC calls to fetch the chain tip fail, if the account cannot be
+    /// found, or if balance validations fail.
     pub async fn validate_request(
         &mut self,
         account_id: AccountId,
@@ -1265,6 +1291,11 @@ where
 
 #[cfg(feature = "testing")]
 impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
+    /// Proves a transaction and returns the resulting [`ProvenTransaction`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if proving the transaction fails.
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
@@ -1272,6 +1303,11 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         self.prove_transaction(tx_result, self.tx_prover.clone()).await
     }
 
+    /// Submits a previously proven transaction to the network and returns the block number.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the submission fails.
     pub async fn testing_submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
@@ -1279,6 +1315,15 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         self.submit_proven_transaction(proven_transaction).await
     }
 
+    /// Applies transaction effects locally using the client's current sync height.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if persisting to the store fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if querying the sync height fails unexpectedly during tests.
     pub async fn testing_apply_transaction(
         &self,
         tx_result: TransactionResult,

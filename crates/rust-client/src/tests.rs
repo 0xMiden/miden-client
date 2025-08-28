@@ -109,6 +109,11 @@ const TX_GRACEFUL_BLOCKS: u32 = 20;
 // HELPERS
 // ================================================================================================
 
+/// Creates a test client builder and associated test RPC and keystore.
+///
+/// # Panics
+///
+/// Panics in tests if the `SQLite` store or keystore cannot be created.
 pub async fn create_test_client_builder()
 -> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
@@ -136,6 +141,11 @@ pub async fn create_test_client_builder()
     (builder, rpc_api, keystore)
 }
 
+/// Creates a fully initialized test client with a prebuilt mock chain.
+///
+/// # Panics
+///
+/// Panics in tests if building the client or syncing the genesis state fails.
 pub async fn create_test_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
@@ -145,6 +155,11 @@ pub async fn create_test_client()
     (client, rpc_api, keystore)
 }
 
+/// Builds a mock chain with a few committed notes and transactions for testing.
+///
+/// # Panics
+///
+/// Panics in tests if proving blocks or building transactions fails.
 pub async fn create_prebuilt_mock_chain() -> MockChain {
     let mut mock_chain_builder = MockChainBuilder::new();
     let mock_account = mock_chain_builder

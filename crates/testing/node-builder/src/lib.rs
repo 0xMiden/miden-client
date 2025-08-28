@@ -86,6 +86,16 @@ impl NodeBuilder {
     // --------------------------------------------------------------------------------------------
 
     /// Starts all node components and returns a handle to manage them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any component fails to bind to its port, fails to start serving,
+    /// bootstrapping the store fails, or if any component task returns an error.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the system clock is before the Unix epoch or if the current timestamp does
+    /// not fit into `u32`. These are considered unreachable on supported systems.
     #[allow(clippy::too_many_lines)]
     pub async fn start(self) -> Result<NodeHandle> {
         miden_node_utils::logging::setup_tracing(
@@ -340,6 +350,11 @@ pub struct NodeHandle {
 
 impl NodeHandle {
     /// Stops all node components.
+    ///
+    /// # Errors
+    ///
+    /// This function does not return an error; it awaits task termination after aborting them and
+    /// always returns `Ok(())`.
     pub async fn stop(self) -> Result<()> {
         self.rpc_handle.abort();
         self.block_producer_handle.abort();

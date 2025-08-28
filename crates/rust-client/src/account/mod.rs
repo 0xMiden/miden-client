@@ -368,6 +368,10 @@ pub mod tests {
     }
 
     #[tokio::test]
+    /// # Panics
+    ///
+    /// Panics if the client creation fails or if adding accounts does not produce the expected
+    /// results during this test.
     pub async fn try_add_account() {
         // generate test client
         let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;

@@ -74,6 +74,12 @@ impl MockRpcApi {
 
     /// Advances the mock chain by proving the next block, committing all pending objects to the
     /// chain in the process.
+    /// Creates and commits the next block in the mock chain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mock chain cannot prove the next block, which is only expected in tests with
+    /// intentionally invalid state.
     pub fn prove_block(&self) {
         let proven_block = self.mock_chain.write().prove_next_block().unwrap();
         let mut account_commitment_updates = self.account_commitment_updates.write();
@@ -211,6 +217,12 @@ impl MockRpcApi {
         self.mock_chain.read().committed_notes().values().cloned().collect()
     }
 
+    /// Advances the mock chain by the given number of blocks.
+    ///
+    /// # Panics
+    ///
+    /// Panics if block proving fails, which is only expected in tests with intentionally invalid
+    /// state.
     pub fn advance_blocks(&self, num_blocks: u32) {
         let current_height = self.get_chain_tip_block_num();
         let mut mock_chain = self.mock_chain.write();

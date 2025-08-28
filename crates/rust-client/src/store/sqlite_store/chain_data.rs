@@ -161,6 +161,11 @@ impl SqliteStore {
         Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
+    /// Inserts MMR authentication nodes into the Partial Blockchain nodes table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database transaction fails.
     pub fn insert_partial_blockchain_nodes(
         conn: &mut Connection,
         nodes: &[(InOrderIndex, Word)],
@@ -216,6 +221,11 @@ impl SqliteStore {
 
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
+    /// Removes block headers with no client notes and not referenced by state sync.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database transaction fails.
     pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 

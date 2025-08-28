@@ -56,6 +56,12 @@ pub const RECALL_HEIGHT_DELTA: u32 = 50;
 ///
 /// Creates the client builder using the provided `ClientConfig`. The store uses a `SQLite` database
 /// at a temporary location determined by the store config.
+/// Creates a `TestClient` builder and keystore.
+///
+/// # Errors
+///
+/// Returns an error if the `SQLite` store or keystore cannot be created, or if the auth path
+/// cannot be converted to string.
 pub async fn create_test_client_builder(
     client_config: ClientConfig,
 ) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
@@ -95,6 +101,11 @@ pub async fn create_test_client_builder(
 /// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
 /// at a temporary location determined by the store config. The client is synced to the
 /// current state before being returned.
+/// Creates a `TestClient`.
+///
+/// # Errors
+///
+/// Returns an error if building the client or syncing state fails.
 pub async fn create_test_client(
     client_config: ClientConfig,
 ) -> Result<(TestClient, TestClientKeyStore)> {
@@ -108,6 +119,11 @@ pub async fn create_test_client(
 }
 
 /// Inserts a new wallet account into the client and into the keystore.
+/// Inserts a new wallet account into the client and into the keystore.
+///
+/// # Errors
+///
+/// Returns an error if adding the account to the client fails.
 pub async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
@@ -120,6 +136,15 @@ pub async fn insert_new_wallet(
 }
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
+/// Inserts a new wallet account built with the provided seed into the client and into the keystore.
+///
+/// # Errors
+///
+/// Returns an error if adding the account to the client fails.
+///
+/// # Panics
+///
+/// Panics if inserting a key into the keystore fails in tests.
 pub async fn insert_new_wallet_with_seed(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
@@ -145,6 +170,15 @@ pub async fn insert_new_wallet_with_seed(
 }
 
 /// Inserts a new fungible faucet account into the client and into the keystore.
+/// Inserts a new fungible faucet account into the client and into the keystore.
+///
+/// # Errors
+///
+/// Returns an error if adding the account to the client fails.
+///
+/// # Panics
+///
+/// Panics if inserting a key into the keystore fails in tests.
 pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
@@ -176,6 +210,11 @@ pub async fn insert_new_fungible_faucet(
 }
 
 /// Executes a transaction and asserts that it fails with the expected error.
+/// Executes a transaction and asserts that it fails with the expected error.
+///
+/// # Panics
+///
+/// Panics if the transaction succeeds or returns an unexpected error.
 pub async fn execute_failing_tx(
     client: &mut TestClient,
     account_id: AccountId,
@@ -194,6 +233,11 @@ pub async fn execute_failing_tx(
 }
 
 /// Executes a transaction and returns the transaction ID.
+/// Executes a transaction and returns the transaction ID.
+///
+/// # Panics
+///
+/// Panics if the transaction fails unexpectedly.
 pub async fn execute_tx(
     client: &mut TestClient,
     account_id: AccountId,
@@ -211,6 +255,11 @@ pub async fn execute_tx(
 }
 
 /// Executes a transaction and waits for it to be committed.
+/// Executes a transaction and waits for it to be committed.
+///
+/// # Errors
+///
+/// Returns an error if syncing or querying the transaction status fails.
 pub async fn execute_tx_and_sync(
     client: &mut TestClient,
     account_id: AccountId,
@@ -222,6 +271,11 @@ pub async fn execute_tx_and_sync(
 }
 
 /// Syncs the client and waits for the transaction to be committed.
+/// Syncs the client and waits for the transaction to be committed.
+///
+/// # Errors
+///
+/// Returns an error if syncing fails or if the transaction lookup fails.
 pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId) -> Result<()> {
     // wait until tx is committed
     let now = Instant::now();
@@ -277,6 +331,11 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
 }
 
 /// Syncs until `amount_of_blocks` have been created onchain compared to client's sync height
+/// Syncs until `amount_of_blocks` have been created onchain compared to client's sync height
+///
+/// # Panics
+///
+/// Panics if querying the sync height or syncing fails unexpectedly in tests.
 pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> SyncSummary {
     let current_block = client.get_sync_height().await.unwrap();
     let final_block = current_block + amount_of_blocks;
@@ -326,6 +385,11 @@ pub const MINT_AMOUNT: u64 = 1000;
 pub const TRANSFER_AMOUNT: u64 = 59;
 
 /// Sets up a basic client and returns two basic accounts and a faucet account (in that order).
+/// Sets up a basic client and returns two basic accounts and a faucet account (in that order).
+///
+/// # Errors
+///
+/// Returns an error if any client interaction fails.
 pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
@@ -373,6 +437,11 @@ pub async fn setup_two_wallets_and_faucet(
 }
 
 /// Sets up a basic client and returns a basic account and a faucet account.
+/// Sets up a basic client and returns a basic account and a faucet account.
+///
+/// # Errors
+///
+/// Returns an error if any client interaction fails.
 pub async fn setup_wallet_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
@@ -391,6 +460,12 @@ pub async fn setup_wallet_and_faucet(
 
 /// Mints a note from `faucet_account_id` for `basic_account_id` and returns the executed
 /// transaction ID and the note with [`MINT_AMOUNT`] units of the corresponding fungible asset.
+/// Mints a note from `faucet_account_id` for `basic_account_id` and returns the executed
+/// transaction ID and the note with [`MINT_AMOUNT`] units of the corresponding fungible asset.
+///
+/// # Panics
+///
+/// Panics if building the mint request fails or if reading expected notes fails unexpectedly.
 pub async fn mint_note(
     client: &mut TestClient,
     basic_account_id: AccountId,
@@ -412,6 +487,12 @@ pub async fn mint_note(
 
 /// Executes a transaction that consumes the provided notes and returns the transaction ID.
 /// This assumes the notes contain assets.
+/// Executes a transaction that consumes the provided notes and returns the transaction ID.
+/// This assumes the notes contain assets.
+///
+/// # Panics
+///
+/// Panics if building or executing the request fails unexpectedly.
 pub async fn consume_notes(
     client: &mut TestClient,
     account_id: AccountId,
@@ -425,6 +506,11 @@ pub async fn consume_notes(
 }
 
 /// Asserts that the account has a single asset with the expected amount.
+/// Asserts that the account has a single asset with the expected amount.
+///
+/// # Panics
+///
+/// Panics if retrieving or inspecting the account fails.
 pub async fn assert_account_has_single_asset(
     client: &TestClient,
     account_id: AccountId,
@@ -445,6 +531,11 @@ pub async fn assert_account_has_single_asset(
 }
 
 /// Tries to consume the note and asserts that the expected error is returned.
+/// Tries to consume the note and asserts that the expected error is returned.
+///
+/// # Panics
+///
+/// Panics if consuming the note succeeds or returns an unexpected error.
 pub async fn assert_note_cannot_be_consumed_twice(
     client: &mut TestClient,
     consuming_account_id: AccountId,
@@ -468,6 +559,11 @@ pub async fn assert_note_cannot_be_consumed_twice(
 }
 
 /// Creates a transaction request that mints assets for each `target_id` account.
+/// Creates a transaction request that mints assets for each `target_id` account.
+///
+/// # Panics
+///
+/// Panics if building the request fails unexpectedly.
 pub fn mint_multiple_fungible_asset(
     asset: FungibleAsset,
     target_id: &[AccountId],
@@ -496,6 +592,12 @@ pub fn mint_multiple_fungible_asset(
 
 /// Executes a transaction and consumes the resulting unauthenticated notes immediately without
 /// waiting for the first transaction to be committed.
+/// Executes a transaction and consumes the resulting unauthenticated notes immediately without
+/// waiting for the first transaction to be committed.
+///
+/// # Panics
+///
+/// Panics if building or executing the requests fails unexpectedly.
 pub async fn execute_tx_and_consume_output_notes(
     tx_request: TransactionRequest,
     client: &mut TestClient,
@@ -519,6 +621,12 @@ pub async fn execute_tx_and_consume_output_notes(
 
 /// Mints assets for the target account and consumes them immediately without waiting for the first
 /// transaction to be committed.
+/// Mints assets for the target account and consumes them immediately without waiting for the first
+/// transaction to be committed.
+///
+/// # Panics
+///
+/// Panics if building or executing the request fails unexpectedly.
 pub async fn mint_and_consume(
     client: &mut TestClient,
     basic_account_id: AccountId,

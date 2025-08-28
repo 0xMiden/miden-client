@@ -122,6 +122,11 @@ impl StateSync {
     /// * `note_tags` - The note tags to be used in the sync state request.
     /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
+    ///   Performs state synchronization with the node and returns the updates to apply to the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if RPC communication fails or applying MMR changes fails.
     pub async fn sync_state(
         self,
         current_partial_blockchain: PartialBlockchain,

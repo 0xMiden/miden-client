@@ -100,6 +100,11 @@ struct SerializedTransactionParts {
 
 impl SqliteStore {
     /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+    /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if reading rows or deserializing stored values fails.
     pub fn get_transactions(
         conn: &mut Connection,
         filter: &TransactionFilter,
@@ -127,6 +132,16 @@ impl SqliteStore {
     }
 
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
+    /// Inserts the transaction record and applies all associated state updates atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any database operation fails during the transaction.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the system time is unexpectedly before Unix epoch when computing
+    /// the creation timestamp, which is considered unreachable.
     pub fn apply_transaction(
         conn: &mut Connection,
         tx_update: &TransactionStoreUpdate,

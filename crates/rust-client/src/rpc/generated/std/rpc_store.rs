@@ -257,6 +257,8 @@ pub mod rpc_client {
         missing_docs,
         clippy::wildcard_imports,
         clippy::let_unit_value,
+        clippy::missing_errors_doc,
+        clippy::missing_panics_doc,
     )]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;

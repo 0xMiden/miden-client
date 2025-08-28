@@ -125,6 +125,11 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 
 impl proto::account::AccountHeader {
     #[cfg(any(feature = "tonic", feature = "web-tonic"))]
+    /// Converts a protobuf `AccountHeader` into the domain [`AccountHeader`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if required fields are missing or cannot be deserialized.
     pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
         use miden_objects::Felt;
 
@@ -167,8 +172,13 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
     /// the response or `known_account_codes`, an error is returned.
     ///
     /// # Errors
-    /// - If account code is missing both on `self` and `known_account_codes`
-    /// - If data cannot be correctly deserialized
+    /// - Returns an error if account code is missing both on `self` and `known_account_codes`.
+    /// - Returns an error if data cannot be correctly deserialized.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if a storage slot index exceeds 255, which is unreachable due to protocol
+    /// constraints.
     #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(
         self,

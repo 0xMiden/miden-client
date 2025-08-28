@@ -26,6 +26,11 @@ fn main() {
 }
 
 /// Builds a component template and stores it under `{OUT_DIR}/templates`.
+///
+/// # Panics
+///
+/// Panics if the metadata file cannot be read or parsed, if the `OUT_DIR` environment variable is
+/// not set, or if writing output files fails. This build script expects a valid project layout.
 pub fn build_component_template(metadata_path: &Path, library: Library) {
     let toml_string = fs::read_to_string(metadata_path).expect("failed to read file");
 

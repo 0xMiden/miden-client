@@ -14,7 +14,6 @@ pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
     use miden_objects::Word;
-    use super::accept_header_value;
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
@@ -50,8 +49,6 @@ pub(crate) mod api_client_wrapper {
 
     use miden_objects::Word;
     use tonic::transport::Channel;
-
-    use super::accept_header_value;
     use crate::rpc::RpcError;
     use crate::rpc::generated::rpc::api_client::ApiClient as ProtoClient;
 
@@ -66,7 +63,7 @@ pub(crate) mod api_client_wrapper {
         pub async fn new_client(
             endpoint: String,
             timeout_ms: u64,
-            genesis_commitment: Option<Word>,
+            _genesis_commitment: Option<Word>,
         ) -> Result<ApiClient, RpcError> {
             // Setup connection channel.
             let endpoint = tonic::transport::Endpoint::try_from(endpoint)

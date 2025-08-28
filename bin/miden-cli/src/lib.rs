@@ -146,6 +146,17 @@ pub enum Command {
 
 /// CLI entry point.
 impl Cli {
+    /// Executes the CLI command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading configuration fails, the client cannot be built, RPC calls
+    /// fail, or command execution fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the store path cannot be represented as a string; this should be unreachable
+    /// in supported environments.
     pub async fn execute(&self) -> Result<(), CliError> {
         let mut current_dir = std::env::current_dir()?;
         current_dir.push(CLIENT_CONFIG_FILE_NAME);
