@@ -126,7 +126,7 @@ pub enum GrpcError {
 #[derive(Debug, Error)]
 pub enum AcceptHeaderError {
     #[error("server rejected request - please check your version and network settings")]
-    UnsupportedMediaRange,
+    NoSupportedMediaRange,
     #[error("server rejected request - parsing error: {0}")]
     ParsingError(String),
 }
@@ -138,7 +138,7 @@ impl AcceptHeaderError {
         if message.contains(
             "server does not support any of the specified application/vnd.miden content types",
         ) {
-            return Some(Self::UnsupportedMediaRange);
+            return Some(Self::NoSupportedMediaRange);
         }
         if message.contains("genesis value failed to parse")
             || message.contains("version value failed to parse")

@@ -389,8 +389,9 @@ pub async fn incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     // because the genesis commitment in the request header does not match the one in the node.
     let result = client.test_rpc_api().get_block_header_by_number(None, false).await;
 
-    match result.unwrap_err() {
-        RpcError::AcceptHeaderError(AcceptHeaderError::UnsupportedMediaRange) => Ok(()),
-        _ => panic!("expected accept header error"),
+    match result {
+        Err(RpcError::AcceptHeaderError(AcceptHeaderError::NoSupportedMediaRange)) => Ok(()),
+        Ok(_) => anyhow::bail!("grpc request was unexpectedly successful"),
+        _ => anyhow::bail!("expected accept header error"),
     }
 }
