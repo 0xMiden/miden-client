@@ -289,7 +289,7 @@ impl SqliteStore {
             .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
 
         const DELETE_QUERY: &str =
-            "DELETE FROM account_vaults WHERE root = ? AND vault_key IN rarray(?)";
+            "DELETE FROM account_assets WHERE root = ? AND vault_key IN rarray(?)";
 
         tx.execute(
             DELETE_QUERY,
@@ -404,7 +404,7 @@ impl SqliteStore {
 
         if init_account_header.vault_root() != final_account_header.vault_root() {
             const VAULT_QUERY: &str = "
-                INSERT OR IGNORE INTO account_vaults (
+                INSERT OR IGNORE INTO account_assets (
                     root,
                     vault_key,
                     faucet_id_prefix,
@@ -415,7 +415,7 @@ impl SqliteStore {
                     vault_key,
                     faucet_id_prefix,
                     asset
-                FROM account_vaults
+                FROM account_assets
                 WHERE root = (SELECT vault_root FROM accounts WHERE account_commitment = ?)
                 ";
             tx.execute(
@@ -623,7 +623,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         for asset in assets {
             const QUERY: &str =
-                insert_sql!(account_vaults { root, vault_key, faucet_id_prefix, asset } | REPLACE);
+                insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![
@@ -754,7 +754,7 @@ fn query_vault_assets(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<Asset>, StoreError> {
-    const VAULT_QUERY: &str = "SELECT asset FROM account_vaults";
+    const VAULT_QUERY: &str = "SELECT asset FROM account_assets";
 
     let query = format!("{VAULT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)?
