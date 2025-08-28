@@ -467,7 +467,7 @@ mod tests {
 
 impl RpcError {
     pub fn from_grpc_error(endpoint: NodeRpcClientEndpoint, status: Status) -> Self {
-        if let Some(accept_error) = AcceptHeaderError::try_from_message(&status.message()) {
+        if let Some(accept_error) = AcceptHeaderError::try_from_message(status.message()) {
             return Self::AcceptHeaderError(accept_error);
         }
 
