@@ -26,11 +26,11 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get output notes"))?
                 .ok_or(JsValue::from_str("No output note found"))?;
 
-            // Fail fast on unspecified/invalid export type instead of defaulting
             let export_type = match export_type.as_str() {
                 "Id" => NoteExportType::NoteId,
                 "Full" => NoteExportType::NoteWithProof,
                 "Details" => NoteExportType::NoteDetails,
+                // Fail fast on unspecified/invalid export type instead of defaulting
                 other => {
                     return Err(JsValue::from_str(&format!(
                         "Invalid export type: {}. Expected one of: Id | Full | Details",
