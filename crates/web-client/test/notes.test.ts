@@ -62,24 +62,21 @@ test.describe("get_input_note", () => {
     expect(noteId).toEqual(consumedNoteId);
 
     // Test RpcClient.getNotesById
-    const rpcResult = await page.evaluate(
-      async (_consumedNoteId: string) => {
-        // NOTE: this assumes the node is running on localhost
-        const endpoint = new window.Endpoint("http://localhost:57291");
-        const rpcClient = new window.RpcClient(endpoint);
+    const rpcResult = await page.evaluate(async (_consumedNoteId: string) => {
+      // NOTE: this assumes the node is running on localhost
+      const endpoint = new window.Endpoint("http://localhost:57291");
+      const rpcClient = new window.RpcClient(endpoint);
 
-        const noteId = window.NoteId.fromHex(_consumedNoteId);
-        const fetchedNotes = await rpcClient.getNotesById([noteId]);
+      const noteId = window.NoteId.fromHex(_consumedNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteId]);
 
-        return fetchedNotes.map((note) => ({
-          noteId: note.noteId.toString(),
-          hasMetadata: !!note.metadata,
-          noteType: note.noteType,
-          hasInputNote: !!note.inputNote,
-        }));
-      },
-      consumedNoteId
-    );
+      return fetchedNotes.map((note) => ({
+        noteId: note.noteId.toString(),
+        hasMetadata: !!note.metadata,
+        noteType: note.noteType,
+        hasInputNote: !!note.inputNote,
+      }));
+    }, consumedNoteId);
 
     // Assert on FetchedNote properties
     expect(rpcResult).toHaveLength(1);
