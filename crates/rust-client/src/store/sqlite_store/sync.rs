@@ -173,6 +173,7 @@ impl SqliteStore {
         for account in account_updates.updated_public_accounts() {
             Self::update_account_state(&tx, &mut merkle_store, account)?;
         }
+        drop(merkle_store);
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
             Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;

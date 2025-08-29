@@ -194,6 +194,7 @@ impl SqliteStore {
             updated_storage_maps,
             executed_transaction.account_delta(),
         )?;
+        drop(merkle_store);
 
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;

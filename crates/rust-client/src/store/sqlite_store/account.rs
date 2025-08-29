@@ -312,16 +312,14 @@ impl SqliteStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let Some(slot) = query_storage_slots(
+        let StorageSlot::Map(map) = query_storage_slots(
             conn,
             "commitment = ? AND slot_index = ?",
             params![header.storage_commitment().to_hex(), index],
         )?
-        .remove(&index) else {
-            return Err(StoreError::AccountStorageNotFound(header.storage_commitment()));
-        };
-
-        let StorageSlot::Map(map) = slot else {
+        .remove(&index)
+        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
+        else {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };
 
