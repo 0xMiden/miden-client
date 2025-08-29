@@ -4,7 +4,8 @@ This guide demonstrates how to import accounts, notes, and store data using the 
 
 ## Importing Accounts
 
-### Importing an Account from Account File
+### Importing an Account from an Account File
+
 
 To import an account that was previously exported:
 
