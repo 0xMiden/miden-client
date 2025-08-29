@@ -30,7 +30,6 @@ rand        = { workspace = true }
 regex       = { version = "1.0" }
 serde       = { features = ["derive"], version = "1.0" }
 tokio       = { workspace = true }
-url         = { version = "2.5.4" }
 
 [build-dependencies]
 proc-macro2 = "1.0"
