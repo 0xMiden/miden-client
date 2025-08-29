@@ -9,10 +9,12 @@ use miden_client::testing::common::*;
 use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{InputNote, PaymentNoteDescription, TransactionRequestBuilder};
 use rand::RngCore;
+use test_case_marker::test_case;
 
 // TESTS
 // ================================================================================================
 
+#[test_case]
 pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     // Client 1 is an private faucet which will mint an onchain note for client 2
     let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await?;
@@ -139,6 +141,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await?;
     let (mut client_2, keystore_2) =
@@ -310,6 +313,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await?;
     let (mut client_2, keystore_2) =
@@ -377,6 +381,7 @@ pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let (builder, _) = create_test_client_builder(client_config).await?;
     let mut client = builder.build().await?;

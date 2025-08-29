@@ -12,13 +12,7 @@ use miden_client::testing::config::ClientConfig;
 use regex::Regex;
 use url::Url;
 
-use crate::tests::client::*;
-use crate::tests::custom_transaction::*;
-use crate::tests::fpi::*;
-use crate::tests::network_transaction::*;
-use crate::tests::onchain::*;
-use crate::tests::swap_transaction::*;
-
+mod generated_tests;
 mod tests;
 
 // MAIN
@@ -31,7 +25,7 @@ mod tests;
 fn main() {
     let args = Args::parse();
 
-    let all_tests = get_all_tests();
+    let all_tests = generated_tests::get_all_tests();
     let filtered_tests = filter_tests(all_tests, &args);
 
     if args.list {
@@ -211,95 +205,6 @@ impl AsRef<str> for TestCategory {
             TestCategory::SwapTransaction => "swap_transaction",
         }
     }
-}
-
-/// Returns all available test cases organized by category.
-///
-/// This function defines the complete list of integration tests available in the test suite,
-/// categorized by functionality area.
-fn get_all_tests() -> Vec<TestCase> {
-    vec![
-        // CLIENT tests
-        TestCase::new(
-            "client_builder_initializes_client_with_endpoint",
-            TestCategory::Client,
-            client_builder_initializes_client_with_endpoint,
-        ),
-        TestCase::new("multiple_tx_on_same_block", TestCategory::Client, multiple_tx_on_same_block),
-        TestCase::new("import_expected_notes", TestCategory::Client, import_expected_notes),
-        TestCase::new(
-            "import_expected_note_uncommitted",
-            TestCategory::Client,
-            import_expected_note_uncommitted,
-        ),
-        TestCase::new(
-            "import_expected_notes_from_the_past_as_committed",
-            TestCategory::Client,
-            import_expected_notes_from_the_past_as_committed,
-        ),
-        TestCase::new("get_account_update", TestCategory::Client, get_account_update),
-        TestCase::new("sync_detail_values", TestCategory::Client, sync_detail_values),
-        TestCase::new(
-            "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
-            TestCategory::Client,
-            multiple_transactions_can_be_committed_in_different_blocks_without_sync,
-        ),
-        TestCase::new(
-            "consume_multiple_expected_notes",
-            TestCategory::Client,
-            consume_multiple_expected_notes,
-        ),
-        TestCase::new(
-            "import_consumed_note_with_proof",
-            TestCategory::Client,
-            import_consumed_note_with_proof,
-        ),
-        TestCase::new(
-            "import_consumed_note_with_id",
-            TestCategory::Client,
-            import_consumed_note_with_id,
-        ),
-        TestCase::new("import_note_with_proof", TestCategory::Client, import_note_with_proof),
-        TestCase::new("discarded_transaction", TestCategory::Client, discarded_transaction),
-        TestCase::new("custom_transaction_prover", TestCategory::Client, custom_transaction_prover),
-        TestCase::new("locked_account", TestCategory::Client, locked_account),
-        TestCase::new("expired_transaction_fails", TestCategory::Client, expired_transaction_fails),
-        TestCase::new("unused_rpc_api", TestCategory::Client, unused_rpc_api),
-        TestCase::new("ignore_invalid_notes", TestCategory::Client, ignore_invalid_notes),
-        TestCase::new("output_only_note", TestCategory::Client, output_only_note),
-        // CUSTOM TRANSACTION tests
-        TestCase::new("merkle_store", TestCategory::CustomTransaction, merkle_store),
-        TestCase::new(
-            "onchain_notes_sync_with_tag",
-            TestCategory::CustomTransaction,
-            onchain_notes_sync_with_tag,
-        ),
-        TestCase::new("transaction_request", TestCategory::CustomTransaction, transaction_request),
-        // FPI tests
-        TestCase::new("standard_fpi_public", TestCategory::Fpi, standard_fpi_public),
-        TestCase::new("standard_fpi_private", TestCategory::Fpi, standard_fpi_private),
-        TestCase::new("fpi_execute_program", TestCategory::Fpi, fpi_execute_program),
-        TestCase::new("nested_fpi_calls", TestCategory::Fpi, nested_fpi_calls),
-        // NETWORK TRANSACTION tests
-        TestCase::new(
-            "counter_contract_ntx",
-            TestCategory::NetworkTransaction,
-            counter_contract_ntx,
-        ),
-        TestCase::new(
-            "recall_note_before_ntx_consumes_it",
-            TestCategory::NetworkTransaction,
-            recall_note_before_ntx_consumes_it,
-        ),
-        // ONCHAIN tests
-        TestCase::new("import_account_by_id", TestCategory::Onchain, import_account_by_id),
-        TestCase::new("onchain_accounts", TestCategory::Onchain, onchain_accounts),
-        TestCase::new("onchain_notes_flow", TestCategory::Onchain, onchain_notes_flow),
-        TestCase::new("incorrect_genesis", TestCategory::Onchain, incorrect_genesis),
-        // SWAP TRANSACTION tests
-        TestCase::new("swap_fully_onchain", TestCategory::SwapTransaction, swap_fully_onchain),
-        TestCase::new("swap_private", TestCategory::SwapTransaction, swap_private),
-    ]
 }
 
 /// Represents the result of executing a test case.

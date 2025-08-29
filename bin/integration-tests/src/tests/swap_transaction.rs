@@ -5,10 +5,12 @@ use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
 use miden_client::testing::common::*;
 use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
+use test_case_marker::test_case;
 
 // SWAP FULLY ONCHAIN
 // ================================================================================================
 
+#[test_case]
 pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
@@ -187,6 +189,7 @@ pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn swap_private(client_config: ClientConfig) -> Result<()> {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;

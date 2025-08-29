@@ -1,0 +1,7 @@
+[package]
+edition = "2021"
+name    = "test-case-marker"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
