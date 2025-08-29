@@ -242,7 +242,8 @@ fn has_test_case_attribute(func: &ItemFn) -> bool {
 /// ```rust
 /// // File header and imports
 /// use anyhow::Result;
-/// use miden_client::testing::config::ClientConfig;
+///
+/// use crate::tests::config::ClientConfig;
 /// // ... other imports
 ///
 /// /// Auto-generated tokio test wrapper for my_test
@@ -272,7 +273,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
 
     // Imports
     result.push_str("use anyhow::{anyhow, Result};\n");
-    result.push_str("use miden_client::testing::config::ClientConfig;\n");
+    result.push_str("use miden_client_integration_tests::tests::config::ClientConfig;\n");
     result.push_str("use miden_client::rpc::Endpoint;\n");
     result.push_str("use url::Url;\n");
 

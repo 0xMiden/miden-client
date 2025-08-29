@@ -11,6 +11,8 @@ use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::tests::config::ClientConfig;
+
 mod generated_tests;
 mod tests;
 
