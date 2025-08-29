@@ -127,10 +127,10 @@ Transactions can have the following statuses:
 
 You can check the status of a transaction using the following methods:
 - `isPending()`: Returns true if the transaction is pending
-- `isCommitted()`: Returns true if the transaction is committed
-- `isDiscarded()`: Returns true if the transaction is discarded
-- `getBlockNum()`: Returns the block number if the transaction is committed, otherwise returns null
-- `getCommittedTimestamp()`: Returns the timestamp when the transaction was committed, or null if it is not committed
+- `isCommitted()`: Returns `true` if the transaction is committed
+- `isDiscarded()`: Returns `true` if the transaction is discarded
+- `getBlockNum()`: Returns the block number if the transaction is committed, otherwise returns `null`
+- `getCommittedTimestamp()`: Returns the timestamp when the transaction was committed, or `null` if it was not
 
 ## Relevant Documentation
 
