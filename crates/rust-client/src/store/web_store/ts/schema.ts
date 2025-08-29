@@ -45,7 +45,8 @@ export interface IAccountStorage {
 
 export interface IAccountVault {
   root: string;
-  assets: Blob;
+  faucetIdPrefix: string;
+  asset: string;
 }
 
 export interface IAccountAuth {
@@ -157,7 +158,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
 db.version(1).stores({
   [Table.AccountCode]: indexes("root"),
   [Table.AccountStorage]: indexes("root"),
-  [Table.AccountVaults]: indexes("root"),
+  [Table.AccountVaults]: indexes("root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKey"),
   [Table.Accounts]: indexes(
     "&accountCommitment",

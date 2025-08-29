@@ -1,6 +1,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use miden_objects::Word;
+use miden_objects::asset::Asset;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
@@ -27,8 +29,8 @@ extern "C" {
     #[wasm_bindgen(js_name = getAccountStorage)]
     pub fn idxdb_get_account_storage(storage_root: String) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getAccountAssetVault)]
-    pub fn idxdb_get_account_asset_vault(vault_root: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getVaultAssets)]
+    pub fn idxdb_get_vault_assets(vault_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
     pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
@@ -45,9 +47,8 @@ extern "C" {
         storage_slots: Vec<u8>,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountAssetVault)]
-    pub fn idxdb_insert_account_asset_vault(vault_root: String, assets: Vec<u8>)
-    -> js_sys::Promise;
+    #[wasm_bindgen(js_name = insertVaultAssets)]
+    pub fn idxdb_insert_vault_assets(assets: Vec<JsVaultAsset>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountRecord)]
     pub fn idxdb_insert_account_record(
@@ -85,4 +86,29 @@ extern "C" {
 
     #[wasm_bindgen(js_name = undoAccountStates)]
     pub fn idxdb_undo_account_states(account_hashes: Vec<String>) -> js_sys::Promise;
+}
+
+/// An object that contains a serialized vault asset
+#[wasm_bindgen(getter_with_clone, inspectable)]
+#[derive(Clone)]
+pub struct JsVaultAsset {
+    /// The merkle root of the vault's assets.
+    #[wasm_bindgen(js_name = "root")]
+    pub root: String,
+    /// Asset's faucet ID prefix.
+    #[wasm_bindgen(js_name = "faucetIdPrefix")]
+    pub faucet_id_prefix: String,
+    /// Word representing the asset.
+    #[wasm_bindgen(js_name = "asset")]
+    pub asset: String,
+}
+
+impl JsVaultAsset {
+    pub fn from_asset(asset: &Asset, vault_root: Word) -> Self {
+        Self {
+            root: vault_root.to_hex(),
+            faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
+            asset: Word::from(asset).to_hex(),
+        }
+    }
 }

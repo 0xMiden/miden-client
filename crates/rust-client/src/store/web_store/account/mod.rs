@@ -10,11 +10,13 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
+use crate::store::web_store::account::js_bindings::idxdb_get_vault_assets;
+use crate::store::web_store::account::models::AccountAssetIdxdbObject;
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
+pub use js_bindings::JsVaultAsset;
 use js_bindings::{
-    idxdb_get_account_asset_vault,
     idxdb_get_account_code,
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
@@ -32,7 +34,6 @@ use models::{
     AccountCodeIdxdbObject,
     AccountRecordIdxdbObject,
     AccountStorageIdxdbObject,
-    AccountVaultIdxdbObject,
     ForeignAccountCodeIdxdbObject,
 };
 
@@ -189,20 +190,23 @@ impl WebStore {
         Ok(AccountStorage::read_from_bytes(&account_storage_idxdb.storage)?)
     }
 
-    pub(super) async fn get_vault_assets(
-        &self,
-        commitment: Word,
-    ) -> Result<Vec<Asset>, StoreError> {
-        let commitment_serialized = commitment.to_string();
-
-        let promise = idxdb_get_account_asset_vault(commitment_serialized);
+    pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
+        let promise = idxdb_get_vault_assets(root.to_hex());
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch vault assets: {js_error:?}",))
         })?;
-        let vault_assets_idxdb: AccountVaultIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> = from_value(js_value)
+            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize DEBUG {err:?}")))?;
 
-        Ok(Vec::<Asset>::read_from_bytes(&vault_assets_idxdb.assets)?)
+        let assets = vault_assets_idxdb
+            .into_iter()
+            .map(|asset| {
+                let word = Word::try_from(&asset.asset)?;
+                Ok(Asset::try_from(word)?)
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        Ok(assets)
     }
 
     pub(crate) async fn insert_account(

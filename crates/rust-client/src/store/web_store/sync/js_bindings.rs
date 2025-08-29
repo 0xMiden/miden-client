@@ -8,6 +8,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
 use super::flattened_vec::FlattenedU8Vec;
+use crate::store::web_store::account::JsVaultAsset;
 use crate::store::web_store::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
 use crate::store::web_store::transaction::utils::SerializedTransactionData;
 
@@ -126,9 +127,9 @@ pub struct JsAccountUpdate {
     #[wasm_bindgen(js_name = "assetVaultRoot")]
     pub asset_vault_root: String,
 
-    /// Serialized asset data for this account.
-    #[wasm_bindgen(js_name = "assetBytes")]
-    pub asset_bytes: Vec<u8>,
+    /// The account's asset vault.
+    #[wasm_bindgen(js_name = "assets")]
+    pub assets: Vec<JsVaultAsset>,
 
     /// ID for this account.
     #[wasm_bindgen(js_name = "accountId")]
@@ -162,7 +163,10 @@ impl JsAccountUpdate {
             storage_root: account.storage().commitment().to_string(),
             storage_slots: account.storage().to_bytes(),
             asset_vault_root: asset_vault.root().to_string(),
-            asset_bytes: asset_vault.assets().collect::<Vec<_>>().to_bytes(),
+            assets: asset_vault
+                .assets()
+                .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
+                .collect(),
             account_id: account.id().to_string(),
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),
