@@ -22,22 +22,18 @@ version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib = { default-features = false, version = "0.11" }
-miden-node-block-producer = { branch = "tomyrd-0.11-base", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "tomyrd-0.11-base", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "tomyrd-0.11-base", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "tomyrd-0.11-base", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "tomyrd-0.11-base", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "tomyrd-0.11-base", git = "https://github.com/0xMiden/miden-node" }
-miden-objects = { default-features = false, version = "0.11" }
-miden-remote-prover = { branch = "tomyrd-0.11-base", features = [
-  "concurrent",
-], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "tomyrd-0.11-base", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { default-features = false, features = [], version = "0.11" }
-miden-tx = { default-features = false, version = "0.11" }
+miden-lib                  = { default-features = false, version = "0.11" }
+miden-node-block-producer  = { version = "0.11" }
+miden-node-ntx-builder     = { version = "0.11" }
+miden-node-proto-build     = { default-features = false, version = "0.11" }
+miden-node-rpc             = { version = "0.11" }
+miden-node-store           = { version = "0.11" }
+miden-node-utils           = { version = "0.11" }
+miden-objects              = { default-features = false, version = "0.11" }
+miden-remote-prover        = { features = ["concurrent"], version = "0.11" }
+miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.11" }
+miden-testing              = { default-features = false, features = [], version = "0.11" }
+miden-tx                   = { default-features = false, version = "0.11" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
