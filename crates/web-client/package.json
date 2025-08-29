@@ -1,6 +1,6 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.11.0-next.31",
+  "version": "0.11.0-next.32",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden",
