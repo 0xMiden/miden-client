@@ -330,15 +330,10 @@ async function updateBlockHeader(
   hasClientNotes: boolean
 ) {
   try {
-    const headerBlob = new Blob([new Uint8Array(blockHeader)]);
-    const partialBlockchainPeaksBlob = new Blob([
-      new Uint8Array(partialBlockchainPeaks),
-    ]);
-
     const data = {
       blockNum: blockNum,
-      header: headerBlob,
-      partialBlockchainPeaks: partialBlockchainPeaksBlob,
+      header: blockHeader,
+      partialBlockchainPeaks,
       hasClientNotes: hasClientNotes.toString(),
     };
 

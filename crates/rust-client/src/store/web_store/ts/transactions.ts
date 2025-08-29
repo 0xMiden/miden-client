@@ -73,7 +73,7 @@ export async function getTransactions(filter: string) {
       .toArray();
 
     // Create a map of scriptRoot to script for quick lookup
-    const scriptMap: Map<string, Blob> = new Map();
+    const scriptMap: Map<string, Uint8Array> = new Map();
     scripts.forEach((script) => {
       if (script.txScript) {
         scriptMap.set(script.scriptRoot, script.txScript);
@@ -88,23 +88,17 @@ export async function getTransactions(filter: string) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
 
           if (txScript) {
-            const txScriptArrayBuffer = await txScript.arrayBuffer();
-            const txScriptArray = new Uint8Array(txScriptArrayBuffer);
-            txScriptBase64 = uint8ArrayToBase64(txScriptArray);
+            txScriptBase64 = uint8ArrayToBase64(txScript);
           }
         }
 
         if (transactionRecord.discardCause) {
-          const discardCauseArrayBuffer =
-            await transactionRecord.discardCause.arrayBuffer();
-          const discardCauseArray = new Uint8Array(discardCauseArrayBuffer);
-          discardCauseBase64 = uint8ArrayToBase64(discardCauseArray);
+          discardCauseBase64 = uint8ArrayToBase64(
+            transactionRecord.discardCause
+          );
         }
 
-        const detailsArrayBuffer =
-          await transactionRecord.details.arrayBuffer();
-        const detailsArray = new Uint8Array(detailsArrayBuffer);
-        const detailsBase64 = uint8ArrayToBase64(detailsArray);
+        const detailsBase64 = uint8ArrayToBase64(transactionRecord.details);
 
         const data: ProcessedTransaction = {
           id: transactionRecord.id,
@@ -146,10 +140,7 @@ export async function insertTransactionScript(
 
     const data: ITransactionScript = {
       scriptRoot: scriptRootBase64,
-      txScript: mapOption(
-        txScript,
-        (txScript) => new Blob([new Uint8Array(txScript)])
-      ),
+      txScript: mapOption(txScript, (txScript) => new Uint8Array(txScript)),
     };
 
     await transactionScripts.add(data);
@@ -170,18 +161,13 @@ export async function upsertTransactionRecord(
   discardCause?: Uint8Array
 ) {
   try {
-    const detailsBlob = new Blob([new Uint8Array(details)]);
-
     const data = {
       id: transactionId,
-      details: detailsBlob,
+      details,
       scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
       blockNum: parseInt(blockNum, 10),
       commitHeight: committed ? committed : undefined,
-      discardCause: mapOption(
-        discardCause,
-        (discardCause) => new Blob([discardCause as BlobPart])
-      ),
+      discardCause,
     };
 
     await transactions.put(data);
