@@ -268,7 +268,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     result.push_str("//! marked with #[test_case] attribute. Do not edit manually.\n\n");
 
     // Imports
-    result.push_str("use anyhow::Result;\n");
+    result.push_str("use anyhow::{anyhow, Result};\n");
     result.push_str("use miden_client::testing::config::ClientConfig;\n");
     result.push_str("use miden_client::rpc::Endpoint;\n");
     result.push_str("use url::Url;\n");
@@ -300,11 +300,15 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
         result.push_str("    let endpoint_url = std::env::var(\"TEST_MIDEN_RPC_ENDPOINT\")\n");
         result.push_str("        .unwrap_or_else(|_| Endpoint::localhost().to_string());\n");
         result.push_str(
-            "    let url = Url::parse(&endpoint_url).expect(\"Invalid RPC endpoint URL\");\n",
+            "    let url = Url::parse(&endpoint_url).map_err(|_| anyhow!(\"Invalid RPC endpoint URL\"))?;\n",
         );
-        result.push_str("    let host = url.host_str().expect(\"RPC endpoint URL is missing a host\").to_string();\n");
+        result.push_str("    let host = url\n");
+        result.push_str("        .host_str()\n");
+        result
+            .push_str("        .ok_or_else(|| anyhow!(\"RPC endpoint URL is missing a host\"))?\n");
+        result.push_str("        .to_string();\n");
         result.push_str(
-            "    let port = url.port().expect(\"RPC endpoint URL is missing a port\");\n",
+            "    let port = url.port().ok_or_else(|| anyhow!(\"RPC endpoint URL is missing a port\"))?;\n",
         );
         result.push_str(
             "    let endpoint = Endpoint::new(url.scheme().to_string(), host, Some(port));\n",
@@ -312,7 +316,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
         result.push_str("    let timeout = std::env::var(\"TEST_TIMEOUT\")\n");
         result.push_str("        .unwrap_or_else(|_| \"10000\".to_string())\n");
         result.push_str("        .parse::<u64>()\n");
-        result.push_str("        .expect(\"Invalid timeout value\");\n");
+        result.push_str("        .map_err(|_| anyhow!(\"Invalid timeout value\"))?;\n");
         result.push_str("        \n");
         result.push_str("    let client_config = ClientConfig::new(endpoint, timeout);\n");
         result.push_str(&format!("    {}(client_config).await\n", test_case.function_name));
