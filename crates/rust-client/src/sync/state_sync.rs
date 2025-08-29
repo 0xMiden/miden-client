@@ -1,58 +1,60 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-    vec::Vec,
-};
-use core::{future::Future, pin::Pin};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Digest,
-    account::{Account, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr},
-    note::{NoteId, NoteTag},
-    transaction::PartialBlockchain,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
+use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::transaction::PartialBlockchain;
+use tonic::async_trait;
 use tracing::info;
 
-use super::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, state_sync_update::TransactionUpdateTracker,
-};
-use crate::{
-    ClientError,
-    note::{NoteScreener, NoteUpdateTracker},
-    rpc::{
-        NodeRpcClient,
-        domain::{note::CommittedNote, transaction::TransactionInclusion},
-    },
-    store::{InputNoteRecord, NoteFilter, OutputNoteRecord, Store, StoreError},
-    transaction::TransactionRecord,
-};
+use super::state_sync_update::TransactionUpdateTracker;
+use super::{AccountUpdates, BlockUpdates, StateSyncUpdate};
+use crate::ClientError;
+use crate::note::NoteUpdateTracker;
+use crate::rpc::NodeRpcClient;
+use crate::rpc::domain::note::CommittedNote;
+use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
+use crate::transaction::TransactionRecord;
 
 // SYNC CALLBACKS
 // ================================================================================================
 
-/// Callback that gets executed when a new note is received as part of the sync response.
-///
-/// It receives:
-///
-/// - The committed note received from the network.
-/// - An optional note record that corresponds to the state of the note in the network (only if the
-///   note is public).
-/// - A note screener that can be used to test whether notes are consumable.
-/// - A set of [`NoteTag`]s that contains all tags tracked in the store.
-///
-/// It returns a boolean indicating if the received note update is relevant. If the return value
-/// is `false`, it gets discarded. If it is `true`, the update gets committed to the client's store.
-pub type OnNoteReceived = Box<
-    dyn Fn(
-        CommittedNote,
-        Option<InputNoteRecord>,
-        Arc<NoteScreener>,
-        Arc<BTreeSet<NoteTag>>,
-    ) -> Pin<Box<dyn Future<Output = Result<bool, ClientError>>>>,
->;
+/// The action to be taken when a note update is received as part of the sync response.
+#[allow(clippy::large_enum_variant)]
+pub enum NoteUpdateAction {
+    /// The note commit update is relevant and the specified note should be marked as committed in
+    /// the store, storing its inclusion proof.
+    Commit(CommittedNote),
+    /// The public note is relevant and should be inserted into the store.
+    Insert(InputNoteRecord),
+    /// The note update is not relevant and should be discarded.
+    Discard,
+}
+
+#[async_trait(?Send)]
+pub trait OnNoteReceived {
+    /// Callback that gets executed when a new note is received as part of the sync response.
+    ///
+    /// It receives:
+    ///
+    /// - The committed note received from the network.
+    /// - An optional note record that corresponds to the state of the note in the network (only if
+    ///   the note is public).
+    ///
+    /// It returns an enum indicating the action to be taken for the received note update. Whether
+    /// the note updated should be committed, new public note inserted, or ignored.
+    async fn on_note_received(
+        &self,
+        committed_note: CommittedNote,
+        public_note: Option<InputNoteRecord>,
+    ) -> Result<NoteUpdateAction, ClientError>;
+}
 
 // STATE SYNC
 // ================================================================================================
@@ -66,13 +68,12 @@ pub type OnNoteReceived = Box<
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
-    /// Callback to be executed when a new note inclusion is received.
-    on_note_received: OnNoteReceived,
+    /// Responsible for checking the relevance of notes and executing the
+    /// [`OnNoteReceived`] callback when a new note inclusion is received.
+    note_screener: Arc<dyn OnNoteReceived>,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
-    /// The note screener used to check the relevance of notes.
-    note_screener: Arc<NoteScreener>,
 }
 
 impl StateSync {
@@ -86,16 +87,13 @@ impl StateSync {
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
-        on_note_received: OnNoteReceived,
+        note_screener: Arc<dyn OnNoteReceived>,
         tx_graceful_blocks: Option<u32>,
-        note_screener: NoteScreener,
     ) -> Self {
         Self {
             rpc_api,
-            on_note_received,
+            note_screener,
             tx_graceful_blocks,
-            #[allow(clippy::arc_with_non_send_sync)]
-            note_screener: Arc::new(note_screener),
         }
     }
 
@@ -207,7 +205,7 @@ impl StateSync {
 
         self.transaction_state_sync(
             &mut state_sync_update.transaction_updates,
-            new_block_num,
+            &response.block_header,
             &response.transactions,
         );
 
@@ -216,7 +214,6 @@ impl StateSync {
                 &mut state_sync_update.note_updates,
                 response.note_inclusions,
                 &response.block_header,
-                note_tags.clone(),
             )
             .await?;
 
@@ -261,7 +258,7 @@ impl StateSync {
         &self,
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
-        account_commitment_updates: &[(AccountId, Digest)],
+        account_commitment_updates: &[(AccountId, Word)],
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
@@ -290,7 +287,7 @@ impl StateSync {
     /// state of the client.
     async fn get_updated_public_accounts(
         &self,
-        account_updates: &[(AccountId, Digest)],
+        account_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
     ) -> Result<Vec<Account>, ClientError> {
         let mut mismatched_public_accounts = vec![];
@@ -327,7 +324,6 @@ impl StateSync {
         note_updates: &mut NoteUpdateTracker,
         note_inclusions: Vec<CommittedNote>,
         block_header: &BlockHeader,
-        note_tags: Arc<BTreeSet<NoteTag>>,
     ) -> Result<bool, ClientError> {
         let public_note_ids: Vec<NoteId> = note_inclusions
             .iter()
@@ -341,21 +337,19 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            if (self.on_note_received)(
-                committed_note.clone(),
-                public_note.clone(),
-                self.note_screener.clone(),
-                note_tags.clone(),
-            )
-            .await?
-            {
-                found_relevant_note = true;
+            match self.note_screener.on_note_received(committed_note, public_note).await? {
+                NoteUpdateAction::Commit(committed_note) => {
+                    found_relevant_note = true;
 
-                note_updates.apply_committed_note_state_transitions(
-                    &committed_note,
-                    public_note,
-                    block_header,
-                )?;
+                    note_updates
+                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
+                },
+                NoteUpdateAction::Insert(public_note) => {
+                    found_relevant_note = true;
+
+                    note_updates.apply_new_public_note(public_note, block_header)?;
+                },
+                NoteUpdateAction::Discard => {},
             }
         }
 
@@ -437,14 +431,18 @@ impl StateSync {
     fn transaction_state_sync(
         &self,
         transaction_updates: &mut TransactionUpdateTracker,
-        new_sync_height: BlockNumber,
+        new_block_header: &BlockHeader,
         transaction_inclusions: &[TransactionInclusion],
     ) {
         for transaction_inclusion in transaction_inclusions {
-            transaction_updates.apply_transaction_inclusion(transaction_inclusion);
+            transaction_updates.apply_transaction_inclusion(
+                transaction_inclusion,
+                u64::from(new_block_header.timestamp()),
+            ); //TODO: Change timestamps from u64 to u32
         }
 
-        transaction_updates.apply_sync_height_update(new_sync_height, self.tx_graceful_blocks);
+        transaction_updates
+            .apply_sync_height_update(new_block_header.block_num(), self.tx_graceful_blocks);
     }
 }
 
@@ -458,9 +456,9 @@ fn apply_mmr_changes(
     new_block_has_relevant_notes: bool,
     current_partial_mmr: &mut PartialMmr,
     mmr_delta: MmrDelta,
-) -> Result<(MmrPeaks, Vec<(InOrderIndex, Digest)>), ClientError> {
+) -> Result<(MmrPeaks, Vec<(InOrderIndex, Word)>), ClientError> {
     // Apply the MMR delta to bring MMR to forest equal to chain tip
-    let mut new_authentication_nodes: Vec<(InOrderIndex, Digest)> =
+    let mut new_authentication_nodes: Vec<(InOrderIndex, Word)> =
         current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
 
     let new_peaks = current_partial_mmr.peaks();
@@ -469,49 +467,4 @@ fn apply_mmr_changes(
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
 
     Ok((new_peaks, new_authentication_nodes))
-}
-
-// DEFAULT CALLBACK IMPLEMENTATIONS
-// ================================================================================================
-
-/// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
-/// committed note to check if it's relevant. If the note wasn't being tracked but it came in the
-/// sync response it may be a new public note, in that case we use the [`NoteScreener`] to check its
-/// relevance.
-pub async fn on_note_received(
-    store: Arc<dyn Store>,
-    committed_note: CommittedNote,
-    public_note: Option<InputNoteRecord>,
-    note_screener: Arc<NoteScreener>,
-    note_tags: Arc<BTreeSet<NoteTag>>,
-) -> Result<bool, ClientError> {
-    let note_id = *committed_note.note_id();
-
-    if !store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty()
-        || !store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty()
-    {
-        // The note is being tracked by the client so it is relevant
-        Ok(true)
-    } else if let Some(public_note) = public_note {
-        // If tracked by the user, keep note regardless of inputs and extra checks
-        if let Some(metadata) = public_note.metadata()
-            && note_tags.contains(&metadata.tag())
-        {
-            return Ok(true);
-        }
-
-        // The note is not being tracked by the client and is public so we can screen it
-        let new_note_relevance = note_screener
-            .check_relevance(
-                &public_note.try_into().map_err(ClientError::NoteRecordConversionError)?,
-            )
-            .await?;
-
-        let is_relevant = !new_note_relevance.is_empty();
-        Ok(is_relevant)
-    } else {
-        // The note is not being tracked by the client and is private so we can't determine if it
-        // is relevant
-        Ok(false)
-    }
 }

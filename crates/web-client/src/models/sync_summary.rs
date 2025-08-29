@@ -2,10 +2,10 @@ use miden_client::sync::SyncSummary as NativeSyncSummary;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::{
-    models::{account_id::AccountId, note_id::NoteId, transaction_id::TransactionId},
-    utils::{deserialize_from_uint8array, serialize_to_uint8array},
-};
+use crate::models::account_id::AccountId;
+use crate::models::note_id::NoteId;
+use crate::models::transaction_id::TransactionId;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 pub struct SyncSummary(NativeSyncSummary);

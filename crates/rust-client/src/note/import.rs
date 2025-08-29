@@ -10,20 +10,30 @@
 //! [`Client::import_note()`].
 use alloc::string::ToString;
 
-use miden_objects::{
-    block::BlockNumber,
-    note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag},
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{
+    Note,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteTag,
 };
+use miden_tx::auth::TransactionAuthenticator;
 
-use crate::{
-    Client, ClientError,
-    rpc::{RpcError, domain::note::FetchedNote},
-    store::{InputNoteRecord, InputNoteState, input_note_states::ExpectedNoteState},
-    sync::NoteTagRecord,
-};
+use crate::rpc::RpcError;
+use crate::rpc::domain::note::FetchedNote;
+use crate::store::input_note_states::ExpectedNoteState;
+use crate::store::{InputNoteRecord, InputNoteState};
+use crate::sync::NoteTagRecord;
+use crate::{Client, ClientError};
 
 /// Note importing methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync + 'static,
+{
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
 
@@ -286,7 +296,7 @@ impl Client {
                 let note_inclusion_proof = NoteInclusionProof::new(
                     note_block_num,
                     note.note_index(),
-                    note.merkle_path().clone(),
+                    note.inclusion_path().clone(),
                 )?;
 
                 return Ok(Some((note.metadata(), note_inclusion_proof)));

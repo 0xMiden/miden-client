@@ -19,6 +19,7 @@
 //!
 //! ```rust
 //! use miden_client::{
+//!     auth::TransactionAuthenticator,
 //!     Client,
 //!     crypto::FeltRng,
 //!     note::{NoteScreener, get_input_note_with_id_prefix},
@@ -26,7 +27,7 @@
 //! };
 //! use miden_objects::account::AccountId;
 //!
-//! # async fn example(client: &Client) -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example<AUTH: TransactionAuthenticator + Sync>(client: &Client<AUTH>) -> Result<(), Box<dyn std::error::Error>> {
 //! // Retrieve all committed input notes
 //! let input_notes = client.get_input_notes(NoteFilter::Committed).await?;
 //! println!("Found {} committed input notes.", input_notes.len());
@@ -56,14 +57,14 @@
 //! For more details on the API and error handling, see the documentation for the specific functions
 //! and types in this module.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::string::ToString;
+use alloc::vec::Vec;
 
 use miden_objects::account::AccountId;
+use miden_tx::auth::TransactionAuthenticator;
 
-use crate::{
-    Client, ClientError, IdPrefixFetchError,
-    store::{InputNoteRecord, NoteFilter, OutputNoteRecord},
-};
+use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
+use crate::{Client, ClientError, IdPrefixFetchError};
 
 mod import;
 mod note_screener;
@@ -72,27 +73,41 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use miden_lib::note::{
-    create_p2id_note, create_swap_note,
-    utils::{build_p2id_recipient, build_swap_tag},
-    well_known_note::WellKnownNote,
-};
-pub use miden_objects::{
-    NoteError,
-    block::BlockNumber,
-    note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId,
-        NoteInclusionProof, NoteInputs, NoteMetadata, NoteRecipient, NoteScript, NoteTag, NoteType,
-        Nullifier,
-    },
+pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
+pub use miden_lib::note::well_known_note::WellKnownNote;
+pub use miden_lib::note::{create_p2id_note, create_swap_note};
+pub use miden_objects::NoteError;
+pub use miden_objects::block::BlockNumber;
+pub use miden_objects::note::{
+    Note,
+    NoteAssets,
+    NoteDetails,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+    NoteType,
+    Nullifier,
 };
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
+    InputNoteUpdate,
+    NoteUpdateTracker,
+    NoteUpdateType,
+    OutputNoteUpdate,
 };
 
 /// Note retrieval methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync,
+{
     // INPUT NOTE DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
@@ -195,10 +210,13 @@ impl Client {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub async fn get_input_note_with_id_prefix(
-    client: &Client,
+pub async fn get_input_note_with_id_prefix<AUTH>(
+    client: &Client<AUTH>,
     note_id_prefix: &str,
-) -> Result<InputNoteRecord, IdPrefixFetchError> {
+) -> Result<InputNoteRecord, IdPrefixFetchError>
+where
+    AUTH: TransactionAuthenticator + Sync,
+{
     let mut input_note_records = client
         .get_input_notes(NoteFilter::All)
         .await

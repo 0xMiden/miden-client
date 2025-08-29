@@ -1,34 +1,30 @@
-use std::{
-    collections::BTreeMap,
-    fs::{self, File},
-    io::{Read, Write},
-    path::PathBuf,
-    vec,
-};
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::vec;
 
 use clap::{Parser, ValueEnum};
-use miden_client::{
-    Client,
-    account::{
-        Account, AccountBuilder, AccountStorageMode, AccountType,
-        component::COMPONENT_TEMPLATE_EXTENSION,
-    },
-    auth::AuthSecretKey,
-    crypto::SecretKey,
-    transaction::TransactionRequestBuilder,
-    utils::Deserializable,
-};
-use miden_lib::account::auth::RpoFalcon512;
+use miden_client::Client;
+use miden_client::account::component::COMPONENT_TEMPLATE_EXTENSION;
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::{AuthSecretKey, TransactionAuthenticator};
+use miden_client::crypto::SecretKey;
+use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::utils::Deserializable;
+use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_objects::account::{
-    AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
+    AccountComponent,
+    AccountComponentTemplate,
+    InitStorageData,
+    StorageValueName,
 };
 use rand::RngCore;
 use tracing::debug;
 
-use crate::{
-    CLIENT_BINARY_NAME, CliKeyStore, commands::account::maybe_set_default_account,
-    errors::CliError, utils::load_config_file,
-};
+use crate::commands::account::maybe_set_default_account;
+use crate::errors::CliError;
+use crate::{CliKeyStore, client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -101,7 +97,11 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let mut component_template_paths = vec![PathBuf::from("basic-wallet")];
         component_template_paths.extend(self.extra_components.iter().cloned());
 
@@ -124,12 +124,12 @@ impl NewWalletCmd {
         .await?;
 
         let (mut current_config, _) = load_config_file()?;
-        let account_address =
-            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
 
         println!("Successfully created new wallet.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}",
+            "To view account details execute {} account -s {}",
+            client_binary_name().display(),
+            new_account.id().to_hex()
         );
 
         maybe_set_default_account(&mut current_config, new_account.id())?;
@@ -170,7 +170,11 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         let new_account = create_client_account(
             &mut client,
             &keystore,
@@ -182,13 +186,11 @@ impl NewAccountCmd {
         )
         .await?;
 
-        let (current_config, _) = load_config_file()?;
-        let account_address =
-            new_account.id().to_bech32(current_config.rpc.endpoint.0.to_network_id()?);
-
         println!("Successfully created new account.");
         println!(
-            "To view account details execute {CLIENT_BINARY_NAME} account -s {account_address}"
+            "To view account details execute {} account -s {}",
+            client_binary_name().display(),
+            new_account.id().to_hex()
         );
 
         Ok(())
@@ -240,8 +242,8 @@ fn load_init_storage_data(path: Option<PathBuf>) -> Result<InitStorageData, CliE
 ///
 /// The created account will have a Falcon-based auth component, additional to any specified
 /// component.
-async fn create_client_account(
-    client: &mut Client,
+async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
     storage_mode: AccountStorageMode,
@@ -271,7 +273,7 @@ async fn create_client_account(
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key()));
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()));
 
     // Process component templates and add them to the account builder.
     let account_components = process_component_templates(&component_templates, &init_storage_data)?;
@@ -297,9 +299,12 @@ async fn create_client_account(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), CliError> {
+async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
+    account: &Account,
+) -> Result<(), CliError> {
     // Retrieve the auth procedure mast root pointer and call it in the transaction script.
-    // We only use RpoFalcon512 for the auth component so this may be overkill but it lets us
+    // We only use AuthRpoFalcon512 for the auth component so this may be overkill but it lets us
     // use different auth components in the future.
     let auth_procedure_mast_root = account.code().get_procedure_by_index(0).mast_root();
 
@@ -317,7 +322,7 @@ async fn deploy_account(client: &mut Client, account: &Account) -> Result<(), Cl
         .expect("Auth script should compile");
 
     let tx_request = TransactionRequestBuilder::new()
-        .script_arg(auth_procedure_mast_root.into())
+        .script_arg(*auth_procedure_mast_root)
         .custom_script(auth_script)
         .build()
         .map_err(|err| {

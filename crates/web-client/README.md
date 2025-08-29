@@ -26,7 +26,9 @@ The build process is powered by a custom `rollup.config.js` file, which orchestr
 
 2. __Worker Build__: Bundles a dedicated web worker file that enables off-main-thread execution for computationally intensive functions.
 
-3. __Main Entry Point Build__: Bundles the top-level JavaScript module (`index.js`) which serves as the main API surface for consumers of the SDK.
+3. __Main Entry Point Build__: Bundles the top-level JavaScript module (`index.js`) which serves as the main API surface for consumers of the SDK. This module also imports `wasm.js`, which
+provides a function to load the wasm module in an async way. Since there's a [known issue](https://github.com/wasm-tool/rollup-plugin-rust?tab=readme-ov-file#usage-with-vite)
+with vite, there's a check to avoid loading the wasm module when SSR is enabled.
 
 This setup allows the SDK to be seamlessly consumed in JavaScript environments, particularly in web applications.
 

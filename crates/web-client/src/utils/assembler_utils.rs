@@ -1,14 +1,17 @@
 use alloc::sync::Arc;
 
 use miden_objects::assembly::{
-    Assembler as NativeAssembler, DefaultSourceManager, LibraryPath, Module, ModuleKind,
+    Assembler as NativeAssembler,
+    DefaultSourceManager,
+    LibraryPath,
+    Module,
+    ModuleKind,
 };
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{assembler::Assembler, library::Library},
-};
+use crate::js_error_with_context;
+use crate::models::assembler::Assembler;
+use crate::models::library::Library;
 
 #[wasm_bindgen]
 pub struct AssemblerUtils;

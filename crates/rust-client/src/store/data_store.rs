@@ -1,12 +1,12 @@
-use alloc::{boxed::Box, collections::BTreeSet, sync::Arc, vec::Vec};
+use alloc::collections::BTreeSet;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Digest, MastForest, Word,
-    account::{Account, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MerklePath, PartialMmr},
-    transaction::PartialBlockchain,
-};
+use miden_objects::account::{Account, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
+use miden_objects::transaction::PartialBlockchain;
+use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
@@ -36,7 +36,6 @@ impl ClientDataStore {
     }
 }
 
-#[async_trait::async_trait(?Send)]
 impl DataStore for ClientDataStore {
     async fn get_transaction_inputs(
         &self,
@@ -44,7 +43,7 @@ impl DataStore for ClientDataStore {
         mut block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError> {
         // Pop last block, used as reference (it does not need to be authenticated manually)
-        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("Block set is empty"))?;
+        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
         // Construct Account
         let account_record = self
@@ -89,7 +88,7 @@ impl DataStore for ClientDataStore {
 // ================================================================================================
 
 impl MastForestStore for ClientDataStore {
-    fn get(&self, procedure_hash: &Digest) -> Option<Arc<MastForest>> {
+    fn get(&self, procedure_hash: &Word) -> Option<Arc<MastForest>> {
         self.transaction_mast_store.get(procedure_hash)
     }
 }
@@ -119,7 +118,8 @@ async fn build_partial_mmr_with_paths(
         authenticated_blocks.iter().map(BlockHeader::block_num).collect();
 
     let authentication_paths =
-        get_authentication_path_for_blocks(store, &block_nums, partial_mmr.forest()).await?;
+        get_authentication_path_for_blocks(store, &block_nums, partial_mmr.forest().num_leaves())
+            .await?;
 
     for (header, path) in authenticated_blocks.iter().zip(authentication_paths.iter()) {
         partial_mmr

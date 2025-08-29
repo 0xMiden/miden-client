@@ -1,18 +1,17 @@
-use std::{fs::File, io::Write, path::PathBuf};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
-use miden_client::{
-    Client, Word,
-    account::{Account, AccountFile},
-    store::NoteExportType,
-    transaction::AccountInterface,
-    utils::Serializable,
-};
-use miden_lib::AuthScheme;
+use miden_client::Client;
+use miden_client::account::{Account, AccountFile};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::store::NoteExportType;
+use miden_client::utils::{Serializable, get_public_keys_from_account};
 use tracing::info;
 
-use crate::{
-    CliKeyStore, Parser, errors::CliError, get_output_note_with_id_prefix, utils::parse_account_id,
-};
+use crate::errors::CliError;
+use crate::utils::parse_account_id;
+use crate::{CliKeyStore, Parser, get_output_note_with_id_prefix};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Export client output notes, or account data")]
@@ -56,7 +55,11 @@ impl From<&ExportType> for NoteExportType {
 }
 
 impl ExportCmd {
-    pub async fn execute(&self, mut client: Client, keystore: CliKeyStore) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
+        &self,
+        mut client: Client<AUTH>,
+        keystore: CliKeyStore,
+    ) -> Result<(), CliError> {
         if self.account {
             export_account(&client, &keystore, self.id.as_str(), self.filename.clone()).await?;
         } else if let Some(export_type) = &self.export_type {
@@ -73,8 +76,8 @@ impl ExportCmd {
 // EXPORT ACCOUNT
 // ================================================================================================
 
-async fn export_account(
-    client: &Client,
+async fn export_account<AUTH>(
+    client: &Client<AUTH>,
     keystore: &CliKeyStore,
     account_id: &str,
     filename: Option<PathBuf>,
@@ -120,8 +123,8 @@ async fn export_account(
 // EXPORT NOTE
 // ================================================================================================
 
-async fn export_note(
-    client: &mut Client,
+async fn export_note<AUTH: TransactionAuthenticator + Sync>(
+    client: &mut Client<AUTH>,
     note_id: &str,
     filename: Option<PathBuf>,
     export_type: &ExportType,
@@ -145,7 +148,7 @@ async fn export_note(
         filename
     } else {
         let current_dir = std::env::current_dir()?;
-        current_dir.join(format!("{}.mno", note_id.inner()))
+        current_dir.join(format!("{}.mno", note_id.to_hex()))
     };
 
     info!("Writing file to {}", file_path.to_string_lossy());
@@ -154,20 +157,4 @@ async fn export_note(
 
     println!("Successfully exported note {note_id}");
     Ok(file)
-}
-
-/// Gets the public key from the storage of an account. This will only work if the account is
-/// created by the CLI as it expects the account to have the `RpoFalcon512` authentication scheme.
-pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
-    let mut pub_keys = vec![];
-    let interface: AccountInterface = account.into();
-
-    for auth in interface.auth() {
-        match auth {
-            AuthScheme::NoAuth => {},
-            AuthScheme::RpoFalcon512 { pub_key } => pub_keys.push(Word::from(*pub_key)),
-        }
-    }
-
-    pub_keys
 }

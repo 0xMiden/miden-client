@@ -39,29 +39,29 @@
 //! For further details and examples, see the documentation for the individual methods in the
 //! [`NodeRpcClient`] trait.
 
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
 
-use domain::{
-    account::{AccountProofs, FetchedAccount},
-    note::{FetchedNote, NoteSyncInfo},
-    nullifier::NullifierUpdate,
-    sync::StateSyncInfo,
-};
-use miden_objects::{
-    account::{Account, AccountCode, AccountDelta, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
-};
+use domain::account::{AccountProofs, FetchedAccount};
+use domain::note::{FetchedNote, NoteSyncInfo};
+use domain::nullifier::NullifierUpdate;
+use domain::sync::StateSyncInfo;
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
 pub mod domain;
 
 mod errors;
-pub use errors::RpcError;
+pub use errors::*;
 
 mod endpoint;
 pub use endpoint::Endpoint;
@@ -79,10 +79,9 @@ mod tonic_client;
 #[cfg(any(feature = "tonic", feature = "web-tonic"))]
 pub use tonic_client::TonicRpcClient;
 
-use crate::{
-    store::{InputNoteRecord, input_note_states::UnverifiedNoteState},
-    transaction::ForeignAccount,
-};
+use crate::store::InputNoteRecord;
+use crate::store::input_note_states::UnverifiedNoteState;
+use crate::transaction::ForeignAccount;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -95,6 +94,11 @@ use crate::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait NodeRpcClient: Send + Sync {
+    /// Sets the genesis commitment for the client and reconnects to the node providing the
+    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// this method does nothing.
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
+
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
     async fn submit_proven_transaction(
@@ -118,17 +122,17 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
-    /// Fetches note-related data for a list of [NoteId] using the `/GetNotesById` rpc endpoint.
+    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
     ///
-    /// For any NoteType::Private note, the return data is only the
-    /// [miden_objects::note::NoteMetadata], whereas for NoteType::Onchain notes, the return
-    /// data includes all details.
+    /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
+    /// [`miden_objects::note::NoteMetadata`], whereas for [`miden_objects::note::NoteType::Public`]
+    /// notes, the return data includes all details.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client. The returned [StateSyncInfo]
+    /// - `block_num` is the last block number known by the client. The returned [`StateSyncInfo`]
     ///   should contain data starting from the next block, until the first block which contains a
     ///   note of matching the requested tag, or the chain tip if there are no notes.
     /// - `account_ids` is a list of account IDs and determines the accounts the client is
@@ -188,20 +192,12 @@ pub trait NodeRpcClient: Send + Sync {
         known_account_codes: Vec<AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 
-    /// Fetches the account state delta for the specified account between the specified blocks
-    /// using the `/GetAccountStateDelta` RPC endpoint.
-    async fn get_account_state_delta(
-        &self,
-        account_id: AccountId,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError>;
-
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
     /// The `block_num` parameter is the block number to start the search from.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::check_nullifiers_by_prefix].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::check_nullifiers_by_prefix`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
@@ -215,11 +211,11 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|update| update.block_num))
     }
 
-    /// Fetches public note-related data for a list of [NoteId] and builds [InputNoteRecord]s with
-    /// it. If a note is not found or it's private, it is ignored and will not be included in the
-    /// returned list.
+    /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
+    /// with it. If a note is not found or it's private, it is ignored and will not be included
+    /// in the returned list.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_notes_by_id].
+    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
     async fn get_public_note_records(
         &self,
         note_ids: &[NoteId],
@@ -250,7 +246,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `local_accounts` parameter is a list of account headers that the client has
     /// stored locally and that it wants to check for updates. If an account is private or didn't
     /// change, it is ignored and will not be included in the returned list.
-    /// The default implementation of this method uses [NodeRpcClient::get_account_details].
+    /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
     async fn get_updated_public_accounts(
         &self,
         local_accounts: &[&AccountHeader],
@@ -274,7 +270,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// along with the MMR proof.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_block_header_by_number].
+    /// The default implementation of this method uses
+    /// [`NodeRpcClient::get_block_header_by_number`].
     async fn get_block_header_with_proof(
         &self,
         block_num: BlockNumber,
@@ -285,10 +282,10 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note with the specified ID.
     ///
-    /// The default implementation of this method uses [NodeRpcClient::get_notes_by_id].
+    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id`].
     ///
     /// Errors:
-    /// - [RpcError::NoteNotFound] if the note with the specified ID is not found.
+    /// - [`RpcError::NoteNotFound`] if the note with the specified ID is not found.
     async fn get_note_by_id(&self, note_id: NoteId) -> Result<FetchedNote, RpcError> {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
@@ -308,6 +305,7 @@ pub enum NodeRpcClientEndpoint {
     GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
+    GetNotesById,
     SyncState,
     SubmitProvenTx,
     SyncNotes,
@@ -327,6 +325,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
             },
+            NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),

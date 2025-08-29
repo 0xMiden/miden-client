@@ -1,10 +1,11 @@
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    input_note_state::InputNoteState, note_details::NoteDetails, note_id::NoteId,
-    note_inclusion_proof::NoteInclusionProof, note_metadata::NoteMetadata,
-};
+use super::input_note_state::InputNoteState;
+use super::note_details::NoteDetails;
+use super::note_id::NoteId;
+use super::note_inclusion_proof::NoteInclusionProof;
+use super::note_metadata::NoteMetadata;
 
 #[derive(Clone)]
 #[wasm_bindgen]

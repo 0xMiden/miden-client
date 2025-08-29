@@ -1,25 +1,20 @@
 #![allow(clippy::items_after_statements)]
 
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::collections::BTreeSet;
+use alloc::vec::Vec;
 
-use miden_objects::{Digest, block::BlockNumber, note::NoteTag};
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::NoteTag;
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
-use super::{SqliteStore, account::undo_account_state};
-use crate::{
-    insert_sql,
-    store::{
-        StoreError,
-        sqlite_store::{
-            account::{lock_account_on_unexpected_commitment, update_account},
-            note::apply_note_updates_tx,
-            transaction::upsert_transaction_record,
-        },
-    },
-    subst,
-    sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate},
-};
+use super::SqliteStore;
+use crate::store::StoreError;
+use crate::store::sqlite_store::note::apply_note_updates_tx;
+use crate::store::sqlite_store::transaction::upsert_transaction_record;
+use crate::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use crate::{insert_sql, subst};
 
 impl SqliteStore {
     pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
@@ -162,20 +157,20 @@ impl SqliteStore {
         }
 
         // Remove the accounts that are originated from the discarded transactions
-        let account_hashes_to_delete: Vec<Digest> = transaction_updates
+        let account_hashes_to_delete: Vec<Word> = transaction_updates
             .discarded_transactions()
             .map(|tx| tx.details.final_account_state)
             .collect();
 
-        undo_account_state(&tx, &account_hashes_to_delete)?;
+        Self::undo_account_state(&tx, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
         for account in account_updates.updated_public_accounts() {
-            update_account(&tx, account)?;
+            Self::update_account_state(&tx, account)?;
         }
 
         for (account_id, digest) in account_updates.mismatched_private_accounts() {
-            lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
+            Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
         }
 
         // Commit the updates

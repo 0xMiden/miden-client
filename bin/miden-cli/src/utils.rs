@@ -1,18 +1,18 @@
-use std::{
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
-use figment::{
-    Figment,
-    providers::{Format, Toml},
-};
-use miden_client::{Client, account::AccountId};
+use figment::Figment;
+use figment::providers::{Format, Toml};
+use miden_client::Client;
+use miden_client::account::AccountId;
+use miden_objects::address::Address;
 use tracing::info;
 
-use super::{CLIENT_CONFIG_FILE_NAME, config::CliConfig, get_account_with_id_prefix};
-use crate::{errors::CliError, faucet_details_map::FaucetDetailsMap};
+use super::config::CliConfig;
+use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
+use crate::errors::CliError;
+use crate::faucet_details_map::FaucetDetailsMap;
 
 pub(crate) const SHARED_TOKEN_DOCUMENTATION: &str = "There are two accepted formats for the asset:
 - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units.
@@ -24,8 +24,8 @@ For example, `100::0xabcdef0123456789` or `1.23::TST`";
 
 /// Returns a tracked Account ID matching a hex string or the default one defined in the Client
 /// config.
-pub(crate) async fn get_input_acc_id_by_prefix_or_default(
-    client: &Client,
+pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
+    client: &Client<AUTH>,
     account_id: Option<String>,
 ) -> Result<AccountId, CliError> {
     let account_id_str = if let Some(account_id_prefix) = account_id {
@@ -53,8 +53,8 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default(
 ///
 /// - Will return a `IdPrefixFetchError` if the provided account ID string can't be parsed as an
 ///   `AccountId` and doesn't correspond to an account tracked by the client either.
-pub(crate) async fn parse_account_id(
-    client: &Client,
+pub(crate) async fn parse_account_id<AUTH>(
+    client: &Client<AUTH>,
     account_id: &str,
 ) -> Result<AccountId, CliError> {
     if account_id.starts_with("0x") {
@@ -67,13 +67,15 @@ pub(crate) async fn parse_account_id(
         .map_err(|_| CliError::Input(format!("Input account ID {account_id} is neither a valid Account ID nor a hex prefix of a known Account ID")))?
         .id())
     } else {
-        Ok(AccountId::from_bech32(account_id)
-            .map_err(|_| {
-                CliError::Input(format!(
-                    "Input account ID {account_id} is not a valid bech32 encoded Account ID"
-                ))
-            })?
-            .1)
+        let address = Address::from_bech32(account_id)
+            .map_err(|err| CliError::Input(format!("error parsing bech32 address: {err}")))?
+            .1;
+        match address {
+            Address::AccountId(account_id_address) => Ok(account_id_address.id()),
+            _ => Err(CliError::Input(format!(
+                "Input account ID {address:?} is not an ID based address"
+            ))),
+        }
     }
 }
 

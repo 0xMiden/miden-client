@@ -1,8 +1,10 @@
 import { Page } from "puppeteer";
+import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
   AccountBuilder,
   AccountComponent,
+  AccountDelta,
   AccountHeader,
   AccountId,
   AccountStorageMode,
@@ -12,11 +14,14 @@ import {
   Assembler,
   AssemblerUtils,
   AuthSecretKey,
+  BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
+  Endpoint,
   Felt,
   FeltArray,
   ForeignAccount,
   FungibleAsset,
+  InputNoteRecord,
   Library,
   Note,
   NoteAssets,
@@ -25,6 +30,7 @@ import {
   NoteExecutionMode,
   NoteFilter,
   NoteFilterTypes,
+  NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
   NoteInputs,
@@ -35,14 +41,17 @@ import {
   OutputNote,
   OutputNotesArray,
   PublicKey,
-  RpoDigest,
   Rpo256,
+  RpcClient,
   SecretKey,
+  Signature,
+  SigningInputs,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
   StorageSlot,
   TestUtils,
+  TokenSymbol,
   TransactionFilter,
   TransactionKernel,
   TransactionProver,
@@ -53,33 +62,43 @@ import {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
-  WebClient,
   NoteAndArgs,
   NoteAndArgsArray,
 } from "../dist/index";
+import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: WebClient;
-    remoteProverUrl: string;
+    client: WebClient & WasmWebClient;
+    MockWebClient: typeof MockWebClient;
+    remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
+    AccountDelta: typeof AccountDelta;
+    AccountStorageDelta: typeof AccountStorageDelta;
+    AccountVaultDelta: typeof AccountVaultDelta;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
+    AccountStorageDelta: typeof AccountStorageDelta;
     AccountStorageMode: typeof AccountStorageMode;
     AccountStorageRequirements: typeof AccountStorageRequirements;
     AccountType: typeof AccountType;
+    AccountVaultDelta: typeof AccountVaultDelta;
     AdviceMap: typeof AdviceMap;
     Assembler: typeof Assembler;
     AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
+    BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
+    Endpoint: typeof Endpoint;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
     ForeignAccount: typeof ForeignAccount;
     FungibleAsset: typeof FungibleAsset;
+    FungibleAssetDelta: typeof FungibleAssetDelta;
+    InputNoteRecord: typeof InputNoteRecord;
     Library: typeof Library;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;
@@ -90,6 +109,7 @@ declare global {
     NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFilterTypes: typeof NoteFilterTypes;
+    NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
     NoteInputs: typeof NoteInputs;
@@ -101,14 +121,16 @@ declare global {
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
     PublicKey: typeof PublicKey;
-    RpoDigest: typeof RpoDigest;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
+    Signature: typeof Signature;
+    SigningInputs: typeof SigningInputs;
     SlotAndKeys: typeof SlotAndKeys;
     SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
     StorageSlot: typeof StorageSlot;
     TestUtils: typeof TestUtils;
+    TokenSymbol: typeof TokenSymbol;
     TransactionFilter: typeof TransactionFilter;
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
@@ -118,6 +140,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
     createClient: () => Promise<void>;
@@ -135,6 +158,6 @@ declare global {
   }
 }
 
-declare module "./mocha.global.setup.mjs" {
+declare module "./playwright.global.setup" {
   export const testingPage: Page;
 }

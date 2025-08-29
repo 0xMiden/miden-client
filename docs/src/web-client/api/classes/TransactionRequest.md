@@ -8,6 +8,16 @@
 
 ## Methods
 
+### authArg()
+
+> **authArg**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### expectedFutureNotes()
 
 > **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
@@ -35,6 +45,16 @@
 #### Returns
 
 `void`
+
+***
+
+### scriptArg()
+
+> **scriptArg**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 

@@ -1,10 +1,9 @@
-use miden_client::{
-    note::{NoteConsumability as NativeNoteConsumability, NoteRelevance},
-    store::InputNoteRecord as NativeInputNoteRecord,
-};
+use miden_client::note::{NoteConsumability as NativeNoteConsumability, NoteRelevance};
+use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, input_note_record::InputNoteRecord};
+use super::account_id::AccountId;
+use super::input_note_record::InputNoteRecord;
 
 #[derive(Clone)]
 #[wasm_bindgen]

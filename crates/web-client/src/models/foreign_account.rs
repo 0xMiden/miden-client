@@ -1,10 +1,9 @@
 use miden_client::transaction::ForeignAccount as NativeForeignAccount;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{account_id::AccountId, account_storage_requirements::AccountStorageRequirements},
-};
+use crate::js_error_with_context;
+use crate::models::account_id::AccountId;
+use crate::models::account_storage_requirements::AccountStorageRequirements;
 
 #[wasm_bindgen]
 pub struct ForeignAccount(NativeForeignAccount);

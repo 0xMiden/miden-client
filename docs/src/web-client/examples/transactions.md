@@ -92,13 +92,15 @@ try {
         console.log("Transaction ID:", tx.id().toString());
         console.log("Account ID:", tx.accountId().toString());
         console.log("Block Number:", tx.blockNum().toString());
-        
+        console.log("Created at:", tx.creationTimestamp());
+
         // Transaction status
         const status = tx.transactionStatus();
         if (status.isPending()) {
             console.log("Status: Pending");
         } else if (status.isCommitted()) {
             console.log("Status: Committed in block", status.getBlockNum());
+            console.log("Status: Committed in timestamp", status.getCommitTimestamp())
         } else if (status.isDiscarded()) {
             console.log("Status: Discarded");
         }
@@ -125,9 +127,10 @@ Transactions can have the following statuses:
 
 You can check the status of a transaction using the following methods:
 - `isPending()`: Returns true if the transaction is pending
-- `isCommitted()`: Returns true if the transaction is committed
-- `isDiscarded()`: Returns true if the transaction is discarded
-- `getBlockNum()`: Returns the block number if the transaction is committed, otherwise returns null
+- `isCommitted()`: Returns `true` if the transaction is committed
+- `isDiscarded()`: Returns `true` if the transaction is discarded
+- `getBlockNum()`: Returns the block number if the transaction is committed, otherwise returns `null`
+- `getCommittedTimestamp()`: Returns the timestamp when the transaction was committed, or `null` if it was not
 
 ## Relevant Documentation
 
@@ -138,7 +141,6 @@ For more detailed information about the classes and methods used in these exampl
 - [TransactionFilter](docs/src/web-client/api/classes/TransactionFilter.md) - Transaction filtering options
 - [TransactionId](docs/src/web-client/api/classes/TransactionId.md) - Transaction identifier class
 - [AccountId](docs/src/web-client/api/classes/AccountId.md) - Account identifier class
-- [RpoDigest](docs/src/web-client/api/classes/RpoDigest.md) - Commitment hash class used for various transaction properties
 - [OutputNotes](docs/src/web-client/api/classes/OutputNotes.md) - Output notes associated with transactions
 - [TransactionStatus](docs/src/web-client/api/classes/TransactionStatus.md) - Transaction status information and methods
 

@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Web Client library that facilitates interaction with the Miden rollup"
-documentation          = "https://docs.rs/miden-client-web/0.10.2"
+documentation          = "https://docs.rs/miden-client-web/0.11.0"
 edition.workspace      = true
 keywords               = ["client", "miden", "wasm", "web"]
 license.workspace      = true
@@ -10,7 +10,7 @@ name                   = "miden-client-web"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.10.2"
+version.workspace      = true
 
 [package.metadata.cargo-machete]
 ignored = ["wasm-bindgen-futures"]
@@ -25,13 +25,13 @@ testing = ["miden-client/testing"]
 # Workspace dependencies
 miden-client = { default-features = false, features = [
   "idxdb",
+  "testing",
   "web-tonic",
-], path = "../rust-client", version = "0.10" }
+], path = "../rust-client", version = "0.11" }
 
 # Miden dependencies
 miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
-
 # External dependencies
 rand                 = { workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
@@ -39,7 +39,6 @@ wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
-miden-client  = { default-features = false, features = ["idxdb", "testing", "web-tonic"], path = "../rust-client" }
 miden-lib     = { default-features = false, features = ["testing"], workspace = true }
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }

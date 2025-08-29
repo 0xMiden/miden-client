@@ -1,12 +1,12 @@
 //! Contains structures and functions related to FPI (Foreign Procedure Invocation) transactions.
 use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::{
-    account::{AccountId, PartialAccount, PartialStorage},
-    asset::PartialVault,
-    transaction::AccountInputs,
-};
+use miden_objects::account::{AccountId, PartialAccount, PartialStorage, PartialStorageMap};
+use miden_objects::asset::PartialVault;
+use miden_objects::crypto::merkle::PartialSmt;
+use miden_objects::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
@@ -135,20 +135,21 @@ impl TryFrom<AccountProof> for AccountInputs {
         }) = state_headers
         {
             // discard slot indices - not needed for execution
-            let storage_map_proofs =
-                storage_slots.into_iter().flat_map(|(_, slots)| slots).collect();
+            let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
+            for (_, slots) in storage_slots {
+                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(slots)?);
+                storage_map_proofs.push(storage_map);
+            }
 
             return Ok(AccountInputs::new(
                 PartialAccount::new(
                     account_header.id(),
                     account_header.nonce(),
                     code,
-                    PartialStorage::new(storage_header, storage_map_proofs),
-                    PartialVault::new(account_header.vault_root(), vec![]), /* We don't use
-                                                                             * vault
-                                                                             * information so we
-                                                                             * leave it
-                                                                             * empty */
+                    PartialStorage::new(storage_header, storage_map_proofs.into_iter())?,
+                    // We don't use vault information so we leave it empty
+                    PartialVault::new(PartialSmt::new())
+                        .expect("Empty partial vault shouldn't fail"),
                 ),
                 witness,
             ));

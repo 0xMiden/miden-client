@@ -20,26 +20,20 @@
 //! notes. For more advanced usage, see the documentation of individual methods in the [`Store`]
 //! trait.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::{
-    Digest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::TransactionId;
 
-use crate::{
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -65,8 +59,13 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
-    OutputNoteState, input_note_states,
+    InputNoteRecord,
+    InputNoteState,
+    NoteExportType,
+    NoteRecordError,
+    OutputNoteRecord,
+    OutputNoteState,
+    input_note_states,
 };
 
 // STORE TRAIT
@@ -130,7 +129,7 @@ pub trait Store: Send + Sync {
 
     /// Returns the nullifiers of all unspent input notes.
     ///
-    /// The default implementation of this method uses [Store::get_input_notes].
+    /// The default implementation of this method uses [`Store::get_input_notes`].
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.get_input_notes(NoteFilter::Unspent)
             .await?
@@ -156,17 +155,17 @@ pub trait Store: Send + Sync {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError>;
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError>;
 
     /// Retrieves a [`BlockHeader`] corresponding to the provided block number and a boolean value
     /// that represents whether the block contains notes relevant to the client. Returns `None` if
     /// the block is not found.
     ///
-    /// The default implementation of this method uses [Store::get_block_headers].
+    /// The default implementation of this method uses [`Store::get_block_headers`].
     async fn get_block_header_by_num(
         &self,
         block_number: BlockNumber,
-    ) -> Result<Option<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Option<(BlockHeader, BlockRelevance)>, StoreError> {
         self.get_block_headers(&[block_number].into_iter().collect())
             .await
             .map(|mut block_headers_list| block_headers_list.pop())
@@ -175,11 +174,11 @@ pub trait Store: Send + Sync {
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
 
-    /// Retrieves all MMR authentication nodes based on [PartialBlockchainFilter].
+    /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError>;
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError>;
 
     /// Inserts blockchain MMR authentication nodes.
     ///
@@ -187,7 +186,7 @@ pub trait Store: Send + Sync {
     /// ignored.
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
     /// Returns peaks information from the blockchain by a specific block number.
@@ -241,7 +240,7 @@ pub trait Store: Send + Sync {
     /// given commitment. If no account state matches the provided commitment, `None` is returned.
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError>;
 
     /// Retrieves a full [`AccountRecord`] object, this contains the account's latest state along
@@ -384,4 +383,35 @@ pub enum NoteFilter {
     /// Return a list containing notes with unverified inclusion proofs. This filter doesn't apply
     /// to output notes.
     Unverified,
+}
+
+// BLOCK RELEVANCE
+// ================================================================================================
+
+/// Expresses metadata about the block header.
+#[derive(Debug, Clone)]
+pub enum BlockRelevance {
+    /// The block header includes notes that the client may consume.
+    HasNotes,
+    /// The block header does not contain notes relevant to the client.
+    Irrelevant,
+}
+
+impl From<BlockRelevance> for bool {
+    fn from(val: BlockRelevance) -> Self {
+        match val {
+            BlockRelevance::HasNotes => true,
+            BlockRelevance::Irrelevant => false,
+        }
+    }
+}
+
+impl From<bool> for BlockRelevance {
+    fn from(has_notes: bool) -> Self {
+        if has_notes {
+            BlockRelevance::HasNotes
+        } else {
+            BlockRelevance::Irrelevant
+        }
+    }
 }

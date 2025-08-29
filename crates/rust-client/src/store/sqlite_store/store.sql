@@ -10,48 +10,63 @@ CREATE TABLE settings (
 
 -- Create account_code table
 CREATE TABLE account_code (
-    root TEXT NOT NULL,         -- root of the Merkle tree for all exported procedures in account module.
+    commitment TEXT NOT NULL,   -- commitment to the account code
     code BLOB NOT NULL,         -- serialized account code.
-    PRIMARY KEY (root)
+    PRIMARY KEY (commitment)
 );
 
 -- Create account_storage table
 CREATE TABLE account_storage (
-    root TEXT NOT NULL,         -- root of the account storage Merkle tree.
-    slots BLOB NOT NULL,        -- serialized key-value pair of non-empty account slots.
-    PRIMARY KEY (root)
+    commitment TEXT NOT NULL,               -- commitment to the account storage
+    slot_index UNSIGNED BIG INT NOT NULL,   -- index of the slot in the storage
+    slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
+    slot_type BLOB NOT NULL,                -- type of the slot, serialized
+    PRIMARY KEY (commitment, slot_index)
 );
 
--- Create account_vaults table
-CREATE TABLE account_vaults (
-    root TEXT NOT NULL,         -- root of the Merkle tree for the account asset vault.
-    assets BLOB NOT NULL,       -- serialized account vault assets.
-    PRIMARY KEY (root)
+CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
+
+-- Create storage_map_entries table
+CREATE TABLE storage_map_entries (
+    root TEXT NOT NULL,     -- root of the storage map
+    key TEXT NOT NULL,      -- key of the storage map entry
+    value TEXT NOT NULL,    -- value of the storage map entry
+    PRIMARY KEY (root, key)
 );
+
+CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
+
+-- Create account_assets table
+CREATE TABLE account_assets (
+    root TEXT NOT NULL,                             -- root of the account_vault Merkle tree
+    vault_key TEXT NOT NULL,                        -- asset's vault key
+    faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
+    asset TEXT NULL,                                -- value that represents the asset in the vault
+    PRIMARY KEY (root, vault_key)
+);
+
+CREATE INDEX idx_account_assets_root ON account_assets(root);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(
     account_id TEXT NOT NULL,              -- ID of the account
-    code_root TEXT NOT NULL,               -- Root of the account_code
+    code_commitment TEXT NOT NULL,         -- Commitment to the account_code
     PRIMARY KEY (account_id),
-    FOREIGN KEY (code_root) REFERENCES account_code(root)
+    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
 -- Create accounts table
 CREATE TABLE accounts (
-    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
-    code_root TEXT NOT NULL,                    -- Root of the account_code
-    storage_root TEXT NOT NULL,                 -- Root of the account_storage Merkle tree.
+    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
+    code_commitment TEXT NOT NULL,              -- Commitment to the account code
+    storage_commitment TEXT NOT NULL,           -- Commitment to the account storage
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
     nonce BIGINT NOT NULL,                      -- Account nonce.
-    committed BOOLEAN NOT NULL,                 -- True if recorded, false if not.
     account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),
-    FOREIGN KEY (code_root) REFERENCES account_code(root),
-    FOREIGN KEY (storage_root) REFERENCES account_storage(root),
-    FOREIGN KEY (vault_root) REFERENCES account_vaults(root)
+    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
@@ -64,8 +79,8 @@ CREATE TABLE transactions (
     details BLOB NOT NULL,                           -- Serialized transaction details
     script_root TEXT,                                -- Transaction script root
     block_num UNSIGNED BIG INT,                      -- Block number for the block against which the transaction was executed.
-    commit_height UNSIGNED BIG INT NULL,             -- Block number of the block at which the transaction was included in the chain.
-    discard_cause BLOB NULL,                         -- Serialized cause of the discarded transaction
+    status_variant INT NOT NULL,                     -- Status variant identifier
+    status BLOB NOT NULL,                            -- Serialized transaction status
     FOREIGN KEY (script_root) REFERENCES transaction_scripts(script_root),
     PRIMARY KEY (id)
 );

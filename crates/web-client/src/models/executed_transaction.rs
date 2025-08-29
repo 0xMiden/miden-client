@@ -1,11 +1,15 @@
 use miden_objects::transaction::ExecutedTransaction as NativeExecutedTransaction;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    account::Account, account_delta::AccountDelta, account_header::AccountHeader,
-    account_id::AccountId, block_header::BlockHeader, input_notes::InputNotes,
-    output_notes::OutputNotes, transaction_args::TransactionArgs, transaction_id::TransactionId,
-};
+use super::account::Account;
+use super::account_delta::AccountDelta;
+use super::account_header::AccountHeader;
+use super::account_id::AccountId;
+use super::block_header::BlockHeader;
+use super::input_notes::InputNotes;
+use super::output_notes::OutputNotes;
+use super::transaction_args::TransactionArgs;
+use super::transaction_id::TransactionId;
 
 #[derive(Clone)]
 #[wasm_bindgen]

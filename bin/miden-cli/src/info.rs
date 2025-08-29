@@ -1,11 +1,16 @@
 use std::fs;
 
-use miden_client::{Client, store::NoteFilter};
+use miden_client::Client;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
-use crate::{errors::CliError, load_config_file};
+use crate::errors::CliError;
+use crate::load_config_file;
 
-pub async fn print_client_info(client: &Client) -> Result<(), CliError> {
+pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &Client<AUTH>,
+) -> Result<(), CliError> {
     let (config, _) = load_config_file()?;
 
     println!("Client version: {}", env!("CARGO_PKG_VERSION"));
@@ -15,7 +20,9 @@ pub async fn print_client_info(client: &Client) -> Result<(), CliError> {
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats(client: &Client) -> Result<(), CliError> {
+async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &Client<AUTH>,
+) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);
     println!("Tracked accounts: {}", client.get_account_headers().await?.len());
     println!("Expected notes: {}", client.get_input_notes(NoteFilter::Expected).await?.len());

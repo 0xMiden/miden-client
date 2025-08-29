@@ -1,8 +1,8 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import { Page, expect } from "@playwright/test";
+import test from "./playwright.global.setup";
 
-export const testStandardFpi = async (): Promise<void> => {
-  return await testingPage.evaluate(async () => {
+export const testStandardFpi = async (page: Page): Promise<void> => {
+  return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
 
@@ -13,8 +13,8 @@ export const testStandardFpi = async (): Promise<void> => {
     let felt2 = new window.Felt(15n);
     let felt3 = new window.Felt(15n);
     let felt4 = new window.Felt(15n);
-    const MAP_KEY = new window.RpoDigest([felt1, felt2, felt3, felt4]);
-    const FPI_STORAGE_VALUE = window.Word.newFromU64s(
+    const MAP_KEY = window.Word.newFromFelts([felt1, felt2, felt3, felt4]);
+    const FPI_STORAGE_VALUE = new window.Word(
       new BigUint64Array([9n, 12n, 18n, 30n])
     );
 
@@ -66,18 +66,7 @@ export const testStandardFpi = async (): Promise<void> => {
     );
     await client.syncState();
 
-    let deploymentTxScript = window.TransactionScript.compile(
-      `
-                begin 
-                    call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
-                end
-            `,
-      window.TransactionKernel.assembler()
-    );
-
-    let txRequest = new window.TransactionRequestBuilder()
-      .withCustomScript(deploymentTxScript)
-      .build();
+    let txRequest = new window.TransactionRequestBuilder().build();
 
     let txResult = await client.newTransaction(foreignAccountId, txRequest);
 
@@ -108,8 +97,6 @@ export const testStandardFpi = async (): Promise<void> => {
         
                 exec.tx::execute_foreign_procedure
                 push.9.12.18.30 assert_eqw
-        
-                call.::miden::contracts::auth::basic::auth__tx_rpo_falcon512 
             end
         `;
     txScript = txScript
@@ -149,8 +136,9 @@ export const testStandardFpi = async (): Promise<void> => {
   });
 };
 
-describe("fpi test", () => {
-  it("runs the standard fpi test successfully", async () => {
-    await expect(testStandardFpi()).to.be.fulfilled;
-  }).timeout(50000);
+test.describe("fpi test", () => {
+  test.setTimeout(50000);
+  test("runs the standard fpi test successfully", async ({ page }) => {
+    await expect(testStandardFpi(page)).resolves.toBeUndefined();
+  });
 });

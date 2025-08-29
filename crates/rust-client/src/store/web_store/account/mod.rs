@@ -1,14 +1,10 @@
-use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    AccountIdError, Digest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
-};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::{AccountIdError, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
@@ -18,23 +14,36 @@ use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_fetch_and_cache_account_auth_by_pub_key, idxdb_get_account_asset_vault,
-    idxdb_get_account_code, idxdb_get_account_header, idxdb_get_account_header_by_commitment,
-    idxdb_get_account_headers, idxdb_get_account_ids, idxdb_get_account_storage,
-    idxdb_get_foreign_account_code, idxdb_lock_account, idxdb_undo_account_states,
+    idxdb_get_account_asset_vault,
+    idxdb_get_account_code,
+    idxdb_get_account_header,
+    idxdb_get_account_header_by_commitment,
+    idxdb_get_account_headers,
+    idxdb_get_account_ids,
+    idxdb_get_account_storage,
+    idxdb_get_foreign_account_code,
+    idxdb_lock_account,
+    idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
 
 mod models;
 use models::{
-    AccountAuthIdxdbObject, AccountCodeIdxdbObject, AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject, AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
+    AccountCodeIdxdbObject,
+    AccountRecordIdxdbObject,
+    AccountStorageIdxdbObject,
+    AccountVaultIdxdbObject,
+    ForeignAccountCodeIdxdbObject,
 };
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault, insert_account_code, insert_account_record, insert_account_storage,
-    parse_account_record_idxdb_object, update_account,
+    insert_account_asset_vault,
+    insert_account_code,
+    insert_account_record,
+    insert_account_storage,
+    parse_account_record_idxdb_object,
+    update_account,
 };
 
 impl WebStore {
@@ -61,10 +70,8 @@ impl WebStore {
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account headers: {js_error:?}",))
         })?;
-
         let account_headers_idxdb: Vec<AccountRecordIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
-
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
             .into_iter()
             .map(parse_account_record_idxdb_object)
@@ -100,7 +107,7 @@ impl WebStore {
 
     pub(crate) async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str = account_commitment.to_string();
 
@@ -149,14 +156,13 @@ impl WebStore {
         Ok(Some(AccountRecord::new(account, status)))
     }
 
-    pub(super) async fn get_account_code(&self, root: Digest) -> Result<AccountCode, StoreError> {
+    pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
         let root_serialized = root.to_string();
 
         let promise = idxdb_get_account_code(root_serialized);
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch account code: {js_error:?}",))
         })?;
-
         let account_code_idxdb: AccountCodeIdxdbObject = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
@@ -168,7 +174,7 @@ impl WebStore {
 
     pub(super) async fn get_account_storage(
         &self,
-        commitment: Digest,
+        commitment: Word,
     ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
@@ -185,7 +191,7 @@ impl WebStore {
 
     pub(super) async fn get_vault_assets(
         &self,
-        commitment: Digest,
+        commitment: Word,
     ) -> Result<Vec<Asset>, StoreError> {
         let commitment_serialized = commitment.to_string();
 
@@ -237,30 +243,6 @@ impl WebStore {
         update_account(new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
-    }
-
-    pub async fn fetch_and_cache_account_auth_by_pub_key(
-        &self,
-        pub_key: String,
-    ) -> Result<Option<String>, StoreError> {
-        let promise = idxdb_fetch_and_cache_account_auth_by_pub_key(pub_key);
-
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to fetch and cache account auth by pub key: {js_error:?}",
-            ))
-        })?;
-
-        let account_auth_idxdb: Option<AccountAuthIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
-
-        match account_auth_idxdb {
-            None => Ok(None),
-            Some(account_auth_idxdb) => {
-                // Convert the auth_info to the appropriate AuthInfo enum variant
-                Ok(Some(account_auth_idxdb.secret_key))
-            },
-        }
     }
 
     pub(crate) async fn upsert_foreign_account_code(
@@ -320,7 +302,7 @@ impl WebStore {
 
     pub(crate) async fn undo_account_states(
         &self,
-        account_states: &[Digest],
+        account_states: &[Word],
     ) -> Result<(), StoreError> {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
@@ -337,15 +319,15 @@ impl WebStore {
     pub(crate) async fn lock_account_on_unexpected_commitment(
         &self,
         account_id: &AccountId,
-        mismatched_digest: &Digest,
+        mismatched_digest: &Word,
     ) -> Result<(), StoreError> {
         // Mismatched digests may be due to stale network data. If the mismatched digest is
         // tracked in the db and corresponds to the mismatched account, it means we
         // got a past update and shouldn't lock the account.
-        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await? {
-            if account.id() == *account_id {
-                return Ok(());
-            }
+        if let Some(account) = self.get_account_header_by_commitment(*mismatched_digest).await?
+            && account.id() == *account_id
+        {
+            return Ok(());
         }
 
         let account_id_str = account_id.to_string();

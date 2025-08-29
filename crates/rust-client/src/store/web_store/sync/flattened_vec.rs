@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct FlattenedU8Vec {
     data: Vec<u8>,
     lengths: Vec<usize>,

@@ -24,6 +24,22 @@
 
 ***
 
+### compileTransactionScript()
+
+> **compileTransactionScript**(`note_script`): [`TransactionScript`](TransactionScript.md)
+
+#### Parameters
+
+##### note\_script
+
+`string`
+
+#### Returns
+
+[`TransactionScript`](TransactionScript.md)
+
+***
+
 ### free()
 
 > **free**(): `void`

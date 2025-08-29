@@ -4,36 +4,37 @@
 //! nodes using an `SQLite` database.
 //! It is compiled only when the `sqlite` feature flag is enabled.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
-use std::{path::PathBuf, string::ToString};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
+use std::path::PathBuf;
+use std::string::ToString;
 
-use db_management::{
-    pool_manager::{Pool, SqlitePoolManager},
-    utils::apply_migrations,
-};
-use miden_objects::{
-    Digest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteTag, Nullifier},
-};
-use rusqlite::{Connection, types::Value};
+use db_management::pool_manager::{Pool, SqlitePoolManager};
+use db_management::utils::apply_migrations;
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteTag, Nullifier};
+use rusqlite::Connection;
+use rusqlite::types::Value;
 use tonic::async_trait;
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    TransactionFilter,
 };
-use crate::{
-    store::StoreError,
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::store::StoreError;
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 mod account;
 mod chain_data;
@@ -67,9 +68,9 @@ impl SqliteStore {
 
         let conn = pool.get().await.map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
-        let _ = conn
-            .interact(apply_migrations)
+        conn.interact(apply_migrations)
             .await
+            .map_err(|e| StoreError::DatabaseError(e.to_string()))?
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
         Ok(SqliteStore { pool })
@@ -198,12 +199,13 @@ impl Store for SqliteStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_numbers = block_numbers.clone();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_block_headers(conn, &block_numbers)
-        })
-        .await
+        Ok(self
+            .interact_with_connection(move |conn| {
+                SqliteStore::get_block_headers(conn, &block_numbers)
+            })
+            .await?)
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
@@ -213,7 +215,7 @@ impl Store for SqliteStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_partial_blockchain_nodes(conn, &filter)
         })
@@ -222,7 +224,7 @@ impl Store for SqliteStore {
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let nodes = nodes.to_vec();
         self.interact_with_connection(move |conn| {
@@ -279,7 +281,7 @@ impl Store for SqliteStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_header_by_commitment(conn, account_commitment)
@@ -361,7 +363,8 @@ pub mod tests {
     use std::boxed::Box;
 
     use super::SqliteStore;
-    use crate::{store::Store, tests::create_test_store_path};
+    use crate::store::Store;
+    use crate::testing::common::create_test_store_path;
 
     fn assert_send_sync<T: Send + Sync>() {}
 

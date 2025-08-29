@@ -7,31 +7,33 @@
 //! **Note:** This implementation is only available when targeting WebAssembly with the `web_store`
 //! feature enabled.
 
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Digest, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId},
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::Nullifier,
-};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::Nullifier;
 use tonic::async_trait;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::{
-    AccountRecord, AccountStatus, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
-use crate::{
-    sync::{NoteTagRecord, StateSyncUpdate},
-    transaction::{TransactionRecord, TransactionStoreUpdate},
-};
+use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
 #[cfg(not(target_arch = "wasm32"))]
 compile_error!("The `idxdb` feature is only supported when targeting wasm32.");
@@ -139,7 +141,7 @@ impl Store for WebStore {
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
-    ) -> Result<Vec<(BlockHeader, bool)>, StoreError> {
+    ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         self.get_block_headers(block_numbers).await
     }
 
@@ -150,13 +152,13 @@ impl Store for WebStore {
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
-    ) -> Result<BTreeMap<InOrderIndex, Digest>, StoreError> {
+    ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.get_partial_blockchain_nodes(filter).await
     }
 
     async fn insert_partial_blockchain_nodes(
         &self,
-        nodes: &[(InOrderIndex, Digest)],
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         self.insert_partial_blockchain_nodes(nodes).await
     }
@@ -204,7 +206,7 @@ impl Store for WebStore {
 
     async fn get_account_header_by_commitment(
         &self,
-        account_commitment: Digest,
+        account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         self.get_account_header_by_commitment(account_commitment).await
     }
@@ -234,4 +236,10 @@ impl Store for WebStore {
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.get_unspent_input_note_nullifiers().await
     }
+}
+
+#[wasm_bindgen(module = "/src/store/web_store/js/utils.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = logWebStoreError)]
+    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
 }

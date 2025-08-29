@@ -1,13 +1,14 @@
-use miden_client::{
-    account::{Account, AccountBuilder, AccountType},
-    crypto::SecretKey,
-};
-use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_client::account::{Account, AccountBuilder, AccountType};
+use miden_client::crypto::SecretKey;
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::wallets::BasicWallet;
 use miden_objects::Felt;
-use rand::{RngCore, SeedableRng, rngs::StdRng};
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;
 
-use crate::{js_error_with_context, models::account_storage_mode::AccountStorageMode};
+use crate::js_error_with_context;
+use crate::models::account_storage_mode::AccountStorageMode;
 
 // HELPERS
 // ================================================================================================
@@ -45,10 +46,10 @@ pub(crate) async fn generate_wallet(
     let (new_account, account_seed) = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode.into())
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key()))
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
         .with_component(BasicWallet)
         .build()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
 
-    Ok((new_account, account_seed, key_pair))
+    Ok((new_account, *account_seed, key_pair))
 }

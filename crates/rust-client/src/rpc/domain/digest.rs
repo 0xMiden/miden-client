@@ -1,32 +1,30 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
 use hex::ToHex;
-use miden_objects::{Digest, Felt, StarkField, note::NoteId};
+use miden_objects::note::NoteId;
+use miden_objects::{Felt, StarkField, Word};
 
-use crate::rpc::{errors::RpcConversionError, generated::digest};
-
-// CONSTANTS
-// ================================================================================================
-
-pub const DIGEST_DATA_SIZE: usize = 32;
+use crate::rpc::errors::RpcConversionError;
+use crate::rpc::generated as proto;
 
 // FORMATTING
 // ================================================================================================
 
-impl Display for digest::Digest {
+impl Display for proto::primitives::Digest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(&self.encode_hex::<String>())
     }
 }
 
-impl Debug for digest::Digest {
+impl Debug for proto::primitives::Digest {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
 }
 
-impl ToHex for &digest::Digest {
+impl ToHex for &proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
         (*self).encode_hex()
     }
@@ -36,9 +34,9 @@ impl ToHex for &digest::Digest {
     }
 }
 
-impl ToHex for digest::Digest {
+impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(DIGEST_DATA_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
         data.extend(format!("{:016x}", self.d0).chars());
         data.extend(format!("{:016x}", self.d1).chars());
         data.extend(format!("{:016x}", self.d2).chars());
@@ -47,7 +45,7 @@ impl ToHex for digest::Digest {
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(DIGEST_DATA_SIZE);
+        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
         data.extend(format!("{:016X}", self.d0).chars());
         data.extend(format!("{:016X}", self.d1).chars());
         data.extend(format!("{:016X}", self.d2).chars());
@@ -59,8 +57,8 @@ impl ToHex for digest::Digest {
 // INTO
 // ================================================================================================
 
-impl From<Digest> for digest::Digest {
-    fn from(value: Digest) -> Self {
+impl From<Word> for proto::primitives::Digest {
+    fn from(value: Word) -> Self {
         Self {
             d0: value[0].as_int(),
             d1: value[1].as_int(),
@@ -70,31 +68,31 @@ impl From<Digest> for digest::Digest {
     }
 }
 
-impl From<&Digest> for digest::Digest {
-    fn from(value: &Digest) -> Self {
+impl From<&Word> for proto::primitives::Digest {
+    fn from(value: &Word) -> Self {
         (*value).into()
     }
 }
 
-impl From<&NoteId> for digest::Digest {
+impl From<&NoteId> for proto::primitives::Digest {
     fn from(value: &NoteId) -> Self {
-        (*value).inner().into()
+        value.as_word().into()
     }
 }
 
-impl From<NoteId> for digest::Digest {
+impl From<NoteId> for proto::primitives::Digest {
     fn from(value: NoteId) -> Self {
-        value.inner().into()
+        value.as_word().into()
     }
 }
 
 // FROM DIGEST
 // ================================================================================================
 
-impl TryFrom<digest::Digest> for [Felt; 4] {
+impl TryFrom<proto::primitives::Digest> for [Felt; 4] {
     type Error = RpcConversionError;
 
-    fn try_from(value: digest::Digest) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         if [value.d0, value.d1, value.d2, value.d3]
             .iter()
             .all(|v| *v < <Felt as StarkField>::MODULUS)
@@ -111,26 +109,26 @@ impl TryFrom<digest::Digest> for [Felt; 4] {
     }
 }
 
-impl TryFrom<digest::Digest> for Digest {
+impl TryFrom<proto::primitives::Digest> for Word {
     type Error = RpcConversionError;
 
-    fn try_from(value: digest::Digest) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         Ok(Self::new(value.try_into()?))
     }
 }
 
-impl TryFrom<&digest::Digest> for [Felt; 4] {
+impl TryFrom<&proto::primitives::Digest> for [Felt; 4] {
     type Error = RpcConversionError;
 
-    fn try_from(value: &digest::Digest) -> Result<Self, Self::Error> {
+    fn try_from(value: &proto::primitives::Digest) -> Result<Self, Self::Error> {
         (*value).try_into()
     }
 }
 
-impl TryFrom<&digest::Digest> for Digest {
+impl TryFrom<&proto::primitives::Digest> for Word {
     type Error = RpcConversionError;
 
-    fn try_from(value: &digest::Digest) -> Result<Self, Self::Error> {
+    fn try_from(value: &proto::primitives::Digest) -> Result<Self, Self::Error> {
         (*value).try_into()
     }
 }

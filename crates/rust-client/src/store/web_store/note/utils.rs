@@ -1,49 +1,71 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use chrono::Utc;
-use miden_objects::{
-    Digest, Word,
-    note::{NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript},
-    utils::Deserializable,
+use miden_objects::Word;
+use miden_objects::note::{
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
 };
+use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{
-    InputNoteIdxdbObject, OutputNoteIdxdbObject,
-    js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note},
-};
-use crate::{
-    note::NoteUpdateTracker,
-    store::{InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState, StoreError},
+use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
+use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::note::NoteUpdateTracker;
+use crate::store::{
+    InputNoteRecord,
+    InputNoteState,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 
 // TYPES
 // ================================================================================================
 
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedInputNoteData {
+    #[wasm_bindgen(js_name = "noteId")]
     pub note_id: String,
+    #[wasm_bindgen(js_name = "noteAssets")]
     pub note_assets: Vec<u8>,
+    #[wasm_bindgen(js_name = "serialNumber")]
     pub serial_number: Vec<u8>,
     pub inputs: Vec<u8>,
+    #[wasm_bindgen(js_name = "noteScriptRoot")]
     pub note_script_root: String,
+    #[wasm_bindgen(js_name = "noteScript")]
     pub note_script: Vec<u8>,
     pub nullifier: String,
+    #[wasm_bindgen(js_name = "stateDiscriminant")]
     pub state_discriminant: u8,
     pub state: Vec<u8>,
+    #[wasm_bindgen(js_name = "createdAt")]
     pub created_at: String,
 }
 
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedOutputNoteData {
+    #[wasm_bindgen(js_name = "noteId")]
     pub note_id: String,
+    #[wasm_bindgen(js_name = "noteAssets")]
     pub note_assets: Vec<u8>,
+    #[wasm_bindgen(js_name = "recipientDigest")]
     pub recipient_digest: String,
     pub metadata: Vec<u8>,
     pub nullifier: Option<String>,
+    #[wasm_bindgen(js_name = "expectedHeight")]
     pub expected_height: u32,
+    #[wasm_bindgen(js_name = "stateDiscriminant")]
     pub state_discriminant: u8,
     pub state: Vec<u8>,
 }
@@ -51,7 +73,7 @@ pub struct SerializedOutputNoteData {
 // ================================================================================================
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let note_id = note.id().inner().to_string();
+    let note_id = note.id().to_hex().to_string();
     let note_assets = note.assets().to_bytes();
 
     let details = note.details();
@@ -104,7 +126,7 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
 }
 
 pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
-    let note_id = note.id().inner().to_string();
+    let note_id = note.id().to_hex().to_string();
     let note_assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
     let metadata = note.metadata().to_bytes();
@@ -181,7 +203,7 @@ pub fn parse_output_note_idxdb_object(
 ) -> Result<OutputNoteRecord, StoreError> {
     let note_metadata = NoteMetadata::read_from_bytes(&note_idxdb.metadata)?;
     let note_assets = NoteAssets::read_from_bytes(&note_idxdb.assets)?;
-    let recipient = Digest::try_from(note_idxdb.recipient_digest)?;
+    let recipient = Word::try_from(note_idxdb.recipient_digest)?;
     let state = OutputNoteState::read_from_bytes(&note_idxdb.state)?;
 
     Ok(OutputNoteRecord::new(

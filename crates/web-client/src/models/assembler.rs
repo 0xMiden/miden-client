@@ -1,10 +1,11 @@
-use miden_objects::{
-    assembly::{Assembler as NativeAssembler, Library as NativeLibrary},
-    note::NoteScript as NativeNoteScript,
-};
+use miden_client::transaction::TransactionScript as NativeTransactionScript;
+use miden_objects::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
+use miden_objects::note::NoteScript as NativeNoteScript;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{library::Library, note_script::NoteScript};
+use crate::models::library::Library;
+use crate::models::note_script::NoteScript;
+use crate::models::transaction_script::TransactionScript;
 
 #[wasm_bindgen]
 pub struct Assembler(NativeAssembler);
@@ -15,8 +16,10 @@ impl Assembler {
     pub fn with_library(self, library: &Library) -> Result<Assembler, JsValue> {
         let native_lib: NativeLibrary = library.into();
 
-        let new_native_asm =
-            self.0.with_library(native_lib).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let new_native_asm = self
+            .0
+            .with_dynamic_library(native_lib)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(Assembler(new_native_asm))
     }
@@ -36,6 +39,20 @@ impl Assembler {
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(NativeNoteScript::new(code).into())
+    }
+
+    #[wasm_bindgen(js_name = "compileTransactionScript")]
+    pub fn compile_transaction_script(
+        self,
+        note_script: &str,
+    ) -> Result<TransactionScript, JsValue> {
+        let code = self
+            .0
+            .clone()
+            .assemble_program(note_script)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        Ok(NativeTransactionScript::new(code).into())
     }
 }
 

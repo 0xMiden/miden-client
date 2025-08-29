@@ -1,27 +1,24 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Digest, Felt, Word,
-    account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage},
-    asset::{Asset, AssetVault},
-    utils::Deserializable,
-};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::utils::Deserializable;
+use miden_objects::{Felt, Word};
 use miden_tx::utils::Serializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
-use super::{
-    js_bindings::{
-        idxdb_get_account_auth_by_pub_key, idxdb_insert_account_asset_vault,
-        idxdb_insert_account_auth, idxdb_insert_account_code, idxdb_insert_account_record,
-        idxdb_insert_account_storage,
-    },
-    models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject},
+use super::js_bindings::{
+    idxdb_get_account_auth_by_pub_key,
+    idxdb_insert_account_asset_vault,
+    idxdb_insert_account_auth,
+    idxdb_insert_account_code,
+    idxdb_insert_account_record,
+    idxdb_insert_account_storage,
 };
+use super::models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject};
 use crate::store::{AccountStatus, StoreError};
 
 pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
@@ -62,14 +59,18 @@ pub async fn insert_account_auth(pub_key: String, secret_key: String) -> Result<
     Ok(())
 }
 
-pub fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, StoreError> {
-    let js_value = idxdb_get_account_auth_by_pub_key(pub_key.clone());
-    let account_auth_idxdb: Option<AccountAuthIdxdbObject> = from_value(js_value)
-        .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsValue> {
+    let promise = idxdb_get_account_auth_by_pub_key(pub_key.clone());
+    let js_secret_key = JsFuture::from(promise).await?;
+
+    let account_auth_idxdb: Option<AccountAuthIdxdbObject> =
+        from_value(js_secret_key).map_err(|err| {
+            JsValue::from_str(&format!("error: failed to deserialize secret key: {err}"))
+        })?;
 
     match account_auth_idxdb {
         Some(account_auth) => Ok(account_auth.secret_key),
-        None => Err(StoreError::AccountKeyNotFound(pub_key)),
+        None => Err(JsValue::from_str(&format!("pub key {pub_key} not found in the store"))),
     }
 }
 
@@ -93,8 +94,8 @@ pub async fn insert_account_record(
         vault_root,
         nonce,
         committed,
-        account_seed,
         commitment,
+        account_seed,
     );
     JsFuture::from(promise).await?;
 
@@ -117,9 +118,9 @@ pub fn parse_account_record_idxdb_object(
     let account_header = AccountHeader::new(
         native_account_id,
         Felt::new(native_nonce),
-        Digest::try_from(&account_header_idxdb.vault_root)?,
-        Digest::try_from(&account_header_idxdb.storage_root)?,
-        Digest::try_from(&account_header_idxdb.code_root)?,
+        Word::try_from(&account_header_idxdb.vault_root)?,
+        Word::try_from(&account_header_idxdb.storage_root)?,
+        Word::try_from(&account_header_idxdb.code_root)?,
     );
 
     let status = match (account_seed, account_header_idxdb.locked) {

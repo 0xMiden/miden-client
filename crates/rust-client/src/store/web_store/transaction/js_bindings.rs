@@ -1,4 +1,5 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
@@ -23,9 +24,9 @@ extern "C" {
     pub fn idxdb_upsert_transaction_record(
         transaction_id: String,
         details: Vec<u8>,
-        script_root: Option<Vec<u8>>,
         block_num: String,
-        committed: Option<String>,
-        discard_cause: Option<Vec<u8>>,
+        statusVariant: u8,
+        status: Vec<u8>,
+        scriptRoot: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 }

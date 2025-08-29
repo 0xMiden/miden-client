@@ -1,21 +1,20 @@
-use miden_client::{
-    note::BlockNumber,
-    transaction::{
-        PaymentNoteDescription, SwapTransactionData,
-        TransactionRequestBuilder as NativeTransactionRequestBuilder,
-        TransactionResult as NativeTransactionResult,
-    },
+use miden_client::note::BlockNumber;
+use miden_client::transaction::{
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequestBuilder as NativeTransactionRequestBuilder,
+    TransactionResult as NativeTransactionResult,
 };
-use miden_objects::{asset::FungibleAsset, note::NoteId as NativeNoteId};
+use miden_objects::asset::FungibleAsset;
+use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient, js_error_with_context,
-    models::{
-        account_id::AccountId, note_type::NoteType, provers::TransactionProver,
-        transaction_request::TransactionRequest, transaction_result::TransactionResult,
-    },
-};
+use crate::models::account_id::AccountId;
+use crate::models::note_type::NoteType;
+use crate::models::provers::TransactionProver;
+use crate::models::transaction_request::TransactionRequest;
+use crate::models::transaction_result::TransactionResult;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
@@ -25,13 +24,13 @@ impl WebClient {
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionResult, JsValue> {
-        self.fetch_and_cache_account_auth_by_account_id(account_id).await?;
-
         if let Some(client) = self.get_mut_inner() {
-            let native_transaction_execution_result: NativeTransactionResult = client
-                .new_transaction(account_id.into(), transaction_request.into())
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to create new transaction"))?;
+            let native_transaction_execution_result: NativeTransactionResult =
+                Box::pin(client.new_transaction(account_id.into(), transaction_request.into()))
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to create new transaction")
+                    })?;
 
             Ok(native_transaction_execution_result.into())
         } else {
@@ -50,17 +49,21 @@ impl WebClient {
         if let Some(client) = self.get_mut_inner() {
             match prover {
                 Some(p) => {
-                    client
-                        .submit_transaction_with_prover(native_transaction_result, p.get_prover())
-                        .await
-                        .map_err(|err| {
-                            js_error_with_context(err, "failed to submit transaction with prover")
-                        })?;
+                    Box::pin(
+                        client.submit_transaction_with_prover(
+                            native_transaction_result,
+                            p.get_prover(),
+                        ),
+                    )
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to submit transaction with prover")
+                    })?;
                 },
                 None => {
-                    client.submit_transaction(native_transaction_result).await.map_err(|err| {
-                        js_error_with_context(err, "failed to submit transaction")
-                    })?;
+                    Box::pin(client.submit_transaction(native_transaction_result)).await.map_err(
+                        |err| js_error_with_context(err, "failed to submit transaction"),
+                    )?;
                 },
             }
             Ok(())
@@ -180,6 +183,7 @@ impl WebClient {
         requested_asset_faucet_id: &AccountId,
         requested_asset_amount: u64,
         note_type: NoteType,
+        payback_note_type: NoteType,
     ) -> Result<TransactionRequest, JsValue> {
         let offered_fungible_asset =
             FungibleAsset::new(offered_asset_faucet_id.into(), offered_asset_amount)
@@ -207,7 +211,12 @@ impl WebClient {
             })?;
 
             NativeTransactionRequestBuilder::new()
-                .build_swap(&swap_transaction_data, note_type.into(), client.rng())
+                .build_swap(
+                    &swap_transaction_data,
+                    note_type.into(),
+                    payback_note_type.into(),
+                    client.rng(),
+                )
                 .map_err(|err| {
                     js_error_with_context(err, "failed to create swap transaction request")
                 })?

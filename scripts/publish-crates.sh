@@ -25,7 +25,8 @@ echo "Publishing crates..."
 
 crates=(
     miden-client
-    miden-cli
+    miden-client-cli
+    miden-client-integration-tests
 )
 
 for crate in ${crates[@]}; do

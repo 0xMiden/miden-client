@@ -2,14 +2,16 @@ use alloc::string::ToString;
 use core::fmt::{self, Display};
 
 use chrono::{Local, TimeZone};
-use miden_objects::{
-    account::AccountId,
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, NoteMetadata},
-    transaction::TransactionId,
-};
+use miden_objects::account::AccountId;
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
+use miden_objects::transaction::TransactionId;
 pub use miden_tx::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
 };
 
 mod committed;

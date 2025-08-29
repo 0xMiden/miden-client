@@ -1,18 +1,14 @@
+use miden_client::Word;
 use miden_client::store::OutputNoteRecord;
-use miden_objects::{
-    Digest,
-    note::{NoteId, NoteScript as NativeNoteScript},
-};
+use miden_objects::note::{NoteId, NoteScript as NativeNoteScript};
 use wasm_bindgen::prelude::*;
 
 use super::models::note_script::NoteScript;
-use crate::{
-    WebClient, js_error_with_context,
-    models::{
-        account_id::AccountId, consumable_note_record::ConsumableNoteRecord,
-        input_note_record::InputNoteRecord, note_filter::NoteFilter,
-    },
-};
+use crate::models::account_id::AccountId;
+use crate::models::consumable_note_record::ConsumableNoteRecord;
+use crate::models::input_note_record::InputNoteRecord;
+use crate::models::note_filter::NoteFilter;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
@@ -38,7 +34,7 @@ impl WebClient {
         note_id: String,
     ) -> Result<Option<InputNoteRecord>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id: NoteId = Digest::try_from(note_id)
+            let note_id: NoteId = Word::try_from(note_id)
                 .map_err(|err| js_error_with_context(err, "failed to parse input note id"))?
                 .into();
             let result = client
@@ -70,7 +66,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "getOutputNote")]
     pub async fn get_output_note(&mut self, note_id: String) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id: NoteId = Digest::try_from(note_id)
+            let note_id: NoteId = Word::try_from(note_id)
                 .map_err(|err| js_error_with_context(err, "failed to parse output note id"))?
                 .into();
             let note: OutputNoteRecord = client
@@ -107,8 +103,7 @@ impl WebClient {
     ) -> Result<Vec<ConsumableNoteRecord>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let native_account_id = account_id.map(Into::into);
-            let result = client
-                .get_consumable_notes(native_account_id)
+            let result = Box::pin(client.get_consumable_notes(native_account_id))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get consumable notes"))?;
 

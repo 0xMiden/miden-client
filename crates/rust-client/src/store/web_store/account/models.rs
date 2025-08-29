@@ -1,7 +1,10 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
-use base64::{Engine as _, engine::general_purpose};
-use serde::{Deserialize, Deserializer, Serialize, de::Error};
+use base64::Engine as _;
+use base64::engine::general_purpose;
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,7 +36,7 @@ pub struct AccountVaultIdxdbObject {
     pub assets: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountRecordIdxdbObject {
     pub id: String,

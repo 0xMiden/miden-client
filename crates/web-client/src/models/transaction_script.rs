@@ -1,8 +1,8 @@
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use super::rpo_digest::RpoDigest;
-use crate::{js_error_with_context, models::assembler::Assembler};
+use crate::models::assembler::Assembler;
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -10,15 +10,15 @@ pub struct TransactionScript(NativeTransactionScript);
 
 #[wasm_bindgen]
 impl TransactionScript {
-    pub fn root(&self) -> RpoDigest {
+    pub fn root(&self) -> Word {
         self.0.root().into()
     }
 
-    pub fn compile(script_code: &str, assembler: &Assembler) -> Result<TransactionScript, JsValue> {
-        let native_tx_script = NativeTransactionScript::compile(script_code, assembler.into())
-            .map_err(|err| js_error_with_context(err, "failed to compile transaction script"))?;
+    // TODO: Replace this for ScriptBuilder
+    pub fn compile(script_code: &str, assembler: Assembler) -> Result<TransactionScript, JsValue> {
+        let tx_script: TransactionScript = assembler.compile_transaction_script(script_code)?;
 
-        Ok(TransactionScript(native_tx_script))
+        Ok(tx_script)
     }
 }
 

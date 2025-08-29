@@ -1,26 +1,23 @@
 use miden_client::auth::AuthSecretKey;
-use miden_objects::{
-    account::{AccountFile, AccountId as NativeAccountId},
-    note::NoteFile,
-    utils::Deserializable,
-};
+use miden_objects::account::{AccountFile, AccountId as NativeAccountId};
+use miden_objects::note::NoteFile;
+use miden_objects::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    WebClient,
-    helpers::generate_wallet,
-    js_error_with_context,
-    models::{
-        account::Account, account_id::AccountId as JsAccountId,
-        account_storage_mode::AccountStorageMode,
-    },
-};
+use crate::helpers::generate_wallet;
+use crate::models::account::Account;
+use crate::models::account_id::AccountId as JsAccountId;
+use crate::models::account_storage_mode::AccountStorageMode;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = "importAccount")]
-    pub async fn import_account(&mut self, account_bytes: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = "importAccountFile")]
+    pub async fn import_account_file(
+        &mut self,
+        account_bytes: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
             let account_bytes_result: Vec<u8> =
@@ -90,8 +87,8 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "failed to import public account"))
     }
 
-    #[wasm_bindgen(js_name = "importNote")]
-    pub async fn import_note(&mut self, note_bytes: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = "importNoteFile")]
+    pub async fn import_note_file(&mut self, note_bytes: JsValue) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let note_bytes_result: Vec<u8> =
                 from_value(note_bytes).map_err(|err| err.to_string())?;

@@ -1,43 +1,45 @@
 #![recursion_limit = "256"]
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::Write,
-    net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
-use miden_lib::{AuthScheme, account::faucets::create_basic_fungible_faucet, utils::Serializable};
+use miden_lib::AuthScheme;
+use miden_lib::account::faucets::create_basic_fungible_faucet;
+use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer, SERVER_MAX_BATCHES_PER_BLOCK, SERVER_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_objects::{
-    Felt, ONE,
-    account::{Account, AccountFile, AuthSecretKey},
-    asset::TokenSymbol,
-    crypto::dsa::rpo_falcon512::SecretKey,
-};
-use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
-use tokio::{
-    net::TcpListener,
-    sync::Barrier,
-    task::{Id, JoinSet},
-};
+use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+use miden_objects::asset::TokenSymbol;
+use miden_objects::block::FeeParameters;
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
+use miden_objects::{Felt, ONE};
+use rand_chacha::ChaCha20Rng;
+use rand_chacha::rand_core::SeedableRng;
+use tokio::net::TcpListener;
+use tokio::sync::Barrier;
+use tokio::task::{Id, JoinSet};
 use url::Url;
 
 pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
+const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -84,6 +86,7 @@ impl NodeBuilder {
     // --------------------------------------------------------------------------------------------
 
     /// Starts all node components and returns a handle to manage them.
+    #[allow(clippy::too_many_lines)]
     pub async fn start(self) -> Result<NodeHandle> {
         miden_node_utils::logging::setup_tracing(
             miden_node_utils::logging::OpenTelemetry::Disabled,
@@ -110,7 +113,13 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let genesis_state = GenesisState::new(vec![account_file.account], version, timestamp);
+        let genesis_state = GenesisState::new(
+            vec![account_file.account],
+            FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
+                .unwrap(),
+            version,
+            timestamp,
+        );
 
         // Bootstrap the store database
         Store::bootstrap(genesis_state, &self.data_directory)
@@ -120,30 +129,30 @@ impl NodeBuilder {
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
-            .context("Failed to bind to RPC gRPC endpoint")?;
+            .context("failed to bind to RPC gRPC endpoint")?;
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store RPC gRPC endpoint")?;
+            .context("failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store ntx-builder gRPC endpoint")?;
+            .context("failed to bind to store ntx-builder gRPC endpoint")?;
         let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("Failed to bind to store block-producer gRPC endpoint")?;
+            .context("failed to bind to store block-producer gRPC endpoint")?;
 
         let store_rpc_address = store_rpc_listener
             .local_addr()
-            .context("Failed to retrieve the store's RPC gRPC address")?;
+            .context("failed to retrieve the store's RPC gRPC address")?;
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
-            .context("Failed to retrieve the store's block-producer gRPC address")?;
+            .context("failed to retrieve the store's block-producer gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
-            .context("Failed to retrieve the store's ntx-builder gRPC address")?;
+            .context("failed to retrieve the store's ntx-builder gRPC address")?;
 
         let block_producer_address = available_socket_addr()
             .await
-            .context("Failed to bind to block-producer gRPC endpoint")?;
+            .context("failed to bind to block-producer gRPC endpoint")?;
 
         // Start components
 
@@ -175,10 +184,18 @@ impl NodeBuilder {
 
         let rpc_id = join_set
             .spawn(async move {
+                let store_url = Url::parse(&format!("http://{store_rpc_address}"))
+                    .context("Failed to parse URL")?;
+                let block_producer_url = Some(
+                    Url::parse(&format!("http://{block_producer_address}"))
+                        .context("Failed to parse URL")?,
+                );
+
                 Rpc {
                     listener: grpc_rpc,
-                    store: store_rpc_address,
-                    block_producer: Some(block_producer_address),
+                    store_url,
+                    block_producer_url,
+                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                 }
                 .serve()
                 .await
@@ -223,7 +240,7 @@ impl NodeBuilder {
     ) -> Result<(Id, SocketAddr)> {
         let store_address = rpc_listener
             .local_addr()
-            .context("Failed to retrieve the store's gRPC address")?;
+            .context("failed to retrieve the store's gRPC address")?;
         Ok((
             join_set
                 .spawn(async move {
@@ -232,6 +249,7 @@ impl NodeBuilder {
                         rpc_listener,
                         block_producer_listener,
                         ntx_builder_listener,
+                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     }
                     .serve()
                     .await
@@ -255,15 +273,18 @@ impl NodeBuilder {
         let block_interval = self.block_interval;
         join_set
             .spawn(async move {
+                let store_url = Url::parse(&format!("http://{store_address}"))
+                    .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,
-                    store_address,
+                    store_url,
+                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
                     block_prover_url: None,
                     batch_interval,
                     block_interval,
-                    max_txs_per_batch: SERVER_MAX_TXS_PER_BATCH,
-                    max_batches_per_block: SERVER_MAX_BATCHES_PER_BLOCK,
+                    max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
+                    max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
                     production_checkpoint: checkpoint,
                 }
                 .serve()
@@ -283,12 +304,18 @@ impl NodeBuilder {
         let store_url =
             Url::parse(&format!("http://{}:{}/", store_address.ip(), store_address.port()))
                 .unwrap();
+        let block_producer_url = Url::parse(&format!(
+            "http://{}:{}/",
+            block_producer_address.ip(),
+            block_producer_address.port()
+        ))
+        .unwrap();
 
         join_set
             .spawn(async move {
                 NetworkTransactionBuilder {
                     store_url,
-                    block_producer_address,
+                    block_producer_url,
                     tx_prover_url: None,
                     ticker_interval: Duration::from_millis(200),
                     bp_checkpoint: production_checkpoint,
@@ -362,6 +389,6 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {
-    let listener = TcpListener::bind("127.0.0.1:0").await.context("Failed to bind to endpoint")?;
-    listener.local_addr().context("Failed to retrieve the address")
+    let listener = TcpListener::bind("127.0.0.1:0").await.context("failed to bind to endpoint")?;
+    listener.local_addr().context("failed to retrieve the address")
 }

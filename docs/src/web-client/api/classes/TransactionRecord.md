@@ -28,13 +28,23 @@
 
 ***
 
-### finalAccountState()
+### creationTimestamp()
 
-> **finalAccountState**(): [`RpoDigest`](RpoDigest.md)
+> **creationTimestamp**(): `bigint`
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+`bigint`
+
+***
+
+### finalAccountState()
+
+> **finalAccountState**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 
@@ -60,21 +70,21 @@
 
 ### initAccountState()
 
-> **initAccountState**(): [`RpoDigest`](RpoDigest.md)
+> **initAccountState**(): [`Word`](Word.md)
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)
+[`Word`](Word.md)
 
 ***
 
 ### inputNoteNullifiers()
 
-> **inputNoteNullifiers**(): [`RpoDigest`](RpoDigest.md)[]
+> **inputNoteNullifiers**(): [`Word`](Word.md)[]
 
 #### Returns
 
-[`RpoDigest`](RpoDigest.md)[]
+[`Word`](Word.md)[]
 
 ***
 

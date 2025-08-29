@@ -1,9 +1,10 @@
 use miden_objects::note::PartialNote as NativePartialNote;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    note_assets::NoteAssets, note_id::NoteId, note_metadata::NoteMetadata, rpo_digest::RpoDigest,
-};
+use super::note_assets::NoteAssets;
+use super::note_id::NoteId;
+use super::note_metadata::NoteMetadata;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -22,7 +23,7 @@ impl PartialNote {
     }
 
     #[wasm_bindgen(js_name = "recipientDigest")]
-    pub fn recipient_digest(&self) -> RpoDigest {
+    pub fn recipient_digest(&self) -> Word {
         self.0.recipient_digest().into()
     }
 

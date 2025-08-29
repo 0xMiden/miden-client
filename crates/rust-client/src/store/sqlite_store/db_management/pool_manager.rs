@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
-use deadpool::{
-    Runtime,
-    managed::{Manager, Metrics, RecycleResult},
-};
-use rusqlite::{Connection, vtab::array};
+use deadpool::Runtime;
+use deadpool::managed::{Manager, Metrics, RecycleResult};
+use rusqlite::Connection;
+use rusqlite::vtab::array;
 
 use super::errors::SqliteStoreError;
 

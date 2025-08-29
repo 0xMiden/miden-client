@@ -2,7 +2,8 @@ use miden_client::transaction::NoteArgs as NativeNoteArgs;
 use miden_objects::note::Note as NativeNote;
 use wasm_bindgen::prelude::*;
 
-use crate::models::{note::Note, word::Word};
+use crate::models::note::Note;
+use crate::models::word::Word;
 
 pub type NoteArgs = Word;
 

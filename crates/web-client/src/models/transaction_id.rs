@@ -1,7 +1,8 @@
 use miden_objects::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
 
-use super::{felt::Felt, rpo_digest::RpoDigest};
+use super::felt::Felt;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -24,8 +25,8 @@ impl TransactionId {
         self.0.to_hex()
     }
 
-    pub fn inner(&self) -> RpoDigest {
-        self.0.inner().into()
+    pub fn inner(&self) -> Word {
+        self.0.as_word().into()
     }
 }
 
@@ -41,5 +42,17 @@ impl From<NativeTransactionId> for TransactionId {
 impl From<&NativeTransactionId> for TransactionId {
     fn from(native_id: &NativeTransactionId) -> Self {
         TransactionId(*native_id)
+    }
+}
+
+impl From<TransactionId> for NativeTransactionId {
+    fn from(transaction_id: TransactionId) -> Self {
+        transaction_id.0
+    }
+}
+
+impl From<&TransactionId> for NativeTransactionId {
+    fn from(id: &TransactionId) -> Self {
+        id.0
     }
 }

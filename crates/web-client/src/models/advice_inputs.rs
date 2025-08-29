@@ -1,7 +1,8 @@
 use miden_objects::vm::AdviceInputs as NativeAdviceInputs;
 use wasm_bindgen::prelude::*;
 
-use super::{felt::Felt, rpo_digest::RpoDigest};
+use super::felt::Felt;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -16,14 +17,16 @@ impl AdviceInputs {
     // TODO: Destructors
 
     pub fn stack(&self) -> Vec<Felt> {
-        self.0.stack().iter().map(Into::into).collect()
+        self.0.stack.iter().map(Into::into).collect()
     }
 
     #[wasm_bindgen(js_name = "mappedValues")]
-    pub fn mapped_values(&self, key: &RpoDigest) -> Option<Vec<Felt>> {
+    pub fn mapped_values(&self, key: &Word) -> Option<Vec<Felt>> {
+        let native_key: miden_objects::Word = key.into();
         self.0
-            .mapped_values(&key.into())
-            .map(|values| values.iter().map(Into::into).collect())
+            .map
+            .get(&native_key)
+            .map(|arc| arc.iter().copied().map(Into::into).collect())
     }
 
     // TODO: Merkle Store

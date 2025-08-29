@@ -1,13 +1,11 @@
-use miden_objects::{
-    Felt as NativeFelt, crypto::hash::rpo::RpoDigest as NativeRpoDigest,
-    vm::AdviceMap as NativeAdviceMap,
-};
+use alloc::sync::Arc;
+
+use miden_objects::vm::AdviceMap as NativeAdviceMap;
+use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
-use super::{
-    felt::{Felt, FeltArray},
-    rpo_digest::RpoDigest,
-};
+use super::felt::{Felt, FeltArray};
+use crate::models::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -17,14 +15,16 @@ pub struct AdviceMap(NativeAdviceMap);
 impl AdviceMap {
     #[wasm_bindgen(constructor)]
     pub fn new() -> AdviceMap {
-        AdviceMap(NativeAdviceMap::new())
+        AdviceMap(NativeAdviceMap::default())
     }
 
-    pub fn insert(&mut self, key: &RpoDigest, value: &FeltArray) -> Option<Vec<Felt>> {
-        let native_rpo_digest: NativeRpoDigest = key.into();
+    pub fn insert(&mut self, key: &Word, value: &FeltArray) -> Option<Vec<Felt>> {
+        let native_key: NativeWord = key.into();
         let native_felts: Vec<NativeFelt> = value.into();
-        let insert_result: Option<Vec<NativeFelt>> = self.0.insert(native_rpo_digest, native_felts);
-        insert_result.map(|native_felts_vec| native_felts_vec.into_iter().map(Into::into).collect())
+        let arc_felts: Arc<[NativeFelt]> = native_felts.into();
+        self.0
+            .insert(native_key, arc_felts)
+            .map(|arc| arc.iter().copied().map(Into::into).collect())
     }
 }
 

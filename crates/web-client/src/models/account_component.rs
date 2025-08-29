@@ -1,14 +1,15 @@
-use miden_lib::account::auth::RpoFalcon512 as NativeRpoFalcon512;
-use miden_objects::{
-    account::{AccountComponent as NativeAccountComponent, StorageSlot as NativeStorageSlot},
-    crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey,
+use miden_lib::account::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
+use miden_objects::account::{
+    AccountComponent as NativeAccountComponent,
+    StorageSlot as NativeStorageSlot,
 };
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    js_error_with_context,
-    models::{assembler::Assembler, secret_key::SecretKey, storage_slot::StorageSlot},
-};
+use crate::js_error_with_context;
+use crate::models::assembler::Assembler;
+use crate::models::secret_key::SecretKey;
+use crate::models::storage_slot::StorageSlot;
 
 #[wasm_bindgen]
 pub struct AccountComponent(NativeAccountComponent);
@@ -40,14 +41,14 @@ impl AccountComponent {
             .0
             .library()
             .exports()
-            .find(|export| export.name.as_str() == procedure_name)
+            .find(|export| export.name.name.as_str() == procedure_name)
             .ok_or_else(|| {
                 JsValue::from_str(&format!(
                     "Procedure {procedure_name} not found in the account component library"
                 ))
             })?;
 
-        let get_proc_mast_id = self.0.library().get_export_node_id(get_proc_export);
+        let get_proc_mast_id = self.0.library().get_export_node_id(&get_proc_export.name);
 
         let digest_hex = self
             .0

@@ -1,14 +1,15 @@
 use alloc::string::ToString;
 
-use miden_objects::{
-    Digest,
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, NoteMetadata},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
+use miden_objects::transaction::TransactionId;
 
 use super::{
-    ConsumedExternalNoteState, InputNoteState, NoteStateHandler, NoteSubmissionData,
+    ConsumedExternalNoteState,
+    InputNoteState,
+    NoteStateHandler,
+    NoteSubmissionData,
     ProcessingAuthenticatedNoteState,
 };
 use crate::store::NoteRecordError;
@@ -22,7 +23,7 @@ pub struct CommittedNoteState {
     /// Inclusion proof for the note inside the chain block.
     pub inclusion_proof: NoteInclusionProof,
     /// Root of the note tree inside the block that verifies the note inclusion proof.
-    pub block_note_root: Digest,
+    pub block_note_root: Word,
 }
 
 impl NoteStateHandler for CommittedNoteState {
@@ -119,7 +120,7 @@ impl miden_tx::utils::Deserializable for CommittedNoteState {
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let inclusion_proof = NoteInclusionProof::read_from(source)?;
-        let block_note_root = Digest::read_from(source)?;
+        let block_note_root = Word::read_from(source)?;
         Ok(CommittedNoteState {
             metadata,
             inclusion_proof,

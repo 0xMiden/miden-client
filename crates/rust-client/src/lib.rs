@@ -28,6 +28,7 @@
 //!
 //! Additionally, the crate re-exports several utility modules:
 //!
+//! - **Assembly:** Types for working with Miden Assembly.
 //! - **Assets:** Types and utilities for working with assets.
 //! - **Auth:** Authentication-related types and functionalities.
 //! - **Blocks:** Types for handling block headers.
@@ -53,15 +54,16 @@
 //! ```rust
 //! use std::sync::Arc;
 //!
-//! use miden_client::{
-//!     Client, ExecutionOptions, Felt,
-//!     crypto::RpoRandomCoin,
-//!     keystore::FilesystemKeyStore,
-//!     rpc::{Endpoint, TonicRpcClient},
-//!     store::{Store, sqlite_store::SqliteStore},
-//! };
-//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, crypto::rand::FeltRng};
-//! use rand::{Rng, rngs::StdRng};
+//! use miden_client::crypto::RpoRandomCoin;
+//! use miden_client::keystore::FilesystemKeyStore;
+//! use miden_client::rpc::{Endpoint, TonicRpcClient};
+//! use miden_client::store::Store;
+//! use miden_client::store::sqlite_store::SqliteStore;
+//! use miden_client::{Client, ExecutionOptions, Felt};
+//! use miden_objects::crypto::rand::FeltRng;
+//! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+//! use rand::Rng;
+//! use rand::rngs::StdRng;
 //!
 //! # pub async fn create_test_client() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create the SQLite store from the client configuration.
@@ -73,7 +75,7 @@
 //! let coin_seed: [u64; 4] = rng.random();
 //!
 //! // Initialize the random coin using the generated seed.
-//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
+//! let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 //! let keystore = FilesystemKeyStore::new("path/to/keys/directory".try_into()?)?;
 //!
 //! // Determine the number of blocks to consider a transaction stale.
@@ -85,11 +87,11 @@
 //!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let client: Client = Client::new(
+//! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
 //!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
-//!     Arc::new(keystore),
+//!     Some(Arc::new(keystore)), // or None if no authenticator is needed
 //!     ExecutionOptions::new(
 //!         Some(MAX_TX_EXECUTION_CYCLES),
 //!         MIN_TX_EXECUTION_CYCLES,
@@ -99,7 +101,9 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
-//! );
+//! )
+//! .await
+//! .unwrap();
 //!
 //! # Ok(())
 //! # }
@@ -124,6 +128,7 @@ pub mod rpc;
 pub mod store;
 pub mod sync;
 pub mod transaction;
+pub mod utils;
 
 #[cfg(feature = "std")]
 pub mod builder;
@@ -139,13 +144,33 @@ mod errors;
 // RE-EXPORTS
 // ================================================================================================
 
+/// Provides types and utilities for working with Miden Assembly.
+pub mod assembly {
+    pub use miden_objects::assembly::{
+        Assembler,
+        DefaultSourceManager,
+        Library,
+        LibraryPath,
+        Module,
+        ModuleKind,
+    };
+}
+
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
-    pub use miden_objects::{
-        account::delta::{
-            AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta, NonFungibleDeltaAction,
-        },
-        asset::{Asset, AssetVault, FungibleAsset, NonFungibleAsset, TokenSymbol},
+    pub use miden_objects::AssetError;
+    pub use miden_objects::account::delta::{
+        AccountVaultDelta,
+        FungibleAssetDelta,
+        NonFungibleAssetDelta,
+        NonFungibleDeltaAction,
+    };
+    pub use miden_objects::asset::{
+        Asset,
+        AssetVault,
+        FungibleAsset,
+        NonFungibleAsset,
+        TokenSymbol,
     };
 }
 
@@ -154,7 +179,7 @@ pub mod asset {
 pub mod auth {
     pub use miden_lib::AuthScheme;
     pub use miden_objects::account::AuthSecretKey;
-    pub use miden_tx::auth::{BasicAuthenticator, TransactionAuthenticator};
+    pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
 
 /// Provides types for working with blocks within the Miden network.
@@ -166,49 +191,48 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::{
-        Digest,
-        crypto::{
-            dsa::rpo_falcon512::SecretKey,
-            merkle::{
-                InOrderIndex, LeafIndex, MerklePath, MmrDelta, MmrPeaks, MmrProof, SmtLeaf,
-                SmtProof,
-            },
-            rand::{FeltRng, RpoRandomCoin},
-        },
+    pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub use miden_objects::crypto::hash::rpo::Rpo256;
+    pub use miden_objects::crypto::merkle::{
+        InOrderIndex,
+        LeafIndex,
+        MerklePath,
+        MerkleStore,
+        MerkleTree,
+        MmrDelta,
+        MmrPeaks,
+        MmrProof,
+        NodeIndex,
+        SmtLeaf,
+        SmtProof,
     };
+    pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
 pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{Felt, ONE, StarkField, Word, ZERO};
+pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
-
-/// Provides various utilities that are commonly used throughout the Miden
-/// client library.
-pub mod utils {
-    pub use miden_tx::utils::{
-        ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
-        bytes_to_hex_string,
-        sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    };
-}
 
 /// Provides test utilities for working with accounts and account IDs
 /// within the Miden network. This module is only available when the `testing` feature is
 /// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
+    pub use miden_lib::testing::note::NoteBuilder;
     pub use miden_objects::testing::*;
+    pub use miden_testing::*;
 
     pub use crate::test_utils::*;
 }
 
 use alloc::sync::Arc;
 
-use miden_lib::utils::ScriptBuilder;
+pub use miden_lib::utils::ScriptBuilder;
+use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
-use miden_tx::{LocalTransactionProver, auth::TransactionAuthenticator};
+use miden_tx::LocalTransactionProver;
+use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
@@ -223,7 +247,7 @@ use store::Store;
 ///   as notes and transactions.
 /// - Connects to a Miden node to periodically sync with the current state of the network.
 /// - Executes, proves, and submits transactions to the network as directed by the user.
-pub struct Client {
+pub struct Client<AUTH> {
     /// The client's store, which provides a way to write and read entities to provide persistence.
     store: Arc<dyn Store>,
     /// An instance of [`FeltRng`] which provides randomness tools for generating new keys,
@@ -237,7 +261,7 @@ pub struct Client {
     tx_prover: Arc<LocalTransactionProver>,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
-    authenticator: Option<Arc<dyn TransactionAuthenticator>>,
+    authenticator: Option<Arc<AUTH>>,
     /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
@@ -248,7 +272,10 @@ pub struct Client {
 }
 
 /// Construction and access methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator,
+{
     // CONSTRUCTOR
     // --------------------------------------------------------------------------------------------
 
@@ -274,19 +301,23 @@ impl Client {
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
-    pub fn new(
+    pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
-        authenticator: Arc<dyn TransactionAuthenticator>,
+        authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
-    ) -> Self {
-        let authenticator = Some(authenticator);
+    ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
-        Self {
+        if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
+            // Set the genesis commitment in the RPC API client for future requests.
+            rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        Ok(Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
@@ -295,7 +326,7 @@ impl Client {
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
-        }
+        })
     }
 
     /// Returns true if the client is in debug mode.
@@ -366,5 +397,30 @@ impl FeltRng for ClientRng {
 
     fn draw_word(&mut self) -> Word {
         self.0.draw_word()
+    }
+}
+
+/// Indicates whether the client is operating in debug mode.
+pub enum DebugMode {
+    Enabled,
+    Disabled,
+}
+
+impl From<DebugMode> for bool {
+    fn from(debug_mode: DebugMode) -> Self {
+        match debug_mode {
+            DebugMode::Enabled => true,
+            DebugMode::Disabled => false,
+        }
+    }
+}
+
+impl From<bool> for DebugMode {
+    fn from(debug_mode: bool) -> DebugMode {
+        if debug_mode {
+            DebugMode::Enabled
+        } else {
+            DebugMode::Disabled
+        }
     }
 }

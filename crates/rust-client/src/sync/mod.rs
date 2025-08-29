@@ -26,11 +26,12 @@
 //! The following example shows how to initiate a state sync and handle the resulting summary:
 //!
 //! ```rust
+//! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
 //! # use miden_objects::{block::BlockHeader, Felt, Word, StarkField};
 //! # use miden_objects::crypto::rand::FeltRng;
-//! # async fn run_sync(client: &mut Client) -> Result<(), ClientError> {
+//! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
 //! // notes, etc. For more information on the data that gets requested, see the doc comments for
@@ -54,37 +55,42 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::{boxed::Box, collections::BTreeSet, vec::Vec};
+use alloc::collections::BTreeSet;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::cmp::max;
 
-use miden_objects::{
-    account::AccountId,
-    block::BlockNumber,
-    note::{NoteId, NoteTag},
-    transaction::{PartialBlockchain, TransactionId},
-};
+use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::transaction::{PartialBlockchain, TransactionId};
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
-use crate::{
-    Client, ClientError,
-    note::NoteScreener,
-    store::{NoteFilter, TransactionFilter},
-};
+use crate::note::NoteScreener;
+use crate::store::{NoteFilter, TransactionFilter};
+use crate::{Client, ClientError};
 mod block_header;
 
 mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{OnNoteReceived, StateSync, on_note_received};
+pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
+    AccountUpdates,
+    BlockUpdates,
+    StateSyncUpdate,
+    TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
-impl Client {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync + 'static,
+{
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
 
@@ -116,23 +122,8 @@ impl Client {
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Box::new({
-                let store_clone = self.store.clone();
-                move |committed_note, public_note, note_screener, note_tags| {
-                    Box::pin(on_note_received(
-                        store_clone.clone(),
-                        committed_note,
-                        public_note,
-                        note_screener,
-                        note_tags,
-                    ))
-                }
-            }),
-            self.tx_graceful_blocks,
-            note_screener,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
         // Get current state of the client
         let accounts = self
@@ -154,7 +145,7 @@ impl Client {
         // Build current partial MMR
         let current_partial_mmr = self.build_current_partial_mmr().await?;
 
-        let all_block_numbers = (0..current_partial_mmr.forest())
+        let all_block_numbers = (0..current_partial_mmr.forest().num_leaves())
             .filter_map(|block_num| {
                 current_partial_mmr.is_tracked(block_num).then_some(BlockNumber::from(
                     u32::try_from(block_num).expect("block number should be less than u32::MAX"),

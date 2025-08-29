@@ -1,28 +1,30 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use miden_lib::account::interface::AccountInterfaceError;
+use miden_objects::account::AccountId;
+use miden_objects::crypto::merkle::MerkleError;
+use miden_objects::note::NoteId;
 use miden_objects::{
-    AccountError, AssetError, Digest, NoteError, PartialBlockchainError, TransactionInputError,
-    TransactionScriptError, account::AccountId, crypto::merkle::MerkleError, note::NoteId,
+    AccountError,
+    AssetError,
+    NoteError,
+    PartialBlockchainError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
 };
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_tx::AuthenticationError;
-use miden_tx::{
-    TransactionExecutorError, TransactionProverError,
-    utils::{DeserializationError, HexParseError},
-};
+use miden_tx::utils::{DeserializationError, HexParseError};
+use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
 use thiserror::Error;
 
-use crate::{
-    note::NoteScreenerError,
-    rpc::RpcError,
-    store::{NoteRecordError, StoreError},
-    transaction::TransactionRequestError,
-};
+use crate::note::NoteScreenerError;
+use crate::rpc::RpcError;
+use crate::store::{NoteRecordError, StoreError};
+use crate::transaction::TransactionRequestError;
 
 // CLIENT ERROR
 // ================================================================================================
@@ -37,7 +39,7 @@ pub enum ClientError {
     #[error("account with id {0} is locked")]
     AccountLocked(AccountId),
     #[error("network account commitment {0} doesn't match the imported account commitment")]
-    AccountCommitmentMismatch(Digest),
+    AccountCommitmentMismatch(Word),
     #[error("account with id {0} is private")]
     AccountIsPrivate(AccountId),
     #[error("account nonce is too low to import")]
@@ -61,9 +63,11 @@ pub enum ClientError {
     #[error(
         "the transaction didn't produce the output notes with the expected recipient digests ({0:?})"
     )]
-    MissingOutputRecipients(Vec<Digest>),
+    MissingOutputRecipients(Vec<Word>),
     #[error("note error")]
     NoteError(#[from] NoteError),
+    #[error("note checker error")]
+    NoteCheckerError(#[from] NoteCheckerError),
     #[error("note import error: {0}")]
     NoteImportError(String),
     #[error("error while converting input note")]
@@ -78,7 +82,7 @@ pub enum ClientError {
     NoteScreenerError(#[from] NoteScreenerError),
     #[error("store error")]
     StoreError(#[from] StoreError),
-    #[error("transaction executor error: {0}")]
+    #[error("transaction executor error")]
     TransactionExecutorError(#[from] TransactionExecutorError),
     #[error("transaction input error")]
     TransactionInputError(#[source] TransactionInputError),

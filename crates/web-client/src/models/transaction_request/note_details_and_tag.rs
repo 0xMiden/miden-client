@@ -1,7 +1,8 @@
 use miden_objects::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
-use crate::models::{note_details::NoteDetails, note_tag::NoteTag};
+use crate::models::note_details::NoteDetails;
+use crate::models::note_tag::NoteTag;
 
 #[derive(Clone)]
 #[wasm_bindgen]

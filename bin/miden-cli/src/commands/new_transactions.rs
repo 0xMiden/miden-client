@@ -1,27 +1,37 @@
-use std::{io, sync::Arc};
+use std::io;
+use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
-use miden_client::{
-    Client, RemoteTransactionProver,
-    account::AccountId,
-    asset::{FungibleAsset, NonFungibleDeltaAction},
-    crypto::Digest,
-    note::{BlockNumber, NoteType as MidenNoteType, build_swap_tag, get_input_note_with_id_prefix},
-    store::NoteRecordError,
-    transaction::{
-        InputNote, OutputNote, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-        TransactionRequestBuilder, TransactionResult,
-    },
+use miden_client::account::AccountId;
+use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::note::{
+    BlockNumber,
+    NoteType as MidenNoteType,
+    build_swap_tag,
+    get_input_note_with_id_prefix,
 };
+use miden_client::store::NoteRecordError;
+use miden_client::transaction::{
+    InputNote,
+    OutputNote,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionResult,
+};
+use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
-use crate::{
-    create_dynamic_table,
-    errors::CliError,
-    utils::{
-        SHARED_TOKEN_DOCUMENTATION, get_input_acc_id_by_prefix_or_default, load_config_file,
-        load_faucet_details_map, parse_account_id,
-    },
+use crate::create_dynamic_table;
+use crate::errors::CliError;
+use crate::utils::{
+    SHARED_TOKEN_DOCUMENTATION,
+    get_input_acc_id_by_prefix_or_default,
+    load_config_file,
+    load_faucet_details_map,
+    parse_account_id,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -62,7 +72,10 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
         let faucet_details_map = load_faucet_details_map()?;
 
@@ -130,7 +143,10 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -191,8 +207,14 @@ pub struct SwapCmd {
     #[arg(short, long, help=format!("Asset requested.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     requested_asset: String,
 
+    /// Visibility of the swap note to be created.
     #[arg(short, long, value_enum)]
     note_type: NoteType,
+
+    /// Visibility of the payback note.
+    #[arg(short, long, value_enum)]
+    payback_note_type: NoteType,
+
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
     force: bool,
@@ -203,7 +225,10 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let faucet_details_map = load_faucet_details_map()?;
@@ -224,7 +249,12 @@ impl SwapCmd {
         );
 
         let transaction_request = TransactionRequestBuilder::new()
-            .build_swap(&swap_transaction, (&self.note_type).into(), client.rng())
+            .build_swap(
+                &swap_transaction,
+                (&self.note_type).into(),
+                (&self.payback_note_type).into(),
+                client.rng(),
+            )
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build swap transaction".to_string())
             })?;
@@ -274,7 +304,10 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let force = self.force;
 
         let mut authenticated_notes = Vec::new();
@@ -342,8 +375,8 @@ impl ConsumeNotesCmd {
 // EXECUTE TRANSACTION
 // ================================================================================================
 
-async fn execute_transaction(
-    client: &mut Client,
+async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
     account_id: AccountId,
     transaction_request: TransactionRequest,
     force: bool,
@@ -451,10 +484,9 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
         let mut table = create_dynamic_table(&["Storage Slot", "Effect"]);
 
         for (updated_item_slot, new_value) in account_delta.storage().values() {
-            let value_digest: Digest = new_value.into();
             table.add_row(vec![
                 updated_item_slot.to_string(),
-                format!("Updated ({})", value_digest.to_hex()),
+                format!("Updated ({})", new_value.to_hex()),
             ]);
         }
 

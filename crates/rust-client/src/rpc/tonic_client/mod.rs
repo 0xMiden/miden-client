@@ -1,41 +1,36 @@
-use alloc::{
-    boxed::Box,
-    collections::{BTreeMap, BTreeSet},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::error::Error;
 
-use miden_objects::{
-    Digest,
-    account::{Account, AccountCode, AccountDelta, AccountId},
-    block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock},
-    crypto::merkle::{MerklePath, MmrProof, SmtProof},
-    note::{NoteId, NoteTag, Nullifier},
-    transaction::ProvenTransaction,
-    utils::Deserializable,
-};
-use miden_tx::utils::{Serializable, sync::RwLock};
+use miden_objects::Word;
+use miden_objects::account::{Account, AccountCode, AccountId};
+use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
+use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
+use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::transaction::ProvenTransaction;
+use miden_objects::utils::Deserializable;
+use miden_tx::utils::Serializable;
+use miden_tx::utils::sync::RwLock;
+use tonic::Status;
 use tracing::info;
 
+use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::note::FetchedNote;
+use super::domain::nullifier::NullifierUpdate;
 use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint,
+    FetchedAccount,
+    NodeRpcClient,
+    NodeRpcClientEndpoint,
+    NoteSyncInfo,
+    RpcError,
     StateSyncInfo,
-    domain::{
-        account::{AccountProof, AccountProofs, AccountUpdateSummary},
-        note::FetchedNote,
-        nullifier::NullifierUpdate,
-    },
-    generated::requests::{
-        CheckNullifiersByPrefixRequest, CheckNullifiersRequest, GetAccountDetailsRequest,
-        GetAccountProofsRequest, GetAccountStateDeltaRequest, GetBlockByNumberRequest,
-        GetNotesByIdRequest, SubmitProvenTransactionRequest, SyncNoteRequest, SyncStateRequest,
-        get_account_proofs_request::{self},
-    },
+    generated as proto,
 };
-use crate::{
-    rpc::{errors::RpcConversionError, generated::requests::GetBlockHeaderByNumberRequest},
-    transaction::ForeignAccount,
-};
+use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::transaction::ForeignAccount;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -57,6 +52,7 @@ pub struct TonicRpcClient {
     client: RwLock<Option<ApiClient>>,
     endpoint: String,
     timeout_ms: u64,
+    genesis_commitment: RwLock<Option<Word>>,
 }
 
 impl TonicRpcClient {
@@ -67,6 +63,7 @@ impl TonicRpcClient {
             client: RwLock::new(None),
             endpoint: endpoint.to_string(),
             timeout_ms,
+            genesis_commitment: RwLock::new(None),
         }
     }
 
@@ -74,33 +71,54 @@ impl TonicRpcClient {
     /// `rpc_api` field is initialized and returns a write guard to it.
     async fn ensure_connected(&self) -> Result<ApiClient, RpcError> {
         if self.client.read().is_none() {
-            let new_client = ApiClient::new_client(self.endpoint.clone(), self.timeout_ms).await?;
-            let mut client = self.client.write();
-            client.replace(new_client);
+            self.connect().await?;
         }
 
         Ok(self.client.read().as_ref().expect("rpc_api should be initialized").clone())
+    }
+
+    /// Connects to the Miden node, setting the client API with the provided URL, timeout and
+    /// genesis commitment.
+    async fn connect(&self) -> Result<(), RpcError> {
+        let genesis_commitment = *self.genesis_commitment.read();
+        let new_client =
+            ApiClient::new_client(self.endpoint.clone(), self.timeout_ms, genesis_commitment)
+                .await?;
+        let mut client = self.client.write();
+        client.replace(new_client);
+
+        Ok(())
     }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
+    /// Sets the genesis commitment for the client and reconnects to the node providing the
+    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// this method does nothing.
+    async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
+        if self.genesis_commitment.read().is_some() {
+            // Genesis commitment is already set, ignoring the new value.
+            return Ok(());
+        }
+
+        *self.genesis_commitment.write() = Some(commitment);
+        self.connect().await
+    }
+
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
     ) -> Result<BlockNumber, RpcError> {
-        let request = SubmitProvenTransactionRequest {
+        let request = proto::transaction::ProvenTransaction {
             transaction: proven_transaction.to_bytes(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
         Ok(BlockNumber::from(api_response.into_inner().block_height))
@@ -111,7 +129,7 @@ impl NodeRpcClient for TonicRpcClient {
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
     ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        let request = GetBlockHeaderByNumberRequest {
+        let request = proto::shared::BlockHeaderByNumberRequest {
             block_num: block_num.as_ref().map(BlockNumber::as_u32),
             include_mmr_proof: Some(include_mmr_proof),
         };
@@ -120,11 +138,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockHeaderByNumber, status)
         })?;
 
         let response = api_response.into_inner();
@@ -144,7 +159,7 @@ impl NodeRpcClient for TonicRpcClient {
                 .try_into()?;
 
             Some(MmrProof {
-                forest: forest as usize,
+                forest: Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
                 position: block_header.block_num().as_usize(),
                 merkle_path,
             })
@@ -156,17 +171,14 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let request = GetNotesByIdRequest {
-            note_ids: note_ids.iter().map(|id| id.inner().into()).collect(),
+        let request = proto::note::NoteIdList {
+            ids: note_ids.iter().map(|id| (*id).into()).collect(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
         })?;
 
         let response_notes = api_response
@@ -180,7 +192,7 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
-    /// into a [StateSyncInfo] struct.
+    /// into a [`StateSyncInfo`] struct.
     async fn sync_state(
         &self,
         block_num: BlockNumber,
@@ -191,7 +203,7 @@ impl NodeRpcClient for TonicRpcClient {
 
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncStateRequest {
+        let request = proto::rpc_store::SyncStateRequest {
             block_num: block_num.as_u32(),
             account_ids,
             note_tags,
@@ -199,41 +211,34 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_state(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncState.to_string(), err.to_string())
+        let response = rpc_api.sync_state(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncState, status)
         })?;
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [FetchedAccount] from
-    /// the `GetAccountDetailsResponse` response.
+    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
+    /// from the `GetAccountDetailsResponse` response.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
     ///
     /// - There was an error sending the request to the node.
-    /// - The answer had a `None` for one of the expected fields (account, summary,
-    ///   account_commitment, details).
+    /// - The answer had a `None` for one of the expected fields (`account`, `summary`,
+    ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let request = GetAccountDetailsRequest { account_id: Some(account_id.into()) };
+        let request = proto::account::AccountId { id: account_id.to_bytes() };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountDetails.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.get_account_details(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
         })?;
         let response = response.into_inner();
-        let account_info = response.details.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `account`".to_string(),
-        ))?;
-
-        let account_summary = account_info.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response's account should have a `summary`".to_string(),
+        let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
+            "GetAccountDetails response should have an `summary`".to_string(),
         ))?;
 
         let commitment =
@@ -248,11 +253,11 @@ impl NodeRpcClient for TonicRpcClient {
         if account_id.is_private() {
             Ok(FetchedAccount::Private(account_id, update_summary))
         } else {
-            let details_bytes = account_info.details.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have `details`".to_string(),
-            ))?;
-
-            let account = Account::read_from_bytes(&details_bytes)?;
+            let account = Account::read_from_bytes(&response.details.ok_or(
+                RpcError::ExpectedDataMissing(
+                    "GetAccountDetails response should have an `account`".to_string(),
+                ),
+            )?)?;
 
             Ok(FetchedAccount::Public(account, update_summary))
         }
@@ -275,20 +280,21 @@ impl NodeRpcClient for TonicRpcClient {
         known_account_codes: Vec<AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let requested_accounts = account_requests.len();
-        let mut rpc_account_requests: Vec<get_account_proofs_request::AccountRequest> =
-            Vec::with_capacity(account_requests.len());
+        let mut rpc_account_requests: Vec<
+            proto::rpc_store::account_proofs_request::AccountRequest,
+        > = Vec::with_capacity(account_requests.len());
 
         for foreign_account in account_requests {
-            rpc_account_requests.push(get_account_proofs_request::AccountRequest {
+            rpc_account_requests.push(proto::rpc_store::account_proofs_request::AccountRequest {
                 account_id: Some(foreign_account.account_id().into()),
                 storage_requests: foreign_account.storage_slot_requirements().into(),
             });
         }
 
-        let known_account_codes: BTreeMap<Digest, AccountCode> =
+        let known_account_codes: BTreeMap<Word, AccountCode> =
             known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
 
-        let request = GetAccountProofsRequest {
+        let request = proto::rpc_store::AccountProofsRequest {
             account_requests: rpc_account_requests,
             include_headers: Some(true),
             code_commitments: known_account_codes.keys().map(Into::into).collect(),
@@ -299,11 +305,8 @@ impl NodeRpcClient for TonicRpcClient {
         let response = rpc_api
             .get_account_proofs(request)
             .await
-            .map_err(|err| {
-                RpcError::RequestError(
-                    NodeRpcClientEndpoint::GetAccountProofs.to_string(),
-                    err.to_string(),
-                )
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
             })?
             .into_inner();
 
@@ -344,7 +347,7 @@ impl NodeRpcClient for TonicRpcClient {
         Ok((block_num, account_proofs))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [NoteSyncInfo] from the
+    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
     /// response.
     async fn sync_notes(
         &self,
@@ -353,12 +356,13 @@ impl NodeRpcClient for TonicRpcClient {
     ) -> Result<NoteSyncInfo, RpcError> {
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = SyncNoteRequest { block_num: block_num.as_u32(), note_tags };
+        let request =
+            proto::rpc_store::SyncNotesRequest { block_num: block_num.as_u32(), note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_notes(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncNotes.to_string(), err.to_string())
+        let response = rpc_api.sync_notes(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNotes, status)
         })?;
 
         response.into_inner().try_into()
@@ -369,7 +373,7 @@ impl NodeRpcClient for TonicRpcClient {
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = CheckNullifiersByPrefixRequest {
+        let request = proto::rpc_store::CheckNullifiersByPrefixRequest {
             nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
             prefix_len: 16,
             block_num: block_num.as_u32(),
@@ -377,11 +381,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiersByPrefix, status)
         })?;
         let response = response.into_inner();
         let nullifiers = response
@@ -395,17 +396,14 @@ impl NodeRpcClient for TonicRpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = CheckNullifiersRequest {
-            nullifiers: nullifiers.iter().map(|nul| nul.inner().into()).collect(),
+        let request = proto::rpc_store::NullifierList {
+            nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiers.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
         })?;
 
         let response = response.into_inner();
@@ -414,45 +412,13 @@ impl NodeRpcClient for TonicRpcClient {
         Ok(proofs)
     }
 
-    async fn get_account_state_delta(
-        &self,
-        account_id: AccountId,
-        from_block: BlockNumber,
-        to_block: BlockNumber,
-    ) -> Result<AccountDelta, RpcError> {
-        let request = GetAccountStateDeltaRequest {
-            account_id: Some(account_id.into()),
-            from_block_num: from_block.as_u32(),
-            to_block_num: to_block.as_u32(),
-        };
-
-        let mut rpc_api = self.ensure_connected().await?;
-
-        let response = rpc_api.get_account_state_delta(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountStateDelta.to_string(),
-                err.to_string(),
-            )
-        })?;
-
-        let response = response.into_inner();
-        let delta = AccountDelta::read_from_bytes(&response.delta.ok_or(
-            RpcError::ExpectedDataMissing("GetAccountStateDeltaResponse.delta".to_string()),
-        )?)?;
-
-        Ok(delta)
-    }
-
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = GetBlockByNumberRequest { block_num: block_num.as_u32() };
+        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.get_block_by_number(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockByNumber, status)
         })?;
 
         let response = response.into_inner();
@@ -462,6 +428,32 @@ impl NodeRpcClient for TonicRpcClient {
             ))?)?;
 
         Ok(block)
+    }
+}
+
+// ERRORS
+// ================================================================================================
+
+impl RpcError {
+    pub fn from_grpc_error(endpoint: NodeRpcClientEndpoint, status: Status) -> Self {
+        if let Some(accept_error) = AcceptHeaderError::try_from_message(status.message()) {
+            return Self::AcceptHeaderError(accept_error);
+        }
+
+        let error_kind = GrpcError::from(&status);
+        let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
+
+        Self::GrpcError {
+            endpoint,
+            error_kind,
+            source: Some(source),
+        }
+    }
+}
+
+impl From<&Status> for GrpcError {
+    fn from(status: &Status) -> Self {
+        GrpcError::from_code(status.code() as i32, Some(status.message().to_string()))
     }
 }
 

@@ -1,24 +1,18 @@
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    vec::Vec,
-};
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
 
-use miden_objects::{
-    Digest,
-    account::AccountId,
-    block::{BlockHeader, BlockNumber},
-    crypto::merkle::{InOrderIndex, MmrPeaks},
-    note::{NoteId, Nullifier},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::account::AccountId;
+use miden_objects::block::{BlockHeader, BlockNumber};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::note::{NoteId, Nullifier};
+use miden_objects::transaction::TransactionId;
 
 use super::SyncSummary;
-use crate::{
-    account::Account,
-    note::{NoteUpdateTracker, NoteUpdateType},
-    rpc::domain::transaction::TransactionInclusion,
-    transaction::{DiscardCause, TransactionRecord, TransactionStatus},
-};
+use crate::account::Account;
+use crate::note::{NoteUpdateTracker, NoteUpdateType};
+use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 // STATE SYNC UPDATE
 // ================================================================================================
@@ -110,14 +104,14 @@ pub struct BlockUpdates {
     block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
     /// headers.
-    new_authentication_nodes: Vec<(InOrderIndex, Digest)>,
+    new_authentication_nodes: Vec<(InOrderIndex, Word)>,
 }
 
 impl BlockUpdates {
     /// Creates a new instance of [`BlockUpdates`].
     pub fn new(
         block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
-        new_authentication_nodes: Vec<(InOrderIndex, Digest)>,
+        new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) -> Self {
         Self { block_headers, new_authentication_nodes }
     }
@@ -130,7 +124,7 @@ impl BlockUpdates {
 
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
     /// block headers.
-    pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Digest)] {
+    pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {
         &self.new_authentication_nodes
     }
 
@@ -160,7 +154,7 @@ impl TransactionUpdateTracker {
     pub fn committed_transactions(&self) -> impl Iterator<Item = &TransactionRecord> {
         self.transactions
             .values()
-            .filter(|tx| matches!(tx.status, TransactionStatus::Committed(_)))
+            .filter(|tx| matches!(tx.status, TransactionStatus::Committed { .. }))
     }
 
     /// Returns a reference to discarded transactions.
@@ -186,10 +180,14 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
-    pub fn apply_transaction_inclusion(&mut self, transaction_inclusion: &TransactionInclusion) {
+    pub fn apply_transaction_inclusion(
+        &mut self,
+        transaction_inclusion: &TransactionInclusion,
+        timestamp: u64,
+    ) {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
-            transaction.commit_transaction(transaction_inclusion.block_num.into());
+            transaction.commit_transaction(transaction_inclusion.block_num.into(), timestamp);
         }
     }
 
@@ -227,14 +225,14 @@ impl TransactionUpdateTracker {
                 transaction
                     .details
                     .input_note_nullifiers
-                    .contains(&input_note_nullifier.inner())
+                    .contains(&input_note_nullifier.as_word())
             },
             DiscardCause::InputConsumed,
         );
     }
 
     /// Discards transactions that have the same initial account state as the provided one.
-    pub fn apply_invalid_initial_account_state(&mut self, invalid_account_state: Digest) {
+    pub fn apply_invalid_initial_account_state(&mut self, invalid_account_state: Word) {
         self.discard_transaction_with_predicate(
             |transaction| transaction.details.init_account_state == invalid_account_state,
             DiscardCause::DiscardedInitialState,
@@ -276,14 +274,14 @@ pub struct AccountUpdates {
     /// These updates may represent a stale account commitment (meaning that the latest local state
     /// hasn't been committed). If this is not the case, the account may be locked until the state
     /// is restored manually.
-    mismatched_private_accounts: Vec<(AccountId, Digest)>,
+    mismatched_private_accounts: Vec<(AccountId, Word)>,
 }
 
 impl AccountUpdates {
     /// Creates a new instance of `AccountUpdates`.
     pub fn new(
         updated_public_accounts: Vec<Account>,
-        mismatched_private_accounts: Vec<(AccountId, Digest)>,
+        mismatched_private_accounts: Vec<(AccountId, Word)>,
     ) -> Self {
         Self {
             updated_public_accounts,
@@ -297,7 +295,7 @@ impl AccountUpdates {
     }
 
     /// Returns the mismatched private accounts.
-    pub fn mismatched_private_accounts(&self) -> &[(AccountId, Digest)] {
+    pub fn mismatched_private_accounts(&self) -> &[(AccountId, Word)] {
         &self.mismatched_private_accounts
     }
 

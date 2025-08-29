@@ -28,6 +28,16 @@
 
 ***
 
+### getCommitTimestamp()
+
+> **getCommitTimestamp**(): `bigint`
+
+#### Returns
+
+`bigint`
+
+***
+
 ### isCommitted()
 
 > **isCommitted**(): `boolean`
@@ -60,13 +70,17 @@
 
 ### committed()
 
-> `static` **committed**(`block_num`): `TransactionStatus`
+> `static` **committed**(`block_num`, `commit_timestamp`): `TransactionStatus`
 
 #### Parameters
 
 ##### block\_num
 
 `number`
+
+##### commit\_timestamp
+
+`bigint`
 
 #### Returns
 

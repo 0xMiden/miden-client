@@ -1,14 +1,15 @@
 use alloc::string::ToString;
 
-use miden_objects::{
-    Digest,
-    block::BlockHeader,
-    note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment},
-    transaction::TransactionId,
-};
+use miden_objects::Word;
+use miden_objects::block::BlockHeader;
+use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_objects::transaction::TransactionId;
 
 use super::{
-    CommittedNoteState, ConsumedExternalNoteState, InputNoteState, NoteStateHandler,
+    CommittedNoteState,
+    ConsumedExternalNoteState,
+    InputNoteState,
+    NoteStateHandler,
     UnverifiedNoteState,
 };
 use crate::store::NoteRecordError;
@@ -22,7 +23,7 @@ pub struct InvalidNoteState {
     /// Inclusion proof for the note inside the chain block, verified to be invalid.
     pub invalid_inclusion_proof: NoteInclusionProof,
     /// Root of the note tree inside the block that invalidates the note inclusion proof.
-    pub block_note_root: Digest,
+    pub block_note_root: Word,
 }
 
 impl NoteStateHandler for InvalidNoteState {
@@ -115,7 +116,7 @@ impl miden_tx::utils::Deserializable for InvalidNoteState {
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let invalid_inclusion_proof = NoteInclusionProof::read_from(source)?;
-        let block_note_root = Digest::read_from(source)?;
+        let block_note_root = Word::read_from(source)?;
         Ok(InvalidNoteState {
             metadata,
             invalid_inclusion_proof,

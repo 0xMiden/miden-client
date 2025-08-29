@@ -1,5 +1,8 @@
 use miden_client::store::TransactionFilter as NativeTransactionFilter;
+use miden_client::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
+
+use super::transaction_id::TransactionId;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -11,8 +14,19 @@ impl TransactionFilter {
         TransactionFilter(NativeTransactionFilter::All)
     }
 
+    pub fn ids(ids: Vec<TransactionId>) -> TransactionFilter {
+        let native_transaction_ids: Vec<NativeTransactionId> =
+            ids.into_iter().map(Into::into).collect();
+        TransactionFilter(NativeTransactionFilter::Ids(native_transaction_ids))
+    }
+
     pub fn uncommitted() -> TransactionFilter {
         TransactionFilter(NativeTransactionFilter::Uncommitted)
+    }
+
+    #[wasm_bindgen(js_name = "expiredBefore")]
+    pub fn expired_before(block_num: u32) -> TransactionFilter {
+        TransactionFilter(NativeTransactionFilter::ExpiredBefore(block_num.into()))
     }
 }
 

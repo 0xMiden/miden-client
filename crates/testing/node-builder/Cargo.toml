@@ -8,7 +8,7 @@ name                   = "node-builder"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.10.0"
+version.workspace      = true
 
 [[bin]]
 name = "testing-node-builder"
@@ -25,7 +25,7 @@ miden-node-utils          = { workspace = true }
 miden-objects             = { workspace = true }
 
 # External dependencies
-anyhow      = "1.0"
+anyhow      = { workspace = true }
 rand        = { workspace = true }
 rand_chacha = { version = "0.9" }
 tokio       = { features = ["full"], version = "1.0" }

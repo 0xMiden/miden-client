@@ -1,4 +1,5 @@
-import wasm from "../../dist/wasm.js";
+import loadWasm from "../../dist/wasm.js";
+const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "../constants.js";
 
 /**
@@ -35,6 +36,7 @@ import { MethodName, WorkerAction } from "../constants.js";
 
 // Global state variables.
 let wasmWebClient = null;
+let wasmSeed = null; // Seed for the WASM WebClient, if needed.
 let ready = false; // Indicates if the worker is fully initialized.
 let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
@@ -89,7 +91,6 @@ const methodHandlers = {
     return serializedTransactionResult.buffer;
   },
   [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    // Destructure the arguments. The prover may be undefined.
     const [serializedTransactionResult, serializedProver] = args;
     const transactionResult = wasm.TransactionResult.deserialize(
       new Uint8Array(serializedTransactionResult)
@@ -120,6 +121,26 @@ const methodHandlers = {
   },
 };
 
+// Add mock methods to the handler mapping.
+methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
+  let [serializedMockChain] = args;
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
+
+  return await methodHandlers[MethodName.SYNC_STATE]();
+};
+
+methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
+  let serializedMockChain = args.pop();
+  serializedMockChain = new Uint8Array(serializedMockChain);
+  wasmWebClient = new wasm.WebClient();
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
+
+  await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
+
+  return wasmWebClient.serializeMockChain().buffer;
+};
+
 /**
  * Process a single message event.
  */
@@ -131,6 +152,8 @@ async function processMessage(event) {
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createClient(rpcUrl, seed);
+
+      wasmSeed = seed;
       ready = true;
       // Signal that the worker is fully initialized.
       self.postMessage({ ready: true });

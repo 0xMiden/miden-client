@@ -1,10 +1,9 @@
-use miden_client::{
-    Client,
-    note::{NoteExecutionMode, NoteTag},
-};
+use miden_client::Client;
+use miden_client::note::{NoteExecutionMode, NoteTag};
 use tracing::info;
 
-use crate::{Parser, create_dynamic_table, errors::CliError, load_config_file};
+use crate::errors::CliError;
+use crate::{Parser, create_dynamic_table};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "View and manage tags. Defaults to `list` command")]
@@ -23,7 +22,7 @@ pub struct TagsCmd {
 }
 
 impl TagsCmd {
-    pub async fn execute(&self, client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match self {
             TagsCmd { add: Some(tag), .. } => {
                 add_tag(client, *tag).await?;
@@ -41,18 +40,16 @@ impl TagsCmd {
 
 // HELPERS
 // ================================================================================================
-async fn list_tags(client: Client) -> Result<(), CliError> {
-    let (cli_config, _) = load_config_file()?;
+async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let mut table = create_dynamic_table(&["Tag", "Source"]);
 
     let tags = client.get_note_tags().await?;
 
     for tag in tags {
         let source = match tag.source {
-            miden_client::sync::NoteTagSource::Account(account_id) => format!(
-                "Account({})",
-                account_id.to_bech32(cli_config.rpc.endpoint.0.to_network_id()?),
-            ),
+            miden_client::sync::NoteTagSource::Account(account_id) => {
+                format!("Account({})", account_id.to_hex())
+            },
             miden_client::sync::NoteTagSource::Note(note_id) => format!("Note({note_id})"),
             miden_client::sync::NoteTagSource::User => "User".to_string(),
         };
@@ -65,7 +62,7 @@ async fn list_tags(client: Client) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn add_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
+async fn add_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
     let tag: NoteTag = tag.into();
     let execution_mode = match tag.execution_mode() {
         NoteExecutionMode::Local => "Local",
@@ -81,7 +78,7 @@ async fn add_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn remove_tag(mut client: Client, tag: u32) -> Result<(), CliError> {
+async fn remove_tag<AUTH>(mut client: Client<AUTH>, tag: u32) -> Result<(), CliError> {
     client.remove_note_tag(tag.into()).await?;
     println!("Tag {tag} removed");
     Ok(())

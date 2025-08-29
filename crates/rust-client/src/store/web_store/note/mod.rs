@@ -1,24 +1,32 @@
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use js_sys::{Array, Promise};
-use miden_objects::{Digest, note::Nullifier};
+use miden_objects::Word;
+use miden_objects::note::Nullifier;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::WebStore;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, StoreError,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_input_notes, idxdb_get_input_notes_from_ids, idxdb_get_input_notes_from_nullifiers,
-    idxdb_get_output_notes, idxdb_get_output_notes_from_ids,
-    idxdb_get_output_notes_from_nullifiers, idxdb_get_unspent_input_note_nullifiers,
+    idxdb_get_input_notes,
+    idxdb_get_input_notes_from_ids,
+    idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_output_notes,
+    idxdb_get_output_notes_from_ids,
+    idxdb_get_output_notes_from_nullifiers,
+    idxdb_get_unspent_input_note_nullifiers,
 };
 
 mod models;
@@ -77,7 +85,7 @@ impl WebStore {
 
         nullifiers_as_str
             .into_iter()
-            .map(|s| Digest::try_from(s).map(Nullifier::from).map_err(StoreError::HexParseError))
+            .map(|s| Word::try_from(s).map(Nullifier::from).map_err(StoreError::WordError))
             .collect::<Result<Vec<Nullifier>, _>>()
     }
 
@@ -135,11 +143,11 @@ impl NoteFilter {
             },
             NoteFilter::List(ids) => {
                 let note_ids_as_str: Vec<String> =
-                    ids.iter().map(|id| id.inner().to_string()).collect();
+                    ids.iter().map(|id| id.as_word().to_string()).collect();
                 idxdb_get_input_notes_from_ids(note_ids_as_str)
             },
             NoteFilter::Unique(id) => {
-                let note_id_as_str = id.inner().to_string();
+                let note_id_as_str = id.as_word().to_string();
                 let note_ids = vec![note_id_as_str];
                 idxdb_get_input_notes_from_ids(note_ids)
             },
@@ -184,11 +192,11 @@ impl NoteFilter {
             },
             NoteFilter::List(ids) => {
                 let note_ids_as_str: Vec<String> =
-                    ids.iter().map(|id| id.inner().to_string()).collect();
+                    ids.iter().map(|id| id.as_word().to_string()).collect();
                 idxdb_get_output_notes_from_ids(note_ids_as_str)
             },
             NoteFilter::Unique(id) => {
-                let note_id_as_str = id.inner().to_string();
+                let note_id_as_str = id.as_word().to_string();
                 let note_ids = vec![note_id_as_str];
                 idxdb_get_output_notes_from_ids(note_ids)
             },

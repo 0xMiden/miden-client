@@ -1,23 +1,17 @@
 use alloc::string::String;
-use std::{
-    fs::OpenOptions,
-    hash::{DefaultHasher, Hash, Hasher},
-    io::{BufRead, BufReader, BufWriter, Write},
-    path::PathBuf,
-    string::ToString,
-    sync::Arc,
-    vec::Vec,
-};
+use std::fs::OpenOptions;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::PathBuf;
+use std::string::ToString;
+use std::sync::{Arc, RwLock};
+use std::vec::Vec;
 
-use miden_objects::{
-    Digest, Felt, Word,
-    account::{AccountDelta, AuthSecretKey},
-};
-use miden_tx::{
-    AuthenticationError,
-    auth::TransactionAuthenticator,
-    utils::{Deserializable, Serializable, sync::RwLock},
-};
+use miden_objects::account::AuthSecretKey;
+use miden_objects::{Felt, Word};
+use miden_tx::AuthenticationError;
+use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
+use miden_tx::utils::{Deserializable, Serializable};
 use rand::{Rng, SeedableRng};
 
 use super::KeyStoreError;
@@ -29,14 +23,14 @@ use super::KeyStoreError;
 /// The keystore requires an RNG component for generating Falcon signatures at the moment of
 /// transaction signing.
 #[derive(Debug, Clone)]
-pub struct FilesystemKeyStore<R: Rng> {
+pub struct FilesystemKeyStore<R: Rng + Send + Sync> {
     /// The random number generator used to generate signatures.
     rng: Arc<RwLock<R>>,
     /// The directory where the keys are stored and read from.
     keys_directory: PathBuf,
 }
 
-impl<R: Rng> FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     pub fn with_rng(keys_directory: PathBuf, rng: R) -> Result<Self, KeyStoreError> {
         if !keys_directory.exists() {
             std::fs::create_dir_all(&keys_directory).map_err(|err| {
@@ -121,7 +115,7 @@ impl FilesystemKeyStore<rand::rngs::StdRng> {
     }
 }
 
-impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
+impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// Gets a signature over a message, given a public key.
     ///
     /// The public key should correspond to one of the keys tracked by the keystore.
@@ -129,20 +123,21 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: Word,
-        message: Word,
-        _account_delta: &AccountDelta,
+        signing_info: &SigningInputs,
     ) -> Result<Vec<Felt>, AuthenticationError> {
-        let mut rng = self.rng.write();
+        let mut rng = self.rng.write().expect("poisoned lock");
+
+        let message = signing_info.to_commitment();
 
         let secret_key = self
             .get_key(pub_key)
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Digest::from(pub_key).into()))?;
+        let AuthSecretKey::RpoFalcon512(k) =
+            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
 
         miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
     }
@@ -150,7 +145,7 @@ impl<R: Rng> TransactionAuthenticator for FilesystemKeyStore<R> {
 
 /// Hashes a public key to a string representation.
 fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = Digest::from(pub_key).to_hex();
+    let pub_key = pub_key.to_hex();
     let mut hasher = DefaultHasher::new();
     pub_key.hash(&mut hasher);
     hasher.finish().to_string()

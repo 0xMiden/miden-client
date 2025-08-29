@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Client library that facilitates interaction with the Miden rollup"
-documentation          = "https://docs.rs/miden-client/0.10.2"
+documentation          = "https://docs.rs/miden-client/0.11.0"
 edition.workspace      = true
 keywords               = ["client", "miden"]
 license.workspace      = true
@@ -10,7 +10,7 @@ name                   = "miden-client"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.10.2"
+version.workspace      = true
 
 [package.metadata.cargo-machete]
 ignored = ["getrandom"]
@@ -30,14 +30,7 @@ idxdb = [
 ]
 sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = [
-  "dep:miden-testing",
-  "dep:toml",
-  "dep:uuid",
-  "miden-lib/testing",
-  "miden-objects/testing",
-  "miden-tx/testing",
-]
+testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 
@@ -47,9 +40,10 @@ miden-lib                  = { workspace = true }
 miden-objects              = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-testing              = { optional = true, workspace = true }
-miden-tx                   = { features = ["async"], workspace = true }
+miden-tx                   = { workspace = true }
 
 # External dependencies
+anyhow                = { workspace = true }
 async-trait           = { workspace = true }
 base64                = { optional = true, version = "0.22" }
 chrono                = { optional = false, version = "0.4" }
@@ -64,7 +58,6 @@ rusqlite_migration    = { optional = true, version = "2.1" }
 serde                 = { optional = true, workspace = true }
 serde-wasm-bindgen    = { optional = true, version = "0.6" }
 thiserror             = { workspace = true }
-toml                  = { optional = true, version = "0.8" }
 tonic                 = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
 tonic-web-wasm-client = { default-features = false, optional = true, version = "0.7" }
 tracing               = { workspace = true }
@@ -89,7 +82,7 @@ tonic-build            = { version = "0.13" }
 miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
 miden-lib     = { features = ["testing"], workspace = true }
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
-miden-testing = { default-features = false, features = ["async"], workspace = true }
+miden-testing = { default-features = false, workspace = true }
 tokio         = { workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
 

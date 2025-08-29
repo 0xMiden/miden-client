@@ -1,30 +1,29 @@
-use std::{env, sync::Arc};
+use std::env;
+use std::ffi::OsString;
+use std::sync::Arc;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
-use miden_client::{
-    Client, IdPrefixFetchError,
-    account::AccountHeader,
-    builder::ClientBuilder,
-    keystore::FilesystemKeyStore,
-    store::{NoteFilter as ClientNoteFilter, OutputNoteRecord},
-};
+use miden_client::account::AccountHeader;
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::builder::ClientBuilder;
+use miden_client::keystore::FilesystemKeyStore;
+use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
+use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use rand::rngs::StdRng;
 mod commands;
-use commands::{
-    account::AccountCmd,
-    exec::ExecCmd,
-    export::ExportCmd,
-    import::ImportCmd,
-    init::InitCmd,
-    new_account::{NewAccountCmd, NewWalletCmd},
-    new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd},
-    notes::NotesCmd,
-    sync::SyncCmd,
-    tags::TagsCmd,
-    transactions::TransactionCmd,
-};
+use commands::account::AccountCmd;
+use commands::exec::ExecCmd;
+use commands::export::ExportCmd;
+use commands::import::ImportCmd;
+use commands::init::InitCmd;
+use commands::new_account::{NewAccountCmd, NewWalletCmd};
+use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::notes::NotesCmd;
+use commands::sync::SyncCmd;
+use commands::tags::TagsCmd;
+use commands::transactions::TransactionCmd;
 
 use self::utils::load_config_file;
 
@@ -40,7 +39,24 @@ mod utils;
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 
 /// Client binary name.
-pub const CLIENT_BINARY_NAME: &str = "miden-client";
+///
+/// If, for whatever reason, we fail to obtain the client's executable name,
+/// then we simply display the standard "miden-client".
+pub fn client_binary_name() -> OsString {
+    std::env::current_exe()
+        .inspect_err(|e| {
+            eprintln!(
+                "WARNING: Couldn't obtain the path of the current executable because of {e}.\
+             Defaulting to miden-client."
+            );
+        })
+        .and_then(|executable_path| {
+            executable_path.file_name().map(std::ffi::OsStr::to_os_string).ok_or(
+                std::io::Error::other("Couldn't obtain the file name of the current executable"),
+            )
+        })
+        .unwrap_or(OsString::from("miden-client"))
+}
 
 /// Number of blocks that must elapse after a transaction’s reference block before it is marked
 /// stale and discarded.
@@ -54,14 +70,55 @@ const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
     version,
     rename_all = "kebab-case"
 )]
-pub struct Cli {
+#[command(multicall(true))]
+pub struct MidenClientCli {
     #[command(subcommand)]
-    action: Command,
+    behavior: Behavior,
+}
 
+impl From<MidenClientCli> for Cli {
+    fn from(value: MidenClientCli) -> Self {
+        match value.behavior {
+            Behavior::MidenClient { cli } => cli,
+            Behavior::External(args) => Cli::parse_from(args).set_external(),
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+#[command(rename_all = "kebab-case")]
+enum Behavior {
+    /// The Miden Client CLI.
+    MidenClient {
+        #[command(flatten)]
+        cli: Cli,
+    },
+
+    /// Used when the Miden Client CLI is called under a different name, like
+    /// when it is called from [Midenup](https://github.com/0xMiden/midenup).
+    /// Vec<OsString> holds the "raw" arguments passed to the command line,
+    /// analogous to `argv`.
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
+}
+
+#[derive(Parser, Debug)]
+#[command(name = "miden-client")]
+pub struct Cli {
     /// Activates the executor's debug mode, which enables debug output for scripts
     /// that were compiled and executed with this mode.
     #[arg(short, long, default_value_t = false)]
     debug: bool,
+
+    #[command(subcommand)]
+    action: Command,
+
+    /// Indicates whether the client's CLI is being called directly, or
+    /// externally under an alias (like in the case of
+    /// [Midenup](https://github.com/0xMiden/midenup).
+    #[arg(skip)]
+    #[allow(unused)]
+    external: bool,
 }
 
 /// CLI actions.
@@ -104,8 +161,8 @@ impl Cli {
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {
-            Ok(value) if value.to_lowercase() == "true" => true,
-            _ => self.debug,
+            Ok(value) if value.to_lowercase() == "true" => DebugMode::Enabled,
+            _ => DebugMode::Disabled,
         };
 
         // Create the client
@@ -135,22 +192,29 @@ impl Cli {
         // Execute CLI command
         match &self.action {
             Command::Account(account) => account.execute(client).await,
-            Command::NewWallet(new_wallet) => new_wallet.execute(client, keystore).await,
-            Command::NewAccount(new_account) => new_account.execute(client, keystore).await,
+            Command::NewWallet(new_wallet) => Box::pin(new_wallet.execute(client, keystore)).await,
+            Command::NewAccount(new_account) => {
+                Box::pin(new_account.execute(client, keystore)).await
+            },
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) => Ok(()),
             Command::Info => info::print_client_info(&client).await,
-            Command::Notes(notes) => notes.execute(client).await,
+            Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
-            Command::Exec(execute_program) => execute_program.execute(client).await,
+            Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,
-            Command::Mint(mint) => mint.execute(client).await,
-            Command::Send(send) => send.execute(client).await,
-            Command::Swap(swap) => swap.execute(client).await,
-            Command::ConsumeNotes(consume_notes) => consume_notes.execute(client).await,
+            Command::Mint(mint) => Box::pin(mint.execute(client)).await,
+            Command::Send(send) => Box::pin(send.execute(client)).await,
+            Command::Swap(swap) => Box::pin(swap.execute(client)).await,
+            Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }
+    }
+
+    fn set_external(mut self) -> Self {
+        self.external = true;
+        self
     }
 }
 
@@ -177,8 +241,8 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub(crate) async fn get_output_note_with_id_prefix(
-    client: &Client,
+pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticator + Sync>(
+    client: &Client<AUTH>,
     note_id_prefix: &str,
 ) -> Result<OutputNoteRecord, IdPrefixFetchError> {
     let mut output_note_records = client
@@ -223,8 +287,8 @@ pub(crate) async fn get_output_note_with_id_prefix(
 ///   `account_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one account found
 ///   where `account_id_prefix` is a prefix of its ID.
-async fn get_account_with_id_prefix(
-    client: &Client,
+async fn get_account_with_id_prefix<AUTH>(
+    client: &Client<AUTH>,
     account_id_prefix: &str,
 ) -> Result<AccountHeader, IdPrefixFetchError> {
     let mut accounts = client

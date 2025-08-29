@@ -1,10 +1,11 @@
 use miden_objects::note::NoteMetadata as NativeNoteMetadata;
 use wasm_bindgen::prelude::*;
 
-use super::{
-    account_id::AccountId, felt::Felt, note_execution_hint::NoteExecutionHint, note_tag::NoteTag,
-    note_type::NoteType,
-};
+use super::account_id::AccountId;
+use super::felt::Felt;
+use super::note_execution_hint::NoteExecutionHint;
+use super::note_tag::NoteTag;
+use super::note_type::NoteType;
 
 #[derive(Clone, Copy)]
 #[wasm_bindgen]

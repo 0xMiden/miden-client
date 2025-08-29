@@ -1,11 +1,10 @@
-use miden_objects::{
-    Word as NativeWord,
-    account::AccountId as NativeAccountId,
-    asset::{Asset as NativeAsset, FungibleAsset as FungibleAssetNative},
-};
+use miden_objects::Word as NativeWord;
+use miden_objects::account::AccountId as NativeAccountId;
+use miden_objects::asset::{Asset as NativeAsset, FungibleAsset as FungibleAssetNative};
 use wasm_bindgen::prelude::*;
 
-use super::{account_id::AccountId, word::Word};
+use super::account_id::AccountId;
+use super::word::Word;
 
 #[derive(Clone, Copy)]
 #[wasm_bindgen]

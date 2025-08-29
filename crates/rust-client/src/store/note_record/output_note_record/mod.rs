@@ -1,15 +1,21 @@
 use alloc::string::ToString;
 use core::fmt::{self, Display};
 
-use miden_objects::{
-    Digest,
-    block::BlockNumber,
-    note::{
-        Note, NoteAssets, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata,
-        NoteRecipient, Nullifier, PartialNote,
-    },
-    transaction::OutputNote,
+use miden_objects::Word;
+use miden_objects::block::BlockNumber;
+use miden_objects::note::{
+    Note,
+    NoteAssets,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteRecipient,
+    Nullifier,
+    PartialNote,
 };
+use miden_objects::transaction::OutputNote;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use super::NoteRecordError;
@@ -33,7 +39,7 @@ pub struct OutputNoteRecord {
     /// information.
     metadata: NoteMetadata,
     /// A commitment to the note's serial number, script and inputs.
-    recipient_digest: Digest,
+    recipient_digest: Word,
     /// The state of the note, with specific fields for each one.
     state: OutputNoteState,
     /// The expected block height at which the note should be included in the chain.
@@ -42,7 +48,7 @@ pub struct OutputNoteRecord {
 
 impl OutputNoteRecord {
     pub fn new(
-        recipient_digest: Digest,
+        recipient_digest: Word,
         assets: NoteAssets,
         metadata: NoteMetadata,
         state: OutputNoteState,
@@ -61,7 +67,7 @@ impl OutputNoteRecord {
         NoteId::new(self.recipient_digest, self.assets.commitment())
     }
 
-    pub fn recipient_digest(&self) -> Digest {
+    pub fn recipient_digest(&self) -> Word {
         self.recipient_digest
     }
 
@@ -134,12 +140,12 @@ impl OutputNoteRecord {
         nullifier: Nullifier,
         block_height: u32,
     ) -> Result<bool, NoteRecordError> {
-        if let Some(note_nullifier) = self.nullifier() {
-            if note_nullifier != nullifier {
-                return Err(NoteRecordError::StateTransitionError(
-                    "Nullifier does not match the expected value".to_string(),
-                ));
-            }
+        if let Some(note_nullifier) = self.nullifier()
+            && note_nullifier != nullifier
+        {
+            return Err(NoteRecordError::StateTransitionError(
+                "Nullifier does not match the expected value".to_string(),
+            ));
         }
 
         let new_state = self.state.nullifier_received(block_height)?;

@@ -1,4 +1,5 @@
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
@@ -30,10 +31,7 @@ extern "C" {
     pub fn idxdb_get_account_asset_vault(vault_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
-    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> JsValue;
-
-    #[wasm_bindgen(js_name = fetchAndCacheAccountAuthByPubKey)]
-    pub fn idxdb_fetch_and_cache_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
 
     // INSERTS
     // ================================================================================================
@@ -59,8 +57,8 @@ extern "C" {
         vault_root: String,
         nonce: String,
         committed: bool,
-        account_seed: Option<Vec<u8>>,
         commitment: String,
+        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountAuth)]

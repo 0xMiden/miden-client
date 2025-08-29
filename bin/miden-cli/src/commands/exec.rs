@@ -1,11 +1,14 @@
-use std::{collections::BTreeSet, path::PathBuf};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 use clap::Parser;
-use miden_client::{Client, Felt};
-use miden_objects::{Digest, vm::AdviceInputs};
+use miden_client::auth::TransactionAuthenticator;
+use miden_client::{Client, Felt, Word};
+use miden_objects::vm::AdviceInputs;
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-use crate::{errors::CliError, utils::get_input_acc_id_by_prefix_or_default};
+use crate::errors::CliError;
+use crate::utils::get_input_acc_id_by_prefix_or_default;
 
 // EXEC COMMAND
 // ================================================================================================
@@ -38,6 +41,7 @@ pub struct ExecCmd {
     ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
     ///    ]
     #[arg(long, short)]
+    #[clap(verbatim_doc_comment)]
     inputs_path: Option<String>,
 
     /// Print the output stack grouped into words
@@ -46,7 +50,10 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute(&self, mut client: Client) -> Result<(), CliError> {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
         let script_path = PathBuf::from(&self.script_path);
         if !script_path.exists() {
             return Err(CliError::Exec(
@@ -76,8 +83,7 @@ impl ExecCmd {
             None => vec![],
         };
 
-        let mut advice_inputs = AdviceInputs::default();
-        advice_inputs.extend_map(inputs);
+        let advice_inputs = AdviceInputs::default().with_map(inputs);
 
         let tx_script = client.script_builder().compile_tx_script(&program)?;
 
@@ -112,7 +118,7 @@ impl ExecCmd {
                 let word: [Felt; 4] =
                     stack[word_idx..=word_idx_end].try_into().expect("Length should be 4");
 
-                println!("{:?} ({})", word, Digest::from(word));
+                println!("{:?} ({})", word, Word::from(word).to_hex());
             }
         } else {
             for (i, value) in stack.iter().enumerate() {
@@ -172,7 +178,7 @@ where
         })
 }
 
-fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Digest, Vec<Felt>)>, CliError> {
+fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Word, Vec<Felt>)>, CliError> {
     let cli_inputs: CliTxInputs = toml::from_str(serialized).map_err(|err| {
         CliError::Exec(
             "error deserializing transaction inputs".into(),
@@ -182,7 +188,7 @@ fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Digest, Vec<Felt>)>, C
     cli_inputs
         .into_iter()
         .map(|input| {
-            let word = Digest::try_from(input.key).map_err(|err| err.to_string())?;
+            let word = Word::try_from(input.key).map_err(|err| err.to_string())?;
             let felts = input.values.into_iter().map(Felt::new).collect();
             Ok((word, felts))
         })

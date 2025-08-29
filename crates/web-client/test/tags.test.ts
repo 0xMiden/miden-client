@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { Page } from "@playwright/test";
 
 // ADD_TAG TESTS
 // =======================================================================================================
@@ -9,7 +10,10 @@ interface AddTagSuccessResult {
   tags: string[];
 }
 
-export const addTag = async (tag: string): Promise<AddTagSuccessResult> => {
+export const addTag = async (
+  testingPage: Page,
+  tag: string
+): Promise<AddTagSuccessResult> => {
   return await testingPage.evaluate(async (tag) => {
     const client = window.client;
     await client.addTag(tag);
@@ -22,10 +26,10 @@ export const addTag = async (tag: string): Promise<AddTagSuccessResult> => {
   }, tag);
 };
 
-describe("add_tag tests", () => {
-  it("adds a tag to the system", async () => {
+test.describe("add_tag tests", () => {
+  test("adds a tag to the system", async ({ page }) => {
     const tag = "123";
-    const result = await addTag(tag);
+    const result = await addTag(page, tag);
 
     expect(result.tags).to.include(tag);
   });
@@ -40,6 +44,7 @@ interface RemoveTagSuccessResult {
 }
 
 export const removeTag = async (
+  testingPage: Page,
   tag: string
 ): Promise<RemoveTagSuccessResult> => {
   return await testingPage.evaluate(async (tag) => {
@@ -56,10 +61,10 @@ export const removeTag = async (
   }, tag);
 };
 
-describe("remove_tag tests", () => {
-  it("removes a tag from the system", async () => {
+test.describe("remove_tag tests", () => {
+  test("removes a tag from the system", async ({ page }) => {
     const tag = "321";
-    const result = await removeTag(tag);
+    const result = await removeTag(page, tag);
 
     expect(result.tags).to.not.include(tag);
   });

@@ -2,12 +2,12 @@
 resolver = "2"
 
 members = [
+  "bin/integration-tests",
   "bin/miden-cli",
   "crates/rust-client",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
-  "tests",
 ]
 
 default-members = ["bin/miden-cli", "crates/rust-client"]
@@ -17,26 +17,28 @@ authors      = ["miden contributors"]
 edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
-rust-version = "1.87"
+rust-version = "1.88"
+version      = "0.11.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib                  = { default-features = false, version = "0.10" }
-miden-node-block-producer  = { version = "0.10" }
-miden-node-ntx-builder     = { version = "0.10" }
-miden-node-proto-build     = { default-features = false, version = "0.10" }
-miden-node-rpc             = { version = "0.10" }
-miden-node-store           = { version = "0.10" }
-miden-node-utils           = { version = "0.10" }
-miden-objects              = { default-features = false, version = "0.10" }
-miden-remote-prover        = { features = ["concurrent"], version = "0.10" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.10" }
-miden-testing              = { default-features = false, features = ["async"], version = "0.10" }
-miden-tx                   = { default-features = false, features = ["async"], version = "0.10" }
+miden-lib                  = { default-features = false, version = "0.11" }
+miden-node-block-producer  = { version = "0.11" }
+miden-node-ntx-builder     = { version = "0.11" }
+miden-node-proto-build     = { default-features = false, version = "0.11" }
+miden-node-rpc             = { version = "0.11" }
+miden-node-store           = { version = "0.11" }
+miden-node-utils           = { version = "0.11" }
+miden-objects              = { default-features = false, version = "0.11" }
+miden-remote-prover        = { features = ["concurrent"], version = "0.11" }
+miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.11" }
+miden-testing              = { default-features = false, features = [], version = "0.11" }
+miden-tx                   = { default-features = false, version = "0.11" }
 
 # External dependencies
+anyhow      = { default-features = false, version = "1.0" }
 async-trait = "0.1"
-miette      = { features = ["fancy"], version = "7.2" }
+miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }
