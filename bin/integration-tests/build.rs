@@ -24,28 +24,27 @@ use syn::{Item, ItemFn, parse_file};
 /// - Any file in `src/tests/` changes
 /// - The `build.rs` file itself changes
 fn main() {
-    println!("cargo:warning=Running build script to generate integration tests");
+    println!("cargo:rerun-if-changed=src/tests/");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:info=Running build script to generate integration tests");
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_path = Path::new(&out_dir);
 
     let test_cases = collect_test_cases();
-    println!("cargo:warning=Found {} test cases", test_cases.len());
+    println!("cargo:info=Found {} test cases", test_cases.len());
 
     // Generate tokio test wrappers in OUT_DIR
     let integration_path = out_path.join("integration_tests.rs");
     let integration_code = generate_integration_tests(&test_cases);
     fs::write(&integration_path, integration_code).unwrap();
-    println!("cargo:warning=Generated tokio test wrappers in {}", integration_path.display());
+    println!("cargo:info=Generated tokio test wrappers in {}", integration_path.display());
 
     // Generate Vec<TestCase> in OUT_DIR
     let generated_path = out_path.join("generated_tests.rs");
     let generated_code = generate_test_case_vector(&test_cases);
     fs::write(&generated_path, generated_code).unwrap();
-    println!("cargo:warning=Generated test case vector in {}", generated_path.display());
-
-    println!("cargo:rerun-if-changed=src/tests/");
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:info=Generated test case vector in {}", generated_path.display());
 }
 
 /// Information about a discovered integration test function.
