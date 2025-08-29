@@ -28,7 +28,7 @@ pub struct RpcClient {
 impl RpcClient {
     /// Creates a new RPC client instance.
     ///
-    /// @param endpoint - endpoint to connect to
+    /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
         let rpc_client = Arc::new(TonicRpcClient::new(&endpoint.into(), 0));
