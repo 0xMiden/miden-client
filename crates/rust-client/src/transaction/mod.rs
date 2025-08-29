@@ -77,7 +77,6 @@ use alloc::vec::Vec;
 use core::fmt::{self};
 
 use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
-use miden_objects::assembly::DefaultSourceManager;
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
@@ -686,13 +685,7 @@ where
         // Execute the transaction and get the witness
         let executed_transaction = self
             .build_executor(&data_store)?
-            .execute_transaction(
-                account_id,
-                block_num,
-                notes,
-                tx_args,
-                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
-            )
+            .execute_transaction(account_id, block_num, notes, tx_args)
             .await?;
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
@@ -845,7 +838,6 @@ where
                 tx_script,
                 advice_inputs,
                 foreign_account_inputs,
-                Arc::new(DefaultSourceManager::default()), // TODO: Use the correct source manager
             )
             .await?)
     }
@@ -1239,11 +1231,12 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
-        TransactionExecutor::with_options(
-            data_store,
-            self.authenticator.as_deref(),
-            self.exec_options,
-        )
+        let mut executor = TransactionExecutor::new(data_store).with_options(self.exec_options)?;
+        if let Some(authenticator) = self.authenticator.as_deref() {
+            executor = executor.with_authenticator(authenticator);
+        }
+
+        Ok(executor)
     }
 }
 

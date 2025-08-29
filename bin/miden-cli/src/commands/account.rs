@@ -240,7 +240,7 @@ async fn print_summary_table<AUTH>(
 
     table.add_row(vec![
         Cell::new("Address"),
-        Cell::new(account_bech_32(account.id(), client, cli_config).await?.unwrap_or_default()),
+        Cell::new(account_bech_32(account.id(), client, cli_config).await?),
     ]);
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
@@ -335,23 +335,21 @@ async fn account_bech_32<AUTH>(
     account_id: AccountId,
     client: &Client<AUTH>,
     cli_config: &CliConfig,
-) -> Result<Option<String>, CliError> {
-    let Some(account_record) = client.get_account(account_id).await? else {
-        return Ok(None);
-    };
+) -> Result<String, CliError> {
+    let account_record = client.try_get_account(account_id).await?;
 
     let account_interface: AccountInterface = account_record.account().into();
 
-    if !account_interface
+    let interface = if account_interface
         .components()
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
     {
-        return Ok(None);
-    }
+        AddressInterface::BasicWallet
+    } else {
+        AddressInterface::Unspecified
+    };
 
-    let address = AccountIdAddress::new(account_id, AddressInterface::BasicWallet);
-    Ok(Some(
-        Address::from(address).to_bech32(cli_config.rpc.endpoint.0.to_network_id()),
-    ))
+    let address = AccountIdAddress::new(account_id, interface);
+    Ok(Address::from(address).to_bech32(cli_config.rpc.endpoint.0.to_network_id()))
 }
