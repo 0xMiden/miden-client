@@ -1,9 +1,9 @@
-import { expect } from "chai";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
 import { TokenSymbol } from "../dist/crates/miden_client_web";
 import { create } from "domain";
 import { createNewFaucet, createNewWallet } from "./webClientTestUtils";
 import { StorageMode } from "./webClientTestUtils";
+import { Page, expect } from "@playwright/test";
 
 // BASIC_FUNGIBLE_FAUCET TESTS
 // =======================================================================================================
@@ -15,14 +15,21 @@ interface basicFungibleFaucetResult {
 }
 
 export const getBasicFungibleFaucet = async (
+  page: Page,
   storageMode: StorageMode = StorageMode.PUBLIC,
   nonFungible: boolean = false,
   tokenSymbol: string = "DAG",
   decimals: number = 8,
   maxSupply: bigint = BigInt(10000000)
 ): Promise<basicFungibleFaucetResult> => {
-  return await testingPage.evaluate(
-    async (_storageMode, _nonFungible, _tokenSymbol, _decimals, _maxSupply) => {
+  return await page.evaluate(
+    async ({
+      _storageMode,
+      _nonFungible,
+      _tokenSymbol,
+      _decimals,
+      _maxSupply,
+    }) => {
       const client = window.client;
 
       const accountStorageMode =
@@ -46,16 +53,20 @@ export const getBasicFungibleFaucet = async (
       };
       return result;
     },
-    storageMode,
-    nonFungible,
-    tokenSymbol,
-    decimals,
-    maxSupply
+    {
+      _storageMode: storageMode,
+      _nonFungible: nonFungible,
+      _tokenSymbol: tokenSymbol,
+      _decimals: decimals,
+      _maxSupply: maxSupply,
+    }
   );
 };
 
-export const createWallet = async (): Promise<basicFungibleFaucetResult> => {
-  return await testingPage.evaluate(async () => {
+export const createWallet = async (
+  page: Page
+): Promise<basicFungibleFaucetResult> => {
+  return await page.evaluate(async () => {
     const client = window.client;
     const account = await client.newWallet(
       window.AccountStorageMode.tryFromStr("PUBLIC"),
@@ -72,17 +83,21 @@ export const createWallet = async (): Promise<basicFungibleFaucetResult> => {
   });
 };
 
-describe("basic fungible faucet", () => {
-  it("creates a basic fungible faucet component from an account", async () => {
-    const faucet = await getBasicFungibleFaucet();
+test.describe("basic fungible faucet", () => {
+  test("creates a basic fungible faucet component from an account", async ({
+    page,
+  }) => {
+    const faucet = await getBasicFungibleFaucet(page);
 
-    expect(faucet.symbol).to.equal("DAG");
-    expect(faucet.decimals).to.equal(8);
-    expect(faucet.maxSupply).to.equal("10000000");
+    expect(faucet.symbol).toEqual("DAG");
+    expect(faucet.decimals).toEqual(8);
+    expect(faucet.maxSupply).toEqual("10000000");
   });
 
-  it("throws an error when creating a basic fungible faucet from a non-faucet account", async () => {
-    await expect(createWallet()).to.be.rejectedWith(
+  test("throws an error when creating a basic fungible faucet from a non-faucet account", async ({
+    page,
+  }) => {
+    await expect(createWallet(page)).rejects.toThrow(
       "failed to get basic fungible faucet details from account"
     );
   });

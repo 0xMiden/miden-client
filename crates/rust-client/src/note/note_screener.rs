@@ -10,7 +10,7 @@ use miden_objects::note::{Note, NoteId};
 use miden_objects::transaction::{InputNote, InputNotes};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{NoteConsumptionChecker, TransactionExecutor, TransactionExecutorError};
+use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 use tonic::async_trait;
 
@@ -130,8 +130,11 @@ where
             .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
-        let transaction_executor =
-            TransactionExecutor::new(&data_store, self.authenticator.as_ref().map(AsRef::as_ref));
+        let mut transaction_executor = TransactionExecutor::new(&data_store);
+        if let Some(authenticator) = &self.authenticator {
+            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
+        }
+
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
@@ -251,9 +254,9 @@ pub enum NoteScreenerError {
     AccountDataNotFound(AccountId),
     #[error("error while fetching data from the store")]
     StoreError(#[from] StoreError),
-    #[error("error while checking consume transaction")]
-    TransactionExecutionError(#[from] TransactionExecutorError),
-    #[error("error while building consume transaction request")]
+    #[error("error while checking note")]
+    NoteCheckerError(#[from] NoteCheckerError),
+    #[error("error while building transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
 }
 

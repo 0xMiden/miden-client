@@ -34,6 +34,7 @@
 * Store changes after transaction execution no longer require fetching the whole account state ([#1147](https://github.com/0xMiden/miden-client/pull/1147)).
 * Tracked creation and committed timestamps for `TransactionRecord` ([#1173](https://github.com/0xMiden/miden-client/pull/1173)).
 * [BREAKING] Changed `exportNoteFile` to fail fast on invalid export type ([#1198](https://github.com/0xMiden/miden-client/pull/1198)).
+* [BREAKING] Refactored RPC errors ([#1202](https://github.com/0xMiden/miden-client/pull/1202)).
 
 ### Features
 
