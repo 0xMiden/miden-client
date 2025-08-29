@@ -12,6 +12,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
+use test_case_marker::test_case;
 
 use crate::tests::config::ClientConfig;
 
@@ -21,14 +22,17 @@ const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::n
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
+#[test_case]
 pub async fn standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
+#[test_case]
 pub async fn standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
+#[test_case]
 pub async fn fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
@@ -103,6 +107,7 @@ pub async fn fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;

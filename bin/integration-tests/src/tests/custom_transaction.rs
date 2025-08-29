@@ -23,6 +23,7 @@ use miden_client::transaction::{
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{Felt, Word, ZERO};
+use test_case_marker::test_case;
 
 use crate::tests::config::ClientConfig;
 
@@ -53,6 +54,7 @@ const NOTE_ARGS: [Felt; 8] = [
     Felt::new(9),
 ];
 
+#[test_case]
 pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
@@ -143,6 +145,7 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
@@ -226,6 +229,7 @@ pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
     // Client 1 has an private faucet which will mint an onchain note for client 2
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
