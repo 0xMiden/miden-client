@@ -32,7 +32,7 @@ miden-client-integration-tests [OPTIONS]
 
 ### Command-Line Options
 
-- `-r, --rpc-endpoint <URL>` - The URL of the RPC endpoint to use (default: `http://localhost:57291`)
+- `-n, --network <NETWORK>` - The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint (default: `localhost`)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
 - `-j, --jobs <NUMBER>` - Number of tests to run in parallel (default: auto-detected CPU cores, set to `1` for sequential execution)
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
@@ -85,9 +85,19 @@ Run tests with verbose output showing worker information:
 miden-client-integration-tests --verbose
 ```
 
+Run tests against devnet:
+```bash
+miden-client-integration-tests --network devnet
+```
+
+Run tests against testnet:
+```bash
+miden-client-integration-tests --network testnet
+```
+
 Run tests against a custom RPC endpoint with timeout:
 ```bash
-miden-client-integration-tests --rpc-endpoint http://192.168.1.100:57291 --timeout 30000
+miden-client-integration-tests --network http://192.168.1.100:57291 --timeout 30000
 ```
 
 Complex example: Run non-swap tests in parallel with verbose output:

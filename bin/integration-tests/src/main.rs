@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -10,7 +11,7 @@ use clap::Parser;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::config::ClientConfig;
 use regex::Regex;
-use url::Url;
+use serde::{Deserialize, Serialize};
 
 mod generated_tests;
 mod tests;
@@ -71,13 +72,10 @@ fn main() {
 )]
 struct Args {
     /// The URL of the RPC endpoint to use.
-    #[arg(
-        short,
-        long,
-        default_value = "http://localhost:57291",
-        env = "TEST_MIDEN_RPC_ENDPOINT"
-    )]
-    rpc_endpoint: Url,
+    ///
+    /// The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint.
+    #[arg(short, long, default_value = "localhost", env = "TEST_MIDEN_NETWORK")]
+    network: Network,
 
     /// Timeout for the RPC requests in milliseconds.
     #[arg(short, long, default_value = "10000")]
@@ -120,18 +118,8 @@ impl TryFrom<Args> for BaseConfig {
 
     /// Creates a BaseConfig from command line arguments.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
-        let host = args
-            .rpc_endpoint
-            .host_str()
-            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
-            .to_string();
-
-        let port = args
-            .rpc_endpoint
-            .port()
-            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
-
-        let endpoint = Endpoint::new(args.rpc_endpoint.scheme().to_string(), host, Some(port));
+        let endpoint = Endpoint::try_from(args.network.to_rpc_endpoint().as_str())
+            .map_err(|e| anyhow!("Invalid network: {}", e))?;
         let timeout_ms = args.timeout;
 
         Ok(BaseConfig {
@@ -516,5 +504,44 @@ fn print_summary(results: &[TestResult], total_duration: Duration) {
         println!("  Median:  {:.2}s", median_duration.as_secs_f64());
         println!("  Min:     {:.2}s", min_duration.as_secs_f64());
         println!("  Max:     {:.2}s", max_duration.as_secs_f64());
+    }
+}
+
+// NETWORK
+// ================================================================================================
+
+/// Represents the network to which the client connects. It is used to determine the RPC endpoint
+/// and network ID for the CLI.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Network {
+    Custom(String),
+    Devnet,
+    Localhost,
+    Testnet,
+}
+
+impl FromStr for Network {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "devnet" => Ok(Network::Devnet),
+            "localhost" => Ok(Network::Localhost),
+            "testnet" => Ok(Network::Testnet),
+            custom => Ok(Network::Custom(custom.to_string())),
+        }
+    }
+}
+
+impl Network {
+    /// Converts the Network variant to its corresponding RPC endpoint string
+    #[allow(dead_code)]
+    pub fn to_rpc_endpoint(&self) -> String {
+        match self {
+            Network::Custom(custom) => custom.clone(),
+            Network::Devnet => Endpoint::devnet().to_string(),
+            Network::Localhost => Endpoint::default().to_string(),
+            Network::Testnet => Endpoint::testnet().to_string(),
+        }
     }
 }
