@@ -28,7 +28,9 @@ use miden_client::transaction::{
     TransactionStatus,
     TransactionWitness,
 };
+use test_case_marker::test_case;
 
+#[test_case]
 pub async fn client_builder_initializes_client_with_endpoint(
     client_config: ClientConfig,
 ) -> Result<()> {
@@ -52,6 +54,7 @@ pub async fn client_builder_initializes_client_with_endpoint(
     Ok(())
 }
 
+#[test_case]
 pub async fn multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = create_test_client(client_config).await?;
     wait_for_node(&mut client).await;
@@ -150,6 +153,7 @@ pub async fn multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
+#[test_case]
 pub async fn import_expected_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = create_test_client(client_config.clone()).await?;
     let (first_basic_account, faucet_account) =
@@ -245,6 +249,7 @@ pub async fn import_expected_notes(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn import_expected_note_uncommitted(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = create_test_client(client_config.clone()).await?;
     let faucet_account =
@@ -287,6 +292,7 @@ pub async fn import_expected_note_uncommitted(client_config: ClientConfig) -> Re
     Ok(())
 }
 
+#[test_case]
 pub async fn import_expected_notes_from_the_past_as_committed(
     client_config: ClientConfig,
 ) -> Result<()> {
@@ -351,6 +357,7 @@ pub async fn import_expected_notes_from_the_past_as_committed(
     Ok(())
 }
 
+#[test_case]
 pub async fn get_account_update(client_config: ClientConfig) -> Result<()> {
     // Create a client with both public and private accounts.
     let (mut client, authenticator) = create_test_client(client_config.clone()).await?;
@@ -384,6 +391,7 @@ pub async fn get_account_update(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn sync_detail_values(client_config: ClientConfig) -> Result<()> {
     let (mut client1, authenticator_1) = create_test_client(client_config.clone()).await?;
     let (mut client2, authenticator_2) =
@@ -443,6 +451,7 @@ pub async fn sync_detail_values(client_config: ClientConfig) -> Result<()> {
 
 /// This test runs 3 mint transactions that get included in different blocks so that once we sync
 /// we can check that each transaction gets marked as committed in the corresponding block.
+#[test_case]
 pub async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync(
     client_config: ClientConfig,
 ) -> Result<()> {
@@ -589,6 +598,7 @@ pub async fn multiple_transactions_can_be_committed_in_different_blocks_without_
 /// - Consuming multiple notes in a single transaction.
 /// - Consuming authenticated notes.
 /// - Consuming unauthenticated notes.
+#[test_case]
 pub async fn consume_multiple_expected_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator_1) = create_test_client(client_config.clone()).await?;
     let (mut unauth_client, authenticator_2) =
@@ -675,6 +685,7 @@ pub async fn consume_multiple_expected_notes(client_config: ClientConfig) -> Res
     Ok(())
 }
 
+#[test_case]
 pub async fn import_consumed_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = create_test_client(client_config.clone()).await?;
     let (first_regular_account, faucet_account_header) =
@@ -736,6 +747,7 @@ pub async fn import_consumed_note_with_proof(client_config: ClientConfig) -> Res
     Ok(())
 }
 
+#[test_case]
 pub async fn import_consumed_note_with_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = create_test_client(client_config.clone()).await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
@@ -791,6 +803,7 @@ pub async fn import_consumed_note_with_id(client_config: ClientConfig) -> Result
     Ok(())
 }
 
+#[test_case]
 pub async fn import_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = create_test_client(client_config.clone()).await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
@@ -849,6 +862,7 @@ pub async fn import_note_with_proof(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn discarded_transaction(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = create_test_client(client_config.clone()).await?;
     let (first_regular_account, faucet_account_header) =
@@ -977,6 +991,7 @@ impl TransactionProver for AlwaysFailingProver {
     }
 }
 
+#[test_case]
 pub async fn custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = create_test_client(client_config).await?;
     let (first_regular_account, faucet_account_header) =
@@ -1014,6 +1029,7 @@ pub async fn custom_transaction_prover(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
+#[test_case]
 pub async fn locked_account(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = create_test_client(client_config.clone()).await?;
 
@@ -1072,6 +1088,7 @@ pub async fn locked_account(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = create_test_client(client_config).await?;
     let (faucet_account, ..) =
@@ -1116,6 +1133,7 @@ pub async fn expired_transaction_fails(client_config: ClientConfig) -> Result<()
 
 /// Tests that RPC methods that are not directly related to the client logic
 /// (like GetBlockByNumber) work correctly
+#[test_case]
 pub async fn unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = create_test_client(client_config).await?;
 
@@ -1169,6 +1187,7 @@ pub async fn unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = create_test_client(client_config).await?;
     let (regular_account, second_regular_account, faucet_account_header) =
@@ -1210,6 +1229,7 @@ pub async fn ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+#[test_case]
 pub async fn output_only_note(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = create_test_client(client_config).await?;
 

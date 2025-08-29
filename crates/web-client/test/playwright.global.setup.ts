@@ -1,9 +1,10 @@
-// @ts-nocheck
+//@ts-nocheck
 import { test as base } from "@playwright/test";
 import { MockWebClient } from "../js";
 
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
+const REMOTE_TX_PROVER_PORT = 50051;
 
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
@@ -82,7 +83,9 @@ export const test = base.extend<{ forEachTest: void }>({
             MockWebClient,
           } = await import("./index.js");
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
-          let proverUrl = undefined;
+          let proverUrl = remoteProverPort
+            ? `http://localhost:${remoteProverPort}`
+            : undefined;
           const client = await WebClient.createClient(rpcUrl, undefined);
 
           window.client = client;

@@ -1,24 +1,18 @@
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::anyhow;
 use clap::Parser;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::config::ClientConfig;
 use regex::Regex;
-use url::Url;
+use serde::{Deserialize, Serialize};
 
-use crate::tests::client::*;
-use crate::tests::custom_transaction::*;
-use crate::tests::fpi::*;
-use crate::tests::network_transaction::*;
-use crate::tests::onchain::*;
-use crate::tests::swap_transaction::*;
-
+mod generated_tests;
 mod tests;
 
 // MAIN
@@ -31,7 +25,7 @@ mod tests;
 fn main() {
     let args = Args::parse();
 
-    let all_tests = get_all_tests();
+    let all_tests = generated_tests::get_all_tests();
     let filtered_tests = filter_tests(all_tests, &args);
 
     if args.list {
@@ -77,13 +71,10 @@ fn main() {
 )]
 struct Args {
     /// The URL of the RPC endpoint to use.
-    #[arg(
-        short,
-        long,
-        default_value = "http://localhost:57291",
-        env = "TEST_MIDEN_RPC_ENDPOINT"
-    )]
-    rpc_endpoint: Url,
+    ///
+    /// The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint.
+    #[arg(short, long, default_value = "localhost", env = "TEST_MIDEN_NETWORK")]
+    network: Network,
 
     /// Timeout for the RPC requests in milliseconds.
     #[arg(short, long, default_value = "10000")]
@@ -126,18 +117,9 @@ impl TryFrom<Args> for BaseConfig {
 
     /// Creates a BaseConfig from command line arguments.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
-        let host = args
-            .rpc_endpoint
-            .host_str()
-            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
-            .to_string();
+        let endpoint = Endpoint::try_from(args.network.to_rpc_endpoint().as_str())
+            .map_err(|e| anyhow::anyhow!("Invalid network: {:?}: {}", args.network, e))?;
 
-        let port = args
-            .rpc_endpoint
-            .port()
-            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
-
-        let endpoint = Endpoint::new(args.rpc_endpoint.scheme().to_string(), host, Some(port));
         let timeout_ms = args.timeout;
 
         Ok(BaseConfig {
@@ -211,95 +193,6 @@ impl AsRef<str> for TestCategory {
             TestCategory::SwapTransaction => "swap_transaction",
         }
     }
-}
-
-/// Returns all available test cases organized by category.
-///
-/// This function defines the complete list of integration tests available in the test suite,
-/// categorized by functionality area.
-fn get_all_tests() -> Vec<TestCase> {
-    vec![
-        // CLIENT tests
-        TestCase::new(
-            "client_builder_initializes_client_with_endpoint",
-            TestCategory::Client,
-            client_builder_initializes_client_with_endpoint,
-        ),
-        TestCase::new("multiple_tx_on_same_block", TestCategory::Client, multiple_tx_on_same_block),
-        TestCase::new("import_expected_notes", TestCategory::Client, import_expected_notes),
-        TestCase::new(
-            "import_expected_note_uncommitted",
-            TestCategory::Client,
-            import_expected_note_uncommitted,
-        ),
-        TestCase::new(
-            "import_expected_notes_from_the_past_as_committed",
-            TestCategory::Client,
-            import_expected_notes_from_the_past_as_committed,
-        ),
-        TestCase::new("get_account_update", TestCategory::Client, get_account_update),
-        TestCase::new("sync_detail_values", TestCategory::Client, sync_detail_values),
-        TestCase::new(
-            "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
-            TestCategory::Client,
-            multiple_transactions_can_be_committed_in_different_blocks_without_sync,
-        ),
-        TestCase::new(
-            "consume_multiple_expected_notes",
-            TestCategory::Client,
-            consume_multiple_expected_notes,
-        ),
-        TestCase::new(
-            "import_consumed_note_with_proof",
-            TestCategory::Client,
-            import_consumed_note_with_proof,
-        ),
-        TestCase::new(
-            "import_consumed_note_with_id",
-            TestCategory::Client,
-            import_consumed_note_with_id,
-        ),
-        TestCase::new("import_note_with_proof", TestCategory::Client, import_note_with_proof),
-        TestCase::new("discarded_transaction", TestCategory::Client, discarded_transaction),
-        TestCase::new("custom_transaction_prover", TestCategory::Client, custom_transaction_prover),
-        TestCase::new("locked_account", TestCategory::Client, locked_account),
-        TestCase::new("expired_transaction_fails", TestCategory::Client, expired_transaction_fails),
-        TestCase::new("unused_rpc_api", TestCategory::Client, unused_rpc_api),
-        TestCase::new("ignore_invalid_notes", TestCategory::Client, ignore_invalid_notes),
-        TestCase::new("output_only_note", TestCategory::Client, output_only_note),
-        // CUSTOM TRANSACTION tests
-        TestCase::new("merkle_store", TestCategory::CustomTransaction, merkle_store),
-        TestCase::new(
-            "onchain_notes_sync_with_tag",
-            TestCategory::CustomTransaction,
-            onchain_notes_sync_with_tag,
-        ),
-        TestCase::new("transaction_request", TestCategory::CustomTransaction, transaction_request),
-        // FPI tests
-        TestCase::new("standard_fpi_public", TestCategory::Fpi, standard_fpi_public),
-        TestCase::new("standard_fpi_private", TestCategory::Fpi, standard_fpi_private),
-        TestCase::new("fpi_execute_program", TestCategory::Fpi, fpi_execute_program),
-        TestCase::new("nested_fpi_calls", TestCategory::Fpi, nested_fpi_calls),
-        // NETWORK TRANSACTION tests
-        TestCase::new(
-            "counter_contract_ntx",
-            TestCategory::NetworkTransaction,
-            counter_contract_ntx,
-        ),
-        TestCase::new(
-            "recall_note_before_ntx_consumes_it",
-            TestCategory::NetworkTransaction,
-            recall_note_before_ntx_consumes_it,
-        ),
-        // ONCHAIN tests
-        TestCase::new("import_account_by_id", TestCategory::Onchain, import_account_by_id),
-        TestCase::new("onchain_accounts", TestCategory::Onchain, onchain_accounts),
-        TestCase::new("onchain_notes_flow", TestCategory::Onchain, onchain_notes_flow),
-        TestCase::new("incorrect_genesis", TestCategory::Onchain, incorrect_genesis),
-        // SWAP TRANSACTION tests
-        TestCase::new("swap_fully_onchain", TestCategory::SwapTransaction, swap_fully_onchain),
-        TestCase::new("swap_private", TestCategory::SwapTransaction, swap_private),
-    ]
 }
 
 /// Represents the result of executing a test case.
@@ -611,5 +504,44 @@ fn print_summary(results: &[TestResult], total_duration: Duration) {
         println!("  Median:  {:.2}s", median_duration.as_secs_f64());
         println!("  Min:     {:.2}s", min_duration.as_secs_f64());
         println!("  Max:     {:.2}s", max_duration.as_secs_f64());
+    }
+}
+
+// NETWORK
+// ================================================================================================
+
+/// Represents the network to which the client connects. It is used to determine the RPC endpoint
+/// and network ID for the CLI.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Network {
+    Custom(String),
+    Devnet,
+    Localhost,
+    Testnet,
+}
+
+impl FromStr for Network {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "devnet" => Ok(Network::Devnet),
+            "localhost" => Ok(Network::Localhost),
+            "testnet" => Ok(Network::Testnet),
+            custom => Ok(Network::Custom(custom.to_string())),
+        }
+    }
+}
+
+impl Network {
+    /// Converts the Network variant to its corresponding RPC endpoint string
+    #[allow(dead_code)]
+    pub fn to_rpc_endpoint(&self) -> String {
+        match self {
+            Network::Custom(custom) => custom.clone(),
+            Network::Devnet => Endpoint::devnet().to_string(),
+            Network::Localhost => Endpoint::default().to_string(),
+            Network::Testnet => Endpoint::testnet().to_string(),
+        }
     }
 }
