@@ -120,3 +120,12 @@ The integration tests cover several categories:
 - **Network Transaction**: Network-level transaction processing
 - **Onchain**: On-chain account and note operations
 - **Swap Transaction**: Asset swap functionality
+
+## Test Case Generation
+
+The integration tests use an automatic code generation system to create both `cargo nextest` compatible tests and a standalone binary. Test functions marked with the `#[test_case]` attribute are automatically discovered during build time and used to generate:
+
+1. **Individual `#[tokio::test]` wrappers** - These allow the tests to be run using standard `cargo test` or `cargo nextest run` commands
+2. **Programmatic test access** - A `Vec<TestCase>` that enables the standalone binary to enumerate and execute tests dynamically with custom parallelism and filtering
+
+This dual approach allows the same test code to work seamlessly with both nextest (for development) and the standalone binary (for CI/CD and production testing scenarios), ensuring consistent behavior across different execution environments.

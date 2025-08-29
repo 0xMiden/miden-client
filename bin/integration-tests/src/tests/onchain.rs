@@ -67,7 +67,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
         .with_context(|| format!("Note {} not found in client_2", note.id()))?
         .try_into()?;
     assert_eq!(received_note.note().commitment(), note.commitment());
-    
+
     // TODO: revisit this.
     // The received note has the uri of the note stored in the node, so it may not match with the
     // original note.
