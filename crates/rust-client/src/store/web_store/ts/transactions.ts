@@ -85,7 +85,7 @@ export async function getTransactions(filter: string) {
     });
 
     const processedTransactions = await Promise.all(
-      transactionRecords.map(async (transactionRecord) => {
+      transactionRecords.map((transactionRecord) => {
         let txScriptBase64: undefined | string = undefined;
         if (transactionRecord.scriptRoot) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);

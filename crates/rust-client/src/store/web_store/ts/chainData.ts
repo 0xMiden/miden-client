@@ -71,7 +71,7 @@ export async function getBlockHeaders(blockNumbers: string[]) {
     const results = await blockHeaders.bulkGet(blockNumbers);
 
     const processedResults = await Promise.all(
-      results.map(async (result) => {
+      results.map((result) => {
         if (result === undefined) {
           return null;
         } else {
@@ -106,7 +106,7 @@ export async function getTrackedBlockHeaders() {
 
     // Process all records with async operations
     const processedRecords = await Promise.all(
-      allMatchingRecords.map(async (record) => {
+      allMatchingRecords.map((record) => {
         const headerBase64 = uint8ArrayToBase64(record.header);
 
         const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
