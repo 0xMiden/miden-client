@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::anyhow;
 use clap::Parser;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::config::ClientConfig;
@@ -119,7 +118,8 @@ impl TryFrom<Args> for BaseConfig {
     /// Creates a BaseConfig from command line arguments.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
         let endpoint = Endpoint::try_from(args.network.to_rpc_endpoint().as_str())
-            .map_err(|e| anyhow!("Invalid network: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid network: {:?}: {}", args.network, e))?;
+
         let timeout_ms = args.timeout;
 
         Ok(BaseConfig {
