@@ -2210,6 +2210,7 @@ dependencies = [
  "syn 2.0.106",
  "test-case-marker",
  "tokio",
+ "url",
 ]
 
 [[package]]
