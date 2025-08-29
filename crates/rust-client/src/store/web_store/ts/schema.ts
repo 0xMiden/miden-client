@@ -70,8 +70,8 @@ export interface ITransaction {
   details: Blob;
   blockNum: number;
   scriptRoot?: string;
-  commitHeight?: string;
-  discardCause?: Blob | null;
+  statusVariant: number;
+  status: Blob;
 }
 
 export interface ITransactionScript {

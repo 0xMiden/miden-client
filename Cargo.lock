@@ -2179,9 +2179,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap 4.5.43",
- "futures",
  "miden-client",
+ "num_cpus",
  "rand 0.9.2",
+ "regex",
  "tokio",
  "url",
 ]

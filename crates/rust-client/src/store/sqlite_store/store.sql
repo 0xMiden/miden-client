@@ -36,15 +36,16 @@ CREATE TABLE storage_map_entries (
 
 CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
--- Create account_vaults table
-CREATE TABLE account_vaults (
+-- Create account_assets table
+CREATE TABLE account_assets (
     root TEXT NOT NULL,                             -- root of the account_vault Merkle tree
+    vault_key TEXT NOT NULL,                        -- asset's vault key
     faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
     asset TEXT NULL,                                -- value that represents the asset in the vault
-    PRIMARY KEY (root, faucet_id_prefix)
+    PRIMARY KEY (root, vault_key)
 );
 
-CREATE INDEX idx_account_vaults_root ON account_vaults(root);
+CREATE INDEX idx_account_assets_root ON account_assets(root);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(
@@ -78,8 +79,8 @@ CREATE TABLE transactions (
     details BLOB NOT NULL,                           -- Serialized transaction details
     script_root TEXT,                                -- Transaction script root
     block_num UNSIGNED BIG INT,                      -- Block number for the block against which the transaction was executed.
-    commit_height UNSIGNED BIG INT NULL,             -- Block number of the block at which the transaction was included in the chain.
-    discard_cause BLOB NULL,                         -- Serialized cause of the discarded transaction
+    status_variant INT NOT NULL,                     -- Status variant identifier
+    status BLOB NOT NULL,                            -- Serialized transaction status
     FOREIGN KEY (script_root) REFERENCES transaction_scripts(script_root),
     PRIMARY KEY (id)
 );

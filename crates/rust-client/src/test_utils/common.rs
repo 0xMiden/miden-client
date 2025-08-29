@@ -241,8 +241,8 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             .with_context(|| format!("transaction with ID {transaction_id} not found"))?;
 
         match tracked_transaction.status {
-            TransactionStatus::Committed(n) => {
-                println!("tx committed in {n}");
+            TransactionStatus::Committed { block_number, .. } => {
+                println!("tx committed in {block_number}");
                 break;
             },
             TransactionStatus::Pending => {

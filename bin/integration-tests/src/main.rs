@@ -1,38 +1,75 @@
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::anyhow;
 use clap::Parser;
-use futures::FutureExt;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::config::ClientConfig;
+use regex::Regex;
 use url::Url;
 
-use crate::tests::{
-    client,
-    custom_transaction,
-    fpi,
-    network_transaction,
-    onchain,
-    swap_transaction,
-};
+use crate::tests::client::*;
+use crate::tests::custom_transaction::*;
+use crate::tests::fpi::*;
+use crate::tests::network_transaction::*;
+use crate::tests::onchain::*;
+use crate::tests::swap_transaction::*;
 
 mod tests;
 
 // MAIN
 // ================================================================================================
 
-#[tokio::main]
-async fn main() -> Result<()> {
+/// Entry point for the integration test binary.
+///
+/// Parses command line arguments, filters tests based on provided criteria, and runs the selected
+/// tests in parallel. Exits with code 1 if any tests fail.
+fn main() {
     let args = Args::parse();
-    let client_config: ClientConfig = args.try_into()?;
 
-    run_tests(&client_config).await
+    let all_tests = get_all_tests();
+    let filtered_tests = filter_tests(all_tests, &args);
+
+    if args.list {
+        list_tests(&filtered_tests);
+        return;
+    }
+
+    if filtered_tests.is_empty() {
+        println!("No tests match the specified filters.");
+        return;
+    }
+
+    let base_config = match BaseConfig::try_from(args.clone()) {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Error: Failed to create configuration: {}", e);
+            std::process::exit(1);
+        },
+    };
+    let start_time = Instant::now();
+
+    let results = run_tests_parallel(filtered_tests, base_config, args.jobs, args.verbose);
+
+    let total_duration = start_time.elapsed();
+    print_summary(&results, total_duration);
+
+    // Exit with error code if any tests failed
+    let failed_count = results.iter().filter(|r| !r.passed).count();
+    if failed_count > 0 {
+        std::process::exit(1);
+    }
 }
 
 // ARGS
 // ================================================================================================
 
-#[derive(Parser)]
+/// Command line arguments for the integration test binary.
+#[derive(Parser, Clone)]
 #[command(
     name = "miden-client-integration-tests",
     about = "Integration tests for the Miden client library",
@@ -51,78 +88,362 @@ struct Args {
     /// Timeout for the RPC requests in milliseconds.
     #[arg(short, long, default_value = "10000")]
     timeout: u64,
+
+    /// Number of tests to run in parallel. Set to 1 for sequential execution.
+    #[arg(short, long, default_value_t = num_cpus::get())]
+    jobs: usize,
+
+    /// Filter tests by name (supports regex patterns).
+    #[arg(short, long)]
+    filter: Option<String>,
+
+    /// List all available tests without running them.
+    #[arg(long)]
+    list: bool,
+
+    /// Show verbose output including individual test timings.
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Only run tests whose names contain this substring.
+    #[arg(long)]
+    contains: Option<String>,
+
+    /// Exclude tests whose names match this pattern (supports regex).
+    #[arg(long)]
+    exclude: Option<String>,
 }
 
-impl TryFrom<Args> for ClientConfig {
+/// Base configuration derived from command line arguments.
+#[derive(Clone)]
+struct BaseConfig {
+    rpc_endpoint: Endpoint,
+    timeout: u64,
+}
+
+impl TryFrom<Args> for BaseConfig {
     type Error = anyhow::Error;
 
+    /// Creates a BaseConfig from command line arguments.
     fn try_from(args: Args) -> Result<Self, Self::Error> {
         let host = args
             .rpc_endpoint
             .host_str()
-            .ok_or_else(|| anyhow::anyhow!("invalid host in RPC endpoint"))?;
+            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
+            .to_string();
+
         let port = args
             .rpc_endpoint
             .port()
-            .ok_or_else(|| anyhow::anyhow!("invalid port in RPC endpoint"))?;
+            .ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
 
-        let endpoint =
-            Endpoint::new(args.rpc_endpoint.scheme().to_string(), host.to_string(), Some(port));
+        let endpoint = Endpoint::new(args.rpc_endpoint.scheme().to_string(), host, Some(port));
+        let timeout_ms = args.timeout;
 
-        Ok(ClientConfig::new(endpoint, args.timeout))
+        Ok(BaseConfig {
+            rpc_endpoint: endpoint,
+            timeout: timeout_ms,
+        })
     }
 }
 
-/// Runs a test function and prints the result.
+// TYPE ALIASES
+// ================================================================================================
+
+/// Type alias for a test function that takes a ClientConfig and returns a boxed future
+type TestFunction = Box<
+    dyn Fn(ClientConfig) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> + Send + Sync,
+>;
+
+// TEST CASE
+// ================================================================================================
+
+/// Represents a single test case with its name, category, and associated function.
+struct TestCase {
+    name: String,
+    category: TestCategory,
+    function: TestFunction,
+}
+
+impl TestCase {
+    /// Creates a new TestCase with the given name, category, and function.
+    fn new<F, Fut>(name: &str, category: TestCategory, func: F) -> Self
+    where
+        F: Fn(ClientConfig) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<(), anyhow::Error>> + 'static,
+    {
+        Self {
+            name: name.to_string(),
+            category,
+            function: Box::new(move |config| Box::pin(func(config))),
+        }
+    }
+}
+
+impl std::fmt::Debug for TestCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TestCase")
+            .field("name", &self.name)
+            .field("category", &self.category)
+            .field("function", &"<function>")
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum TestCategory {
+    Client,
+    CustomTransaction,
+    Fpi,
+    NetworkTransaction,
+    Onchain,
+    SwapTransaction,
+}
+
+impl AsRef<str> for TestCategory {
+    fn as_ref(&self) -> &str {
+        match self {
+            TestCategory::Client => "client",
+            TestCategory::CustomTransaction => "custom_transaction",
+            TestCategory::Fpi => "fpi",
+            TestCategory::NetworkTransaction => "network_transaction",
+            TestCategory::Onchain => "onchain",
+            TestCategory::SwapTransaction => "swap_transaction",
+        }
+    }
+}
+
+/// Returns all available test cases organized by category.
 ///
-/// # Arguments
+/// This function defines the complete list of integration tests available in the test suite,
+/// categorized by functionality area.
+fn get_all_tests() -> Vec<TestCase> {
+    vec![
+        // CLIENT tests
+        TestCase::new(
+            "client_builder_initializes_client_with_endpoint",
+            TestCategory::Client,
+            client_builder_initializes_client_with_endpoint,
+        ),
+        TestCase::new("multiple_tx_on_same_block", TestCategory::Client, multiple_tx_on_same_block),
+        TestCase::new("import_expected_notes", TestCategory::Client, import_expected_notes),
+        TestCase::new(
+            "import_expected_note_uncommitted",
+            TestCategory::Client,
+            import_expected_note_uncommitted,
+        ),
+        TestCase::new(
+            "import_expected_notes_from_the_past_as_committed",
+            TestCategory::Client,
+            import_expected_notes_from_the_past_as_committed,
+        ),
+        TestCase::new("get_account_update", TestCategory::Client, get_account_update),
+        TestCase::new("sync_detail_values", TestCategory::Client, sync_detail_values),
+        TestCase::new(
+            "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
+            TestCategory::Client,
+            multiple_transactions_can_be_committed_in_different_blocks_without_sync,
+        ),
+        TestCase::new(
+            "consume_multiple_expected_notes",
+            TestCategory::Client,
+            consume_multiple_expected_notes,
+        ),
+        TestCase::new(
+            "import_consumed_note_with_proof",
+            TestCategory::Client,
+            import_consumed_note_with_proof,
+        ),
+        TestCase::new(
+            "import_consumed_note_with_id",
+            TestCategory::Client,
+            import_consumed_note_with_id,
+        ),
+        TestCase::new("import_note_with_proof", TestCategory::Client, import_note_with_proof),
+        TestCase::new("discarded_transaction", TestCategory::Client, discarded_transaction),
+        TestCase::new("custom_transaction_prover", TestCategory::Client, custom_transaction_prover),
+        TestCase::new("locked_account", TestCategory::Client, locked_account),
+        TestCase::new("expired_transaction_fails", TestCategory::Client, expired_transaction_fails),
+        TestCase::new("unused_rpc_api", TestCategory::Client, unused_rpc_api),
+        TestCase::new("ignore_invalid_notes", TestCategory::Client, ignore_invalid_notes),
+        TestCase::new("output_only_note", TestCategory::Client, output_only_note),
+        // CUSTOM TRANSACTION tests
+        TestCase::new("merkle_store", TestCategory::CustomTransaction, merkle_store),
+        TestCase::new(
+            "onchain_notes_sync_with_tag",
+            TestCategory::CustomTransaction,
+            onchain_notes_sync_with_tag,
+        ),
+        TestCase::new("transaction_request", TestCategory::CustomTransaction, transaction_request),
+        // FPI tests
+        TestCase::new("standard_fpi_public", TestCategory::Fpi, standard_fpi_public),
+        TestCase::new("standard_fpi_private", TestCategory::Fpi, standard_fpi_private),
+        TestCase::new("fpi_execute_program", TestCategory::Fpi, fpi_execute_program),
+        TestCase::new("nested_fpi_calls", TestCategory::Fpi, nested_fpi_calls),
+        // NETWORK TRANSACTION tests
+        TestCase::new(
+            "counter_contract_ntx",
+            TestCategory::NetworkTransaction,
+            counter_contract_ntx,
+        ),
+        TestCase::new(
+            "recall_note_before_ntx_consumes_it",
+            TestCategory::NetworkTransaction,
+            recall_note_before_ntx_consumes_it,
+        ),
+        // ONCHAIN tests
+        TestCase::new("import_account_by_id", TestCategory::Onchain, import_account_by_id),
+        TestCase::new("onchain_accounts", TestCategory::Onchain, onchain_accounts),
+        TestCase::new("onchain_notes_flow", TestCategory::Onchain, onchain_notes_flow),
+        TestCase::new("incorrect_genesis", TestCategory::Onchain, incorrect_genesis),
+        // SWAP TRANSACTION tests
+        TestCase::new("swap_fully_onchain", TestCategory::SwapTransaction, swap_fully_onchain),
+        TestCase::new("swap_private", TestCategory::SwapTransaction, swap_private),
+    ]
+}
+
+/// Represents the result of executing a test case.
+#[derive(Debug)]
+struct TestResult {
+    name: String,
+    category: TestCategory,
+    passed: bool,
+    duration: Duration,
+    error_message: Option<String>,
+}
+
+impl TestResult {
+    /// Creates a TestResult for a passed test.
+    fn passed(name: String, category: TestCategory, duration: Duration) -> Self {
+        Self {
+            name,
+            category,
+            passed: true,
+            duration,
+            error_message: None,
+        }
+    }
+
+    /// Creates a TestResult for a failed test with an error message.
+    fn failed(name: String, category: TestCategory, duration: Duration, error: String) -> Self {
+        Self {
+            name,
+            category,
+            passed: false,
+            duration,
+            error_message: Some(error),
+        }
+    }
+}
+
+/// Filters the list of tests based on command line arguments.
 ///
-/// * `name` - The name of the test.
-/// * `test_fn` - The test function to run.
-/// * `failed_tests` - A reference to a vector of failed tests.
-/// * `client_config` - The client configuration.
+/// Applies regex patterns, substring matching, and exclusion filters to select which tests should
+/// be executed.
+fn filter_tests(tests: Vec<TestCase>, args: &Args) -> Vec<TestCase> {
+    let mut filtered_tests = tests;
+
+    // Apply filter (regex pattern on test names)
+    if let Some(ref filter_pattern) = args.filter {
+        if let Ok(regex) = Regex::new(filter_pattern) {
+            filtered_tests.retain(|test| regex.is_match(&test.name));
+        } else {
+            eprintln!("Warning: Invalid regex pattern in filter: {}", filter_pattern);
+        }
+    }
+
+    // Apply contains filter
+    if let Some(ref contains) = args.contains {
+        filtered_tests.retain(|test| test.name.contains(contains));
+    }
+
+    // Apply exclude filter
+    if let Some(ref exclude_pattern) = args.exclude {
+        if let Ok(regex) = Regex::new(exclude_pattern) {
+            filtered_tests.retain(|test| !regex.is_match(&test.name));
+        } else {
+            eprintln!("Warning: Invalid regex pattern in exclude: {}", exclude_pattern);
+        }
+    }
+
+    filtered_tests
+}
+
+/// Prints all available tests organized by category.
 ///
-/// Works by wrapping the test function in a `std::panic::AssertUnwindSafe` and catching any panics.
-/// If the test function panics, the panic is caught and the test is considered failed.
-/// If the test function succeeds, the test is considered passed.
+/// Used when the --list flag is provided to show what tests are available without actually running
+/// them.
+fn list_tests(tests: &[TestCase]) {
+    println!("Available tests:");
+    println!("================");
+
+    let mut tests_by_category: BTreeMap<TestCategory, Vec<&TestCase>> = BTreeMap::new();
+    for test in tests {
+        tests_by_category.entry(test.category.clone()).or_default().push(test);
+    }
+
+    for (category, tests) in tests_by_category {
+        println!("\n{}:", category.as_ref().to_uppercase());
+        for test in tests {
+            println!("  - {}", test.name);
+        }
+    }
+
+    println!("\nTotal: {} tests", tests.len());
+}
+
+/// Executes a single test and returns its result.
 ///
-/// The test function is expected to return a `Future` that resolves when the test is complete.
-async fn run_test<F, Fut>(
-    name: &str,
-    test_fn: F,
-    failed_tests: &Arc<Mutex<Vec<String>>>,
-    client_config: &ClientConfig,
-) -> Result<()>
-where
-    F: FnOnce(ClientConfig) -> Fut,
-    Fut: Future<Output = Result<()>>,
-{
-    let result = std::panic::AssertUnwindSafe(test_fn(client_config.clone()))
-        .catch_unwind()
-        .await;
+/// Creates a new Tokio runtime for the test, handles panics, and measures execution time. Each
+/// test gets its own isolated configuration.
+fn run_single_test(test_case: &TestCase, base_config: &BaseConfig) -> TestResult {
+    let start_time = Instant::now();
+
+    // Create a new runtime for this test
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        rt.block_on(async {
+            // Create a unique ClientConfig for this test (with unique temporary directories)
+            let client_config =
+                ClientConfig::new(base_config.rpc_endpoint.clone(), base_config.timeout);
+
+            // Call the stored test function directly
+            (test_case.function)(client_config).await
+        })
+    }));
+
+    let duration = start_time.elapsed();
 
     match result {
         Ok(Ok(_)) => {
-            println!(" - {name}: PASSED");
+            TestResult::passed(test_case.name.clone(), test_case.category.clone(), duration)
         },
         Ok(Err(e)) => {
-            println!(" - {name}: FAILED");
-            let error_report = format_error_report(e);
-            failed_tests.lock().unwrap().push(format!("{name}:\n{error_report}"));
+            let error_msg = format_error_report(e);
+            TestResult::failed(
+                test_case.name.clone(),
+                test_case.category.clone(),
+                duration,
+                error_msg,
+            )
         },
         Err(panic_info) => {
-            println!(" - {name}: FAILED (panic)");
-            let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+            let error_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
                 s.to_string()
             } else if let Some(s) = panic_info.downcast_ref::<String>() {
                 s.clone()
             } else {
                 "Unknown panic".into()
             };
-            failed_tests.lock().unwrap().push(format!("{name}: {msg}"));
+            TestResult::failed(
+                test_case.name.clone(),
+                test_case.category.clone(),
+                duration,
+                error_msg,
+            )
         },
     }
-    Ok(())
 }
 
 /// Formats an error with its full chain
@@ -141,199 +462,154 @@ fn format_error_report(error: anyhow::Error) -> String {
     output
 }
 
-/// Runs all the tests sequentially.
+/// Runs multiple tests in parallel using a specified number of worker threads.
 ///
-/// # Arguments
-///
-/// * `client_config` - The client configuration.
-async fn run_tests(client_config: &ClientConfig) -> Result<()> {
-    println!("Starting Miden client integration tests");
+/// Uses a shared work queue to distribute tests among worker threads. Provides real-time progress
+/// updates and collects results from all workers.
+fn run_tests_parallel(
+    tests: Vec<TestCase>,
+    base_config: BaseConfig,
+    jobs: usize,
+    verbose: bool,
+) -> Vec<TestResult> {
+    let total_tests = tests.len();
+    println!("Running {} tests with {} parallel jobs...", total_tests, jobs);
     println!("==========================================================");
     println!("Using:");
-    println!(" - RPC endpoint: {}", client_config.rpc_endpoint);
-    println!(" - Timeout: {}ms", client_config.rpc_timeout_ms);
+    println!(" - RPC endpoint: {}", base_config.rpc_endpoint);
+    println!(" - Timeout: {}ms", base_config.timeout);
     println!("==========================================================");
 
-    let failed_tests = Arc::new(Mutex::new(Vec::new()));
+    let results = Arc::new(Mutex::new(Vec::new()));
+    let completed_count = Arc::new(Mutex::new(0usize));
 
-    // CLIENT
-    run_test(
-        "client_builder_initializes_client_with_endpoint",
-        client::client_builder_initializes_client_with_endpoint,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "multiple_tx_on_same_block",
-        client::multiple_tx_on_same_block,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_expected_notes",
-        client::import_expected_notes,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_expected_note_uncommitted",
-        client::import_expected_note_uncommitted,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_expected_notes_from_the_past_as_committed",
-        client::import_expected_notes_from_the_past_as_committed,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("get_account_update", client::get_account_update, &failed_tests, client_config)
-        .await?;
-    run_test("sync_detail_values", client::sync_detail_values, &failed_tests, client_config)
-        .await?;
-    run_test(
-        "multiple_transactions_can_be_committed_in_different_blocks_without_sync",
-        client::multiple_transactions_can_be_committed_in_different_blocks_without_sync,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "consume_multiple_expected_notes",
-        client::consume_multiple_expected_notes,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_consumed_note_with_proof",
-        client::import_consumed_note_with_proof,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_consumed_note_with_id",
-        client::import_consumed_note_with_id,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "import_note_with_proof",
-        client::import_note_with_proof,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "discarded_transaction",
-        client::discarded_transaction,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "custom_transaction_prover",
-        client::custom_transaction_prover,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("locked_account", client::locked_account, &failed_tests, client_config).await?;
-    run_test(
-        "expired_transaction_fails",
-        client::expired_transaction_fails,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("unused_rpc_api", client::unused_rpc_api, &failed_tests, client_config).await?;
-    run_test(
-        "ignore_invalid_notes",
-        client::ignore_invalid_notes,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("output_only_note", client::output_only_note, &failed_tests, client_config).await?;
-    // CUSTOM TRANSACTION
-    run_test("merkle_store", custom_transaction::merkle_store, &failed_tests, client_config)
-        .await?;
-    run_test(
-        "onchain_notes_sync_with_tag",
-        custom_transaction::onchain_notes_sync_with_tag,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "transaction_request",
-        custom_transaction::transaction_request,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    // FPI
-    run_test("standard_fpi_public", fpi::standard_fpi_public, &failed_tests, client_config).await?;
-    run_test("standard_fpi_private", fpi::standard_fpi_private, &failed_tests, client_config)
-        .await?;
-    run_test("fpi_execute_program", fpi::fpi_execute_program, &failed_tests, client_config).await?;
-    run_test("nested_fpi_calls", fpi::nested_fpi_calls, &failed_tests, client_config).await?;
-    // NETWORK TRANSACTION
-    run_test(
-        "counter_contract_ntx",
-        network_transaction::counter_contract_ntx,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test(
-        "recall_note_before_ntx_consumes_it",
-        network_transaction::recall_note_before_ntx_consumes_it,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    // ONCHAIN
-    run_test(
-        "import_account_by_id",
-        onchain::import_account_by_id,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("onchain_accounts", onchain::onchain_accounts, &failed_tests, client_config).await?;
-    run_test("onchain_notes_flow", onchain::onchain_notes_flow, &failed_tests, client_config)
-        .await?;
-    run_test("incorrect_genesis", onchain::incorrect_genesis, &failed_tests, client_config).await?;
-    // SWAP TRANSACTION
-    run_test(
-        "swap_fully_onchain",
-        swap_transaction::swap_fully_onchain,
-        &failed_tests,
-        client_config,
-    )
-    .await?;
-    run_test("swap_private", swap_transaction::swap_private, &failed_tests, client_config).await?;
+    // Use Arc<Mutex<>> to share the work queue
+    let work_queue = Arc::new(Mutex::new(tests));
 
-    // Print summary
-    println!("\n====================== TEST SUMMARY ======================");
-    if failed_tests.lock().expect("poisoned lock").is_empty() {
-        println!("All tests passed!");
-        Ok(())
-    } else {
-        let failed = failed_tests.lock().expect("poisoned lock");
-        println!("{} tests failed:", failed.len());
-        for (i, failed_test) in failed.iter().enumerate() {
-            println!("\n[{}] {}", i + 1, failed_test);
-            println!("{}", "─".repeat(80));
+    // Spawn worker threads
+    let mut handles = Vec::new();
+    for worker_id in 0..jobs {
+        let work_queue = Arc::clone(&work_queue);
+        let base_config = base_config.clone();
+        let results = Arc::clone(&results);
+        let completed_count = Arc::clone(&completed_count);
+
+        let handle = thread::spawn(move || {
+            loop {
+                // Get the next test to run
+                let test = {
+                    let mut queue = work_queue.lock().unwrap();
+                    if queue.is_empty() {
+                        break; // No more work
+                    }
+                    queue.pop().unwrap()
+                };
+
+                let test_name = test.name.clone();
+
+                if verbose {
+                    println!("[Worker {}] Starting test: {}", worker_id, test_name);
+                }
+
+                let result = run_single_test(&test, &base_config);
+
+                let status = if result.passed { "PASSED" } else { "FAILED" };
+                let duration_str = if result.duration.as_secs() > 0 {
+                    format!("{:.2}s", result.duration.as_secs_f64())
+                } else {
+                    format!("{}ms", result.duration.as_millis())
+                };
+
+                if verbose {
+                    println!(
+                        "[Worker {}] {} - {}: {} ({})",
+                        worker_id,
+                        test_name,
+                        result.category.as_ref(),
+                        status,
+                        duration_str
+                    );
+                } else {
+                    println!(
+                        " - {} ({}): {} ({})",
+                        test_name,
+                        result.category.as_ref(),
+                        status,
+                        duration_str
+                    );
+                }
+
+                if !result.passed
+                    && let Some(ref error) = result.error_message
+                {
+                    println!("   Error: {}", error);
+                }
+
+                // Update results
+                results.lock().unwrap().push(result);
+
+                // Update and print progress
+                let mut count = completed_count.lock().unwrap();
+                *count += 1;
+                let progress = *count;
+                drop(count);
+
+                if !verbose {
+                    println!("   Progress: {}/{}", progress, total_tests);
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all workers to complete
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // Extract results
+    Arc::try_unwrap(results).unwrap().into_inner().unwrap()
+}
+
+/// Prints a comprehensive summary of test execution results.
+///
+/// Shows pass/fail counts, failed test details, and timing statistics including average, median,
+/// min, and max execution times.
+fn print_summary(results: &[TestResult], total_duration: Duration) {
+    let passed = results.iter().filter(|r| r.passed).count();
+    let failed = results.len() - passed;
+
+    println!("\n=== TEST SUMMARY ===");
+    println!("Total: {} tests", results.len());
+    println!("Passed: {} tests", passed);
+    println!("Failed: {} tests", failed);
+    println!("Total time: {:.2}s", total_duration.as_secs_f64());
+
+    if failed > 0 {
+        println!("\nFailed tests:");
+        for result in results.iter().filter(|r| !r.passed) {
+            println!("  - {} ({})", result.name, result.category.as_ref());
+            if let Some(ref error) = result.error_message {
+                println!("    Error: {}", error);
+            }
         }
-        std::process::exit(1);
+    }
+
+    // Print timing statistics
+    if results.len() > 1 {
+        let mut durations: Vec<_> = results.iter().map(|r| r.duration).collect();
+        durations.sort();
+
+        let avg_duration = durations.iter().sum::<Duration>() / durations.len() as u32;
+        let median_duration = durations[durations.len() / 2];
+        let min_duration = durations[0];
+        let max_duration = durations[durations.len() - 1];
+
+        println!("\nTiming statistics:");
+        println!("  Average: {:.2}s", avg_duration.as_secs_f64());
+        println!("  Median:  {:.2}s", median_duration.as_secs_f64());
+        println!("  Min:     {:.2}s", min_duration.as_secs_f64());
+        println!("  Max:     {:.2}s", max_duration.as_secs_f64());
     }
 }

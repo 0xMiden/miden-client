@@ -1,4 +1,5 @@
 import { Page } from "puppeteer";
+import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
   AccountBuilder,
@@ -15,6 +16,7 @@ import {
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
+  Endpoint,
   Felt,
   FeltArray,
   ForeignAccount,
@@ -28,6 +30,7 @@ import {
   NoteExecutionMode,
   NoteFilter,
   NoteFilterTypes,
+  NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
   NoteInputs,
@@ -39,6 +42,7 @@ import {
   OutputNotesArray,
   PublicKey,
   Rpo256,
+  RpcClient,
   SecretKey,
   Signature,
   SigningInputs,
@@ -58,15 +62,16 @@ import {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
-  WebClient,
   NoteAndArgs,
   NoteAndArgsArray,
 } from "../dist/index";
+import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: WebClient;
-    remoteProverUrl: string;
+    client: WebClient & WasmWebClient;
+    MockWebClient: typeof MockWebClient;
+    remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
     AccountBuilder: typeof AccountBuilder;
@@ -87,6 +92,7 @@ declare global {
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
+    Endpoint: typeof Endpoint;
     Felt: typeof Felt;
     FeltArray: typeof FeltArray;
     ForeignAccount: typeof ForeignAccount;
@@ -103,6 +109,7 @@ declare global {
     NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
     NoteFilterTypes: typeof NoteFilterTypes;
+    NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
     NoteInputs: typeof NoteInputs;
@@ -133,6 +140,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
     createClient: () => Promise<void>;
@@ -150,6 +158,6 @@ declare global {
   }
 }
 
-declare module "./mocha.global.setup.mjs" {
+declare module "./playwright.global.setup" {
   export const testingPage: Page;
 }

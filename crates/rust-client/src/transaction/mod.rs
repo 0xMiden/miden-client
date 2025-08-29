@@ -285,13 +285,20 @@ impl TransactionRecord {
 
     /// Updates (if necessary) the transaction status to signify that the transaction was
     /// committed. Will return true if the record was modified, false otherwise.
-    pub fn commit_transaction(&mut self, commit_height: BlockNumber) -> bool {
+    pub fn commit_transaction(
+        &mut self,
+        commit_height: BlockNumber,
+        commit_timestamp: u64,
+    ) -> bool {
         match self.status {
             TransactionStatus::Pending => {
-                self.status = TransactionStatus::Committed(commit_height);
+                self.status = TransactionStatus::Committed {
+                    block_number: commit_height,
+                    commit_timestamp,
+                };
                 true
             },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
         }
     }
 
@@ -303,7 +310,7 @@ impl TransactionRecord {
                 self.status = TransactionStatus::Discarded(cause);
                 true
             },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed(_) => false,
+            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
         }
     }
 }
@@ -327,6 +334,8 @@ pub struct TransactionDetails {
     pub submission_height: BlockNumber,
     /// Block number at which the transaction is set to expire.
     pub expiration_block_num: BlockNumber,
+    /// Timestamp indicating when the transaction was created by the client.
+    pub creation_timestamp: u64,
 }
 
 impl Serializable for TransactionDetails {
@@ -339,6 +348,7 @@ impl Serializable for TransactionDetails {
         self.block_num.write_into(target);
         self.submission_height.write_into(target);
         self.expiration_block_num.write_into(target);
+        self.creation_timestamp.write_into(target);
     }
 }
 
@@ -352,6 +362,7 @@ impl Deserializable for TransactionDetails {
         let block_num = BlockNumber::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
         let expiration_block_num = BlockNumber::read_from(source)?;
+        let creation_timestamp = source.read_u64()?;
 
         Ok(Self {
             account_id,
@@ -362,6 +373,7 @@ impl Deserializable for TransactionDetails {
             block_num,
             submission_height,
             expiration_block_num,
+            creation_timestamp,
         })
     }
 }
@@ -427,19 +439,77 @@ pub enum TransactionStatus {
     /// Transaction has been submitted but not yet committed.
     Pending,
     /// Transaction has been committed and included at the specified block number.
-    Committed(BlockNumber),
+    Committed {
+        /// Block number at which the transaction was committed.
+        block_number: BlockNumber,
+        /// Timestamp indicating when the transaction was committed.
+        commit_timestamp: u64,
+    },
     /// Transaction has been discarded and isn't included in the node.
     Discarded(DiscardCause),
+}
+
+pub enum TransactionStatusVariant {
+    Pending = 0,
+    Committed = 1,
+    Discarded = 2,
+}
+
+impl TransactionStatus {
+    pub const fn variant(&self) -> TransactionStatusVariant {
+        match self {
+            TransactionStatus::Pending => TransactionStatusVariant::Pending,
+            TransactionStatus::Committed { .. } => TransactionStatusVariant::Committed,
+            TransactionStatus::Discarded(_) => TransactionStatusVariant::Discarded,
+        }
+    }
 }
 
 impl fmt::Display for TransactionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TransactionStatus::Pending => write!(f, "Pending"),
-            TransactionStatus::Committed(block_number) => {
+            TransactionStatus::Committed { block_number, .. } => {
                 write!(f, "Committed (Block: {block_number})")
             },
             TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
+        }
+    }
+}
+
+impl Serializable for TransactionStatus {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            TransactionStatus::Pending => target.write_u8(self.variant() as u8),
+            TransactionStatus::Committed { block_number, commit_timestamp } => {
+                target.write_u8(self.variant() as u8);
+                block_number.write_into(target);
+                commit_timestamp.write_into(target);
+            },
+            TransactionStatus::Discarded(cause) => {
+                target.write_u8(self.variant() as u8);
+                cause.write_into(target);
+            },
+        }
+    }
+}
+
+impl Deserializable for TransactionStatus {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            variant if variant == TransactionStatusVariant::Pending as u8 => {
+                Ok(TransactionStatus::Pending)
+            },
+            variant if variant == TransactionStatusVariant::Committed as u8 => {
+                let block_number = BlockNumber::read_from(source)?;
+                let commit_timestamp = source.read_u64()?;
+                Ok(TransactionStatus::Committed { block_number, commit_timestamp })
+            },
+            variant if variant == TransactionStatusVariant::Discarded as u8 => {
+                let cause = DiscardCause::read_from(source)?;
+                Ok(TransactionStatus::Discarded(cause))
+            },
+            _ => Err(DeserializationError::InvalidValue("Invalid transaction status".to_string())),
         }
     }
 }
@@ -454,8 +524,6 @@ pub struct TransactionStoreUpdate {
     executed_transaction: ExecutedTransaction,
     /// Block number at which the transaction was submitted.
     submission_height: BlockNumber,
-    /// Updated account state after the [`AccountDelta`] has been applied.
-    updated_account: Account,
     /// Information about note changes after the transaction execution.
     note_updates: NoteUpdateTracker,
     /// New note tags to be tracked.
@@ -468,21 +536,18 @@ impl TransactionStoreUpdate {
     /// # Arguments
     /// - `executed_transaction`: The executed transaction details.
     /// - `submission_height`: The block number at which the transaction was submitted.
-    /// - `updated_account`: The updated account state after applying the transaction.
     /// - `note_updates`: The note updates that need to be applied to the store after the
     ///   transaction execution.
     /// - `new_tags`: New note tags that were need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
         submission_height: BlockNumber,
-        updated_account: Account,
         note_updates: NoteUpdateTracker,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
             executed_transaction,
             submission_height,
-            updated_account,
             note_updates,
             new_tags,
         }
@@ -496,11 +561,6 @@ impl TransactionStoreUpdate {
     /// Returns the block number at which the transaction was submitted.
     pub fn submission_height(&self) -> BlockNumber {
         self.submission_height
-    }
-
-    /// Returns the updated account.
-    pub fn updated_account(&self) -> &Account {
-        &self.updated_account
     }
 
     /// Returns the note updates that need to be applied after the transaction execution.
@@ -691,24 +751,16 @@ where
         info!("Applying transaction to the local store...");
 
         let account_id = tx_result.executed_transaction().account_id();
-        let account_delta = tx_result.account_delta();
         let account_record = self.try_get_account(account_id).await?;
 
         if account_record.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
         }
 
-        let mut account: Account = account_record.into();
-        account.apply_delta(account_delta)?;
-
-        if self
-            .store
-            .get_account_header_by_commitment(account.commitment())
-            .await?
-            .is_some()
-        {
+        let final_commitment = tx_result.executed_transaction().final_account().commitment();
+        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
             return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
-                account.commitment(),
+                final_commitment,
             )));
         }
 
@@ -732,7 +784,6 @@ where
         let tx_update = TransactionStoreUpdate::new(
             tx_result.into(),
             submission_height,
-            account,
             note_updates,
             new_tags,
         );

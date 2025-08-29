@@ -26,10 +26,9 @@ pub struct SerializedTransactionData {
     pub tx_script: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: String,
-    #[wasm_bindgen(js_name = "commitHeight")]
-    pub commit_height: Option<String>,
-    #[wasm_bindgen(js_name = "discardCause")]
-    pub discard_cause: Option<Vec<u8>>,
+    #[wasm_bindgen(js_name = "statusVariant")]
+    pub status_variant: u8,
+    pub status: Vec<u8>,
 }
 
 // ================================================================================================
@@ -58,6 +57,8 @@ pub async fn insert_proven_transaction_data(
         block_num: executed_transaction.block_header().block_num(),
         submission_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
+        creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
+            .expect("timestamp is always after epoch"),
     };
 
     let transaction_record = TransactionRecord::new(
@@ -81,20 +82,14 @@ pub(crate) fn serialize_transaction_record(
     let script_root = transaction_record.script.as_ref().map(|script| script.root().to_bytes());
     let tx_script = transaction_record.script.as_ref().map(TransactionScript::to_bytes);
 
-    let (commit_height, discard_cause) = match &transaction_record.status {
-        TransactionStatus::Pending => (None, None),
-        TransactionStatus::Committed(block_num) => (Some(block_num.as_u32().to_string()), None),
-        TransactionStatus::Discarded(cause) => (None, Some(cause.to_bytes())),
-    };
-
     SerializedTransactionData {
         id: transaction_id,
         script_root,
         tx_script,
         details: transaction_record.details.to_bytes(),
         block_num: transaction_record.details.block_num.as_u32().to_string(),
-        commit_height,
-        discard_cause,
+        status_variant: transaction_record.status.variant() as u8,
+        status: transaction_record.status.to_bytes(),
     }
 }
 
@@ -115,9 +110,9 @@ pub(crate) async fn upsert_transaction_record(
         serialized_data.id,
         serialized_data.details,
         serialized_data.block_num,
-        serialized_data.script_root.clone(),
-        serialized_data.commit_height,
-        serialized_data.discard_cause,
+        serialized_data.status_variant,
+        serialized_data.status,
+        serialized_data.script_root,
     );
     JsFuture::from(promise).await.map_err(|js_error| {
         StoreError::DatabaseError(format!("failed to insert transaction data: {js_error:?}"))

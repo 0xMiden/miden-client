@@ -22,6 +22,7 @@ pub mod models;
 pub mod new_account;
 pub mod new_transactions;
 pub mod notes;
+pub mod rpc_client;
 pub mod sync;
 pub mod tags;
 pub mod transactions;

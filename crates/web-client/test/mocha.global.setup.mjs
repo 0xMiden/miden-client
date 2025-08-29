@@ -77,6 +77,7 @@ before(async () => {
         AuthSecretKey,
         BasicFungibleFaucetComponent,
         ConsumableNoteRecord,
+        Endpoint,
         Felt,
         FeltArray,
         ForeignAccount,
@@ -93,6 +94,7 @@ before(async () => {
         NoteExecutionMode,
         NoteFilter,
         NoteFilterTypes,
+        NoteId,
         NoteIdAndArgs,
         NoteIdAndArgsArray,
         NoteInputs,
@@ -105,6 +107,7 @@ before(async () => {
         OutputNotesArray,
         PublicKey,
         Rpo256,
+        RpcClient,
         SecretKey,
         Signature,
         SigningInputs,
@@ -152,6 +155,7 @@ before(async () => {
       window.AuthSecretKey = AuthSecretKey;
       window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
       window.ConsumableNoteRecord = ConsumableNoteRecord;
+      window.Endpoint = Endpoint;
       window.Felt = Felt;
       window.FeltArray = FeltArray;
       window.ForeignAccount = ForeignAccount;
@@ -168,6 +172,7 @@ before(async () => {
       window.NoteExecutionMode = NoteExecutionMode;
       window.NoteFilter = NoteFilter;
       window.NoteFilterTypes = NoteFilterTypes;
+      window.NoteId = NoteId;
       window.NoteIdAndArgs = NoteIdAndArgs;
       window.NoteIdAndArgsArray = NoteIdAndArgsArray;
       window.NoteInputs = NoteInputs;
@@ -180,6 +185,7 @@ before(async () => {
       window.OutputNotesArray = OutputNotesArray;
       window.PublicKey = PublicKey;
       window.Rpo256 = Rpo256;
+      window.RpcClient = RpcClient;
       window.SecretKey = SecretKey;
       window.Signature = Signature;
       window.SigningInputs = SigningInputs;

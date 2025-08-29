@@ -286,9 +286,11 @@ impl NoteUpdateTracker {
                 .find(|t| input_note_record.consumer_transaction_id() == Some(&t.id))
             {
                 // The note was being processed by a local transaction that just got committed
-                if let TransactionStatus::Committed(commit_height) = consumer_transaction.status {
+                if let TransactionStatus::Committed { block_number, .. } =
+                    consumer_transaction.status
+                {
                     input_note_record
-                        .transaction_committed(consumer_transaction.id, commit_height.as_u32())?;
+                        .transaction_committed(consumer_transaction.id, block_number.as_u32())?;
                 }
             } else {
                 // The note was consumed by an external transaction

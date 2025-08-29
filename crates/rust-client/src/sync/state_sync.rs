@@ -205,7 +205,7 @@ impl StateSync {
 
         self.transaction_state_sync(
             &mut state_sync_update.transaction_updates,
-            new_block_num,
+            &response.block_header,
             &response.transactions,
         );
 
@@ -431,14 +431,18 @@ impl StateSync {
     fn transaction_state_sync(
         &self,
         transaction_updates: &mut TransactionUpdateTracker,
-        new_sync_height: BlockNumber,
+        new_block_header: &BlockHeader,
         transaction_inclusions: &[TransactionInclusion],
     ) {
         for transaction_inclusion in transaction_inclusions {
-            transaction_updates.apply_transaction_inclusion(transaction_inclusion);
+            transaction_updates.apply_transaction_inclusion(
+                transaction_inclusion,
+                u64::from(new_block_header.timestamp()),
+            ); //TODO: Change timestamps from u64 to u32
         }
 
-        transaction_updates.apply_sync_height_update(new_sync_height, self.tx_graceful_blocks);
+        transaction_updates
+            .apply_sync_height_update(new_block_header.block_num(), self.tx_graceful_blocks);
     }
 }
 
