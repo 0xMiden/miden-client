@@ -189,6 +189,10 @@ pub struct TransactionResult {
 impl TransactionResult {
     /// Screens the output notes to store and track the relevant ones, and instantiates a
     /// [`TransactionResult`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction result cannot be created.
     pub fn new(
         transaction: ExecutedTransaction,
         future_notes: Vec<(NoteDetails, NoteTag)>,
@@ -388,6 +392,11 @@ pub enum DiscardCause {
 }
 
 impl DiscardCause {
+    /// Converts a string to a [`DiscardCause`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a `DeserializationError` if the string does not match any known discard cause.
     pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
         match cause {
             "Expired" => Ok(DiscardCause::Expired),
@@ -583,6 +592,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves tracked transactions, filtered by [`TransactionFilter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_transactions(
         &self,
         filter: TransactionFilter,
@@ -695,6 +708,13 @@ where
 
     /// Proves the specified transaction using a local prover, submits it to the network, and saves
     /// the transaction into the local database for tracking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Transaction proving fails
+    /// - Network submission fails
+    /// - Database storage fails
     pub async fn submit_transaction(
         &mut self,
         tx_result: TransactionResult,
@@ -704,6 +724,13 @@ where
 
     /// Proves the specified transaction using the provided prover, submits it to the network, and
     /// saves the transaction into the local database for tracking.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Transaction proving fails
+    /// - Network submission fails
+    /// - Database storage fails
     pub async fn submit_transaction_with_prover(
         &mut self,
         tx_result: TransactionResult,

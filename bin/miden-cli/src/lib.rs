@@ -146,6 +146,20 @@ pub enum Command {
 
 /// CLI entry point.
 impl Cli {
+    /// Executes the CLI command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The current directory cannot be determined
+    /// - The configuration file cannot be loaded
+    /// - The keystore cannot be created
+    /// - The client cannot be built
+    /// - The command execution fails
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the store filepath cannot be converted to a valid string.
     pub async fn execute(&self) -> Result<(), CliError> {
         let mut current_dir = std::env::current_dir()?;
         current_dir.push(CLIENT_CONFIG_FILE_NAME);
