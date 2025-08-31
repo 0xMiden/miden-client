@@ -24,7 +24,6 @@ use miden_client::testing::common::{
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, ScriptBuilder, Word, ZERO};
 use rand::RngCore;
-use test_case_marker::test_case;
 
 use crate::tests::config::ClientConfig;
 
@@ -140,8 +139,7 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-#[test_case]
-pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
+pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
@@ -201,8 +199,7 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-#[test_case]
-pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
+pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 

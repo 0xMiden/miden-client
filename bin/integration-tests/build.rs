@@ -2,26 +2,27 @@
 //!
 //! This build script automatically discovers integration test functions and generates:
 //! 1. Individual `#[tokio::test]` wrappers in `OUT_DIR/integration_tests.rs`
-//! 2. Programmatic access via `Vec<TestCase>` in `OUT_DIR/generated_tests.rs`
+//! 2. Programmatic access via `Vec<TestCase>` in `OUT_DIR/test_registry.rs`
 //!
 //! The generated files are included via `include!()` macro to keep them out of the source tree.
-//! Test functions are discovered by looking for the `#[test_case]` attribute.
+//! Test functions are discovered by looking for functions named `test_*`.
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::{env, fs};
 
-use syn::{Item, ItemFn, parse_file};
+const TEST_PREFIX: &str = "test_";
 
 /// Main entry point for the build script.
 ///
 /// This function:
-/// 1. Scans all Rust files in `src/tests/` directory
-/// 2. Discovers test functions marked with `#[test_case]` attribute
+/// 1. Scans all Rust files in `src/` directory recursively
+/// 2. Discovers test functions named `test_*`
 /// 3. Generates integration test wrappers in `OUT_DIR/integration_tests.rs`
-/// 4. Generates test case vector in `OUT_DIR/generated_tests.rs`
+/// 4. Generates test case vector in `OUT_DIR/test_registry.rs`
 ///
 /// The build script will re-run when:
-/// - Any file in `src/tests/` changes
+/// - Any file in `src/` changes
 /// - The `build.rs` file itself changes
 fn main() {
     println!("cargo:rerun-if-changed=src/tests/");
@@ -41,7 +42,7 @@ fn main() {
     println!("cargo:info=Generated tokio test wrappers in {}", integration_path.display());
 
     // Generate Vec<TestCase> in OUT_DIR
-    let generated_path = out_path.join("generated_tests.rs");
+    let generated_path = out_path.join("test_registry.rs");
     let generated_code = generate_test_case_vector(&test_cases);
     fs::write(&generated_path, generated_code).unwrap();
     println!("cargo:info=Generated test case vector in {}", generated_path.display());
@@ -60,10 +61,10 @@ struct TestCaseInfo {
     function_name: String,
 }
 
-/// Discovers all integration test functions across all test files.
+/// Discovers all integration test functions across all source files.
 ///
-/// This function scans the `src/tests/` directory for Rust files and extracts
-/// test case information from each one.
+/// This function recursively scans the `src/tests` directory for Rust files and extracts
+/// test case information from functions named `test_*`.
 ///
 /// # Returns
 ///
@@ -77,29 +78,34 @@ struct TestCaseInfo {
 /// ```
 fn collect_test_cases() -> Vec<TestCaseInfo> {
     let mut test_cases = Vec::new();
-    let tests_dir = Path::new("src/tests");
+    let src_dir = Path::new("src/tests");
 
-    if tests_dir.exists() && tests_dir.is_dir() {
-        for entry in fs::read_dir(tests_dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-
-            if path.extension().and_then(|s| s.to_str()) == Some("rs")
-                && path.file_name().and_then(|s| s.to_str()) != Some("mod.rs")
-            {
-                let mut file_test_cases = collect_test_cases_from_file(&path);
-                test_cases.append(&mut file_test_cases);
-            }
-        }
+    if src_dir.exists() && src_dir.is_dir() {
+        collect_test_cases_recursive(src_dir, &mut test_cases);
     }
 
     test_cases
 }
 
+/// Recursively scans directories for test functions.
+fn collect_test_cases_recursive(current_dir: &Path, test_cases: &mut Vec<TestCaseInfo>) {
+    for entry in fs::read_dir(current_dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.is_dir() {
+            collect_test_cases_recursive(&path, test_cases);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let mut file_test_cases = collect_test_cases_from_file(&path);
+            test_cases.append(&mut file_test_cases);
+        }
+    }
+}
+
 /// Extracts test case information from a single Rust source file.
 ///
-/// This function parses a Rust file's syntax tree and identifies functions that
-/// are integration tests by having the `#[test_case]` attribute.
+/// This function parses a Rust file's content using simple text processing
+/// and identifies functions that start with `test_`.
 ///
 /// # Arguments
 ///
@@ -109,13 +115,6 @@ fn collect_test_cases() -> Vec<TestCaseInfo> {
 ///
 /// A vector of [`TestCaseInfo`] structs for all test functions found in the file.
 /// Returns an empty vector if the file cannot be read or parsed.
-///
-/// # Example
-///
-/// ```
-/// let path = Path::new("src/tests/client.rs");
-/// let test_cases = collect_test_cases_from_file(&path);
-/// ```
 fn collect_test_cases_from_file(file_path: &Path) -> Vec<TestCaseInfo> {
     let mut test_cases = Vec::new();
 
@@ -130,16 +129,11 @@ fn collect_test_cases_from_file(file_path: &Path) -> Vec<TestCaseInfo> {
         Err(_) => return test_cases,
     };
 
-    let syntax_tree = match parse_file(&content) {
-        Ok(syntax_tree) => syntax_tree,
-        Err(_) => return test_cases,
-    };
+    for line in content.lines() {
+        let trimmed = line.trim();
 
-    for item in syntax_tree.items {
-        if let Item::Fn(func) = item
-            && has_test_case_attribute(&func)
-        {
-            let function_name = func.sig.ident.to_string();
+        // Look for function definitions that start with test_
+        if let Some(function_name) = parse_test_function_name(trimmed) {
             test_cases.push(TestCaseInfo {
                 name: function_name.clone(),
                 category: category.clone(),
@@ -194,33 +188,55 @@ fn extract_category_from_path(file_path: &Path) -> Option<String> {
 
 /// Determines if a function should be treated as an integration test.
 ///
-/// This function checks if a function has the `#[test_case]` attribute.
-/// Only functions explicitly marked with this attribute will be considered
-/// integration tests.
+/// Looks for public function definitions that start with [`TEST_PREFIX`].
+/// Only public functions with this prefix will be added to the list of integration tests.
+/// This ensures we only capture actual test functions and not helper functions or comments.
 ///
 /// # Arguments
 ///
-/// * `func` - The function AST node to analyze
+/// * `line` - A line of source code to analyze
 ///
 /// # Returns
 ///
-/// `true` if the function has the `#[test_case]` attribute, `false` otherwise.
-///
-/// # Example
-///
-/// ```rust
-/// #[test_case]
-/// pub async fn my_test(client_config: ClientConfig) -> Result<()> {
-///     // This function will be detected as an integration test
-/// }
-///
-/// pub async fn helper_function(client_config: ClientConfig) -> Result<()> {
-///     // This function will NOT be detected (no #[test_case] attribute)
-/// }
-/// ```
-fn has_test_case_attribute(func: &ItemFn) -> bool {
-    // Only consider functions with the #[test_case] attribute
-    func.attrs.iter().any(|attr| attr.path().is_ident("test_case"))
+/// `Some(function_name)` if the line contains a public test function definition, `None` otherwise.
+fn parse_test_function_name(line: &str) -> Option<String> {
+    let s = line.trim();
+
+    // Skip comments (both single-line and multi-line starts)
+    // FIXME: this technically could match with fn names on /* */ blocks
+    // but should be good enough for now
+    if s.is_empty() || s.starts_with("//") || s.starts_with("/*") {
+        return None;
+    }
+
+    let tokens: Vec<&str> = s.split_whitespace().collect();
+    // Look for public function patterns
+    let fn_pos = if tokens[0] == "pub" && tokens[1] == "async" && tokens[2] == "fn" {
+        2 // pub async fn 
+    } else if tokens[0] == "pub" && tokens[1] == "fn" {
+        1 // pub fn 
+    } else {
+        return None;
+    };
+
+    let name_token = tokens.get(fn_pos + 1)?;
+    // Extract only valid identifier characters from the name token
+    // This stops at '(' for parameters, '<' for generics, etc.
+    let ident: String = name_token
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect();
+
+    // Check if the identifier starts with "test_"
+    let after_prefix = ident.strip_prefix(TEST_PREFIX)?;
+
+    // Ensure there's actually something after the prefix (not just "test_")
+    if after_prefix.is_empty() {
+        return None;
+    }
+
+    // Return the full function name
+    Some(format!("{TEST_PREFIX}{after_prefix}"))
 }
 
 /// Generates integration test wrappers with individual `#[tokio::test]` functions.
@@ -269,7 +285,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     result.push_str(
         "// This module is automatically generated by the build script from test functions\n",
     );
-    result.push_str("// marked with #[test_case] attribute. Do not edit manually.\n\n");
+    result.push_str("// named test_*. Do not edit manually.\n\n");
 
     // Imports
     result.push_str("use anyhow::{anyhow, Result};\n");
@@ -278,7 +294,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     result.push_str("use url::Url;\n");
 
     // Collect unique imports for test modules
-    let mut modules = std::collections::HashSet::new();
+    let mut modules = HashSet::new();
     for test_case in test_cases {
         let module_name = &test_case.category;
         modules.insert(module_name);
@@ -292,7 +308,10 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
 
     // Generate tokio test wrappers for each test case
     for test_case in test_cases {
-        let test_fn_name = format!("test_{}", test_case.function_name);
+        // Strip test prefix
+        // SAFETY: ok to unwrap here because we collected these names based on the fact they
+        // had a "test_" prefix
+        let test_fn_name = test_case.function_name.strip_prefix(TEST_PREFIX).unwrap().to_string();
 
         result.push_str(&format!(
             "/// Auto-generated tokio test wrapper for {}\n",
@@ -375,13 +394,13 @@ fn generate_test_case_vector(test_cases: &[TestCaseInfo]) -> String {
     result.push_str(
         "// This module is automatically generated by the build script from test functions\n",
     );
-    result.push_str("// marked with #[test_case] attribute. Do not edit manually.\n\n");
+    result.push_str("// named test_*. Do not edit manually.\n\n");
 
     // Imports
     result.push_str("use super::{TestCase, TestCategory};\n");
 
     // Collect unique imports
-    let mut modules = std::collections::HashSet::new();
+    let mut modules = HashSet::new();
     for test_case in test_cases {
         let module_name = &test_case.category;
         modules.insert(module_name);
@@ -394,9 +413,7 @@ fn generate_test_case_vector(test_cases: &[TestCaseInfo]) -> String {
     // Function header
     result.push_str("\n/// Returns all available test cases organized by category.\n");
     result.push_str("///\n");
-    result.push_str(
-        "/// This function is auto-generated from test functions marked with #[test_case].\n",
-    );
+    result.push_str("/// This function is auto-generated from test functions named test_*.\n");
     result.push_str(
         "/// The test cases are automatically discovered by scanning the test modules.\n",
     );
