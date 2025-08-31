@@ -1,5 +1,6 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
@@ -207,7 +208,7 @@ impl WebStore {
 
     pub(crate) async fn insert_account(
         &self,
-        account: &Account,
+        account: Arc<Account>,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
         insert_account_code(account.code()).await.map_err(|js_error| {
@@ -222,7 +223,7 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
         })?;
 
-        insert_account_record(account, account_seed).await.map_err(|js_error| {
+        insert_account_record(&account, account_seed).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 

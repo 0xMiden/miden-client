@@ -22,6 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -251,7 +252,7 @@ pub trait Store: Send + Sync {
     /// Inserts an [`Account`] along with the seed used to create it.
     async fn insert_account(
         &self,
-        account: &Account,
+        account: Arc<Account>,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError>;
 
@@ -274,7 +275,7 @@ pub trait Store: Send + Sync {
     /// # Errors
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
-    async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+    async fn update_account(&self, new_account_state: Arc<Account>) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------

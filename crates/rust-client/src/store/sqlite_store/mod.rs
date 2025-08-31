@@ -6,6 +6,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use std::path::PathBuf;
 use std::string::ToString;
@@ -245,7 +246,7 @@ impl Store for SqliteStore {
 
     async fn insert_account(
         &self,
-        account: &Account,
+        account: Arc<Account>,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
         let account = account.clone();
@@ -256,7 +257,7 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn update_account(&self, account: &Account) -> Result<(), StoreError> {
+    async fn update_account(&self, account: Arc<Account>) -> Result<(), StoreError> {
         let account = account.clone();
 
         self.interact_with_connection(move |conn| SqliteStore::update_account(conn, &account))

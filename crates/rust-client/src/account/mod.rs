@@ -35,6 +35,7 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
@@ -155,7 +156,7 @@ impl<AUTH> Client<AUTH> {
                 self.store.add_note_tag(account.into()).await?;
 
                 self.store
-                    .insert_account(account, account_seed)
+                    .insert_account(Arc::new(account.clone()), account_seed)
                     .await
                     .map_err(ClientError::StoreError)
             },
@@ -182,7 +183,10 @@ impl<AUTH> Client<AUTH> {
                     }
                 }
 
-                self.store.update_account(account).await.map_err(ClientError::StoreError)
+                self.store
+                    .update_account(Arc::new(account.clone()))
+                    .await
+                    .map_err(ClientError::StoreError)
             },
         }
     }
