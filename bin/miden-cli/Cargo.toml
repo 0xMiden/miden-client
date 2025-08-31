@@ -1,8 +1,8 @@
 [package]
 authors.workspace      = true
 categories             = ["command-line-utilities"]
-description            = "The official command line client for interacting with the Miden rollup"
-documentation          = "https://docs.rs/miden-client-cli/0.11.0"
+description            = "The official command line client for interacting with the Miden network"
+documentation          = "https://docs.rs/miden-client-cli/0.12.0"
 edition.workspace      = true
 keywords               = ["cli", "client", "miden"]
 license.workspace      = true
@@ -21,7 +21,7 @@ default = []
 
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.11" }
+miden-client = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.12" }
 
 # Miden dependencies
 miden-lib     = { workspace = true }
@@ -41,7 +41,7 @@ tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client  = { path = "../../crates/rust-client", version = "0.11" }
+miden-client  = { path = "../../crates/rust-client", version = "0.12" }
 miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
 
