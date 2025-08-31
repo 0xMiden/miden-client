@@ -35,6 +35,7 @@
 * Tracked creation and committed timestamps for `TransactionRecord` ([#1173](https://github.com/0xMiden/miden-client/pull/1173)).
 * [BREAKING] Changed `exportNoteFile` to fail fast on invalid export type ([#1198](https://github.com/0xMiden/miden-client/pull/1198)).
 * [BREAKING] Refactored RPC errors ([#1202](https://github.com/0xMiden/miden-client/pull/1202)).
+* Avoid deep cloning of `Account` in  `Store`. ([1216](https://github.com/0xMiden/miden-client/pull/1216)).
 
 ### Features
 
