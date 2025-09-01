@@ -2,6 +2,7 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
+    "declaration": true,
     "incremental": true,
     "sourceMap": true,
     "noEmitOnError": true,
@@ -12,6 +13,6 @@
     "outDir": "./js",
     "strict": true
   },
-  "include": ["./ts/**/*", "ts/notes.ts"],
+  "include": ["./ts/*.ts"],
   "exclude": ["./js/**/*"]
 }
