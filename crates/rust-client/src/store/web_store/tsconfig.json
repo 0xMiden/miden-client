@@ -11,7 +11,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "outDir": "./js",
-    "strict": true
+    "strict": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": ["./ts/*.ts"],
   "exclude": ["./js/**/*"]
