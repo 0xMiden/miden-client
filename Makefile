@@ -114,7 +114,11 @@ integration-test: ## Run integration tests
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
-	cd ./crates/web-client && npm run test:clean
+	cd ./crates/web-client && BROWSER="chromium" npm run test:clean
+
+.PHONY: integration-test-web-client-webkit
+integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
+	cd ./crates/web-client && BROWSER="webkit" npm run test:clean
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
@@ -124,10 +128,6 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 integration-test-full: ## Run the integration test binary with ignored tests included
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
-
-.PHONY: integration-test-binary
-integration-test-binary: ## Run the integration tests using the standalone binary
-	cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover
