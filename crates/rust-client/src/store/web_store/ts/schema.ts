@@ -70,8 +70,8 @@ export interface ITransaction {
   details: Uint8Array;
   blockNum: number;
   scriptRoot?: string;
-  commitHeight?: string;
-  discardCause?: Uint8Array;
+  statusVariant: number;
+  status: Uint8Array;
 }
 
 export interface ITransactionScript {

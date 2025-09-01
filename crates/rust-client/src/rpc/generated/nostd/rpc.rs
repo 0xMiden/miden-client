@@ -5,6 +5,9 @@ pub struct RpcStatus {
     /// The rpc component's running version.
     #[prost(string, tag = "1")]
     pub version: ::prost::alloc::string::String,
+    /// The genesis commitment.
+    #[prost(message, optional, tag = "2")]
+    pub genesis_commitment: ::core::option::Option<super::primitives::Digest>,
     /// The store status.
     #[prost(message, optional, tag = "3")]
     pub store: ::core::option::Option<super::rpc_store::StoreStatus>,
@@ -349,6 +352,30 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SubmitProvenBatch"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns account vault updates for specified account within a block range.
+        pub async fn sync_account_vault(
+            &mut self,
+            request: impl tonic::IntoRequest<
+                super::super::rpc_store::SyncAccountVaultRequest,
+            >,
+        ) -> core::result::Result<
+            tonic::Response<super::super::rpc_store::SyncAccountVaultResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncAccountVault");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncAccountVault"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Returns info which can be used by the client to sync up to the tip of chain for the notes they are interested in.
         ///
         /// Client specifies the `note_tags` they are interested in, and the block height from which to search for new for
@@ -413,6 +440,30 @@ pub mod api_client {
             let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncState");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncState"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns storage map updates for specified account and storage slots within a block range.
+        pub async fn sync_storage_maps(
+            &mut self,
+            request: impl tonic::IntoRequest<
+                super::super::rpc_store::SyncStorageMapsRequest,
+            >,
+        ) -> core::result::Result<
+            tonic::Response<super::super::rpc_store::SyncStorageMapsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncStorageMaps");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncStorageMaps"));
             self.inner.unary(req, path, codec).await
         }
     }

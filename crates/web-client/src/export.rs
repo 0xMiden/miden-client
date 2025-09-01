@@ -29,7 +29,14 @@ impl WebClient {
             let export_type = match export_type.as_str() {
                 "Id" => NoteExportType::NoteId,
                 "Full" => NoteExportType::NoteWithProof,
-                _ => NoteExportType::NoteDetails,
+                "Details" => NoteExportType::NoteDetails,
+                // Fail fast on unspecified/invalid export type instead of defaulting
+                other => {
+                    return Err(JsValue::from_str(&format!(
+                        "Invalid export type: {}. Expected one of: Id | Full | Details",
+                        if other.is_empty() { "<empty>" } else { other }
+                    )));
+                },
             };
 
             let note_file = output_note.into_note_file(&export_type).map_err(|err| {

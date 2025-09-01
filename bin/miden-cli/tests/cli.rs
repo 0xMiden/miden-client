@@ -26,10 +26,10 @@ use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
     TestClientKeyStore,
+    create_test_store_path,
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::testing::config::create_test_store_path;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};

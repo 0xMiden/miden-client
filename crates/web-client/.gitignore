@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 # Playwright
 node_modules/
@@ -5,3 +6,12 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+||||||| e1a718a0
+=======
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+>>>>>>> next

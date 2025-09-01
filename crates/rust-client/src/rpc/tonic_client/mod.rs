@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::error::Error;
 
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountId};
@@ -12,6 +13,7 @@ use miden_objects::transaction::ProvenTransaction;
 use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
 use miden_tx::utils::sync::RwLock;
+use tonic::Status;
 use tracing::info;
 
 use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
@@ -27,7 +29,7 @@ use super::{
     StateSyncInfo,
     generated as proto,
 };
-use crate::rpc::errors::RpcConversionError;
+use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -115,11 +117,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::SubmitProvenTx.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.submit_proven_transaction(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
         Ok(BlockNumber::from(api_response.into_inner().block_height))
@@ -139,11 +138,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.get_block_header_by_number(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockHeaderByNumber, status)
         })?;
 
         let response = api_response.into_inner();
@@ -181,11 +177,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockHeaderByNumber.to_string(),
-                err.to_string(),
-            )
+        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
         })?;
 
         let response_notes = api_response
@@ -218,8 +211,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_state(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncState.to_string(), err.to_string())
+        let response = rpc_api.sync_state(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncState, status)
         })?;
         response.into_inner().try_into()
     }
@@ -240,11 +233,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetAccountDetails.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.get_account_details(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
         })?;
         let response = response.into_inner();
         let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
@@ -315,11 +305,8 @@ impl NodeRpcClient for TonicRpcClient {
         let response = rpc_api
             .get_account_proofs(request)
             .await
-            .map_err(|err| {
-                RpcError::RequestError(
-                    NodeRpcClientEndpoint::GetAccountProofs.to_string(),
-                    err.to_string(),
-                )
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
             })?
             .into_inner();
 
@@ -374,8 +361,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_notes(request).await.map_err(|err| {
-            RpcError::RequestError(NodeRpcClientEndpoint::SyncNotes.to_string(), err.to_string())
+        let response = rpc_api.sync_notes(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNotes, status)
         })?;
 
         response.into_inner().try_into()
@@ -394,11 +381,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiersByPrefix.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiersByPrefix, status)
         })?;
         let response = response.into_inner();
         let nullifiers = response
@@ -418,11 +402,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::CheckNullifiers.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
         })?;
 
         let response = response.into_inner();
@@ -436,11 +417,8 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_block_by_number(request).await.map_err(|err| {
-            RpcError::RequestError(
-                NodeRpcClientEndpoint::GetBlockByNumber.to_string(),
-                err.to_string(),
-            )
+        let response = rpc_api.get_block_by_number(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetBlockByNumber, status)
         })?;
 
         let response = response.into_inner();
@@ -450,6 +428,32 @@ impl NodeRpcClient for TonicRpcClient {
             ))?)?;
 
         Ok(block)
+    }
+}
+
+// ERRORS
+// ================================================================================================
+
+impl RpcError {
+    pub fn from_grpc_error(endpoint: NodeRpcClientEndpoint, status: Status) -> Self {
+        if let Some(accept_error) = AcceptHeaderError::try_from_message(status.message()) {
+            return Self::AcceptHeaderError(accept_error);
+        }
+
+        let error_kind = GrpcError::from(&status);
+        let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
+
+        Self::GrpcError {
+            endpoint,
+            error_kind,
+            source: Some(source),
+        }
+    }
+}
+
+impl From<&Status> for GrpcError {
+    fn from(status: &Status) -> Self {
+        GrpcError::from_code(status.code() as i32, Some(status.message().to_string()))
     }
 }
 

@@ -61,7 +61,7 @@ use miden_objects::transaction::ProvenTransaction;
 pub mod domain;
 
 mod errors;
-pub use errors::RpcError;
+pub use errors::*;
 
 mod endpoint;
 pub use endpoint::Endpoint;
@@ -305,6 +305,7 @@ pub enum NodeRpcClientEndpoint {
     GetAccountProofs,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
+    GetNotesById,
     SyncState,
     SubmitProvenTx,
     SyncNotes,
@@ -324,6 +325,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
             },
+            NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),

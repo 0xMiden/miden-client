@@ -12,13 +12,11 @@ import { defineConfig, devices } from "@playwright/test";
  * See https://playwright.dev/docs/test-configuration.
  */
 
-const testMatch = "*.test.ts";
-
 export default defineConfig({
   timeout: 240_000,
   testDir: "./test",
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: process.env.REMOTE_PROVER ? false : true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
@@ -76,7 +74,7 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  // FIXME: Modulairze test server constants (localhost, port)
+  // FIXME: Modularise test server constants (localhost, port)
   webServer: {
     command: "npx http-server ./dist -p 8080",
     url: "http://127.0.0.1:8080",

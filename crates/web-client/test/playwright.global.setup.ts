@@ -1,9 +1,10 @@
-// @ts-nocheck
+//@ts-nocheck
 import { test as base } from "@playwright/test";
 import { MockWebClient } from "../js";
 
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
+const REMOTE_TX_PROVER_PORT = 50051;
 
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
@@ -57,6 +58,9 @@ export const test = base.extend<{ forEachTest: void }>({
             PublicKey,
             Rpo256,
             SecretKey,
+            Endpoint,
+            RpcClient,
+            NoteId,
             Signature,
             SigningInputs,
             SlotAndKeys,
@@ -79,7 +83,9 @@ export const test = base.extend<{ forEachTest: void }>({
             MockWebClient,
           } = await import("./index.js");
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
-          let proverUrl = undefined;
+          let proverUrl = remoteProverPort
+            ? `http://localhost:${remoteProverPort}`
+            : undefined;
           const client = await WebClient.createClient(rpcUrl, undefined);
 
           window.client = client;
@@ -100,6 +106,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.AuthSecretKey = AuthSecretKey;
           window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
           window.ConsumableNoteRecord = ConsumableNoteRecord;
+          window.Endpoint = Endpoint;
           window.Felt = Felt;
           window.FeltArray = FeltArray;
           window.ForeignAccount = ForeignAccount;
@@ -121,12 +128,14 @@ export const test = base.extend<{ forEachTest: void }>({
           window.NoteMetadata = NoteMetadata;
           window.NoteRecipient = NoteRecipient;
           window.NoteScript = NoteScript;
+          window.NoteId = NoteId;
           window.NoteTag = NoteTag;
           window.NoteType = NoteType;
           window.OutputNote = OutputNote;
           window.OutputNotesArray = OutputNotesArray;
           window.PublicKey = PublicKey;
           window.Rpo256 = Rpo256;
+          window.RpcClient = RpcClient;
           window.SecretKey = SecretKey;
           window.Signature = Signature;
           window.SigningInputs = SigningInputs;

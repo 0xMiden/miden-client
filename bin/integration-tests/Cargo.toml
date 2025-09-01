@@ -4,7 +4,7 @@ description            = "Integration Tests for the miden client library"
 edition.workspace      = true
 license.workspace      = true
 name                   = "miden-client-integration-tests"
-publish                = false
+publish                = true
 repository.workspace   = true
 rust-version.workspace = true
 version.workspace      = true
@@ -19,19 +19,19 @@ path = "tests/integration.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client" }
+miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client", version = "0.12" }
 
 # External dependencies
 anyhow      = { features = ["std"], workspace = true }
 async-trait = { workspace = true }
 clap        = { features = ["derive", "env"], version = "4.0" }
-futures     = { version = "0.3" }
+num_cpus    = { version = "1.0" }
 rand        = { workspace = true }
+regex       = { version = "1.0" }
+serde       = { features = ["derive"], version = "1.0" }
 tokio       = { workspace = true }
 url         = { version = "2.5.4" }
-
-[dev-dependencies]
-tokio = { workspace = true }
+uuid        = { version = "1.10" }
 
 [package.metadata.cargo-machete]
-ignored = ["async-trait"]
+ignored = ["url"]

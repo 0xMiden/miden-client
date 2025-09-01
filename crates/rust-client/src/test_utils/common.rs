@@ -1,9 +1,10 @@
 use std::boxed::Box;
+use std::env::temp_dir;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 use std::println;
 use std::string::ToString;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::vec::Vec;
 
@@ -11,27 +12,23 @@ use anyhow::{Context, Result};
 use miden_objects::account::{Account, AccountId, AccountStorageMode};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
-use miden_objects::crypto::rand::RpoRandomCoin;
 use miden_objects::note::{NoteId, NoteType};
 use miden_objects::transaction::{OutputNote, TransactionId};
 use miden_objects::{Felt, FieldElement};
+use rand::RngCore;
 use rand::rngs::StdRng;
-use rand::{Rng, RngCore};
 use uuid::Uuid;
 
 use crate::account::component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet};
 use crate::account::{AccountBuilder, AccountType};
 use crate::auth::AuthSecretKey;
-use crate::builder::ClientBuilder;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
 use crate::note::{Note, create_p2id_note};
-use crate::rpc::{RpcError, TonicRpcClient};
-use crate::store::sqlite_store::SqliteStore;
+use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use crate::testing::config::ClientConfig;
 use crate::transaction::{
     NoteArgs,
     TransactionRequest,
@@ -39,7 +36,7 @@ use crate::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use crate::{Client, ClientError, DebugMode, Word};
+use crate::{Client, ClientError, Word};
 
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
 pub type TestClient = Client<TestClientKeyStore>;
@@ -52,59 +49,10 @@ pub const ACCOUNT_ID_REGULAR: u128 = ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABL
 /// too low, some tests might fail due to expected recall failures not happening.
 pub const RECALL_HEIGHT_DELTA: u32 = 50;
 
-/// Creates a `TestClient` builder and keystore.
-///
-/// Creates the client builder using the provided `ClientConfig`. The store uses a `SQLite` database
-/// at a temporary location determined by the store config.
-pub async fn create_test_client_builder(
-    client_config: ClientConfig,
-) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
-    let (rpc_endpoint, rpc_timeout, store_config, auth_path) = client_config.into_parts();
-
-    let store = {
-        let sqlite_store = SqliteStore::new(store_config)
-            .await
-            .with_context(|| "failed to create SQLite store")?;
-        std::sync::Arc::new(sqlite_store)
-    };
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
-        format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
-    })?;
-
-    let builder = ClientBuilder::new()
-        .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
-        .rng(Box::new(rng))
-        .store(store)
-        .filesystem_keystore(auth_path.to_str().with_context(|| {
-            format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
-        })?)
-        .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
-
-    Ok((builder, keystore))
-}
-
-/// Creates a `TestClient`.
-///
-/// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
-/// at a temporary location determined by the store config. The client is synced to the
-/// current state before being returned.
-pub async fn create_test_client(
-    client_config: ClientConfig,
-) -> Result<(TestClient, TestClientKeyStore)> {
-    let (builder, keystore) = create_test_client_builder(client_config).await?;
-
-    let mut client = builder.build().await.with_context(|| "failed to build test client")?;
-
-    client.sync_state().await.with_context(|| "failed to sync client state")?;
-
-    Ok((client, keystore))
+pub fn create_test_store_path() -> PathBuf {
+    let mut temp_file = temp_dir();
+    temp_file.push(format!("{}.sqlite3", Uuid::new_v4()));
+    temp_file
 }
 
 /// Inserts a new wallet account into the client and into the keystore.
@@ -241,8 +189,8 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             .with_context(|| format!("transaction with ID {transaction_id} not found"))?;
 
         match tracked_transaction.status {
-            TransactionStatus::Committed(n) => {
-                println!("tx committed in {n}");
+            TransactionStatus::Committed { block_number, .. } => {
+                println!("tx committed in {block_number}");
                 break;
             },
             TransactionStatus::Pending => {

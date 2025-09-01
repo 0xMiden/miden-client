@@ -9,23 +9,27 @@ import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
   scriptRoot?: string;
-  discardCause?: string;
   details?: string;
   id: string;
   txScript?: string;
   blockNum: string;
-  commitHeight?: string;
+  statusVariant: number;
+  status?: string;
 }
 
 const IDS_FILTER_PREFIX = "Ids:";
 const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
+
+const STATUS_COMMITTED_VARIANT = 1;
+const STATUS_DISCARDED_VARIANT = 2;
+
 export async function getTransactions(filter: string) {
   let transactionRecords: ITransaction[] = [];
 
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter((tx) => tx.commitHeight == undefined)
+        .filter((tx) => tx.statusVariant !== STATUS_COMMITTED_VARIANT)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -49,8 +53,8 @@ export async function getTransactions(filter: string) {
         .filter(
           (tx) =>
             tx.blockNum < blockNum &&
-            tx.commitHeight == undefined &&
-            tx.discardCause == undefined
+            tx.statusVariant !== STATUS_COMMITTED_VARIANT &&
+            tx.statusVariant !== STATUS_DISCARDED_VARIANT
         )
         .toArray();
     } else {
@@ -83,7 +87,6 @@ export async function getTransactions(filter: string) {
     const processedTransactions = await Promise.all(
       transactionRecords.map(async (transactionRecord) => {
         let txScriptBase64: undefined | string = undefined;
-        let discardCauseBase64: string | undefined = undefined;
         if (transactionRecord.scriptRoot) {
           const txScript = scriptMap.get(transactionRecord.scriptRoot);
 
@@ -92,13 +95,9 @@ export async function getTransactions(filter: string) {
           }
         }
 
-        if (transactionRecord.discardCause) {
-          discardCauseBase64 = uint8ArrayToBase64(
-            transactionRecord.discardCause
-          );
-        }
-
         const detailsBase64 = uint8ArrayToBase64(transactionRecord.details);
+
+        const statusBase64 = uint8ArrayToBase64(transactionRecord.status);
 
         const data: ProcessedTransaction = {
           id: transactionRecord.id,
@@ -106,8 +105,8 @@ export async function getTransactions(filter: string) {
           scriptRoot: transactionRecord.scriptRoot,
           txScript: txScriptBase64,
           blockNum: transactionRecord.blockNum.toString(),
-          commitHeight: transactionRecord.commitHeight,
-          discardCause: discardCauseBase64,
+          statusVariant: transactionRecord.statusVariant,
+          status: statusBase64,
         };
 
         return data;
@@ -122,7 +121,7 @@ export async function getTransactions(filter: string) {
 
 export async function insertTransactionScript(
   scriptRoot: Uint8Array,
-  txScript?: Uint8Array
+  txScript: Uint8Array
 ) {
   try {
     // check if script root already exists
@@ -156,9 +155,9 @@ export async function upsertTransactionRecord(
   transactionId: string,
   details: Uint8Array,
   blockNum: string,
-  scriptRoot?: Uint8Array,
-  committed?: string,
-  discardCause?: Uint8Array
+  statusVariant: number,
+  status: Uint8Array,
+  scriptRoot?: Uint8Array
 ) {
   try {
     const data = {
@@ -166,8 +165,8 @@ export async function upsertTransactionRecord(
       details,
       scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
       blockNum: parseInt(blockNum, 10),
-      commitHeight: committed ? committed : undefined,
-      discardCause,
+      statusVariant,
+      status,
     };
 
     await transactions.put(data);
