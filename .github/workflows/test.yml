@@ -79,7 +79,7 @@ jobs:
           cd ./crates/web-client
           yarn install
 
-        name: Check TSC output equals commited JS
+      - name: Check TSC output equals commited JS
         run: |
           cd ./crates/web-client
           yarn tsc --outDir ci_test_folder
