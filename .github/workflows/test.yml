@@ -81,7 +81,8 @@ jobs:
 
       - name: Check TSC output equals commited JS
         run: |
-          cd ./crates/web-client
+          cd ./crates/rust-client/src/store/web_store
+          yarn
           yarn tsc --outDir ci_test_folder
           diff -bur js ci_test_folder
 
