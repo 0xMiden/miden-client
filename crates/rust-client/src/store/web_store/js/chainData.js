@@ -167,6 +167,4 @@ export async function pruneIrrelevantBlocks() {
         logWebStoreError(err, "Failed to prune irrelevant blocks");
     }
 }
-
-export async function dummyFunction() {}
 //# sourceMappingURL=chainData.js.map
