@@ -140,10 +140,7 @@ jobs:
       - name: Run web client tests
         run: |
           cd ./crates/web-client
-          yarn install
-          yarn playwright install --with-deps
-          MIDEN_WEB_DEV=true yarn run build
-          yarn playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+          yarn run test:ci -- --browser=chromium --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
       - name: Stop test node
         if: always()
         run: make stop-node
