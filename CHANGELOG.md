@@ -6,6 +6,13 @@
 
 * [BREAKING] Incremented MSRV to 1.89.
 
+## 0.11.1 (2025-08-31)
+
+### Fixes
+
+* Added JS files generated from TypeScript ([#1218](https://github.com/0xMiden/miden-client/pull/1218)).
+* Changed method for automatically picking up tests for integraion tests binary ([#1219](https://github.com/0xMiden/miden-client/pull/1219)).
+
 ## 0.11.0 (2025-08-30)
 
 ### Features

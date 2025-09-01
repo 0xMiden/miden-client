@@ -9,15 +9,13 @@ use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{InputNote, PaymentNoteDescription, TransactionRequestBuilder};
 use rand::RngCore;
-use test_case_marker::test_case;
 
 use crate::tests::config::ClientConfig;
 
 // TESTS
 // ================================================================================================
 
-#[test_case]
-pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
+pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     // Client 1 is an private faucet which will mint an onchain note for client 2
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     // Client 2 is an private account which will consume the note that it will sync from the node
@@ -149,8 +147,7 @@ pub async fn onchain_notes_flow(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-#[test_case]
-pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
+pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -322,8 +319,7 @@ pub async fn onchain_accounts(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-#[test_case]
-pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -391,8 +387,7 @@ pub async fn import_account_by_id(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-#[test_case]
-pub async fn incorrect_genesis(client_config: ClientConfig) -> Result<()> {
+pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let (builder, _) = client_config.into_client_builder().await?;
     let mut client = builder.build().await?;
 
