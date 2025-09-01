@@ -4,7 +4,8 @@ This guide demonstrates how to import accounts, notes, and store data using the 
 
 ## Importing Accounts
 
-### Importing an Account from Bytes
+### Importing an Account from an Account File
+
 
 To import an account that was previously exported:
 
@@ -15,8 +16,8 @@ try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
-    // accountBytes should be the result of a previous account export
-    const result = await webClient.importAccount(accountBytes);
+    // accountFile should be the result of a previous account export
+    const result = await webClient.importAccountFile(accountFile);
     console.log("Account import result:", result);
 } catch (error) {
     console.error("Failed to import account:", error.message);
@@ -63,8 +64,8 @@ try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
-    // noteBytes should be the result of a previous note export
-    const noteId = await webClient.importNote(noteBytes);
+    // noteFile should be the result of a previous note export
+    const noteId = await webClient.importNoteFile(noteFile);
     console.log("Imported note ID:", noteId);
 } catch (error) {
     console.error("Failed to import note:", error.message);

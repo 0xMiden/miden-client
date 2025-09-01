@@ -8,9 +8,10 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use miden_client::rpc::Endpoint;
-use miden_client::testing::config::ClientConfig;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+
+use crate::tests::config::ClientConfig;
 
 mod generated_tests;
 mod tests;

@@ -216,6 +216,56 @@ pub struct SyncStateResponse {
     #[prost(message, repeated, tag = "7")]
     pub notes: ::prost::alloc::vec::Vec<super::note::NoteSyncRecord>,
 }
+/// Account vault synchronization request.
+///
+/// Allows clients to sync asset values for specific public accounts within a block range.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncAccountVaultRequest {
+    /// Block number from which to start synchronizing.
+    #[prost(fixed32, tag = "1")]
+    pub block_from: u32,
+    /// / Block number up to which to sync. If not specified, syncs up to the latest block.
+    /// /
+    /// / If specified, this block must be close to the chain tip (i.e., within 30 blocks),
+    /// / otherwise an error will be returned.
+    #[prost(fixed32, optional, tag = "2")]
+    pub block_to: ::core::option::Option<u32>,
+    /// Account for which we want to sync asset vault.
+    #[prost(message, optional, tag = "3")]
+    pub account_id: ::core::option::Option<super::account::AccountId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncAccountVaultResponse {
+    /// The block number of the last update included in this response.
+    ///
+    /// For chunked responses, this may be less than request.block_to.
+    /// If it is less than request.block_to, the user is expected to make a subsequent request
+    /// starting from the next block to this one (ie, request.block_from = block_num + 1).
+    #[prost(fixed32, tag = "1")]
+    pub block_num: u32,
+    /// Chain tip at the moment of the request.
+    #[prost(fixed32, tag = "2")]
+    pub chain_tip: u32,
+    /// List of asset updates for the account.
+    ///
+    /// Multiple updates can be returned for a single asset, and the one with a higher `block_num`
+    /// is expected to be retained by the caller.
+    #[prost(message, repeated, tag = "3")]
+    pub updates: ::prost::alloc::vec::Vec<AccountVaultUpdate>,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct AccountVaultUpdate {
+    /// Vault key associated with the asset.
+    #[prost(message, optional, tag = "1")]
+    pub vault_key: ::core::option::Option<super::primitives::Digest>,
+    /// Asset value related to the vault key.
+    /// If not present, the asset was removed from the vault.
+    #[prost(message, optional, tag = "2")]
+    pub asset: ::core::option::Option<super::primitives::Asset>,
+    /// Block number at which the above asset was updated in the account vault.
+    #[prost(fixed32, tag = "3")]
+    pub block_num: u32,
+}
 /// Note synchronization request.
 ///
 /// Specifies note tags that client is interested in. The server will return the first block which
@@ -248,6 +298,60 @@ pub struct SyncNotesResponse {
     /// List of all notes together with the Merkle paths from `response.block_header.note_root`.
     #[prost(message, repeated, tag = "4")]
     pub notes: ::prost::alloc::vec::Vec<super::note::NoteSyncRecord>,
+}
+/// Storage map synchronization request.
+///
+/// Allows clients to sync storage map values for specific public accounts within a block range,
+/// with support for cursor-based pagination to handle large storage maps.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncStorageMapsRequest {
+    /// Block number to start sending updates from (inclusive).
+    #[prost(fixed32, tag = "1")]
+    pub block_from: u32,
+    /// Block number up to which to sync. If not specified, syncs up to the latest block.
+    ///
+    /// If specified, this block must be close to the chain tip (i.e., within 30 blocks),
+    /// otherwise an error will be returned.
+    #[prost(fixed32, optional, tag = "2")]
+    pub block_to: ::core::option::Option<u32>,
+    /// Account for which we want to sync storage maps.
+    #[prost(message, optional, tag = "3")]
+    pub account_id: ::core::option::Option<super::account::AccountId>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncStorageMapsResponse {
+    /// The block number of the last update included in this response.
+    ///
+    /// For chunked responses, this may be less than request.block_to.
+    /// If it is less than request.block_to, the user is expected to make a subsequent request
+    /// starting from the next block to this one (ie, request.block_from = block_num + 1).
+    #[prost(fixed32, tag = "1")]
+    pub block_num: u32,
+    /// Current chain tip
+    #[prost(fixed32, tag = "2")]
+    pub chain_tip: u32,
+    /// The list of storage map updates.
+    ///
+    /// Multiple updates can be returned for a single slot index and key combination, and the one
+    /// with a higher `block_num` is expected to be retained by the caller.
+    #[prost(message, repeated, tag = "3")]
+    pub updates: ::prost::alloc::vec::Vec<StorageMapUpdate>,
+}
+/// Represents a single storage map update.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct StorageMapUpdate {
+    /// Block number in which the slot was updated.
+    #[prost(fixed32, tag = "1")]
+    pub block_num: u32,
+    /// Slot index (\[0..255\]).
+    #[prost(uint32, tag = "2")]
+    pub slot_index: u32,
+    /// The storage map key.
+    #[prost(message, optional, tag = "3")]
+    pub key: ::core::option::Option<super::primitives::Digest>,
+    /// The storage map value.
+    #[prost(message, optional, tag = "4")]
+    pub value: ::core::option::Option<super::primitives::Digest>,
 }
 /// Generated client implementations.
 pub mod rpc_client {
@@ -601,6 +705,56 @@ pub mod rpc_client {
             let path = http::uri::PathAndQuery::from_static("/rpc_store.Rpc/SyncState");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc_store.Rpc", "SyncState"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns account vault updates for specified account within a block range.
+        pub async fn sync_account_vault(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncAccountVaultRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SyncAccountVaultResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc_store.Rpc/SyncAccountVault",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc_store.Rpc", "SyncAccountVault"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns storage map updates for specified account and storage slots within a block range.
+        pub async fn sync_storage_maps(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncStorageMapsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SyncStorageMapsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc_store.Rpc/SyncStorageMaps",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc_store.Rpc", "SyncStorageMaps"));
             self.inner.unary(req, path, codec).await
         }
     }

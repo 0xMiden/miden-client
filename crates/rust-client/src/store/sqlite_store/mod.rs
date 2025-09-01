@@ -364,7 +364,7 @@ pub mod tests {
 
     use super::SqliteStore;
     use crate::store::Store;
-    use crate::testing::config::create_test_store_path;
+    use crate::testing::common::create_test_store_path;
 
     fn assert_send_sync<T: Send + Sync>() {}
 

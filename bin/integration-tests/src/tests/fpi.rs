@@ -5,7 +5,6 @@ use miden_client::auth::AuthSecretKey;
 use miden_client::crypto::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
-use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{
     AdviceInputs,
     ForeignAccount,
@@ -13,27 +12,26 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
-use test_case_marker::test_case;
+
+use crate::tests::config::ClientConfig;
 
 // FPI TESTS
 // ================================================================================================
+
 const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
-#[test_case]
-pub async fn standard_fpi_public(client_config: ClientConfig) -> Result<()> {
+pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
-#[test_case]
-pub async fn standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
-#[test_case]
-pub async fn fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = create_test_client(client_config).await?;
+pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
+    let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
@@ -106,9 +104,8 @@ pub async fn fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-#[test_case]
-pub async fn nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = create_test_client(client_config).await?;
+pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+    let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
@@ -209,6 +206,9 @@ pub async fn nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
+// HELPERS
+// ================================================================================================
+
 /// Tests the standard FPI functionality for the given storage mode.
 ///
 /// This function sets up a foreign account with a custom component that retrieves a value from its
@@ -216,7 +216,7 @@ pub async fn nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
 async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = create_test_client(client_config).await?;
+    let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(

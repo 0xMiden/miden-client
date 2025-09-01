@@ -22,6 +22,8 @@ Creates a new RPC client instance.
 
 [`Endpoint`](Endpoint.md)
 
+Endpoint to connect to.
+
 #### Returns
 
 `RpcClient`
@@ -49,6 +51,8 @@ Fetches notes by their IDs from the connected Miden node.
 ##### note\_ids
 
 [`NoteId`](NoteId.md)[]
+
+Array of [`NoteId`] objects to fetch.
 
 #### Returns
 

@@ -28,7 +28,7 @@ pub struct RpcClient {
 impl RpcClient {
     /// Creates a new RPC client instance.
     ///
-    /// @param endpoint: endpoint to connect to
+    /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
         let rpc_client = Arc::new(TonicRpcClient::new(&endpoint.into(), 0));
@@ -38,12 +38,15 @@ impl RpcClient {
 
     /// Fetches notes by their IDs from the connected Miden node.
     ///
-    /// @param `note_ids` - Array of [`NoteId`] objects to fetch
+    /// @param note_ids - Array of [`NoteId`] objects to fetch
     /// @returns Promise that resolves to  different data depending on the note type:
     /// - Private notes: Returns only `note_id` and `metadata`. The `input_note` field will be
     ///   `null`.
     /// - Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
     ///   ID.
+    // TODO: try to remove this allow - conflicts with the above "note_ids" and with what typedoc
+    // expects
+    #[allow(clippy::doc_markdown)]
     #[wasm_bindgen(js_name = "getNotesById")]
     pub async fn get_notes_by_id(
         &self,
