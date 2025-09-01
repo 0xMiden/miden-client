@@ -95,6 +95,10 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Returns the block number of the last state sync block.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the store operation fails.
     pub async fn get_sync_height(&self) -> Result<BlockNumber, ClientError> {
         self.store.get_sync_height().await.map_err(Into::into)
     }
@@ -118,6 +122,19 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Genesis block cannot be retrieved
+    /// - State sync fails
+    /// - Store operations fail
+    /// - Note screening fails
+    /// - Account or transaction updates fail
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the block number exceeds `u32::MAX` (which should never happen in practice).
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 

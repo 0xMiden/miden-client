@@ -270,6 +270,10 @@ impl TransactionRequestBuilder {
     /// specified notes.
     ///
     /// - `note_ids` is a list of note IDs to be consumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the transaction request cannot be built.
     pub fn build_consume_notes(
         self,
         note_ids: Vec<NoteId>,
@@ -288,6 +292,12 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A custom script was already set
+    /// - The transaction request cannot be built
     pub fn build_mint_fungible_asset(
         self,
         asset: FungibleAsset,
@@ -318,6 +328,13 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The payment contains no assets
+    /// - The note creation fails
+    /// - The transaction request cannot be built
     pub fn build_pay_to_id(
         self,
         payment_data: PaymentNoteDescription,
@@ -348,6 +365,12 @@ impl TransactionRequestBuilder {
     ///   note.
     ///
     /// This function cannot be used with a previously set custom script.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The swap note creation fails
+    /// - The transaction request cannot be built
     pub fn build_swap(
         self,
         swap_data: &SwapTransactionData,
