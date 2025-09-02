@@ -23,7 +23,7 @@ const instanceAddress = async ({
         );
         _accountId = newAccount.id();
       }
-      const address = new window.Address(_accountId, _interface);
+      const address = window.Address.fromAccountId(_accountId, _interface);
       return address.interface();
     },
     { accountId, _interface }
@@ -37,7 +37,10 @@ const instanceAddressTestBech32 = async (page: Page, bech32Prefix: string) => {
       window.AccountStorageMode.private(),
       true
     );
-    const address = new window.Address(newAccount.id(), "BasicWallet");
+    const address = window.Address.fromAccountId(
+      newAccount.id(),
+      "BasicWallet"
+    );
     return address.toBech32(bech32Prefix);
   }, bech32Prefix);
 };
@@ -59,7 +62,10 @@ const instanceAddressTestNoteTag = async (page: Page) => {
       window.AccountStorageMode.private(),
       true
     );
-    const address = new window.Address(newAccount.id(), "BasicWallet");
+    const address = window.Address.fromAccountId(
+      newAccount.id(),
+      "BasicWallet"
+    );
     return address.toNoteTag().asU32();
   });
 };

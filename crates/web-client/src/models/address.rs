@@ -23,8 +23,11 @@ pub enum AddressInterface {
 
 #[wasm_bindgen]
 impl Address {
-    #[wasm_bindgen(constructor)]
-    pub fn new(account_id: AccountId, interface: AddressInterface) -> Result<Self, JsValue> {
+    #[wasm_bindgen(js_name = "fromAccountId")]
+    pub fn from_account_id(
+        account_id: AccountId,
+        interface: AddressInterface,
+    ) -> Result<Self, JsValue> {
         let interface: NativeAddressInterface = interface.try_into()?;
         let address = NativeAccountIdAddress::new(account_id.into(), interface);
 
