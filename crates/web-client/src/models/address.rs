@@ -36,11 +36,12 @@ impl Address {
         self.0.interface().try_into()
     }
 
-    #[wasm_bindgen(js_name = toNoteTag)]
+    #[wasm_bindgen(js_name = "toNoteTag")]
     pub fn to_note_tag(&self) -> NoteTag {
         self.0.to_note_tag().into()
     }
 
+    #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
         let net_id = network_id
             .try_into()
@@ -48,6 +49,7 @@ impl Address {
         Ok(self.0.to_bech32(net_id))
     }
 
+    #[wasm_bindgen(js_name = fromBech32)]
     pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
         let (_net_id, address) = NativeAddress::from_bech32(bech32).map_err(|err| {
             js_error_with_context(err, "could not convert bech32 into an address")
