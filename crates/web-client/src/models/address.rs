@@ -1,15 +1,14 @@
 use miden_objects::address::{
-    AccountIdAddress as NativeAccountIdAddress, Address as NativeAddress,
+    AccountIdAddress as NativeAccountIdAddress,
+    Address as NativeAddress,
     AddressInterface as NativeAddressInterface,
 };
-use wasm_bindgen::{JsValue, prelude::wasm_bindgen};
+use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::wasm_bindgen;
 
+use super::account_id::{AccountId, NetworkId};
+use super::note_tag::NoteTag;
 use crate::js_error_with_context;
-
-use super::{
-    account_id::{AccountId, NetworkId},
-    note_tag::NoteTag,
-};
 
 #[wasm_bindgen(inspectable)]
 #[derive(Debug)]
@@ -32,6 +31,14 @@ impl Address {
         Ok(Address(NativeAddress::AccountId(address)))
     }
 
+    #[wasm_bindgen(js_name = fromBech32)]
+    pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
+        let (_net_id, address) = NativeAddress::from_bech32(bech32).map_err(|err| {
+            js_error_with_context(err, "could not convert bech32 into an address")
+        })?;
+        Ok(Self(address))
+    }
+
     pub fn interface(&self) -> Result<AddressInterface, JsValue> {
         self.0.interface().try_into()
     }
@@ -47,14 +54,6 @@ impl Address {
             .try_into()
             .map_err(|err| js_error_with_context(err, "wrong network id for bech32 conversion"))?;
         Ok(self.0.to_bech32(net_id))
-    }
-
-    #[wasm_bindgen(js_name = fromBech32)]
-    pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
-        let (_net_id, address) = NativeAddress::from_bech32(bech32).map_err(|err| {
-            js_error_with_context(err, "could not convert bech32 into an address")
-        })?;
-        Ok(Self(address))
     }
 }
 
