@@ -660,6 +660,7 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
+        let src_manager = transaction_request.source_manager();
         let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -683,10 +684,12 @@ where
         }
 
         // Execute the transaction and get the witness
-        let executed_transaction = self
-            .build_executor(&data_store)?
-            .execute_transaction(account_id, block_num, notes, tx_args)
-            .await?;
+        let mut executor = self.build_executor(&data_store)?;
+        if let Some(sm) = src_manager {
+            executor = executor.with_source_manager(sm);
+        }
+        let executed_transaction =
+            executor.execute_transaction(account_id, block_num, notes, tx_args).await?;
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
 

@@ -100,6 +100,7 @@ use crate::transaction::{
     TransactionStatus,
 };
 use crate::{ClientError, DebugMode};
+use crate::ScriptBuilder;
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
@@ -351,6 +352,52 @@ async fn insert_basic_account() {
 
     // Validate seed matches
     assert_eq!(account_seed, fetched_account_seed.unwrap());
+}
+
+#[tokio::test]
+#[ignore]
+async fn tx_error_includes_source_snippet_when_source_manager_attached() {
+    // Setup client in debug mode and insert a basic account
+    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (account, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // Build a deliberately failing transaction script: unaligned word memory load at address 3
+    let mut script_builder = ScriptBuilder::new(true);
+    // Attach the source manager so the executor can render source snippets on error
+    let sm = script_builder.source_manager().clone();
+    let tx_script = script_builder
+        .compile_tx_script("begin push.3 mem_loadw end")
+        .expect("failed to compile failing tx script");
+    let tx_request = TransactionRequestBuilder::new()
+        .custom_script(tx_script)
+        .with_source_manager(sm)
+        .build()
+        .unwrap();
+
+    // Expect execution to fail with an executor error that includes a code snippet
+    let err = client
+        .new_transaction(account.id(), tx_request)
+        .await
+        .expect_err("transaction should fail due to unaligned access");
+
+    match err {
+        ClientError::TransactionExecutorError(
+            TransactionExecutorError::TransactionProgramExecutionFailed(exec_err),
+        ) => {
+            let err_str = exec_err.to_string();
+            assert!(
+                err_str.contains("unaligned"),
+                "expected unaligned access error, got: {err_str}"
+            );
+            assert!(
+                err_str.contains("mem_loadw") || err_str.contains("^^"),
+                "expected error to include source snippet; got: {err_str}"
+            );
+        },
+        other => panic!("unexpected error kind: {other:?}"),
+    }
 }
 
 #[tokio::test]

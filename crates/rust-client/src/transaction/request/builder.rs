@@ -20,6 +20,8 @@ use miden_objects::note::{
 use miden_objects::transaction::{OutputNote, TransactionScript};
 use miden_objects::vm::AdviceMap;
 use miden_objects::{Felt, FieldElement, NoteError, Word};
+use miden_objects::assembly::SourceManagerSync;
+use alloc::sync::Arc;
 
 use super::{
     ForeignAccount,
@@ -78,6 +80,9 @@ pub struct TransactionRequestBuilder {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
+    /// Optional source manager used when assembling the transaction script or related libraries.
+    /// If provided, it will be passed through the request to the executor.
+    source_manager: Option<Arc<dyn SourceManagerSync>>,
 }
 
 impl TransactionRequestBuilder {
@@ -100,6 +105,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: false,
             script_arg: None,
             auth_arg: None,
+            source_manager: None,
         }
     }
 
@@ -260,6 +266,17 @@ impl TransactionRequestBuilder {
     #[must_use]
     pub fn auth_arg(mut self, auth_arg: Word) -> Self {
         self.auth_arg = Some(auth_arg);
+        self
+    }
+
+    /// Attaches the SourceManager that was used to assemble the transaction script or libraries.
+    /// This enables the executor to render source code snippets on errors in debug mode.
+    #[must_use]
+    pub fn with_source_manager(
+        mut self,
+        source_manager: Arc<dyn SourceManagerSync>,
+    ) -> Self {
+        self.source_manager = Some(source_manager);
         self
     }
 
@@ -436,6 +453,7 @@ impl TransactionRequestBuilder {
             ignore_invalid_input_notes: self.ignore_invalid_input_notes,
             script_arg: self.script_arg,
             auth_arg: self.auth_arg,
+            source_manager: self.source_manager,
         })
     }
 }
