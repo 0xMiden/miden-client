@@ -13,19 +13,19 @@ use miden_client::assembly::{
     ModuleKind,
 };
 use miden_client::note::NoteTag;
+use miden_client::testing::NoteBuilder;
 use miden_client::testing::common::{
     TestClient,
-    create_test_client,
     execute_tx_and_sync,
     insert_new_wallet,
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::testing::config::ClientConfig;
-use miden_client::testing::note::NoteBuilder;
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, ScriptBuilder, Word, ZERO};
 use rand::RngCore;
+
+use crate::tests::config::ClientConfig;
 
 // HELPERS
 // ================================================================================================
@@ -139,9 +139,9 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
+pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
-    let (mut client, keystore) = create_test_client(client_config).await?;
+    let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
     let (network_account, library) =
@@ -161,11 +161,6 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     let (native_account, _native_seed, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
 
-    let assembler = TransactionKernel::assembler()
-        .with_debug_mode(true)
-        .with_dynamic_library(library)
-        .map_err(|e| anyhow!(e))?;
-
     let mut network_notes = vec![];
 
     for _ in 0..BUMP_NOTE_NUMBER {
@@ -178,7 +173,8 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
                 end",
                 )
                 .tag(NoteTag::from_account_id(network_account.id()).into())
-                .build(&assembler)?,
+                .dynamically_linked_libraries(vec![library.clone()])
+                .build()?,
         ));
     }
 
@@ -203,8 +199,8 @@ pub async fn counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
-    let (mut client, keystore) = create_test_client(client_config).await?;
+pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
     let (network_account, library) =
@@ -214,11 +210,6 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> 
 
     let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?.0;
 
-    let assembler = TransactionKernel::assembler()
-        .with_debug_mode(true)
-        .with_dynamic_library(library)
-        .map_err(|e| anyhow!(e))?;
-
     let network_note = NoteBuilder::new(wallet.id(), client.rng())
         .code(
             "use.external_contract::counter_contract
@@ -226,8 +217,9 @@ pub async fn recall_note_before_ntx_consumes_it(client_config: ClientConfig) -> 
                 call.counter_contract::increment_count
             end",
         )
+        .dynamically_linked_libraries(vec![library])
         .tag(NoteTag::from_account_id(network_account.id()).into())
-        .build(&assembler)?;
+        .build()?;
 
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()

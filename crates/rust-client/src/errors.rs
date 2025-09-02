@@ -18,7 +18,7 @@ use miden_objects::{
 // ================================================================================================
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::{DeserializationError, HexParseError};
-use miden_tx::{TransactionExecutorError, TransactionProverError};
+use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
@@ -66,6 +66,8 @@ pub enum ClientError {
     MissingOutputRecipients(Vec<Word>),
     #[error("note error")]
     NoteError(#[from] NoteError),
+    #[error("note checker error")]
+    NoteCheckerError(#[from] NoteCheckerError),
     #[error("note import error: {0}")]
     NoteImportError(String),
     #[error("error while converting input note")]

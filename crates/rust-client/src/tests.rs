@@ -16,7 +16,7 @@ use miden_lib::{
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
-    testing::mock_account::MockAccountExt,
+    testing::{mock_account::MockAccountExt, note::NoteBuilder},
     transaction::TransactionKernel,
     utils::ScriptBuilder,
 };
@@ -57,7 +57,6 @@ use miden_objects::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_objects::testing::note::NoteBuilder;
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
@@ -85,6 +84,7 @@ use crate::testing::common::{
     assert_account_has_single_asset,
     assert_note_cannot_be_consumed_twice,
     consume_notes,
+    create_test_store_path,
     execute_failing_tx,
     execute_tx,
     mint_and_consume,
@@ -92,7 +92,6 @@ use crate::testing::common::{
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
 };
-use crate::testing::config::create_test_store_path;
 use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
     DiscardCause,
@@ -156,14 +155,14 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
     let note_first =
         NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
             .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-            .build(&TransactionKernel::assembler())
+            .build()
             .unwrap();
 
     let note_second =
         NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
             .note_type(NoteType::Private)
             .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-            .build(&TransactionKernel::assembler())
+            .build()
             .unwrap();
     let mut mock_chain = mock_chain_builder.build().unwrap();
 

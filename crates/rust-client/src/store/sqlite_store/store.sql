@@ -36,15 +36,16 @@ CREATE TABLE storage_map_entries (
 
 CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
--- Create account_vaults table
-CREATE TABLE account_vaults (
+-- Create account_assets table
+CREATE TABLE account_assets (
     root TEXT NOT NULL,                             -- root of the account_vault Merkle tree
+    vault_key TEXT NOT NULL,                        -- asset's vault key
     faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
     asset TEXT NULL,                                -- value that represents the asset in the vault
-    PRIMARY KEY (root, faucet_id_prefix)
+    PRIMARY KEY (root, vault_key)
 );
 
-CREATE INDEX idx_account_vaults_root ON account_vaults(root);
+CREATE INDEX idx_account_assets_root ON account_assets(root);
 
 -- Create foreign_account_code table
 CREATE TABLE foreign_account_code(

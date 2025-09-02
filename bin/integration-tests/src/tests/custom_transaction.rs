@@ -14,7 +14,6 @@ use miden_client::note::{
 };
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::*;
-use miden_client::testing::config::ClientConfig;
 use miden_client::transaction::{
     AdviceMap,
     InputNote,
@@ -24,6 +23,8 @@ use miden_client::transaction::{
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{Felt, Word, ZERO};
+
+use crate::tests::config::ClientConfig;
 
 // CUSTOM TRANSACTION REQUEST
 // ================================================================================================
@@ -52,8 +53,8 @@ const NOTE_ARGS: [Felt; 8] = [
     Felt::new(9),
 ];
 
-pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
-    let (mut client, authenticator) = create_test_client(client_config).await?;
+pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
     client.sync_state().await?;
@@ -142,8 +143,8 @@ pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
-    let (mut client, authenticator) = create_test_client(client_config).await?;
+pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
     client.sync_state().await?;
@@ -225,19 +226,21 @@ pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
+pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
     // Client 1 has an private faucet which will mint an onchain note for client 2
-    let (mut client_1, keystore_1) = create_test_client(client_config.clone()).await?;
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
     // whose tag doesn't necessarily match any of its accounts
-    let (mut client_2, keystore_2) =
-        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
-            .await?;
+    let (mut client_2, keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
     // Client 3 will be the control client. We won't add any tags and expect the note not to be
     // fetched
-    let (mut client_3, ..) =
-        create_test_client(ClientConfig::default().with_rpc_endpoint(client_config.rpc_endpoint()))
-            .await?;
+    let (mut client_3, ..) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
     wait_for_node(&mut client_3).await;
 
     // Create accounts
@@ -318,6 +321,9 @@ async fn mint_custom_note(
     execute_tx_and_sync(client, faucet_account_id, transaction_request).await?;
     Ok(note)
 }
+
+// HELPERS
+// ================================================================================================
 
 fn create_custom_note(
     client: &TestClient,

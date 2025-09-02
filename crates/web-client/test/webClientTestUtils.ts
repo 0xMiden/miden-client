@@ -1,6 +1,8 @@
+// @ts-nocheck
 import { expect } from "chai";
 import { TransactionProver, WebClient } from "../dist";
-import { testingPage } from "./mocha.global.setup.mjs";
+import test from "./playwright.global.setup";
+import { Page } from "@playwright/test";
 
 interface MintTransactionResult {
   transactionId: string;
@@ -17,15 +19,25 @@ export enum StorageMode {
 // SDK functions
 
 export const mintTransaction = async (
+  testingPage: Page,
   targetAccountId: string,
   faucetAccountId: string,
   withRemoteProver: boolean = false,
   sync: boolean = true
 ): Promise<MintTransactionResult> => {
   return await testingPage.evaluate(
-    async (_targetAccountId, _faucetAccountId, _withRemoteProver, _sync) => {
+    async ({
+      _targetAccountId,
+      _faucetAccountId,
+      _withRemoteProver,
+      _sync,
+    }: {
+      _targetAccountId: string;
+      _faucetAccountId: string;
+      _withRemoteProver: boolean;
+      _sync: boolean;
+    }) => {
       const client = window.client;
-
       await client.syncState();
 
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
@@ -67,14 +79,16 @@ export const mintTransaction = async (
           .toString(),
       };
     },
-    targetAccountId,
-    faucetAccountId,
-    withRemoteProver,
-    sync
+    {
+      _targetAccountId: targetAccountId,
+      _faucetAccountId: faucetAccountId,
+      _withRemoteProver: withRemoteProver,
+      _sync: sync,
+    }
   );
 };
 
-export const getSyncHeight = async () => {
+export const getSyncHeight = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
     const client = window.client;
     let summary = await client.syncState();
@@ -83,6 +97,7 @@ export const getSyncHeight = async () => {
 };
 
 export const sendTransaction = async (
+  testingPage: Page,
   senderAccountId: string,
   targetAccountId: string,
   faucetAccountId: string,
@@ -90,13 +105,19 @@ export const sendTransaction = async (
   withRemoteProver: boolean = false
 ) => {
   return testingPage.evaluate(
-    async (
+    async ({
       _senderAccountId,
       _targetAccountId,
       _faucetAccountId,
       _recallHeight,
-      _withRemoteProver
-    ) => {
+      _withRemoteProver,
+    }: {
+      _senderAccountId: string;
+      _targetAccountId: string;
+      _faucetAccountId: string;
+      _recallHeight?: number;
+      _withRemoteProver: boolean;
+    }): Promise<string[]> => {
       const client = window.client;
 
       await client.syncState();
@@ -187,11 +208,13 @@ export const sendTransaction = async (
 
       return sendCreatedNoteIds;
     },
-    senderAccountId,
-    targetAccountId,
-    faucetAccountId,
-    recallHeight,
-    withRemoteProver
+    {
+      _senderAccountId: senderAccountId,
+      _targetAccountId: targetAccountId,
+      _faucetAccountId: faucetAccountId,
+      _recallHeight: recallHeight,
+      _withRemoteProver: withRemoteProver,
+    }
   );
 };
 
@@ -201,6 +224,7 @@ export interface SwapTransactionResult {
 }
 
 export const swapTransaction = async (
+  testingPage: Page,
   accountAId: string,
   accountBId: string,
   assetAFaucetId: string,
@@ -212,7 +236,7 @@ export const swapTransaction = async (
   withRemoteProver: boolean = false
 ): Promise<SwapTransactionResult> => {
   return await testingPage.evaluate(
-    async (
+    async ({
       _accountAId,
       _accountBId,
       _assetAFaucetId,
@@ -221,8 +245,18 @@ export const swapTransaction = async (
       _assetBAmount,
       _swapNoteType,
       _paybackNoteType,
-      _withRemoteProver
-    ) => {
+      _withRemoteProver,
+    }: {
+      _accountAId: string;
+      _accountBId: string;
+      _assetAFaucetId: string;
+      _assetAAmount: bigint;
+      _assetBFaucetId: string;
+      _assetBAmount: bigint;
+      _swapNoteType: string;
+      _paybackNoteType: string;
+      _withRemoteProver: boolean;
+    }) => {
       const client = window.client;
 
       await client.syncState();
@@ -353,15 +387,17 @@ export const swapTransaction = async (
         accountBAssets,
       };
     },
-    accountAId,
-    accountBId,
-    assetAFaucetId,
-    assetAAmount,
-    assetBFaucetId,
-    assetBAmount,
-    swapNoteType,
-    paybackNoteType,
-    withRemoteProver
+    {
+      _accountAId: accountAId,
+      _accountBId: accountBId,
+      _assetAFaucetId: assetAFaucetId,
+      _assetAAmount: assetAAmount,
+      _assetBFaucetId: assetBFaucetId,
+      _assetBAmount: assetBAmount,
+      _swapNoteType: swapNoteType,
+      _paybackNoteType: paybackNoteType,
+      _withRemoteProver: withRemoteProver,
+    }
   );
 };
 
@@ -377,32 +413,38 @@ export interface NewAccountTestResult {
   isPublic: boolean;
   isNew: boolean;
 }
-export const createNewWallet = async ({
-  storageMode,
-  mutable,
-  clientSeed,
-  isolatedClient,
-  walletSeed,
-}: {
+interface createNewWalletParams {
   storageMode: StorageMode;
   mutable: boolean;
   clientSeed?: Uint8Array;
   isolatedClient?: boolean;
   walletSeed?: Uint8Array;
-}): Promise<NewAccountTestResult> => {
+  serializeWalletSeed?: string;
+  serializeClientSeed?: string;
+}
+export const createNewWallet = async (
+  testingPage: Page,
+  {
+    storageMode,
+    mutable,
+    clientSeed,
+    isolatedClient,
+    walletSeed,
+  }: createNewWalletParams
+): Promise<NewAccountTestResult> => {
   // Serialize initSeed for Puppeteer
-  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : null;
-  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : null;
+  const serializedClientSeed = clientSeed ? Array.from(clientSeed) : undefined;
+  const serializedWalletSeed = walletSeed ? Array.from(walletSeed) : undefined;
 
   return await testingPage.evaluate(
-    async (
-      _storageMode,
-      _mutable,
+    async ({
+      storageMode,
+      mutable,
+      _serializedWalletSeed,
       _serializedClientSeed,
-      _isolatedClient,
-      _serializedWalletSeed
-    ) => {
-      if (_isolatedClient) {
+      isolatedClient,
+    }: createNewWalletParams) => {
+      if (isolatedClient) {
         // Reconstruct Uint8Array inside the browser context
         const _clientSeed = _serializedClientSeed
           ? new Uint8Array(_serializedClientSeed)
@@ -418,11 +460,11 @@ export const createNewWallet = async ({
 
       let client = window.client;
       const accountStorageMode =
-        window.AccountStorageMode.tryFromStr(_storageMode);
+        window.AccountStorageMode.tryFromStr(storageMode);
 
       const newWallet = await client.newWallet(
         accountStorageMode,
-        _mutable,
+        mutable,
         _walletSeed
       );
 
@@ -439,15 +481,18 @@ export const createNewWallet = async ({
         isNew: newWallet.isNew(),
       };
     },
-    storageMode,
-    mutable,
-    serializedClientSeed,
-    isolatedClient,
-    serializedWalletSeed
+    {
+      storageMode: storageMode,
+      mutable: mutable,
+      _serializedClientSeed: serializedClientSeed,
+      isolatedClient: isolatedClient,
+      _serializedWalletSeed: serializedWalletSeed,
+    }
   );
 };
 
 export const createNewFaucet = async (
+  testingPage: Page,
   storageMode: StorageMode = StorageMode.PUBLIC,
   nonFungible: boolean = false,
   tokenSymbol: string = "DAG",
@@ -455,16 +500,16 @@ export const createNewFaucet = async (
   maxSupply: bigint = BigInt(10000000)
 ): Promise<NewAccountTestResult> => {
   return await testingPage.evaluate(
-    async (_storageMode, _nonFungible, _tokenSymbol, _decimals, _maxSupply) => {
+    async ({ storageMode, nonFungible, tokenSymbol, decimals, maxSupply }) => {
       const client = window.client;
       const accountStorageMode =
-        window.AccountStorageMode.tryFromStr(_storageMode);
+        window.AccountStorageMode.tryFromStr(storageMode);
       const newFaucet = await client.newFaucet(
         accountStorageMode,
-        _nonFungible,
-        _tokenSymbol,
-        _decimals,
-        _maxSupply
+        nonFungible,
+        tokenSymbol,
+        decimals,
+        maxSupply
       );
       return {
         id: newFaucet.id().toString(),
@@ -479,20 +524,24 @@ export const createNewFaucet = async (
         isNew: newFaucet.isNew(),
       };
     },
-    storageMode,
-    nonFungible,
-    tokenSymbol,
-    decimals,
-    maxSupply
+    {
+      storageMode,
+      nonFungible,
+      tokenSymbol,
+      decimals,
+      maxSupply,
+    }
   );
 };
 
 export const fundAccountFromFaucet = async (
+  page: Page,
   accountId: string,
   faucetId: string
 ) => {
-  const mintResult = await mintTransaction(accountId, faucetId);
+  const mintResult = await mintTransaction(page, accountId, faucetId);
   return await consumeTransaction(
+    page,
     accountId,
     faucetId,
     mintResult.createdNoteId
@@ -500,25 +549,28 @@ export const fundAccountFromFaucet = async (
 };
 
 export const getAccountBalance = async (
+  testingPage: Page,
   accountId: string,
   faucetId: string
 ) => {
   return await testingPage.evaluate(
-    async (_accountId, _faucetId) => {
+    async ({ accountId, faucetId }) => {
       const client = window.client;
       const account = await client.getAccount(
-        window.AccountId.fromHex(_accountId)
+        window.AccountId.fromHex(accountId)
       );
       let balance = BigInt(0);
       if (account) {
         balance = account
           .vault()
-          .getBalance(window.AccountId.fromHex(_faucetId));
+          .getBalance(window.AccountId.fromHex(faucetId));
       }
       return balance;
     },
-    accountId,
-    faucetId
+    {
+      accountId,
+      faucetId,
+    }
   );
 };
 
@@ -530,13 +582,14 @@ interface ConsumeTransactionResult {
 }
 
 export const consumeTransaction = async (
+  testingPage: Page,
   targetAccountId: string,
   faucetId: string,
   noteId: string,
   withRemoteProver: boolean = false
 ): Promise<ConsumeTransactionResult> => {
   return await testingPage.evaluate(
-    async (_targetAccountId, _faucetId, _noteId, _withRemoteProver) => {
+    async ({ _targetAccountId, _faucetId, _noteId, _withRemoteProver }) => {
       const client = window.client;
 
       await client.syncState();
@@ -572,16 +625,18 @@ export const consumeTransaction = async (
           .toHex(),
         nonce: consumeTransactionResult.accountDelta().nonceDelta().toString(),
         numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
-        targetAccountBalance: changedTargetAccount
+        targetAccountBalance: changedTargetAccount!
           .vault()
           .getBalance(faucetId)
           .toString(),
       };
     },
-    targetAccountId,
-    faucetId,
-    noteId,
-    withRemoteProver
+    {
+      _targetAccountId: targetAccountId,
+      _faucetId: faucetId,
+      _noteId: noteId,
+      _withRemoteProver: withRemoteProver,
+    }
   );
 };
 
@@ -591,13 +646,19 @@ interface MintAndConsumeTransactionResult {
 }
 
 export const mintAndConsumeTransaction = async (
+  testingPage: Page,
   targetAccountId: string,
   faucetAccountId: string,
   withRemoteProver: boolean = false,
   sync: boolean = true
 ): Promise<MintAndConsumeTransactionResult> => {
   return await testingPage.evaluate(
-    async (_targetAccountId, _faucetAccountId, _withRemoteProver, _sync) => {
+    async ({
+      _targetAccountId,
+      _faucetAccountId,
+      _withRemoteProver,
+      _sync,
+    }) => {
       const client = window.client;
 
       await client.syncState();
@@ -690,17 +751,19 @@ export const mintAndConsumeTransaction = async (
             .nonceDelta()
             .toString(),
           numConsumedNotes: consumeTransactionResult.consumedNotes().numNotes(),
-          targetAccountBalance: changedTargetAccount
+          targetAccountBalance: changedTargetAccount!
             .vault()
             .getBalance(faucetAccountId)
             .toString(),
         },
       };
     },
-    targetAccountId,
-    faucetAccountId,
-    withRemoteProver,
-    sync
+    {
+      _targetAccountId: targetAccountId,
+      _faucetAccountId: faucetAccountId,
+      _withRemoteProver: withRemoteProver,
+      _sync: sync,
+    }
   );
 };
 
@@ -710,31 +773,32 @@ interface SetupWalletFaucetResult {
   accountCommitment: string;
 }
 
-export const setupWalletAndFaucet =
-  async (): Promise<SetupWalletFaucetResult> => {
-    return await testingPage.evaluate(async () => {
-      const client = window.client;
-      const account = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-      const faucetAccount = await client.newFaucet(
-        window.AccountStorageMode.private(),
-        false,
-        "DAG",
-        8,
-        BigInt(10000000)
-      );
+export const setupWalletAndFaucet = async (
+  testingPage: Page
+): Promise<SetupWalletFaucetResult> => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
+    const account = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const faucetAccount = await client.newFaucet(
+      window.AccountStorageMode.private(),
+      false,
+      "DAG",
+      8,
+      BigInt(10000000)
+    );
 
-      return {
-        accountId: account.id().toString(),
-        accountCommitment: account.commitment().toHex(),
-        faucetId: faucetAccount.id().toString(),
-      };
-    });
-  };
+    return {
+      accountId: account.id().toString(),
+      accountCommitment: account.commitment().toHex(),
+      faucetId: faucetAccount.id().toString(),
+    };
+  });
+};
 
-export const getAccount = async (accountId: string) => {
+export const getAccount = async (testingPage: Page, accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
@@ -750,7 +814,7 @@ export const getAccount = async (accountId: string) => {
   }, accountId);
 };
 
-export const syncState = async () => {
+export const syncState = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
     const client = window.client;
     const summary = await client.syncState();
@@ -759,8 +823,8 @@ export const syncState = async () => {
     };
   });
 };
-export const clearStore = async () => {
-  await testingPage.evaluate(async () => {
+export const clearStore = async (page: Page) => {
+  await page.evaluate(async () => {
     // Open a connection to the list of databases
     const databases = await indexedDB.databases();
     for (const db of databases) {
@@ -782,3 +846,43 @@ export const isValidAddress = (address: string) => {
 
 export const badHexId =
   "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+export const setupConsumedNote = async (page: Page) => {
+  const { createdNoteId, accountId, faucetId } = await setupMintedNote(page);
+  await consumeTransaction(page, accountId, faucetId, createdNoteId);
+
+  return {
+    consumedNoteId: createdNoteId,
+    accountId: accountId,
+    faucetId: faucetId,
+  };
+};
+
+export const getInputNote = async (noteId: string, testingPage: Page) => {
+  return await testingPage.evaluate(async (_noteId) => {
+    const client = window.client;
+    const note = await client.getInputNote(_noteId);
+    return {
+      noteId: note ? note.id().toString() : undefined,
+    };
+  }, noteId);
+};
+
+// TODO: Figure out a way to easily pass NoteFilters into the tests
+export const getInputNotes = async (testingPage: Page) => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
+    const filter = new window.NoteFilter(window.NoteFilterTypes.All);
+    const notes = await client.getInputNotes(filter);
+    return {
+      noteIds: notes.map((note) => note.id().toString()),
+    };
+  });
+};
+
+export const setupMintedNote = async (page: Page) => {
+  const { accountId, faucetId } = await setupWalletAndFaucet(page);
+  const { createdNoteId } = await mintTransaction(page, accountId, faucetId);
+
+  return { createdNoteId, accountId, faucetId };
+};

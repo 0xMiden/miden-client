@@ -32,7 +32,7 @@ miden-client-integration-tests [OPTIONS]
 
 ### Command-Line Options
 
-- `-r, --rpc-endpoint <URL>` - The URL of the RPC endpoint to use (default: `http://localhost:57291`)
+- `-n, --network <NETWORK>` - The network to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC endpoint (default: `localhost`)
 - `-t, --timeout <MILLISECONDS>` - Timeout for RPC requests in milliseconds (default: `10000`)
 - `-j, --jobs <NUMBER>` - Number of tests to run in parallel (default: auto-detected CPU cores, set to `1` for sequential execution)
 - `-f, --filter <REGEX>` - Filter tests by name using regex patterns
@@ -85,9 +85,19 @@ Run tests with verbose output showing worker information:
 miden-client-integration-tests --verbose
 ```
 
+Run tests against devnet:
+```bash
+miden-client-integration-tests --network devnet
+```
+
+Run tests against testnet:
+```bash
+miden-client-integration-tests --network testnet
+```
+
 Run tests against a custom RPC endpoint with timeout:
 ```bash
-miden-client-integration-tests --rpc-endpoint http://192.168.1.100:57291 --timeout 30000
+miden-client-integration-tests --network http://192.168.1.100:57291 --timeout 30000
 ```
 
 Complex example: Run non-swap tests in parallel with verbose output:
@@ -110,3 +120,39 @@ The integration tests cover several categories:
 - **Network Transaction**: Network-level transaction processing
 - **Onchain**: On-chain account and note operations
 - **Swap Transaction**: Asset swap functionality
+
+## Test Case Generation
+
+The integration tests use an automatic code generation system to create both `cargo nextest` compatible tests and a standalone binary. Test functions that start with `test_` are automatically discovered during build time and used to generate:
+
+1. **Individual `#[tokio::test]` wrappers** - These allow the tests to be run using standard `cargo test` or `cargo nextest run` commands
+2. **Programmatic test access** - A `Vec<TestCase>` that enables the standalone binary to enumerate and execute tests dynamically with custom parallelism and filtering
+
+The discovery system:
+- Scans all `.rs` files in the `src/` directory recursively
+- Identifies functions named `test_*` (supporting `pub async fn test_*`, `async fn test_*`, etc.)
+- Generates test registry and integration test wrappers automatically
+
+This dual approach allows the same test code to work seamlessly with both nextest (for development) and the standalone binary (for CI/CD and production testing scenarios), ensuring consistent behavior across different execution environments.
+
+## Writing Tests
+
+To add a new integration test:
+
+1. Create a public async function that starts with `test_`
+2. The function should take a `ClientConfig` parameter
+3. The function should return `Result<()>`
+4. Place the function in any `.rs` file under `src/`
+
+Example:
+```rust
+pub async fn test_my_feature(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
+    // test logic here
+}
+```
+
+The build system will automatically discover this function and include it in both the test registry and generate tokio test wrappers.
+
+## License
+This project is [MIT licensed](../../LICENSE).
