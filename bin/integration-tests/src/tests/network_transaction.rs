@@ -256,12 +256,11 @@ static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
         )
         .map_err(|err| anyhow!(err))
         .unwrap();
-    let library = assembler
+    assembler
         .clone()
         .assemble_library([module])
         .map_err(|err| anyhow!(err))
-        .unwrap();
-    library
+        .unwrap()
 });
 
 /// Returns the Basic Fungible Faucet Library.
