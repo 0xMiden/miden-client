@@ -52,7 +52,7 @@ Fetches notes by their IDs from the connected Miden node.
 
 [`NoteId`](NoteId.md)[]
 
-Array of [`NoteId`] objects to fetch.
+Array of [`NoteId`] objects to fetch
 
 #### Returns
 
