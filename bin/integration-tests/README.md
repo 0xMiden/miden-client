@@ -153,6 +153,3 @@ pub async fn test_my_feature(client_config: ClientConfig) -> Result<()> {
 ```
 
 The build system will automatically discover this function and include it in both the test registry and generate tokio test wrappers.
-
-## License
-This project is [MIT licensed](../../LICENSE).
