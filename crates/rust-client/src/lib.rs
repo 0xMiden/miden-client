@@ -219,7 +219,6 @@ pub use miden_tx::ExecutionOptions;
 /// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
-    pub use miden_lib::testing::note::NoteBuilder;
     pub use miden_objects::testing::*;
     pub use miden_testing::*;
 
