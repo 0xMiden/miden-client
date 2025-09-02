@@ -50,9 +50,7 @@ impl Address {
     pub fn account_id(&self) -> Result<AccountId, JsValue> {
         match &self.0 {
             NativeAddress::AccountId(account_id_address) => Ok(account_id_address.id().into()),
-            _other => {
-                Err("Unsupported Account address type".into())
-            },
+            _other => Err("Unsupported Account address type".into()),
         }
     }
 
