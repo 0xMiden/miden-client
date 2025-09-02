@@ -66,6 +66,13 @@ const INCR_NONCE_AUTH_CODE: &str = "
     end
 ";
 
+const INCR_SCRIPT_CODE: &str = "
+    use.external_contract::counter_contract
+    begin
+        call.counter_contract::increment_count
+    end
+";
+
 /// Deploys a counter contract as a network account
 async fn deploy_counter_contract(
     client: &mut TestClient,
@@ -77,12 +84,7 @@ async fn deploy_counter_contract(
 
     let mut script_builder = ScriptBuilder::new(true);
     script_builder.link_dynamic_library(&counter_contract_library())?;
-    let tx_script = script_builder.compile_tx_script(
-        "use.external_contract::counter_contract
-        begin
-            call.counter_contract::increment_count
-        end",
-    )?;
+    let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
     // Build a transaction request with the custom script
     let tx_increment_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
@@ -282,12 +284,7 @@ fn get_network_note<T: Rng>(
 
     let script = ScriptBuilder::new(true)
         .with_dynamically_linked_library(&counter_contract_library())?
-        .compile_note_script(
-            "use.external_contract::counter_contract
-        begin
-            call.counter_contract::increment_count
-        end",
-        )?;
+        .compile_note_script(INCR_SCRIPT_CODE)?;
     let recipient = NoteRecipient::new(
         Word::new([
             Felt::new(rng.random()),
