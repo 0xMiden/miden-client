@@ -14,6 +14,7 @@ use super::{
 pub struct Address(NativeAddress);
 
 #[wasm_bindgen]
+/// Specifies which procedures an account accepts, and by extension which notes it can consume.
 pub enum AddressInterface {
     Unspecified = "Unspecified",
     BasicWallet = "BasicWallet",
