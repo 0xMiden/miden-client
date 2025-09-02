@@ -30,7 +30,7 @@ const instanceAddress = async ({
   );
 };
 
-const instanceAddressTestBech32 = async (page: Page, bech32Prefix: string) => {
+const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
   return await page.evaluate(async (bech32Prefix) => {
     const client = window.client;
     const newAccount = await client.newWallet(
