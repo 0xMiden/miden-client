@@ -122,7 +122,7 @@ integration-test-web-client-webkit: ## Run integration tests for the web client 
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
-	cd ./crates/web-client && npm run test:remote_prover
+	cd ./crates/web-client && yarn run test:remote_prover -- --project=chromium
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
