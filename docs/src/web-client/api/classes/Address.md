@@ -6,26 +6,6 @@
 
 # Class: Address
 
-## Constructors
-
-### Constructor
-
-> **new Address**(`account_id`, `_interface`): `Address`
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### \_interface
-
-[`AddressInterface`](../type-aliases/AddressInterface.md)
-
-#### Returns
-
-`Address`
-
 ## Methods
 
 ### free()
@@ -48,9 +28,9 @@
 
 ***
 
-### to\_bech32()
+### toBech32()
 
-> **to\_bech32**(`network_id`): `string`
+> **toBech32**(`network_id`): `string`
 
 #### Parameters
 
@@ -98,9 +78,29 @@ Return stringified version of self.
 
 ***
 
-### from\_bech32()
+### fromAccountId()
 
-> `static` **from\_bech32**(`bech32`): `Address`
+> `static` **fromAccountId**(`account_id`, `_interface`): `Address`
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### \_interface
+
+[`AddressInterface`](../type-aliases/AddressInterface.md)
+
+#### Returns
+
+`Address`
+
+***
+
+### fromBech32()
+
+> `static` **fromBech32**(`bech32`): `Address`
 
 #### Parameters
 
