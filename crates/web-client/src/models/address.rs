@@ -13,36 +13,23 @@ use super::{
 #[derive(Debug)]
 pub struct Address(NativeAddress);
 
-#[derive(Debug)]
-pub struct AddressInterface(NativeAddressInterface);
-
 #[wasm_bindgen]
-impl AddressInterface {
-    #[wasm_bindgen(constructor)]
-    pub fn new(interface: u16) -> Self {
-        AddressInterface(
-            // FIXME: Error handling
-            interface.try_into().unwrap(),
-        )
-    }
-    #[wasm_bindgen(js_name = "toString")]
-    pub fn to_string(&self) -> String {
-        match self.0 {
-            NativeAddressInterface::Unspecified => format!("Unspecified"),
-            NativeAddressInterface::BasicWallet => format!("BasicWallet"),
-        }
-    }
+pub enum AddressInterface {
+    Unspecified = "Unspecified",
+    BasicWallet = "BasicWallet",
 }
 
 #[wasm_bindgen]
 impl Address {
     #[wasm_bindgen(constructor)]
     pub fn new(account_id: AccountId, interface: AddressInterface) -> Self {
-        let address = NativeAccountIdAddress::new(account_id.into(), interface.0);
+        // FIXME: Handle error
+        let address = NativeAccountIdAddress::new(account_id.into(), interface.try_into().unwrap());
         Address(NativeAddress::AccountId(address))
     }
     pub fn interface(&self) -> AddressInterface {
-        AddressInterface(self.0.interface())
+        // FIXME: Handle error
+        self.0.interface().try_into().unwrap()
     }
 
     #[wasm_bindgen(js_name = toNoteTag)]
@@ -60,5 +47,29 @@ impl Address {
     pub fn from_bech32(bech32: &str) -> Self {
         let (_net_id, address) = NativeAddress::from_bech32(bech32).unwrap();
         Self(address)
+    }
+}
+
+impl TryFrom<AddressInterface> for NativeAddressInterface {
+    type Error = &'static str;
+    fn try_from(value: AddressInterface) -> Result<Self, &'static str> {
+        match value {
+            AddressInterface::BasicWallet => Ok(NativeAddressInterface::BasicWallet),
+            AddressInterface::Unspecified => Ok(NativeAddressInterface::Unspecified),
+            AddressInterface::__Invalid => Err("Non-valid address interface given"),
+        }
+    }
+}
+
+impl TryFrom<NativeAddressInterface> for AddressInterface {
+    type Error = &'static str;
+    fn try_from(value: NativeAddressInterface) -> Result<Self, Self::Error> {
+        match value {
+            NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
+            NativeAddressInterface::Unspecified => Ok(AddressInterface::Unspecified),
+            _other => {
+                Err("AddressInterface from miden-objects crate was instanced with a wrong value")
+            },
+        }
     }
 }
