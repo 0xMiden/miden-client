@@ -1,8 +1,15 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
-use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    StorageSlot,
+};
+use miden_objects::asset::AssetVault;
 use miden_objects::utils::Deserializable;
 use miden_objects::{Felt, Word};
 use miden_tx::utils::Serializable;
@@ -12,13 +19,19 @@ use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{
     idxdb_get_account_auth_by_pub_key,
-    idxdb_insert_account_asset_vault,
     idxdb_insert_account_auth,
     idxdb_insert_account_code,
     idxdb_insert_account_record,
     idxdb_insert_account_storage,
 };
 use super::models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject};
+use crate::store::web_store::account::JsStorageMapEntry;
+use crate::store::web_store::account::js_bindings::{
+    JsStorageSlot,
+    JsVaultAsset,
+    idxdb_insert_storage_map_entries,
+    idxdb_insert_vault_assets,
+};
 use crate::store::{AccountStatus, StoreError};
 
 pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
@@ -32,21 +45,32 @@ pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsVal
 }
 
 pub async fn insert_account_storage(account_storage: &AccountStorage) -> Result<(), JsValue> {
-    let root = account_storage.commitment().to_string();
+    let mut slots = vec![];
+    let mut maps = vec![];
+    for (index, slot) in account_storage.slots().iter().enumerate() {
+        slots.push(JsStorageSlot::from_slot(
+            slot,
+            u8::try_from(index).expect("Indexes in account storage should be less than 256"),
+            account_storage.commitment(),
+        ));
+        if let StorageSlot::Map(map) = slot {
+            maps.extend(JsStorageMapEntry::from_map(map));
+        }
+    }
 
-    let storage = account_storage.to_bytes();
-
-    let promise = idxdb_insert_account_storage(root, storage);
-    JsFuture::from(promise).await?;
+    JsFuture::from(idxdb_insert_account_storage(slots)).await?;
+    JsFuture::from(idxdb_insert_storage_map_entries(maps)).await?;
 
     Ok(())
 }
 
 pub async fn insert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), JsValue> {
-    let commitment = asset_vault.root().to_string();
-    let assets = asset_vault.assets().collect::<Vec<Asset>>().to_bytes();
+    let js_assets: Vec<JsVaultAsset> = asset_vault
+        .assets()
+        .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
+        .collect();
 
-    let promise = idxdb_insert_account_asset_vault(commitment, assets);
+    let promise = idxdb_insert_vault_assets(js_assets);
     JsFuture::from(promise).await?;
 
     Ok(())

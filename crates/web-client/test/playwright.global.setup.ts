@@ -9,6 +9,20 @@ const REMOTE_TX_PROVER_PORT = 50051;
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use) => {
+      page.on("console", (msg) => {
+        if (msg.type() === "debug") {
+          console.log(`PAGE DEBUG: ${msg.text()}`);
+        }
+      });
+
+      page.on("pageerror", (err) => {
+        console.error("PAGE ERROR:", err);
+      });
+
+      page.on("error", (err) => {
+        console.error("PUPPETEER ERROR:", err);
+      });
+
       await page.goto("http://localhost:8080");
       await page.evaluate(
         async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
