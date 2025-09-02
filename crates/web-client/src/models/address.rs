@@ -11,7 +11,7 @@ use super::note_tag::NoteTag;
 use crate::js_error_with_context;
 
 #[wasm_bindgen(inspectable)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Address(NativeAddress);
 
 #[wasm_bindgen]
@@ -46,6 +46,16 @@ impl Address {
         self.0.interface().try_into()
     }
 
+    #[wasm_bindgen(js_name = "accountId")]
+    pub fn account_id(&self) -> Result<AccountId, JsValue> {
+        match &self.0 {
+            NativeAddress::AccountId(account_id_address) => Ok(account_id_address.id().into()),
+            _other => {
+                Err("Unsupported Account address type".into())
+            },
+        }
+    }
+
     #[wasm_bindgen(js_name = "toNoteTag")]
     pub fn to_note_tag(&self) -> NoteTag {
         self.0.to_note_tag().into()
@@ -55,8 +65,35 @@ impl Address {
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
         let net_id = network_id
             .try_into()
-            .map_err(|err| js_error_with_context(err, "wrong network id for bech32 conversion"))?;
+            .map_err(|err| js_error_with_context(err, "wrong network ID for bech32 conversion"))?;
         Ok(self.0.to_bech32(net_id))
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<NativeAddress> for Address {
+    fn from(native_address: NativeAddress) -> Self {
+        Address(native_address)
+    }
+}
+
+impl From<&NativeAddress> for Address {
+    fn from(native_address: &NativeAddress) -> Self {
+        Address(native_address.clone())
+    }
+}
+
+impl From<Address> for NativeAddress {
+    fn from(address: Address) -> Self {
+        address.0
+    }
+}
+
+impl From<&Address> for NativeAddress {
+    fn from(address: &Address) -> Self {
+        address.0.clone()
     }
 }
 
@@ -78,7 +115,7 @@ impl TryFrom<NativeAddressInterface> for AddressInterface {
             NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
             NativeAddressInterface::Unspecified => Ok(AddressInterface::Unspecified),
             _other => {
-                Err("AddressInterface from miden-objects crate was instanced with a wrong value"
+                Err("AddressInterface from miden-objects crate was instantiated with an unsupported value"
                     .into())
             },
         }
