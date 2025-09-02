@@ -114,11 +114,11 @@ integration-test: ## Run integration tests
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
-	cd ./crates/web-client && yarn run test:clean -- --browser=chromium
+	cd ./crates/web-client && yarn run test:clean -- --project=chromium
 
 .PHONY: integration-test-web-client-webkit
 integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
-	cd ./crates/web-client && yarn run test:clean -- --browser=webkit
+	cd ./crates/web-client && yarn run test:clean -- --project=webkit
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover

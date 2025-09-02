@@ -140,7 +140,7 @@ jobs:
       - name: Run web client tests
         run: |
           cd ./crates/web-client
-          yarn run test:clean -- --browser=chromium --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
+          yarn run test:clean -- --project=chromium --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
       - name: Stop test node
         if: always()
         run: make stop-node
