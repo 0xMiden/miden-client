@@ -27,6 +27,7 @@
 - [AccountStorageMode](classes/AccountStorageMode.md)
 - [AccountStorageRequirements](classes/AccountStorageRequirements.md)
 - [AccountVaultDelta](classes/AccountVaultDelta.md)
+- [Address](classes/Address.md)
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
 - [Assembler](classes/Assembler.md)
@@ -118,5 +119,6 @@
 
 ## Type Aliases
 
+- [AddressInterface](type-aliases/AddressInterface.md)
 - [NetworkId](type-aliases/NetworkId.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)
