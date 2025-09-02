@@ -42,7 +42,7 @@ const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
       "BasicWallet"
     );
     return address.toBech32(bech32Prefix);
-  }, bech32Prefix);
+  }, networkId);
 };
 
 const instanceAddressFromBech32 = async (
@@ -107,31 +107,31 @@ test.describe("Address instantiation tests", () => {
 test.describe("Bech32 tests", () => {
   test("to bech32 fails with non-valid-prefix", async ({ page }) => {
     await expect(
-      instanceAddressTestBech32(page, "non-valid-prefix")
+      instanceNewAddressBech32(page, "non-valid-prefix")
     ).rejects.toThrow();
   });
   test("encoding from bech32 and going back results in the same address", async ({
     page,
   }) => {
-    const expectedBech32 = "mtst1qz8dmgd0kl2v3ypkgcjf0ewjmacqzzzq3qw";
+    const expectedBech32 = await instanceNewAddressBech32(page, "mtst");
     await expect(instanceAddressFromBech32(page, expectedBech32)).resolves.toBe(
       true
     );
   });
   test("bech32 succeeds with mainnet prefix", async ({ page }) => {
-    await expect(instanceAddressTestBech32(page, "mm")).resolves.toHaveLength(
+    await expect(instanceNewAddressBech32(page, "mm")).resolves.toHaveLength(
       38
     );
   });
 
   test("bech32 succeeds with testnet prefix", async ({ page }) => {
-    await expect(instanceAddressTestBech32(page, "mtst")).resolves.toHaveLength(
+    await expect(instanceNewAddressBech32(page, "mtst")).resolves.toHaveLength(
       40
     );
   });
 
   test("bech32 succeeds with dev prefix", async ({ page }) => {
-    await expect(instanceAddressTestBech32(page, "mdev")).resolves.toHaveLength(
+    await expect(instanceNewAddressBech32(page, "mdev")).resolves.toHaveLength(
       40
     );
   });
