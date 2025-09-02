@@ -8,6 +8,16 @@
 
 ## Methods
 
+### accountId()
+
+> **accountId**(): [`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountId`](AccountId.md)
+
+***
+
 ### free()
 
 > **free**(): `void`
