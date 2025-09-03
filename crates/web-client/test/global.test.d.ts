@@ -10,6 +10,7 @@ import {
   AccountStorageMode,
   AccountStorageRequirements,
   AccountType,
+  Address,
   AdviceMap,
   Assembler,
   AssemblerUtils,
@@ -143,6 +144,7 @@ declare global {
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
+    Address: typeof Address;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace
