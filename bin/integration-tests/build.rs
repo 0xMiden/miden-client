@@ -58,9 +58,6 @@ const TEST_REGISTRY_HEADER: &str = r#"// Auto-generated test cases module
 const TEST_REGISTRY_IMPORTS: &str = r#"use super::{TestCase, TestCategory};"#;
 
 const TEST_REGISTRY_FUNCTION: &str = r#"/// Returns all available test cases organized by category.
-///
-/// This function is auto-generated from test functions named test_*.
-/// The test cases are automatically discovered by scanning the test modules.
 pub fn get_all_tests() -> Vec<TestCase> {{
     vec![
 {TEST_CASES}
