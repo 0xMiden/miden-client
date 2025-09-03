@@ -5,7 +5,8 @@
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
-* Bump web-client version in package.json after merging main into next
+* Bumped web-client version in package.json after merging main into next.
+* Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 
 ## 0.11.2 (2025-09-02)
 
