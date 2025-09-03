@@ -5,6 +5,7 @@
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
+* Bump web-client version in package.json after merging main into next
 
 ## 0.11.2 (2025-09-02)
 
