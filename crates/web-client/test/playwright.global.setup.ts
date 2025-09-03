@@ -230,9 +230,9 @@ export const test = base.extend<{ forEachTest: void }>({
 
           window.helpers.parseNetworkId = (networkId) => {
             const map = {
-              "mm": window.NetworkId.Mainnet,
-              "mtst": window.NetworkId.Testnet,
-              "mdev": window.NetworkId.Devnet,
+              mm: window.NetworkId.Mainnet,
+              mtst: window.NetworkId.Testnet,
+              mdev: window.NetworkId.Devnet,
             };
             const parsedNetworkId = map[networkId];
             if (parsedNetworkId === undefined) {
@@ -241,7 +241,7 @@ export const test = base.extend<{ forEachTest: void }>({
               );
             }
             return parsedNetworkId;
-          }
+          };
         },
         {
           MIDEN_NODE_PORT,
