@@ -3,6 +3,7 @@
 ## 0.11.2 (2025-09-02)
 
 * Added WASM bindings for the `Address` type from the miden_objects crate([#1244](https://github.com/0xMiden/miden-client/pull/1244)).
+* Updated index.d.ts file to reflect recent address changes + updates to `NetworkId` enum ([#1249](https://github.com/0xMiden/miden-client/pull/1249))
 
 ## 0.11.1 (2025-08-31)
 
