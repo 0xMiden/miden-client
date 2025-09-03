@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
+use miden_objects::Felt as NativeFelt;
 use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_objects::address::{
     AccountIdAddress,
     Address,
     AddressInterface as NativeAccountInterface,
 };
-use miden_objects::{Felt as NativeFelt, NetworkIdError};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -21,7 +21,7 @@ pub struct AccountId(NativeAccountId);
 pub enum NetworkId {
     Mainnet = 0,
     Testnet = 1,
-    Devnet  = 2,
+    Devnet = 2,
 }
 
 #[wasm_bindgen]
@@ -139,7 +139,7 @@ impl From<NetworkId> for NativeNetworkId {
         match value {
             NetworkId::Mainnet => NativeNetworkId::Mainnet,
             NetworkId::Testnet => NativeNetworkId::Testnet,
-            NetworkId::Devnet  => NativeNetworkId::Devnet,
+            NetworkId::Devnet => NativeNetworkId::Devnet,
         }
     }
 }
