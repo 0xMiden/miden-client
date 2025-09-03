@@ -1074,13 +1074,15 @@ mod tests {
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
-
+        let merkle_store = store.merkle_store.clone();
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction()?;
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,
+                    &mut merkle_store,
                     &account.into(),
                     &final_state,
                     BTreeMap::default(),
@@ -1149,6 +1151,7 @@ mod tests {
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
 
+        let merkle_store = store.merkle_store.clone();
         store
             .interact_with_connection(move |conn| {
                 let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
@@ -1162,9 +1165,11 @@ mod tests {
                     &delta,
                 )?;
                 let tx = conn.transaction()?;
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,
+                    &mut merkle_store,
                     &account.into(),
                     &final_state,
                     fungible_assets,
