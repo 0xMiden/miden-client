@@ -7,7 +7,7 @@ use super::note_execution_mode::NoteExecutionMode;
 
 #[derive(Clone, Copy)]
 #[wasm_bindgen]
-pub struct NoteTag(NativeNoteTag);
+pub struct NoteTag(pub(crate) NativeNoteTag);
 
 #[wasm_bindgen]
 impl NoteTag {
