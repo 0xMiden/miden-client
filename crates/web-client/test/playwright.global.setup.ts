@@ -24,6 +24,7 @@ export const test = base.extend<{ forEachTest: void }>({
             AccountStorageMode,
             AccountStorageRequirements,
             AccountType,
+            Address,
             AdviceMap,
             Assembler,
             AssemblerUtils,
@@ -158,6 +159,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
+          window.Address = Address;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};
