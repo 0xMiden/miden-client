@@ -30,6 +30,7 @@ use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
 use crate::note::{Note, create_p2id_note};
 use crate::rpc::RpcError;
+#[cfg(feature = "sqlite")]
 use crate::store::sqlite_store::SqliteStore;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -498,6 +499,7 @@ pub async fn mint_and_consume(
     .await
 }
 
+#[cfg(feature = "sqlite")]
 pub async fn create_test_client_builder()
 -> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
@@ -525,6 +527,7 @@ pub async fn create_test_client_builder()
     (builder, rpc_api, keystore)
 }
 
+#[cfg(feature = "sqlite")]
 pub async fn create_test_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
