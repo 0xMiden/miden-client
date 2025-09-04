@@ -1361,7 +1361,7 @@ mod test {
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::PaymentNoteDescription;
-    use crate::tests::create_test_client;
+    use crate::test_utils::common::create_test_client;
     use crate::transaction::{TransactionRequestBuilder, TransactionResult};
 
     #[tokio::test]

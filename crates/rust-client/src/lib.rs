@@ -133,7 +133,7 @@ pub mod utils;
 #[cfg(feature = "std")]
 pub mod builder;
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 mod test_utils;
 
 #[cfg(test)]
