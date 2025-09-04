@@ -130,6 +130,10 @@ integration-test-full: ## Run the integration test binary with ignored tests inc
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
+.PHONY: integration-test-binary
+integration-test-binary: ## Run the integration tests using the standalone binary
+	cargo run --package miden-client-integration-tests --release --locked
+
 .PHONY: start-prover
 start-prover: ## Start the remote prover
 	cd $(PROVER_DIR) && RUST_LOG=info cargo run --release --locked
