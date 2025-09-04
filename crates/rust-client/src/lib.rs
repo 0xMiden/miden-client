@@ -58,8 +58,8 @@
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::rpc::{Endpoint, TonicRpcClient};
 //! use miden_client::store::Store;
-//! use miden_client::store::sqlite_store::SqliteStore;
 //! use miden_client::{Client, ExecutionOptions, Felt};
+//! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
 //! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 //! use rand::Rng;
@@ -136,8 +136,7 @@ pub mod builder;
 #[cfg(feature = "testing")]
 mod test_utils;
 
-#[cfg(test)]
-pub mod tests;
+// Tests have been extracted to a standalone crate to avoid cyclic deps.
 
 mod errors;
 

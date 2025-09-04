@@ -24,7 +24,6 @@ testing = ["miden-client/testing"]
 [dependencies]
 # Workspace dependencies
 miden-client = { default-features = false, features = [
-  "idxdb",
   "testing",
   "web-tonic",
 ], path = "../rust-client", version = "0.12" }
@@ -37,6 +36,9 @@ rand                 = { workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+indexed-db-store = { path = "../indexed-db-store", version = "0.12" }
 
 [dev-dependencies]
 miden-lib     = { default-features = false, features = ["testing"], workspace = true }

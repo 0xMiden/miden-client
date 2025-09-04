@@ -3,4 +3,5 @@
 *.yaml
 
 # Generated JS (codegen)
+crates/indexed-db-store/src/web_store/js/**
 crates/rust-client/src/store/web_store/js/**

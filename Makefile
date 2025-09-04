@@ -30,8 +30,8 @@ clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo +nightly fix --workspace --exclude miden-client-web --exclude testing-remote-prover --allow-staged --allow-dirty --all-targets
+fix: ## Run Fix with configs, building tests with proper features to avoid type split.
+	cargo +nightly fix --workspace --exclude miden-client-web --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
@@ -63,7 +63,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn lint
+	cd crates/indexed-db-store/src/web_store && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -161,7 +161,7 @@ build-wasm: rust-client-ts-build ## Build the client library for wasm32
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn build
+	cd crates/indexed-db-store/src/web_store && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 
@@ -195,7 +195,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
-	yarn --cwd $(RUST_CLIENT_DIR)/src/store/web_store --silent
+	yarn --cwd crates/indexed-db-store/src/web_store --silent
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"

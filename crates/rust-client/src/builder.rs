@@ -13,8 +13,6 @@ use crate::rpc::NodeRpcClient;
 #[cfg(feature = "tonic")]
 use crate::rpc::{Endpoint, TonicRpcClient};
 use crate::store::Store;
-#[cfg(feature = "sqlite")]
-use crate::store::sqlite_store::SqliteStore;
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -53,9 +51,7 @@ pub struct ClientBuilder<AUTH> {
     store: Option<Arc<dyn Store>>,
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
-    /// The store path to use when no store is directly provided via `store()`.
-    #[cfg(feature = "sqlite")]
-    store_path: String,
+    // The store must be provided by the caller.
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -74,8 +70,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             rpc_api: None,
             store: None,
             rng: None,
-            #[cfg(feature = "sqlite")]
-            store_path: "store.sqlite3".to_string(),
+
             keystore: None,
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
@@ -116,13 +111,7 @@ where
         self
     }
 
-    /// Optionally set a custom store path.
-    #[cfg(feature = "sqlite")]
-    #[must_use]
-    pub fn sqlite_store(mut self, path: &str) -> Self {
-        self.store_path = path.to_string();
-        self
-    }
+    // sqlite_store path helper removed; supply a Store via `.store(...)`.
 
     /// Optionally provide a store directly.
     #[must_use]
@@ -191,20 +180,12 @@ where
             ));
         };
 
-        #[cfg(feature = "sqlite")]
-        if self.store.is_none() {
-            let store = SqliteStore::new(self.store_path.into())
-                .await
-                .map_err(ClientError::StoreError)?;
-            self.store = Some(Arc::new(store));
-        }
-
-        // If no store was provided, create a SQLite store from the given path.
+        // Ensure a store was provided.
         let arc_store: Arc<dyn Store> = if let Some(store) = self.store {
             store
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path if `sqlite` is enabled."
+                "Store must be specified. Call `.store(...)` with a concrete Store implementation."
                     .into(),
             ));
         };

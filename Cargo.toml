@@ -4,7 +4,10 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/indexed-db-store",
+  "crates/miden-client-sqlite-store",
   "crates/rust-client",
+  "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",

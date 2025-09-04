@@ -2,9 +2,9 @@ extern crate alloc;
 use alloc::sync::Arc;
 use std::fmt::Write;
 
+use indexed_db_store::WebStore;
 use miden_client::keystore::WebKeyStore;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
-use miden_client::store::web_store::WebStore;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{Client, ExecutionOptions};
 use miden_objects::crypto::rand::RpoRandomCoin;

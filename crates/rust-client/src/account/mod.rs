@@ -332,8 +332,6 @@ pub mod tests {
     };
     use miden_objects::{EMPTY_WORD, Word, ZERO};
 
-    use crate::tests::create_test_client;
-
     fn create_account_data(account_id: u128) -> AccountFile {
         let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
 

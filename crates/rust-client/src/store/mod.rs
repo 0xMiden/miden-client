@@ -55,14 +55,9 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
-#[cfg(all(feature = "sqlite", feature = "idxdb"))]
-compile_error!("features `sqlite` and `idxdb` are mutually exclusive");
+// SQLite store moved to `miden-client-sqlite-store` crate.
 
-#[cfg(feature = "sqlite")]
-pub mod sqlite_store;
-
-#[cfg(feature = "idxdb")]
-pub mod web_store;
+// Web store moved to `indexed-db-store` crate.
 
 mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};

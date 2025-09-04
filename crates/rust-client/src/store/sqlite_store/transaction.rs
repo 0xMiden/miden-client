@@ -203,7 +203,7 @@ impl SqliteStore {
             add_note_tag_tx(&tx, tag_record)?;
         }
 
-        tx.commit()?;
+        tx.commit().as_store_error()?;
 
         Ok(())
     }

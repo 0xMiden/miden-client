@@ -20,15 +20,6 @@ crate-type = ["lib"]
 
 [features]
 default = ["std", "tonic/channel"]
-idxdb = [
-  "dep:base64",
-  "dep:getrandom",
-  "dep:serde",
-  "dep:serde-wasm-bindgen",
-  "dep:wasm-bindgen",
-  "dep:wasm-bindgen-futures",
-]
-sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
 testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
@@ -47,14 +38,10 @@ anyhow                = { workspace = true }
 async-trait           = { workspace = true }
 base64                = { optional = true, version = "0.22" }
 chrono                = { optional = false, version = "0.4" }
-deadpool              = { default-features = false, features = ["managed", "rt_tokio_1"], optional = true, version = "0.12" }
-deadpool-sync         = { optional = true, version = "0.1" }
 getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
 hex                   = { version = "0.4" }
 prost                 = { default-features = false, features = ["derive"], version = "0.13" }
 rand                  = { workspace = true }
-rusqlite              = { features = ["array", "bundled", "vtab"], optional = true, version = "0.36" }
-rusqlite_migration    = { optional = true, version = "2.1" }
 serde                 = { optional = true, workspace = true }
 serde-wasm-bindgen    = { optional = true, version = "0.6" }
 thiserror             = { workspace = true }
@@ -79,7 +66,8 @@ protox                 = { version = "0.7" }
 tonic-build            = { version = "0.13" }
 
 [dev-dependencies]
-miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
+miden-client-sqlite-store = { path = "../miden-client-sqlite-store", package = "miden-client-sqlite-store", version = "0.12" }
+miden-client = {path = ".", features = ["testing", "std"]}
 miden-lib     = { features = ["testing"], workspace = true }
 miden-objects = { default-features = false, features = ["testing"], workspace = true }
 miden-testing = { default-features = false, workspace = true }

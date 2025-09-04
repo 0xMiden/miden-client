@@ -343,7 +343,6 @@ impl NodeRpcClient for TonicRpcClient {
                 .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
             account_proofs.push(proof);
         }
-
         Ok((block_num, account_proofs))
     }
 

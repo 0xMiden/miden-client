@@ -66,7 +66,7 @@ impl SqliteStore {
         let tx = conn.transaction()?;
         add_note_tag_tx(&tx, &tag)?;
 
-        tx.commit()?;
+        tx.commit().as_store_error()?;
 
         Ok(true)
     }
@@ -78,7 +78,7 @@ impl SqliteStore {
         let tx = conn.transaction()?;
         let removed_tags = remove_note_tag_tx(&tx, tag)?;
 
-        tx.commit()?;
+        tx.commit().as_store_error()?;
 
         Ok(removed_tags)
     }
@@ -180,7 +180,7 @@ impl SqliteStore {
         }
 
         // Commit the updates
-        tx.commit()?;
+        tx.commit().as_store_error()?;
 
         Ok(())
     }
