@@ -113,7 +113,7 @@ integration-test: ## Run integration tests
 	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
-integration-test-web-client: ## Run integration tests for the web client
+integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
 	cd ./crates/web-client && yarn run test:clean -- --project=chromium
 
 .PHONY: integration-test-web-client-webkit
