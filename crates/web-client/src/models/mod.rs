@@ -38,6 +38,7 @@ pub mod account_storage;
 pub mod account_storage_mode;
 pub mod account_storage_requirements;
 pub mod account_type;
+pub mod address;
 pub mod advice_inputs;
 pub mod advice_map;
 pub mod assembler;

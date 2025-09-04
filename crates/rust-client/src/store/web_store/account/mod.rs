@@ -142,9 +142,9 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self.get_account_storage(account_header.storage_commitment()).await?;
-        let account_vault = self.get_vault_assets(account_header.vault_root()).await?;
-        let account_vault = AssetVault::new(&account_vault)?;
+        let account_storage = self.get_storage(account_header.storage_commitment()).await?;
+        let assets = self.get_vault_assets(account_header.vault_root()).await?;
+        let account_vault = AssetVault::new(&assets)?;
 
         let account = Account::from_parts(
             account_header.id(),
@@ -173,10 +173,7 @@ impl WebStore {
         Ok(code)
     }
 
-    pub(super) async fn get_account_storage(
-        &self,
-        commitment: Word,
-    ) -> Result<AccountStorage, StoreError> {
+    pub(super) async fn get_storage(&self, commitment: Word) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
         let promise = idxdb_get_account_storage(commitment_serialized);
@@ -244,6 +241,33 @@ impl WebStore {
         update_account(new_account_state)
             .await
             .map_err(|_| StoreError::DatabaseError("failed to update account".to_string()))
+    }
+
+    pub(crate) async fn get_account_vault(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AssetVault, StoreError> {
+        let account_header = self
+            .get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        let assets = self.get_vault_assets(account_header.vault_root()).await?;
+        Ok(AssetVault::new(&assets)?)
+    }
+
+    pub(crate) async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError> {
+        let account_header = self
+            .get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        self.get_storage(account_header.storage_commitment()).await
     }
 
     pub(crate) async fn upsert_foreign_account_code(

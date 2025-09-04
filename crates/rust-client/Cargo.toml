@@ -1,8 +1,8 @@
 [package]
 authors.workspace      = true
 categories             = ["no-std"]
-description            = "Client library that facilitates interaction with the Miden rollup"
-documentation          = "https://docs.rs/miden-client/0.11.0"
+description            = "Client library that facilitates interaction with the Miden network"
+documentation          = "https://docs.rs/miden-client/0.12.0"
 edition.workspace      = true
 keywords               = ["client", "miden"]
 license.workspace      = true
@@ -30,7 +30,7 @@ idxdb = [
 ]
 sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+testing = ["dep:miden-testing", "dep:uuid", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 

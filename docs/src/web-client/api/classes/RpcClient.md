@@ -22,7 +22,7 @@ Creates a new RPC client instance.
 
 [`Endpoint`](Endpoint.md)
 
-endpoint to connect to
+Endpoint to connect to.
 
 #### Returns
 

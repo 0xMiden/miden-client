@@ -4,7 +4,7 @@ description            = "Integration Tests for the miden client library"
 edition.workspace      = true
 license.workspace      = true
 name                   = "miden-client-integration-tests"
-publish                = false
+publish                = true
 repository.workspace   = true
 rust-version.workspace = true
 version.workspace      = true
@@ -19,7 +19,7 @@ path = "tests/integration.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client", version = "0.11" }
+miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client", version = "0.12" }
 
 # External dependencies
 anyhow      = { features = ["std"], workspace = true }
@@ -32,15 +32,6 @@ serde       = { features = ["derive"], version = "1.0" }
 tokio       = { workspace = true }
 url         = { version = "2.5.4" }
 uuid        = { version = "1.10" }
-
-[build-dependencies]
-proc-macro2 = "1.0"
-quote       = "1.0"
-syn         = { features = ["full", "visit"], version = "2.0" }
-
-# Simple proc-macro for test_case attribute
-[dependencies.test-case-marker]
-path = "test-case-marker"
 
 [package.metadata.cargo-machete]
 ignored = ["url"]
