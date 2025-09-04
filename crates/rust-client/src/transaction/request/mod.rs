@@ -187,6 +187,11 @@ impl TransactionRequest {
         &self.advice_map
     }
 
+    /// Returns a mutable reference to the [`AdviceMap`] for the transaction request.
+    pub fn advice_map_mut(&mut self) -> &mut AdviceMap {
+        &mut self.advice_map
+    }
+
     /// Returns the [`MerkleStore`] for the transaction request.
     pub fn merkle_store(&self) -> &MerkleStore {
         &self.merkle_store
