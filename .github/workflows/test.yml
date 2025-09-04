@@ -139,8 +139,9 @@ jobs:
         run: make start-node-background
       - name: Run web client tests
         run: |
-          cd ./crates/web-client
-          yarn run test:clean -- --project=chromium --shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}
+          make integration-test-web-client
+        env:
+          SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
       - name: Stop test node
         if: always()
         run: make stop-node
