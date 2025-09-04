@@ -534,7 +534,7 @@ pub async fn create_test_client()
     (client, rpc_api, keystore)
 }
 
-pub async fn create_prebuilt_mock_chain() -> MockChain {
+async fn create_prebuilt_mock_chain() -> MockChain {
     let mut mock_chain_builder = MockChainBuilder::new();
     let mock_account = mock_chain_builder
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
