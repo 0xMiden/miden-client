@@ -180,13 +180,13 @@ impl Store for WebStore {
 
     async fn insert_account(
         &self,
-        account: Arc<Account>,
+        account: Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
         self.insert_account(account, account_seed).await
     }
 
-    async fn update_account(&self, new_account_state: Arc<Account>) -> Result<(), StoreError> {
+    async fn update_account(&self, new_account_state: Account) -> Result<(), StoreError> {
         self.update_account(&new_account_state).await
     }
 

@@ -208,7 +208,7 @@ impl WebStore {
 
     pub(crate) async fn insert_account(
         &self,
-        account: Arc<Account>,
+        account: Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
         insert_account_code(account.code()).await.map_err(|js_error| {
