@@ -1,17 +1,15 @@
 use alloc::vec::Vec;
 use std::boxed::Box;
 use std::collections::BTreeSet;
-use std::env::temp_dir;
 use std::println;
 use std::string::ToString;
-use std::sync::Arc;
 
 // TESTS
 // ================================================================================================
 use miden_lib::{
     account::{auth::AuthRpoFalcon512, interface::AccountInterfaceError, wallets::BasicWallet},
     note::{utils, well_known_note::WellKnownNote},
-    testing::{mock_account::MockAccountExt, note::NoteBuilder},
+    testing::mock_account::MockAccountExt,
     transaction::TransactionKernel,
 };
 use miden_objects::account::{
@@ -29,12 +27,11 @@ use miden_objects::account::{
 };
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_objects::crypto::rand::FeltRng;
 use miden_objects::note::{
     Note,
     NoteAssets,
     NoteExecutionHint,
-    NoteExecutionMode,
     NoteFile,
     NoteInputs,
     NoteMetadata,
@@ -53,30 +50,26 @@ use miden_objects::testing::account_id::{
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
-use miden_testing::{MockChain, MockChainBuilder};
 use miden_tx::TransactionExecutorError;
 use miden_tx::utils::{Deserializable, Serializable};
-use rand::rngs::StdRng;
-use rand::{Rng, RngCore};
+use rand::RngCore;
 
-use crate::builder::ClientBuilder;
-use crate::keystore::FilesystemKeyStore;
+use crate::ClientError;
 use crate::note::NoteRelevance;
 use crate::rpc::NodeRpcClient;
 use crate::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use crate::store::sqlite_store::SqliteStore;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::sync::NoteTagSource;
-use crate::testing::common::{
+use crate::test_utils::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
     RECALL_HEIGHT_DELTA,
     TRANSFER_AMOUNT,
-    TestClientKeyStore,
     assert_account_has_single_asset,
     assert_note_cannot_be_consumed_twice,
     consume_notes,
-    create_test_store_path,
+    create_test_client,
+    create_test_client_builder,
     execute_failing_tx,
     execute_tx,
     insert_new_fungible_faucet,
@@ -86,7 +79,6 @@ use crate::testing::common::{
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
 };
-use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
     DiscardCause,
     PaymentNoteDescription,
@@ -95,102 +87,10 @@ use crate::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use crate::{ClientError, DebugMode};
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
 const TX_GRACEFUL_BLOCKS: u32 = 20;
-
-// HELPERS
-// ================================================================================================
-
-pub async fn create_test_client_builder()
--> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let store = SqliteStore::new(create_test_store_path()).await.unwrap();
-    let store = Arc::new(store);
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore_path = temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
-
-    let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
-    let arc_rpc_api = Arc::new(rpc_api.clone());
-
-    let builder = ClientBuilder::new()
-        .rpc(arc_rpc_api)
-        .rng(Box::new(rng))
-        .store(store)
-        .filesystem_keystore(keystore_path.to_str().unwrap())
-        .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
-
-    (builder, rpc_api, keystore)
-}
-
-pub async fn create_test_client()
--> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let mut client = builder.build().await.unwrap();
-    client.ensure_genesis_in_place().await.unwrap();
-
-    (client, rpc_api, keystore)
-}
-
-pub async fn create_prebuilt_mock_chain() -> MockChain {
-    let mut mock_chain_builder = MockChainBuilder::new();
-    let mock_account = mock_chain_builder
-        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
-        .unwrap();
-
-    let note_first =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
-            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-            .build()
-            .unwrap();
-
-    let note_second =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
-            .note_type(NoteType::Private)
-            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-            .build()
-            .unwrap();
-    let mut mock_chain = mock_chain_builder.build().unwrap();
-
-    // Block 1: Create first note
-    mock_chain.add_pending_note(OutputNote::Full(note_first));
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 2
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 3
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 4: Create second note
-    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
-    mock_chain.prove_next_block().unwrap();
-
-    let transaction = Box::pin(
-        mock_chain
-            .build_tx_context(mock_account, &[note_second.id()], &[])
-            .unwrap()
-            .build()
-            .unwrap()
-            .execute(),
-    )
-    .await
-    .unwrap();
-
-    // Block 5: Consume (nullify) second note
-    mock_chain.add_pending_executed_transaction(&transaction).unwrap();
-    mock_chain.prove_next_block().unwrap();
-
-    mock_chain
-}
 
 // TESTS
 // ================================================================================================
