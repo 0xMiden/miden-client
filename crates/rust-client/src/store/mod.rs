@@ -25,12 +25,21 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    StorageSlot,
+};
+use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
+use miden_objects::{AccountError, Word};
 
 use crate::note::NoteUpdateTracker;
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -319,6 +328,56 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // ACCOUNT VAULT AND STORE
+    // --------------------------------------------------------------------------------------------
+
+    /// Retrieves the asset vault for a specific account.
+    async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
+
+    /// Retrieves a specific asset from the account's vault along with its Merkle proof.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_vault`].
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        faucet_id_prefix: AccountIdPrefix,
+    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+        let vault = self.get_account_vault(account_id).await?;
+        let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
+            return Ok(None);
+        };
+
+        let path = vault.asset_tree().open(&asset.vault_key()).into_parts().0;
+
+        Ok(Some((asset, path)))
+    }
+
+    /// Retrieves the storage for a specific account.
+    async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError>;
+
+    /// Retrieves a specific item from the account's storage map along with its Merkle proof.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_storage`].
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        index: u8,
+        key: Word,
+    ) -> Result<(Word, MerklePath), StoreError> {
+        let storage = self.get_account_storage(account_id).await?;
+        let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        };
+
+        let value = map.get(&key);
+        let path = map.open(&key).into_parts().0;
+
+        Ok((value, path))
+    }
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

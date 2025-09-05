@@ -433,7 +433,8 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     println!("Applying transaction to store...");
 
-    let tx_update = transaction_pipeline.get_transaction_update(submit_height, executed_transaction);
+    let tx_update =
+        transaction_pipeline.get_transaction_update(submit_height, executed_transaction);
     client.apply_transaction(tx_update).await?;
 
     println!("Successfully created transaction.");

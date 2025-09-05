@@ -1,19 +1,20 @@
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::vec;
 
 use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::AccountComponent;
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageSlot};
-use miden_client::assembly::{
-    Assembler,
-    DefaultSourceManager,
-    Library,
-    LibraryPath,
-    Module,
-    ModuleKind,
+use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot};
+use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
+use miden_client::note::{
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
-use miden_client::note::NoteTag;
-use miden_client::testing::NoteBuilder;
 use miden_client::testing::common::{
     TestClient,
     execute_tx_and_sync,
@@ -23,7 +24,7 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, ScriptBuilder, Word, ZERO};
-use rand::RngCore;
+use rand::{Rng, RngCore};
 
 use crate::tests::config::ClientConfig;
 
@@ -65,23 +66,25 @@ const INCR_NONCE_AUTH_CODE: &str = "
     end
 ";
 
+const INCR_SCRIPT_CODE: &str = "
+    use.external_contract::counter_contract
+    begin
+        call.counter_contract::increment_count
+    end
+";
+
 /// Deploys a counter contract as a network account
 async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-) -> Result<(Account, Library)> {
-    let (acc, seed, library) = get_counter_contract_account(client, storage_mode).await?;
+) -> Result<Account> {
+    let (acc, seed) = get_counter_contract_account(client, storage_mode).await?;
 
     client.add_account(&acc, Some(seed), false).await?;
 
     let mut script_builder = ScriptBuilder::new(true);
-    script_builder.link_dynamic_library(&library)?;
-    let tx_script = script_builder.compile_tx_script(
-        "use.external_contract::counter_contract
-        begin
-            call.counter_contract::increment_count
-        end",
-    )?;
+    script_builder.link_dynamic_library(&counter_contract_library())?;
+    let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
     // Build a transaction request with the custom script
     let tx_increment_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
@@ -90,13 +93,13 @@ async fn deploy_counter_contract(
     let tx_id = client.new_transaction(acc.id(), tx_increment_request).await?;
     wait_for_tx(client, tx_id).await?;
 
-    Ok((acc, library))
+    Ok(acc)
 }
 
 async fn get_counter_contract_account(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-) -> Result<(Account, Word, Library)> {
+) -> Result<(Account, Word)> {
     let counter_component = AccountComponent::compile(
         COUNTER_CONTRACT,
         TransactionKernel::assembler(),
@@ -120,19 +123,7 @@ async fn get_counter_contract_account(
         .build()
         .context("failed to build account with counter contract")?;
 
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            LibraryPath::new("external_contract::counter_contract")
-                .context("failed to create library path for counter contract")?,
-            COUNTER_CONTRACT,
-            &source_manager,
-        )
-        .map_err(|err| anyhow!(err))?;
-    let library = assembler.clone().assemble_library([module]).map_err(|err| anyhow!(err))?;
-
-    Ok((account, seed, library))
+    Ok((account, seed))
 }
 // TESTS
 // ================================================================================================
@@ -142,8 +133,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
-    let (network_account, library) =
-        deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
+    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
     assert_eq!(
         client
@@ -162,18 +152,9 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     let mut network_notes = vec![];
 
     for _ in 0..BUMP_NOTE_NUMBER {
-        network_notes.push(OutputNote::Full(
-            NoteBuilder::new(native_account.id(), client.rng())
-                .code(
-                    "use.external_contract::counter_contract
-                begin
-                    call.counter_contract::increment_count
-                end",
-                )
-                .tag(NoteTag::from_account_id(network_account.id()).into())
-                .dynamically_linked_libraries(vec![library.clone()])
-                .build()?,
-        ));
+        let network_note =
+            get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
+        network_notes.push(OutputNote::Full(network_note));
     }
 
     let tx_request = TransactionRequestBuilder::new().own_output_notes(network_notes).build()?;
@@ -201,24 +182,13 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
-    let (network_account, library) =
-        deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
+    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
 
-    let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?.0;
+    let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
 
     let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?.0;
 
-    let network_note = NoteBuilder::new(wallet.id(), client.rng())
-        .code(
-            "use.external_contract::counter_contract
-            begin
-                call.counter_contract::increment_count
-            end",
-        )
-        .dynamically_linked_libraries(vec![library])
-        .tag(NoteTag::from_account_id(network_account.id()).into())
-        .build()?;
-
+    let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(network_note.clone())])
@@ -237,8 +207,9 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let (consume_transaction, transaction_pipeline) =
         client.execute_transaction(native_account.id(), tx_request).await?;
 
-    let bump_proof =
-        transaction_pipeline.prove_transaction(bump_transaction, client.prover()).await?;
+    let bump_proof = transaction_pipeline
+        .prove_transaction(bump_transaction, client.prover())
+        .await?;
     let consume_proof = transaction_pipeline
         .prove_transaction(consume_transaction.clone(), client.prover())
         .await?;
@@ -277,4 +248,61 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
     );
     Ok(())
+}
+
+// Initialize the Basic Fungible Faucet library only once.
+static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
+    let assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("external_contract::counter_contract")
+                .context("failed to create library path for counter contract")
+                .unwrap(),
+            COUNTER_CONTRACT,
+            &source_manager,
+        )
+        .map_err(|err| anyhow!(err))
+        .unwrap();
+    assembler
+        .clone()
+        .assemble_library([module])
+        .map_err(|err| anyhow!(err))
+        .unwrap()
+});
+
+/// Returns the Basic Fungible Faucet Library.
+fn counter_contract_library() -> Library {
+    COUNTER_CONTRACT_LIBRARY.clone()
+}
+
+fn get_network_note<T: Rng>(
+    sender: AccountId,
+    network_account: AccountId,
+    rng: &mut T,
+) -> Result<Note> {
+    let metadata = NoteMetadata::new(
+        sender,
+        NoteType::Public,
+        NoteTag::from_account_id(network_account),
+        NoteExecutionHint::Always,
+        ZERO,
+    )?;
+
+    let script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&counter_contract_library())?
+        .compile_note_script(INCR_SCRIPT_CODE)?;
+    let recipient = NoteRecipient::new(
+        Word::new([
+            Felt::new(rng.random()),
+            Felt::new(rng.random()),
+            Felt::new(rng.random()),
+            Felt::new(rng.random()),
+        ]),
+        script,
+        NoteInputs::new(vec![])?,
+    );
+
+    let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);
+    Ok(network_note)
 }

@@ -9,14 +9,24 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use std::path::PathBuf;
 use std::string::ToString;
+use std::sync::Arc;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::apply_migrations;
 use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+};
+use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
+use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
 use miden_objects::note::{NoteTag, Nullifier};
+use miden_tx::utils::sync::RwLock;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use tonic::async_trait;
@@ -34,6 +44,7 @@ use super::{
 };
 use crate::note::NoteUpdateTracker;
 use crate::store::StoreError;
+use crate::store::sqlite_store::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
@@ -41,6 +52,7 @@ mod account;
 mod chain_data;
 mod db_management;
 mod errors;
+mod merkle_store;
 mod note;
 mod sync;
 mod transaction;
@@ -54,6 +66,7 @@ mod transaction;
 /// Current table definitions can be found at `store.sql` migration file.
 pub struct SqliteStore {
     pub(crate) pool: Pool,
+    merkle_store: Arc<RwLock<MerkleStore>>,
 }
 
 impl SqliteStore {
@@ -74,7 +87,22 @@ impl SqliteStore {
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
 
-        Ok(SqliteStore { pool })
+        let store = SqliteStore {
+            pool,
+            merkle_store: Arc::new(RwLock::new(MerkleStore::new())),
+        };
+
+        // Initialize merkle store
+        for id in store.get_account_ids().await? {
+            let vault = store.get_account_vault(id).await?;
+            let storage = store.get_account_storage(id).await?;
+
+            let mut merkle_store = store.merkle_store.write();
+            insert_asset_nodes(&mut merkle_store, &vault);
+            insert_storage_map_nodes(&mut merkle_store, &storage);
+        }
+
+        Ok(store)
     }
 
     /// Interacts with the database by executing the provided function on a connection from the
@@ -132,8 +160,9 @@ impl Store for SqliteStore {
     }
 
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
+        let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_state_sync(conn, state_sync_update)
+            SqliteStore::apply_state_sync(conn, &merkle_store, state_sync_update)
         })
         .await
     }
@@ -153,8 +182,9 @@ impl Store for SqliteStore {
         tx_update: TransactionStoreUpdate,
         note_updates: NoteUpdateTracker,
     ) -> Result<(), StoreError> {
+        let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_transaction(conn, &tx_update, &note_updates)
+            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update, &note_updates)
         })
         .await
     }
@@ -255,19 +285,23 @@ impl Store for SqliteStore {
         account: &Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
-        let account = account.clone();
+        let cloned_account = account.clone();
+        let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &account, account_seed)
+            SqliteStore::insert_account(conn, &merkle_store, &cloned_account, account_seed)
         })
         .await
     }
 
     async fn update_account(&self, account: &Account) -> Result<(), StoreError> {
-        let account = account.clone();
+        let cloned_account = account.clone();
+        let merkle_store = self.merkle_store.clone();
 
-        self.interact_with_connection(move |conn| SqliteStore::update_account(conn, &account))
-            .await
+        self.interact_with_connection(move |conn| {
+            SqliteStore::update_account(conn, &merkle_store, &cloned_account)
+        })
+        .await
     }
 
     async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
@@ -328,6 +362,47 @@ impl Store for SqliteStore {
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.interact_with_connection(SqliteStore::get_unspent_input_note_nullifiers)
             .await
+    }
+
+    async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::get_account_vault(conn, account_id))
+            .await
+    }
+
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        faucet_id_prefix: AccountIdPrefix,
+    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+        let merkle_store = self.merkle_store.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_asset(conn, &merkle_store, account_id, faucet_id_prefix)
+        })
+        .await
+    }
+
+    async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_storage(conn, account_id)
+        })
+        .await
+    }
+
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        index: u8,
+        key: Word,
+    ) -> Result<(Word, MerklePath), StoreError> {
+        let merkle_store = self.merkle_store.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+        })
+        .await
     }
 }
 

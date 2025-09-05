@@ -521,7 +521,8 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             .prove_transaction(executed_tx.clone(), client.prover())
             .await
             .unwrap();
-        let submit_height = transaction_pipeline.submit_proven_transaction(proven_tx).await.unwrap();
+        let submit_height =
+            transaction_pipeline.submit_proven_transaction(proven_tx).await.unwrap();
         let tx_update = transaction_pipeline.get_transaction_update(submit_height, executed_tx);
 
         client.apply_transaction(tx_update).await.unwrap();
@@ -563,7 +564,8 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             .prove_transaction(executed_tx.clone(), client.prover())
             .await
             .unwrap();
-        let submit_height = transaction_pipeline.submit_proven_transaction(proven_tx).await.unwrap();
+        let submit_height =
+            transaction_pipeline.submit_proven_transaction(proven_tx).await.unwrap();
         let tx_update = transaction_pipeline.get_transaction_update(submit_height, executed_tx);
 
         client.apply_transaction(tx_update).await.unwrap();

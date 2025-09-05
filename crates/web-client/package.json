@@ -1,6 +1,6 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.12.0-next.2",
+  "version": "0.12.0-next.5",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden",
@@ -23,7 +23,7 @@
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "test": "yarn playwright install --with-deps && yarn playwright test",
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
-    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test"
+    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

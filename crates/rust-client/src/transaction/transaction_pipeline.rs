@@ -8,7 +8,12 @@ use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::{
-    AccountInputs, ExecutedTransaction, InputNote, InputNotes, ProvenTransaction, TransactionArgs,
+    AccountInputs,
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    ProvenTransaction,
+    TransactionArgs,
 };
 use miden_objects::{AssetError, Word};
 use miden_tx::auth::TransactionAuthenticator;
@@ -17,7 +22,10 @@ use miden_tx::{NoteConsumptionChecker, TransactionExecutor};
 use crate::rpc::NodeRpcClient;
 use crate::store::data_store::ClientDataStore;
 use crate::transaction::{
-    TransactionProver, TransactionRequest, TransactionScriptTemplate, TransactionStoreUpdate,
+    TransactionProver,
+    TransactionRequest,
+    TransactionScriptTemplate,
+    TransactionStoreUpdate,
 };
 use crate::{ClientError, DebugMode};
 

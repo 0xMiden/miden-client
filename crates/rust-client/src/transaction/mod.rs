@@ -22,7 +22,7 @@
 //! use miden_client::Client;
 //! use miden_client::auth::TransactionAuthenticator;
 //! use miden_client::crypto::FeltRng;
-//! use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
+//! use miden_client::transaction::{PaymentNoteDescription, TransactionId, TransactionRequestBuilder};
 //! use miden_objects::account::AccountId;
 //! use miden_objects::asset::FungibleAsset;
 //! use miden_objects::note::NoteType;

@@ -257,7 +257,7 @@ pub struct Client<AUTH> {
     rng: ClientRng,
     /// An instance of [`NodeRpcClient`] which provides a way for the client to connect to the
     /// Miden node.
-    rpc_api: Arc<dyn NodeRpcClient + Send>,
+    rpc_api: Arc<dyn NodeRpcClient>,
     /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
     /// client.
     tx_prover: Arc<LocalTransactionProver>,
@@ -304,7 +304,7 @@ where
     ///
     /// Returns an error if the client couldn't be instantiated.
     pub async fn new(
-        rpc_api: Arc<dyn NodeRpcClient + Send>,
+        rpc_api: Arc<dyn NodeRpcClient>,
         rng: Box<dyn FeltRng>,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
@@ -355,7 +355,7 @@ where
     // --------------------------------------------------------------------------------------------
 
     #[cfg(any(test, feature = "testing"))]
-    pub fn test_rpc_api(&mut self) -> &mut Arc<dyn NodeRpcClient + Send> {
+    pub fn test_rpc_api(&mut self) -> &mut Arc<dyn NodeRpcClient> {
         &mut self.rpc_api
     }
 

@@ -12,7 +12,8 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::asset::AssetVault;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
 use miden_objects::note::Nullifier;
@@ -240,6 +241,17 @@ impl Store for WebStore {
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.get_unspent_input_note_nullifiers().await
+    }
+
+    async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError> {
+        self.get_account_vault(account_id).await
+    }
+
+    async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError> {
+        self.get_account_storage(account_id).await
     }
 }
 
