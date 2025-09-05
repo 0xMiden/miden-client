@@ -14,8 +14,3 @@ pub enum KeyStoreError {
 mod fs_keystore;
 #[cfg(feature = "std")]
 pub use fs_keystore::FilesystemKeyStore;
-
-#[cfg(feature = "idxdb")]
-mod web_keystore;
-#[cfg(feature = "idxdb")]
-pub use web_keystore::WebKeyStore;

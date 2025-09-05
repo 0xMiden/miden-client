@@ -1681,6 +1681,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
 
 [[package]]
+name = "indexed-db-store"
+version = "0.12.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "miden-client",
+ "miden-objects",
+ "miden-tx",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2134,13 +2151,11 @@ version = "0.12.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64",
  "chrono",
- "deadpool",
- "deadpool-sync",
  "getrandom 0.3.3",
  "hex",
  "miden-client",
+ "miden-client-sqlite-store",
  "miden-lib",
  "miden-node-proto-build",
  "miden-objects",
@@ -2152,10 +2167,6 @@ dependencies = [
  "prost-build",
  "protox 0.7.2",
  "rand 0.9.2",
- "rusqlite",
- "rusqlite_migration",
- "serde",
- "serde-wasm-bindgen",
  "thiserror 2.0.16",
  "tokio",
  "tonic",
@@ -2163,8 +2174,6 @@ dependencies = [
  "tonic-web-wasm-client",
  "tracing",
  "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -2178,6 +2187,7 @@ dependencies = [
  "comfy-table",
  "figment",
  "miden-client",
+ "miden-client-sqlite-store",
  "miden-lib",
  "miden-objects",
  "miette",
@@ -2200,6 +2210,7 @@ dependencies = [
  "async-trait",
  "clap 4.5.46",
  "miden-client",
+ "miden-client-sqlite-store",
  "num_cpus",
  "rand 0.9.2",
  "regex",
@@ -2210,9 +2221,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-client-sqlite-store"
+version = "0.12.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "deadpool",
+ "deadpool-sync",
+ "hex",
+ "miden-client",
+ "miden-lib",
+ "miden-objects",
+ "rusqlite",
+ "rusqlite_migration",
+ "thiserror 2.0.16",
+ "tokio",
+]
+
+[[package]]
+name = "miden-client-unit-tests"
+version = "0.12.0"
+dependencies = [
+ "miden-client",
+ "miden-client-sqlite-store",
+ "miden-lib",
+ "miden-objects",
+ "miden-testing",
+ "rand 0.9.2",
+ "tokio",
+]
+
+[[package]]
 name = "miden-client-web"
 version = "0.12.0"
 dependencies = [
+ "hex",
+ "indexed-db-store",
  "miden-client",
  "miden-lib",
  "miden-objects",

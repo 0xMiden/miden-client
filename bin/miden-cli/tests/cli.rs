@@ -21,7 +21,6 @@ use miden_client::note::{
     NoteType,
 };
 use miden_client::rpc::{Endpoint, TonicRpcClient};
-use miden_client::store::sqlite_store::SqliteStore;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -34,6 +33,7 @@ use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};
 use miden_client_cli::CliKeyStore;
+use miden_client_sqlite_store::SqliteStore;
 use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;

@@ -171,8 +171,15 @@ impl Cli {
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
+        // Build store explicitly from sqlite store crate
+        let sqlite_store = miden_client_sqlite_store::SqliteStore::new(
+            cli_config.store_filepath.to_str().expect("Store path should be valid").into(),
+        )
+        .await
+        .map_err(|e| CliError::Client(miden_client::ClientError::StoreError(e)))?;
+
         let mut builder = ClientBuilder::new()
-            .sqlite_store(cli_config.store_filepath.to_str().expect("Store path should be valid"))
+            .store(Arc::new(sqlite_store))
             .tonic_rpc_client(
                 &cli_config.rpc.endpoint.clone().into(),
                 Some(cli_config.rpc.timeout_ms),
