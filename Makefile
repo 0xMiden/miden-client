@@ -115,12 +115,17 @@ integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
-integration-test-web-client: ## Run integration tests for the web client
-	cd ./crates/web-client && npm run test:clean
+SHARD_PARAMETER ?= ""
+integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
+	cd ./crates/web-client && yarn run test:clean -- --project=chromium $(SHARD_PARAMETER)
+
+.PHONY: integration-test-web-client-webkit
+integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
+	cd ./crates/web-client && yarn run test:clean -- --project=webkit
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
-	cd ./crates/web-client && npm run test:remote_prover
+	cd ./crates/web-client && yarn run test:remote_prover -- --project=chromium
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
