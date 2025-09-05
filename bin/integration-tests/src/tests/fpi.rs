@@ -373,7 +373,7 @@ async fn deploy_foreign_account(
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(secret_key))
         .with_context(|| "failed to add key to keystore")?;
-    client.add_account(&foreign_account, Some(foreign_seed), false).await?;
+    client.add_account(foreign_account.clone(), Some(foreign_seed), false).await?;
 
     println!("Deploying foreign account");
 

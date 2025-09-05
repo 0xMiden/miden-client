@@ -1,6 +1,5 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};

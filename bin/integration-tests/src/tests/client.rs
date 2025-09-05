@@ -1050,7 +1050,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    client_2.add_account(&private_account, seed.into(), false).await.unwrap();
+    client_2.add_account(private_account, seed.into(), false).await.unwrap();
 
     wait_for_node(&mut client_2).await;
 
@@ -1073,7 +1073,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
     let updated_private_account =
         client_1.get_account(from_account_id).await.unwrap().unwrap().into();
-    client_2.add_account(&updated_private_account, None, true).await.unwrap();
+    client_2.add_account(updated_private_account, None, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();

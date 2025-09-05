@@ -9,7 +9,6 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_objects::Word;

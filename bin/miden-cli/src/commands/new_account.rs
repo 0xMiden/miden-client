@@ -289,7 +289,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
         .map_err(CliError::KeyStore)?;
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(account.clone(), Some(seed), false).await?;
 
     if deploy {
         deploy_account(client, &account).await?;
