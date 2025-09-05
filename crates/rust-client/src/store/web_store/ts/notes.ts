@@ -3,12 +3,11 @@ import {
   inputNotes,
   outputNotes,
   notesScripts,
-  transactions,
   IInputNote,
   IOutputNote,
 } from "./schema.js";
 
-import { logWebStoreError, uint8ArrayToBase64, mapOption } from "./utils.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 export async function getOutputNotes(states: Uint8Array) {
   try {
