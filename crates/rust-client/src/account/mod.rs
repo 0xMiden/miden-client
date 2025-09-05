@@ -28,7 +28,7 @@
 //!
 //! // Add the account to the client. The account seed and authentication key are required
 //! // for new accounts.
-//! client.add_account(&account, Some(seed), false).await?;
+//! client.add_account(account, Some(seed), false).await?;
 //! #   Ok(())
 //! # }
 //! ```

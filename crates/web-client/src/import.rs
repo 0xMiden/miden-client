@@ -27,7 +27,7 @@ impl WebClient {
             let account_id = account_data.account.id().to_string();
 
             client
-                .add_account(&account_data.account, account_data.account_seed, false)
+                .add_account(account_data.account, account_data.account_seed, false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 

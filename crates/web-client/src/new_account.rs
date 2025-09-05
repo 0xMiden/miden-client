@@ -30,7 +30,7 @@ impl WebClient {
                 generate_wallet(storage_mode, mutable, init_seed).await?;
 
             client
-                .add_account(&new_account, Some(account_seed.into()), false)
+                .add_account(new_account.clone(), Some(account_seed.into()), false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
@@ -95,7 +95,7 @@ impl WebClient {
                 .await
                 .map_err(|err| err.to_string())?;
 
-            match client.add_account(&new_account, Some(seed), false).await {
+            match client.add_account(new_account.clone(), Some(seed), false).await {
                 Ok(_) => Ok(new_account.into()),
                 Err(err) => {
                     let error_message = format!("Failed to insert new faucet: {err:?}");
@@ -117,7 +117,7 @@ impl WebClient {
         if let Some(client) = self.get_mut_inner() {
             let account_seed = account_seed.map(Into::into);
             client
-                .add_account(&account.into(), account_seed, overwrite)
+                .add_account(account.into(), account_seed, overwrite)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
             Ok(())
