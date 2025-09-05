@@ -53,7 +53,7 @@ impl WebStore {
             header,
             partial_blockchain_peaks,
             has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes)?;
+        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
 
         let promise = idxdb_insert_block_header(
             block_num,

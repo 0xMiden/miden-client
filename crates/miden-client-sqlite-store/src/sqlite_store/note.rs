@@ -252,10 +252,10 @@ impl SqliteStore {
         let (query, params) = note_filter_to_query_input_notes(filter);
         let notes = conn
             .prepare(query.as_str())
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params_from_iter(params), parse_input_note_columns)
             .expect("no binding parameters used in query")
-            .map(|result| Ok(result.as_store_error()?).and_then(parse_input_note))
+            .map(|result| Ok(result.into_store_error()?).and_then(parse_input_note))
             .collect::<Result<Vec<InputNoteRecord>, _>>()?;
 
         Ok(notes)
@@ -269,10 +269,10 @@ impl SqliteStore {
         let (query, params) = note_filter_to_query_output_notes(filter);
         let notes = conn
             .prepare(&query)
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params_from_iter(params), parse_output_note_columns)
             .expect("no binding parameters used in query")
-            .map(|result| Ok(result.as_store_error()?).and_then(parse_output_note))
+            .map(|result| Ok(result.into_store_error()?).and_then(parse_output_note))
             .collect::<Result<Vec<OutputNoteRecord>, _>>()?;
 
         Ok(notes)
@@ -282,7 +282,7 @@ impl SqliteStore {
         conn: &mut Connection,
         notes: &[InputNoteRecord],
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         for note in notes {
             upsert_input_note_tx(&tx, note)?;
@@ -297,7 +297,7 @@ impl SqliteStore {
             }
         }
 
-        Ok(tx.commit().as_store_error()?)
+        tx.commit().into_store_error()
     }
 
     pub(crate) fn get_unspent_input_note_nullifiers(
@@ -311,7 +311,7 @@ impl SqliteStore {
             Value::from(InputNoteState::STATE_CONSUMED_EXTERNAL.to_string()),
         ]);
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([unspent_filters], |row| row.get(0))
             .expect("no binding parameters used in query")
             .map(|result| {
@@ -347,7 +347,7 @@ pub(super) fn upsert_input_note_tx(
 
     const SCRIPT_QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
-    tx.execute(SCRIPT_QUERY, params![script_root, script,]).as_store_error()?;
+    tx.execute(SCRIPT_QUERY, params![script_root, script,]).into_store_error()?;
 
     const NOTE_QUERY: &str = insert_sql!(
         input_notes {
@@ -423,7 +423,7 @@ pub fn upsert_output_note_tx(
             state,
         ],
     )
-    .as_store_error()?;
+    .into_store_error()?;
 
     Ok(())
 }
@@ -582,7 +582,7 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
     let nullifier = note.nullifier().map(|nullifier| nullifier.to_hex());
 
     let state_discriminant = match note.state() {
-        OutputNoteState::ExpectedPartial { .. } => OutputNoteState::STATE_EXPECTED_PARTIAL,
+        OutputNoteState::ExpectedPartial => OutputNoteState::STATE_EXPECTED_PARTIAL,
         OutputNoteState::ExpectedFull { .. } => OutputNoteState::STATE_EXPECTED_FULL,
         OutputNoteState::CommittedPartial { .. } => OutputNoteState::STATE_COMMITTED_PARTIAL,
         OutputNoteState::CommittedFull { .. } => OutputNoteState::STATE_COMMITTED_FULL,

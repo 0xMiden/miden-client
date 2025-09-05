@@ -2184,8 +2184,8 @@ async fn storage_and_vault_proofs() {
     }
 }
 
-
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 pub mod tests {
     use alloc::boxed::Box;
     use alloc::vec::Vec;
@@ -2268,12 +2268,11 @@ pub mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use alloc::boxed::Box;
 
-    use miden_client::transaction::TransactionResult;
+    use miden_client::transaction::{TransactionRequestBuilder, TransactionResult};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::transaction::TransactionKernel;
     use miden_lib::utils::{Deserializable, Serializable};
@@ -2296,7 +2295,6 @@ mod test {
 
     use super::PaymentNoteDescription;
     use crate::tests::create_test_client;
-    use miden_client::transaction::{TransactionRequestBuilder};
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {

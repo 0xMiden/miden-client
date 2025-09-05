@@ -95,8 +95,8 @@ impl SqliteStore {
             let storage = store.get_account_storage(id).await?;
 
             let mut merkle_store = store.merkle_store.write().expect("merkle_store lock poisoned");
-            insert_asset_nodes(&mut *merkle_store, &vault);
-            insert_storage_map_nodes(&mut *merkle_store, &storage);
+            insert_asset_nodes(&mut merkle_store, &vault);
+            insert_storage_map_nodes(&mut merkle_store, &storage);
         }
 
         Ok(store)

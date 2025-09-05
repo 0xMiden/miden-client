@@ -29,17 +29,17 @@ pub fn serialize_block_header(
     block_header: &BlockHeader,
     partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
-) -> Result<SerializedBlockHeaderData, StoreError> {
+) -> SerializedBlockHeaderData {
     let block_num = block_header.block_num().to_string();
     let header = block_header.to_bytes();
     let partial_blockchain_peaks = partial_blockchain_peaks.to_bytes();
 
-    Ok(SerializedBlockHeaderData {
+    SerializedBlockHeaderData {
         block_num,
         header,
         partial_blockchain_peaks,
         has_client_notes,
-    })
+    }
 }
 
 pub fn serialize_partial_blockchain_node(

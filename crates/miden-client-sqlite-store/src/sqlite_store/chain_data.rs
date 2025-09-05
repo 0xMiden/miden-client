@@ -58,7 +58,7 @@ impl SqliteStore {
         partial_blockchain_peaks: &MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         Self::insert_block_header_tx(
             &tx,
@@ -67,7 +67,7 @@ impl SqliteStore {
             has_client_notes,
         )?;
 
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
         Ok(())
     }
 
@@ -83,12 +83,12 @@ impl SqliteStore {
         const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params![Rc::new(block_number_list)], parse_block_headers_columns)
-            .as_store_error()?
+            .into_store_error()?
             .map(|result| {
                 let serialized_block_header_parts: SerializedBlockHeaderParts =
-                    result.as_store_error()?;
+                    result.into_store_error()?;
                 parse_block_header(&serialized_block_header_parts)
             })
             .collect()
@@ -99,12 +99,12 @@ impl SqliteStore {
     ) -> Result<Vec<BlockHeader>, StoreError> {
         const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE has_client_notes=true";
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params![], parse_block_headers_columns)
-            .as_store_error()?
+            .into_store_error()?
             .map(|result| {
                 let serialized_block_header_parts: SerializedBlockHeaderParts =
-                    result.as_store_error()?;
+                    result.into_store_error()?;
                 parse_block_header(&serialized_block_header_parts).map(|(block, _)| block)
             })
             .collect()
@@ -126,12 +126,12 @@ impl SqliteStore {
         }
 
         conn.prepare(&partial_blockchain_filter_to_query(filter))
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params_from_iter(params), parse_partial_blockchain_nodes_columns)
-            .as_store_error()?
+            .into_store_error()?
             .map(|result| {
                 let serialized_partial_blockchain_node_parts: SerializedPartialBlockchainNodeParts =
-                    result.as_store_error()?;
+                    result.into_store_error()?;
                 parse_partial_blockchain_nodes(&serialized_partial_blockchain_node_parts)
             })
             .collect()
@@ -146,10 +146,10 @@ impl SqliteStore {
 
         let partial_blockchain_peaks: Option<Vec<u8>> = conn
             .prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_row(params![block_num.as_u32()], |row| row.get::<_, Vec<u8>>(0))
             .optional()
-            .as_store_error()?;
+            .into_store_error()?;
 
         if let Some(partial_blockchain_peaks) = partial_blockchain_peaks {
             return parse_partial_blockchain_peaks(block_num.as_u32(), &partial_blockchain_peaks);
@@ -162,10 +162,10 @@ impl SqliteStore {
         conn: &mut Connection,
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
         Ok(())
     }
 
@@ -206,7 +206,7 @@ impl SqliteStore {
             } | IGNORE
         );
         tx.execute(QUERY, params![block_num, header, partial_blockchain_peaks, has_client_notes])
-            .as_store_error()?;
+            .into_store_error()?;
 
         set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
         Ok(())
@@ -215,7 +215,7 @@ impl SqliteStore {
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
     pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         let query = format!(
             "\
@@ -225,8 +225,8 @@ impl SqliteStore {
             AND block_num NOT IN (SELECT block_num FROM state_sync)",
             BlockNumber::GENESIS.as_u32()
         );
-        tx.execute(query.as_str(), params![]).as_store_error()?;
-        tx.commit().as_store_error()?;
+        tx.execute(query.as_str(), params![]).into_store_error()?;
+        tx.commit().into_store_error()?;
         Ok(())
     }
 }
@@ -243,7 +243,7 @@ fn insert_partial_blockchain_node(
     let SerializedPartialBlockchainNodeData { id, node } =
         serialize_partial_blockchain_node(id, node);
     const QUERY: &str = insert_sql!(partial_blockchain_nodes { id, node } | IGNORE);
-    tx.execute(QUERY, params![id, node]).as_store_error()?;
+    tx.execute(QUERY, params![id, node]).into_store_error()?;
     Ok(())
 }
 
@@ -340,7 +340,7 @@ pub(crate) fn set_block_header_has_client_notes(
     UPDATE block_headers
         SET has_client_notes=?
         WHERE block_num=? AND has_client_notes=FALSE;";
-    tx.execute(QUERY, params![has_client_notes, block_num]).as_store_error()?;
+    tx.execute(QUERY, params![has_client_notes, block_num]).into_store_error()?;
     Ok(())
 }
 

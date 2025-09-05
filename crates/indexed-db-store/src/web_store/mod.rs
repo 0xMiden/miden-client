@@ -68,6 +68,7 @@ impl WebStore {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl Store for WebStore {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         // Use JS Date for WASM-friendly timestamp (seconds since epoch)
         Some((Date::now() as u64) / 1000)

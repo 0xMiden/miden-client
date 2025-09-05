@@ -112,19 +112,19 @@ impl SqliteStore {
 
                 // Create a prepared statement and bind the array parameter
                 conn.prepare(&transaction_filter_to_query(filter))
-                    .as_store_error()?
+                    .into_store_error()?
                     .query_map(params![Rc::new(id_strings)], parse_transaction_columns)
-                    .as_store_error()?
-                    .map(|result| Ok(result.as_store_error()?).and_then(parse_transaction))
+                    .into_store_error()?
+                    .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
                     .collect::<Result<Vec<TransactionRecord>, _>>()
             },
             _ => {
                 // For other filters, no parameters are needed
                 conn.prepare(&transaction_filter_to_query(filter))
-                    .as_store_error()?
+                    .into_store_error()?
                     .query_map([], parse_transaction_columns)
-                    .as_store_error()?
-                    .map(|result| Ok(result.as_store_error()?).and_then(parse_transaction))
+                    .into_store_error()?
+                    .map(|result| Ok(result.into_store_error()?).and_then(parse_transaction))
                     .collect::<Result<Vec<TransactionRecord>, _>>()
             },
         }
@@ -150,7 +150,7 @@ impl SqliteStore {
             executed_transaction.account_delta(),
         )?;
 
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         // Build transaction record
         let nullifiers: Vec<Word> = executed_transaction
@@ -188,7 +188,7 @@ impl SqliteStore {
         let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
         Self::apply_account_delta(
             &tx,
-            &mut *merkle_store,
+            &mut merkle_store,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
@@ -204,7 +204,7 @@ impl SqliteStore {
             add_note_tag_tx(&tx, tag_record)?;
         }
 
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
 
         Ok(())
     }
@@ -227,14 +227,14 @@ pub(crate) fn upsert_transaction_record(
 
     if let Some(root) = script_root.clone() {
         tx.execute(INSERT_TRANSACTION_SCRIPT_QUERY, params![root, tx_script])
-            .as_store_error()?;
+            .into_store_error()?;
     }
 
     tx.execute(
         UPSERT_TRANSACTION_QUERY,
         params![id, details, script_root, block_num, status_variant, status],
     )
-    .as_store_error()?;
+    .into_store_error()?;
 
     Ok(())
 }

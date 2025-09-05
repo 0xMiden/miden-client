@@ -1,11 +1,11 @@
 use miden_client::store::StoreError;
 
 pub(crate) trait SqlResultExt<T> {
-    fn as_store_error(self) -> Result<T, StoreError>;
+    fn into_store_error(self) -> Result<T, StoreError>;
 }
 
 impl<T> SqlResultExt<T> for Result<T, rusqlite::Error> {
-    fn as_store_error(self) -> Result<T, StoreError> {
+    fn into_store_error(self) -> Result<T, StoreError> {
         self.map_err(|value| match value {
             rusqlite::Error::FromSqlConversionFailure(..)
             | rusqlite::Error::IntegralValueOutOfRange(..)

@@ -47,7 +47,7 @@ pub(crate) mod api_client_wrapper {
 // CLIENT
 // ================================================================================================
 
-#[cfg(all(not(target_arch = "wasm32"), feature="std"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "std"))]
 pub(crate) mod api_client_wrapper {
     use alloc::boxed::Box;
     use alloc::string::String;

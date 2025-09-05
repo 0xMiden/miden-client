@@ -24,11 +24,11 @@ impl SqliteStore {
         const QUERY: &str = "SELECT tag, source FROM tags";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
             .map(|result| {
-                let (tag, source): (Vec<u8>, Vec<u8>) = result.as_store_error()?;
+                let (tag, source): (Vec<u8>, Vec<u8>) = result.into_store_error()?;
                 Ok(NoteTagRecord {
                     tag: NoteTag::read_from_bytes(&tag)
                         .map_err(StoreError::DataDeserializationError)?,
@@ -45,11 +45,11 @@ impl SqliteStore {
         const QUERY: &str = "SELECT DISTINCT tag FROM tags";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
             .map(|result| {
-                let tag: Vec<u8> = result.as_store_error()?;
+                let tag: Vec<u8> = result.into_store_error()?;
                 NoteTag::read_from_bytes(&tag).map_err(StoreError::DataDeserializationError)
             })
             .collect::<Result<BTreeSet<NoteTag>, _>>()
@@ -63,10 +63,10 @@ impl SqliteStore {
             return Ok(false);
         }
 
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
         add_note_tag_tx(&tx, &tag)?;
 
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
 
         Ok(true)
     }
@@ -75,10 +75,10 @@ impl SqliteStore {
         conn: &mut Connection,
         tag: NoteTagRecord,
     ) -> Result<usize, StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
         let removed_tags = remove_note_tag_tx(&tx, tag)?;
 
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
 
         Ok(removed_tags)
     }
@@ -87,11 +87,11 @@ impl SqliteStore {
         const QUERY: &str = "SELECT block_num FROM state_sync";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
             .map(|result| {
-                let v: i64 = result.as_store_error()?;
+                let v: i64 = result.into_store_error()?;
                 Ok(BlockNumber::from(u32::try_from(v).expect("block number is always positive")))
             })
             .next()
@@ -111,12 +111,12 @@ impl SqliteStore {
             account_updates,
         } = state_sync_update;
 
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         // Update state sync block number
         const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ?";
         tx.execute(BLOCK_NUMBER_QUERY, params![i64::from(block_num.as_u32())])
-            .as_store_error()?;
+            .into_store_error()?;
 
         for (block_header, block_has_relevant_notes, new_mmr_peaks) in block_updates.block_headers()
         {
@@ -172,7 +172,7 @@ impl SqliteStore {
         // Update public accounts on the db that have been updated onchain
         let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
         for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, &mut *merkle_store, account)?;
+            Self::update_account_state(&tx, &mut merkle_store, account)?;
         }
         drop(merkle_store);
 
@@ -181,7 +181,7 @@ impl SqliteStore {
         }
 
         // Commit the updates
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
 
         Ok(())
     }
@@ -190,7 +190,7 @@ impl SqliteStore {
 pub(super) fn add_note_tag_tx(tx: &Transaction<'_>, tag: &NoteTagRecord) -> Result<(), StoreError> {
     const QUERY: &str = insert_sql!(tags { tag, source });
     tx.execute(QUERY, params![tag.tag.to_bytes(), tag.source.to_bytes()])
-        .as_store_error()?;
+        .into_store_error()?;
 
     Ok(())
 }
@@ -202,7 +202,7 @@ pub(super) fn remove_note_tag_tx(
     const QUERY: &str = "DELETE FROM tags WHERE tag = ? AND source = ?";
     let removed_tags = tx
         .execute(QUERY, params![tag.tag.to_bytes(), tag.source.to_bytes()])
-        .as_store_error()?;
+        .into_store_error()?;
 
     Ok(removed_tags)
 }

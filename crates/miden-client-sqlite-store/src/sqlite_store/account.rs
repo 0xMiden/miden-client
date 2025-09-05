@@ -59,7 +59,7 @@ impl SqliteStore {
         const QUERY: &str = "SELECT DISTINCT id FROM accounts";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([], |row| row.get(0))
             .expect("no binding parameters used in query")
             .map(|result| {
@@ -140,7 +140,7 @@ impl SqliteStore {
         account: &Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         Self::insert_account_code(&tx, account.code())?;
 
@@ -153,11 +153,11 @@ impl SqliteStore {
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
 
-        tx.commit().as_store_error()?;
+        tx.commit().into_store_error()?;
 
         let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
-        insert_storage_map_nodes(&mut *merkle_store, account.storage());
-        insert_asset_nodes(&mut *merkle_store, account.vault());
+        insert_storage_map_nodes(&mut merkle_store, account.storage());
+        insert_asset_nodes(&mut merkle_store, account.vault());
 
         Ok(())
     }
@@ -170,9 +170,9 @@ impl SqliteStore {
         const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
         if conn
             .prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map(params![new_account_state.id().to_hex()], |row| row.get(0))
-            .as_store_error()?
+            .into_store_error()?
             .map(|result| {
                 result.map_err(|err| StoreError::ParsingError(err.to_string())).and_then(
                     |id: String| {
@@ -191,9 +191,9 @@ impl SqliteStore {
         }
 
         let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
-        let tx = conn.transaction().as_store_error()?;
-        Self::update_account_state(&tx, &mut *merkle_store, new_account_state)?;
-        Ok(tx.commit().as_store_error()?)
+        let tx = conn.transaction().into_store_error()?;
+        Self::update_account_state(&tx, &mut merkle_store, new_account_state)?;
+        tx.commit().into_store_error()
     }
 
     pub fn upsert_foreign_account_code(
@@ -201,16 +201,16 @@ impl SqliteStore {
         account_id: AccountId,
         code: &AccountCode,
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().as_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
 
         const QUERY: &str =
             insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
 
         tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
-            .as_store_error()?;
+            .into_store_error()?;
 
         Self::insert_account_code(&tx, code)?;
-        Ok(tx.commit().as_store_error()?)
+        tx.commit().into_store_error()
     }
 
     pub fn get_foreign_account_code(
@@ -225,7 +225,7 @@ impl SqliteStore {
             WHERE account_id IN rarray(?)";
 
         conn.prepare(QUERY)
-            .as_store_error()?
+            .into_store_error()?
             .query_map([Rc::new(params)], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
             .map(|result| {
@@ -299,7 +299,7 @@ impl SqliteStore {
 
         let merkle_store = merkle_store.read().expect("merkle_store lock poisoned");
 
-        let merkle_path = get_asset_proof(&*merkle_store, header.vault_root(), &asset)?;
+        let merkle_path = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
 
         Ok(Some((asset, merkle_path)))
     }
@@ -332,7 +332,7 @@ impl SqliteStore {
 
         let merkle_store = merkle_store.read().expect("merkle_store lock poisoned");
 
-        let merkle_path = get_storage_map_item_proof(&*merkle_store, map.root(), key)?;
+        let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
 
         Ok((item, merkle_path))
     }
@@ -423,7 +423,7 @@ impl SqliteStore {
                 ),
             ],
         )
-        .as_store_error()?;
+        .into_store_error()?;
 
         update_asset_nodes(
             merkle_store,
@@ -484,9 +484,9 @@ impl SqliteStore {
             .collect::<Vec<Value>>();
 
         Ok(query_vault_assets(
-                    conn,
-                    "root = ? AND faucet_id_prefix IN rarray(?)",
-                    params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
+            conn,
+            "root = ? AND faucet_id_prefix IN rarray(?)",
+            params![header.vault_root().to_hex(), Rc::new(fungible_faucet_prefixes)]
                 )?
                 .into_iter()
                 // SAFETY: all retrieved assets should be fungible
@@ -557,7 +557,7 @@ impl SqliteStore {
                     init_account_header.commitment().to_hex()
                 ],
             )
-            .as_store_error()?;
+            .into_store_error()?;
         }
 
         if init_account_header.storage_commitment() != final_account_header.storage_commitment() {
@@ -584,7 +584,7 @@ impl SqliteStore {
                     init_account_header.commitment().to_hex()
                 ],
             )
-            .as_store_error()?;
+            .into_store_error()?;
         }
 
         Ok(())
@@ -638,7 +638,7 @@ impl SqliteStore {
                 ":digest": mismatched_digest.to_string()
             },
         )
-        .as_store_error()?;
+        .into_store_error()?;
         Ok(())
     }
 
@@ -656,7 +656,7 @@ impl SqliteStore {
         const QUERY: &str = "DELETE FROM accounts WHERE account_commitment IN rarray(?)";
 
         let params = account_hashes.iter().map(|h| Value::from(h.to_hex())).collect::<Vec<_>>();
-        tx.execute(QUERY, params![Rc::new(params)]).as_store_error()?;
+        tx.execute(QUERY, params![Rc::new(params)]).into_store_error()?;
 
         Ok(())
     }
@@ -702,7 +702,7 @@ impl SqliteStore {
                 false,
             ],
         )
-        .as_store_error()?;
+        .into_store_error()?;
         Ok(())
     }
 
@@ -713,7 +713,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
         tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])
-            .as_store_error()?;
+            .into_store_error()?;
         Ok(())
     }
 
@@ -741,7 +741,7 @@ impl SqliteStore {
                     slot.slot_type().to_bytes()
                 ],
             )
-            .as_store_error()?;
+            .into_store_error()?;
 
             if let StorageSlot::Map(map) = slot {
                 const MAP_QUERY: &str =
@@ -752,7 +752,7 @@ impl SqliteStore {
                         MAP_QUERY,
                         params![map.root().to_hex(), key.to_hex(), value.to_hex()],
                     )
-                    .as_store_error()?;
+                    .into_store_error()?;
                 }
             }
         }
@@ -777,7 +777,7 @@ impl SqliteStore {
                     Word::from(asset).to_hex(),
                 ],
             )
-            .as_store_error()?;
+            .into_store_error()?;
         }
 
         Ok(())
@@ -830,16 +830,16 @@ fn query_storage_slots(
     let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
     let storage_values = conn
         .prepare(&query)
-        .as_store_error()?
+        .into_store_error()?
         .query_map(params, |row| {
             let index: u8 = row.get(0)?;
             let value: String = row.get(1)?;
             let slot_type: Vec<u8> = row.get(2)?;
             Ok((index, value, slot_type))
         })
-        .as_store_error()?
+        .into_store_error()?
         .map(|result| {
-            let (index, value, slot_type) = result.as_store_error()?;
+            let (index, value, slot_type) = result.into_store_error()?;
             Ok((index, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
         })
         .collect::<Result<Vec<(u8, Word, StorageSlotType)>, StoreError>>()?;
@@ -874,7 +874,7 @@ fn query_storage_maps(
 
     let map_entries = conn
         .prepare(&query)
-        .as_store_error()?
+        .into_store_error()?
         .query_map(params, |row| {
             let root: String = row.get(0)?;
             let key: String = row.get(1)?;
@@ -882,9 +882,9 @@ fn query_storage_maps(
 
             Ok((root, key, value))
         })
-        .as_store_error()?
+        .into_store_error()?
         .map(|result| {
-            let (root, key, value) = result.as_store_error()?;
+            let (root, key, value) = result.into_store_error()?;
             Ok((Word::try_from(root)?, Word::try_from(key)?, Word::try_from(value)?))
         })
         .collect::<Result<Vec<(Word, Word, Word)>, StoreError>>()?;
@@ -907,14 +907,14 @@ fn query_vault_assets(
 
     let query = format!("{VAULT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)
-        .as_store_error()?
+        .into_store_error()?
         .query_map(params, |row| {
             let asset: String = row.get(0)?;
             Ok(asset)
         })
-        .as_store_error()?
+        .into_store_error()?
         .map(|result| {
-            let asset_str: String = result.as_store_error()?;
+            let asset_str: String = result.into_store_error()?;
             let word = Word::try_from(asset_str)?;
             Ok(Asset::try_from(word)?)
         })
@@ -930,14 +930,14 @@ fn query_account_code(
     const CODE_QUERY: &str = "SELECT code FROM account_code WHERE commitment = ?";
 
     conn.prepare(CODE_QUERY)
-        .as_store_error()?
+        .into_store_error()?
         .query_map(params![commitment.to_hex()], |row| {
             let code: Vec<u8> = row.get(0)?;
             Ok(code)
         })
-        .as_store_error()?
+        .into_store_error()?
         .map(|result| {
-            let bytes: Vec<u8> = result.as_store_error()?;
+            let bytes: Vec<u8> = result.into_store_error()?;
             Ok(AccountCode::from_bytes(&bytes)?)
         })
         .next()
@@ -953,7 +953,7 @@ fn query_account_headers(
         FROM accounts";
     let query = format!("{SELECT_QUERY} WHERE {where_clause}");
     conn.prepare(&query)
-        .as_store_error()?
+        .into_store_error()?
         .query_map(params, |row| {
             let id: String = row.get(0)?;
             let nonce: u64 = column_value_as_u64(row, 1)?;
@@ -973,8 +973,8 @@ fn query_account_headers(
                 locked,
             })
         })
-        .as_store_error()?
-        .map(|result| parse_accounts(result.as_store_error()?))
+        .into_store_error()?
+        .map(|result| parse_accounts(result.into_store_error()?))
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
@@ -1036,26 +1036,26 @@ mod tests {
 
         store
             .interact_with_connection(move |conn| {
-                let tx = conn.transaction().as_store_error()?;
+                let tx = conn.transaction().into_store_error()?;
 
                 // Table is empty at the beginning
                 let mut actual: usize = tx
                     .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .as_store_error()?;
+                    .into_store_error()?;
                 assert_eq!(actual, 0);
 
                 // First insertion generates a new row
                 SqliteStore::insert_account_code(&tx, &account_code)?;
                 actual = tx
                     .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .as_store_error()?;
+                    .into_store_error()?;
                 assert_eq!(actual, 1);
 
                 // Second insertion passes but does not generate a new row
                 assert!(SqliteStore::insert_account_code(&tx, &account_code).is_ok());
                 actual = tx
                     .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
-                    .as_store_error()?;
+                    .into_store_error()?;
                 assert_eq!(actual, 1);
 
                 Ok(())
@@ -1110,7 +1110,7 @@ mod tests {
         let merkle_store = store.merkle_store.clone();
         store
             .interact_with_connection(move |conn| {
-                let tx = conn.transaction().as_store_error()?;
+                let tx = conn.transaction().into_store_error()?;
                 let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
 
                 SqliteStore::apply_account_delta(
@@ -1123,7 +1123,7 @@ mod tests {
                     &delta,
                 )?;
 
-                tx.commit().as_store_error()?;
+                tx.commit().into_store_error()?;
                 Ok(())
             })
             .await?;
@@ -1197,7 +1197,7 @@ mod tests {
                     &(&account).into(),
                     &delta,
                 )?;
-                let tx = conn.transaction().as_store_error()?;
+                let tx = conn.transaction().into_store_error()?;
                 let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
 
                 SqliteStore::apply_account_delta(
@@ -1210,7 +1210,7 @@ mod tests {
                     &delta,
                 )?;
 
-                tx.commit().as_store_error()?;
+                tx.commit().into_store_error()?;
                 Ok(())
             })
             .await?;

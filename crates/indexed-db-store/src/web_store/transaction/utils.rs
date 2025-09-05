@@ -59,7 +59,13 @@ pub async fn insert_proven_transaction_data(
         submission_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
         // Use JS Date for WASM-friendly timestamp (seconds since epoch)
-        creation_timestamp: (Date::now() as u64) / 1000,
+        // Casting from f64 is intentional: JS Date.now() is non-negative milliseconds.
+        creation_timestamp: {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            {
+                (Date::now() as u64) / 1000
+            }
+        },
     };
 
     let transaction_record = TransactionRecord::new(
