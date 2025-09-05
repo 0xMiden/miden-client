@@ -22,7 +22,11 @@
 //! use miden_client::Client;
 //! use miden_client::auth::TransactionAuthenticator;
 //! use miden_client::crypto::FeltRng;
-//! use miden_client::transaction::{PaymentNoteDescription, TransactionId, TransactionRequestBuilder};
+//! use miden_client::transaction::{
+//!     PaymentNoteDescription,
+//!     TransactionId,
+//!     TransactionRequestBuilder,
+//! };
 //! use miden_objects::account::AccountId;
 //! use miden_objects::asset::FungibleAsset;
 //! use miden_objects::note::NoteType;
@@ -94,18 +98,34 @@ mod transaction_pipeline;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
-    TransactionId, TransactionScript, TransactionWitness,
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNote,
+    OutputNotes,
+    ProvenTransaction,
+    TransactionId,
+    TransactionScript,
+    TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
+    DataStoreError,
+    LocalTransactionProver,
+    ProvingOptions,
+    TransactionExecutorError,
     TransactionProverError,
 };
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
 };
 pub use transaction_pipeline::TransactionPipeline;
 
@@ -901,13 +921,18 @@ mod test {
     use miden_lib::transaction::TransactionKernel;
     use miden_objects::Word;
     use miden_objects::account::{
-        AccountBuilder, AccountComponent, AuthSecretKey, StorageMap, StorageSlot,
+        AccountBuilder,
+        AccountComponent,
+        AuthSecretKey,
+        StorageMap,
+        StorageSlot,
     };
     use miden_objects::asset::{Asset, FungibleAsset};
     use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
     use miden_objects::note::NoteType;
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     };
 
