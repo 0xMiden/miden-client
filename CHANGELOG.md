@@ -5,8 +5,8 @@
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
-* Bumped web-client version in package.json after merging main into next.
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
+* [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#???](https://github.com/0xMiden/miden-client/pull/???)).
 
 ## 0.11.2 (2025-09-02)
 

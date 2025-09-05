@@ -36,21 +36,16 @@ miden-tx                   = { workspace = true }
 # External dependencies
 anyhow                = { workspace = true }
 async-trait           = { workspace = true }
-base64                = { optional = true, version = "0.22" }
 chrono                = { optional = false, version = "0.4" }
 getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
 hex                   = { workspace = true }
 prost                 = { default-features = false, features = ["derive"], version = "0.13" }
 rand                  = { workspace = true }
-serde                 = { optional = true, workspace = true }
-serde-wasm-bindgen    = { optional = true, version = "0.6" }
 thiserror             = { workspace = true }
 tonic                 = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
 tonic-web-wasm-client = { default-features = false, optional = true, version = "0.7" }
 tracing               = { workspace = true }
 uuid                  = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
-wasm-bindgen          = { features = ["serde-serialize"], optional = true, version = "0.2" }
-wasm-bindgen-futures  = { optional = true, version = "0.4" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }

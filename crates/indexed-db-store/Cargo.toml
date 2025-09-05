@@ -19,15 +19,11 @@ miden-client  = { default-features = false, path = "../rust-client", version = "
 miden-objects = { workspace = true }
 miden-tx      = { workspace = true }
 
-anyhow               = { workspace = true }
 async-trait          = { workspace = true }
 base64               = { version = "0.22" }
 chrono               = { workspace = true }
-getrandom            = { features = ["wasm_js"], version = "0.3" }
 serde                = { features = ["derive"], workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
-thiserror            = { workspace = true }
-tracing              = { workspace = true }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 

@@ -1684,18 +1684,14 @@ checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
 name = "indexed-db-store"
 version = "0.12.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "base64",
  "chrono",
- "getrandom 0.3.3",
  "miden-client",
  "miden-objects",
  "miden-tx",
  "serde",
  "serde-wasm-bindgen",
- "thiserror 2.0.16",
- "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2155,7 +2151,6 @@ version = "0.12.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64",
  "chrono",
  "getrandom 0.3.3",
  "hex",
@@ -2172,8 +2167,6 @@ dependencies = [
  "prost-build",
  "protox 0.7.2",
  "rand 0.9.2",
- "serde",
- "serde-wasm-bindgen",
  "thiserror 2.0.16",
  "tokio",
  "tonic",
@@ -2181,8 +2174,6 @@ dependencies = [
  "tonic-web-wasm-client",
  "tracing",
  "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -2246,7 +2237,6 @@ dependencies = [
  "rusqlite_migration",
  "thiserror 2.0.16",
  "tokio",
- "tracing",
 ]
 
 [[package]]
