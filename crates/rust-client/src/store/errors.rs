@@ -2,7 +2,7 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MmrError;
+use miden_objects::crypto::merkle::{MerkleError, MmrError};
 use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
     AccountError,
@@ -58,6 +58,8 @@ pub enum StoreError {
     InvalidInt(#[from] TryFromIntError),
     #[error("note record error")]
     NoteRecordError(#[from] NoteRecordError),
+    #[error("error in merkle store")]
+    MerkleStoreError(#[from] MerkleError),
     #[error("error constructing mmr")]
     MmrError(#[from] MmrError),
     #[error("inclusion proof creation error")]

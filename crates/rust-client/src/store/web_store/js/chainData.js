@@ -3,14 +3,10 @@ import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // INSERT FUNCTIONS
 export async function insertBlockHeader(blockNum, header, partialBlockchainPeaks, hasClientNotes) {
     try {
-        const headerBlob = new Blob([new Uint8Array(header)]);
-        const partialBlockchainPeaksBlob = new Blob([
-            new Uint8Array(partialBlockchainPeaks),
-        ]);
         const data = {
             blockNum: blockNum,
-            header: headerBlob,
-            partialBlockchainPeaks: partialBlockchainPeaksBlob,
+            header,
+            partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
         const existingBlockHeader = await blockHeaders.get(blockNum);
@@ -60,17 +56,13 @@ export async function insertPartialBlockchainNodes(ids, nodes) {
 export async function getBlockHeaders(blockNumbers) {
     try {
         const results = await blockHeaders.bulkGet(blockNumbers);
-        const processedResults = await Promise.all(results.map(async (result) => {
+        const processedResults = await Promise.all(results.map((result) => {
             if (result === undefined) {
                 return null;
             }
             else {
-                const headerArrayBuffer = await result.header.arrayBuffer();
-                const headerArray = new Uint8Array(headerArrayBuffer);
-                const headerBase64 = uint8ArrayToBase64(headerArray);
-                const partialBlockchainPeaksArrayBuffer = await result.partialBlockchainPeaks.arrayBuffer();
-                const partialBlockchainPeaksArray = new Uint8Array(partialBlockchainPeaksArrayBuffer);
-                const partialBlockchainPeaksBase64 = uint8ArrayToBase64(partialBlockchainPeaksArray);
+                const headerBase64 = uint8ArrayToBase64(result.header);
+                const partialBlockchainPeaksBase64 = uint8ArrayToBase64(result.partialBlockchainPeaks);
                 return {
                     blockNum: result.blockNum,
                     header: headerBase64,
@@ -93,13 +85,9 @@ export async function getTrackedBlockHeaders() {
             .equals("true")
             .toArray();
         // Process all records with async operations
-        const processedRecords = await Promise.all(allMatchingRecords.map(async (record) => {
-            const headerArrayBuffer = await record.header.arrayBuffer();
-            const headerArray = new Uint8Array(headerArrayBuffer);
-            const headerBase64 = uint8ArrayToBase64(headerArray);
-            const partialBlockchainPeaksArrayBuffer = await record.partialBlockchainPeaks.arrayBuffer();
-            const partialBlockchainPeaksArray = new Uint8Array(partialBlockchainPeaksArrayBuffer);
-            const partialBlockchainPeaksBase64 = uint8ArrayToBase64(partialBlockchainPeaksArray);
+        const processedRecords = await Promise.all(allMatchingRecords.map((record) => {
+            const headerBase64 = uint8ArrayToBase64(record.header);
+            const partialBlockchainPeaksBase64 = uint8ArrayToBase64(record.partialBlockchainPeaks);
             return {
                 blockNum: record.blockNum,
                 header: headerBase64,
@@ -121,9 +109,7 @@ export async function getPartialBlockchainPeaksByBlockNum(blockNum) {
                 peaks: undefined,
             };
         }
-        const partialBlockchainPeaksArrayBuffer = await blockHeader.partialBlockchainPeaks.arrayBuffer();
-        const partialBlockchainPeaksArray = new Uint8Array(partialBlockchainPeaksArrayBuffer);
-        const partialBlockchainPeaksBase64 = uint8ArrayToBase64(partialBlockchainPeaksArray);
+        const partialBlockchainPeaksBase64 = uint8ArrayToBase64(blockHeader.partialBlockchainPeaks);
         return {
             peaks: partialBlockchainPeaksBase64,
         };

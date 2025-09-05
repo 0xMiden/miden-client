@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0 (TBD)
+
+### Changes
+
+* [BREAKING] Incremented MSRV to 1.89.
+* Bumped web-client version in package.json after merging main into next.
+* Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
+* Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
+
 ## 0.11.2 (2025-09-02)
 
 * Added WASM bindings for the `Address` type from the miden_objects crate([#1244](https://github.com/0xMiden/miden-client/pull/1244)).

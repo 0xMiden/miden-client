@@ -19,7 +19,7 @@ path = "tests/integration.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client", version = "0.11" }
+miden-client = { features = ["sqlite", "std", "testing", "tonic"], path = "../../crates/rust-client", version = "0.12" }
 
 # External dependencies
 anyhow      = { features = ["std"], workspace = true }
