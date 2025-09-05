@@ -80,7 +80,7 @@ async fn deploy_counter_contract(
 ) -> Result<Account> {
     let (acc, seed) = get_counter_contract_account(client, storage_mode).await?;
 
-    client.add_account(&acc, Some(seed), false).await?;
+    client.add_account(acc.clone(), Some(seed), false).await?;
 
     let mut script_builder = ScriptBuilder::new(true);
     script_builder.link_dynamic_library(&counter_contract_library())?;

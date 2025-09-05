@@ -219,7 +219,7 @@ async fn insert_new_wallet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(account.clone(), Some(seed), false).await?;
 
     Ok((account, seed))
 }
@@ -250,7 +250,7 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(account.clone(), Some(seed), false).await?;
     Ok((account, seed))
 }
 
@@ -396,8 +396,8 @@ async fn insert_same_account_twice_fails() {
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
     );
 
-    assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
-    assert!(client.add_account(&account, Some(Word::default()), false).await.is_err());
+    assert!(client.add_account(account.clone(), Some(Word::default()), false).await.is_ok());
+    assert!(client.add_account(account, Some(Word::default()), false).await.is_err());
 }
 
 #[tokio::test]
@@ -417,7 +417,7 @@ async fn account_code() {
     let reconstructed_code = AccountCode::read_from_bytes(&account_code_bytes).unwrap();
     assert_eq!(*account_code, reconstructed_code);
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(account.clone(), Some(Word::default()), false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
     assert_eq!(*account.code(), *retrieved_acc.account().code());
 }
@@ -432,7 +432,7 @@ async fn get_account_by_id() {
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
     );
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(account.clone(), Some(Word::default()), false).await.unwrap();
 
     // Retrieving an existing account should succeed
     let (acc_from_db, _account_seed) = match client.get_account_header_by_id(account.id()).await {
@@ -2039,7 +2039,7 @@ async fn empty_storage_map() {
 
     let account_id = account.id();
 
-    client.add_account(&account, Some(seed), false).await.unwrap();
+    client.add_account(account.clone(), Some(seed), false).await.unwrap();
 
     let fetched_account = client.get_account(account_id).await.unwrap().unwrap();
 
@@ -2125,9 +2125,9 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await.unwrap();
-
     let account_id = account.id();
+
+    client.add_account(account, Some(seed), false).await.unwrap();
 
     // Add assets and modify storage map multiple times
     for _ in 0..5 {

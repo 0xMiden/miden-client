@@ -28,7 +28,7 @@
 //!
 //! // Add the account to the client. The account seed and authentication key are required
 //! // for new accounts.
-//! client.add_account(&account, Some(seed), false).await?;
+//! client.add_account(account, Some(seed), false).await?;
 //! #   Ok(())
 //! # }
 //! ```
@@ -123,7 +123,7 @@ impl<AUTH> Client<AUTH> {
     ///   network's account commitment.
     pub async fn add_account(
         &mut self,
-        account: &Account,
+        account: Account,
         account_seed: Option<Word>,
         overwrite: bool,
     ) -> Result<(), ClientError> {
@@ -152,7 +152,7 @@ impl<AUTH> Client<AUTH> {
             None => {
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.into()).await?;
+                self.store.add_note_tag((&account).into()).await?;
 
                 self.store
                     .insert_account(account, account_seed)
@@ -182,7 +182,10 @@ impl<AUTH> Client<AUTH> {
                     }
                 }
 
-                self.store.update_account(account).await.map_err(ClientError::StoreError)
+                self.store
+                    .update_account(account.clone())
+                    .await
+                    .map_err(ClientError::StoreError)
             },
         }
     }
@@ -205,7 +208,7 @@ impl<AUTH> Client<AUTH> {
             FetchedAccount::Public(account, ..) => account,
         };
 
-        self.add_account(&account, None, true).await
+        self.add_account(account, None, true).await
     }
 
     // ACCOUNT DATA RETRIEVAL
@@ -369,8 +372,8 @@ pub mod tests {
         let (id, vault, storage, code, _) = account.into_parts();
         let account = Account::from_parts(id, vault, storage, code, ZERO);
 
-        assert!(client.add_account(&account, None, false).await.is_err());
-        assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
+        assert!(client.add_account(account.clone(), None, false).await.is_err());
+        assert!(client.add_account(account, Some(Word::default()), false).await.is_ok());
     }
 
     #[tokio::test]
@@ -382,7 +385,7 @@ pub mod tests {
 
         for account_data in created_accounts_data.clone() {
             client
-                .add_account(&account_data.account, account_data.account_seed, false)
+                .add_account(account_data.account, account_data.account_seed, false)
                 .await
                 .unwrap();
         }

@@ -83,7 +83,7 @@ async fn import_account<AUTH>(
     }
 
     client
-        .add_account(&account_data.account, account_data.account_seed, overwrite)
+        .add_account(account_data.account, account_data.account_seed, overwrite)
         .await?;
 
     Ok(account_id)
