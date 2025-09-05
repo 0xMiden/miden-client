@@ -1,10 +1,10 @@
 #![allow(clippy::items_after_statements)]
 
-use std::string::{String, ToString};
-use std::vec::Vec;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
+use std::vec::Vec;
 
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_objects::account::{
@@ -982,15 +982,17 @@ fn query_account_headers(
 mod tests {
     use std::collections::BTreeMap;
     use std::vec::Vec;
+
+    use anyhow::Context;
     use miden_client::asset::{Asset, FungibleAsset, NonFungibleAsset};
     use miden_client::store::Store;
-    use miden_client::testing::account_id::{ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET};
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::account::components::{
-        basic_wallet_library,
+    use miden_client::testing::account_id::{
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
-    use anyhow::Context;
     use miden_client::transaction::TransactionKernel;
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::account::components::basic_wallet_library;
     use miden_objects::account::{
         Account,
         AccountBuilder,
@@ -1009,6 +1011,7 @@ mod tests {
     use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_objects::{EMPTY_WORD, ONE, ZERO};
+
     use crate::sqlite_store::SqliteStore;
     use crate::sqlite_store::sql_error::SqlResultExt;
     use crate::sqlite_store::tests::create_test_store;
@@ -1036,18 +1039,23 @@ mod tests {
                 let tx = conn.transaction().as_store_error()?;
 
                 // Table is empty at the beginning
-                let mut actual: usize =
-                    tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0)).as_store_error()?;
+                let mut actual: usize = tx
+                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .as_store_error()?;
                 assert_eq!(actual, 0);
 
                 // First insertion generates a new row
                 SqliteStore::insert_account_code(&tx, &account_code)?;
-                actual = tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0)).as_store_error()?;
+                actual = tx
+                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .as_store_error()?;
                 assert_eq!(actual, 1);
 
                 // Second insertion passes but does not generate a new row
                 assert!(SqliteStore::insert_account_code(&tx, &account_code).is_ok());
-                actual = tx.query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0)).as_store_error()?;
+                actual = tx
+                    .query_row("SELECT Count(*) FROM account_code", [], |row| row.get(0))
+                    .as_store_error()?;
                 assert_eq!(actual, 1);
 
                 Ok(())
@@ -1207,7 +1215,8 @@ mod tests {
             })
             .await?;
 
-        let updated_account: Account = store.get_account(account_id)
+        let updated_account: Account = store
+            .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
             .into();

@@ -1,11 +1,10 @@
 #![allow(clippy::items_after_statements)]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroUsize;
 use std::rc::Rc;
 use std::string::String;
 use std::vec::Vec;
-use std::collections::BTreeSet;
-use std::num::NonZeroUsize;
 
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_objects::Word;

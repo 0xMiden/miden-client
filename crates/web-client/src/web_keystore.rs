@@ -2,15 +2,13 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use indexed_db_store::{get_account_auth_by_pub_key, insert_account_auth};
+use miden_client::auth::{AuthSecretKey, SigningInputs, TransactionAuthenticator};
+use miden_client::keystore::KeyStoreError;
+use miden_client::utils::RwLock;
+use miden_client::{AuthenticationError, Felt, Word};
 use miden_lib::utils::{Deserializable, Serializable};
-use miden_tx::auth::SigningInputs;
 use rand::Rng;
-
-use super::KeyStoreError;
-use crate::auth::{AuthSecretKey, TransactionAuthenticator};
-use crate::store::web_store::account::utils::{get_account_auth_by_pub_key, insert_account_auth};
-use crate::utils::RwLock;
-use crate::{AuthenticationError, Felt, Word};
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
 /// and provides transaction authentication functionality.
@@ -81,6 +79,6 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
 
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
-        miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
+        miden_client::auth::get_falcon_signature(&k, message, &mut *rng)
     }
 }

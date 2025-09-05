@@ -1,26 +1,26 @@
 [package]
-name = "miden-client-sqlite-store"
-version.workspace = true
-edition.workspace = true
+authors.workspace      = true
+description            = "SQLite-backed Store implementation for miden-client"
+edition.workspace      = true
+license.workspace      = true
+name                   = "miden-client-sqlite-store"
+repository.workspace   = true
 rust-version.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
-description = "SQLite-backed Store implementation for miden-client"
+version.workspace      = true
 
 [lib]
 crate-type = ["lib"]
 
 [dependencies]
-miden-client = { path = "../rust-client", version = "0.12" }
+miden-client  = { path = "../rust-client", version = "0.12" }
 miden-objects = { workspace = true }
 
 anyhow      = { workspace = true }
 async-trait = { workspace = true }
+chrono      = { workspace = true }
+hex         = { workspace = true }
 thiserror   = { workspace = true }
 tracing     = { workspace = true }
-chrono      = { version = "0.4" }
-hex         = { version = "0.4" }
 
 deadpool           = { default-features = false, features = ["managed", "rt_tokio_1"], version = "0.12" }
 deadpool-sync      = { version = "0.1" }
@@ -33,5 +33,5 @@ workspace = true
 
 [dev-dependencies]
 # Enable client testing utilities only for tests
-miden-client = { path = "../rust-client", version = "0.12", features = ["testing"] }
-miden-lib = { workspace = true, features = ["testing"] }
+miden-client = { features = ["testing"], path = "../rust-client", version = "0.12" }
+miden-lib    = { features = ["testing"], workspace = true }

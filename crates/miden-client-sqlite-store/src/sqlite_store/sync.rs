@@ -1,8 +1,8 @@
 #![allow(clippy::items_after_statements)]
 
 use std::collections::BTreeSet;
-use std::vec::Vec;
 use std::sync::{Arc, RwLock};
+use std::vec::Vec;
 
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};

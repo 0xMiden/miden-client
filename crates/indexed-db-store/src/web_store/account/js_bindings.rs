@@ -61,9 +61,6 @@ extern "C" {
         account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountAuth)]
-    pub fn idxdb_insert_account_auth(pub_key: String, secret_key: String) -> js_sys::Promise;
-
     #[wasm_bindgen(js_name = upsertForeignAccountCode)]
     pub fn idxdb_upsert_foreign_account_code(
         account_id: String,

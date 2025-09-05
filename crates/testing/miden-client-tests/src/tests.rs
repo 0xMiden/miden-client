@@ -4,11 +4,46 @@ use std::env::temp_dir;
 use std::println;
 use std::string::ToString;
 use std::sync::Arc;
-use miden_client_sqlite_store::SqliteStore;
 
+use miden_client::builder::ClientBuilder;
+use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note::NoteRelevance;
+use miden_client::rpc::NodeRpcClient;
+use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
+use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::sync::NoteTagSource;
+use miden_client::testing::common::{
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    TestClientKeyStore,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    create_test_store_path,
+    execute_failing_tx,
+    execute_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
+};
+use miden_client::testing::mock::{MockClient, MockRpcApi};
+use miden_client::transaction::{
+    DiscardCause,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
+};
+use miden_client::{ClientError, DebugMode};
+use miden_client_sqlite_store::SqliteStore;
 // TESTS
 // ================================================================================================
-
 use miden_lib::{
     account::{
         auth::AuthRpoFalcon512,
@@ -64,42 +99,6 @@ use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
-
-use miden_client::{builder::ClientBuilder, transaction::TransactionExecutorError};
-use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::NoteRelevance;
-use miden_client::rpc::NodeRpcClient;
-use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
-use miden_client::sync::NoteTagSource;
-use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    create_test_store_path,
-    execute_failing_tx,
-    execute_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
-};
-use miden_client::testing::mock::{MockClient, MockRpcApi};
-use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
-};
-use miden_client::{ClientError, DebugMode};
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
@@ -2170,8 +2169,11 @@ async fn storage_and_vault_proofs() {
         assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path());
 
         // Check that specific map item proof matches the one in the storage
-        let (value, proof) =
-            client.test_store().get_account_map_item(account_id, 1, MAP_KEY.into()).await.unwrap();
+        let (value, proof) = client
+            .test_store()
+            .get_account_map_item(account_id, 1, MAP_KEY.into())
+            .await
+            .unwrap();
 
         let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
             panic!("Expected a map storage slot");
@@ -2179,5 +2181,186 @@ async fn storage_and_vault_proofs() {
 
         assert_eq!(value, map.get(&MAP_KEY.into()));
         assert_eq!(&proof, map.open(&MAP_KEY.into()).path());
+    }
+}
+
+
+#[cfg(test)]
+pub mod tests {
+    use alloc::boxed::Box;
+    use alloc::vec::Vec;
+
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::testing::mock_account::MockAccountExt;
+    use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+    use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    };
+    use miden_objects::{EMPTY_WORD, Word, ZERO};
+
+    use crate::tests::create_test_client;
+
+    fn create_account_data(account_id: u128) -> AccountFile {
+        let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
+
+        AccountFile::new(
+            account.clone(),
+            Some(Word::default()),
+            vec![AuthSecretKey::RpoFalcon512(SecretKey::new())],
+        )
+    }
+
+    pub fn create_initial_accounts_data() -> Vec<AccountFile> {
+        let account = create_account_data(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET);
+
+        let faucet_account = create_account_data(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET);
+
+        // Create Genesis state and save it to a file
+        let accounts = vec![account, faucet_account];
+
+        accounts
+    }
+
+    #[tokio::test]
+    pub async fn try_add_account() {
+        // generate test client
+        let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+        let account = Account::mock(
+            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        );
+
+        // The mock account has nonce 1, we need it to be 0 for the test.
+        let (id, vault, storage, code, _) = account.into_parts();
+        let account = Account::from_parts(id, vault, storage, code, ZERO);
+
+        assert!(client.add_account(&account, None, false).await.is_err());
+        assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn load_accounts_test() {
+        // generate test client
+        let (mut client, ..) = Box::pin(create_test_client()).await;
+
+        let created_accounts_data = create_initial_accounts_data();
+
+        for account_data in created_accounts_data.clone() {
+            client
+                .add_account(&account_data.account, account_data.account_seed, false)
+                .await
+                .unwrap();
+        }
+
+        let expected_accounts: Vec<Account> = created_accounts_data
+            .into_iter()
+            .map(|account_data| account_data.account)
+            .collect();
+        let accounts = client.get_account_headers().await.unwrap();
+
+        assert_eq!(accounts.len(), 2);
+        for (client_acc, expected_acc) in accounts.iter().zip(expected_accounts.iter()) {
+            assert_eq!(client_acc.0.commitment(), expected_acc.commitment());
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use alloc::boxed::Box;
+
+    use miden_client::transaction::TransactionResult;
+    use miden_lib::account::auth::AuthRpoFalcon512;
+    use miden_lib::transaction::TransactionKernel;
+    use miden_lib::utils::{Deserializable, Serializable};
+    use miden_objects::Word;
+    use miden_objects::account::{
+        AccountBuilder,
+        AccountComponent,
+        AuthSecretKey,
+        StorageMap,
+        StorageSlot,
+    };
+    use miden_objects::asset::{Asset, FungibleAsset};
+    use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    use miden_objects::note::NoteType;
+    use miden_objects::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+    };
+
+    use super::PaymentNoteDescription;
+    use crate::tests::create_test_client;
+    use miden_client::transaction::{TransactionRequestBuilder};
+
+    #[tokio::test]
+    async fn transaction_creates_two_notes() {
+        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+        let asset_1: Asset =
+            FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
+                .unwrap()
+                .into();
+        let asset_2: Asset =
+            FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 500)
+                .unwrap()
+                .into();
+
+        let secret_key = SecretKey::new();
+        let pub_key = secret_key.public_key();
+        keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
+
+        let wallet_component = AccountComponent::compile(
+            "
+                export.::miden::contracts::wallets::basic::receive_asset
+                export.::miden::contracts::wallets::basic::move_asset_to_note
+            ",
+            TransactionKernel::assembler(),
+            vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
+        )
+        .unwrap()
+        .with_supports_all_types();
+
+        let account = AccountBuilder::new(Default::default())
+            .with_component(wallet_component)
+            .with_auth_component(AuthRpoFalcon512::new(pub_key))
+            .with_assets([asset_1, asset_2])
+            .build_existing()
+            .unwrap();
+
+        client.add_account(&account, None, false).await.unwrap();
+        client.sync_state().await.unwrap();
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pay_to_id(
+                PaymentNoteDescription::new(
+                    vec![asset_1, asset_2],
+                    account.id(),
+                    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
+                ),
+                NoteType::Private,
+                client.rng(),
+            )
+            .unwrap();
+
+        let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
+        assert!(
+            tx_result
+                .created_notes()
+                .get_note(0)
+                .assets()
+                .is_some_and(|assets| assets.num_assets() == 2)
+        );
+        // Prove and apply transaction
+        Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
+
+        // Test serialization
+        let bytes: std::vec::Vec<u8> = tx_result.to_bytes();
+        let decoded = TransactionResult::read_from_bytes(&bytes).unwrap();
+
+        assert_eq!(tx_result, decoded);
     }
 }

@@ -1,18 +1,17 @@
 [package]
-name = "miden-client-unit-tests"
+edition           = "2024"
+name              = "miden-client-unit-tests"
+publish           = false
 version.workspace = true
-edition = "2024"
-publish = false
 
 [dev-dependencies]
-miden-client = { path = "../../rust-client", features = ["testing", "std"] }
+miden-client              = { features = ["std", "testing"], path = "../../rust-client" }
 miden-client-sqlite-store = { path = "../../miden-client-sqlite-store" }
-miden-lib = { workspace = true, features = ["testing"] }
-miden-objects = { workspace = true, default-features = false, features = ["testing"] }
-miden-testing = { workspace = true, default-features = false }
-tokio = { workspace = true }
-rand = { workspace = true }
+miden-lib                 = { features = ["testing"], workspace = true }
+miden-objects             = { default-features = false, features = ["testing"], workspace = true }
+miden-testing             = { default-features = false, workspace = true }
+rand                      = { workspace = true }
+tokio                     = { workspace = true }
 
 [lints]
 workspace = true
-

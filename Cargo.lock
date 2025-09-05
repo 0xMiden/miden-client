@@ -1687,6 +1687,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
+ "chrono",
  "getrandom 0.3.3",
  "miden-client",
  "miden-objects",
@@ -2266,6 +2267,7 @@ dependencies = [
 name = "miden-client-web"
 version = "0.12.0"
 dependencies = [
+ "hex",
  "indexed-db-store",
  "miden-client",
  "miden-lib",

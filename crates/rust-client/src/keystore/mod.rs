@@ -14,8 +14,3 @@ pub enum KeyStoreError {
 mod fs_keystore;
 #[cfg(feature = "std")]
 pub use fs_keystore::FilesystemKeyStore;
-
-#[cfg(target_arch = "wasm32")]
-mod web_keystore;
-#[cfg(target_arch = "wasm32")]
-pub use web_keystore::WebKeyStore;

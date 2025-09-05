@@ -23,6 +23,7 @@ testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies
+indexed-db-store = { path = "../indexed-db-store", version = "0.12" }
 miden-client = { default-features = false, features = [
   "testing",
   "web-tonic",
@@ -32,13 +33,12 @@ miden-client = { default-features = false, features = [
 miden-lib     = { workspace = true }
 miden-objects = { workspace = true }
 # External dependencies
+hex                  = { version = "0.4" }
 rand                 = { workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-indexed-db-store = { path = "../indexed-db-store", version = "0.12" }
 
 [dev-dependencies]
 miden-lib     = { default-features = false, features = ["testing"], workspace = true }

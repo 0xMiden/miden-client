@@ -1,12 +1,12 @@
 [package]
-name = "indexed-db-store"
-version.workspace = true
-edition.workspace = true
+authors.workspace      = true
+description            = "IndexedDB-backed Store implementation for miden-client (WASM)"
+edition.workspace      = true
+license.workspace      = true
+name                   = "indexed-db-store"
+repository.workspace   = true
 rust-version.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
-description = "IndexedDB-backed Store implementation for miden-client (WASM)"
+version.workspace      = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -15,18 +15,19 @@ crate-type = ["cdylib", "rlib"]
 default = []
 
 [dependencies]
-miden-client = { path = "../rust-client", version = "0.12", default-features = false }
+miden-client  = { default-features = false, path = "../rust-client", version = "0.12" }
 miden-objects = { workspace = true }
 miden-tx      = { workspace = true }
 
-anyhow      = { workspace = true }
-async-trait = { workspace = true }
-base64      = { version = "0.22" }
-getrandom   = { features = ["wasm_js"], version = "0.3" }
-serde       = { workspace = true, features = ["derive"] }
+anyhow               = { workspace = true }
+async-trait          = { workspace = true }
+base64               = { version = "0.22" }
+chrono               = { workspace = true }
+getrandom            = { features = ["wasm_js"], version = "0.3" }
+serde                = { features = ["derive"], workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
-thiserror   = { workspace = true }
-tracing     = { workspace = true }
+thiserror            = { workspace = true }
+tracing              = { workspace = true }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 

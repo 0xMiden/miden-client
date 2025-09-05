@@ -1,9 +1,9 @@
 #![allow(clippy::items_after_statements)]
 
-use std::string::{String, ToString};
-use std::vec::Vec;
 use std::rc::Rc;
+use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
+use std::vec::Vec;
 
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{

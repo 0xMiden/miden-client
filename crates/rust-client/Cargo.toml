@@ -19,10 +19,10 @@ ignored = ["getrandom"]
 crate-type = ["lib"]
 
 [features]
-default = ["std", "tonic/channel"]
-std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
-tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
+default   = ["std", "tonic/channel"]
+std       = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
+testing   = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+tonic     = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 
 [dependencies]
@@ -39,7 +39,7 @@ async-trait           = { workspace = true }
 base64                = { optional = true, version = "0.22" }
 chrono                = { optional = false, version = "0.4" }
 getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
-hex                   = { version = "0.4" }
+hex                   = { workspace = true }
 prost                 = { default-features = false, features = ["derive"], version = "0.13" }
 rand                  = { workspace = true }
 serde                 = { optional = true, workspace = true }
@@ -66,13 +66,13 @@ protox                 = { version = "0.7" }
 tonic-build            = { version = "0.13" }
 
 [dev-dependencies]
-miden-client-sqlite-store = { path = "../miden-client-sqlite-store", package = "miden-client-sqlite-store", version = "0.12" }
-miden-client = {path = ".", features = ["testing", "std"]}
-miden-lib     = { features = ["testing"], workspace = true }
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
-miden-testing = { default-features = false, workspace = true }
-tokio         = { workspace = true }
-web-sys       = { features = ["console"], version = "0.3" }
+miden-client              = { features = ["std", "testing"], path = "." }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../miden-client-sqlite-store", version = "0.12" }
+miden-lib                 = { features = ["testing"], workspace = true }
+miden-objects             = { default-features = false, features = ["testing"], workspace = true }
+miden-testing             = { default-features = false, workspace = true }
+tokio                     = { workspace = true }
+web-sys                   = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true

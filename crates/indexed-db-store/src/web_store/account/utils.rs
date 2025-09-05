@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_client::store::{AccountStatus, StoreError};
@@ -7,19 +7,16 @@ use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::utils::Deserializable;
 use miden_objects::{Felt, Word};
 use miden_tx::utils::Serializable;
-use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{
-    idxdb_get_account_auth_by_pub_key,
     idxdb_insert_account_asset_vault,
-    idxdb_insert_account_auth,
     idxdb_insert_account_code,
     idxdb_insert_account_record,
     idxdb_insert_account_storage,
 };
-use super::models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject};
+use super::models::AccountRecordIdxdbObject;
 
 pub async fn insert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -50,28 +47,6 @@ pub async fn insert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), 
     JsFuture::from(promise).await?;
 
     Ok(())
-}
-
-pub async fn insert_account_auth(pub_key: String, secret_key: String) -> Result<(), JsValue> {
-    let promise = idxdb_insert_account_auth(pub_key, secret_key);
-    JsFuture::from(promise).await?;
-
-    Ok(())
-}
-
-pub async fn get_account_auth_by_pub_key(pub_key: String) -> Result<String, JsValue> {
-    let promise = idxdb_get_account_auth_by_pub_key(pub_key.clone());
-    let js_secret_key = JsFuture::from(promise).await?;
-
-    let account_auth_idxdb: Option<AccountAuthIdxdbObject> =
-        from_value(js_secret_key).map_err(|err| {
-            JsValue::from_str(&format!("error: failed to deserialize secret key: {err}"))
-        })?;
-
-    match account_auth_idxdb {
-        Some(account_auth) => Ok(account_auth.secret_key),
-        None => Err(JsValue::from_str(&format!("pub key {pub_key} not found in the store"))),
-    }
 }
 
 pub async fn insert_account_record(

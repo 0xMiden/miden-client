@@ -9,6 +9,7 @@ use miden_objects::transaction::{ExecutedTransaction, ToInputNoteCommitments, Tr
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::js_sys::Date;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
 
@@ -57,8 +58,8 @@ pub async fn insert_proven_transaction_data(
         block_num: executed_transaction.block_header().block_num(),
         submission_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
-        creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
-            .expect("timestamp is always after epoch"),
+        // Use JS Date for WASM-friendly timestamp (seconds since epoch)
+        creation_timestamp: (Date::now() as u64) / 1000,
     };
 
     let transaction_record = TransactionRecord::new(

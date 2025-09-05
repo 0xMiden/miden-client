@@ -43,6 +43,8 @@ miden-tx = { default-features = false, version = "0.11" }
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
 async-trait = "0.1"
+chrono      = "0.4"
+hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }

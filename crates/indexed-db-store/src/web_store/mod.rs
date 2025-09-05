@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use async_trait::async_trait;
+use js_sys::Date;
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -33,10 +33,7 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
 use miden_objects::note::Nullifier;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
-
-#[cfg(not(target_arch = "wasm32"))]
-compile_error!("The `idxdb` feature is only supported when targeting wasm32.");
+use wasm_bindgen_futures::{JsFuture, js_sys};
 
 pub mod account;
 pub mod chain_data;
@@ -45,6 +42,12 @@ pub mod import;
 pub mod note;
 pub mod sync;
 pub mod transaction;
+
+#[wasm_bindgen(module = "/src/web_store/js/utils.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = logWebStoreError)]
+    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
+}
 
 // Initialize IndexedDB
 #[wasm_bindgen(module = "/src/web_store/js/schema.js")]
@@ -62,11 +65,12 @@ impl WebStore {
     }
 }
 
-#[async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl Store for WebStore {
     fn get_current_timestamp(&self) -> Option<u64> {
-        let now = chrono::Utc::now();
-        Some(u64::try_from(now.timestamp()).expect("timestamp is always after epoch"))
+        // Use JS Date for WASM-friendly timestamp (seconds since epoch)
+        Some((Date::now() as u64) / 1000)
     }
 
     // SYNC
@@ -247,10 +251,4 @@ impl Store for WebStore {
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
     }
-}
-
-#[wasm_bindgen(module = "/src/web_store/js/utils.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = logWebStoreError)]
-    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
 }

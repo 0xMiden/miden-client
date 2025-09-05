@@ -1,7 +1,6 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use js_sys::{Array, Promise};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -14,7 +13,8 @@ use miden_objects::Word;
 use miden_objects::note::Nullifier;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
+use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::js_sys::{Array, Promise};
 
 use super::WebStore;
 
@@ -101,7 +101,13 @@ impl WebStore {
     }
 }
 
-impl NoteFilter {
+// Provide extension methods for NoteFilter via a local trait
+pub(crate) trait NoteFilterExt {
+    fn to_input_notes_promise(&self) -> Promise;
+    fn to_output_note_promise(&self) -> Promise;
+}
+
+impl NoteFilterExt for NoteFilter {
     fn to_input_notes_promise(&self) -> Promise {
         match self {
             NoteFilter::All

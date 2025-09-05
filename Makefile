@@ -18,11 +18,13 @@ PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
+EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude indexed-db-store
+
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo clippy --workspace --exclude miden-client-web --exclude testing-remote-prover --all-targets -- -D warnings
+	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --all-targets -- -D warnings
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
@@ -31,7 +33,7 @@ clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
 
 .PHONY: fix
 fix: ## Run Fix with configs, building tests with proper features to avoid type split.
-	cargo +nightly fix --workspace --exclude miden-client-web --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
+	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
@@ -87,7 +89,7 @@ typedoc: rust-client-ts-build ## Generate web client package documentation.
 
 .PHONY: test
 test: ## Run tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-docs
 test-docs: ## Run documentation tests
@@ -110,7 +112,7 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
 integration-test-web-client: ## Run integration tests for the web client
@@ -122,8 +124,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary

@@ -1,9 +1,8 @@
 extern crate alloc;
 use alloc::sync::Arc;
-use std::fmt::Write;
+use core::fmt::Write;
 
 use indexed_db_store::WebStore;
-use miden_client::keystore::WebKeyStore;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{Client, ExecutionOptions};
@@ -12,7 +11,6 @@ use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
-
 pub mod account;
 pub mod export;
 pub mod helpers;
@@ -27,6 +25,9 @@ pub mod sync;
 pub mod tags;
 pub mod transactions;
 pub mod utils;
+
+mod web_keystore;
+pub use web_keystore::WebKeyStore;
 
 #[wasm_bindgen]
 pub struct WebClient {

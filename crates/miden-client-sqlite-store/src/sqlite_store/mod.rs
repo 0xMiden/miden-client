@@ -6,10 +6,10 @@
 
 use std::boxed::Box;
 use std::collections::{BTreeMap, BTreeSet};
-use std::vec::Vec;
 use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
+use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::apply_migrations;
