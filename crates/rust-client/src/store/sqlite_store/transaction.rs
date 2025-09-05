@@ -16,7 +16,10 @@ use rusqlite::{Connection, Transaction, params};
 use super::SqliteStore;
 use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
-use crate::store::{StoreError, TransactionFilter};
+use crate::note::NoteUpdateTracker;
+use crate::store::input_note_states::ExpectedNoteState;
+use crate::store::{InputNoteState, StoreError, TransactionFilter};
+use crate::sync::NoteTagRecord;
 use crate::transaction::{
     TransactionDetails,
     TransactionRecord,
@@ -134,6 +137,7 @@ impl SqliteStore {
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         tx_update: &TransactionStoreUpdate,
+        note_updates: &NoteUpdateTracker,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
 
@@ -197,10 +201,22 @@ impl SqliteStore {
         drop(merkle_store);
 
         // Note Updates
-        apply_note_updates_tx(&tx, tx_update.note_updates())?;
+        apply_note_updates_tx(&tx, note_updates)?;
 
-        for tag_record in tx_update.new_tags() {
-            add_note_tag_tx(&tx, tag_record)?;
+        // Note tags
+        let note_tags = note_updates.updated_input_notes().filter_map(|note| {
+            let note = note.inner();
+
+            if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
+            {
+                Some(NoteTagRecord::with_note_source(*tag, note.id()))
+            } else {
+                None
+            }
+        });
+
+        for tag_record in note_tags {
+            add_note_tag_tx(&tx, &tag_record)?;
         }
 
         tx.commit()?;

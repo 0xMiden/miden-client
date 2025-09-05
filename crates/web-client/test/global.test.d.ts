@@ -57,7 +57,7 @@ import {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
@@ -136,7 +136,7 @@ declare global {
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
-    TransactionResult: typeof TransactionResult;
+    TransactionStoreUpdate: typeof TransactionStoreUpdate;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;

@@ -200,9 +200,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     ];
 
     let tx_request = builder.foreign_accounts(foreign_accounts).build()?;
-    let tx_result = client.new_transaction(native_account.id(), tx_request).await?;
-
-    client.submit_transaction(tx_result).await?;
+    client.new_transaction(native_account.id(), tx_request).await?;
     Ok(())
 }
 
@@ -296,9 +294,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
-    let tx_result = client.new_transaction(native_account.id(), tx_request).await?;
-
-    client.submit_transaction(tx_result).await?;
+    client.new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -377,7 +373,7 @@ async fn deploy_foreign_account(
 
     println!("Deploying foreign account");
 
-    let tx = client
+    let tx_id = client
         .new_transaction(
             foreign_account_id,
             TransactionRequestBuilder::new()
@@ -385,8 +381,6 @@ async fn deploy_foreign_account(
                 .with_context(|| "failed to build transaction request")?,
         )
         .await?;
-    let tx_id = tx.executed_transaction().id();
-    client.submit_transaction(tx).await?;
     wait_for_tx(client, tx_id).await?;
 
     Ok((foreign_account, proc_root))

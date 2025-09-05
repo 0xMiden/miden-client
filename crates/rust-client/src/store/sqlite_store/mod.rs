@@ -42,6 +42,7 @@ use super::{
     Store,
     TransactionFilter,
 };
+use crate::note::NoteUpdateTracker;
 use crate::store::StoreError;
 use crate::store::sqlite_store::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -176,10 +177,14 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError> {
         let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update)
+            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update, &note_updates)
         })
         .await
     }

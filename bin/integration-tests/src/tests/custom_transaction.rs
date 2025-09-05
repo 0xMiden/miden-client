@@ -12,7 +12,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::store::NoteFilter;
+use miden_client::store::{NoteFilter, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     AdviceMap,
@@ -118,20 +118,22 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let deserialized_transaction_request = TransactionRequest::read_from_bytes(&buffer)?;
     assert_eq!(transaction_request, deserialized_transaction_request);
 
-    let transaction_execution_result =
-        client.new_transaction(regular_account.id(), transaction_request).await?;
+    let tx_id = client.new_transaction(regular_account.id(), transaction_request).await?;
+    let transaction = client
+        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+        .await?
+        .pop()
+        .with_context(|| "failed to find transaction after submission")?;
 
     // Assert that the custom note was used in the transaction
     assert!(
-        transaction_execution_result
-            .executed_transaction()
-            .input_notes()
+        transaction
+            .details
+            .input_note_nullifiers
             .into_iter()
-            .any(|input_note| input_note.note().id() == note.id())
+            .any(|nullifier| nullifier == note.nullifier().as_word())
     );
 
-    let tx_id = transaction_execution_result.executed_transaction().id();
-    client.submit_transaction(transaction_execution_result).await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     // Assert that the note was consumed on chain

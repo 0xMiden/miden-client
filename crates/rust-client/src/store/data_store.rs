@@ -16,7 +16,7 @@ use crate::store::StoreError;
 // ================================================================================================
 
 /// Wrapper structure that implements [`DataStore`] over any [`Store`].
-pub(crate) struct ClientDataStore {
+pub struct ClientDataStore {
     /// Local database containing information about the accounts managed by this client.
     store: alloc::sync::Arc<dyn Store>,
     /// Store used to provide MAST nodes to the transaction executor.

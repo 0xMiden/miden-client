@@ -87,7 +87,7 @@ typedoc: rust-client-ts-build ## Generate web client package documentation.
 
 .PHONY: test
 test: ## Run tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
+	cargo nextest run -p miden-client --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-docs
 test-docs: ## Run documentation tests

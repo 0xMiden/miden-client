@@ -26,19 +26,19 @@ try {
     );
 
     // 2. Execute transaction
-    const transactionResult = await webClient.newTransaction(
+    const transactionUpdate = await webClient.newTransaction(
         accountId,
         transactionRequest
     );
 
     // 3. Submit transaction
-    await webClient.submitTransaction(transactionResult);
+    await webClient.submitTransaction(transactionUpdate);
     
     // Access transaction details
-    console.log("Block number:", transactionResult.blockNum());
-    console.log("Created notes:", transactionResult.createdNotes());
-    console.log("Consumed notes:", transactionResult.consumedNotes());
-    console.log("Account delta:", transactionResult.accountDelta());
+    console.log("Block number:", transactionUpdate.blockNum());
+    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
+    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
+    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
 } catch (error) {
     console.error("Transaction failed:", error.message);
 }
@@ -67,19 +67,19 @@ try {
     );
 
     // 2. Execute transaction
-    const transactionResult = await webClient.newTransaction(
+    const transactionUpdate = await webClient.newTransaction(
         accountId,
         transactionRequest
     );
 
     // 3. Submit transaction with remote prover
-    await webClient.submitTransaction(transactionResult, remoteProver);
+    await webClient.submitTransaction(transactionUpdate, remoteProver);
     
     // Access transaction details
-    console.log("Block number:", transactionResult.blockNum());
-    console.log("Created notes:", transactionResult.createdNotes());
-    console.log("Consumed notes:", transactionResult.consumedNotes());
-    console.log("Account delta:", transactionResult.accountDelta());
+    console.log("Block number:", transactionUpdate.blockNum());
+    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
+    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
+    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
 } catch (error) {
     console.error("Transaction failed:", error.message);
 }
@@ -108,18 +108,18 @@ try {
         90               // Optional timelock height
     );
 
-    const transactionResult = await webClient.newTransaction(
+    const transactionUpdate = await webClient.newTransaction(
         senderAccountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionResult);
+    await webClient.submitTransaction(transactionUpdate);
     
     // Access transaction details
-    console.log("Block number:", transactionResult.blockNum());
-    console.log("Created notes:", transactionResult.createdNotes());
-    console.log("Consumed notes:", transactionResult.consumedNotes());
-    console.log("Account delta:", transactionResult.accountDelta());
+    console.log("Block number:", transactionUpdate.blockNum());
+    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
+    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
+    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
 } catch (error) {
     console.error("Send transaction failed:", error.message);
 }
@@ -140,18 +140,18 @@ try {
         [noteId1, noteId2]  // Array of note IDs to consume
     );
 
-    const transactionResult = await webClient.newTransaction(
+    const transactionUpdate = await webClient.newTransaction(
         accountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionResult);
+    await webClient.submitTransaction(transactionUpdate);
     
     // Access transaction details
-    console.log("Block number:", transactionResult.blockNum());
-    console.log("Created notes:", transactionResult.createdNotes());
-    console.log("Consumed notes:", transactionResult.consumedNotes());
-    console.log("Account delta:", transactionResult.accountDelta());
+    console.log("Block number:", transactionUpdate.blockNum());
+    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
+    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
+    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
 } catch (error) {
     console.error("Consume transaction failed:", error.message);
 }
@@ -235,18 +235,18 @@ try {
         .build();
 
     // Create and submit the transaction
-    const transactionResult = await webClient.newTransaction(
+    const transactionUpdate = await webClient.newTransaction(
         accountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionResult);
+    await webClient.submitTransaction(transactionUpdate);
     
     // Access transaction details
-    console.log("Block number:", transactionResult.blockNum());
-    console.log("Created notes:", transactionResult.createdNotes());
-    console.log("Consumed notes:", transactionResult.consumedNotes());
-    console.log("Account delta:", transactionResult.accountDelta());
+    console.log("Block number:", transactionUpdate.blockNum());
+    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
+    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
+    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
 } catch (error) {
     console.error("Custom transaction failed:", error.message);
 }
