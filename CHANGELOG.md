@@ -5,6 +5,7 @@
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
+* Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 
 ## 0.11.2 (2025-09-02)
 
