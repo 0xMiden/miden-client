@@ -120,42 +120,6 @@ pub mod account_proofs {
         }
     }
 }
-/// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CheckNullifiersByPrefixRequest {
-    /// Number of bits used for nullifier prefix. Currently the only supported value is 16.
-    #[prost(uint32, tag = "1")]
-    pub prefix_len: u32,
-    /// List of nullifiers to check. Each nullifier is specified by its prefix with length equal
-    /// to `prefix_len`.
-    #[prost(uint32, repeated, tag = "2")]
-    pub nullifiers: ::prost::alloc::vec::Vec<u32>,
-    /// Block number from which the nullifiers are requested (inclusive).
-    #[prost(fixed32, tag = "3")]
-    pub block_num: u32,
-}
-/// Represents the result of checking nullifiers by prefix.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CheckNullifiersByPrefixResponse {
-    /// List of nullifiers matching the prefixes specified in the request.
-    #[prost(message, repeated, tag = "1")]
-    pub nullifiers: ::prost::alloc::vec::Vec<
-        check_nullifiers_by_prefix_response::NullifierUpdate,
-    >,
-}
-/// Nested message and enum types in `CheckNullifiersByPrefixResponse`.
-pub mod check_nullifiers_by_prefix_response {
-    /// Represents a single nullifier update.
-    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-    pub struct NullifierUpdate {
-        /// Nullifier ID.
-        #[prost(message, optional, tag = "1")]
-        pub nullifier: ::core::option::Option<super::super::primitives::Digest>,
-        /// Block number.
-        #[prost(fixed32, tag = "2")]
-        pub block_num: u32,
-    }
-}
 /// List of nullifiers to return proofs for.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NullifierList {
@@ -169,6 +133,43 @@ pub struct CheckNullifiersResponse {
     /// Each requested nullifier has its corresponding nullifier proof at the same position.
     #[prost(message, repeated, tag = "1")]
     pub proofs: ::prost::alloc::vec::Vec<super::primitives::SmtOpening>,
+}
+/// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncNullifiersRequest {
+    /// Block number from which the nullifiers are requested (inclusive).
+    #[prost(message, optional, tag = "1")]
+    pub block_range: ::core::option::Option<BlockRange>,
+    /// Number of bits used for nullifier prefix. Currently the only supported value is 16.
+    #[prost(uint32, tag = "2")]
+    pub prefix_len: u32,
+    /// List of nullifiers to check. Each nullifier is specified by its prefix with length equal
+    /// to `prefix_len`.
+    #[prost(uint32, repeated, tag = "3")]
+    pub nullifiers: ::prost::alloc::vec::Vec<u32>,
+}
+/// Represents the result of syncing nullifiers.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncNullifiersResponse {
+    /// Pagination information.
+    #[prost(message, optional, tag = "1")]
+    pub pagination_info: ::core::option::Option<PaginationInfo>,
+    /// List of nullifiers matching the prefixes specified in the request.
+    #[prost(message, repeated, tag = "2")]
+    pub nullifiers: ::prost::alloc::vec::Vec<sync_nullifiers_response::NullifierUpdate>,
+}
+/// Nested message and enum types in `SyncNullifiersResponse`.
+pub mod sync_nullifiers_response {
+    /// Represents a single nullifier update.
+    #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+    pub struct NullifierUpdate {
+        /// Nullifier ID.
+        #[prost(message, optional, tag = "1")]
+        pub nullifier: ::core::option::Option<super::super::primitives::Digest>,
+        /// Block number.
+        #[prost(fixed32, tag = "2")]
+        pub block_num: u32,
+    }
 }
 /// State synchronization request.
 ///
@@ -221,36 +222,26 @@ pub struct SyncStateResponse {
 /// Allows clients to sync asset values for specific public accounts within a block range.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncAccountVaultRequest {
-    /// Block number from which to start synchronizing.
-    #[prost(fixed32, tag = "1")]
-    pub block_from: u32,
-    /// / Block number up to which to sync. If not specified, syncs up to the latest block.
-    /// /
-    /// / If specified, this block must be close to the chain tip (i.e., within 30 blocks),
-    /// / otherwise an error will be returned.
-    #[prost(fixed32, optional, tag = "2")]
-    pub block_to: ::core::option::Option<u32>,
+    /// Block range from which to start synchronizing.
+    ///
+    /// If the `block_to` is specified, this block must be close to the chain tip (i.e., within 30 blocks),
+    /// otherwise an error will be returned.
+    #[prost(message, optional, tag = "1")]
+    pub block_range: ::core::option::Option<BlockRange>,
     /// Account for which we want to sync asset vault.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag = "2")]
     pub account_id: ::core::option::Option<super::account::AccountId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncAccountVaultResponse {
-    /// The block number of the last update included in this response.
-    ///
-    /// For chunked responses, this may be less than request.block_to.
-    /// If it is less than request.block_to, the user is expected to make a subsequent request
-    /// starting from the next block to this one (ie, request.block_from = block_num + 1).
-    #[prost(fixed32, tag = "1")]
-    pub block_num: u32,
-    /// Chain tip at the moment of the request.
-    #[prost(fixed32, tag = "2")]
-    pub chain_tip: u32,
+    /// Pagination information.
+    #[prost(message, optional, tag = "1")]
+    pub pagination_info: ::core::option::Option<PaginationInfo>,
     /// List of asset updates for the account.
     ///
     /// Multiple updates can be returned for a single asset, and the one with a higher `block_num`
     /// is expected to be retained by the caller.
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag = "2")]
     pub updates: ::prost::alloc::vec::Vec<AccountVaultUpdate>,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
@@ -305,36 +296,26 @@ pub struct SyncNotesResponse {
 /// with support for cursor-based pagination to handle large storage maps.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncStorageMapsRequest {
-    /// Block number to start sending updates from (inclusive).
-    #[prost(fixed32, tag = "1")]
-    pub block_from: u32,
-    /// Block number up to which to sync. If not specified, syncs up to the latest block.
+    /// Block range from which to start synchronizing.
     ///
-    /// If specified, this block must be close to the chain tip (i.e., within 30 blocks),
+    /// If the `block_to` is specified, this block must be close to the chain tip (i.e., within 30 blocks),
     /// otherwise an error will be returned.
-    #[prost(fixed32, optional, tag = "2")]
-    pub block_to: ::core::option::Option<u32>,
+    #[prost(message, optional, tag = "1")]
+    pub block_range: ::core::option::Option<BlockRange>,
     /// Account for which we want to sync storage maps.
     #[prost(message, optional, tag = "3")]
     pub account_id: ::core::option::Option<super::account::AccountId>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncStorageMapsResponse {
-    /// The block number of the last update included in this response.
-    ///
-    /// For chunked responses, this may be less than request.block_to.
-    /// If it is less than request.block_to, the user is expected to make a subsequent request
-    /// starting from the next block to this one (ie, request.block_from = block_num + 1).
-    #[prost(fixed32, tag = "1")]
-    pub block_num: u32,
-    /// Current chain tip
-    #[prost(fixed32, tag = "2")]
-    pub chain_tip: u32,
+    /// Pagination information.
+    #[prost(message, optional, tag = "1")]
+    pub pagination_info: ::core::option::Option<PaginationInfo>,
     /// The list of storage map updates.
     ///
     /// Multiple updates can be returned for a single slot index and key combination, and the one
     /// with a higher `block_num` is expected to be retained by the caller.
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag = "2")]
     pub updates: ::prost::alloc::vec::Vec<StorageMapUpdate>,
 }
 /// Represents a single storage map update.
@@ -352,6 +333,44 @@ pub struct StorageMapUpdate {
     /// The storage map value.
     #[prost(message, optional, tag = "4")]
     pub value: ::core::option::Option<super::primitives::Digest>,
+}
+/// Represents a note script or nothing.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct MaybeNoteScript {
+    /// The script for a note by its root.
+    #[prost(message, optional, tag = "1")]
+    pub script: ::core::option::Option<super::note::NoteScript>,
+}
+/// Represents a block range.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct BlockRange {
+    /// Block number from which to start (inclusive).
+    #[prost(fixed32, tag = "1")]
+    pub block_from: u32,
+    /// Block number up to which to check (inclusive). If not specified, checks up to the latest block.
+    #[prost(fixed32, optional, tag = "2")]
+    pub block_to: ::core::option::Option<u32>,
+}
+/// Represents pagination information for chunked responses.
+///
+/// Pagination is done using block numbers as the axis, allowing clients to request
+/// data in chunks by specifying block ranges and continuing from where the previous
+/// response left off.
+///
+/// To request the next chunk, the client should use `block_num + 1` from the previous response
+/// as the `block_from` for the next request.
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct PaginationInfo {
+    /// Current chain tip
+    #[prost(fixed32, tag = "1")]
+    pub chain_tip: u32,
+    /// The block number of the last check included in this response.
+    ///
+    /// For chunked responses, this may be less than `request.block_range.block_to`.
+    /// If it is less than request.block_range.block_to, the user is expected to make a subsequent request
+    /// starting from the next block to this one (ie, request.block_range.block_from = block_num + 1).
+    #[prost(fixed32, tag = "2")]
+    pub block_num: u32,
 }
 /// Generated client implementations.
 pub mod rpc_client {
@@ -478,33 +497,6 @@ pub mod rpc_client {
                 .insert(GrpcMethod::new("rpc_store.Rpc", "CheckNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
-        ///
-        /// Note that only 16-bit prefixes are supported at this time.
-        pub async fn check_nullifiers_by_prefix(
-            &mut self,
-            request: impl tonic::IntoRequest<super::CheckNullifiersByPrefixRequest>,
-        ) -> core::result::Result<
-            tonic::Response<super::CheckNullifiersByPrefixResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/rpc_store.Rpc/CheckNullifiersByPrefix",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("rpc_store.Rpc", "CheckNullifiersByPrefix"));
-            self.inner.unary(req, path, codec).await
-        }
         /// Returns the latest state of an account with the specified ID.
         pub async fn get_account_details(
             &mut self,
@@ -628,6 +620,58 @@ pub mod rpc_client {
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(GrpcMethod::new("rpc_store.Rpc", "GetNotesById"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns the script for a note by its root.
+        pub async fn get_note_script_by_root(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::note::NoteRoot>,
+        ) -> core::result::Result<
+            tonic::Response<super::MaybeNoteScript>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc_store.Rpc/GetNoteScriptByRoot",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc_store.Rpc", "GetNoteScriptByRoot"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
+        ///
+        /// Note that only 16-bit prefixes are supported at this time.
+        pub async fn sync_nullifiers(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SyncNullifiersRequest>,
+        ) -> core::result::Result<
+            tonic::Response<super::SyncNullifiersResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc_store.Rpc/SyncNullifiers",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc_store.Rpc", "SyncNullifiers"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns info which can be used by the client to sync up to the tip of chain for the notes they are interested in.
