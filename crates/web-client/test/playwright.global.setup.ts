@@ -165,6 +165,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.helpers = window.helpers || {};
 
           // Add the remote prover url to window
+          window.rpcUrl = rpcUrl;
           window.remoteProverUrl = proverUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =

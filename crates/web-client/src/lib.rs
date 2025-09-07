@@ -12,6 +12,7 @@ use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Function;
 
 pub mod account;
 pub mod export;
@@ -72,7 +73,30 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
 
-        self.setup_client(web_rpc_client, seed).await?;
+        self.setup_client(web_rpc_client, seed, None, None, None).await?;
+
+        Ok(JsValue::from_str("Client created successfully"))
+    }
+
+    /// Creates a new client with the given node URL, optional seed, and external keystore
+    /// callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+    #[wasm_bindgen(js_name = "createClientWithExternalKeystore")]
+    pub async fn create_client_with_external_keystore(
+        &mut self,
+        node_url: Option<String>,
+        seed: Option<Vec<u8>>,
+        get_key_cb: Option<Function>,
+        insert_key_cb: Option<Function>,
+        sign_cb: Option<Function>,
+    ) -> Result<JsValue, JsValue> {
+        let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
+            Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
+        })?;
+
+        let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
+
+        self.setup_client(web_rpc_client, seed, get_key_cb, insert_key_cb, sign_cb)
+            .await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
@@ -82,6 +106,9 @@ impl WebClient {
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
         seed: Option<Vec<u8>>,
+        get_key_cb: Option<Function>,
+        insert_key_cb: Option<Function>,
+        sign_cb: Option<Function>,
     ) -> Result<(), JsValue> {
         let mut rng = match seed {
             Some(seed_bytes) => {
@@ -105,7 +132,7 @@ impl WebClient {
                 .map_err(|_| JsValue::from_str("Failed to initialize WebStore"))?,
         );
 
-        let keystore = WebKeyStore::new(rng);
+        let keystore = WebKeyStore::new_with_callbacks(rng, get_key_cb, insert_key_cb, sign_cb);
 
         self.inner = Some(
             Client::new(
