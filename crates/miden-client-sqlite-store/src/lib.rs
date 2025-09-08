@@ -3,6 +3,3 @@
 
 mod sqlite_store;
 pub use sqlite_store::SqliteStore;
-
-// Builder extension temporarily removed; construct SqliteStore directly and pass via
-// ClientBuilder::store(...)

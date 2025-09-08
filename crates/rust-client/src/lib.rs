@@ -136,8 +136,6 @@ pub mod builder;
 #[cfg(feature = "testing")]
 mod test_utils;
 
-// Tests have been extracted to a standalone crate to avoid cyclic deps.
-
 mod errors;
 
 // RE-EXPORTS

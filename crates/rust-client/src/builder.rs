@@ -49,10 +49,8 @@ pub struct ClientBuilder<AUTH> {
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
     /// An optional store provided by the user.
     store: Option<Arc<dyn Store>>,
-    // StoreFactory removed; provide store directly instead.
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
-    // The store must be provided by the caller.
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -119,8 +117,6 @@ where
         self
     }
 
-    // StoreFactory setter removed for now.
-
     /// Optionally provide a custom RNG.
     #[must_use]
     pub fn rng(mut self, rng: Box<dyn FeltRng>) -> Self {
@@ -186,7 +182,8 @@ where
             store
         } else {
             return Err(ClientError::ClientInitializationError(
-                "A store component must be specified.".into(),
+                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path if `sqlite` is enabled."
+                    .into(),
             ));
         };
 

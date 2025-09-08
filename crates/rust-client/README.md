@@ -25,11 +25,9 @@ Features `idxdb` and `web-tonic` are for WebAssembly builds; `tonic` is for nati
 
 The library user can provide their own implementations of `Store` and `RpcClient` traits, which can be used as components of `Client`, though it is not necessary. The `Store` trait is used to persist the state of the client, while the `RpcClient` trait is used to communicate via [gRPC](https://grpc.io/) with the Miden node.
 
-Storage backends are now provided as separate crates:
-- Native: `miden-client-sqlite-store`
-- Web (WASM): `indexed-db-store`
-
-Use `tonic` for native networking; `web-tonic` + `idxdb` for web.
+Storage backends are provided as separate crates:
+- SQLite: `miden-client-sqlite-store`, based on SQLite. For `std`-compatible environments.
+- Web (WASM): `indexed-db-store`, based on IndexedDB. For browser environments.
 
 ## License
 This project is [MIT licensed](../../LICENSE).

@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::store::StoreError;
+use miden_client::store::{Store, StoreError};
 use miden_client::transaction::{TransactionDetails, TransactionRecord, TransactionStatus};
 use miden_objects::Word;
 use miden_objects::block::BlockNumber;
@@ -12,6 +12,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::Date;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
+use crate::WebStore;
 
 // TYPES
 // ================================================================================================
@@ -58,14 +59,9 @@ pub async fn insert_proven_transaction_data(
         block_num: executed_transaction.block_header().block_num(),
         submission_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
-        // Use JS Date for WASM-friendly timestamp (seconds since epoch)
-        // Casting from f64 is intentional: JS Date.now() is non-negative milliseconds.
-        creation_timestamp: {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            {
-                (Date::now() as u64) / 1000
-            }
-        },
+        // TODO: make Store::get_current_timestamp() not take &self
+        creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
+            .expect("timestamp is always after epoch"),
     };
 
     let transaction_record = TransactionRecord::new(

@@ -83,9 +83,9 @@ export const test = base.extend<{ forEachTest: void }>({
             WebClient,
             MockWebClient,
           } = await import("./index.js");
-          let rpcUrl = `https://rpc.devnet.miden.io:443`;
+          let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
-            ? `https://tx-prover.devnet.miden.io:${remoteProverPort}`
+            ? `http://localhost:${remoteProverPort}`
             : undefined;
           const client = await WebClient.createClient(rpcUrl, undefined);
 
