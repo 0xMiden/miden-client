@@ -2,7 +2,7 @@
 
 ## 0.11.3 (2025-09-08)
 
-* Refreshed dependencies ([#1244](https://github.com/0xMiden/miden-client/pull/1244)).
+* Refreshed dependencies ([#1269](https://github.com/0xMiden/miden-client/pull/1269)).
 
 ## 0.11.2 (2025-09-02)
 
