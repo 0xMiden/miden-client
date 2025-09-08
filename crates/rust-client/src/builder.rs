@@ -9,8 +9,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
-use crate::rpc::NodeRpcClient;
-use crate::rpc::{Endpoint, TonicRpcClient};
+use crate::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use crate::store::Store;
 use crate::{Client, ClientError, DebugMode};
 
