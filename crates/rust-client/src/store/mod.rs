@@ -32,6 +32,7 @@ use miden_objects::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    PartialAccount,
     StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault};
@@ -284,6 +285,16 @@ pub trait Store: Send + Sync {
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+
+    async fn insert_partial_account(
+        &self,
+        partial_account: PartialAccount,
+    ) -> Result<(), StoreError>;
+
+    async fn get_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccount>, StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------

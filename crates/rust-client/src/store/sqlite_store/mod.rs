@@ -21,6 +21,7 @@ use miden_objects::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    PartialAccount,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -98,7 +99,7 @@ impl SqliteStore {
 
             let mut merkle_store = store.merkle_store.write();
             insert_asset_nodes(&mut merkle_store, &vault);
-            insert_storage_map_nodes(&mut merkle_store, &storage);
+            insert_storage_map_nodes(&mut merkle_store, storage.slots().iter());
         }
 
         Ok(store)
@@ -396,6 +397,28 @@ impl Store for SqliteStore {
 
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+        })
+        .await
+    }
+
+    async fn insert_partial_account(
+        &self,
+        partial_account: PartialAccount,
+    ) -> Result<(), StoreError> {
+        let merkle_store = self.merkle_store.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::insert_partial_account(conn, &merkle_store, &partial_account)
+        })
+        .await
+    }
+
+    async fn get_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccount>, StoreError> {
+        let merkle_store = self.merkle_store.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_partial_account(conn, &merkle_store, account_id)
         })
         .await
     }

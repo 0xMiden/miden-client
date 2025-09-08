@@ -1,5 +1,5 @@
 use miden_objects::Word;
-use miden_objects::account::{AccountStorage, StorageMap, StorageSlot};
+use miden_objects::account::{StorageMap, StorageSlot};
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SmtLeaf};
 
@@ -65,8 +65,11 @@ pub fn update_storage_map_nodes(
 }
 
 /// Inserts all storage map SMT nodes to the merkle store.
-pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &AccountStorage) {
-    let maps = storage.slots().iter().filter_map(|slot| {
+pub fn insert_storage_map_nodes<'a>(
+    merkle_store: &mut MerkleStore,
+    slots: impl Iterator<Item = &'a StorageSlot>,
+) {
+    let maps = slots.filter_map(|slot| {
         if let StorageSlot::Map(map) = slot {
             Some(map)
         } else {

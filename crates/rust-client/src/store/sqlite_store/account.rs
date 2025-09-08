@@ -7,20 +7,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    NonFungibleDeltaAction,
-    StorageMap,
-    StorageSlot,
-    StorageSlotType,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    AccountStorageHeader, NonFungibleDeltaAction, PartialAccount, PartialStorage,
+    PartialStorageMap, StorageMap, StorageSlot, StorageSlotType,
 };
-use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore};
+use miden_objects::asset::{Asset, AssetVault, FungibleAsset, PartialVault};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
@@ -29,12 +21,8 @@ use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::store::sqlite_store::merkle_store::{
-    get_asset_proof,
-    get_storage_map_item_proof,
-    insert_asset_nodes,
-    insert_storage_map_nodes,
-    update_asset_nodes,
-    update_storage_map_nodes,
+    get_asset_proof, get_storage_map_item_proof, insert_asset_nodes, insert_storage_map_nodes,
+    update_asset_nodes, update_storage_map_nodes,
 };
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 use crate::{insert_sql, subst};
@@ -155,7 +143,7 @@ impl SqliteStore {
         tx.commit()?;
 
         let mut merkle_store = merkle_store.write();
-        insert_storage_map_nodes(&mut merkle_store, account.storage());
+        insert_storage_map_nodes(&mut merkle_store, account.storage().slots().iter());
         insert_asset_nodes(&mut merkle_store, account.vault());
 
         Ok(())
@@ -330,6 +318,116 @@ impl SqliteStore {
         let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
 
         Ok((item, merkle_path))
+    }
+
+    pub(crate) fn insert_partial_account(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        partial_account: &PartialAccount,
+    ) -> Result<(), StoreError> {
+        let tx = conn.transaction()?;
+        Self::insert_account_header(&tx, &(partial_account).into(), None)?; //TODO: Should we receive account_seed?
+
+        Self::insert_account_code(&tx, partial_account.code())?;
+
+        let mut slots = vec![];
+        for (slot_type, value) in partial_account.storage().header().slots() {
+            match slot_type {
+                StorageSlotType::Value => slots.push(StorageSlot::Value(*value)),
+                StorageSlotType::Map => {
+                    let map =
+                        partial_account.storage().maps().find(|map| map.root() == *value).ok_or(
+                            StoreError::AccountError(AccountError::StorageMapRootNotFound(*value)),
+                        )?;
+                    let entries = map.entries().collect::<Vec<_>>();
+                    slots.push(StorageSlot::Map(
+                        StorageMap::with_entries(entries).unwrap(), /* TODO: Remove unwrap */
+                    ));
+                },
+            }
+        }
+
+        Self::insert_storage_slots(
+            &tx,
+            partial_account.storage().commitment(),
+            slots.iter().enumerate(),
+        )?;
+
+        // TODO: This should be exposed from miden_base
+        let mut assets = vec![];
+        for leaf in partial_account.vault().leaves() {
+            match leaf {
+                SmtLeaf::Single((_, value)) => assets.push(Asset::try_from(value)?),
+                SmtLeaf::Multiple(items) => {
+                    for (_, value) in items {
+                        assets.push(Asset::try_from(value)?);
+                    }
+                },
+                SmtLeaf::Empty(_) => {},
+            }
+        }
+
+        Self::insert_assets(&tx, partial_account.vault().root(), assets.into_iter())?;
+
+        let mut merkle_store = merkle_store.write();
+        insert_storage_map_nodes(&mut merkle_store, slots.iter());
+        merkle_store.extend(partial_account.vault().inner_nodes());
+
+        Ok(())
+    }
+
+    pub(crate) fn get_partial_account(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccount>, StoreError> {
+        let header = Self::get_account_header(conn, account_id)?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        let merkle_store = merkle_store.read();
+        let mut partial_vault = PartialVault::default();
+        for asset in query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])? {
+            let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+            partial_vault
+                .add(
+                    SmtProof::new(proof, SmtLeaf::Single((asset.vault_key(), asset.into())))
+                        .unwrap(), /* TODO: Remove unwrap */
+                )
+                .unwrap() /* TODO: Remove unwrap */;
+        }
+
+        let mut storage_header = vec![];
+        let mut maps = vec![];
+        for slot in query_storage_slots(
+            conn,
+            "commitment = ?",
+            params![header.storage_commitment().to_hex()],
+        )?
+        .into_values()
+        {
+            match slot {
+                StorageSlot::Value(value) => storage_header.push((StorageSlotType::Value, value)),
+                StorageSlot::Map(map) => {
+                    //TODO: This might not work as inteded, this map may calculate the root based
+                    // on the returned entries and not on the original partial storage map root.
+                    storage_header.push((StorageSlotType::Map, map.root()));
+                    maps.push(PartialStorageMap::from(map));
+                },
+            }
+        }
+
+        let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PartialAccount::new(
+            account_id,
+            header.nonce(),
+            account_code,
+            PartialStorage::new(AccountStorageHeader::new(storage_header), maps)?,
+            partial_vault,
+        )))
     }
 
     // ACCOUNT DELTA HELPERS
@@ -597,7 +695,7 @@ impl SqliteStore {
         merkle_store: &mut MerkleStore,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        insert_storage_map_nodes(merkle_store, new_account_state.storage());
+        insert_storage_map_nodes(merkle_store, new_account_state.storage().slots().iter());
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().commitment(),
@@ -962,24 +1060,13 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
     use miden_objects::account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountComponent,
-        AccountDelta,
-        AccountHeader,
-        AccountId,
-        AccountStorageDelta,
-        AccountType,
-        AccountVaultDelta,
-        StorageMap,
-        StorageSlot,
+        Account, AccountBuilder, AccountCode, AccountComponent, AccountDelta, AccountHeader,
+        AccountId, AccountStorageDelta, AccountType, AccountVaultDelta, StorageMap, StorageSlot,
     };
     use miden_objects::asset::{Asset, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails};
     use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
     use miden_objects::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_objects::{EMPTY_WORD, ONE, ZERO};
