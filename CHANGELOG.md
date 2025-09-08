@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.8 (2025-09-29)
+
+* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+
 ## 0.11.7 (2025-09-26)
 
 * Fixed an issue where `AccountId` was being left as null-pointer ([#1340](https://github.com/0xMiden/miden-client/pull/1340)).
