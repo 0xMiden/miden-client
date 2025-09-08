@@ -54,6 +54,22 @@
 
 ***
 
+### signAndPrepareVerification()
+
+> **signAndPrepareVerification**(`message`): [`Felt`](Felt.md)[]
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
 ### signData()
 
 > **signData**(`signing_inputs`): [`Signature`](Signature.md)
