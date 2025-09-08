@@ -28,6 +28,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### toString()
 
 > **toString**(): `string`
@@ -37,6 +47,22 @@ Print the MAST source for this script.
 #### Returns
 
 `string`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `NoteScript`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`NoteScript`
 
 ***
 
