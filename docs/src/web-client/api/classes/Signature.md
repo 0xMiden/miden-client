@@ -28,6 +28,16 @@
 
 ***
 
+### toPreparedSignature()
+
+> **toPreparedSignature**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Signature`

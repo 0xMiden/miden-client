@@ -26,7 +26,7 @@ impl WebClient {
             None => Arc::new(MockRpcApi::default()),
         };
 
-        self.setup_client(mock_rpc_api.clone(), seed).await?;
+        self.setup_client(mock_rpc_api.clone(), seed, None, None, None).await?;
 
         self.mock_rpc_api = Some(mock_rpc_api);
 
