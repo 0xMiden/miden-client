@@ -11,7 +11,6 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use js_sys::Date;
 use miden_client::store::{
     AccountRecord,
     AccountStatus,

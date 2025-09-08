@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::store::{Store, StoreError};
+use miden_client::store::StoreError;
 use miden_client::transaction::{TransactionDetails, TransactionRecord, TransactionStatus};
 use miden_objects::Word;
 use miden_objects::block::BlockNumber;
@@ -9,10 +9,8 @@ use miden_objects::transaction::{ExecutedTransaction, ToInputNoteCommitments, Tr
 use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
-use wasm_bindgen_futures::js_sys::Date;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
-use crate::WebStore;
 
 // TYPES
 // ================================================================================================
