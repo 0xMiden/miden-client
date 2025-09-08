@@ -8,7 +8,6 @@ module.exports = [
       "miden-node/**/*",
       "**/*.d.ts",
       "docs/book/**/*",
-      // The web_store JS/TS lives in its own crate now and has its own ESLint config
       "crates/indexed-db-store/src/web_store/**",
     ],
   },

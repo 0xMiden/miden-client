@@ -42,20 +42,16 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::SqliteStore;
-// TESTS
-// ================================================================================================
-use miden_lib::{
-    account::{
-        auth::AuthRpoFalcon512,
-        faucets::BasicFungibleFaucet,
-        interface::AccountInterfaceError,
-        wallets::BasicWallet,
-    },
-    note::{utils, well_known_note::WellKnownNote},
-    testing::{mock_account::MockAccountExt, note::NoteBuilder},
-    transaction::TransactionKernel,
-    utils::{Deserializable, ScriptBuilder, Serializable},
-};
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::faucets::BasicFungibleFaucet;
+use miden_lib::account::interface::AccountInterfaceError;
+use miden_lib::account::wallets::BasicWallet;
+use miden_lib::note::utils;
+use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::testing::mock_account::MockAccountExt;
+use miden_lib::testing::note::NoteBuilder;
+use miden_lib::transaction::TransactionKernel;
+use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
 use miden_objects::account::{
     Account,
     AccountBuilder,
@@ -100,156 +96,12 @@ use miden_testing::{MockChain, MockChainBuilder};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
 
+pub mod store;
+mod transaction;
+
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
 const TX_GRACEFUL_BLOCKS: u32 = 20;
-
-// HELPERS
-// ================================================================================================
-
-pub async fn create_test_client()
--> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let mut client = builder.build().await.unwrap();
-    client.ensure_genesis_in_place().await.unwrap();
-
-    (client, rpc_api, keystore)
-}
-
-pub async fn create_test_client_builder()
--> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let store = SqliteStore::new(create_test_store_path()).await.unwrap();
-    let store = Arc::new(store);
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore_path = temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
-
-    let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
-    let arc_rpc_api = Arc::new(rpc_api.clone());
-
-    let builder = ClientBuilder::new()
-        .rpc(arc_rpc_api)
-        .rng(Box::new(rng))
-        .store(store)
-        .filesystem_keystore(keystore_path.to_str().unwrap())
-        .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
-
-    (builder, rpc_api, keystore)
-}
-
-pub async fn create_prebuilt_mock_chain() -> MockChain {
-    let mut mock_chain_builder = MockChainBuilder::new();
-    let mock_account = mock_chain_builder
-        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
-        .unwrap();
-
-    let note_first =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
-            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-            .build()
-            .unwrap();
-
-    let note_second =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
-            .note_type(NoteType::Private)
-            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-            .build()
-            .unwrap();
-    let mut mock_chain = mock_chain_builder.build().unwrap();
-
-    // Block 1: Create first note
-    mock_chain.add_pending_note(OutputNote::Full(note_first));
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 2
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 3
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 4: Create second note
-    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
-    mock_chain.prove_next_block().unwrap();
-
-    let transaction = Box::pin(
-        mock_chain
-            .build_tx_context(mock_account, &[note_second.id()], &[])
-            .unwrap()
-            .build()
-            .unwrap()
-            .execute(),
-    )
-    .await
-    .unwrap();
-
-    // Block 5: Consume (nullify) second note
-    mock_chain.add_pending_executed_transaction(&transaction).unwrap();
-    mock_chain.prove_next_block().unwrap();
-
-    mock_chain
-}
-
-async fn insert_new_wallet(
-    client: &mut TestClient,
-    storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
-) -> Result<(Account, Word), ClientError> {
-    let key_pair = SecretKey::with_rng(&mut client.rng());
-    let pub_key = key_pair.public_key();
-
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
-
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-
-    let (account, seed) = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
-        .with_component(BasicWallet)
-        .build()
-        .unwrap();
-
-    client.add_account(&account, Some(seed), false).await?;
-
-    Ok((account, seed))
-}
-
-async fn insert_new_fungible_faucet(
-    client: &mut TestClient,
-    storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
-) -> Result<(Account, Word), ClientError> {
-    let key_pair = SecretKey::with_rng(client.rng());
-    let pub_key = key_pair.public_key();
-
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
-
-    // we need to use an initial seed to create the wallet account
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-
-    let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
-        .expect("u64 can be safely converted to a field element");
-
-    let (account, seed) = AccountBuilder::new(init_seed)
-        .account_type(AccountType::FungibleFaucet)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .build()
-        .unwrap();
-
-    client.add_account(&account, Some(seed), false).await?;
-    Ok((account, seed))
-}
 
 // TESTS
 // ================================================================================================
@@ -2184,181 +2036,147 @@ async fn storage_and_vault_proofs() {
     }
 }
 
-#[cfg(test)]
-#[allow(clippy::module_inception)]
-pub mod tests {
-    use alloc::boxed::Box;
-    use alloc::vec::Vec;
+// HELPERS
+// ================================================================================================
 
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::testing::mock_account::MockAccountExt;
-    use miden_objects::account::{Account, AccountFile, AuthSecretKey};
-    use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
-    use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-    };
-    use miden_objects::{EMPTY_WORD, Word, ZERO};
+pub async fn create_test_client()
+-> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
 
-    use crate::tests::create_test_client;
-
-    fn create_account_data(account_id: u128) -> AccountFile {
-        let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
-
-        AccountFile::new(
-            account.clone(),
-            Some(Word::default()),
-            vec![AuthSecretKey::RpoFalcon512(SecretKey::new())],
-        )
-    }
-
-    pub fn create_initial_accounts_data() -> Vec<AccountFile> {
-        let account = create_account_data(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET);
-
-        let faucet_account = create_account_data(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET);
-
-        // Create Genesis state and save it to a file
-        let accounts = vec![account, faucet_account];
-
-        accounts
-    }
-
-    #[tokio::test]
-    pub async fn try_add_account() {
-        // generate test client
-        let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-
-        let account = Account::mock(
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-        );
-
-        // The mock account has nonce 1, we need it to be 0 for the test.
-        let (id, vault, storage, code, _) = account.into_parts();
-        let account = Account::from_parts(id, vault, storage, code, ZERO);
-
-        assert!(client.add_account(&account, None, false).await.is_err());
-        assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn load_accounts_test() {
-        // generate test client
-        let (mut client, ..) = Box::pin(create_test_client()).await;
-
-        let created_accounts_data = create_initial_accounts_data();
-
-        for account_data in created_accounts_data.clone() {
-            client
-                .add_account(&account_data.account, account_data.account_seed, false)
-                .await
-                .unwrap();
-        }
-
-        let expected_accounts: Vec<Account> = created_accounts_data
-            .into_iter()
-            .map(|account_data| account_data.account)
-            .collect();
-        let accounts = client.get_account_headers().await.unwrap();
-
-        assert_eq!(accounts.len(), 2);
-        for (client_acc, expected_acc) in accounts.iter().zip(expected_accounts.iter()) {
-            assert_eq!(client_acc.0.commitment(), expected_acc.commitment());
-        }
-    }
+    (client, rpc_api, keystore)
 }
 
-#[cfg(test)]
-mod test {
-    use alloc::boxed::Box;
+pub async fn create_test_client_builder()
+-> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
 
-    use miden_client::transaction::{TransactionRequestBuilder, TransactionResult};
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::transaction::TransactionKernel;
-    use miden_lib::utils::{Deserializable, Serializable};
-    use miden_objects::Word;
-    use miden_objects::account::{
-        AccountBuilder,
-        AccountComponent,
-        AuthSecretKey,
-        StorageMap,
-        StorageSlot,
-    };
-    use miden_objects::asset::{Asset, FungibleAsset};
-    use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
-    use miden_objects::note::NoteType;
-    use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-    };
+    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-    use super::PaymentNoteDescription;
-    use crate::tests::create_test_client;
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
 
-    #[tokio::test]
-    async fn transaction_creates_two_notes() {
-        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-        let asset_1: Asset =
-            FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
-                .unwrap()
-                .into();
-        let asset_2: Asset =
-            FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 500)
-                .unwrap()
-                .into();
+    let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
+    let arc_rpc_api = Arc::new(rpc_api.clone());
 
-        let secret_key = SecretKey::new();
-        let pub_key = secret_key.public_key();
-        keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
+    let sqlite_store = SqliteStore::new(create_test_store_path()).await.unwrap();
+    let builder = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .store(Arc::new(sqlite_store))
+        .filesystem_keystore(keystore_path.to_str().unwrap())
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_graceful_blocks(None);
 
-        let wallet_component = AccountComponent::compile(
-            "
-                export.::miden::contracts::wallets::basic::receive_asset
-                export.::miden::contracts::wallets::basic::move_asset_to_note
-            ",
-            TransactionKernel::assembler(),
-            vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
-        )
-        .unwrap()
-        .with_supports_all_types();
+    (builder, rpc_api, keystore)
+}
 
-        let account = AccountBuilder::new(Default::default())
-            .with_component(wallet_component)
-            .with_auth_component(AuthRpoFalcon512::new(pub_key))
-            .with_assets([asset_1, asset_2])
-            .build_existing()
+pub async fn create_prebuilt_mock_chain() -> MockChain {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+
+    let note_first =
+        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
+            .build()
             .unwrap();
 
-        client.add_account(&account, None, false).await.unwrap();
-        client.sync_state().await.unwrap();
-        let tx_request = TransactionRequestBuilder::new()
-            .build_pay_to_id(
-                PaymentNoteDescription::new(
-                    vec![asset_1, asset_2],
-                    account.id(),
-                    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
-                ),
-                NoteType::Private,
-                client.rng(),
-            )
+    let note_second =
+        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+            .note_type(NoteType::Private)
+            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
+            .build()
             .unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
 
-        let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
-        assert!(
-            tx_result
-                .created_notes()
-                .get_note(0)
-                .assets()
-                .is_some_and(|assets| assets.num_assets() == 2)
-        );
-        // Prove and apply transaction
-        Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
+    // Block 1: Create first note
+    mock_chain.add_pending_note(OutputNote::Full(note_first));
+    mock_chain.prove_next_block().unwrap();
 
-        // Test serialization
-        let bytes: std::vec::Vec<u8> = tx_result.to_bytes();
-        let decoded = TransactionResult::read_from_bytes(&bytes).unwrap();
+    // Block 2
+    mock_chain.prove_next_block().unwrap();
 
-        assert_eq!(tx_result, decoded);
-    }
+    // Block 3
+    mock_chain.prove_next_block().unwrap();
+
+    // Block 4: Create second note
+    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
+    mock_chain.prove_next_block().unwrap();
+
+    let transaction = Box::pin(
+        mock_chain
+            .build_tx_context(mock_account, &[note_second.id()], &[])
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+
+    // Block 5: Consume (nullify) second note
+    mock_chain.add_pending_executed_transaction(&transaction).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    mock_chain
+}
+
+async fn insert_new_wallet(
+    client: &mut TestClient,
+    storage_mode: AccountStorageMode,
+    keystore: &FilesystemKeyStore<StdRng>,
+) -> Result<(Account, Word), ClientError> {
+    let key_pair = SecretKey::with_rng(&mut client.rng());
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_component(BasicWallet)
+        .build()
+        .unwrap();
+
+    client.add_account(&account, Some(seed), false).await?;
+
+    Ok((account, seed))
+}
+
+async fn insert_new_fungible_faucet(
+    client: &mut TestClient,
+    storage_mode: AccountStorageMode,
+    keystore: &FilesystemKeyStore<StdRng>,
+) -> Result<(Account, Word), ClientError> {
+    let key_pair = SecretKey::with_rng(client.rng());
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+
+    // we need to use an initial seed to create the wallet account
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("TEST").unwrap();
+    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
+        .expect("u64 can be safely converted to a field element");
+
+    let (account, seed) = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .build()
+        .unwrap();
+
+    client.add_account(&account, Some(seed), false).await?;
+    Ok((account, seed))
 }

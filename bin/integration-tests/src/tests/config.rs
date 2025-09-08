@@ -59,13 +59,6 @@ impl ClientConfig {
     ) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
         let (rpc_endpoint, rpc_timeout, store_config, auth_path) = self.as_parts();
 
-        let store = {
-            let sqlite_store = SqliteStore::new(store_config)
-                .await
-                .with_context(|| "failed to create SQLite store")?;
-            std::sync::Arc::new(sqlite_store)
-        };
-
         let mut rng = rand::rng();
         let coin_seed: [u64; 4] = rng.random();
 
@@ -75,10 +68,14 @@ impl ClientConfig {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
         })?;
 
+        let sqlite_store = SqliteStore::new(store_config)
+            .await
+            .with_context(|| "failed to create sqlite store")?;
+
         let builder = ClientBuilder::new()
             .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
             .rng(Box::new(rng))
-            .store(store)
+            .store(Arc::new(sqlite_store))
             .filesystem_keystore(auth_path.to_str().with_context(|| {
                 format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
             })?)

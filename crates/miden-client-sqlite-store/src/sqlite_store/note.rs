@@ -492,25 +492,7 @@ fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
 
     let script_root = recipient.script().root().to_hex();
 
-    let state_discriminant = match note.state() {
-        InputNoteState::Expected(_) => InputNoteState::STATE_EXPECTED,
-        InputNoteState::Unverified(_) => InputNoteState::STATE_UNVERIFIED,
-        InputNoteState::Committed(_) => InputNoteState::STATE_COMMITTED,
-        InputNoteState::Invalid(_) => InputNoteState::STATE_INVALID,
-        InputNoteState::ProcessingAuthenticated(_) => {
-            InputNoteState::STATE_PROCESSING_AUTHENTICATED
-        },
-        InputNoteState::ProcessingUnauthenticated(_) => {
-            InputNoteState::STATE_PROCESSING_UNAUTHENTICATED
-        },
-        InputNoteState::ConsumedAuthenticatedLocal(_) => {
-            InputNoteState::STATE_CONSUMED_AUTHENTICATED_LOCAL
-        },
-        InputNoteState::ConsumedUnauthenticatedLocal(_) => {
-            InputNoteState::STATE_CONSUMED_UNAUTHENTICATED_LOCAL
-        },
-        InputNoteState::ConsumedExternal(_) => InputNoteState::STATE_CONSUMED_EXTERNAL,
-    };
+    let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
     SerializedInputNoteData {
@@ -581,13 +563,7 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
 
     let nullifier = note.nullifier().map(|nullifier| nullifier.to_hex());
 
-    let state_discriminant = match note.state() {
-        OutputNoteState::ExpectedPartial => OutputNoteState::STATE_EXPECTED_PARTIAL,
-        OutputNoteState::ExpectedFull { .. } => OutputNoteState::STATE_EXPECTED_FULL,
-        OutputNoteState::CommittedPartial { .. } => OutputNoteState::STATE_COMMITTED_PARTIAL,
-        OutputNoteState::CommittedFull { .. } => OutputNoteState::STATE_COMMITTED_FULL,
-        OutputNoteState::Consumed { .. } => OutputNoteState::STATE_CONSUMED,
-    };
+    let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
     SerializedOutputNoteData {

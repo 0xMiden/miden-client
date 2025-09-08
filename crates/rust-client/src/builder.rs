@@ -49,6 +49,7 @@ pub struct ClientBuilder<AUTH> {
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
     /// An optional store provided by the user.
     store: Option<Arc<dyn Store>>,
+    // StoreFactory removed; provide store directly instead.
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
     // The store must be provided by the caller.
@@ -81,7 +82,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
 
 impl<AUTH> ClientBuilder<AUTH>
 where
-    AUTH: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static,
+    AUTH: BuilderAuthenticator,
 {
     /// Create a new `ClientBuilder` with default settings.
     #[must_use]
@@ -111,14 +112,14 @@ where
         self
     }
 
-    // sqlite_store path helper removed; supply a Store via `.store(...)`.
-
     /// Optionally provide a store directly.
     #[must_use]
     pub fn store(mut self, store: Arc<dyn Store>) -> Self {
         self.store = Some(store);
         self
     }
+
+    // StoreFactory setter removed for now.
 
     /// Optionally provide a custom RNG.
     #[must_use]
@@ -181,12 +182,11 @@ where
         };
 
         // Ensure a store was provided.
-        let arc_store: Arc<dyn Store> = if let Some(store) = self.store {
+        let store: Arc<dyn Store> = if let Some(store) = self.store {
             store
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)` with a concrete Store implementation."
-                    .into(),
+                "A store component must be specified.".into(),
             ));
         };
 
@@ -213,7 +213,7 @@ where
         Client::new(
             rpc_api,
             rng,
-            arc_store,
+            store,
             authenticator,
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
@@ -227,4 +227,18 @@ where
         )
         .await
     }
+}
+
+// AUTH TRAIT MARKER
+// ================================================================================================
+
+/// Marker trait to capture the bounds the builder requires for the authenticator type
+/// parameter
+pub trait BuilderAuthenticator:
+    TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+{
+}
+impl<T> BuilderAuthenticator for T where
+    T: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+{
 }

@@ -55,10 +55,6 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
-// SQLite store moved to `miden-client-sqlite-store` crate.
-
-// Web store moved to `indexed-db-store` crate.
-
 mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;

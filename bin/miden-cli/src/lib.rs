@@ -11,6 +11,7 @@ use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
+use miden_client_sqlite_store::SqliteStore;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
@@ -171,12 +172,9 @@ impl Cli {
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
-        // Build store explicitly from sqlite store crate
-        let sqlite_store = miden_client_sqlite_store::SqliteStore::new(
-            cli_config.store_filepath.to_str().expect("Store path should be valid").into(),
-        )
-        .await
-        .map_err(|e| CliError::Client(miden_client::ClientError::StoreError(e)))?;
+        let sqlite_store = SqliteStore::new(cli_config.store_filepath.clone())
+            .await
+            .map_err(|e| CliError::Internal(Box::new(e)))?;
 
         let mut builder = ClientBuilder::new()
             .store(Arc::new(sqlite_store))
