@@ -499,7 +499,7 @@ pub async fn mint_and_consume(
     .await
 }
 
-/// Creates a client builder with a local Sqlite store and initialized with the MockRpcApi for
+/// Creates a client builder with a local Sqlite store and initialized with the [`MockRpcApi`] for
 /// testing purposes.
 #[cfg(feature = "sqlite")]
 pub async fn create_mock_client_builder()
