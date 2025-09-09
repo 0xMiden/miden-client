@@ -69,7 +69,7 @@ use crate::test_utils::common::{
     assert_note_cannot_be_consumed_twice,
     consume_notes,
     create_mock_client,
-    create_test_client_builder,
+    create_mock_client_builder,
     execute_failing_tx,
     execute_tx,
     insert_new_fungible_faucet,
@@ -1456,7 +1456,7 @@ async fn get_output_notes() {
 
 #[tokio::test]
 async fn account_rollback() {
-    let (builder, mock_rpc_api, authenticator) = Box::pin(create_test_client_builder()).await;
+    let (builder, mock_rpc_api, authenticator) = Box::pin(create_mock_client_builder()).await;
 
     let mut client = builder.tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
 

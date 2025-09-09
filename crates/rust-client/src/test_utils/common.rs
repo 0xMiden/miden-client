@@ -502,7 +502,7 @@ pub async fn mint_and_consume(
 /// Creates a client builder with a local Sqlite store and initialized with the MockRpcApi for
 /// testing purposes.
 #[cfg(feature = "sqlite")]
-pub async fn create_test_client_builder()
+pub async fn create_mock_client_builder()
 -> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let store = Arc::new(store);
@@ -533,7 +533,7 @@ pub async fn create_test_client_builder()
 #[cfg(feature = "sqlite")]
 pub async fn create_mock_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let (builder, rpc_api, keystore) = Box::pin(create_mock_client_builder()).await;
     let mut client = builder.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
 
