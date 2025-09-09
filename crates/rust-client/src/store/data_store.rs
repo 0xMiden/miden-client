@@ -1,8 +1,10 @@
+use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
+use miden_objects::account::{Account, AccountId, PartialAccount};
+use miden_objects::asset::AssetWitness;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
 use miden_objects::transaction::PartialBlockchain;
@@ -41,11 +43,13 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
-    ) -> Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError> {
+    ) -> Result<(PartialAccount, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError>
+    {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
-        // Construct Account
+        //TODO: Only retrieve partial account. This should be done in the `tomyrd-partial-accounts`
+        // branch (and future PR). Construct Account
         let account_record = self
             .store
             .get_account(account_id)
@@ -80,7 +84,31 @@ impl DataStore for ClientDataStore {
                     err,
                 )
             })?;
-        Ok((account, seed, block_header, partial_blockchain))
+        Ok((account.into(), seed, block_header, partial_blockchain))
+    }
+
+    async fn get_vault_asset_witness(
+        &self,
+        account_id: AccountId,
+        vault_root: Word,
+        vault_key: Word,
+    ) -> Result<AssetWitness, DataStoreError> {
+        //TODO: Refactor `get_account_asset` for this.
+        let vault = self.store.get_account_vault(account_id).await?;
+
+        if vault.root() != vault_root {
+            return Err(DataStoreError::Other {
+                error_msg: "Vault root mismatch".into(),
+                source: None,
+            });
+        }
+
+        AssetWitness::new(vault.asset_tree().open(&vault_key)).map_err(|err| {
+            DataStoreError::Other {
+                error_msg: "Failed to open vault asset tree".into(),
+                source: Some(Box::new(err)),
+            }
+        })
     }
 }
 

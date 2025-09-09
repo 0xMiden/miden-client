@@ -1109,7 +1109,7 @@ where
                 .check_notes_consumability(
                     account.id(),
                     self.store.get_sync_height().await?,
-                    input_notes.clone(),
+                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
                     tx_args.clone(),
                 )
                 .await?;
