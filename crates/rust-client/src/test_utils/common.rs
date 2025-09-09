@@ -499,6 +499,8 @@ pub async fn mint_and_consume(
     .await
 }
 
+/// Creates a client builder with a local Sqlite store and initialized with the MockRpcApi for
+/// testing purposes.
 #[cfg(feature = "sqlite")]
 pub async fn create_test_client_builder()
 -> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
@@ -527,6 +529,7 @@ pub async fn create_test_client_builder()
     (builder, rpc_api, keystore)
 }
 
+/// Creates a client for interacting with the pre-built mock chain.
 #[cfg(feature = "sqlite")]
 pub async fn create_test_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
