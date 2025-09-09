@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## 0.12.0 (TBD)
 
 ### Features
