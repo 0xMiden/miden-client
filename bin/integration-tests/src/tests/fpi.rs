@@ -297,6 +297,8 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
 
+    // Create a fresh client to prove with a fresh LocalTransactionProver
+    // (see miden-base/issues/1865 for more details)
     let (mut client, _keystore) = client_config.clone().into_client().await?;
     let tx_result = client.new_transaction(native_account.id(), tx_request).await?;
 
