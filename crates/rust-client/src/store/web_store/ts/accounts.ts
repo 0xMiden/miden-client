@@ -212,10 +212,7 @@ export async function getAccountStorage(storageRoot: string) {
       return null;
     }
 
-    // Convert the module Blob to an ArrayBuffer
-    const storageArrayBuffer = await storageRecord.slots.arrayBuffer();
-    const storageArray = new Uint8Array(storageArrayBuffer);
-    const storageBase64 = uint8ArrayToBase64(storageArray);
+    const storageBase64 = uint8ArrayToBase64(storageRecord.slots);
     return {
       root: storageRecord.root,
       storage: storageBase64,
@@ -245,9 +242,7 @@ export async function getAccountAssetVault(vaultRoot: string) {
     }
 
     // Convert the assets Blob to an ArrayBuffer
-    const assetsArrayBuffer = await vaultRecord.assets.arrayBuffer();
-    const assetsArray = new Uint8Array(assetsArrayBuffer);
-    const assetsBase64 = uint8ArrayToBase64(assetsArray);
+    const assetsBase64 = uint8ArrayToBase64(vaultRecord.assets);
 
     return {
       root: vaultRecord.root,
@@ -302,7 +297,7 @@ export async function insertAccountStorage(
   storageSlots: Uint8Array
 ) {
   try {
-    const storageSlotsBlob = new Blob([new Uint8Array(storageSlots)]);
+    const storageSlotsBlob = new Uint8Array(storageSlots);
 
     // Prepare the data object to insert
     const data = {
@@ -325,12 +320,10 @@ export async function insertAccountAssetVault(
   assets: Uint8Array
 ) {
   try {
-    const assetsBlob = new Blob([new Uint8Array(assets)]);
-
     // Prepare the data object to insert
     const data = {
       root: vaultRoot, // Using vaultRoot as the key
-      assets: assetsBlob,
+      assets,
     };
 
     // Perform the insert using Dexie

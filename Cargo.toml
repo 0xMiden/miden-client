@@ -17,23 +17,28 @@ authors      = ["miden contributors"]
 edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
-rust-version = "1.88"
-version      = "0.11.3"
+rust-version = "1.89"
+version      = "0.12.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib                  = { default-features = false, version = "0.11" }
-miden-node-block-producer  = { version = "0.11" }
-miden-node-ntx-builder     = { version = "0.11" }
-miden-node-proto-build     = { default-features = false, version = "0.11" }
-miden-node-rpc             = { version = "0.11" }
-miden-node-store           = { version = "0.11" }
-miden-node-utils           = { version = "0.11" }
-miden-objects              = { default-features = false, version = "0.11" }
-miden-remote-prover        = { features = ["concurrent"], version = "0.11" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.11" }
-miden-testing              = { default-features = false, features = [], version = "0.11" }
-miden-tx                   = { default-features = false, version = "0.11" }
+miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-node-block-producer = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "tomyrd-update-next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-remote-prover = { branch = "tomyrd-update-next", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "tomyrd-update-next", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-testing = { branch = "next", default-features = false, features = [
+], git = "https://github.com/0xMiden/miden-base" }
+miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

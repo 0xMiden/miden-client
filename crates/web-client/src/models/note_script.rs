@@ -1,8 +1,10 @@
 use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
 use miden_objects::PrettyPrint;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -15,6 +17,14 @@ impl NoteScript {
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.0.to_pretty_string()
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.0)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<NoteScript, JsValue> {
+        deserialize_from_uint8array::<NativeNoteScript>(bytes).map(NoteScript)
     }
 
     pub fn p2id() -> Self {

@@ -57,22 +57,16 @@ export async function getTransactions(filter) {
                 scriptMap.set(script.scriptRoot, script.txScript);
             }
         });
-        const processedTransactions = await Promise.all(transactionRecords.map(async (transactionRecord) => {
+        const processedTransactions = await Promise.all(transactionRecords.map((transactionRecord) => {
             let txScriptBase64 = undefined;
             if (transactionRecord.scriptRoot) {
                 const txScript = scriptMap.get(transactionRecord.scriptRoot);
                 if (txScript) {
-                    const txScriptArrayBuffer = await txScript.arrayBuffer();
-                    const txScriptArray = new Uint8Array(txScriptArrayBuffer);
-                    txScriptBase64 = uint8ArrayToBase64(txScriptArray);
+                    txScriptBase64 = uint8ArrayToBase64(txScript);
                 }
             }
-            const detailsArrayBuffer = await transactionRecord.details.arrayBuffer();
-            const detailsArray = new Uint8Array(detailsArrayBuffer);
-            const detailsBase64 = uint8ArrayToBase64(detailsArray);
-            const statusArrayBuffer = await transactionRecord.status.arrayBuffer();
-            const statusArray = new Uint8Array(statusArrayBuffer);
-            const statusBase64 = uint8ArrayToBase64(statusArray);
+            const detailsBase64 = uint8ArrayToBase64(transactionRecord.details);
+            const statusBase64 = uint8ArrayToBase64(transactionRecord.status);
             const data = {
                 id: transactionRecord.id,
                 details: detailsBase64,
@@ -104,7 +98,7 @@ export async function insertTransactionScript(scriptRoot, txScript) {
         const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
         const data = {
             scriptRoot: scriptRootBase64,
-            txScript: mapOption(txScript, (txScript) => new Blob([new Uint8Array(txScript)])),
+            txScript: mapOption(txScript, (txScript) => new Uint8Array(txScript)),
         };
         await transactionScripts.add(data);
     }
@@ -117,15 +111,13 @@ export async function insertTransactionScript(scriptRoot, txScript) {
 }
 export async function upsertTransactionRecord(transactionId, details, blockNum, statusVariant, status, scriptRoot) {
     try {
-        const detailsBlob = new Blob([new Uint8Array(details)]);
-        const statusBlob = new Blob([new Uint8Array(status)]);
         const data = {
             id: transactionId,
-            details: detailsBlob,
+            details,
             scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
             blockNum: parseInt(blockNum, 10),
             statusVariant,
-            status: statusBlob,
+            status,
         };
         await transactions.put(data);
     }
