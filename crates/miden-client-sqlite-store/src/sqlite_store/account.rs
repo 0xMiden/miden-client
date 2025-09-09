@@ -3,11 +3,11 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::string::{String, ToString};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::vec::Vec;
 
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
-use miden_objects::account::{
+use miden_client::account::component::StorageSlotType;
+use miden_client::account::{
     Account,
     AccountCode,
     AccountDelta,
@@ -15,15 +15,14 @@ use miden_objects::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
-    NonFungibleDeltaAction,
     StorageMap,
     StorageSlot,
-    StorageSlotType,
 };
-use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore};
-use miden_objects::crypto::utils::{Deserializable, Serializable};
-use miden_objects::{AccountError, Felt, Word};
+use miden_client::asset::{Asset, AssetVault, FungibleAsset, NonFungibleDeltaAction};
+use miden_client::crypto::{MerklePath, MerkleStore};
+use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::utils::{Deserializable, RwLock, Serializable};
+use miden_client::{AccountError, Felt, Word};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -155,7 +154,7 @@ impl SqliteStore {
 
         tx.commit().into_store_error()?;
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+        let mut merkle_store = merkle_store.write();
         insert_storage_map_nodes(&mut merkle_store, account.storage());
         insert_asset_nodes(&mut merkle_store, account.vault());
 
@@ -190,7 +189,7 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+        let mut merkle_store = merkle_store.write();
         let tx = conn.transaction().into_store_error()?;
         Self::update_account_state(&tx, &mut merkle_store, new_account_state)?;
         tx.commit().into_store_error()
@@ -297,7 +296,7 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let merkle_store = merkle_store.read().expect("merkle_store lock poisoned");
+        let merkle_store = merkle_store.read();
 
         let merkle_path = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
 
@@ -330,7 +329,7 @@ impl SqliteStore {
 
         let item = map.get(&key);
 
-        let merkle_store = merkle_store.read().expect("merkle_store lock poisoned");
+        let merkle_store = merkle_store.read();
 
         let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
 
@@ -984,33 +983,37 @@ mod tests {
     use std::vec::Vec;
 
     use anyhow::Context;
-    use miden_client::asset::{Asset, FungibleAsset, NonFungibleAsset};
+    use miden_client::account::component::AccountComponent;
+    use miden_client::account::{
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountDelta,
+        AccountHeader,
+        AccountId,
+        AccountType,
+        StorageMap,
+        StorageSlot,
+    };
+    use miden_client::asset::{
+        AccountStorageDelta,
+        AccountVaultDelta,
+        Asset,
+        FungibleAsset,
+        NonFungibleAsset,
+        NonFungibleAssetDetails,
+    };
+    use miden_client::crypto::FalconPublicKey;
     use miden_client::store::Store;
     use miden_client::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
+    use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_client::transaction::TransactionKernel;
+    use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountComponent,
-        AccountDelta,
-        AccountHeader,
-        AccountId,
-        AccountStorageDelta,
-        AccountType,
-        AccountVaultDelta,
-        StorageMap,
-        StorageSlot,
-    };
-    use miden_objects::asset::NonFungibleAssetDetails;
-    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
-    use miden_objects::testing::constants::NON_FUNGIBLE_ASSET_DATA;
-    use miden_objects::{EMPTY_WORD, ONE, ZERO};
 
     use crate::sqlite_store::SqliteStore;
     use crate::sqlite_store::sql_error::SqlResultExt;
@@ -1030,8 +1033,11 @@ mod tests {
         )?
         .with_supports_all_types();
         let account_code = AccountCode::from_components(
-            &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
-            miden_objects::account::AccountType::RegularAccountUpdatableCode,
+            &[
+                AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)).into(),
+                account_component,
+            ],
+            AccountType::RegularAccountUpdatableCode,
         )?;
 
         store
@@ -1078,7 +1084,7 @@ mod tests {
         // Create and insert an account
         let (account, seed) = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
         store.insert_account(&account, Some(seed)).await?;
@@ -1111,7 +1117,7 @@ mod tests {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,
@@ -1164,7 +1170,7 @@ mod tests {
         ];
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
@@ -1198,7 +1204,7 @@ mod tests {
                     &delta,
                 )?;
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,

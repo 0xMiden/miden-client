@@ -69,8 +69,7 @@ impl WebStore {
 impl Store for WebStore {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
-        let now = chrono::Utc::now();
-        Some(u64::try_from(now.timestamp()).expect("timestamp is always after epoch"))
+        Some(current_timestamp_u64())
     }
 
     // SYNC
@@ -251,4 +250,13 @@ impl Store for WebStore {
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
     }
+}
+
+// UTILS
+// ================================================================================================
+
+/// Returns the current UTC timestamp as `u64` (non-leap seconds since Unix epoch).
+pub(crate) fn current_timestamp_u64() -> u64 {
+    let now = chrono::Utc::now();
+    u64::try_from(now.timestamp()).expect("timestamp is always after epoch")
 }

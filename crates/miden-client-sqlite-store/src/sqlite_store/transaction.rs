@@ -2,21 +2,22 @@
 
 use std::rc::Rc;
 use std::string::{String, ToString};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::vec::Vec;
 
+use miden_client::Word;
+use miden_client::crypto::MerkleStore;
+use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,
+    TransactionScript,
     TransactionStatus,
     TransactionStatusVariant,
     TransactionStoreUpdate,
 };
-use miden_objects::Word;
-use miden_objects::crypto::merkle::MerkleStore;
-use miden_objects::crypto::utils::{Deserializable, Serializable};
-use miden_objects::transaction::{ToInputNoteCommitments, TransactionScript};
+use miden_client::utils::{Deserializable as _, RwLock, Serializable as _};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
@@ -170,8 +171,7 @@ impl SqliteStore {
             block_num: executed_transaction.block_header().block_num(),
             submission_height: tx_update.submission_height(),
             expiration_block_num: executed_transaction.expiration_block_num(),
-            creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
-                .expect("timestamp is always after epoch"),
+            creation_timestamp: super::current_timestamp_u64(),
         };
 
         let transaction_record = TransactionRecord::new(
@@ -185,7 +185,7 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
-        let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+        let mut merkle_store = merkle_store.write();
         Self::apply_account_delta(
             &tx,
             &mut merkle_store,

@@ -1,8 +1,8 @@
+use miden_client::Word;
+use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
+use miden_client::asset::{Asset, AssetVault};
+use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf};
 use miden_client::store::StoreError;
-use miden_objects::Word;
-use miden_objects::account::{AccountStorage, StorageMap, StorageSlot};
-use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SmtLeaf};
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
 pub fn get_asset_proof(
@@ -88,7 +88,7 @@ pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &Accoun
 /// internal structure is so that merkle paths and roots match. For more information, see the
 /// [`miden_objects::crypto::merkle::Smt`] documentation and implementation.
 fn get_node_index(key: Word) -> Result<NodeIndex, StoreError> {
-    Ok(NodeIndex::new(miden_objects::crypto::merkle::SMT_DEPTH, key[3].as_int())?)
+    Ok(NodeIndex::new(SMT_DEPTH, key[3].as_int())?)
 }
 
 /// Builds the merkle node value for the given key and value.

@@ -2232,7 +2232,6 @@ dependencies = [
  "hex",
  "miden-client",
  "miden-lib",
- "miden-objects",
  "rusqlite",
  "rusqlite_migration",
  "thiserror 2.0.16",

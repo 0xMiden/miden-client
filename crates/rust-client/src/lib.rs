@@ -157,6 +157,7 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
+        AccountStorageDelta,
         AccountVaultDelta,
         FungibleAssetDelta,
         NonFungibleAssetDelta,
@@ -167,6 +168,7 @@ pub mod asset {
         AssetVault,
         FungibleAsset,
         NonFungibleAsset,
+        NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -189,9 +191,17 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub mod rpo_falcon512 {
+    pub use miden_objects::crypto::dsa::rpo_falcon512::{
+        PublicKey,
+        SecretKey,
+    };
+    }
+
+    pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
+        Forest,
         InOrderIndex,
         LeafIndex,
         MerklePath,
@@ -201,13 +211,14 @@ pub mod crypto {
         MmrPeaks,
         MmrProof,
         NodeIndex,
+        SMT_DEPTH,
         SmtLeaf,
         SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
-pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
+pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
 pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;

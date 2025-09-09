@@ -4,7 +4,18 @@ use std::rc::Rc;
 use std::string::{String, ToString};
 use std::vec::Vec;
 
-use miden_client::note::NoteUpdateTracker;
+use miden_client::Word;
+use miden_client::note::{
+    BlockNumber,
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteUpdateTracker,
+    Nullifier,
+};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -13,18 +24,7 @@ use miden_client::store::{
     OutputNoteState,
     StoreError,
 };
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::crypto::utils::{Deserializable, Serializable};
-use miden_objects::note::{
-    NoteAssets,
-    NoteDetails,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    Nullifier,
-};
+use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
 

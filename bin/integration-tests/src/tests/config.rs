@@ -64,18 +64,21 @@ impl ClientConfig {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
+        let store = {
+            let sqlite_store = SqliteStore::new(store_config)
+                .await
+                .with_context(|| "failed to create SQLite store")?;
+            std::sync::Arc::new(sqlite_store)
+        };
+
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
         })?;
 
-        let sqlite_store = SqliteStore::new(store_config)
-            .await
-            .with_context(|| "failed to create sqlite store")?;
-
         let builder = ClientBuilder::new()
             .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
             .rng(Box::new(rng))
-            .store(Arc::new(sqlite_store))
+            .store(store)
             .filesystem_keystore(auth_path.to_str().with_context(|| {
                 format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
             })?)

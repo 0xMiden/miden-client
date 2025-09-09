@@ -55,6 +55,7 @@ pub use miden_objects::{
         AccountFile,
         AccountHeader,
         AccountId,
+        AccountIdPrefix,
         AccountStorage,
         AccountStorageMode,
         AccountType,

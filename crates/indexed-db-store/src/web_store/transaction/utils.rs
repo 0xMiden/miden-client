@@ -57,9 +57,7 @@ pub async fn insert_proven_transaction_data(
         block_num: executed_transaction.block_header().block_num(),
         submission_height,
         expiration_block_num: executed_transaction.expiration_block_num(),
-        // TODO: make Store::get_current_timestamp() not take &self
-        creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
-            .expect("timestamp is always after epoch"),
+        creation_timestamp: crate::web_store::current_timestamp_u64(),
     };
 
     let transaction_record = TransactionRecord::new(

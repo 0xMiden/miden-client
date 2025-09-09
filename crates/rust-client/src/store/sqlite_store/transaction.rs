@@ -26,6 +26,12 @@ use crate::transaction::{
 };
 use crate::{insert_sql, subst};
 
+/// Returns the current UTC timestamp as `u64` (non-leap seconds since Unix epoch).
+fn current_timestamp_u64() -> u64 {
+    let now = chrono::Utc::now();
+    u64::try_from(now.timestamp()).expect("timestamp is always after epoch")
+}
+
 pub(crate) const UPSERT_TRANSACTION_QUERY: &str = insert_sql!(
     transactions {
         id,
@@ -169,8 +175,7 @@ impl SqliteStore {
             block_num: executed_transaction.block_header().block_num(),
             submission_height: tx_update.submission_height(),
             expiration_block_num: executed_transaction.expiration_block_num(),
-            creation_timestamp: u64::try_from(chrono::Utc::now().timestamp())
-                .expect("timestamp is always after epoch"),
+            creation_timestamp: current_timestamp_u64(),
         };
 
         let transaction_record = TransactionRecord::new(

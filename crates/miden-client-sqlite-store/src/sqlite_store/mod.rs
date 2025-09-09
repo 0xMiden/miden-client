@@ -8,11 +8,24 @@ use std::boxed::Box;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::string::ToString;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::apply_migrations;
+use miden_client::Word;
+use miden_client::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+};
+use miden_client::asset::{Asset, AssetVault};
+use miden_client::block::BlockHeader;
+use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
+use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -27,19 +40,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
-use miden_objects::Word;
-use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-};
-use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
-use miden_objects::note::{NoteTag, Nullifier};
+use miden_client::utils::RwLock;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 
@@ -94,7 +95,7 @@ impl SqliteStore {
             let vault = store.get_account_vault(id).await?;
             let storage = store.get_account_storage(id).await?;
 
-            let mut merkle_store = store.merkle_store.write().expect("merkle_store lock poisoned");
+            let mut merkle_store = store.merkle_store.write();
             insert_asset_nodes(&mut merkle_store, &vault);
             insert_storage_map_nodes(&mut merkle_store, &storage);
         }
@@ -130,8 +131,7 @@ impl SqliteStore {
 #[async_trait::async_trait]
 impl Store for SqliteStore {
     fn get_current_timestamp(&self) -> Option<u64> {
-        let now = chrono::Utc::now();
-        Some(u64::try_from(now.timestamp()).expect("timestamp is always after epoch"))
+        Some(current_timestamp_u64())
     }
 
     async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
@@ -401,6 +401,12 @@ impl Store for SqliteStore {
 
 // UTILS
 // ================================================================================================
+
+/// Returns the current UTC timestamp as `u64` (non-leap seconds since Unix epoch).
+pub(crate) fn current_timestamp_u64() -> u64 {
+    let now = chrono::Utc::now();
+    u64::try_from(now.timestamp()).expect("timestamp is always after epoch")
+}
 
 /// Gets a `u64` value from the database.
 ///

@@ -1,16 +1,15 @@
 #![allow(clippy::items_after_statements)]
 
 use std::collections::BTreeSet;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::vec::Vec;
 
+use miden_client::Word;
+use miden_client::crypto::MerkleStore;
+use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::crypto::merkle::MerkleStore;
-use miden_objects::crypto::utils::{Deserializable, Serializable};
-use miden_objects::note::NoteTag;
+use miden_client::utils::{Deserializable, RwLock, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
@@ -170,7 +169,7 @@ impl SqliteStore {
         Self::undo_account_state(&tx, &account_hashes_to_delete)?;
 
         // Update public accounts on the db that have been updated onchain
-        let mut merkle_store = merkle_store.write().expect("merkle_store lock poisoned");
+        let mut merkle_store = merkle_store.write();
         for account in account_updates.updated_public_accounts() {
             Self::update_account_state(&tx, &mut merkle_store, account)?;
         }

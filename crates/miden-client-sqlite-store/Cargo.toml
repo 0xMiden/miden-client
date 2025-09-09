@@ -13,7 +13,6 @@ crate-type = ["lib"]
 
 [dependencies]
 miden-client  = { path = "../rust-client", version = "0.12" }
-miden-objects = { workspace = true }
 
 anyhow      = { workspace = true }
 async-trait = { workspace = true }

@@ -6,11 +6,12 @@ use std::rc::Rc;
 use std::string::String;
 use std::vec::Vec;
 
+use miden_client::Word;
+use miden_client::block::BlockHeader;
+use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
+use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
-use miden_objects::Word;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{Forest, InOrderIndex, MmrPeaks};
-use miden_objects::crypto::utils::{Deserializable, Serializable};
+use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_iter};
 
@@ -348,10 +349,10 @@ pub(crate) fn set_block_header_has_client_notes(
 mod test {
     use std::vec::Vec;
 
+    use miden_client::block::BlockHeader;
+    use miden_client::crypto::{Forest, MmrPeaks};
     use miden_client::store::Store;
     use miden_lib::transaction::TransactionKernel;
-    use miden_objects::block::BlockHeader;
-    use miden_objects::crypto::merkle::{Forest, MmrPeaks};
 
     use crate::sqlite_store::SqliteStore;
     use crate::sqlite_store::tests::create_test_store;

@@ -2,7 +2,7 @@ use std::string::{String, ToString};
 use std::sync::LazyLock;
 use std::vec::Vec;
 
-use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
+use miden_client::crypto::{Blake3_160, Blake3Digest};
 use rusqlite::types::FromSql;
 use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
 use rusqlite_migration::{M, Migrations, SchemaVersion};
