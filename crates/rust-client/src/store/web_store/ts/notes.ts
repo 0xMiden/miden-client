@@ -197,7 +197,7 @@ async function processInputNotes(notes: IInputNote[]) {
 
 async function processOutputNotes(notes: IOutputNote[]) {
   return await Promise.all(
-    notes.map(async (note) => {
+    notes.map((note) => {
       const assetsBase64 = uint8ArrayToBase64(note.assets);
 
       const metadataBase64 = uint8ArrayToBase64(note.metadata);
