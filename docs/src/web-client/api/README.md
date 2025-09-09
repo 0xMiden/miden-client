@@ -9,6 +9,7 @@
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
+- [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 
@@ -120,5 +121,4 @@
 ## Type Aliases
 
 - [AddressInterface](type-aliases/AddressInterface.md)
-- [NetworkId](type-aliases/NetworkId.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)

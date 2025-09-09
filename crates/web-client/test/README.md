@@ -4,10 +4,12 @@ The .wasm must be run within the context of a webpage. To this end, we've set up
 test suite which hosts the .wasm on a local server and then executes WebClient commands
 within the context of the web page.
 
-## Prerequisites 
+## Prerequisites
 
 1. [Node](https://nodejs.org/en/download/package-manager)
-  - Node Version >= v20.16.0
+
+- Node Version >= v20.16.0
+
 1. These instructions utilize [yarn](https://classic.yarnpkg.com/lang/en/docs/install) but can also be executed with npm
 
 ## Running tests
@@ -15,7 +17,6 @@ within the context of the web page.
 1. Install dependencies via `yarn`
 2. Ensure the .wasm is built by running `yarn build` (use `yarn build-dev` for a shorter build time)
 3. In crates/web-client run `yarn test` to run all tests
-
    - Can alternatively run `yarn test:clean` to run the .wasm build process prior to testing. We provide both paths as the build process can take some time.
 
 4. To run an individual test by name run `yarn test test/name_of_test_file.ts`.
@@ -23,7 +24,7 @@ within the context of the web page.
 ## Writing tests
 
 1. The test setup in `playwright.global.setup` exposes the `WebClient` class (under
-the global `Window` object) which provides a static method `createClient` to create an instance of the web client.
+   the global `Window` object) which provides a static method `createClient` to create an instance of the web client.
    - Any further setup of wasm code should be done in this file and similarly expose a function for testing here
 2. `webClientTestUtils.ts` should contain all interfaces for interacting with the web client. If further methods need to be added, follow existing patterns which use the exposed `page` and pass through any required arguments to the page execution. Example:
 
