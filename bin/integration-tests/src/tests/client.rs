@@ -27,6 +27,7 @@ use miden_client::transaction::{
     TransactionStatus,
     TransactionWitness,
 };
+use miden_client_sqlite_store::SqliteStore;
 
 use crate::tests::config::ClientConfig;
 
@@ -35,12 +36,12 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
+    let sqlite_store = SqliteStore::new(store_config).await?;
+
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
-        .sqlite_store(
-            store_config.to_str().context("failed to convert store config path to string")?,
-        )
+        .store(Arc::new(sqlite_store))
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;

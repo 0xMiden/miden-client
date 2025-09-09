@@ -16,7 +16,7 @@ echo
 
 # Detect our two target directories
 if echo "$CHANGED_FILES" \
-     | grep -E '^crates/web-client/|^crates/rust-client/src/store/web_store/' \
+     | grep -E '^crates/web-client/|^crates/indexed-db-store/src/web_store/' \
   >/dev/null; then
   echo "code_changed=true" >> "$GITHUB_OUTPUT"
 else
