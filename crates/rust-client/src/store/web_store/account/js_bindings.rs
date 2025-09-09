@@ -36,21 +36,21 @@ extern "C" {
     // INSERTS
     // ================================================================================================
 
-    #[wasm_bindgen(js_name = insertAccountCode)]
-    pub fn idxdb_insert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = upsertAccountCode)]
+    pub fn idxdb_upsert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountStorage)]
-    pub fn idxdb_insert_account_storage(
+    #[wasm_bindgen(js_name = upsertAccountStorage)]
+    pub fn idxdb_upsert_account_storage(
         storage_root: String,
         storage_slots: Vec<u8>,
     ) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountAssetVault)]
-    pub fn idxdb_insert_account_asset_vault(vault_root: String, assets: Vec<u8>)
+    #[wasm_bindgen(js_name = upsertAccountAssetVault)]
+    pub fn idxdb_upsert_account_asset_vault(vault_root: String, assets: Vec<u8>)
     -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountRecord)]
-    pub fn idxdb_insert_account_record(
+    #[wasm_bindgen(js_name = upsertAccountRecord)]
+    pub fn idxdb_upsert_account_record(
         id: String,
         code_root: String,
         storage_root: String,

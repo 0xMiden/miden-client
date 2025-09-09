@@ -277,7 +277,7 @@ export async function getAccountAuthByPubKey(pubKey: string) {
 
 // INSERT FUNCTIONS
 
-export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
+export async function upsertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
     // Prepare the data object to insert
     const data = {
@@ -292,7 +292,7 @@ export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   }
 }
 
-export async function insertAccountStorage(
+export async function upsertAccountStorage(
   storageRoot: string,
   storageSlots: Uint8Array
 ) {
@@ -315,7 +315,7 @@ export async function insertAccountStorage(
   }
 }
 
-export async function insertAccountAssetVault(
+export async function upsertAccountAssetVault(
   vaultRoot: string,
   assets: Uint8Array
 ) {
@@ -332,7 +332,7 @@ export async function insertAccountAssetVault(
     logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
   }
 }
-export async function insertAccountRecord(
+export async function upsertAccountRecord(
   accountId: string,
   codeRoot: string,
   storageRoot: string,
@@ -355,7 +355,7 @@ export async function insertAccountRecord(
       locked: false,
     };
 
-    await accounts.add(data as IAccount);
+    await accounts.put(data as IAccount);
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
@@ -385,7 +385,7 @@ export async function upsertForeignAccountCode(
   codeRoot: string
 ) {
   try {
-    await insertAccountCode(codeRoot, code);
+    await upsertAccountCode(codeRoot, code);
 
     const data = {
       accountId,
