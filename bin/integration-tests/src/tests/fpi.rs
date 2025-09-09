@@ -296,8 +296,8 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
-    
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+
+    let (mut client, keystore) = client_config.clone().into_client().await?;
     let tx_result = client.new_transaction(native_account.id(), tx_request).await?;
 
     client.submit_transaction(tx_result).await?;
