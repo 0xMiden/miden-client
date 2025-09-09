@@ -9,8 +9,9 @@
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
 //!
-//! In addition, the module provides implementations for different environments (e.g. tonic-based or
-//! web-based) via feature flags ( `tonic` and `web-tonic`).
+//! The client implementation adapts to the target environment automatically:
+//! - Native targets use `tonic` transport with TLS.
+//! - `wasm32` targets use `tonic-web-wasm-client` transport.
 //!
 //! ## Example
 //!
@@ -71,9 +72,7 @@ mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
 
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
 mod tonic_client;
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
 pub use tonic_client::TonicRpcClient;
 
 use crate::store::InputNoteRecord;

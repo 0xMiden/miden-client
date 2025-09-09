@@ -9,9 +9,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
-use crate::rpc::NodeRpcClient;
-#[cfg(feature = "tonic")]
-use crate::rpc::{Endpoint, TonicRpcClient};
+use crate::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use crate::store::Store;
 use crate::{Client, ClientError, DebugMode};
 
@@ -102,8 +100,7 @@ where
         self
     }
 
-    /// Sets the a tonic RPC client from the endpoint and optional timeout.
-    #[cfg(feature = "tonic")]
+    /// Sets a tonic RPC client from the endpoint and optional timeout.
     #[must_use]
     pub fn tonic_rpc_client(mut self, endpoint: &Endpoint, timeout_ms: Option<u64>) -> Self {
         self.rpc_api = Some(Arc::new(TonicRpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
@@ -172,7 +169,7 @@ where
             client
         } else {
             return Err(ClientError::ClientInitializationError(
-                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)` if `tonic` is enabled."
+                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)`."
                     .into(),
             ));
         };

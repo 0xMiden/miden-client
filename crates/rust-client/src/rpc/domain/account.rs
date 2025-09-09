@@ -124,7 +124,6 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 // ================================================================================================
 
 impl proto::account::AccountHeader {
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
         use miden_objects::Felt;
 
@@ -169,7 +168,6 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
     /// # Errors
     /// - If account code is missing both on `self` and `known_account_codes`
     /// - If data cannot be correctly deserialized
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(
         self,
         account_id: AccountId,
