@@ -3,6 +3,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use std::collections::BTreeMap;
+use std::dbg;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -12,7 +13,7 @@ use miden_objects::account::{
     PartialStorageMap, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset, PartialVault};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, PartialSmt, SmtLeaf, SmtProof};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
@@ -326,32 +327,29 @@ impl SqliteStore {
         partial_account: &PartialAccount,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
-        Self::insert_account_header(&tx, &(partial_account).into(), None)?; //TODO: Should we receive account_seed?
-
         Self::insert_account_code(&tx, partial_account.code())?;
 
-        let mut slots = vec![];
-        for (slot_type, value) in partial_account.storage().header().slots() {
+        for (index, (slot_type, value)) in partial_account.storage().header().slots().enumerate() {
+            SqliteStore::insert_storage_value(
+                &tx,
+                partial_account.storage().commitment(),
+                index,
+                slot_type,
+                value,
+            )?;
+
             match slot_type {
-                StorageSlotType::Value => slots.push(StorageSlot::Value(*value)),
+                StorageSlotType::Value => {},
                 StorageSlotType::Map => {
                     let map =
                         partial_account.storage().maps().find(|map| map.root() == *value).ok_or(
                             StoreError::AccountError(AccountError::StorageMapRootNotFound(*value)),
                         )?;
-                    let entries = map.entries().collect::<Vec<_>>();
-                    slots.push(StorageSlot::Map(
-                        StorageMap::with_entries(entries).unwrap(), /* TODO: Remove unwrap */
-                    ));
+
+                    SqliteStore::insert_storage_map_entries(&tx, map.root(), map.entries())?;
                 },
             }
         }
-
-        Self::insert_storage_slots(
-            &tx,
-            partial_account.storage().commitment(),
-            slots.iter().enumerate(),
-        )?;
 
         // TODO: This should be exposed from miden_base
         let mut assets = vec![];
@@ -369,8 +367,11 @@ impl SqliteStore {
 
         Self::insert_assets(&tx, partial_account.vault().root(), assets.into_iter())?;
 
+        Self::insert_account_header(&tx, &(partial_account).into(), None)?; //TODO: Should we receive account_seed?
+        tx.commit()?;
+
         let mut merkle_store = merkle_store.write();
-        insert_storage_map_nodes(&mut merkle_store, slots.iter());
+        merkle_store.extend(partial_account.storage().inner_nodes());
         merkle_store.extend(partial_account.vault().inner_nodes());
 
         Ok(())
@@ -399,20 +400,50 @@ impl SqliteStore {
 
         let mut storage_header = vec![];
         let mut maps = vec![];
-        for slot in query_storage_slots(
+
+        let storage_values = query_storage_values(
             conn,
             "commitment = ?",
             params![header.storage_commitment().to_hex()],
-        )?
-        .into_values()
-        {
-            match slot {
-                StorageSlot::Value(value) => storage_header.push((StorageSlotType::Value, value)),
-                StorageSlot::Map(map) => {
+        )?;
+
+        let possible_roots: Vec<Value> =
+            storage_values.values().map(|(_, value)| Value::from(value.to_hex())).collect();
+
+        let mut storage_maps =
+            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
+
+        for (slot_type, value) in storage_values.into_values() {
+            match slot_type {
+                StorageSlotType::Value => storage_header.push((StorageSlotType::Value, value)),
+                StorageSlotType::Map => {
                     //TODO: This might not work as inteded, this map may calculate the root based
                     // on the returned entries and not on the original partial storage map root.
-                    storage_header.push((StorageSlotType::Map, map.root()));
-                    maps.push(PartialStorageMap::from(map));
+                    let map = storage_maps
+                        .remove(&value)
+                        .ok_or(AccountError::StorageMapRootNotFound(value))
+                        .unwrap();
+
+                    storage_header.push((StorageSlotType::Map, value));
+                    let proofs = map
+                        .entries()
+                        .map(|entry| {
+                            let path =
+                                get_storage_map_item_proof(&merkle_store, value, *entry.0).unwrap();
+                            SmtProof::new(
+                                path,
+                                SmtLeaf::Single((StorageMap::hash_key(*entry.0), *entry.1)),
+                            )
+                            .map_err(|err| {
+                                StoreError::ParsingError(format!(
+                                    "invalid smt proof received: {err}"
+                                ))
+                            })
+                        })
+                        .collect::<Result<Vec<SmtProof>, StoreError>>()
+                        .unwrap();
+
+                    maps.push(PartialStorageMap::new(PartialSmt::from_proofs(proofs)?));
                 },
             }
         }
@@ -425,7 +456,7 @@ impl SqliteStore {
             account_id,
             header.nonce(),
             account_code,
-            PartialStorage::new(AccountStorageHeader::new(storage_header), maps)?,
+            PartialStorage::new(AccountStorageHeader::new(storage_header), maps).unwrap(),
             partial_vault,
         )))
     }
@@ -810,38 +841,59 @@ impl SqliteStore {
         account_storage: impl Iterator<Item = (usize, &'a StorageSlot)>,
     ) -> Result<(), StoreError> {
         for (index, slot) in account_storage {
-            const QUERY: &str = insert_sql!(
-                account_storage {
-                    commitment,
-                    slot_index,
-                    slot_value,
-                    slot_type
-                } | REPLACE
-            );
-
-            tx.execute(
-                QUERY,
-                params![
-                    commitment.to_hex(),
-                    index,
-                    slot.value().to_hex(),
-                    slot.slot_type().to_bytes()
-                ],
+            SqliteStore::insert_storage_value(
+                tx,
+                commitment,
+                index,
+                &slot.slot_type(),
+                &slot.value(),
             )?;
 
             if let StorageSlot::Map(map) = slot {
-                const MAP_QUERY: &str =
-                    insert_sql!(storage_map_entries { root, key, value } | REPLACE);
-                for (key, value) in map.entries() {
-                    // Insert each entry of the storage map
-                    tx.execute(
-                        MAP_QUERY,
-                        params![map.root().to_hex(), key.to_hex(), value.to_hex()],
-                    )?;
-                }
+                SqliteStore::insert_storage_map_entries(
+                    tx,
+                    map.root(),
+                    map.entries().map(|(k, v)| (*k, *v)),
+                )?;
             }
         }
 
+        Ok(())
+    }
+
+    fn insert_storage_value(
+        tx: &Transaction<'_>,
+        commitment: Word,
+        index: usize,
+        slot_type: &StorageSlotType,
+        value: &Word,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(
+            account_storage {
+                commitment,
+                slot_index,
+                slot_value,
+                slot_type
+            } | REPLACE
+        );
+
+        tx.execute(
+            QUERY,
+            params![commitment.to_hex(), index, value.to_hex(), slot_type.to_bytes()],
+        )?;
+
+        Ok(())
+    }
+
+    fn insert_storage_map_entries(
+        tx: &Transaction<'_>,
+        root: Word,
+        entries: impl Iterator<Item = (Word, Word)>,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(storage_map_entries { root, key, value } | REPLACE);
+        for (key, value) in entries {
+            tx.execute(QUERY, params![root.to_hex(), key.to_hex(), value.to_hex()])?;
+        }
         Ok(())
     }
 
@@ -909,32 +961,17 @@ fn query_storage_slots(
     where_clause: &str,
     params: impl Params,
 ) -> Result<BTreeMap<u8, StorageSlot>, StoreError> {
-    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value, slot_type FROM account_storage";
-
-    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
-    let storage_values = conn
-        .prepare(&query)?
-        .query_map(params, |row| {
-            let index: u8 = row.get(0)?;
-            let value: String = row.get(1)?;
-            let slot_type: Vec<u8> = row.get(2)?;
-            Ok((index, value, slot_type))
-        })?
-        .map(|result| {
-            let (index, value, slot_type) = result?;
-            Ok((index, Word::try_from(value)?, StorageSlotType::read_from_bytes(&slot_type)?))
-        })
-        .collect::<Result<Vec<(u8, Word, StorageSlotType)>, StoreError>>()?;
+    let storage_values = query_storage_values(conn, where_clause, params)?;
 
     let possible_roots: Vec<Value> =
-        storage_values.iter().map(|(_, value, _)| Value::from(value.to_hex())).collect();
+        storage_values.values().map(|(_, value)| Value::from(value.to_hex())).collect();
 
     let mut storage_maps =
         query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
 
     Ok(storage_values
         .into_iter()
-        .map(|(index, value, slot_type)| {
+        .map(|(index, (slot_type, value))| {
             let slot = match slot_type {
                 StorageSlotType::Value => StorageSlot::Value(value),
                 StorageSlotType::Map => {
@@ -976,6 +1013,28 @@ fn query_storage_maps(
     }
 
     Ok(maps)
+}
+
+fn query_storage_values(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<BTreeMap<u8, (StorageSlotType, Word)>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value, slot_type FROM account_storage";
+
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
+    conn.prepare(&query)?
+        .query_map(params, |row| {
+            let index: u8 = row.get(0)?;
+            let value: String = row.get(1)?;
+            let slot_type: Vec<u8> = row.get(2)?;
+            Ok((index, value, slot_type))
+        })?
+        .map(|result| {
+            let (index, value, slot_type) = result?;
+            Ok((index, (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?)))
+        })
+        .collect()
 }
 
 fn query_vault_assets(

@@ -2,10 +2,11 @@ use alloc::vec::Vec;
 use std::boxed::Box;
 use std::collections::BTreeSet;
 use std::env::temp_dir;
-use std::println;
 use std::string::ToString;
 use std::sync::Arc;
+use std::{println, vec};
 
+use anyhow::Result;
 // TESTS
 // ================================================================================================
 use miden_lib::{
@@ -20,19 +21,22 @@ use miden_lib::{
 };
 use miden_objects::account::{
     Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
-    AccountStorageMode, AccountType, AuthSecretKey, StorageMap, StorageSlot,
+    AccountStorageHeader, AccountStorageMode, AccountType, AuthSecretKey, PartialAccount,
+    PartialStorage, PartialStorageMap, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::asset::{Asset, FungibleAsset, PartialVault, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
     Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
     NoteRecipient, NoteTag, NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -2147,4 +2151,85 @@ async fn storage_and_vault_proofs() {
 }
 
 #[tokio::test]
-async fn partial_account() {}
+async fn partial_account() -> Result<()> {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    // Build full account
+    let mut storage_map = StorageMap::new();
+    storage_map
+        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into());
+    storage_map.insert(
+        [Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)].into(),
+    );
+    storage_map.insert(
+        [Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)].into(),
+        [Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)].into(),
+    );
+    storage_map.insert(
+        [Felt::new(3), Felt::new(3), Felt::new(3), Felt::new(3)].into(),
+        [Felt::new(3), Felt::new(3), Felt::new(3), Felt::new(3)].into(),
+    );
+
+    let bump_item_component = AccountComponent::compile(
+        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        TransactionKernel::assembler(),
+        vec![StorageSlot::Map(storage_map.clone())],
+    )?
+    .with_supports_all_types();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(SecretKey::new().public_key()))
+        .with_component(BasicWallet)
+        .with_component(bump_item_component)
+        .with_assets(vec![
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1)?, 10)?
+                .into(),
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2)?, 20)?
+                .into(),
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET)?, 30)?
+                .into(),
+        ])
+        .build_existing()?;
+
+    // Build partial account by removing some elements
+    let partial_storage = PartialStorage::new(
+        AccountStorageHeader::new(vec![(StorageSlotType::Map, storage_map.root())]),
+        vec![PartialStorageMap::new(PartialSmt::from_proofs(vec![
+            storage_map.open(&MAP_KEY.into()),
+        ])?)],
+    )?;
+
+    let partial_vault = PartialVault::new(PartialSmt::from_proofs(vec![
+        account.vault().asset_tree().open(
+            &FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1)?, 0)?
+                .vault_key(),
+        ),
+    ])?)?;
+
+    let partial_account = PartialAccount::new(
+        account.id(),
+        account.nonce(),
+        account.code().clone(),
+        partial_storage,
+        partial_vault,
+    );
+
+    client.test_store().insert_partial_account(partial_account.clone()).await?;
+
+    let fetched_partial_account = client
+        .test_store()
+        .get_partial_account(partial_account.id())
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(fetched_partial_account, partial_account);
+
+    Ok(())
+}
