@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 default = []
 
 [dependencies]
-miden-client  = { default-features = false, path = "../rust-client", version = "0.12" }
+miden-client = { default-features = false, path = "../rust-client", version = "0.12" }
 
 async-trait          = { workspace = true }
 base64               = { version = "0.22" }

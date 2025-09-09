@@ -1003,7 +1003,7 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
-    use miden_client::crypto::FalconPublicKey;
+    use miden_client::crypto::rpo_falcon512::PublicKey;
     use miden_client::store::Store;
     use miden_client::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -1033,10 +1033,7 @@ mod tests {
         )?
         .with_supports_all_types();
         let account_code = AccountCode::from_components(
-            &[
-                AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)).into(),
-                account_component,
-            ],
+            &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
             AccountType::RegularAccountUpdatableCode,
         )?;
 
@@ -1084,7 +1081,7 @@ mod tests {
         // Create and insert an account
         let (account, seed) = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
         store.insert_account(&account, Some(seed)).await?;
@@ -1170,7 +1167,7 @@ mod tests {
         ];
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(FalconPublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
