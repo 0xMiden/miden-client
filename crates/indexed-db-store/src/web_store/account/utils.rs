@@ -1,12 +1,11 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
+use miden_client::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountStatus, StoreError};
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
-use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::utils::Deserializable;
-use miden_objects::{Felt, Word};
-use miden_tx::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
+use miden_client::{Felt, Word};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 

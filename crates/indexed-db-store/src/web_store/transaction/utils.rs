@@ -1,12 +1,17 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
+use miden_client::note::{BlockNumber, ToInputNoteCommitments};
 use miden_client::store::StoreError;
-use miden_client::transaction::{TransactionDetails, TransactionRecord, TransactionStatus};
-use miden_objects::Word;
-use miden_objects::block::BlockNumber;
-use miden_objects::transaction::{ExecutedTransaction, ToInputNoteCommitments, TransactionScript};
-use miden_tx::utils::Serializable;
+use miden_client::transaction::{
+    ExecutedTransaction,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionScript,
+    TransactionStatus,
+};
+use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 

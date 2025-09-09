@@ -2,11 +2,18 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
+use miden_client::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdError,
+    AccountStorage,
+};
+use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
-use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::{AccountIdError, Word};
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_client::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 

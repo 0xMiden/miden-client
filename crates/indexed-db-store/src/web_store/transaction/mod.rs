@@ -1,17 +1,17 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
+use miden_client::account::Account;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,
+    TransactionScript,
     TransactionStatus,
     TransactionStoreUpdate,
 };
-use miden_objects::Word;
-use miden_objects::account::Account;
-use miden_objects::transaction::TransactionScript;
-use miden_tx::utils::Deserializable;
+use miden_client::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 

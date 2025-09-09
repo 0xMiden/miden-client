@@ -1,9 +1,9 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::Account;
-use miden_tx::utils::Serializable;
+use miden_client::Word;
+use miden_client::account::Account;
+use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 

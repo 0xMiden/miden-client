@@ -192,10 +192,7 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-    pub use miden_objects::crypto::dsa::rpo_falcon512::{
-        PublicKey,
-        SecretKey,
-    };
+        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
     }
 
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};

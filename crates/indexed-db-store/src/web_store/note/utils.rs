@@ -2,7 +2,16 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use chrono::Utc;
-use miden_client::note::NoteUpdateTracker;
+use miden_client::Word;
+use miden_client::note::{
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteUpdateTracker,
+};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -10,17 +19,7 @@ use miden_client::store::{
     OutputNoteState,
     StoreError,
 };
-use miden_objects::Word;
-use miden_objects::note::{
-    NoteAssets,
-    NoteDetails,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-};
-use miden_objects::utils::Deserializable;
-use miden_tx::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 

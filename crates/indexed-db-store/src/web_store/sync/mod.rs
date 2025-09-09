@@ -1,12 +1,11 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::account::AccountId;
+use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
-use miden_objects::account::AccountId;
-use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteId, NoteTag};
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_client::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 

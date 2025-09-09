@@ -16,8 +16,6 @@ default = []
 
 [dependencies]
 miden-client  = { default-features = false, path = "../rust-client", version = "0.12" }
-miden-objects = { workspace = true }
-miden-tx      = { workspace = true }
 
 async-trait          = { workspace = true }
 base64               = { version = "0.22" }

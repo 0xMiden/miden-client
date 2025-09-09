@@ -2,11 +2,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
+use miden_client::block::BlockHeader;
+use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
+use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
-use miden_objects::Word;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{Forest, InOrderIndex, MmrPeaks};
-use miden_tx::utils::Deserializable;
+use miden_client::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 

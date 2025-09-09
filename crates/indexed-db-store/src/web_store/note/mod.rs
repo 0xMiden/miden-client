@@ -1,6 +1,8 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use miden_client::Word;
+use miden_client::note::Nullifier;
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -9,8 +11,6 @@ use miden_client::store::{
     OutputNoteState,
     StoreError,
 };
-use miden_objects::Word;
-use miden_objects::note::Nullifier;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
