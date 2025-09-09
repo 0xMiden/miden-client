@@ -3,12 +3,11 @@ import {
   inputNotes,
   outputNotes,
   notesScripts,
-  transactions,
   IInputNote,
   IOutputNote,
 } from "./schema.js";
 
-import { logWebStoreError, uint8ArrayToBase64, mapOption } from "./utils.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 export async function getOutputNotes(states: Uint8Array) {
   try {
@@ -198,7 +197,7 @@ async function processInputNotes(notes: IInputNote[]) {
 
 async function processOutputNotes(notes: IOutputNote[]) {
   return await Promise.all(
-    notes.map(async (note) => {
+    notes.map((note) => {
       const assetsBase64 = uint8ArrayToBase64(note.assets);
 
       const metadataBase64 = uint8ArrayToBase64(note.metadata);
