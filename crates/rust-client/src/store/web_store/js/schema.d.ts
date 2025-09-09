@@ -6,11 +6,11 @@ export interface IAccountCode {
 }
 export interface IAccountStorage {
     root: string;
-    slots: Blob;
+    slots: Uint8Array;
 }
 export interface IAccountVault {
     root: string;
-    assets: Blob;
+    assets: Uint8Array;
 }
 export interface IAccountAuth {
     pubKey: string;
@@ -29,40 +29,40 @@ export interface IAccount {
 }
 export interface ITransaction {
     id: string;
-    details: Blob;
+    details: Uint8Array;
     blockNum: number;
     scriptRoot?: string;
     statusVariant: number;
-    status: Blob;
+    status: Uint8Array;
 }
 export interface ITransactionScript {
     scriptRoot: string;
-    txScript?: Blob;
+    txScript?: Uint8Array;
 }
 export interface IInputNote {
     noteId: string;
     stateDiscriminant: number;
-    assets: Blob;
-    serialNumber: Blob;
-    inputs: Blob;
+    assets: Uint8Array;
+    serialNumber: Uint8Array;
+    inputs: Uint8Array;
     scriptRoot: string;
     nullifier: string;
     serializedCreatedAt: string;
-    state: Blob;
+    state: Uint8Array;
 }
 export interface IOutputNote {
     noteId: string;
     recipientDigest: string;
-    assets: Blob;
-    metadata: Blob;
+    assets: Uint8Array;
+    metadata: Uint8Array;
     stateDiscriminant: number;
     nullifier?: string;
     expectedHeight: number;
-    state: Blob;
+    state: Uint8Array;
 }
 export interface INotesScript {
     scriptRoot: string;
-    serializedNoteScript: Blob;
+    serializedNoteScript: Uint8Array;
 }
 export interface IStateSync {
     id: number;
@@ -70,8 +70,8 @@ export interface IStateSync {
 }
 export interface IBlockHeader {
     blockNum: string;
-    header: Blob;
-    partialBlockchainPeaks: Blob;
+    header: Uint8Array;
+    partialBlockchainPeaks: Uint8Array;
     hasClientNotes: string;
 }
 export interface IPartialBlockchainNode {

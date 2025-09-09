@@ -71,7 +71,7 @@ testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
 
 ##### network\_id
 
-[`NetworkId`](../type-aliases/NetworkId.md)
+[`NetworkId`](../enumerations/NetworkId.md)
 
 ##### account\_interface
 

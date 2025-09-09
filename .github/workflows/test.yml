@@ -119,8 +119,8 @@ jobs:
     needs: [ build-web-client-dist-folder ]
     strategy:
       matrix:
-        shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
+        shard_index: [1, 2, 3, 4]
+        shard_total: [4]
     steps:
       - uses: actions/checkout@main
       - name: Install Rust
@@ -146,11 +146,9 @@ jobs:
         run: make start-node-background
       - name: Run web client tests
         run: |
-          cd ./crates/web-client
-          yarn install
-          yarn playwright install --with-deps
-          MIDEN_WEB_DEV=true yarn run build
-          yarn playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+          make integration-test-web-client
+        env:
+          SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
       - name: Stop test node
         if: always()
         run: make stop-node

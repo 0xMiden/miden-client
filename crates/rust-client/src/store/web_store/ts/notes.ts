@@ -106,31 +106,23 @@ export async function upsertInputNote(
 ) {
   return db.transaction("rw", inputNotes, notesScripts, async (tx) => {
     try {
-      let assetsBlob = new Blob([new Uint8Array(assets)]);
-      let serialNumberBlob = new Blob([new Uint8Array(serialNumber)]);
-      let inputsBlob = new Blob([new Uint8Array(inputs)]);
-      let stateBlob = new Blob([new Uint8Array(state)]);
-
       const data = {
         noteId,
-        assets: assetsBlob,
-        serialNumber: serialNumberBlob,
-        inputs: inputsBlob,
+        assets,
+        serialNumber,
+        inputs,
         scriptRoot,
         nullifier,
-        state: stateBlob,
+        state,
         stateDiscriminant,
         serializedCreatedAt,
       };
 
       await tx.inputNotes.put(data);
 
-      let serializedNoteScriptBlob = new Blob([
-        new Uint8Array(serializedNoteScript),
-      ]);
       const noteScriptData = {
         scriptRoot,
-        serializedNoteScript: serializedNoteScriptBlob,
+        serializedNoteScript,
       };
 
       await tx.notesScripts.put(noteScriptData);
@@ -152,19 +144,15 @@ export async function upsertOutputNote(
 ) {
   return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
     try {
-      let assetsBlob = new Blob([new Uint8Array(assets)]);
-      let metadataBlob = new Blob([new Uint8Array(metadata)]);
-      let stateBlob = new Blob([new Uint8Array(state)]);
-
       const data = {
         noteId,
-        assets: assetsBlob,
+        assets,
         recipientDigest,
-        metadata: metadataBlob,
+        metadata,
         nullifier: nullifier ? nullifier : undefined,
         expectedHeight,
         stateDiscriminant,
-        state: stateBlob,
+        state,
       };
 
       await tx.outputNotes.put(data);
@@ -177,36 +165,23 @@ export async function upsertOutputNote(
 async function processInputNotes(notes: IInputNote[]) {
   return await Promise.all(
     notes.map(async (note) => {
-      const assetsArrayBuffer = await note.assets.arrayBuffer();
-      const assetsArray = new Uint8Array(assetsArrayBuffer);
-      const assetsBase64 = uint8ArrayToBase64(assetsArray);
+      const assetsBase64 = uint8ArrayToBase64(note.assets);
 
-      const serialNumberBuffer = await note.serialNumber.arrayBuffer();
-      const serialNumberArray = new Uint8Array(serialNumberBuffer);
-      const serialNumberBase64 = uint8ArrayToBase64(serialNumberArray);
+      const serialNumberBase64 = uint8ArrayToBase64(note.serialNumber);
 
-      const inputsBuffer = await note.inputs.arrayBuffer();
-      const inputsArray = new Uint8Array(inputsBuffer);
-      const inputsBase64 = uint8ArrayToBase64(inputsArray);
+      const inputsBase64 = uint8ArrayToBase64(note.inputs);
 
       let serializedNoteScriptBase64: string | undefined = undefined;
       if (note.scriptRoot) {
         let record = await notesScripts.get(note.scriptRoot);
         if (record) {
-          let serializedNoteScriptArrayBuffer =
-            await record.serializedNoteScript.arrayBuffer();
-          const serializedNoteScriptArray = new Uint8Array(
-            serializedNoteScriptArrayBuffer
-          );
           serializedNoteScriptBase64 = uint8ArrayToBase64(
-            serializedNoteScriptArray
+            record.serializedNoteScript
           );
         }
       }
 
-      const stateBuffer = await note.state.arrayBuffer();
-      const stateArray = new Uint8Array(stateBuffer);
-      const stateBase64 = uint8ArrayToBase64(stateArray);
+      const stateBase64 = uint8ArrayToBase64(note.state);
 
       return {
         assets: assetsBase64,
@@ -223,17 +198,11 @@ async function processInputNotes(notes: IInputNote[]) {
 async function processOutputNotes(notes: IOutputNote[]) {
   return await Promise.all(
     notes.map(async (note) => {
-      const assetsArrayBuffer = await note.assets.arrayBuffer();
-      const assetsArray = new Uint8Array(assetsArrayBuffer);
-      const assetsBase64 = uint8ArrayToBase64(assetsArray);
+      const assetsBase64 = uint8ArrayToBase64(note.assets);
 
-      const metadataArrayBuffer = await note.metadata.arrayBuffer();
-      const metadataArray = new Uint8Array(metadataArrayBuffer);
-      const metadataBase64 = uint8ArrayToBase64(metadataArray);
+      const metadataBase64 = uint8ArrayToBase64(note.metadata);
 
-      const stateBuffer = await note.state.arrayBuffer();
-      const stateArray = new Uint8Array(stateBuffer);
-      const stateBase64 = uint8ArrayToBase64(stateArray);
+      const stateBase64 = uint8ArrayToBase64(note.state);
 
       return {
         assets: assetsBase64,

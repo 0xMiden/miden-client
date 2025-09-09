@@ -67,7 +67,7 @@ pub trait OnNoteReceived {
 /// in the sync response.
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
-    rpc_api: Arc<dyn NodeRpcClient + Send>,
+    rpc_api: Arc<dyn NodeRpcClient>,
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
@@ -86,7 +86,7 @@ impl StateSync {
     /// * `tx_graceful_blocks` - The number of blocks that are considered old enough to discard.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
-        rpc_api: Arc<dyn NodeRpcClient + Send>,
+        rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_graceful_blocks: Option<u32>,
     ) -> Self {

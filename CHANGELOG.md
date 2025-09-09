@@ -2,15 +2,25 @@
 
 ## 0.12.0 (TBD)
 
+### Features
+
+* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
 * Bumped web-client version in package.json after merging main into next.
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
+* Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
+
+## 0.11.3 (2025-09-08)
+
+* Refreshed dependencies ([#1269](https://github.com/0xMiden/miden-client/pull/1269)).
 
 ## 0.11.2 (2025-09-02)
 
-* Added WASM bindings for the `Address` type from the miden_objects crate([#1244](https://github.com/0xMiden/miden-client/pull/1244)).
+* Added WASM bindings for the `Address` type from the miden_objects crate ([#1244](https://github.com/0xMiden/miden-client/pull/1244)).
+* Updated index.d.ts file to reflect recent address changes + updates to `NetworkId` enum ([#1249](https://github.com/0xMiden/miden-client/pull/1249))
 
 ## 0.11.1 (2025-08-31)
 

@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
+use miden_objects::Felt as NativeFelt;
 use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_objects::address::{
     AccountIdAddress,
     Address,
     AddressInterface as NativeAccountInterface,
 };
-use miden_objects::{Felt as NativeFelt, NetworkIdError};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -17,15 +17,17 @@ use crate::js_error_with_context;
 pub struct AccountId(NativeAccountId);
 
 #[wasm_bindgen]
+#[repr(u8)]
 pub enum NetworkId {
-    Mainnet = "mm",
-    Testnet = "mtst",
-    Devnet = "mdev",
+    Mainnet = 0,
+    Testnet = 1,
+    Devnet = 2,
 }
 
 #[wasm_bindgen]
+#[repr(u8)]
 pub enum AccountInterface {
-    BasicWallet,
+    BasicWallet = 0,
 }
 
 #[wasm_bindgen]
@@ -73,12 +75,7 @@ impl AccountId {
         network_id: NetworkId,
         account_interface: AccountInterface,
     ) -> Result<String, JsValue> {
-        let network_id = network_id.try_into().map_err(|err| {
-            js_error_with_context(
-                err,
-                "wrong network id, for a custom network id, use to bech32Custom",
-            )
-        })?;
+        let network_id: NativeNetworkId = network_id.into();
 
         let address: Address = AccountIdAddress::new(self.0, account_interface.into()).into();
         Ok(address.to_bech32(network_id))
@@ -137,16 +134,12 @@ impl From<&AccountId> for NativeAccountId {
     }
 }
 
-impl TryFrom<NetworkId> for NativeNetworkId {
-    type Error = NetworkIdError;
-    fn try_from(value: NetworkId) -> Result<Self, Self::Error> {
+impl From<NetworkId> for NativeNetworkId {
+    fn from(value: NetworkId) -> Self {
         match value {
-            NetworkId::Devnet => Ok(NativeNetworkId::Devnet),
-            NetworkId::Mainnet => Ok(NativeNetworkId::Mainnet),
-            NetworkId::Testnet => Ok(NativeNetworkId::Testnet),
-            NetworkId::__Invalid => Err(NetworkIdError::NetworkIdParseError(
-                "expected either a devnet, mainnet or testnet network ID".into(),
-            )),
+            NetworkId::Mainnet => NativeNetworkId::Mainnet,
+            NetworkId::Testnet => NativeNetworkId::Testnet,
+            NetworkId::Devnet => NativeNetworkId::Devnet,
         }
     }
 }
