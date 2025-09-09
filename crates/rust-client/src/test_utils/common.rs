@@ -531,7 +531,7 @@ pub async fn create_test_client_builder()
 
 /// Creates a client for interacting with the pre-built mock chain.
 #[cfg(feature = "sqlite")]
-pub async fn create_test_client()
+pub async fn create_mock_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
     let mut client = builder.build().await.unwrap();

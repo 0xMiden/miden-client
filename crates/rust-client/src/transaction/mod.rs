@@ -1361,12 +1361,12 @@ mod test {
     use miden_tx::utils::{Deserializable, Serializable};
 
     use super::PaymentNoteDescription;
-    use crate::test_utils::common::create_test_client;
+    use crate::test_utils::common::create_mock_client;
     use crate::transaction::{TransactionRequestBuilder, TransactionResult};
 
     #[tokio::test]
     async fn transaction_creates_two_notes() {
-        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+        let (mut client, _, keystore) = Box::pin(create_mock_client()).await;
         let asset_1: Asset =
             FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
                 .unwrap()

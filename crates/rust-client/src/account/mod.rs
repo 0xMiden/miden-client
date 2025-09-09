@@ -332,7 +332,7 @@ pub mod tests {
     };
     use miden_objects::{EMPTY_WORD, Word, ZERO};
 
-    use crate::test_utils::common::create_test_client;
+    use crate::test_utils::common::create_mock_client;
 
     fn create_account_data(account_id: u128) -> AccountFile {
         let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
@@ -358,7 +358,7 @@ pub mod tests {
     #[tokio::test]
     pub async fn try_add_account() {
         // generate test client
-        let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+        let (mut client, _rpc_api, _) = Box::pin(create_mock_client()).await;
 
         let account = Account::mock(
             ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -376,7 +376,7 @@ pub mod tests {
     #[tokio::test]
     async fn load_accounts_test() {
         // generate test client
-        let (mut client, ..) = Box::pin(create_test_client()).await;
+        let (mut client, ..) = Box::pin(create_mock_client()).await;
 
         let created_accounts_data = create_initial_accounts_data();
 
