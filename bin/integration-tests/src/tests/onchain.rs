@@ -175,7 +175,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let faucet_seed = status.seed().cloned();
 
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
-    client_2.add_account(&faucet_account_header, faucet_seed, false).await?;
+    client_2.add_account(faucet_account_header.clone(), faucet_seed, false).await?;
 
     // First Mint necessary token
     println!("First client consuming note");

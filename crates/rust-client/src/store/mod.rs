@@ -260,7 +260,7 @@ pub trait Store: Send + Sync {
     /// Inserts an [`Account`] along with the seed used to create it.
     async fn insert_account(
         &self,
-        account: &Account,
+        account: Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError>;
 
@@ -283,7 +283,7 @@ pub trait Store: Send + Sync {
     /// # Errors
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
-    async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+    async fn update_account(&self, new_account_state: Account) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------

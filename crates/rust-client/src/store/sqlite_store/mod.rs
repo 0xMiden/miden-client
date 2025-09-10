@@ -277,24 +277,22 @@ impl Store for SqliteStore {
 
     async fn insert_account(
         &self,
-        account: &Account,
+        account: Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
-        let cloned_account = account.clone();
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &merkle_store, &cloned_account, account_seed)
+            SqliteStore::insert_account(conn, &merkle_store, &account, account_seed)
         })
         .await
     }
 
-    async fn update_account(&self, account: &Account) -> Result<(), StoreError> {
-        let cloned_account = account.clone();
+    async fn update_account(&self, account: Account) -> Result<(), StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::update_account(conn, &merkle_store, &cloned_account)
+            SqliteStore::update_account(conn, &merkle_store, &account)
         })
         .await
     }

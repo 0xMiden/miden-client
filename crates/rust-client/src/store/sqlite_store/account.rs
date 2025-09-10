@@ -1048,7 +1048,7 @@ mod tests {
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
-        store.insert_account(&account, Some(seed)).await?;
+        store.insert_account(account.clone(), Some(seed)).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
@@ -1135,7 +1135,7 @@ mod tests {
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
-        store.insert_account(&account, None).await?;
+        store.insert_account(account.clone(), None).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, EMPTY_WORD);

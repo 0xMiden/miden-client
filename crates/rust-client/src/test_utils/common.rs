@@ -87,7 +87,7 @@ pub async fn insert_new_wallet_with_seed(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(account.clone(), Some(seed), false).await?;
 
     Ok((account, seed, key_pair))
 }
@@ -119,7 +119,7 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(account.clone(), Some(seed), false).await?;
     Ok((account, seed, key_pair))
 }
 
