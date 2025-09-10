@@ -30,6 +30,7 @@ use super::{
     generated as proto,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated::rpc_store::BlockRange;
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -378,21 +379,24 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    async fn check_nullifiers_by_prefix(
+    async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = proto::rpc_store::CheckNullifiersByPrefixRequest {
+        let request = proto::rpc_store::SyncNullifiersRequest {
             nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
             prefix_len: 16,
-            block_num: block_num.as_u32(),
+            block_range: Some(BlockRange {
+                block_from: block_num.as_u32(),
+                block_to: None,
+            }),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiersByPrefix, status)
+        let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
         })?;
         let response = response.into_inner();
         let nullifiers = response

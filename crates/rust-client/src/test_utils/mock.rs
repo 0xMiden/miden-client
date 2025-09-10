@@ -402,7 +402,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the nullifiers created after the specified block number that match the provided
     /// prefixes.
-    async fn check_nullifiers_by_prefix(
+    async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
         from_block_num: BlockNumber,
