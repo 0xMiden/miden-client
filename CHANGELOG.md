@@ -3,6 +3,7 @@
 ## 0.11.4
 
 * Added a mutable getter for `TransactionRequest`'s advice map ([#1254](https://github.com/0xMiden/miden-client/pull/1254)).
+* Added a way to retrieve map items in web client ([#1282](https://github.com/0xMiden/miden-client/pull/1282)).
 
 ## 0.11.3 (2025-09-08)
 
