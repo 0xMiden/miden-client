@@ -61,7 +61,7 @@ Errors:
 
 > **getMapItem**(`index`, `key`): [`Word`](Word.md)
 
-Returns a map item from a map located in storage at the specified index.
+Retrieves a map item from a map located in storage at the specified index.
 
 #### Parameters
 

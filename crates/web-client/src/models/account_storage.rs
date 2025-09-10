@@ -27,7 +27,7 @@ impl AccountStorage {
         self.0.get_item(index).ok().map(Into::into)
     }
 
-    /// Returns a map item from a map located in storage at the specified index.
+    /// Retrieves a map item from a map located in storage at the specified index.
     ///
     /// @remarks
     /// Errors:
