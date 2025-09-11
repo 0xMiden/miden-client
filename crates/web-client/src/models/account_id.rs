@@ -27,7 +27,8 @@ pub enum NetworkId {
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum AccountInterface {
-    BasicWallet = 0,
+    Unspecified = 0,
+    BasicWallet = 1,
 }
 
 #[wasm_bindgen]
@@ -137,6 +138,7 @@ impl From<AccountInterface> for NativeAccountInterface {
     fn from(account_interface: AccountInterface) -> Self {
         match account_interface {
             AccountInterface::BasicWallet => NativeAccountInterface::BasicWallet,
+            AccountInterface::Unspecified => NativeAccountInterface::Unspecified,
         }
     }
 }
