@@ -36,6 +36,7 @@
 //! For more details on accounts, refer to the [Account] documentation.
 
 use alloc::vec::Vec;
+use alloc::string::{ToString, String};
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
@@ -64,6 +65,7 @@ pub use miden_objects::{
     },
     address::{AccountIdAddress, Address, AddressInterface, AddressType},
 };
+use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
 use crate::errors::ClientError;
