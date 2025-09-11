@@ -82,6 +82,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let storage_requirements =
         AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
     let (mut client2, keystore2) = client_config.into_client().await?;
 
     let (wallet, ..) =
@@ -200,6 +202,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let tx_request = builder.foreign_accounts(foreign_accounts).build()?;
 
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
     let (mut client2, keystore2) = client_config.into_client().await?;
 
     let (native_account, ..) =
