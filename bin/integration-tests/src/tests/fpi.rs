@@ -202,7 +202,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let (mut client2, keystore2) = ClientConfig::default().into_client().await?;
 
-    let (native_account, _native_seed, _) =
+    let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
     let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
@@ -301,7 +301,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 
     let (mut client2, keystore2) = ClientConfig::default().into_client().await?;
 
-    let (native_account, _native_seed, _) =
+    let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
     let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
