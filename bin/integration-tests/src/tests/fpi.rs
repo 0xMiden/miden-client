@@ -84,7 +84,10 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) = client_config.into_client().await?;
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
 
     let (wallet, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Private, &keystore2).await?;
@@ -204,7 +207,10 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) = client_config.into_client().await?;
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
 
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
@@ -305,7 +311,10 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) = client_config.into_client().await?;
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
 
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
