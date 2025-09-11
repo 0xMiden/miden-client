@@ -55,7 +55,7 @@ impl ClientConfig {
     /// Creates the client builder using the provided `ClientConfig`. The store uses a `SQLite`
     /// database at a temporary location determined by the store config.
     pub async fn into_client_builder(
-        self,
+        &self,
     ) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
         let (rpc_endpoint, rpc_timeout, store_config, auth_path) = self.as_parts();
 
@@ -93,7 +93,7 @@ impl ClientConfig {
     /// Creates the client using the provided [`ClientConfig`]. The store uses a `SQLite` database
     /// at a temporary location determined by the store config. The client is synced to the
     /// current state before being returned.
-    pub async fn into_client(self) -> Result<(TestClient, TestClientKeyStore)> {
+    pub async fn into_client(&self) -> Result<(TestClient, TestClientKeyStore)> {
         let (builder, keystore) = self.into_client_builder().await?;
 
         let mut client = builder.build().await.with_context(|| "failed to build test client")?;

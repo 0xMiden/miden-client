@@ -82,7 +82,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let storage_requirements =
         AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
-    let (mut client2, keystore2) = ClientConfig::default().into_client().await?;
+    let (mut client2, keystore2) = client_config.into_client().await?;
 
     let (wallet, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Private, &keystore2).await?;
@@ -200,7 +200,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     let tx_request = builder.foreign_accounts(foreign_accounts).build()?;
 
-    let (mut client2, keystore2) = ClientConfig::default().into_client().await?;
+    let (mut client2, keystore2) = client_config.into_client().await?;
 
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
@@ -221,7 +221,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
 async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.clone().into_client().await?;
+    let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(
@@ -299,7 +299,9 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
 
-    let (mut client2, keystore2) = ClientConfig::default().into_client().await?;
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
+    let (mut client2, keystore2) = client_config.into_client().await?;
 
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
