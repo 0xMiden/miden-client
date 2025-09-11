@@ -38,17 +38,6 @@ impl AccountId {
         AccountId(native_account_id)
     }
 
-    #[wasm_bindgen(js_name = "fromBech32")]
-    pub fn from_bech32(bech32: &str) -> AccountId {
-        let Address::AccountId(account_id_address) =
-            Address::from_bech32(bech32).expect("expected a valid bech32 address").1
-        else {
-            panic!("expected an account ID address");
-        };
-
-        AccountId(account_id_address.id())
-    }
-
     #[wasm_bindgen(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
