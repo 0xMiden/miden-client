@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::apply_migrations;
-use miden_objects::Word;
 use miden_objects::account::{
     Account,
     AccountCode,
@@ -26,6 +25,7 @@ use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
 use miden_objects::note::{NoteTag, Nullifier};
+use miden_objects::{AccountError, Word};
 use miden_tx::utils::sync::RwLock;
 use rusqlite::Connection;
 use rusqlite::types::Value;
