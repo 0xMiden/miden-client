@@ -9,6 +9,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use miden_objects::Word;
@@ -247,6 +248,21 @@ impl Store for WebStore {
         account_id: AccountId,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
+    }
+
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
+    async fn set_setting_value(&self, _key: String, _value: Vec<u8>) -> Result<(), StoreError> {
+        unimplemented!()
+    }
+
+    async fn get_setting_value(&self, _key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        unimplemented!()
+    }
+
+    async fn delete_setting_value(&self, _key: String) -> Result<(), StoreError> {
+        unimplemented!()
     }
 }
 
