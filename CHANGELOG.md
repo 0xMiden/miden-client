@@ -5,6 +5,7 @@
 ### Features
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+* Separated `migrations` and `settings` tables [(#1287)](https://github.com/0xMiden/miden-client/pull/1287).
 
 ### Changes
 

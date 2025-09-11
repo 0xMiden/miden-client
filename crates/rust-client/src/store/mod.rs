@@ -22,6 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -285,6 +286,18 @@ pub trait Store: Send + Sync {
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
+    /// Adds a value to the `settings` table.
+    async fn set_setting_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError>;
+
+    /// Retrieves a value from the `settings` table.
+    async fn get_setting_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
+
+    /// Deletes a value from the `settings` table.
+    async fn delete_setting_value(&self, key: String) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------

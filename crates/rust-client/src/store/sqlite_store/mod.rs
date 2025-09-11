@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use std::path::PathBuf;
-use std::string::ToString;
+use std::string::{String, ToString};
 use std::sync::Arc;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
@@ -44,6 +44,11 @@ use super::{
     TransactionFilter,
 };
 use crate::store::StoreError;
+use crate::store::sqlite_store::db_management::utils::{
+    delete_settings_value,
+    get_settings_value,
+    set_settings_value,
+};
 use crate::store::sqlite_store::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -353,6 +358,20 @@ impl Store for SqliteStore {
             SqliteStore::get_foreign_account_code(conn, account_ids)
         })
         .await
+    }
+
+    async fn set_setting_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| set_settings_value(conn, &key, &value))
+            .await
+    }
+
+    async fn get_setting_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.interact_with_connection(move |conn| get_settings_value(conn, &key)).await
+    }
+
+    async fn delete_setting_value(&self, key: String) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| delete_settings_value(conn, &key))
+            .await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

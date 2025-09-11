@@ -22,7 +22,7 @@ use miden_objects::account::{
 use rand::RngCore;
 use tracing::debug;
 
-use crate::commands::account::maybe_set_default_account;
+use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
 use crate::{CliKeyStore, client_binary_name, load_config_file};
 
@@ -123,8 +123,6 @@ impl NewWalletCmd {
         )
         .await?;
 
-        let (mut current_config, _) = load_config_file()?;
-
         println!("Successfully created new wallet.");
         println!(
             "To view account details execute {} account -s {}",
@@ -132,7 +130,7 @@ impl NewWalletCmd {
             new_account.id().to_hex()
         );
 
-        maybe_set_default_account(&mut current_config, new_account.id())?;
+        set_default_account_if_unset(&mut client, new_account.id()).await?;
 
         Ok(())
     }
