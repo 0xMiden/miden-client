@@ -220,7 +220,7 @@ export async function getAccountAuthByPubKey(pubKey) {
     return data;
 }
 // INSERT FUNCTIONS
-export async function insertAccountCode(codeRoot, code) {
+export async function upsertAccountCode(codeRoot, code) {
     try {
         // Prepare the data object to insert
         const data = {
@@ -234,7 +234,7 @@ export async function insertAccountCode(codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function insertAccountStorage(storageRoot, storageSlots) {
+export async function upsertAccountStorage(storageRoot, storageSlots) {
     try {
         const storageSlotsBlob = new Uint8Array(storageSlots);
         // Prepare the data object to insert
@@ -249,7 +249,7 @@ export async function insertAccountStorage(storageRoot, storageSlots) {
         logWebStoreError(error, `Error inserting storage with root: ${storageRoot}`);
     }
 }
-export async function insertAccountAssetVault(vaultRoot, assets) {
+export async function upsertAccountAssetVault(vaultRoot, assets) {
     try {
         // Prepare the data object to insert
         const data = {
@@ -263,7 +263,7 @@ export async function insertAccountAssetVault(vaultRoot, assets) {
         logWebStoreError(error, `Error inserting vault with root: ${vaultRoot}`);
     }
 }
-export async function insertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
+export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
     try {
         const data = {
             id: accountId,
@@ -276,7 +276,7 @@ export async function insertAccountRecord(accountId, codeRoot, storageRoot, vaul
             accountCommitment: commitment,
             locked: false,
         };
-        await accounts.add(data);
+        await accounts.put(data);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account: ${accountId}`);
@@ -298,7 +298,7 @@ export async function insertAccountAuth(pubKey, secretKey) {
 }
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {
     try {
-        await insertAccountCode(codeRoot, code);
+        await upsertAccountCode(codeRoot, code);
         const data = {
             accountId,
             codeRoot,

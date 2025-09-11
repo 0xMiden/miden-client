@@ -47,19 +47,19 @@ export declare function getAccountAssetVault(vaultRoot: string): Promise<{
 export declare function getAccountAuthByPubKey(pubKey: string): Promise<{
   secretKey: string;
 }>;
-export declare function insertAccountCode(
+export declare function upsertAccountCode(
   codeRoot: string,
   code: Uint8Array
 ): Promise<void>;
-export declare function insertAccountStorage(
+export declare function upsertAccountStorage(
   storageRoot: string,
   storageSlots: Uint8Array
 ): Promise<void>;
-export declare function insertAccountAssetVault(
+export declare function upsertAccountAssetVault(
   vaultRoot: string,
   assets: Uint8Array
 ): Promise<void>;
-export declare function insertAccountRecord(
+export declare function upsertAccountRecord(
   accountId: string,
   codeRoot: string,
   storageRoot: string,

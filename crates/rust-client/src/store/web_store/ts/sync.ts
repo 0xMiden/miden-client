@@ -17,9 +17,9 @@ import {
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
 
 import {
-  insertAccountStorage,
-  insertAccountAssetVault,
-  insertAccountRecord,
+  upsertAccountStorage,
+  upsertAccountAssetVault,
+  upsertAccountRecord,
 } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
@@ -258,15 +258,15 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   let accountUpdatesWriteOp = Promise.all(
     accountUpdates.flatMap((accountUpdate) => {
       return [
-        insertAccountStorage(
+        upsertAccountStorage(
           accountUpdate.storageRoot,
           accountUpdate.storageSlots
         ),
-        insertAccountAssetVault(
+        upsertAccountAssetVault(
           accountUpdate.assetVaultRoot,
           accountUpdate.assetBytes
         ),
-        insertAccountRecord(
+        upsertAccountRecord(
           accountUpdate.accountId,
           accountUpdate.codeRoot,
           accountUpdate.storageRoot,
