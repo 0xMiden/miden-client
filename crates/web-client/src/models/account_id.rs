@@ -3,9 +3,7 @@ use std::str::FromStr;
 use miden_objects::Felt as NativeFelt;
 use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_objects::address::{
-    AccountIdAddress,
-    Address,
-    AddressInterface as NativeAccountInterface,
+    AccountIdAddress, Address, AddressInterface as NativeAccountInterface,
 };
 use wasm_bindgen::prelude::*;
 
@@ -13,8 +11,12 @@ use super::felt::Felt;
 use crate::js_error_with_context;
 
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
+
+define_array! {
+    AccountId -> AccountIdArray
+}
 
 #[wasm_bindgen]
 #[repr(u8)]
