@@ -31,7 +31,7 @@ pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()
 }
 
 pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
@@ -109,7 +109,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 }
 
 pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
@@ -225,7 +225,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
 async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(
