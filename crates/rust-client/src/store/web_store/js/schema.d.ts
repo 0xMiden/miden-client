@@ -87,6 +87,10 @@ export interface IForeignAccountCode {
   accountId: string;
   codeRoot: string;
 }
+export interface ISetting {
+  key: string;
+  value: Blob;
+}
 declare const db: Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -103,6 +107,7 @@ declare const db: Dexie & {
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+  settings: Dexie.Table<ISetting, string>;
 };
 declare const accountCodes: import("dexie").Table<
   IAccountCode,
@@ -163,6 +168,7 @@ declare const foreignAccountCode: import("dexie").Table<
   string,
   IForeignAccountCode
 >;
+declare const settings: import("dexie").Table<ISetting, string, ISetting>;
 export {
   db,
   accountCodes,
@@ -180,4 +186,5 @@ export {
   partialBlockchainNodes,
   tags,
   foreignAccountCode,
+  settings,
 };
