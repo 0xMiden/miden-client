@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Client library that facilitates interaction with the Miden rollup"
-documentation          = "https://docs.rs/miden-client/0.11.3"
+documentation          = "https://docs.rs/miden-client/0.11.4"
 edition.workspace      = true
 keywords               = ["client", "miden"]
 license.workspace      = true
