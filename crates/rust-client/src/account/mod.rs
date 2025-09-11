@@ -35,8 +35,8 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::string::{ToString, String};
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
