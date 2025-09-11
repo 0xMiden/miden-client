@@ -40,7 +40,7 @@
 
 ### deserialize()
 
-> `static` **deserialize**(`prover_type`, `endpoint?`): `TransactionProver`
+> `static` **deserialize**(`prover_type`, `endpoint`?): `TransactionProver`
 
 #### Parameters
 

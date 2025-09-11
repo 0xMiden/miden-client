@@ -116,22 +116,6 @@ network ID.
 
 ***
 
-### fromBech32()
-
-> `static` **fromBech32**(`bech32`): `AccountId`
-
-#### Parameters
-
-##### bech32
-
-`string`
-
-#### Returns
-
-`AccountId`
-
-***
-
 ### fromHex()
 
 > `static` **fromHex**(`hex`): `AccountId`

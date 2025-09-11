@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new RecipientArray**(`recipient_array?`): `RecipientArray`
+> **new RecipientArray**(`recipient_array`?): `RecipientArray`
 
 #### Parameters
 
