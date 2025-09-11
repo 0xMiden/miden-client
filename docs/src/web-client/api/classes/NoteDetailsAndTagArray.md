@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteDetailsAndTagArray**(`note_details_and_tag_array`?): `NoteDetailsAndTagArray`
+> **new NoteDetailsAndTagArray**(`note_details_and_tag_array?`): `NoteDetailsAndTagArray`
 
 #### Parameters
 
