@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new FeltArray**(`felts_array?`): `FeltArray`
+> **new FeltArray**(`felts_array`?): `FeltArray`
 
 #### Parameters
 

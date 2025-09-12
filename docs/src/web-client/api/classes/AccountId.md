@@ -75,7 +75,7 @@ testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
 
 #### Returns
 
@@ -98,7 +98,7 @@ network ID.
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
 
 #### Returns
 
@@ -113,6 +113,22 @@ network ID.
 #### Returns
 
 `string`
+
+***
+
+### fromBech32()
+
+> `static` **fromBech32**(`bech32`): `AccountId`
+
+#### Parameters
+
+##### bech32
+
+`string`
+
+#### Returns
+
+`AccountId`
 
 ***
 

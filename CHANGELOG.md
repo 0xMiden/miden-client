@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.11.4
+## 0.11.5
+
+* Added a way to retrieve a secret key in the client given a pub key ([#1293](https://github.com/0xMiden/miden-client/pull/1293))
+
+## 0.11.4 (2025-09-11)
 
 * Added a mutable getter for `TransactionRequest`'s advice map ([#1254](https://github.com/0xMiden/miden-client/pull/1254)).
 * Added a way to retrieve map items in web client ([#1282](https://github.com/0xMiden/miden-client/pull/1282)).
