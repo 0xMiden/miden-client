@@ -5,7 +5,6 @@ pub enum ArrayError {
     OutOfBounds { index: usize, length: usize },
 }
 macro_rules! export_js_miden_array {
-    // Multiple inputs
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {
         $(
             #[wasm_bindgen]
@@ -41,7 +40,6 @@ macro_rules! export_js_miden_array {
                     }
                 }
 
-                /// Replace element at index
                 #[wasm_bindgen(js_name = "replaceAt")]
                 pub fn replace_at(
                     &mut self,
