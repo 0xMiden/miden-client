@@ -4,6 +4,8 @@ use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use crate::js_error_with_context;
+use crate::models::felt::Felt;
 use crate::models::public_key::PublicKey;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
@@ -46,6 +48,18 @@ impl SecretKey {
         let mut rng = StdRng::from_os_rng();
         let native_word = signing_inputs.to_commitment().into();
         self.0.sign_with_rng(native_word, &mut rng).into()
+    }
+
+    #[wasm_bindgen(js_name = "signAndPrepareVerification")]
+    pub fn sign_and_prepare_verification(&self, message: &Word) -> Result<Vec<Felt>, JsValue> {
+        let mut rng = StdRng::from_os_rng();
+        let native_word = message.into();
+
+        miden_client::auth::get_falcon_signature(&self.0, native_word, &mut rng)
+            .map_err(|err| {
+                js_error_with_context(err, "failed to sign and prepare for verification")
+            })
+            .map(|felts| felts.into_iter().map(Into::into).collect())
     }
 
     pub fn serialize(&self) -> Uint8Array {

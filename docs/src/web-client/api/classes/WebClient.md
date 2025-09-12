@@ -105,6 +105,41 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
+### createClientWithExternalKeystore()
+
+> **createClientWithExternalKeystore**(`node_url`?, `seed`?, `get_key_cb`?, `insert_key_cb`?, `sign_cb`?): `Promise`\<`any`\>
+
+Creates a new client with the given node URL, optional seed, and external keystore
+callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+
+#### Parameters
+
+##### node\_url?
+
+`string`
+
+##### seed?
+
+`Uint8Array`
+
+##### get\_key\_cb?
+
+`Function`
+
+##### insert\_key\_cb?
+
+`Function`
+
+##### sign\_cb?
+
+`Function`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### createMockClient()
 
 > **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>

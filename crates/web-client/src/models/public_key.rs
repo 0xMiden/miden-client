@@ -64,3 +64,9 @@ impl From<&PublicKey> for NativePublicKey {
         public_key.0
     }
 }
+
+impl From<NativeWord> for PublicKey {
+    fn from(word: NativeWord) -> Self {
+        PublicKey(NativePublicKey::new(word))
+    }
+}

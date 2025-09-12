@@ -177,12 +177,20 @@ export {
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
 export class WebClient {
-  constructor(rpcUrl, seed) {
+  constructor(rpcUrl, seed, getKeyCb, insertKeyCb, signCb) {
     this.rpcUrl = rpcUrl;
     this.seed = seed;
+    this.getKeyCb = getKeyCb;
+    this.insertKeyCb = insertKeyCb;
+    this.signCb = signCb;
 
     // Check if Web Workers are available.
-    if (typeof Worker !== "undefined") {
+    if (
+      typeof Worker !== "undefined" &&
+      !this.getKeyCb &&
+      !this.insertKeyCb &&
+      !this.signCb
+    ) {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
@@ -240,7 +248,13 @@ export class WebClient {
       this.loaded.then(() => {
         this.worker.postMessage({
           action: WorkerAction.INIT,
-          args: [this.rpcUrl, this.seed],
+          args: [
+            this.rpcUrl,
+            this.seed,
+            this.getKeyCb,
+            this.insertKeyCb,
+            this.signCb,
+          ],
         });
       });
     } else {
@@ -274,6 +288,54 @@ export class WebClient {
     // Wait for the worker to be ready
     await instance.ready;
 
+    // Return a proxy that forwards missing properties to wasmWebClient.
+    return new Proxy(instance, {
+      get(target, prop, receiver) {
+        // If the property exists on the wrapper, return it.
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
+        }
+        // Otherwise, if the wasmWebClient has it, return that.
+        if (target.wasmWebClient && prop in target.wasmWebClient) {
+          const value = target.wasmWebClient[prop];
+          if (typeof value === "function") {
+            return value.bind(target.wasmWebClient);
+          }
+          return value;
+        }
+        return undefined;
+      },
+    });
+  }
+
+  /**
+   * Factory method to create and initialize a WebClient instance with a remote keystore.
+   * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
+   *
+   * @param {string} rpcUrl - The RPC URL.
+   * @param {string} seed - The seed for the account.
+   * @param {Function} getKeyCb - The get key callback.
+   * @param {Function} insertKeyCb - The insert key callback.
+   * @param {Function} signCb - The sign callback.
+   * @returns {Promise<WebClient>} The fully initialized WebClient.
+   */
+  static async createClientWithExternalKeystore(
+    rpcUrl,
+    seed,
+    getKeyCb,
+    insertKeyCb,
+    signCb
+  ) {
+    // Construct the instance (synchronously).
+    const instance = new WebClient(rpcUrl, seed, getKeyCb, insertKeyCb, signCb);
+    await instance.wasmWebClient.createClientWithExternalKeystore(
+      rpcUrl,
+      seed,
+      getKeyCb,
+      insertKeyCb,
+      signCb
+    );
+    await instance.ready;
     // Return a proxy that forwards missing properties to wasmWebClient.
     return new Proxy(instance, {
       get(target, prop, receiver) {

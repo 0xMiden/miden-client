@@ -74,6 +74,7 @@ declare global {
     MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
+    rpcUrl?: string;
     Account: typeof Account;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
