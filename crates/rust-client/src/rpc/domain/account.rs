@@ -4,11 +4,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::Word;
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
 use miden_objects::crypto::merkle::{MerklePath, SmtProof};

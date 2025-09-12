@@ -14,36 +14,22 @@ use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_account_asset_vault,
-    idxdb_get_account_code,
-    idxdb_get_account_header,
-    idxdb_get_account_header_by_commitment,
-    idxdb_get_account_headers,
-    idxdb_get_account_ids,
-    idxdb_get_account_storage,
-    idxdb_get_foreign_account_code,
-    idxdb_lock_account,
-    idxdb_undo_account_states,
-    idxdb_upsert_foreign_account_code,
+    idxdb_get_account_asset_vault, idxdb_get_account_code, idxdb_get_account_header,
+    idxdb_get_account_header_by_commitment, idxdb_get_account_headers, idxdb_get_account_ids,
+    idxdb_get_account_storage, idxdb_get_foreign_account_code, idxdb_lock_account,
+    idxdb_undo_account_states, idxdb_upsert_foreign_account_code,
 };
 
 mod models;
 use models::{
-    AccountCodeIdxdbObject,
-    AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject,
-    AccountVaultIdxdbObject,
-    ForeignAccountCodeIdxdbObject,
+    AccountCodeIdxdbObject, AccountRecordIdxdbObject, AccountStorageIdxdbObject,
+    AccountVaultIdxdbObject, ForeignAccountCodeIdxdbObject,
 };
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault,
-    insert_account_code,
-    insert_account_record,
-    insert_account_storage,
-    parse_account_record_idxdb_object,
-    update_account,
+    insert_account_asset_vault, insert_account_code, insert_account_record, insert_account_storage,
+    parse_account_record_idxdb_object, update_account,
 };
 
 impl WebStore {

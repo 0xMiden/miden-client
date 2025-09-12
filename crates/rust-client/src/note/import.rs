@@ -12,13 +12,7 @@ use alloc::string::ToString;
 
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{
-    Note,
-    NoteDetails,
-    NoteFile,
-    NoteId,
-    NoteInclusionProof,
-    NoteMetadata,
-    NoteTag,
+    Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag,
 };
 use miden_tx::auth::TransactionAuthenticator;
 

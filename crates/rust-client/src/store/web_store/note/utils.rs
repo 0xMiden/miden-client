@@ -4,12 +4,7 @@ use alloc::vec::Vec;
 use chrono::Utc;
 use miden_objects::Word;
 use miden_objects::note::{
-    NoteAssets,
-    NoteDetails,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
+    NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript,
 };
 use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
@@ -20,11 +15,7 @@ use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
 use crate::note::NoteUpdateTracker;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    OutputNoteRecord,
-    OutputNoteState,
-    StoreError,
+    InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState, StoreError,
 };
 
 // TYPES

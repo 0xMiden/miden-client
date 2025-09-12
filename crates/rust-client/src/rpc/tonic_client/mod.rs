@@ -8,7 +8,7 @@ use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
@@ -20,14 +20,8 @@ use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::{
-    Endpoint,
-    FetchedAccount,
-    NodeRpcClient,
-    NodeRpcClientEndpoint,
-    NoteSyncInfo,
-    RpcError,
-    StateSyncInfo,
-    generated as proto,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    StateSyncInfo, generated as proto,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc_store::BlockRange;
@@ -442,6 +436,25 @@ impl NodeRpcClient for TonicRpcClient {
             ))?)?;
 
         Ok(block)
+    }
+
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+        let request = proto::note::NoteRoot { root: Some(root.into()) };
+
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.get_note_script_by_root(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNodeScriptByRoot, status)
+        })?;
+
+        let response = response.into_inner();
+        let note_script = NoteScript::try_from(
+            response
+                .script
+                .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
+        )?;
+
+        Ok(note_script)
     }
 }
 

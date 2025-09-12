@@ -26,13 +26,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    StorageSlot,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -68,13 +62,8 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteExportType,
-    NoteRecordError,
-    OutputNoteRecord,
-    OutputNoteState,
-    input_note_states,
+    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
+    OutputNoteState, input_note_states,
 };
 
 // STORE TRAIT

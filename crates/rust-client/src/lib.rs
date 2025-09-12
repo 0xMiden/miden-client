@@ -147,12 +147,7 @@ mod errors;
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
     pub use miden_objects::assembly::{
-        Assembler,
-        DefaultSourceManager,
-        Library,
-        LibraryPath,
-        Module,
-        ModuleKind,
+        Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind,
     };
 }
 
@@ -160,17 +155,10 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
-        AccountVaultDelta,
-        FungibleAssetDelta,
-        NonFungibleAssetDelta,
-        NonFungibleDeltaAction,
+        AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta, NonFungibleDeltaAction,
     };
     pub use miden_objects::asset::{
-        Asset,
-        AssetVault,
-        FungibleAsset,
-        NonFungibleAsset,
-        TokenSymbol,
+        Asset, AssetVault, FungibleAsset, NonFungibleAsset, TokenSymbol,
     };
 }
 
@@ -194,17 +182,8 @@ pub mod crypto {
     pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
-        InOrderIndex,
-        LeafIndex,
-        MerklePath,
-        MerkleStore,
-        MerkleTree,
-        MmrDelta,
-        MmrPeaks,
-        MmrProof,
-        NodeIndex,
-        SmtLeaf,
-        SmtProof,
+        InOrderIndex, LeafIndex, MerklePath, MerkleStore, MerkleTree, MmrDelta, MmrPeaks, MmrProof,
+        NodeIndex, SmtLeaf, SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }

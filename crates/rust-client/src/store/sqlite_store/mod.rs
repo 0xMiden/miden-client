@@ -15,12 +15,7 @@ use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::apply_migrations;
 use miden_objects::Word;
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -32,15 +27,8 @@ use rusqlite::types::Value;
 use tonic::async_trait;
 
 use super::{
-    AccountRecord,
-    AccountStatus,
-    BlockRelevance,
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    PartialBlockchainFilter,
-    Store,
-    TransactionFilter,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    PartialBlockchainFilter, Store, TransactionFilter,
 };
 use crate::store::StoreError;
 use crate::store::sqlite_store::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};

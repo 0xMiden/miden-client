@@ -79,28 +79,13 @@ pub use miden_lib::note::{create_p2id_note, create_swap_note};
 pub use miden_objects::NoteError;
 pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteDetails,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteId,
-    NoteInclusionProof,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteDetails, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteId,
+    NoteInclusionProof, NoteInputs, NoteMetadata, NoteRecipient, NoteScript, NoteTag, NoteType,
     Nullifier,
 };
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate,
-    NoteUpdateTracker,
-    NoteUpdateType,
-    OutputNoteUpdate,
+    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
 };
 
 /// Note retrieval methods.

@@ -30,10 +30,7 @@ use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
-    NoteArgs,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
+    NoteArgs, TransactionRequest, TransactionRequestBuilder, TransactionRequestError,
     TransactionStatus,
 };
 use crate::{Client, ClientError, Word};

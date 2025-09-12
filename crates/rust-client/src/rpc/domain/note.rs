@@ -3,15 +3,9 @@ use alloc::vec::Vec;
 use miden_objects::block::BlockHeader;
 use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
-    Note,
-    NoteDetails,
-    NoteId,
-    NoteInclusionProof,
-    NoteMetadata,
-    NoteTag,
-    NoteType,
+    Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteScript, NoteTag, NoteType,
 };
-use miden_objects::{Felt, Word};
+use miden_objects::{Felt, MastForest, MastNodeId, Word};
 use miden_tx::utils::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
@@ -279,5 +273,18 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
         } else {
             Ok(FetchedNote::Private(note_id, metadata, inclusion_proof))
         }
+    }
+}
+
+// NOTE SCRIPT
+// ================================================================================================
+
+impl TryFrom<proto::note::NoteScript> for NoteScript {
+    type Error = RpcConversionError;
+
+    fn try_from(note_script: proto::note::NoteScript) -> Result<Self, Self::Error> {
+        let mast_forest = MastForest::read_from_bytes(&note_script.mast)?;
+        let entrypoint = MastNodeId::from_u32_safe(note_script.entrypoint, &mast_forest)?;
+        Ok(NoteScript::from_parts(alloc::sync::Arc::new(mast_forest), entrypoint))
     }
 }

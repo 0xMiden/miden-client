@@ -5,14 +5,8 @@ use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MmrError};
 use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
-    AccountError,
-    AccountIdError,
-    AssetError,
-    AssetVaultError,
-    NoteError,
-    TransactionScriptError,
-    Word,
-    WordError,
+    AccountError, AccountIdError, AssetError, AssetVaultError, NoteError, TransactionScriptError,
+    Word, WordError,
 };
 use miden_tx::DataStoreError;
 use thiserror::Error;

@@ -14,10 +14,7 @@ use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_objects::account::{
-    AccountComponent,
-    AccountComponentTemplate,
-    InitStorageData,
-    StorageValueName,
+    AccountComponent, AccountComponentTemplate, InitStorageData, StorageValueName,
 };
 use rand::RngCore;
 use tracing::debug;
