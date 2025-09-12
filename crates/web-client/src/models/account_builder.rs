@@ -28,6 +28,7 @@ impl AccountBuilderResult {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct AccountBuilder(NativeAccountBuilder);
 
 #[wasm_bindgen]
