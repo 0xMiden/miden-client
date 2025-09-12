@@ -14,10 +14,6 @@ use crate::js_error_with_context;
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
-define_array! {
-    AccountId -> AccountIdArray
-}
-
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum NetworkId {

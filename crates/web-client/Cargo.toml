@@ -38,6 +38,7 @@ serde-wasm-bindgen   = { version = "0.6" }
 thiserror.workspace = true
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
+paste.workspace = true
 
 [dev-dependencies]
 miden-lib     = { default-features = false, features = ["testing"], workspace = true }

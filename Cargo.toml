@@ -39,6 +39,7 @@ miden-remote-prover-client = { branch = "tomyrd-update-next", default-features =
 miden-testing = { branch = "next", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
 miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+paste = "1.0.15"
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

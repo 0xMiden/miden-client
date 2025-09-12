@@ -77,8 +77,43 @@ const outOfBoundsReplace = async ({
 }) => {
   return await page.evaluate(
     async ({ index }) => {
+      const wallet = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true
+      );
+      const accountId = wallet.id();
       const array = new window.AccountIdArray([]);
-      return array.replaceAt(index);
+      return array.replaceAt(index, accountId);
+    },
+    { index }
+  );
+};
+
+const arrayReturnsClone = async ({
+  page,
+  index,
+}: {
+  page: typeof Page;
+  index: number;
+}) => {
+  return await page.evaluate(
+    async ({ index }) => {
+      let accounts = [];
+      for (let i = 0; i < 10; i++) {
+        const account = await window.client.newWallet(
+          window.AccountStorageMode.private(),
+          true
+        );
+        accounts[i] = account.id();
+      }
+      const array = new window.AccountIdArray(accounts);
+      let cloned = array.at(index);
+      cloned = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true
+      );
+      let original = array.at(index);
+      return cloned !== original;
     },
     { index }
   );
@@ -112,8 +147,6 @@ test.describe("Instance array", () => {
   test("OOB index throws", async ({ page }) => {
     const index = Math.random() * (1 << 30);
     const params = { page, index };
-
-    // Test multiple calls to ensure consistent behavior
     await Promise.all([
       expect(outOfBoundsArrayAccess(params)).rejects.toThrowError(
         /out of bounds access/
@@ -123,6 +156,21 @@ test.describe("Instance array", () => {
       ),
       expect(outOfBoundsArrayAccess(params)).rejects.toThrowError("0"),
       expect(outOfBoundsArrayAccess(params)).rejects.toThrowError("AccountId"),
+      expect(outOfBoundsReplace(params)).rejects.toThrowError(
+        /out of bounds access/
+      ),
+      expect(outOfBoundsReplace(params)).rejects.toThrowError(
+        /tried to access at index/
+      ),
+      expect(outOfBoundsReplace(params)).rejects.toThrowError("0"),
+      expect(outOfBoundsReplace(params)).rejects.toThrowError("AccountId"),
     ]);
+  });
+  test("Cannot modify array through aliasing", async ({ page }) => {
+    const params = {
+      page,
+      index: Math.floor(Math.random() * 10),
+    };
+    await expect(arrayReturnsClone(params)).resolves.toBe(true);
   });
 });

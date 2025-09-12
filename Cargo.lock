@@ -2211,6 +2211,7 @@ dependencies = [
  "miden-client",
  "miden-lib",
  "miden-objects",
+ "paste",
  "rand 0.9.2",
  "serde-wasm-bindgen",
  "thiserror 2.0.16",
