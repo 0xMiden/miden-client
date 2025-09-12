@@ -8,7 +8,7 @@ use miden_objects::account::{
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountStorageHeader,
+    AccountStorageHeader, StorageMapWitness,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
 use miden_objects::crypto::merkle::{MerklePath, SmtProof};
@@ -252,7 +252,7 @@ pub struct StateHeaders {
     pub account_header: AccountHeader,
     pub storage_header: AccountStorageHeader,
     pub code: AccountCode,
-    pub storage_slots: BTreeMap<StorageSlotIndex, Vec<SmtProof>>,
+    pub storage_slots: BTreeMap<StorageSlotIndex, Vec<StorageMapWitness>>,
 }
 
 /// Represents a proof of existence of an account's state at a specific block number.
