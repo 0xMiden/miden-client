@@ -55,14 +55,14 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::note::NoteId;
 use miden_objects::transaction::{PartialBlockchain, TransactionId};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
@@ -138,7 +138,19 @@ where
             .map(|(acc_header, _)| acc_header)
             .collect();
 
-        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
+        let note_tag_records = self.store.get_note_tags().await?;
+        // Unique tags, cursors
+        let note_tags_pg = note_tag_records
+            .iter()
+            .map(|record| (record.tag, record.transport_layer_cursor.unwrap_or(0)))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        // Unique tags
+        let note_tags = note_tags_pg.iter().map(|&(tag, _)| tag).collect();
+
+        // Retrieve transport layer notes
+        self.transport_layer().fetch_notes_pg(&note_tags_pg).await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
         let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;

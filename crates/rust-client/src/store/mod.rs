@@ -316,6 +316,11 @@ pub trait Store: Send + Sync {
     /// Otherwise returns true.
     async fn remove_note_tag(&self, tag: NoteTagRecord) -> Result<usize, StoreError>;
 
+    /// Updates the transport layer cursor for a given note tag.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the transport layer.
+    async fn update_note_tag_cursor(&self, tag: NoteTag, cursor: u64) -> Result<bool, StoreError>;
+
     /// Returns the block number of the last state sync block.
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError>;
 

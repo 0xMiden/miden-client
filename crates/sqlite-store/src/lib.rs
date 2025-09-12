@@ -159,6 +159,13 @@ impl Store for SqliteStore {
             .await
     }
 
+    async fn update_note_tag_cursor(&self, tag: NoteTag, cursor: u64) -> Result<bool, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::update_note_tag_cursor(conn, tag, cursor)
+        })
+        .await
+    }
+
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
         self.interact_with_connection(SqliteStore::get_sync_height).await
     }

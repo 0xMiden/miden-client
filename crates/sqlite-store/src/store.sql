@@ -149,8 +149,9 @@ CREATE TABLE state_sync (
 
 -- Create tags table
 CREATE TABLE tags (
-    tag BLOB NOT NULL,                  -- the serialized tag
-    source BLOB NOT NULL                -- the serialized tag source
+    tag BLOB NOT NULL,                       -- the serialized tag
+    source BLOB NOT NULL,                    -- the serialized tag source
+    transport_layer_cursor UNSIGNED BIG INT  -- transport layer tag cursor
 );
 
 -- insert initial row into state_sync table

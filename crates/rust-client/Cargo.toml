@@ -33,23 +33,27 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
-miden-lib                  = { workspace = true }
-miden-objects              = { workspace = true }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
-miden-testing              = { optional = true, workspace = true }
-miden-tx                   = { workspace = true }
+miden-lib                     = { workspace = true }
+miden-objects                 = { workspace = true }
+miden-private-transport-proto = { git = "https://github.com/0xMiden/miden-private-transport" }
+miden-remote-prover-client    = { default-features = false, features = ["tx-prover"], workspace = true }
+miden-testing                 = { optional = true, workspace = true }
+miden-tx                      = { workspace = true }
 
 # External dependencies
-anyhow      = { workspace = true }
-async-trait = { workspace = true }
-chrono      = { optional = false, version = "0.4" }
-hex         = { workspace = true }
-prost       = { default-features = false, features = ["derive"], version = "0.13" }
-rand        = { workspace = true }
-thiserror   = { workspace = true }
-tonic       = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
-tracing     = { workspace = true }
-uuid        = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
+anyhow       = { workspace = true }
+async-trait  = { workspace = true }
+chrono       = { optional = false, version = "0.4" }
+futures      = { version = "0.3" }
+hex          = { workspace = true }
+prost        = { default-features = false, features = ["derive"], version = "0.13" }
+rand         = { workspace = true }
+thiserror    = { workspace = true }
+tonic        = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
+tonic-health = { version = "0.13" }
+tower        = { features = ["timeout"], version = "0.5" }
+tracing      = { workspace = true }
+uuid         = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom             = { features = ["wasm_js"], version = "0.3" }

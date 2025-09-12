@@ -24,6 +24,7 @@ use crate::note::NoteScreenerError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
+use crate::transport::TransportError;
 
 // CLIENT ERROR
 // ================================================================================================
@@ -89,6 +90,8 @@ pub enum ClientError {
     TransactionProvingError(#[from] TransactionProverError),
     #[error("transaction request error")]
     TransactionRequestError(#[from] TransactionRequestError),
+    #[error("transport api error")]
+    TransportError(#[from] TransportError),
     #[error("transaction script builder error")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]

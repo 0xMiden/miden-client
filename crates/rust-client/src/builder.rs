@@ -11,6 +11,7 @@ use rand::Rng;
 use crate::keystore::FilesystemKeyStore;
 use crate::rpc::NodeRpcClient;
 use crate::store::Store;
+use crate::transport::NoteTransportClient;
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -59,6 +60,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An optional custom transport layer client.
+    transport_api: Option<Box<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -72,6 +75,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
+            transport_api: None,
         }
     }
 }
@@ -163,6 +167,13 @@ where
         self
     }
 
+    /// Sets a custom transport layer client directly.
+    #[must_use]
+    pub fn transport_layer(mut self, client: Box<dyn NoteTransportClient>) -> Self {
+        self.transport_api = Some(client);
+        self
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
@@ -226,6 +237,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
+            self.transport_api,
         )
         .await
     }
