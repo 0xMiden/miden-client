@@ -1,22 +1,15 @@
 use alloc::vec::Vec;
 use std::boxed::Box;
 use std::collections::BTreeSet;
-use std::env::temp_dir;
 use std::println;
 use std::string::ToString;
-use std::sync::Arc;
 
 // TESTS
 // ================================================================================================
 use miden_lib::{
-    account::{
-        auth::AuthRpoFalcon512,
-        faucets::BasicFungibleFaucet,
-        interface::AccountInterfaceError,
-        wallets::BasicWallet,
-    },
+    account::{auth::AuthRpoFalcon512, interface::AccountInterfaceError, wallets::BasicWallet},
     note::{utils, well_known_note::WellKnownNote},
-    testing::{mock_account::MockAccountExt, note::NoteBuilder},
+    testing::mock_account::MockAccountExt,
     transaction::TransactionKernel,
 };
 use miden_objects::account::{
@@ -32,14 +25,13 @@ use miden_objects::account::{
     StorageMap,
     StorageSlot,
 };
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
-use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
+use miden_objects::crypto::rand::FeltRng;
 use miden_objects::note::{
     Note,
     NoteAssets,
     NoteExecutionHint,
-    NoteExecutionMode,
     NoteFile,
     NoteInputs,
     NoteMetadata,
@@ -58,39 +50,35 @@ use miden_objects::testing::account_id::{
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
-use miden_testing::{MockChain, MockChainBuilder};
 use miden_tx::TransactionExecutorError;
 use miden_tx::utils::{Deserializable, Serializable};
-use rand::rngs::StdRng;
-use rand::{Rng, RngCore};
+use rand::RngCore;
 
-use crate::builder::ClientBuilder;
-use crate::keystore::FilesystemKeyStore;
+use crate::ClientError;
 use crate::note::NoteRelevance;
 use crate::rpc::NodeRpcClient;
 use crate::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use crate::store::sqlite_store::SqliteStore;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::sync::NoteTagSource;
-use crate::testing::common::{
+use crate::test_utils::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
     RECALL_HEIGHT_DELTA,
     TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
     assert_account_has_single_asset,
     assert_note_cannot_be_consumed_twice,
     consume_notes,
-    create_test_store_path,
+    create_mock_client,
+    create_mock_client_builder,
     execute_failing_tx,
     execute_tx,
+    insert_new_fungible_faucet,
+    insert_new_wallet,
     mint_and_consume,
     mint_note,
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
 };
-use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
     DiscardCause,
     PaymentNoteDescription,
@@ -99,158 +87,10 @@ use crate::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use crate::{ClientError, DebugMode};
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
 const TX_GRACEFUL_BLOCKS: u32 = 20;
-
-// HELPERS
-// ================================================================================================
-
-pub async fn create_test_client_builder()
--> (ClientBuilder<TestClientKeyStore>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let store = SqliteStore::new(create_test_store_path()).await.unwrap();
-    let store = Arc::new(store);
-
-    let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
-
-    let keystore_path = temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
-
-    let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
-    let arc_rpc_api = Arc::new(rpc_api.clone());
-
-    let builder = ClientBuilder::new()
-        .rpc(arc_rpc_api)
-        .rng(Box::new(rng))
-        .store(store)
-        .filesystem_keystore(keystore_path.to_str().unwrap())
-        .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None);
-
-    (builder, rpc_api, keystore)
-}
-
-pub async fn create_test_client()
--> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
-    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let mut client = builder.build().await.unwrap();
-    client.ensure_genesis_in_place().await.unwrap();
-
-    (client, rpc_api, keystore)
-}
-
-pub async fn create_prebuilt_mock_chain() -> MockChain {
-    let mut mock_chain_builder = MockChainBuilder::new();
-    let mock_account = mock_chain_builder
-        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
-        .unwrap();
-
-    let note_first =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
-            .tag(NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap().into())
-            .build()
-            .unwrap();
-
-    let note_second =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
-            .note_type(NoteType::Private)
-            .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
-            .build()
-            .unwrap();
-    let mut mock_chain = mock_chain_builder.build().unwrap();
-
-    // Block 1: Create first note
-    mock_chain.add_pending_note(OutputNote::Full(note_first));
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 2
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 3
-    mock_chain.prove_next_block().unwrap();
-
-    // Block 4: Create second note
-    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
-    mock_chain.prove_next_block().unwrap();
-
-    let transaction = Box::pin(
-        mock_chain
-            .build_tx_context(mock_account, &[note_second.id()], &[])
-            .unwrap()
-            .build()
-            .unwrap()
-            .execute(),
-    )
-    .await
-    .unwrap();
-
-    // Block 5: Consume (nullify) second note
-    mock_chain.add_pending_executed_transaction(&transaction).unwrap();
-    mock_chain.prove_next_block().unwrap();
-
-    mock_chain
-}
-
-async fn insert_new_wallet(
-    client: &mut TestClient,
-    storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
-) -> Result<(Account, Word), ClientError> {
-    let key_pair = SecretKey::with_rng(&mut client.rng);
-    let pub_key = key_pair.public_key();
-
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
-
-    let mut init_seed = [0u8; 32];
-    client.rng.fill_bytes(&mut init_seed);
-
-    let (account, seed) = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
-        .with_component(BasicWallet)
-        .build()
-        .unwrap();
-
-    client.add_account(&account, Some(seed), false).await?;
-
-    Ok((account, seed))
-}
-
-async fn insert_new_fungible_faucet(
-    client: &mut TestClient,
-    storage_mode: AccountStorageMode,
-    keystore: &FilesystemKeyStore<StdRng>,
-) -> Result<(Account, Word), ClientError> {
-    let key_pair = SecretKey::with_rng(&mut client.rng);
-    let pub_key = key_pair.public_key();
-
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
-
-    // we need to use an initial seed to create the wallet account
-    let mut init_seed = [0u8; 32];
-    client.rng.fill_bytes(&mut init_seed);
-
-    let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
-        .expect("u64 can be safely converted to a field element");
-
-    let (account, seed) = AccountBuilder::new(init_seed)
-        .account_type(AccountType::FungibleFaucet)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .build()
-        .unwrap();
-
-    client.add_account(&account, Some(seed), false).await?;
-    Ok((account, seed))
-}
 
 // TESTS
 // ================================================================================================
@@ -258,7 +98,7 @@ async fn insert_new_fungible_faucet(
 #[tokio::test]
 async fn input_notes_round_trip() {
     // generate test client with a random store name
-    let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, keystore) = Box::pin(create_mock_client()).await;
 
     insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
@@ -300,7 +140,7 @@ async fn input_notes_round_trip() {
 #[tokio::test]
 async fn get_input_note() {
     // generate test client with a random store name
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, _) = Box::pin(create_mock_client()).await;
     // Get note from mocked RPC backend since any note works here
     let original_note = rpc_api.get_available_notes()[0].note().unwrap().clone();
 
@@ -325,14 +165,14 @@ async fn get_input_note() {
 #[tokio::test]
 async fn insert_basic_account() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, keystore) = Box::pin(create_mock_client()).await;
 
     // Insert Account
     let account_insert_result =
         insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore).await;
     assert!(account_insert_result.is_ok());
 
-    let (account, account_seed) = account_insert_result.unwrap();
+    let (account, account_seed, _secret_key) = account_insert_result.unwrap();
 
     // Fetch Account
     let fetched_account_data = client.get_account(account.id()).await;
@@ -356,14 +196,14 @@ async fn insert_basic_account() {
 #[tokio::test]
 async fn insert_faucet_account() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, keystore) = Box::pin(create_mock_client()).await;
 
     // Insert Account
     let account_insert_result =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
     assert!(account_insert_result.is_ok());
 
-    let (account, account_seed) = account_insert_result.unwrap();
+    let (account, account_seed, _secret_key) = account_insert_result.unwrap();
 
     // Fetch Account
     let fetched_account_data = client.get_account(account.id()).await;
@@ -387,7 +227,7 @@ async fn insert_faucet_account() {
 #[tokio::test]
 async fn insert_same_account_twice_fails() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, _) = Box::pin(create_mock_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
@@ -401,7 +241,7 @@ async fn insert_same_account_twice_fails() {
 #[tokio::test]
 async fn account_code() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, _) = Box::pin(create_mock_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
@@ -423,7 +263,7 @@ async fn account_code() {
 #[tokio::test]
 async fn get_account_by_id() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, _) = Box::pin(create_mock_client()).await;
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -447,7 +287,7 @@ async fn get_account_by_id() {
 #[tokio::test]
 async fn sync_state() {
     // generate test client with a random store name
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, _) = Box::pin(create_mock_client()).await;
 
     // Import first mockchain note as expected
     let expected_notes = rpc_api
@@ -494,7 +334,7 @@ async fn sync_state() {
 #[tokio::test]
 async fn sync_state_mmr() {
     // generate test client with a random store name
-    let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, keystore) = Box::pin(create_mock_client()).await;
     // Import note and create wallet so that synced notes do not get discarded (due to being
     // irrelevant)
     insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
@@ -567,7 +407,7 @@ async fn sync_state_mmr() {
 #[tokio::test]
 async fn sync_state_tags() {
     // generate test client with a random store name
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, _) = Box::pin(create_mock_client()).await;
 
     // Import first mockchain note as expected
     let expected_notes = rpc_api.get_available_notes();
@@ -597,7 +437,7 @@ async fn sync_state_tags() {
 #[tokio::test]
 async fn tags() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, _) = Box::pin(create_mock_client()).await;
 
     // Assert that the store gets created with the tag 0 (used for notes consumable by any account)
     assert!(client.get_note_tags().await.unwrap().is_empty());
@@ -634,10 +474,10 @@ async fn tags() {
 #[tokio::test]
 async fn mint_transaction() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, keystore) = Box::pin(create_mock_client()).await;
 
     // Faucet account generation
-    let (faucet, _seed) =
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -664,7 +504,7 @@ async fn mint_transaction() {
 #[tokio::test]
 async fn import_note_validation() {
     // generate test client
-    let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
+    let (mut client, rpc_api, _) = Box::pin(create_mock_client()).await;
 
     // generate test data
     let expected_note = rpc_api.get_available_notes()[0].clone();
@@ -705,11 +545,11 @@ async fn import_note_validation() {
 
 #[tokio::test]
 async fn transaction_request_expiration() {
-    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _, keystore) = Box::pin(create_mock_client()).await;
     client.sync_state().await.unwrap();
 
     let current_height = client.get_sync_height().await.unwrap();
-    let (faucet, _seed) =
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -736,15 +576,16 @@ async fn transaction_request_expiration() {
 #[tokio::test]
 async fn import_processing_note_returns_error() {
     // generate test client with a random store name
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, keystore) = Box::pin(create_mock_client()).await;
     client.sync_state().await.unwrap();
 
-    let (account, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (account, _seed, _secret_key) =
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
 
     // Faucet account generation
-    let (faucet, _seed) =
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -790,16 +631,17 @@ async fn import_processing_note_returns_error() {
 
 #[tokio::test]
 async fn note_without_asset() {
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _rpc_api, keystore) = Box::pin(create_mock_client()).await;
 
-    let (faucet, _seed) =
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
 
-    let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (wallet, _seed, _secret_key) =
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -874,12 +716,13 @@ async fn note_without_asset() {
 
 #[tokio::test]
 async fn execute_program() {
-    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (mut client, _, keystore) = Box::pin(create_mock_client()).await;
     let _ = client.sync_state().await.unwrap();
 
-    let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (wallet, _seed, _secret_key) =
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
 
     let code = "
         use.std::sys
@@ -914,11 +757,12 @@ async fn execute_program() {
 
 #[tokio::test]
 async fn real_note_roundtrip() {
-    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    let (faucet, _seed) =
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_mock_client()).await;
+    let (wallet, _seed, _secret_key) =
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -969,7 +813,7 @@ async fn real_note_roundtrip() {
 
 #[tokio::test]
 async fn added_notes() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let faucet_account_header =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1001,7 +845,7 @@ async fn added_notes() {
 
 #[tokio::test]
 async fn p2id_transfer() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1109,7 +953,7 @@ async fn p2id_transfer() {
 
 #[tokio::test]
 async fn p2id_transfer_failing_not_enough_balance() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1153,7 +997,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
 
 #[tokio::test]
 async fn p2ide_transfer_consumed_by_target() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1276,7 +1120,7 @@ async fn p2ide_transfer_consumed_by_target() {
 
 #[tokio::test]
 async fn p2ide_transfer_consumed_by_sender() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1379,7 +1223,7 @@ async fn p2ide_transfer_consumed_by_sender() {
 
 #[tokio::test]
 async fn p2ide_timelocked() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1450,7 +1294,7 @@ async fn p2ide_timelocked() {
 
 #[tokio::test]
 async fn get_consumable_notes() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1549,7 +1393,7 @@ async fn get_consumable_notes() {
 
 #[tokio::test]
 async fn get_output_notes() {
-    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
+    let (mut client, mock_rpc_api, authenticator) = Box::pin(create_mock_client()).await;
     let _ = client.sync_state().await.unwrap();
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1612,7 +1456,7 @@ async fn get_output_notes() {
 
 #[tokio::test]
 async fn account_rollback() {
-    let (builder, mock_rpc_api, authenticator) = Box::pin(create_test_client_builder()).await;
+    let (builder, mock_rpc_api, authenticator) = Box::pin(create_mock_client_builder()).await;
 
     let mut client = builder.tx_graceful_blocks(Some(TX_GRACEFUL_BLOCKS)).build().await.unwrap();
 
@@ -1708,7 +1552,7 @@ async fn account_rollback() {
 
 #[tokio::test]
 async fn subsequent_discarded_transactions() {
-    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+    let (mut client, mock_rpc_api, keystore) = create_mock_client().await;
 
     let (regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore)
@@ -1805,9 +1649,9 @@ async fn subsequent_discarded_transactions() {
 
 #[tokio::test]
 async fn missing_recipient_digest() {
-    let (mut client, _, keystore) = create_test_client().await;
+    let (mut client, _, keystore) = create_mock_client().await;
 
-    let (faucet, _seed) =
+    let (faucet, _seed, _secret_key) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -1839,7 +1683,7 @@ async fn missing_recipient_digest() {
 
 #[tokio::test]
 async fn input_note_checks() {
-    let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
+    let (mut client, mock_rpc_api, authenticator) = create_mock_client().await;
 
     let (wallet, faucet) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1928,7 +1772,7 @@ async fn swap_chain_test() {
     // 6. Finally, it asserts that the last wallet now owns the asset originally held by the first
     //    wallet, verifying that the whole swap chain was successful.
 
-    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+    let (mut client, mock_rpc_api, keystore) = create_mock_client().await;
 
     // Generate a few account pairs with a fungible asset that can be used for swaps.
     let mut account_pairs = vec![];
@@ -2003,7 +1847,7 @@ async fn swap_chain_test() {
 
 #[tokio::test]
 async fn empty_storage_map() {
-    let (mut client, _, keystore) = create_test_client().await;
+    let (mut client, _, keystore) = create_mock_client().await;
 
     let storage_map = StorageMap::new();
 
