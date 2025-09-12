@@ -138,7 +138,11 @@ methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
 
   await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
 
-  return wasmWebClient.serializeMockChain().buffer;
+  return {
+    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
+    serializedMockNoteTransportNode:
+      wasmWebClient.serializeMockNoteTransportNode().buffer,
+  };
 };
 
 /**
@@ -148,10 +152,10 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, seed] = args;
+      const [rpcUrl, noteTransportUrl, seed] = args;
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, seed);
+      await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 
       wasmSeed = seed;
       ready = true;
