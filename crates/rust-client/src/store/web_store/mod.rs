@@ -45,6 +45,7 @@ pub mod chain_data;
 pub mod export;
 pub mod import;
 pub mod note;
+pub mod settings;
 pub mod sync;
 pub mod transaction;
 
@@ -253,16 +254,16 @@ impl Store for WebStore {
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
-    async fn set_setting_value(&self, _key: String, _value: Vec<u8>) -> Result<(), StoreError> {
-        unimplemented!()
+    async fn set_setting_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.set_setting_value(key, value).await
     }
 
-    async fn get_setting_value(&self, _key: String) -> Result<Option<Vec<u8>>, StoreError> {
-        unimplemented!()
+    async fn get_setting_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.get_setting_value(key).await
     }
 
-    async fn delete_setting_value(&self, _key: String) -> Result<(), StoreError> {
-        unimplemented!()
+    async fn delete_setting_value(&self, key: String) -> Result<(), StoreError> {
+        self.delete_setting_value(key).await
     }
 }
 
