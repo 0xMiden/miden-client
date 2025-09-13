@@ -137,8 +137,11 @@ impl TryFrom<AccountProof> for AccountInputs {
             // discard slot indices - not needed for execution
             let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
             for (_, slots) in storage_slots {
-                // TODO: take out defualt here
-                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(slots.iter().map(|witness|witness.into()))?, Default::default());
+                // TODO: take out BTreeMap::default() here
+                let storage_map = PartialStorageMap::new(
+                    PartialSmt::from_proofs(slots.into_iter().map(Into::into))?,
+                    alloc::collections::BTreeMap::default(),
+                );
                 storage_map_proofs.push(storage_map);
             }
 

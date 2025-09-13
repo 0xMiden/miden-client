@@ -8,10 +8,11 @@ use miden_objects::account::{
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountStorageHeader, StorageMapWitness,
+    AccountStorageHeader,
+    StorageMapWitness,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
-use miden_objects::crypto::merkle::{MerklePath, SmtProof};
+use miden_objects::crypto::merkle::MerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
@@ -135,6 +136,7 @@ impl proto::account::AccountHeader {
             vault_root,
             storage_commitment,
             code_commitment,
+            ..
         } = self;
         let vault_root = vault_root
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(vault_root)))?
@@ -159,7 +161,7 @@ impl proto::account::AccountHeader {
 // FROM PROTO ACCOUNT HEADERS
 // ================================================================================================
 
-impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
+impl proto::rpc_store::account_proof::AccountDetailsResponse {
     /// Converts the RPC response into `StateHeaders`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
@@ -177,23 +179,46 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
-        use crate::rpc::generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof;
+        use crate::rpc::generated::rpc_store::account_proof::account_details_response::StorageSlotMapProof;
 
-        let proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
+        let proto::rpc_store::account_proof::AccountDetailsResponse {
             header,
             storage_header,
             account_code,
             storage_maps,
         } = self;
         let account_header = header
-            .ok_or(
-                proto::rpc_store::account_proofs::account_proof::AccountStateHeader::missing_field(
-                    stringify!(header),
-                ),
-            )?
+            .ok_or(proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(
+                stringify!(header),
+            ))?
             .into_domain(account_id)?;
 
-        let storage_header = AccountStorageHeader::read_from_bytes(&storage_header)?;
+        let storage_header_proto = storage_header.ok_or(
+            proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(stringify!(
+                storage_header
+            )),
+        )?;
+
+        let mut header_slots: Vec<(miden_objects::account::StorageSlotType, Word)> =
+            Vec::with_capacity(storage_header_proto.slots.len());
+        for slot in storage_header_proto.slots {
+            let commitment: Word = slot
+                .commitment
+                .ok_or(proto::account::account_storage_header::StorageSlot::missing_field(
+                    stringify!(commitment),
+                ))?
+                .try_into()?;
+
+            let slot_type = match slot.slot_type {
+                0 => miden_objects::account::StorageSlotType::Value,
+                1 => miden_objects::account::StorageSlotType::Map,
+                _ => return Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
+            };
+
+            header_slots.push((slot_type, commitment));
+        }
+
+        let storage_header = AccountStorageHeader::new(header_slots);
 
         // If an account code was received, it means the previously known account code is no longer
         // valid. If it was not, it means we sent a code commitment that matched and so our code
@@ -214,17 +239,25 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
         };
 
         // Get map values into slot |-> (key, value, proof) mapping
-        let mut storage_slot_proofs: BTreeMap<u8, Vec<SmtProof>> = BTreeMap::new();
+        let mut storage_slot_proofs: BTreeMap<u8, Vec<StorageMapWitness>> = BTreeMap::new();
         for StorageSlotMapProof { storage_slot, smt_proof } in storage_maps {
-            let proof = SmtProof::read_from_bytes(&smt_proof)?;
+            let smt_proof = smt_proof
+                .as_ref()
+                .ok_or(proto::rpc_store::account_proof::account_details_response::StorageSlotMapProof::missing_field(
+                    stringify!(smt_proof),
+                ))?;
+            let proof = <miden_objects::crypto::merkle::SmtProof as TryFrom<
+                &proto::primitives::SmtOpening,
+            >>::try_from(smt_proof)?;
+            let witness = StorageMapWitness::new(proof);
             match storage_slot_proofs
                 .get_mut(&(u8::try_from(storage_slot).expect("there are no more than 256 slots")))
             {
-                Some(list) => list.push(proof),
+                Some(list) => list.push(witness),
                 None => {
                     _ = storage_slot_proofs.insert(
                         u8::try_from(storage_slot).expect("only 256 storage slots"),
-                        vec![proof],
+                        vec![witness],
                     );
                 },
             }
@@ -392,15 +425,15 @@ impl AccountStorageRequirements {
 }
 
 impl From<AccountStorageRequirements>
-    for Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest>
+    for Vec<proto::rpc_store::account_proof_request::account_details_request::StorageRequest>
 {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest> {
+    ) -> Vec<proto::rpc_store::account_proof_request::account_details_request::StorageRequest> {
         let mut requests = Vec::with_capacity(value.0.len());
         for (slot_index, map_keys) in value.0 {
             requests.push(
-                proto::rpc_store::account_proofs_request::account_request::StorageRequest {
+                proto::rpc_store::account_proof_request::account_details_request::StorageRequest {
                     storage_slot_index: u32::from(slot_index),
                     map_keys: map_keys
                         .into_iter()

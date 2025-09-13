@@ -174,14 +174,14 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountDetails"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns the latest state proofs of the specified accounts.
-        pub async fn get_account_proofs(
+        /// Returns the latest state proof of the specified account.
+        pub async fn get_account_proof(
             &mut self,
             request: impl tonic::IntoRequest<
-                super::super::rpc_store::AccountProofsRequest,
+                super::super::rpc_store::AccountProofRequest,
             >,
         ) -> std::result::Result<
-            tonic::Response<super::super::rpc_store::AccountProofs>,
+            tonic::Response<super::super::rpc_store::AccountProof>,
             tonic::Status,
         > {
             self.inner
@@ -193,9 +193,9 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProofs");
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProof");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProofs"));
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProof"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns raw block data for the specified block number.

@@ -20,7 +20,8 @@ use miden_objects::account::{
     AccountHeader,
     AccountId,
     AccountIdPrefix,
-    AccountStorage, StorageMapWitness,
+    AccountStorage,
+    StorageMapWitness,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};

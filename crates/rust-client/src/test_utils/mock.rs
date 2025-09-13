@@ -356,7 +356,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        _known_account_codes: Vec<AccountCode>,
+        _known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let mock_chain = self.mock_chain.read();
 

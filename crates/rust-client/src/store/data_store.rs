@@ -110,7 +110,7 @@ impl DataStore for ClientDataStore {
             }
         })
     }
-    
+
     async fn get_storage_map_witness(
         &self,
         account_id: AccountId,
@@ -120,15 +120,19 @@ impl DataStore for ClientDataStore {
         //TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
         for slot in account_storage.slots() {
-            if let StorageSlot::Map(map) = slot {
-                if map.root() == map_root {
-                    let witness = map.open(&map_key);
-                    return Ok(witness);
-                }
+            if let StorageSlot::Map(map) = slot
+                && map.root() == map_root
+            {
+                let witness = map.open(&map_key);
+                return Ok(witness);
             }
         }
 
-        Err(DataStoreError::Other { error_msg: format!("did not find map with {map_root} as a root for {account_id}").into(), source: None })
+        Err(DataStoreError::Other {
+            error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                .into(),
+            source: None,
+        })
     }
 }
 

@@ -30,7 +30,9 @@ miden-node-rpc = { branch = "igamigo-storage-maps", git = "https://github.com/0x
 miden-node-store = { branch = "igamigo-storage-maps", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "igamigo-storage-maps", git = "https://github.com/0xMiden/miden-node" }
 miden-objects = { branch = "tomyrd-fix-partial-storage-map", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-remote-prover = { branch = "igamigo-storage-maps", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover = { branch = "igamigo-storage-maps", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "igamigo-storage-maps", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }

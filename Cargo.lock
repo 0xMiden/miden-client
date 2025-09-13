@@ -2125,7 +2125,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2292,7 +2292,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2360,7 +2360,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "futures",
@@ -2388,7 +2388,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "futures",
@@ -2408,7 +2408,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2430,7 +2430,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "fs-err",
  "miette",
@@ -2442,7 +2442,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "futures",
@@ -2469,7 +2469,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2500,7 +2500,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2527,7 +2527,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2580,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2623,7 +2623,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#0f615346375ead8abd49507cc4e9da1dd4e44fca"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-storage-maps#fd5a713ca48ebec68b81599ab9bdb27865a1187f"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2657,7 +2657,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2677,7 +2677,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2692,7 +2692,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#3f5fa7536d9a468d0460faca8c6ef5afaaf0727f"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#63d1b3e532ad789d63742d330277dff9eaffd7b6"
 dependencies = [
  "miden-objects",
  "miden-tx",

@@ -2,13 +2,23 @@
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use tonic::service::LayerExt;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use miden_objects::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, NonFungibleDeltaAction, StorageMap, StorageMapWitness, StorageSlot, StorageSlotType
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    NonFungibleDeltaAction,
+    StorageMap,
+    StorageMapWitness,
+    StorageSlot,
+    StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
 use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};

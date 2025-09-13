@@ -2180,6 +2180,6 @@ async fn storage_and_vault_proofs() {
         };
 
         assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(&proof, map.open(&MAP_KEY.into()).path());
+        assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
 }

@@ -26,7 +26,14 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miden_objects::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, StorageMapWitness, StorageSlot
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    StorageMapWitness,
+    StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
