@@ -1,7 +1,7 @@
 use miden_objects::Word;
 use miden_objects::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SmtLeaf};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, NodeIndex, SmtLeaf, ValuePath};
 
 use crate::store::StoreError;
 
@@ -43,9 +43,9 @@ pub fn get_storage_map_item_proof(
     merkle_store: &MerkleStore,
     map_root: Word,
     key: Word,
-) -> Result<MerklePath, StoreError> {
+) -> Result<ValuePath, StoreError> {
     let hashed_key = StorageMap::hash_key(key);
-    Ok(merkle_store.get_path(map_root, get_node_index(hashed_key)?)?.path)
+    Ok(merkle_store.get_path(map_root, get_node_index(hashed_key)?)?)
 }
 
 /// Updates the merkle store with the new storage map entries.

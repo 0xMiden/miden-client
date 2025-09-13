@@ -375,7 +375,7 @@ impl StateSync {
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses
-    /// the `check_nullifiers_by_prefix` endpoint to check if there are new nullifiers for these
+    /// the `sync_nullifiers` endpoint to check if there are new nullifiers for these
     /// notes. It then processes the nullifiers to apply the state transitions on the note updates.
     ///
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
@@ -396,10 +396,8 @@ impl StateSync {
             .map(|nullifier| nullifier.prefix())
             .collect();
 
-        let mut new_nullifiers = self
-            .rpc_api
-            .check_nullifiers_by_prefix(&nullifiers_tags, current_block_num)
-            .await?;
+        let mut new_nullifiers =
+            self.rpc_api.sync_nullifiers(&nullifiers_tags, current_block_num).await?;
 
         // Discard nullifiers that are newer than the current block (this might happen if the block
         // changes between the sync_state and the check_nullifier calls)
