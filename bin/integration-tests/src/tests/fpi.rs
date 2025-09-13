@@ -1,3 +1,5 @@
+// TODO: remove once miden-base#1878 is solved
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
@@ -23,17 +25,17 @@ const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
+pub async fn ignore_test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
+pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -107,7 +109,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     Ok(())
 }
 
-pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -218,10 +221,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// storage. It then deploys the foreign account and creates a native account to execute a
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
-async fn standard_fpi(
-    storage_mode: AccountStorageMode,
-    client_config: ClientConfig,
-) -> Result<()> {
+async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
