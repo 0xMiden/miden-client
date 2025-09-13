@@ -124,20 +124,25 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 // ACCOUNT HEADER
 // ================================================================================================
 
-impl proto::account::AccountHeader {
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
-    pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
+impl core::convert::TryInto<AccountHeader> for proto::account::AccountHeader {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<AccountHeader, Self::Error> {
         use miden_objects::Felt;
 
         use crate::rpc::domain::MissingFieldHelper;
 
         let proto::account::AccountHeader {
+            account_id,
             nonce,
             vault_root,
             storage_commitment,
             code_commitment,
-            ..
         } = self;
+
+        let account_id: AccountId = account_id
+            .ok_or(proto::account::AccountHeader::missing_field(stringify!(account_id)))?
+            .try_into()?;
         let vault_root = vault_root
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(vault_root)))?
             .try_into()?;
@@ -158,50 +163,20 @@ impl proto::account::AccountHeader {
     }
 }
 
-// FROM PROTO ACCOUNT HEADERS
+// ACCOUNT STORAGE HEADER
 // ================================================================================================
 
-impl proto::rpc_store::account_proof::AccountDetailsResponse {
-    /// Converts the RPC response into `StateHeaders`.
-    ///
-    /// The RPC response may omit unchanged account codes. If so, this function uses
-    /// `known_account_codes` to fill in the missing code. If a required code cannot be found in
-    /// the response or `known_account_codes`, an error is returned.
-    ///
-    /// # Errors
-    /// - If account code is missing both on `self` and `known_account_codes`
-    /// - If data cannot be correctly deserialized
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
-    pub fn into_domain(
-        self,
-        account_id: AccountId,
-        known_account_codes: &BTreeMap<Word, AccountCode>,
-    ) -> Result<StateHeaders, crate::rpc::RpcError> {
+impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<AccountStorageHeader, Self::Error> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
-        use crate::rpc::generated::rpc_store::account_proof::account_details_response::StorageSlotMapProof;
-
-        let proto::rpc_store::account_proof::AccountDetailsResponse {
-            header,
-            storage_header,
-            account_code,
-            storage_maps,
-        } = self;
-        let account_header = header
-            .ok_or(proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(
-                stringify!(header),
-            ))?
-            .into_domain(account_id)?;
-
-        let storage_header_proto = storage_header.ok_or(
-            proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(stringify!(
-                storage_header
-            )),
-        )?;
 
         let mut header_slots: Vec<(miden_objects::account::StorageSlotType, Word)> =
-            Vec::with_capacity(storage_header_proto.slots.len());
-        for slot in storage_header_proto.slots {
+            Vec::with_capacity(self.slots.len());
+
+        for slot in self.slots {
             let commitment: Word = slot
                 .commitment
                 .ok_or(proto::account::account_storage_header::StorageSlot::missing_field(
@@ -218,7 +193,49 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
             header_slots.push((slot_type, commitment));
         }
 
-        let storage_header = AccountStorageHeader::new(header_slots);
+        Ok(AccountStorageHeader::new(header_slots))
+    }
+}
+
+// FROM PROTO ACCOUNT HEADERS
+// ================================================================================================
+
+impl proto::rpc_store::account_proof::AccountDetailsResponse {
+    /// Converts the RPC response into `StateHeaders`.
+    ///
+    /// The RPC response may omit unchanged account codes. If so, this function uses
+    /// `known_account_codes` to fill in the missing code. If a required code cannot be found in
+    /// the response or `known_account_codes`, an error is returned.
+    ///
+    /// # Errors
+    /// - If account code is missing both on `self` and `known_account_codes`
+    /// - If data cannot be correctly deserialized
+    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
+    pub fn into_domain(
+        self,
+        known_account_codes: &BTreeMap<Word, AccountCode>,
+    ) -> Result<StateHeaders, crate::rpc::RpcError> {
+        use crate::rpc::RpcError;
+        use crate::rpc::domain::MissingFieldHelper;
+        use crate::rpc::generated::rpc_store::account_proof::account_details_response::StorageSlotMapProof;
+
+        let proto::rpc_store::account_proof::AccountDetailsResponse {
+            header,
+            storage_header,
+            account_code,
+            storage_maps,
+        } = self;
+        let account_header: AccountHeader = header
+            .ok_or(proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(
+                stringify!(header),
+            ))?
+            .try_into()?;
+
+        let storage_header = storage_header
+            .ok_or(proto::rpc_store::account_proof::AccountDetailsResponse::missing_field(
+                stringify!(storage_header),
+            ))?
+            .try_into()?;
 
         // If an account code was received, it means the previously known account code is no longer
         // valid. If it was not, it means we sent a code commitment that matched and so our code
@@ -241,26 +258,18 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
         // Get map values into slot |-> (key, value, proof) mapping
         let mut storage_slot_proofs: BTreeMap<u8, Vec<StorageMapWitness>> = BTreeMap::new();
         for StorageSlotMapProof { storage_slot, smt_proof } in storage_maps {
-            let smt_proof = smt_proof
+            use miden_objects::crypto::merkle::SmtProof;
+
+            let smt_opening = smt_proof
                 .as_ref()
                 .ok_or(proto::rpc_store::account_proof::account_details_response::StorageSlotMapProof::missing_field(
                     stringify!(smt_proof),
                 ))?;
-            let proof = <miden_objects::crypto::merkle::SmtProof as TryFrom<
-                &proto::primitives::SmtOpening,
-            >>::try_from(smt_proof)?;
+            let proof = SmtProof::try_from(smt_opening)?;
             let witness = StorageMapWitness::new(proof);
-            match storage_slot_proofs
-                .get_mut(&(u8::try_from(storage_slot).expect("there are no more than 256 slots")))
-            {
-                Some(list) => list.push(witness),
-                None => {
-                    _ = storage_slot_proofs.insert(
-                        u8::try_from(storage_slot).expect("only 256 storage slots"),
-                        vec![witness],
-                    );
-                },
-            }
+            let key: u8 = storage_slot.try_into().expect("there are no more than 256 slots");
+
+            storage_slot_proofs.entry(key).or_default().push(witness);
         }
 
         Ok(StateHeaders {

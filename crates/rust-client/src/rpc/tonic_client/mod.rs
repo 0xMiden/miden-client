@@ -345,7 +345,7 @@ impl NodeRpcClient for TonicRpcClient {
                     response
                         .details
                         .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(account_witness.id(), &known_codes_by_commitment)?,
+                        .into_domain(&known_codes_by_commitment)?,
                 )
             } else {
                 None
