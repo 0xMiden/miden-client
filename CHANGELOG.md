@@ -3,6 +3,7 @@
 ## 0.11.5
 
 * Added a way to retrieve a secret key in the client given a pub key ([#1293](https://github.com/0xMiden/miden-client/pull/1293))
+* Reexport all authentication components from `miden-lib` ([#1297](https://github.com/0xMiden/miden-client/pull/1297)).
 
 ## 0.11.4 (2025-09-11)
 
