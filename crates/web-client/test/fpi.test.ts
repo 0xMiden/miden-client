@@ -92,11 +92,11 @@
 //             begin
 //                 # push the hash of the {} account procedure
 //                 push.{proc_root}
-        
+
 //                 # push the foreign account id
 //                 push.{account_id_suffix} push.{account_id_prefix}
 //                 # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-        
+
 //                 exec.tx::execute_foreign_procedure
 //                 push.9.12.18.30 assert_eqw
 //             end
