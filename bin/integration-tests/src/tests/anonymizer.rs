@@ -80,24 +80,19 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(anonymizer_note.clone())])
-        .expected_future_notes(vec![(
-            anonymized_note_details,
-            NoteTag::from_account_id(target.id()),
-        )])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
     println!("consuming anonymizer note");
 
-    client.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
-    client.sync_state().await?;
-
     client_2.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
     client_2.sync_state().await?;
     let input_note_record = client_2.get_input_note(anonymizer_note.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
 
+    client.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
+    client.sync_state().await?;
     let input_note_record = client.get_input_note(anonymizer_note.id()).await?.unwrap();
     // state is unverified :(
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
