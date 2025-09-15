@@ -1,183 +1,123 @@
 import Dexie from "dexie";
 export declare function openDatabase(): Promise<boolean>;
 export interface IAccountCode {
-  root: string;
-  code: Blob;
+    root: string;
+    code: Uint8Array;
 }
 export interface IAccountStorage {
-  root: string;
-  slots: Blob;
+    root: string;
+    slots: Uint8Array;
 }
 export interface IAccountVault {
-  root: string;
-  assets: Blob;
+    root: string;
+    assets: Uint8Array;
 }
 export interface IAccountAuth {
-  pubKey: string;
-  secretKey: string;
+    pubKey: string;
+    secretKey: string;
 }
 export interface IAccount {
-  id: string;
-  codeRoot: string;
-  storageRoot: string;
-  vaultRoot: string;
-  nonce: string;
-  committed: boolean;
-  accountSeed: Blob | null;
-  accountCommitment: string;
-  locked: boolean;
+    id: string;
+    codeRoot: string;
+    storageRoot: string;
+    vaultRoot: string;
+    nonce: string;
+    committed: boolean;
+    accountSeed?: Uint8Array;
+    accountCommitment: string;
+    locked: boolean;
 }
 export interface ITransaction {
-  id: string;
-  details: Blob;
-  scriptRoot: string;
-  blockNum: number;
-  commitHeight: number;
-  discardCause: Blob | null;
+    id: string;
+    details: Uint8Array;
+    blockNum: number;
+    scriptRoot?: string;
+    statusVariant: number;
+    status: Uint8Array;
 }
 export interface ITransactionScript {
-  scriptRoot: string;
-  script: Blob;
+    scriptRoot: string;
+    txScript?: Uint8Array;
 }
 export interface IInputNote {
-  noteId: string;
-  stateDiscriminant: string;
-  assets: string;
-  serialNumber: Blob;
-  inputs: Blob;
-  scriptRoot: string;
-  nullifier: string;
-  createdAt: BigInt;
+    noteId: string;
+    stateDiscriminant: number;
+    assets: Uint8Array;
+    serialNumber: Uint8Array;
+    inputs: Uint8Array;
+    scriptRoot: string;
+    nullifier: string;
+    serializedCreatedAt: string;
+    state: Uint8Array;
 }
 export interface IOutputNote {
-  noteId: string;
-  recipientDigest: string;
-  assets: Blob;
-  metadata: Blob;
-  stateDiscriminant: string;
-  nullifier: string;
-  expectedHeight: BigInt;
-  state: Blob;
+    noteId: string;
+    recipientDigest: string;
+    assets: Uint8Array;
+    metadata: Uint8Array;
+    stateDiscriminant: number;
+    nullifier?: string;
+    expectedHeight: number;
+    state: Uint8Array;
 }
 export interface INotesScript {
-  scriptRoot: string;
-  serializedNoteScript: Blob;
+    scriptRoot: string;
+    serializedNoteScript: Uint8Array;
 }
 export interface IStateSync {
-  id: number;
-  blockNum: string;
+    id: number;
+    blockNum: string;
 }
 export interface IBlockHeader {
-  blockNum: number;
-  header: Blob;
-  partialBlockchainPeaks: Blob;
-  hasClientNotes: string;
+    blockNum: string;
+    header: Uint8Array;
+    partialBlockchainPeaks: Uint8Array;
+    hasClientNotes: string;
 }
 export interface IPartialBlockchainNode {
-  id: string;
-  node: string;
+    id: string;
+    node: string;
 }
 export interface ITag {
-  id?: number;
-  tag: string;
-  sourceNoteId: string;
-  sourceAccountId: string;
+    id?: number;
+    tag: string;
+    sourceNoteId?: string;
+    sourceAccountId?: string;
 }
 export interface IForeignAccountCode {
-  accountId: string;
-  codeRoot: string;
+    accountId: string;
+    codeRoot: string;
 }
 declare const db: Dexie & {
-  accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountVaults: Dexie.Table<IAccountVault, string>;
-  accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
-  transactions: Dexie.Table<ITransaction, string>;
-  transactionScripts: Dexie.Table<ITransactionScript, string>;
-  inputNotes: Dexie.Table<IInputNote, string>;
-  outputNotes: Dexie.Table<IOutputNote, string>;
-  notesScripts: Dexie.Table<INotesScript, string>;
-  stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, number>;
-  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
-  tags: Dexie.Table<ITag, number>;
-  foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+    accountCodes: Dexie.Table<IAccountCode, string>;
+    accountStorages: Dexie.Table<IAccountStorage, string>;
+    accountVaults: Dexie.Table<IAccountVault, string>;
+    accountAuths: Dexie.Table<IAccountAuth, string>;
+    accounts: Dexie.Table<IAccount, string>;
+    transactions: Dexie.Table<ITransaction, string>;
+    transactionScripts: Dexie.Table<ITransactionScript, string>;
+    inputNotes: Dexie.Table<IInputNote, string>;
+    outputNotes: Dexie.Table<IOutputNote, string>;
+    notesScripts: Dexie.Table<INotesScript, string>;
+    stateSync: Dexie.Table<IStateSync, number>;
+    blockHeaders: Dexie.Table<IBlockHeader, string>;
+    partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+    tags: Dexie.Table<ITag, number>;
+    foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
 };
-declare const accountCodes: import("dexie").Table<
-  IAccountCode,
-  string,
-  IAccountCode
->;
-declare const accountStorages: import("dexie").Table<
-  IAccountStorage,
-  string,
-  IAccountStorage
->;
-declare const accountVaults: import("dexie").Table<
-  IAccountVault,
-  string,
-  IAccountVault
->;
-declare const accountAuths: import("dexie").Table<
-  IAccountAuth,
-  string,
-  IAccountAuth
->;
+declare const accountCodes: import("dexie").Table<IAccountCode, string, IAccountCode>;
+declare const accountStorages: import("dexie").Table<IAccountStorage, string, IAccountStorage>;
+declare const accountVaults: import("dexie").Table<IAccountVault, string, IAccountVault>;
+declare const accountAuths: import("dexie").Table<IAccountAuth, string, IAccountAuth>;
 declare const accounts: import("dexie").Table<IAccount, string, IAccount>;
-declare const transactions: import("dexie").Table<
-  ITransaction,
-  string,
-  ITransaction
->;
-declare const transactionScripts: import("dexie").Table<
-  ITransactionScript,
-  string,
-  ITransactionScript
->;
+declare const transactions: import("dexie").Table<ITransaction, string, ITransaction>;
+declare const transactionScripts: import("dexie").Table<ITransactionScript, string, ITransactionScript>;
 declare const inputNotes: import("dexie").Table<IInputNote, string, IInputNote>;
-declare const outputNotes: import("dexie").Table<
-  IOutputNote,
-  string,
-  IOutputNote
->;
-declare const notesScripts: import("dexie").Table<
-  INotesScript,
-  string,
-  INotesScript
->;
+declare const outputNotes: import("dexie").Table<IOutputNote, string, IOutputNote>;
+declare const notesScripts: import("dexie").Table<INotesScript, string, INotesScript>;
 declare const stateSync: import("dexie").Table<IStateSync, number, IStateSync>;
-declare const blockHeaders: import("dexie").Table<
-  IBlockHeader,
-  number,
-  IBlockHeader
->;
-declare const partialBlockchainNodes: import("dexie").Table<
-  IPartialBlockchainNode,
-  string,
-  IPartialBlockchainNode
->;
+declare const blockHeaders: import("dexie").Table<IBlockHeader, string, IBlockHeader>;
+declare const partialBlockchainNodes: import("dexie").Table<IPartialBlockchainNode, string, IPartialBlockchainNode>;
 declare const tags: import("dexie").Table<ITag, number, ITag>;
-declare const foreignAccountCode: import("dexie").Table<
-  IForeignAccountCode,
-  string,
-  IForeignAccountCode
->;
-export {
-  db,
-  accountCodes,
-  accountStorages,
-  accountVaults,
-  accountAuths,
-  accounts,
-  transactions,
-  transactionScripts,
-  inputNotes,
-  outputNotes,
-  notesScripts,
-  stateSync,
-  blockHeaders,
-  partialBlockchainNodes,
-  tags,
-  foreignAccountCode,
-};
+declare const foreignAccountCode: import("dexie").Table<IForeignAccountCode, string, IForeignAccountCode>;
+export { db, accountCodes, accountStorages, accountVaults, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, };

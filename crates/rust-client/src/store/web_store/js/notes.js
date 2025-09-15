@@ -150,7 +150,7 @@ async function processInputNotes(notes) {
     }));
 }
 async function processOutputNotes(notes) {
-    return await Promise.all(notes.map(async (note) => {
+    return await Promise.all(notes.map((note) => {
         const assetsBase64 = uint8ArrayToBase64(note.assets);
         const metadataBase64 = uint8ArrayToBase64(note.metadata);
         const stateBase64 = uint8ArrayToBase64(note.state);
