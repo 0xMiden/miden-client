@@ -10,7 +10,7 @@ members = [
   "crates/web-client",
 ]
 
-#default-members = ["bin/miden-cli", "crates/rust-client"]
+default-members = ["bin/miden-cli", "crates/rust-client"]
 
 [workspace.package]
 authors      = ["miden contributors"]
