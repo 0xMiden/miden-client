@@ -18,7 +18,7 @@ PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
-EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude idxdb-store
+EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
 
 # --- Linting -------------------------------------------------------------------------------------
 

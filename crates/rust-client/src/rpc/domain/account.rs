@@ -13,7 +13,7 @@ use miden_objects::account::{
     StorageSlotType,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
-use miden_objects::crypto::merkle::{MerklePath, SmtProof};
+use miden_objects::crypto::merkle::MerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
@@ -219,6 +219,7 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
     /// # Errors
     /// - If account code is missing both on `self` and `known_account_codes`
     /// - If data cannot be correctly deserialized
+    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
@@ -271,7 +272,7 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
                 .ok_or(proto::rpc_store::account_proof::account_details_response::StorageSlotMapProof::missing_field(
                     stringify!(smt_proof),
                 ))?;
-            let proof = SmtProof::try_from(smt_opening)?;
+            let proof = miden_objects::crypto::merkle::SmtProof::try_from(smt_opening)?;
             let witness = StorageMapWitness::new(proof);
             let key: u8 = storage_slot.try_into().expect("there are no more than 256 slots");
 
