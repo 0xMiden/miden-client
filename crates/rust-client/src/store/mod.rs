@@ -26,7 +26,14 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miden_objects::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, StorageSlot,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    StorageMapWitness,
+    StorageSlot,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -62,8 +69,13 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
-    OutputNoteState, input_note_states,
+    InputNoteRecord,
+    InputNoteState,
+    NoteExportType,
+    NoteRecordError,
+    OutputNoteRecord,
+    OutputNoteState,
+    input_note_states,
 };
 
 // STORE TRAIT
@@ -351,16 +363,16 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<(Word, MerklePath), StoreError> {
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self.get_account_storage(account_id).await?;
         let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };
 
         let value = map.get(&key);
-        let path = map.open(&key).into_parts().0;
+        let witness = map.open(&key);
 
-        Ok((value, path))
+        Ok((value, witness))
     }
 }
 

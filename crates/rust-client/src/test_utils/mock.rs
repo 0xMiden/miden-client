@@ -13,7 +13,11 @@ use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
-    AccountProof, AccountProofs, AccountUpdateSummary, FetchedAccount, StateHeaders,
+    AccountProof,
+    AccountProofs,
+    AccountUpdateSummary,
+    FetchedAccount,
+    StateHeaders,
 };
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
@@ -352,7 +356,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        _known_account_codes: Vec<AccountCode>,
+        _known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let mock_chain = self.mock_chain.read();
 

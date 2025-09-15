@@ -8,7 +8,13 @@ use miden_objects::Word;
 use miden_objects::block::BlockNumber;
 use miden_objects::crypto::utils::{Deserializable, Serializable};
 use miden_objects::note::{
-    NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript, Nullifier,
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    Nullifier,
 };
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
@@ -17,7 +23,10 @@ use super::SqliteStore;
 use super::chain_data::set_block_header_has_client_notes;
 use crate::note::NoteUpdateTracker;
 use crate::store::note_record::{
-    InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState,
+    InputNoteRecord,
+    InputNoteState,
+    OutputNoteRecord,
+    OutputNoteState,
 };
 use crate::store::{NoteFilter, StoreError};
 use crate::{insert_sql, subst};

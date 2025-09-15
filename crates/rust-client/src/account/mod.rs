@@ -44,10 +44,22 @@ use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
-    AccountIdError, AddressError, NetworkIdError,
+    AccountIdError,
+    AddressError,
+    NetworkIdError,
     account::{
-        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-        AccountStorage, AccountStorageMode, AccountType, StorageMap, StorageSlot,
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountDelta,
+        AccountFile,
+        AccountHeader,
+        AccountId,
+        AccountStorage,
+        AccountStorageMode,
+        AccountType,
+        StorageMap,
+        StorageSlot,
     },
     address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
 };
@@ -64,8 +76,15 @@ pub mod component {
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
-        AccountComponent, AccountComponentMetadata, AccountComponentTemplate, FeltRepresentation,
-        InitStorageData, StorageEntry, StorageSlotType, StorageValueName, TemplateType,
+        AccountComponent,
+        AccountComponentMetadata,
+        AccountComponentTemplate,
+        FeltRepresentation,
+        InitStorageData,
+        StorageEntry,
+        StorageSlotType,
+        StorageValueName,
+        TemplateType,
         WordRepresentation,
     };
 }
@@ -307,7 +326,8 @@ pub mod tests {
     use miden_objects::account::{Account, AccountFile, AuthSecretKey};
     use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     };
     use miden_objects::{EMPTY_WORD, Word, ZERO};
 

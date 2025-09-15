@@ -18,7 +18,10 @@ use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
 use crate::store::{StoreError, TransactionFilter};
 use crate::transaction::{
-    TransactionDetails, TransactionRecord, TransactionStatus, TransactionStatusVariant,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
+    TransactionStatusVariant,
     TransactionStoreUpdate,
 };
 use crate::{insert_sql, subst};

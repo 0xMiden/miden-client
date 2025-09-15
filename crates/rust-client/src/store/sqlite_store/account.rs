@@ -7,11 +7,21 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use miden_objects::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
-    NonFungibleDeltaAction, StorageMap, StorageSlot, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    NonFungibleDeltaAction,
+    StorageMap,
+    StorageMapWitness,
+    StorageSlot,
+    StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
@@ -20,8 +30,12 @@ use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::store::sqlite_store::merkle_store::{
-    get_asset_proof, get_storage_map_item_proof, insert_asset_nodes, insert_storage_map_nodes,
-    update_asset_nodes, update_storage_map_nodes,
+    get_asset_proof,
+    get_storage_map_item_proof,
+    insert_asset_nodes,
+    insert_storage_map_nodes,
+    update_asset_nodes,
+    update_storage_map_nodes,
 };
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 use crate::{insert_sql, subst};
@@ -294,7 +308,7 @@ impl SqliteStore {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<(Word, MerklePath), StoreError> {
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
@@ -314,9 +328,11 @@ impl SqliteStore {
 
         let merkle_store = merkle_store.read();
 
-        let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
+        let value_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
+        let leaf = SmtLeaf::new_single(key, value_path.value);
+        let proof = SmtProof::new(value_path.path, leaf)?;
 
-        Ok((item, merkle_path))
+        Ok((item, StorageMapWitness::new(proof)))
     }
 
     // ACCOUNT DELTA HELPERS
@@ -949,13 +965,24 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
     use miden_objects::account::{
-        Account, AccountBuilder, AccountCode, AccountComponent, AccountDelta, AccountHeader,
-        AccountId, AccountStorageDelta, AccountType, AccountVaultDelta, StorageMap, StorageSlot,
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountComponent,
+        AccountDelta,
+        AccountHeader,
+        AccountId,
+        AccountStorageDelta,
+        AccountType,
+        AccountVaultDelta,
+        StorageMap,
+        StorageSlot,
     };
     use miden_objects::asset::{Asset, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails};
     use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
     use miden_objects::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_objects::{EMPTY_WORD, ONE, ZERO};

@@ -11,8 +11,12 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{
-    idxdb_get_account_auth_by_pub_key, idxdb_insert_account_asset_vault, idxdb_insert_account_auth,
-    idxdb_insert_account_code, idxdb_insert_account_record, idxdb_insert_account_storage,
+    idxdb_get_account_auth_by_pub_key,
+    idxdb_insert_account_asset_vault,
+    idxdb_insert_account_auth,
+    idxdb_insert_account_code,
+    idxdb_insert_account_record,
+    idxdb_insert_account_storage,
 };
 use super::models::{AccountAuthIdxdbObject, AccountRecordIdxdbObject};
 use crate::store::{AccountStatus, StoreError};

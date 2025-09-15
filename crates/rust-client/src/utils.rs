@@ -12,8 +12,14 @@ use miden_objects::Word;
 use miden_objects::account::Account;
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use miden_tx::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable, ToHex,
-    bytes_to_hex_string, hex_to_bytes,
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+    ToHex,
+    bytes_to_hex_string,
+    hex_to_bytes,
 };
 
 use crate::alloc::borrow::ToOwned;

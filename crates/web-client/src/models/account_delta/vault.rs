@@ -1,5 +1,6 @@
 use miden_objects::account::{
-    AccountId as NativeAccountId, AccountVaultDelta as NativeAccountVaultDelta,
+    AccountId as NativeAccountId,
+    AccountVaultDelta as NativeAccountVaultDelta,
     FungibleAssetDelta as NativeFungibleAssetDelta,
 };
 use wasm_bindgen::prelude::*;

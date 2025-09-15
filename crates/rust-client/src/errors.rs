@@ -6,8 +6,13 @@ use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::MerkleError;
 use miden_objects::note::NoteId;
 use miden_objects::{
-    AccountError, AssetError, NoteError, PartialBlockchainError, TransactionInputError,
-    TransactionScriptError, Word,
+    AccountError,
+    AssetError,
+    NoteError,
+    PartialBlockchainError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
 };
 // RE-EXPORTS
 // ================================================================================================

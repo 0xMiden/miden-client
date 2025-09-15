@@ -40,7 +40,7 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -189,7 +189,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: Vec<AccountCode>,
+        known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,

@@ -2,11 +2,17 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::{MerkleError, MmrError};
+use miden_objects::crypto::merkle::{MerkleError, MmrError, SmtProofError};
 use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
-    AccountError, AccountIdError, AssetError, AssetVaultError, NoteError, TransactionScriptError,
-    Word, WordError,
+    AccountError,
+    AccountIdError,
+    AssetError,
+    AssetVaultError,
+    NoteError,
+    TransactionScriptError,
+    Word,
+    WordError,
 };
 use miden_tx::DataStoreError;
 use thiserror::Error;
@@ -64,6 +70,8 @@ pub enum StoreError {
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]
     QueryError(String),
+    #[error("error with the SMT proof")]
+    SmtProofError(#[from] SmtProofError),
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]

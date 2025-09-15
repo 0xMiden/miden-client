@@ -10,7 +10,9 @@ use std::sync::Arc;
 // ================================================================================================
 use miden_lib::{
     account::{
-        auth::AuthRpoFalcon512, faucets::BasicFungibleFaucet, interface::AccountInterfaceError,
+        auth::AuthRpoFalcon512,
+        faucets::BasicFungibleFaucet,
+        interface::AccountInterfaceError,
         wallets::BasicWallet,
     },
     note::{utils, well_known_note::WellKnownNote},
@@ -19,20 +21,39 @@ use miden_lib::{
     utils::ScriptBuilder,
 };
 use miden_objects::account::{
-    Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
-    AccountStorageMode, AccountType, AuthSecretKey, StorageMap, StorageSlot,
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountHeader,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    AuthSecretKey,
+    StorageMap,
+    StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-    NoteRecipient, NoteTag, NoteType,
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -54,15 +75,31 @@ use crate::store::sqlite_store::SqliteStore;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use crate::sync::NoteTagSource;
 use crate::testing::common::{
-    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
-    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
-    consume_notes, create_test_store_path, execute_failing_tx, execute_tx, mint_and_consume,
-    mint_note, setup_two_wallets_and_faucet, setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    TestClientKeyStore,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    create_test_store_path,
+    execute_failing_tx,
+    execute_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
 };
 use crate::testing::mock::{MockClient, MockRpcApi};
 use crate::transaction::{
-    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder,
-    TransactionRequestError, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use crate::{ClientError, DebugMode};
 
@@ -2032,7 +2069,7 @@ const BUMP_MAP_CODE: &str = "export.bump_map_item
                 end";
 
 #[tokio::test]
-#[ignore = "ignoring due to bug. Should be fixed in miden-base#1878"]
+#[ignore = "ignoring due to bug, see miden-base#1878"]
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
@@ -2143,6 +2180,6 @@ async fn storage_and_vault_proofs() {
         };
 
         assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(&proof, map.open(&MAP_KEY.into()).path());
+        assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
 }

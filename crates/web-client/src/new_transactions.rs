@@ -1,6 +1,7 @@
 use miden_client::note::BlockNumber;
 use miden_client::transaction::{
-    PaymentNoteDescription, SwapTransactionData,
+    PaymentNoteDescription,
+    SwapTransactionData,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionResult as NativeTransactionResult,
 };

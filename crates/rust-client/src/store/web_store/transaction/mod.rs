@@ -13,7 +13,10 @@ use super::account::utils::update_account;
 use super::note::utils::apply_note_updates_tx;
 use crate::store::{StoreError, TransactionFilter};
 use crate::transaction::{
-    TransactionDetails, TransactionRecord, TransactionStatus, TransactionStoreUpdate,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
+    TransactionStoreUpdate,
 };
 
 mod js_bindings;

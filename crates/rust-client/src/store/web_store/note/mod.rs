@@ -10,14 +10,23 @@ use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
 
 use super::WebStore;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, StoreError,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_input_notes, idxdb_get_input_notes_from_ids, idxdb_get_input_notes_from_nullifiers,
-    idxdb_get_output_notes, idxdb_get_output_notes_from_ids,
-    idxdb_get_output_notes_from_nullifiers, idxdb_get_unspent_input_note_nullifiers,
+    idxdb_get_input_notes,
+    idxdb_get_input_notes_from_ids,
+    idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_output_notes,
+    idxdb_get_output_notes_from_ids,
+    idxdb_get_output_notes_from_nullifiers,
+    idxdb_get_unspent_input_note_nullifiers,
 };
 
 mod models;
