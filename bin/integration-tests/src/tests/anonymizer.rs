@@ -30,13 +30,14 @@ use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
 
-// SWAP FULLY ONCHAIN
+// ANONYMIZING THE NOTE (change sender from Alice -> Anonymizer account)
 // ================================================================================================
 
 pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
     const ASSET_AMOUNT: u64 = 1;
     let (mut client, authenticator_1) = client_config.clone().into_client().await?;
 
+    // Workaround to show that importing the note into another client works
     let mut client_config_2 = client_config.as_parts();
     client_config_2.2 = create_test_store_path();
     let client_config_2 = ClientConfig {
@@ -45,8 +46,8 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
         store_config: client_config_2.2,
         auth_path: client_config_2.3,
     };
-
     let (mut client_2, authenticator_2) = client_config_2.into_client().await?;
+
     wait_for_node(&mut client).await;
     client.sync_state().await?;
     client_2.sync_state().await?;
