@@ -89,7 +89,7 @@ export interface IForeignAccountCode {
 }
 export interface ISetting {
   key: string;
-  value: Blob;
+  value: Uint8Array;
 }
 declare const db: Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;

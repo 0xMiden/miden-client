@@ -14,7 +14,7 @@ export async function getSettingValue(key) {
         }
         // There should be only one match
         const matchingRecord = allMatchingRecords[0];
-        // Convert the setting value Blob to an ArrayBuffer
+        // Convert the setting value to base64
         const valueBase64 = uint8ArrayToBase64(matchingRecord.value);
         const setting = {
             key: matchingRecord.key,
