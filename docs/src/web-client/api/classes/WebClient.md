@@ -128,6 +128,22 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### deleteSettingValue()
+
+> **deleteSettingValue**(`key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### exportAccountFile()
 
 > **exportAccountFile**(`account_id`): `Promise`\<`any`\>
@@ -303,6 +319,22 @@ Meant to be used in conjunction with the `force_import_store` method
 ##### filter
 
 [`NoteFilter`](NoteFilter.md)
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### getSettingValue()
+
+> **getSettingValue**(`key`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### key
+
+`string`
 
 #### Returns
 
@@ -673,6 +705,26 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### setSettingValue()
+
+> **setSettingValue**(`key`, `value`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 
