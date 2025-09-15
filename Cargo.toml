@@ -22,21 +22,21 @@ version      = "0.12.0"
 
 [workspace.dependencies]
 # Miden dependencies
-miden-lib = { default-features = false, version = "0.11.1" }
+miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
 miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-objects = { default-features = false, version = "0.11.1" }
+miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-testing = { branch = "next", default-features = false, features = [
 ], git = "https://github.com/0xMiden/miden-base" }
-miden-tx = { default-features = false, version = "0.11.1" }
+miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
