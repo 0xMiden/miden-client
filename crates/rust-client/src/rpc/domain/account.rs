@@ -11,6 +11,7 @@ use miden_objects::account::{
     AccountStorageHeader,
     StorageMapWitness,
 };
+use miden_objects::crypto::merkle::SmtProof;
 use miden_objects::block::{AccountWitness, BlockNumber};
 use miden_objects::crypto::merkle::MerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
@@ -258,8 +259,6 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
         // Get map values into slot |-> (key, value, proof) mapping
         let mut storage_slot_proofs: BTreeMap<u8, Vec<StorageMapWitness>> = BTreeMap::new();
         for StorageSlotMapProof { storage_slot, smt_proof } in storage_maps {
-            use miden_objects::crypto::merkle::SmtProof;
-
             let smt_opening = smt_proof
                 .as_ref()
                 .ok_or(proto::rpc_store::account_proof::account_details_response::StorageSlotMapProof::missing_field(

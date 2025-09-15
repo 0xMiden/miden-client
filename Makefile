@@ -91,8 +91,7 @@ test: ## Run tests
 
 .PHONY: test-docs
 test-docs: ## Run documentation tests
-	# Run doctests for the Rust client with the features required by examples
-	cargo test -p miden-client --doc --features "std,tonic"
+	cargo test --doc $(FEATURES_CLIENT)
 
 # --- Integration testing -------------------------------------------------------------------------
 
