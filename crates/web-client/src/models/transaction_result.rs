@@ -10,6 +10,7 @@ use crate::models::transaction_args::TransactionArgs;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct TransactionResult(NativeTransactionResult);
 
 #[wasm_bindgen]

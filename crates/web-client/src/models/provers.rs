@@ -2,13 +2,12 @@ use alloc::sync::Arc;
 
 use miden_client::RemoteTransactionProver;
 use miden_client::transaction::{
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionProver as TransactionProverTrait,
+    LocalTransactionProver, ProvingOptions, TransactionProver as TransactionProverTrait,
 };
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct TransactionProver {
     prover: Arc<dyn TransactionProverTrait>,
     endpoint: Option<String>,

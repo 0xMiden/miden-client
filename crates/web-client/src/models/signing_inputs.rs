@@ -6,6 +6,7 @@ use crate::models::transaction_summary::TransactionSummary;
 use crate::models::word::Word;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct SigningInputs {
     inner: NativeSigningInputs,
 }

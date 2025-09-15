@@ -6,6 +6,7 @@ use super::felt::{Felt, FeltArray};
 use super::word::Word;
 
 #[wasm_bindgen]
+#[derive(Copy, Clone)]
 pub struct Rpo256;
 
 #[wasm_bindgen]
