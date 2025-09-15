@@ -16,11 +16,12 @@ use miden_objects::account::{
     AccountStorage,
     NonFungibleDeltaAction,
     StorageMap,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
-use miden_objects::crypto::merkle::{MerklePath, MerkleStore};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
 use miden_objects::{AccountError, Felt, Word};
 use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
@@ -307,7 +308,7 @@ impl SqliteStore {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<(Word, MerklePath), StoreError> {
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
@@ -327,9 +328,11 @@ impl SqliteStore {
 
         let merkle_store = merkle_store.read();
 
-        let merkle_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
+        let value_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
+        let leaf = SmtLeaf::new_single(key, value_path.value);
+        let proof = SmtProof::new(value_path.path, leaf)?;
 
-        Ok((item, merkle_path))
+        Ok((item, StorageMapWitness::new(proof)))
     }
 
     // ACCOUNT DELTA HELPERS

@@ -1160,11 +1160,11 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let node_nullifier = client
         .test_rpc_api()
-        .check_nullifiers_by_prefix(&[nullifier.prefix()], 0.into())
+        .sync_nullifiers(&[nullifier.prefix()], 0.into())
         .await
         .unwrap()
         .pop()
-        .with_context(|| "no nullifier found in check_nullifiers_by_prefix response")?;
+        .with_context(|| "no nullifier found in sync_nullifiers response")?;
     let node_nullifier_proof = client
         .test_rpc_api()
         .check_nullifiers(&[nullifier])

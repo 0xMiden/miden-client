@@ -33,7 +33,7 @@ The RPC client communicates with the node through a defined set of gRPC methods.
 Currently, these include:
 
 - `CheckNullifiers`: Returns proofs for specific provided full nullifiers.
-- `CheckNullifiersByPrefix`: Returns a list of tracked nullifiers that match specific prefixes. This is useful for checking if a note has been consumed without revealing the nullifiers that the client is tracking.
+- `SyncNullifiers`: Returns a list of tracked nullifiers that match specific prefixes. This is useful for checking if a note has been consumed without revealing the nullifiers that the client is tracking.
 - `GetAccountDetails`: Returns the account details for a specific account ID. The available information will depend on the account type (public or private).
 - `GetAccountProofs`: Returns the account data needed to perform a Foreign Procedure Invocation (FPI) on the specified foreign accounts.
 - `GetAccountStateDelta`: Returns the state delta for a specific account ID between two block numbers.
