@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use indexed_db_store::{get_account_auth_by_pub_key, insert_account_auth};
+use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::auth::{AuthSecretKey, SigningInputs, TransactionAuthenticator};
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::RwLock;

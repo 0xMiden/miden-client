@@ -59,11 +59,10 @@ pub use miden_objects::{
         AccountStorage,
         AccountStorageMode,
         AccountType,
-        NetworkId,
         StorageMap,
         StorageSlot,
     },
-    address::{AccountIdAddress, Address, AddressInterface, AddressType},
+    address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
 };
 
 use super::Client;

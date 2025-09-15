@@ -14,12 +14,9 @@ miden-client = { version = "0.11" }
 
 | Features     | Description                                                                                                                                               |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `idxdb`      | Enables WebAssembly (browser) support. The Web store implementation now lives in the separate `indexed-db-store` crate. |
 | `tonic`      | Includes `TonicRpcClient`, a `std`-compatible Tonic client to communicate with Miden node. This relies on the `tonic` for the inner transport.  **Disabled by default.**                                                        |
 | `web-tonic`  | Includes `TonicRpcClient`, a `wasm`-compatible Tonic client to communicate with the Miden node. This relies on `tonic-web-wasm-client` for the inner transport. **Disabled by default.**                                   |
 | `testing`    | Enables functions meant to be used in testing environments. **Disabled by default.**             |
-
-Features `idxdb` and `web-tonic` are for WebAssembly builds; `tonic` is for native.
 
 ### Store and RpcClient implementations
 
@@ -27,7 +24,7 @@ The library user can provide their own implementations of `Store` and `RpcClient
 
 Storage backends are provided as separate crates:
 - SQLite: `miden-client-sqlite-store`, based on SQLite. For `std`-compatible environments.
-- Web (WASM): `indexed-db-store`, based on IndexedDB. For browser environments.
+- Web (WASM): `idxdb-store`, based on IndexedDB. For browser environments.
 
 ## License
 This project is [MIT licensed](../../LICENSE).

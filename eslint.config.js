@@ -8,7 +8,7 @@ module.exports = [
       "miden-node/**/*",
       "**/*.d.ts",
       "docs/book/**/*",
-      "crates/indexed-db-store/src/web_store/**",
+      "crates/idxdb-store/src/**",
     ],
   },
   {

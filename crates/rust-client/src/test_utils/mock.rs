@@ -356,7 +356,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        _known_account_codes: Vec<AccountCode>,
+        _known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let mock_chain = self.mock_chain.read();
 
@@ -402,7 +402,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the nullifiers created after the specified block number that match the provided
     /// prefixes.
-    async fn check_nullifiers_by_prefix(
+    async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
         from_block_num: BlockNumber,

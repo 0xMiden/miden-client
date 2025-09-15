@@ -3,4 +3,4 @@
 *.yaml
 
 # Generated JS (codegen)
-crates/indexed-db-store/src/web_store/js/**
+crates/idxdb-store/src/js/**

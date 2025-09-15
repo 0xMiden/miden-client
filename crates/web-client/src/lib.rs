@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use core::fmt::Write;
 
-use indexed_db_store::WebStore;
+use idxdb_store::WebStore;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{Client, ExecutionOptions};

@@ -76,7 +76,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt::{self};
 
-use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::account::{Account, AccountDelta, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
@@ -1109,7 +1109,7 @@ where
                 .check_notes_consumability(
                     account.id(),
                     self.store.get_sync_height().await?,
-                    input_notes.clone(),
+                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
                     tx_args.clone(),
                 )
                 .await?;
@@ -1167,8 +1167,6 @@ where
         let account_ids = foreign_accounts.iter().map(ForeignAccount::account_id);
         let known_account_codes =
             self.store.get_foreign_account_code(account_ids.collect()).await?;
-
-        let known_account_codes: Vec<AccountCode> = known_account_codes.into_values().collect();
 
         // Fetch account proofs
         let (block_num, account_proofs) =

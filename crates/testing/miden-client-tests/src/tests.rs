@@ -1919,6 +1919,7 @@ const BUMP_MAP_CODE: &str = "export.bump_map_item
                 end";
 
 #[tokio::test]
+#[ignore = "ignoring due to bug, see miden-base#1878"]
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
@@ -2032,7 +2033,7 @@ async fn storage_and_vault_proofs() {
         };
 
         assert_eq!(value, map.get(&MAP_KEY.into()));
-        assert_eq!(&proof, map.open(&MAP_KEY.into()).path());
+        assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
 }
 

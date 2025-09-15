@@ -2,6 +2,7 @@ use miden_objects::address::{
     AccountIdAddress as NativeAccountIdAddress,
     Address as NativeAddress,
     AddressInterface as NativeAddressInterface,
+    NetworkId as NativeNetworkId,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -61,9 +62,7 @@ impl Address {
 
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
-        let net_id = network_id
-            .try_into()
-            .map_err(|err| js_error_with_context(err, "wrong network ID for bech32 conversion"))?;
+        let net_id: NativeNetworkId = network_id.into();
         Ok(self.0.to_bech32(net_id))
     }
 }

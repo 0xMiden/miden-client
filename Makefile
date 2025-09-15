@@ -18,7 +18,7 @@ PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
-EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude indexed-db-store
+EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude idxdb-store
 
 # --- Linting -------------------------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd crates/indexed-db-store/src/web_store && yarn && yarn lint
+	cd crates/idxdb-store/src/ && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -168,7 +168,7 @@ build-wasm: rust-client-ts-build ## Build the client library for wasm32
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
-	cd crates/indexed-db-store/src/web_store && yarn && yarn build
+	cd crates/idxdb-store/src && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 
@@ -202,7 +202,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
-	yarn --cwd crates/indexed-db-store/src/web_store --silent
+	yarn --cwd crates/idxdb-store/src --silent
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"

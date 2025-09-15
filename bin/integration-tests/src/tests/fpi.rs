@@ -1,3 +1,5 @@
+// TODO: remove once miden-base#1878 is solved
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
@@ -22,15 +24,18 @@ const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::n
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
-pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
-pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
-pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -104,7 +109,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     Ok(())
 }
 
-pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -216,7 +222,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
 async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (foreign_account, proc_root) = deploy_foreign_account(
@@ -296,6 +302,10 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
+
+    // Create a fresh client to prove with a fresh LocalTransactionProver
+    // (see miden-base/issues/1865 for more details)
+    let (mut client, _keystore) = client_config.clone().into_client().await?;
     let tx_result = client.new_transaction(native_account.id(), tx_request).await?;
 
     client.submit_transaction(tx_result).await?;

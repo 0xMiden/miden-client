@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": true,
+    "incremental": true,
+    "sourceMap": true,
+    "noEmitOnError": true,
+    "removeComments": false,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "./js",
+    "strict": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+  },
+  "include": ["./ts/*.ts"],
+  "exclude": ["./js/**/*"]
+}

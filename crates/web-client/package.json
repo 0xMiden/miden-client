@@ -18,7 +18,7 @@
     "../LICENSE.md"
   ],
   "scripts": {
-    "build-rust-client-js": "cd ../indexed-db-store/src/web_store && yarn && yarn build",
+    "build-rust-client-js": "cd ../idxdb-store/src/ && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "test": "yarn playwright install --with-deps && yarn playwright test",
