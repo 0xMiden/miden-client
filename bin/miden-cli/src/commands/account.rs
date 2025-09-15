@@ -61,19 +61,18 @@ impl AccountCmd {
                     None => {
                         display_default_account_id(&client).await?;
                     },
+                    Some(id) if id == "none" => {
+                        client.delete_default_account_id().await?;
+                        println!("Removing default account...");
+                    },
                     Some(id) => {
-                        if id == "none" {
-                            client.delete_default_account_id().await?;
-                            println!("Removing default account...");
-                        } else {
-                            let account_id: AccountId = parse_account_id(&client, id).await?;
+                        let account_id: AccountId = parse_account_id(&client, id).await?;
 
-                            // Check whether we're tracking that account
-                            let (account, _) = client.try_get_account_header(account_id).await?;
+                        // Check whether we're tracking that account
+                        let (account, _) = client.try_get_account_header(account_id).await?;
 
-                            client.set_default_account_id(account.id()).await?;
-                            println!("Setting default account to {id}...");
-                        }
+                        client.set_default_account_id(account.id()).await?;
+                        println!("Setting default account to {id}...");
                     },
                 }
             },
