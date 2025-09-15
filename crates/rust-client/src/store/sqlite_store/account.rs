@@ -330,8 +330,7 @@ impl SqliteStore {
 
         let value_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
         let leaf = SmtLeaf::new_single(key, value_path.value);
-        // TODO: Remove unwrap
-        let proof = SmtProof::new(value_path.path, leaf).unwrap();
+        let proof = SmtProof::new(value_path.path, leaf)?;
 
         Ok((item, StorageMapWitness::new(proof)))
     }
