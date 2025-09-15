@@ -449,11 +449,13 @@ impl NodeRpcClient for MockRpcApi {
         // For the mock implementation, we'll return a simple note script
         // In a real implementation, this would look up the script by its root hash
         use alloc::sync::Arc;
+
+        use miden_objects::MastForest;
         use miden_objects::note::NoteScript;
-        use miden_objects::vm::{MastForest, Program};
+        use miden_objects::vm::Program;
 
         let mast_forest = Arc::new(MastForest::new());
-        let program = Program::new(mast_forest, 0); // Simple placeholder program
+        let program = Program::new(mast_forest, miden_core::MastNodeId::new(0)); // Simple placeholder program
         let script = NoteScript::new(program);
 
         Ok(script)

@@ -47,7 +47,6 @@ pub use miden_objects::{
     AccountIdError,
     AddressError,
     NetworkIdError,
-    account::NetworkId,
     account::{
         Account,
         AccountBuilder,
@@ -62,6 +61,7 @@ pub use miden_objects::{
         StorageMap,
         StorageSlot,
     },
+    address::NetworkId,
     address::{AccountIdAddress, Address, AddressInterface, AddressType},
 };
 

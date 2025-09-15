@@ -385,8 +385,8 @@ impl NodeRpcClient for TonicRpcClient {
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let request = proto::rpc_store::SyncNullifiersRequest {
             block_range: Some(proto::rpc_store::BlockRange {
-                start: Some(block_num.into()),
-                end: None, // No end limit
+                block_from: Some(block_num.into()),
+                block_to: None, // No end limit
             }),
             prefix_len: 16, // 16-bit prefixes
             nullifiers: prefixes.iter().map(|&prefix| prefix.into()).collect(),
@@ -401,8 +401,14 @@ impl NodeRpcClient for TonicRpcClient {
         let nullifier_updates = response
             .nullifiers
             .into_iter()
-            .map(|update| update.try_into())
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|update| {
+                // Convert the protobuf NullifierUpdate to our domain type
+                NullifierUpdate {
+                    nullifier: update.nullifier.unwrap_or_default().into(),
+                    block_num: update.block_num.unwrap_or(0),
+                }
+            })
+            .collect();
 
         Ok(nullifier_updates)
     }
