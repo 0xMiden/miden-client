@@ -315,6 +315,7 @@ pub enum NodeRpcClientEndpoint {
     SyncState,
     SubmitProvenTx,
     SyncNotes,
+    SyncNullifiers,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -336,6 +337,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
+            NodeRpcClientEndpoint::SyncNullifiers => write!(f, "sync_nullifiers"),
         }
     }
 }

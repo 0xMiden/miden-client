@@ -87,50 +87,30 @@ test.describe("get_input_note", () => {
 
   test("get note script by root", async ({ page }) => {
     await setupWalletAndFaucet(page);
-    
-    // First, we need to get a note script root from an existing note
-    const { consumedNoteId } = await setupConsumedNote(page);
-    
-    // Get the note to extract its script root
-    const noteData = await page.evaluate(async (_consumedNoteId: string) => {
+
+    // Create a note with a well-known script that always has a script
+    const scriptRoot = await page.evaluate(async () => {
+      // Use a well-known script that always exists
+      const noteScript = window.NoteScript.p2id();
+      return noteScript.root().toString();
+    });
+
+    // Test GetNoteScriptByRoot endpoint
+    const scriptResult = await page.evaluate(async (scriptRootHex: string) => {
       const endpoint = new window.Endpoint("http://localhost:57291");
       const rpcClient = new window.RpcClient(endpoint);
-      
-      const noteId = window.NoteId.fromHex(_consumedNoteId);
-      const fetchedNotes = await rpcClient.getNotesById([noteId]);
-      
-      if (fetchedNotes.length > 0 && fetchedNotes[0].inputNote) {
-        const scriptRoot = fetchedNotes[0].inputNote.script().root();
-        return {
-          scriptRoot: scriptRoot.toString(),
-          hasScript: true
-        };
-      }
-      
-      return { scriptRoot: null, hasScript: false };
-    }, consumedNoteId);
-    
-    if (noteData.hasScript) {
-      // Test GetNoteScriptByRoot endpoint
-      const scriptResult = await page.evaluate(async (scriptRootHex: string) => {
-        const endpoint = new window.Endpoint("http://localhost:57291");
-        const rpcClient = new window.RpcClient(endpoint);
-        
-        const scriptRoot = window.Word.fromHex(scriptRootHex);
-        const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
-        
-        return {
-          hasScript: !!noteScript,
-          scriptRoot: noteScript ? noteScript.root().toString() : null
-        };
-      }, noteData.scriptRoot);
-      
-      expect(scriptResult.hasScript).toBe(true);
-      expect(scriptResult.scriptRoot).toEqual(noteData.scriptRoot);
-    } else {
-      // Skip test if no script available
-      console.log("Skipping GetNoteScriptByRoot test - no script available for the note");
-    }
+
+      const scriptRoot = window.Word.fromHex(scriptRootHex);
+      const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+
+      return {
+        hasScript: !!noteScript,
+        scriptRoot: noteScript ? noteScript.root().toString() : null,
+      };
+    }, scriptRoot);
+
+    expect(scriptResult.hasScript).toBe(true);
+    expect(scriptResult.scriptRoot).toEqual(scriptRoot);
   });
 });
 

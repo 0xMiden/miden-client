@@ -383,11 +383,28 @@ impl NodeRpcClient for TonicRpcClient {
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        // TODO: Update to use sync_nullifiers API when available
-        // For now, return empty result to allow compilation
-        let _prefixes = prefixes;
-        let _block_num = block_num;
-        Ok(vec![])
+        let request = proto::rpc_store::SyncNullifiersRequest {
+            block_range: Some(proto::rpc_store::BlockRange {
+                start: Some(block_num.into()),
+                end: None, // No end limit
+            }),
+            prefix_len: 16, // 16-bit prefixes
+            nullifiers: prefixes.iter().map(|&prefix| prefix.into()).collect(),
+        };
+
+        let mut rpc_api = self.ensure_connected().await?;
+        let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
+        })?;
+
+        let response = response.into_inner();
+        let nullifier_updates = response
+            .nullifiers
+            .into_iter()
+            .map(|update| update.try_into())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(nullifier_updates)
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
