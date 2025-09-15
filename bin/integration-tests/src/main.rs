@@ -177,7 +177,8 @@ impl std::fmt::Debug for TestCase {
 enum TestCategory {
     Client,
     CustomTransaction,
-    //Fpi,
+    #[allow(unused)] // ignoring due to bug, see miden-base#1878
+    Fpi,
     NetworkTransaction,
     Onchain,
     SwapTransaction,
@@ -188,7 +189,7 @@ impl AsRef<str> for TestCategory {
         match self {
             TestCategory::Client => "client",
             TestCategory::CustomTransaction => "custom_transaction",
-            //TestCategory::Fpi => "fpi",
+            TestCategory::Fpi => "fpi",
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
             TestCategory::SwapTransaction => "swap_transaction",

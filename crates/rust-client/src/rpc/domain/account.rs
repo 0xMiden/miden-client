@@ -10,6 +10,7 @@ use miden_objects::account::{
     AccountId,
     AccountStorageHeader,
     StorageMapWitness,
+    StorageSlotType,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};
 use miden_objects::crypto::merkle::{MerklePath, SmtProof};
@@ -124,7 +125,21 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 // ACCOUNT HEADER
 // ================================================================================================
 
-impl core::convert::TryInto<AccountHeader> for proto::account::AccountHeader {
+pub(crate) struct SlotTypeProto(pub u32);
+
+impl TryInto<StorageSlotType> for SlotTypeProto {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<StorageSlotType, Self::Error> {
+        match self.0 {
+            0 => Ok(StorageSlotType::Value),
+            1 => Ok(StorageSlotType::Map),
+            _ => Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
+        }
+    }
+}
+
+impl TryInto<AccountHeader> for proto::account::AccountHeader {
     type Error = crate::rpc::RpcError;
 
     fn try_into(self) -> Result<AccountHeader, Self::Error> {
@@ -170,11 +185,9 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
     type Error = crate::rpc::RpcError;
 
     fn try_into(self) -> Result<AccountStorageHeader, Self::Error> {
-        use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
-        let mut header_slots: Vec<(miden_objects::account::StorageSlotType, Word)> =
-            Vec::with_capacity(self.slots.len());
+        let mut header_slots: Vec<(StorageSlotType, Word)> = Vec::with_capacity(self.slots.len());
 
         for slot in self.slots {
             let commitment: Word = slot
@@ -184,11 +197,7 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
                 ))?
                 .try_into()?;
 
-            let slot_type = match slot.slot_type {
-                0 => miden_objects::account::StorageSlotType::Value,
-                1 => miden_objects::account::StorageSlotType::Map,
-                _ => return Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
-            };
+            let slot_type: StorageSlotType = SlotTypeProto(slot.slot_type).try_into()?;
 
             header_slots.push((slot_type, commitment));
         }
