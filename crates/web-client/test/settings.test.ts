@@ -10,11 +10,10 @@ test.describe("settings tests", () => {
 
       const result = await client.getSettingValue("test");
 
-      return (JSON.stringify(result) === JSON.stringify(testValue));
+      return JSON.stringify(result) === JSON.stringify(testValue);
     });
     expect(isValid).toEqual(true);
   });
-
 
   test("delete setting", async ({ page }) => {
     const isValid = await page.evaluate(async () => {
@@ -25,7 +24,7 @@ test.describe("settings tests", () => {
 
       const resultAfterDelete = await client.getSettingValue("test");
 
-      return (resultAfterDelete === undefined);
+      return resultAfterDelete === undefined;
     });
     expect(isValid).toEqual(true);
   });

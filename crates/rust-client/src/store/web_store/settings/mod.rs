@@ -36,10 +36,13 @@ impl WebStore {
     ) -> Result<Option<Vec<u8>>, StoreError> {
         let promise = idxdb_get_setting_value(key);
         let value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get setting value from idxdb: {js_error:?}",))
+            StoreError::DatabaseError(format!(
+                "failed to get setting value from idxdb: {js_error:?}",
+            ))
         })?;
-        let setting: Option<SettingValueIdxdbObject> = from_value(value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize value from idxdb: {err:?}")))?;
+        let setting: Option<SettingValueIdxdbObject> = from_value(value).map_err(|err| {
+            StoreError::DatabaseError(format!("failed to deserialize value from idxdb: {err:?}"))
+        })?;
         Ok(setting.map(|setting| setting.value))
     }
 
