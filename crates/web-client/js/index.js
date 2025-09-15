@@ -79,6 +79,20 @@ const {
   WebClient: WasmWebClient, // Alias the WASM-exported WebClient
 } = wasm;
 
+const buildTypedErraysExport = async (exportObject) => {
+  return Object.entries(exportObject).reduce(
+    (exports, [exportName, _export]) => {
+      if (exportName.endsWith("Array")) {
+        exports[exportName] = _export;
+      }
+      return exports;
+    },
+    {}
+  );
+};
+
+const MidenArrays = await buildTypedErraysExport(wasm);
+
 export {
   Account,
   AccountBuilder,
@@ -153,6 +167,7 @@ export {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
+  MidenArrays,
 };
 
 /**

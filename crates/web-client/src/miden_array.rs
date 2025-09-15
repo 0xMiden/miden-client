@@ -7,7 +7,7 @@ pub enum ArrayError {
 macro_rules! export_js_miden_array {
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {
         $(
-            #[wasm_bindgen]
+            #[wasm_bindgen(inspectable)]
             #[derive(Clone)]
             pub struct $miden_type_array_name {
                 __inner: Vec<$miden_type_name>,

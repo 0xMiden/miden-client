@@ -68,6 +68,7 @@ import {
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  MidenArrays,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -152,6 +153,7 @@ declare global {
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    MidenArrays: typeof MidenArrays;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

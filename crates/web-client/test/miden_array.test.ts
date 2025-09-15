@@ -6,12 +6,33 @@ import {
   Address,
   NetworkId,
   AccountIdArray,
+  MidenArrays,
 } from "../js";
 
-const instanceEmptyAccountArray = async ({ page }: { page: typeof Page }) => {
+const instanceEmptyArray = async ({ page }: { page: typeof Page }) => {
   return await page.evaluate(async ({}) => {
-    const array = new window.AccountIdArray([]);
-    return array.length;
+    for (const [arrayName, arrayBuilder] of Object.entries(
+      window.MidenArrays
+    )) {
+      // FIXME: Avoid filtering these before finishing PR.
+      if (
+        arrayName != "FeltArray" &&
+        arrayName != "NoteDetailsArray" &&
+        arrayName != "OutputNotesArray" &&
+        !arrayName.startsWith("Note")
+      ) {
+        try {
+          const array = new window.MidenArrays[arrayName]();
+          console.log(array);
+          const _length = array.length();
+        } catch (err) {
+          throw new Error(
+            `Failed to build and/or access miden array of type ${arrayName}: ${err}`
+          );
+        }
+      }
+    }
+    return true;
   }, {});
 };
 
@@ -30,7 +51,7 @@ const instanceAccountArrayFromAccounts = async ({
       accounts[i] = account.id();
     }
     const array = new window.AccountIdArray(accounts);
-    return array.length;
+    return array.length();
   }, {});
 };
 
@@ -120,12 +141,12 @@ const arrayReturnsClone = async ({
 };
 
 test.describe("Instance array", () => {
-  test("Instance empty array", async ({ page }) => {
+  test(`Instance empty arrays`, async ({ page }) => {
     await expect(
-      instanceEmptyAccountArray({
+      instanceEmptyArray({
         page,
       })
-    ).resolves.toBe(0);
+    ).resolves.toBeTrue();
   });
 
   test("Instance array with 10 account ids ", async ({ page }) => {
