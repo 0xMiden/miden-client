@@ -290,6 +290,11 @@ impl NodeRpcClient for TonicRpcClient {
         account_requests: &BTreeSet<ForeignAccount>,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
+        if account_requests.is_empty() {
+            let (header, _) = self.get_block_header_by_number(None, false).await?;
+            return Ok((header.block_num(), Vec::new()));
+        }
+
         let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
             known_account_codes.values().cloned().map(|c| (c.commitment(), c)).collect();
 
