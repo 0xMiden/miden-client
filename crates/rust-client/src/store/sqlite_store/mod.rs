@@ -21,6 +21,7 @@ use miden_objects::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    StorageMapWitness,
 };
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -391,7 +392,7 @@ impl Store for SqliteStore {
         account_id: AccountId,
         index: u8,
         key: Word,
-    ) -> Result<(Word, MerklePath), StoreError> {
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {

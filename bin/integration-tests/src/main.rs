@@ -177,6 +177,7 @@ impl std::fmt::Debug for TestCase {
 enum TestCategory {
     Client,
     CustomTransaction,
+    #[allow(unused)] // ignoring due to bug, see miden-base#1878
     Fpi,
     NetworkTransaction,
     Onchain,
