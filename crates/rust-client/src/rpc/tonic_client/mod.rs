@@ -456,7 +456,7 @@ impl NodeRpcClient for TonicRpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         let response = rpc_api.get_note_script_by_root(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNodeScriptByRoot, status)
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNoteScriptByRoot, status)
         })?;
 
         let response = response.into_inner();

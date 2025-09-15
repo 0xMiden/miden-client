@@ -318,7 +318,7 @@ pub enum NodeRpcClientEndpoint {
     SyncState,
     SubmitProvenTx,
     SyncNotes,
-    GetNodeScriptByRoot,
+    GetNoteScriptByRoot,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -339,7 +339,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
-            NodeRpcClientEndpoint::GetNodeScriptByRoot => write!(f, "get_note_script_by_root"),
+            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
         }
     }
 }
