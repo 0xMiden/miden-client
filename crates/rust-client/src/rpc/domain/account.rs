@@ -11,9 +11,8 @@ use miden_objects::account::{
     AccountStorageHeader,
     StorageMapWitness,
 };
-use miden_objects::crypto::merkle::SmtProof;
 use miden_objects::block::{AccountWitness, BlockNumber};
-use miden_objects::crypto::merkle::MerklePath;
+use miden_objects::crypto::merkle::{MerklePath, SmtProof};
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
