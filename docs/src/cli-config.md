@@ -17,7 +17,7 @@ secret_keys_directory = "keystore"
 default_account_id = "0x012345678"
 token_symbol_map_filepath = "token_symbol_map.toml"
 remote_prover_endpoint = "http://localhost:8080"
-component_template_directory = "./templates"
+package_directory         = "./packages"
 max_block_number_delta = 256
 
 [rpc]
@@ -87,29 +87,10 @@ Notice how the amount specified when using the token symbol takes into account t
 ### Remote prover endpoint
 The `remote_prover_endpoint` field is used to configure the usage of a remote prover. You can set a remote prover when calling the `miden-client prover` command with the `--remote-prover-endpoint` flag. The prover will be used for all transactions that are executed with the `miden` command. By default, no remote prover is used and all transactions are executed locally.
 
-### Component template directory
-The `component_template_directory` field is used to configure the path to the directory where the account component templates are stored. The default value is `./templates`.
+### Package directory
+The `package_directory` field is used to configure the path to the directory where the account component are stored in package (`.masp`) form. The default value is `./packages`.
 
-In this directory you can place the templates used to create the account components. These templates define the interface of the account that will be created.
-
-A sample template file looks like this:
-```toml
-name = "basic_fungible_faucet"
-description = ""
-version = "0.1.0"
-supported-types = ["FungibleFaucet"]
-
-[[storage]]
-name = "token_metadata"
-description = "Contains metadata about the token associated to the faucet account"
-slot = 0
-value = [
-    { name = "max_supply", type = "felt", description = "Maximum supply of the token in base units" },
-    { name = "decimals",type = "u8", description = "Number of decimal places" },
-    { name = "ticker", type = "token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." },
-    { value = "0" },
-]
-```
+In this directory you can place the packages used to create the account components. These define the interface of the account that will be created.
 
 ### Block Delta
 The `max_block_number_delta` is an optional field that is used to configure the maximum number of blocks the client can be behind the network.

@@ -29,23 +29,23 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden base/protocol dependencies
-miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-tx      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-lib     = { branch = "fabrizioorsi/re-export-Section", default-features = false, git = "https://github.com/lambdaclass/miden-base" }
+miden-objects = { branch = "fabrizioorsi/re-export-Section", default-features = false, git = "https://github.com/lambdaclass/miden-base" }
+miden-testing = { branch = "fabrizioorsi/re-export-Section", default-features = false, git = "https://github.com/lambdaclass/miden-base" }
+miden-tx      = { branch = "fabrizioorsi/re-export-Section", default-features = false, git = "https://github.com/lambdaclass/miden-base" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "fabrizioorsi/re-export-Section", git = "https://github.com/lambdaclass/miden-node" }
+miden-node-ntx-builder = { branch = "fabrizioorsi/re-export-Section", git = "https://github.com/lambdaclass/miden-node" }
+miden-node-proto-build = { branch = "fabrizioorsi/re-export-Section", default-features = false, git = "https://github.com/lambdaclass/miden-node" }
+miden-node-rpc = { branch = "fabrizioorsi/re-export-Section", git = "https://github.com/lambdaclass/miden-node" }
+miden-node-store = { branch = "fabrizioorsi/re-export-Section", git = "https://github.com/lambdaclass/miden-node" }
+miden-node-utils = { branch = "fabrizioorsi/re-export-Section", git = "https://github.com/lambdaclass/miden-node" }
 miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-note-transport" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover-client = { branch = "fabrizioorsi/re-export-Section", default-features = false, features = [
   "tx-prover",
-], git = "https://github.com/0xMiden/miden-node" }
+], git = "https://github.com/lambdaclass/miden-node" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

@@ -16,6 +16,7 @@
 * Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 * Refactored code into their own files and added `ProvenTransaction` and `TransactionStoreUpdate` bindings for the WebClient ([#1408](https://github.com/0xMiden/miden-client/pull/1408)).
 * Added `NoteFile` type, used for exporting and importing `Notes`([#1378](https://github.com/0xMiden/miden-client/pull/1383))
+* [BREAKING] Replaced `AccountComponentTemplates` for `Packages` for account creation ([#1313](https://github.com/0xMiden/miden-client/pull/1313)).
 
 ### Changes
 
