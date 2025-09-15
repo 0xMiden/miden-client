@@ -292,13 +292,7 @@ pub trait NodeRpcClient: Send + Sync {
     }
 
     /// Fetches the note script with the specified root.
-    ///
-    /// The default implementation of this method uses
-    /// [`NodeRpcClient::get_note_script_by_root`].
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
-        let note_script = self.get_note_script_by_root(root).await?;
-        Ok(note_script)
-    }
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 }
 
 // RPC API ENDPOINT
