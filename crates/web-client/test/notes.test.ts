@@ -23,7 +23,10 @@ const getConsumableNotes = async (
 ): Promise<
   {
     noteId: string;
-    consumability: { accountId: string; consumableAfterBlock: number | undefined }[];
+    consumability: {
+      accountId: string;
+      consumableAfterBlock: number | undefined;
+    }[];
   }[]
 > => {
   return await testingPage.evaluate(async (_accountId?: string) => {

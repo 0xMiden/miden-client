@@ -12,7 +12,7 @@ const instanceAddress = async ({
 }) => {
   return await page.evaluate(
     async ({ accountId, _interface }) => {
-      let _accountId; 
+      let _accountId;
       const client = window.client;
       if (accountId) {
         _accountId = accountId;

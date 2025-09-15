@@ -28,8 +28,9 @@ clippy: ## Run Clippy with configs. We need two separate commands because the `t
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
-clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
+clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
+	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
 fix: ## Run Fix with configs, building tests with proper features to avoid type split.
@@ -37,8 +38,9 @@ fix: ## Run Fix with configs, building tests with proper features to avoid type 
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
-fix-wasm: ## Run Fix for the miden-client-web package
+fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
 	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
+	cargo +nightly fix --package miden-idxdb-store --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
 
 .PHONY: format
 format: ## Run format using nightly toolchain
@@ -163,8 +165,9 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 	CODEGEN=1 cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --locked
 	cargo build --package testing-remote-prover --release --locked
 
-build-wasm: rust-client-ts-build ## Build the client library for wasm32
+build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
+	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
@@ -177,8 +180,9 @@ check: ## Build the CLI binary and client library in release mode
 	cargo check --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
 
 .PHONY: check-wasm
-check-wasm: ## Build the client library for wasm32
+check-wasm: ## Check the wasm packages (web client and idxdb store)
 	cargo check --package miden-client-web --target wasm32-unknown-unknown
+	cargo check --package miden-idxdb-store --target wasm32-unknown-unknown
 
 ## --- Setup --------------------------------------------------------------------------------------
 
