@@ -1,18 +1,18 @@
 import { expect, Page } from "@playwright/test";
 import test from "./playwright.global.setup";
-import { AddressInterface, AccountId, Address, NetworkId } from "../js";
+import { AddressInterface, AccountId } from "../js";
 const instanceAddress = async ({
   page,
   accountId,
   _interface,
 }: {
-  page: typeof Page;
+  page: Page;
   accountId?: typeof AccountId;
   _interface: typeof AddressInterface;
 }) => {
   return await page.evaluate(
     async ({ accountId, _interface }) => {
-      let _accountId;
+      let _accountId; 
       const client = window.client;
       if (accountId) {
         _accountId = accountId;

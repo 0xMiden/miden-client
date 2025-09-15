@@ -4,7 +4,6 @@ Browser‑compatible `Store` implementation for the Miden client. This crate tar
 IndexedDB (via `wasm-bindgen`) to persist client state in web environments.
 
 - Persists accounts, notes, transactions, block headers, and MMR nodes in the browser
-- Designed for use with the `web-client` crate and Playwright tests
 - Ships as a `cdylib`; works with bundlers via `@wasm-tool/rollup-plugin-rust`
 
 ## Quick Start
