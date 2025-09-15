@@ -73,6 +73,7 @@ use crate::store::{AccountRecord, AccountStatus};
 
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
+    pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
     pub use miden_lib::account::auth::AuthRpoFalcon512;
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};

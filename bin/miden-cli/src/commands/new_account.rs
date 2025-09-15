@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -6,7 +7,7 @@ use std::vec;
 
 use clap::{Parser, ValueEnum};
 use miden_client::Client;
-use miden_client::account::component::COMPONENT_TEMPLATE_EXTENSION;
+use miden_client::account::component::{COMPONENT_TEMPLATE_EXTENSION, MIDEN_PACKAGE_EXTENSION};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthSecretKey, TransactionAuthenticator};
 use miden_client::crypto::rpo_falcon512::SecretKey;
@@ -19,6 +20,7 @@ use miden_objects::account::{
     InitStorageData,
     StorageValueName,
 };
+use miden_objects::vm::Package;
 use rand::RngCore;
 use tracing::debug;
 
@@ -84,6 +86,10 @@ pub struct NewWalletCmd {
     /// Optional list of files specifying additional components to add to the account.
     #[arg(short, long)]
     pub extra_components: Vec<PathBuf>,
+    /// Optional list of files containing a Miden Package in `.masp` form from which a
+    /// component template can be extracted.
+    #[arg(short, long)]
+    pub packages: Vec<PathBuf>,
     /// Optional file path to a TOML file containing a list of key/values used for initializing
     /// storage. Each of these keys should map to the templated storage values within the passed
     /// list of component templates. The user will be prompted to provide values for any keys not
@@ -118,6 +124,7 @@ impl NewWalletCmd {
             account_type,
             self.storage_mode.into(),
             &component_template_paths,
+            &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
         )
@@ -153,10 +160,15 @@ pub struct NewAccountCmd {
     /// Account type to create.
     #[arg(long, value_enum)]
     pub account_type: CliAccountType,
-    /// Optional list of files specifying additional component template files to add to the
-    /// account.
+    /// List of files specifying component template files for the account.
+    /// At least one component template is required, either specified by
+    /// [[`NewAccountCmd::component_templates`]] or by [[`NewAccountCmd::packages`]].
     #[arg(short, long)]
     pub component_templates: Vec<PathBuf>,
+    /// List of files containing a Miden Package in `.masp` form from which a
+    /// component template is extracted.
+    #[arg(short, long)]
+    pub packages: Vec<PathBuf>,
     /// Optional file path to a TOML file containing a list of key/values used for initializing
     /// storage. Each of these keys should map to the templated storage values within the passed
     /// list of component templates. The user will be prompted to provide values for any keys not
@@ -181,6 +193,7 @@ impl NewAccountCmd {
             self.account_type.into(),
             self.storage_mode.into(),
             &self.component_templates,
+            &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
         )
@@ -200,28 +213,125 @@ impl NewAccountCmd {
 // HELPERS
 // ================================================================================================
 
-/// Reads component templates from the given file paths.
-// TODO: IO errors should have more context
-fn load_component_templates(paths: &[PathBuf]) -> Result<Vec<AccountComponentTemplate>, CliError> {
+type ComponentPath = PathBuf;
+type PackagePath = PathBuf;
+/// Reads component templates and [[`miden_core::vm::Package`]]s from the given file paths.
+fn load_component_templates(
+    component_paths: &[ComponentPath],
+    package_paths: &[PackagePath],
+) -> Result<Vec<AccountComponentTemplate>, CliError> {
     let (cli_config, _) = load_config_file()?;
-    let components_base_dir = &cli_config.component_template_directory;
     let mut templates = Vec::new();
-    for path in paths {
-        // Set extension to COMPONENT_TEMPLATE_EXTENSION in case user did not
-        let path = if path.extension().is_none() {
-            path.with_extension(COMPONENT_TEMPLATE_EXTENSION)
-        } else {
-            path.clone()
-        };
-        let bytes = fs::read(components_base_dir.join(path))?;
+
+    let components_base_dir = &cli_config.component_template_directory;
+    for path in component_paths {
+        let file_name = match path.extension() {
+            None => {
+                // Set extension to COMPONENT_TEMPLATE_EXTENSION in case user
+                // did not
+                Ok(path.with_extension(COMPONENT_TEMPLATE_EXTENSION))
+            },
+            Some(extension) => {
+                if extension == OsStr::new(COMPONENT_TEMPLATE_EXTENSION) {
+                    Ok(path.clone())
+                } else {
+                    let error = std::io::Error::new(
+                        std::io::ErrorKind::InvalidFilename,
+                        format!(
+                            "{} has an invalid file extension: '{}'. \
+                            Expected: {COMPONENT_TEMPLATE_EXTENSION}",
+                            path.display(),
+                            extension.display()
+                        ),
+                    );
+                    Err(CliError::AccountComponentError(
+                        Box::new(error),
+                        format!(
+                            "failed to read account component template from {}",
+                            path.display()
+                        ),
+                    ))
+                }
+            },
+        }?;
+        let path = components_base_dir.join(&file_name);
+
+        let bytes = fs::read(&path).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("failed to read account component template from {}", path.display()),
+            )
+        })?;
+
         let template = AccountComponentTemplate::read_from_bytes(&bytes).map_err(|e| {
             CliError::AccountComponentError(
                 Box::new(e),
-                "failed to read account component template".into(),
+                format!("failed to deserialize account component template from {}", path.display()),
             )
         })?;
+
         templates.push(template);
     }
+
+    let packages_dir = &cli_config.package_directory;
+    for path in package_paths {
+        // If a user passes in a file with the `.masp` file extension, then we
+        // leave the passed in path as is; since it probably is a full path.
+        // This is the case with cargo-miden, which displays the full path to
+        // stdout after compilation finishes.
+        let path = match path.extension() {
+            None => {
+                let path = path.with_extension(MIDEN_PACKAGE_EXTENSION);
+                Ok(packages_dir.join(path))
+            },
+            Some(extension) => {
+                if extension == OsStr::new(MIDEN_PACKAGE_EXTENSION) {
+                    Ok(path.clone())
+                } else {
+                    let error = std::io::Error::new(
+                        std::io::ErrorKind::InvalidFilename,
+                        format!(
+                            "{} has an invalid file extension: '{}'. \
+                            Expected: {MIDEN_PACKAGE_EXTENSION}",
+                            path.display(),
+                            extension.display()
+                        ),
+                    );
+                    Err(CliError::AccountComponentError(
+                        Box::new(error),
+                        format!("failed to read Package from {}", path.display()),
+                    ))
+                }
+            },
+        }?;
+
+        let bytes = fs::read(&path).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("failed to read Package from {}", path.display()),
+            )
+        })?;
+
+        let package = Package::read_from_bytes(&bytes).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!("failed to deserialize Package in {}", path.display()),
+            )
+        })?;
+
+        let template = AccountComponentTemplate::try_from(package).map_err(|e| {
+            CliError::AccountComponentError(
+                Box::new(e),
+                format!(
+                    "failed to read account component template from Package in {}",
+                    path.display()
+                ),
+            )
+        })?;
+
+        templates.push(template);
+    }
+
     Ok(templates)
 }
 
@@ -248,10 +358,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     account_type: AccountType,
     storage_mode: AccountStorageMode,
     component_template_paths: &[PathBuf],
+    package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
 ) -> Result<Account, CliError> {
-    if component_template_paths.is_empty() {
+    if component_template_paths.is_empty() && package_paths.is_empty() {
         return Err(CliError::InvalidArgument(
             "account must contain at least one component".into(),
         ));
@@ -259,7 +370,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
     debug!("Loading component templates...");
-    let component_templates = load_component_templates(component_template_paths)?;
+    let component_templates = load_component_templates(component_template_paths, package_paths)?;
     debug!("Loaded {} component templates", component_templates.len());
     debug!("Loading initialization storage data...");
     let init_storage_data = load_init_storage_data(init_storage_data_path)?;
