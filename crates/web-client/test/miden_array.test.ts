@@ -9,7 +9,33 @@ import {
   MidenArrays,
 } from "../js";
 
-const instanceEmptyArray = async ({ page }: { page: typeof Page }) => {
+const collectArrayTypes = async ({
+  page,
+}: {
+  page: typeof Page;
+}): Promise<Array<string>> => {
+  return await page.evaluate(async ({}) => {
+    return Object.entries(window.MidenArrays).reduce(
+      (arrayTypeNames, [arrayTypeName, _]) => {
+        // FIXME: Avoid filtering these before finishing PR.
+        if (
+          arrayTypeName != "FeltArray" &&
+          arrayTypeName != "NoteDetailsArray" &&
+          arrayTypeName != "OutputNotesArray" &&
+          !arrayTypeName.startsWith("Note") &&
+          arrayTypeName != "RecipientArray" &&
+          arrayTypeName != "TransactionScriptInputPairArray"
+        ) {
+          arrayTypeNames.push(arrayTypeName);
+        }
+        return arrayTypeNames;
+      },
+      []
+    );
+  }, {});
+};
+
+const instanceEmptyArrays = async ({ page }: { page: typeof Page }) => {
   return await page.evaluate(async ({}) => {
     for (const [arrayName, arrayBuilder] of Object.entries(
       window.MidenArrays
@@ -19,12 +45,18 @@ const instanceEmptyArray = async ({ page }: { page: typeof Page }) => {
         arrayName != "FeltArray" &&
         arrayName != "NoteDetailsArray" &&
         arrayName != "OutputNotesArray" &&
-        !arrayName.startsWith("Note")
+        !arrayName.startsWith("Note") &&
+        arrayName != "RecipientArray" &&
+        arrayName != "TransactionScriptInputPairArray"
       ) {
         try {
           const array = new window.MidenArrays[arrayName]();
           console.log(array);
-          const _length = array.length();
+          if (array.length() != 0) {
+            throw new Error(
+              `Newly created array of type ${arrayName} should be zero`
+            );
+          }
         } catch (err) {
           throw new Error(
             `Failed to build and/or access miden array of type ${arrayName}: ${err}`
@@ -34,6 +66,23 @@ const instanceEmptyArray = async ({ page }: { page: typeof Page }) => {
     }
     return true;
   }, {});
+};
+
+const instanceMixedArray = async ({
+  page,
+  arrayTypeName,
+}: {
+  page: typeof Page;
+  arrayTypeName: string;
+}) => {
+  return await page.evaluate(
+    async ({ arrayType }) => {
+      const element = Symbol("not a miden type");
+      const midenArray = new window.MidenArrays[arrayType]();
+      midenArray.push(element);
+    },
+    { arrayType: arrayTypeName }
+  );
 };
 
 const instanceAccountArrayFromAccounts = async ({
@@ -57,7 +106,7 @@ const instanceAccountArrayFromAccounts = async ({
 
 const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
   return await page.evaluate(async ({}) => {
-    const account_to_set = await window.client.newWallet(
+    const accountToSet = await window.client.newWallet(
       window.AccountStorageMode.private(),
       true
     );
@@ -68,8 +117,8 @@ const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
     );
     const account_ids = accounts.map((account) => account.id());
     const array = new window.AccountIdArray(account_ids);
-    array.replaceAt(5, account_to_set.id());
-    return array.at(5).toString() == account_to_set.id().toString();
+    array.replaceAt(5, accountToSet.id());
+    return array.at(5).toString() == accountToSet.id().toString();
   }, {});
 };
 
@@ -140,13 +189,39 @@ const arrayReturnsClone = async ({
   );
 };
 
+const arrayWithSingleAccount = async ({ page }: { page: typeof Page }) => {
+  return await page.evaluate(async ({}) => {
+    const account = await window.client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    const array = new window.MidenArrays.AccountArray([]);
+
+    array.push(account);
+
+    return account;
+  }, {});
+};
+
 test.describe("Instance array", () => {
-  test(`Instance empty arrays`, async ({ page }) => {
+  test("Instance empty arrays", async ({ page }) => {
     await expect(
-      instanceEmptyArray({
+      instanceEmptyArrays({
         page,
       })
-    ).resolves.toBeTrue();
+    ).resolves.toBe(true);
+  });
+
+  test("Building array of mixed types fails", async ({ page }) => {
+    const arrayTypes = await collectArrayTypes({ page });
+    await Promise.all(
+      arrayTypes.map((arrayTypeName) => {
+        expect(
+          instanceMixedArray({ page, arrayTypeName }),
+          `Should not be able to build array of type ${arrayTypeName} with mixed types`
+        ).rejects.toThrow();
+      })
+    );
   });
 
   test("Instance array with 10 account ids ", async ({ page }) => {
@@ -187,11 +262,18 @@ test.describe("Instance array", () => {
       expect(outOfBoundsReplace(params)).rejects.toThrowError("AccountId"),
     ]);
   });
+
   test("Cannot modify array through aliasing", async ({ page }) => {
     const params = {
       page,
       index: Math.floor(Math.random() * 10),
     };
     await expect(arrayReturnsClone(params)).resolves.toBe(true);
+  });
+
+  test("Pushing into array does not leave variable as undefined", async ({
+    page,
+  }) => {
+    await expect(arrayWithSingleAccount({ page })).resolves.toBeTruthy();
   });
 });
