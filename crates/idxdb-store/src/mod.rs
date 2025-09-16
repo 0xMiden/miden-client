@@ -41,6 +41,7 @@ pub mod import;
 pub mod note;
 pub mod sync;
 pub mod transaction;
+mod promise;
 
 #[wasm_bindgen(module = "/src/web_store/js/utils.js")]
 extern "C" {

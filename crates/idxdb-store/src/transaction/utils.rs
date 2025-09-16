@@ -16,6 +16,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
+use crate::promise::await_ok;
 
 // TYPES
 // ================================================================================================
@@ -105,9 +106,7 @@ pub(crate) async fn upsert_transaction_record(
 
     if let Some(root) = serialized_data.script_root.clone() {
         let promise = idxdb_insert_transaction_script(root, serialized_data.tx_script);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert script: {js_error:?}"))
-        })?;
+        await_ok(promise, "failed to insert script").await?;
     }
 
     let promise = idxdb_upsert_transaction_record(
@@ -118,9 +117,7 @@ pub(crate) async fn upsert_transaction_record(
         serialized_data.status,
         serialized_data.script_root,
     );
-    JsFuture::from(promise).await.map_err(|js_error| {
-        StoreError::DatabaseError(format!("failed to insert transaction data: {js_error:?}"))
-    })?;
+    await_ok(promise, "failed to insert transaction data").await?;
 
     Ok(())
 }
