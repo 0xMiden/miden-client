@@ -4,8 +4,7 @@
 //! etc.) when running in a browser. It uses wasm-bindgen to interface with JavaScript and
 //! `IndexedDB`, allowing the Miden client to store and retrieve data asynchronously.
 //!
-//! **Note:** This implementation is only available when targeting WebAssembly with the `web_store`
-//! feature enabled.
+//! **Note:** This implementation is only available when targeting WebAssembly
 
 extern crate alloc;
 
