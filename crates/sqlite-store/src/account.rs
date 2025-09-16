@@ -13,6 +13,7 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
+    AccountIdAddress,
     AccountIdPrefix,
     AccountStorage,
     StorageMap,
@@ -806,7 +807,8 @@ impl SqliteStore {
         for address in addresses {
             const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
             let serialized_addres: [u8; AccountIdAddress::SERIALIZED_SIZE] = address.into();
-            tx.execute(QUERY, params![serialized_addres, account_id.to_hex(),])?;
+            tx.execute(QUERY, params![serialized_addres, account_id.to_hex(),])
+                .into_store_error()?;
         }
 
         Ok(())
@@ -1014,13 +1016,15 @@ fn query_account_addresses(
     const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
 
     let query = format!("{ADDRESS_QUERY} WHERE ID = '{}'", account_id.to_hex());
-    conn.prepare(&query)?
+    conn.prepare(&query)
+        .into_store_error()?
         .query_map([], |row| {
             let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = row.get(0)?;
             Ok(address)
-        })?
+        })
+        .into_store_error()?
         .map(|result| {
-            let serialized_address = result?;
+            let serialized_address = result.into_store_error()?;
             let address = AccountIdAddress::try_from(serialized_address).unwrap(); // TODO: handle unwrap
             Ok(address)
         })
@@ -1041,22 +1045,31 @@ mod tests {
         AccountDelta,
         AccountHeader,
         AccountId,
+        AccountIdAddress,
         AccountType,
+        AddressInterface,
         StorageMap,
         StorageSlot,
+    };
+    use miden_client::asset::{
+        AccountStorageDelta,
+        AccountVaultDelta,
+        Asset,
+        FungibleAsset,
+        NonFungibleAsset,
+        NonFungibleAssetDetails,
+    };
+    use miden_client::crypto::rpo_falcon512::PublicKey;
+    use miden_client::store::Store;
+    use miden_client::testing::account_id::{
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
     use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_client::transaction::TransactionKernel;
     use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::address::{AccountIdAddress, AddressInterface};
-    use miden_objects::asset::{Asset, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails};
-    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
-    use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
-    };
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;

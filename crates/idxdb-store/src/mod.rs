@@ -11,18 +11,13 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
-use miden_objects::address::AccountIdAddress;
-use miden_objects::asset::AssetVault;
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
-use miden_objects::note::Nullifier;
-use tonic::async_trait;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{JsFuture, js_sys, wasm_bindgen};
-
-use super::{
+use miden_client::Word;
+use miden_client::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_client::asset::AssetVault;
+use miden_client::block::BlockHeader;
+use miden_client::crypto::{InOrderIndex, MmrPeaks};
+use miden_client::note::{BlockNumber, Nullifier};
+use miden_client::store::{
     AccountRecord,
     AccountStatus,
     BlockRelevance,

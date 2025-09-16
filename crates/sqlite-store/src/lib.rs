@@ -22,6 +22,10 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
 };
+use miden_client::asset::{Asset, AssetVault};
+use miden_client::block::BlockHeader;
+use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
+use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -38,10 +42,6 @@ use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
 use miden_objects::address::AccountIdAddress;
-use miden_objects::asset::{Asset, AssetVault};
-use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
-use miden_objects::note::{NoteTag, Nullifier};
 use rusqlite::Connection;
 use rusqlite::types::Value;
 
