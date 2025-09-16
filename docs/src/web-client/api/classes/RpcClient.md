@@ -63,3 +63,25 @@ Promise that resolves to  different data depending on the note type:
   `null`.
 - Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
   ID.
+
+***
+
+### getNoteScriptByRoot()
+
+> **getNoteScriptByRoot**(`script_root`): `Promise`\<[`NoteScript`](NoteScript.md)\>
+
+Fetches a note script by its root hash from the connected Miden node.
+
+#### Parameters
+
+##### script\_root
+
+[`Word`](Word.md)
+
+The root hash of the note script to fetch
+
+#### Returns
+
+`Promise`\<[`NoteScript`](NoteScript.md)\>
+
+Promise that resolves to the `NoteScript`
