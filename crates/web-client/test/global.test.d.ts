@@ -7,9 +7,12 @@ import {
   AccountDelta,
   AccountHeader,
   AccountId,
+  AccountInterface,
   AccountStorageMode,
   AccountStorageRequirements,
   AccountType,
+  Address,
+  AddressInterface,
   AdviceMap,
   Assembler,
   AssemblerUtils,
@@ -23,6 +26,7 @@ import {
   FungibleAsset,
   InputNoteRecord,
   Library,
+  NetworkId,
   Note,
   NoteAssets,
   NoteConsumability,
@@ -81,11 +85,14 @@ declare global {
     AccountVaultDelta: typeof AccountVaultDelta;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
+    AccountInterface: typeof AccountInterface;
     AccountStorageDelta: typeof AccountStorageDelta;
     AccountStorageMode: typeof AccountStorageMode;
     AccountStorageRequirements: typeof AccountStorageRequirements;
     AccountType: typeof AccountType;
     AccountVaultDelta: typeof AccountVaultDelta;
+    Address: typeof Address;
+    AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
     Assembler: typeof Assembler;
     AssemblerUtils: typeof AssemblerUtils;
@@ -100,6 +107,7 @@ declare global {
     FungibleAssetDelta: typeof FungibleAssetDelta;
     InputNoteRecord: typeof InputNoteRecord;
     Library: typeof Library;
+    NetworkId: typeof NetworkId;
     Note: typeof Note;
     NoteAndArgs: typeof NoteAndArgs;
     NoteAndArgsArray: typeof NoteAndArgsArray;
@@ -143,6 +151,7 @@ declare global {
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
+    Address: typeof Address;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace
@@ -154,6 +163,7 @@ declare global {
       ) => Promise<void>;
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
+      parseNetworkId: (networkId: string) => NetworkId;
     };
   }
 }

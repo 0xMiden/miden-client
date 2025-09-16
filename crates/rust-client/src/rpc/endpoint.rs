@@ -1,7 +1,7 @@
 use alloc::string::{String, ToString};
 use core::fmt;
 
-use miden_objects::account::NetworkId;
+use miden_objects::address::NetworkId;
 
 // ENDPOINT
 // ================================================================================================

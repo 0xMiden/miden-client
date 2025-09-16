@@ -4,6 +4,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use miden_objects::account::{
     Account,
@@ -15,16 +16,27 @@ use miden_objects::account::{
     AccountStorage,
     NonFungibleDeltaAction,
     StorageMap,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotType,
 };
 use miden_objects::asset::{Asset, AssetVault, FungibleAsset};
+use miden_objects::crypto::merkle::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
 use miden_objects::{AccountError, Felt, Word};
+use miden_tx::utils::sync::RwLock;
 use miden_tx::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
+use crate::store::sqlite_store::merkle_store::{
+    get_asset_proof,
+    get_storage_map_item_proof,
+    insert_asset_nodes,
+    insert_storage_map_nodes,
+    update_asset_nodes,
+    update_storage_map_nodes,
+};
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 use crate::{insert_sql, subst};
 
@@ -124,25 +136,35 @@ impl SqliteStore {
 
     pub(crate) fn insert_account(
         conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
         account: &Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
 
         Self::insert_account_code(&tx, account.code())?;
+
         Self::insert_storage_slots(
             &tx,
             account.storage().commitment(),
             account.storage().slots().iter().enumerate(),
         )?;
+
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
 
-        Ok(tx.commit()?)
+        tx.commit()?;
+
+        let mut merkle_store = merkle_store.write();
+        insert_storage_map_nodes(&mut merkle_store, account.storage());
+        insert_asset_nodes(&mut merkle_store, account.vault());
+
+        Ok(())
     }
 
     pub(crate) fn update_account(
         conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
         const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
@@ -166,8 +188,9 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
+        let mut merkle_store = merkle_store.write();
         let tx = conn.transaction()?;
-        Self::update_account_state(&tx, new_account_state)?;
+        Self::update_account_state(&tx, &mut merkle_store, new_account_state)?;
         Ok(tx.commit()?)
     }
 
@@ -218,6 +241,100 @@ impl SqliteStore {
             .collect::<Result<BTreeMap<AccountId, AccountCode>, _>>()
     }
 
+    /// Retrieves the full asset vault for a specific account.
+    pub fn get_account_vault(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<AssetVault, StoreError> {
+        let assets = query_vault_assets(
+            conn,
+            "root = (SELECT vault_root FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+            params![account_id.to_hex()],
+        )?;
+
+        Ok(AssetVault::new(&assets)?)
+    }
+
+    /// Retrieves the full storage for a specific account.
+    pub fn get_account_storage(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError> {
+        let slots = query_storage_slots(
+            conn,
+            "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+            params![account_id.to_hex()],
+        )?
+        .into_values()
+        .collect();
+
+        Ok(AccountStorage::new(slots)?)
+    }
+
+    /// Fetches a specific asset from the account's vault without the need of loading the entire
+    /// vault. The Merkle proof is also retrieved from the [`MerkleStore`].
+    pub(crate) fn get_account_asset(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        account_id: AccountId,
+        faucet_id_prefix: AccountIdPrefix,
+    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+        let header = Self::get_account_header(conn, account_id)?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        let Some(asset) = query_vault_assets(
+            conn,
+            "faucet_id_prefix = ? AND root = ?",
+            params![faucet_id_prefix.to_hex(), header.vault_root().to_hex()],
+        )?
+        .into_iter()
+        .next() else {
+            return Ok(None);
+        };
+
+        let merkle_store = merkle_store.read();
+
+        let merkle_path = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+
+        Ok(Some((asset, merkle_path)))
+    }
+
+    /// Retrieves a specific item from the account's storage map without loading the entire storage.
+    /// The Merkle proof is also retrieved from the [`MerkleStore`].
+    pub(crate) fn get_account_map_item(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        account_id: AccountId,
+        index: u8,
+        key: Word,
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
+        let header = Self::get_account_header(conn, account_id)?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?
+            .0;
+
+        let StorageSlot::Map(map) = query_storage_slots(
+            conn,
+            "commitment = ? AND slot_index = ?",
+            params![header.storage_commitment().to_hex(), index],
+        )?
+        .remove(&index)
+        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
+        else {
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        };
+
+        let item = map.get(&key);
+
+        let merkle_store = merkle_store.read();
+
+        let value_path = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
+        let leaf = SmtLeaf::new_single(key, value_path.value);
+        let proof = SmtProof::new(value_path.path, leaf)?;
+
+        Ok((item, StorageMapWitness::new(proof)))
+    }
+
     // ACCOUNT DELTA HELPERS
     // --------------------------------------------------------------------------------------------
 
@@ -230,6 +347,7 @@ impl SqliteStore {
     /// `updated_fungible_assets` and `updated_storage_maps` parameters.
     pub(super) fn apply_account_delta(
         tx: &Transaction<'_>,
+        merkle_store: &mut MerkleStore,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
         mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
@@ -304,6 +422,11 @@ impl SqliteStore {
             ],
         )?;
 
+        update_asset_nodes(
+            merkle_store,
+            init_account_state.vault_root(),
+            updated_assets.values().copied(),
+        )?;
         Self::insert_assets(tx, final_account_state.vault_root(), updated_assets.into_values())?;
 
         // Apply storage delta. This map will contain all updated storage slots, both values and
@@ -320,6 +443,12 @@ impl SqliteStore {
         // previously retrieved storage maps.
         for (index, map_delta) in delta.storage().maps() {
             let mut map = updated_storage_maps.remove(index).unwrap_or_default();
+
+            update_storage_map_nodes(
+                merkle_store,
+                map.root(),
+                map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)),
+            )?;
 
             for (key, value) in map_delta.entries() {
                 map.insert((*key).into(), *value);
@@ -459,20 +588,25 @@ impl SqliteStore {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Update previously-existing account after a transaction execution.
+    /// Update previously-existing account after a transaction execution. Apart from updating the
+    /// `SQLite` database, this function also updates the [`MerkleStore`] by adding the vault and
+    /// storage SMT's nodes.
     ///
     /// Because the Client retrieves the account by account ID before applying the delta, we don't
     /// need to check that it exists here. This inserts a new row into the accounts table.
     /// We can later identify the proper account state by looking at the nonce.
     pub(super) fn update_account_state(
         tx: &Transaction<'_>,
+        merkle_store: &mut MerkleStore,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
+        insert_storage_map_nodes(merkle_store, new_account_state.storage());
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().commitment(),
             new_account_state.storage().slots().iter().enumerate(),
         )?;
+        insert_asset_nodes(merkle_store, new_account_state.vault());
         Self::insert_assets(
             tx,
             new_account_state.vault().root(),
@@ -943,13 +1077,15 @@ mod tests {
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
-
+        let merkle_store = store.merkle_store.clone();
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction()?;
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,
+                    &mut merkle_store,
                     &account.into(),
                     &final_state,
                     BTreeMap::default(),
@@ -1018,6 +1154,7 @@ mod tests {
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
 
+        let merkle_store = store.merkle_store.clone();
         store
             .interact_with_connection(move |conn| {
                 let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
@@ -1031,9 +1168,11 @@ mod tests {
                     &delta,
                 )?;
                 let tx = conn.transaction()?;
+                let mut merkle_store = merkle_store.write();
 
                 SqliteStore::apply_account_delta(
                     &tx,
+                    &mut merkle_store,
                     &account.into(),
                     &final_state,
                     fungible_assets,

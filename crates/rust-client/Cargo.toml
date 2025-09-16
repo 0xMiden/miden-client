@@ -31,7 +31,7 @@ idxdb = [
 ]
 sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
 std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+testing = ["dep:miden-testing", "dep:uuid", "miden-objects/testing", "miden-tx/testing"]
 tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 

@@ -154,14 +154,10 @@ async function updateSyncHeight(tx, blockNum) {
 }
 async function updateBlockHeader(tx, blockNum, blockHeader, partialBlockchainPeaks, hasClientNotes) {
     try {
-        const headerBlob = new Blob([new Uint8Array(blockHeader)]);
-        const partialBlockchainPeaksBlob = new Blob([
-            new Uint8Array(partialBlockchainPeaks),
-        ]);
         const data = {
             blockNum: blockNum,
-            header: headerBlob,
-            partialBlockchainPeaks: partialBlockchainPeaksBlob,
+            header: blockHeader,
+            partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
         const existingBlockHeader = await tx.blockHeaders.get(blockNum);

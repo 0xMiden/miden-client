@@ -9,6 +9,7 @@
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
 - [InputNoteState](enumerations/InputNoteState.md)
+- [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 
@@ -27,6 +28,7 @@
 - [AccountStorageMode](classes/AccountStorageMode.md)
 - [AccountStorageRequirements](classes/AccountStorageRequirements.md)
 - [AccountVaultDelta](classes/AccountVaultDelta.md)
+- [Address](classes/Address.md)
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
 - [Assembler](classes/Assembler.md)
@@ -121,5 +123,5 @@
 
 ## Type Aliases
 
-- [NetworkId](type-aliases/NetworkId.md)
+- [AddressInterface](type-aliases/AddressInterface.md)
 - [ReadableStreamType](type-aliases/ReadableStreamType.md)

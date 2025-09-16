@@ -215,7 +215,6 @@ export async function getAccountStorage(storageCommitment: string) {
         slotType: record.slotType,
       };
     });
-
     return slots;
   } catch (error) {
     logWebStoreError(

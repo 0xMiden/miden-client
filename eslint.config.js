@@ -11,6 +11,7 @@ module.exports = [
       // TODO: Instead of ignoring the web_store, we should check if we're able to merge that
       // eslint config file with this one.
       "crates/rust-client/src/store/web_store/**",
+      "crates/web-client/playwright-report/**",
     ],
   },
   {

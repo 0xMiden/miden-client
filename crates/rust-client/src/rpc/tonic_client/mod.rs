@@ -30,6 +30,7 @@ use super::{
     generated as proto,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated::rpc_store::BlockRange;
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -94,17 +95,27 @@ impl TonicRpcClient {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for TonicRpcClient {
-    /// Sets the genesis commitment for the client and reconnects to the node providing the
-    /// genesis commitment in the request headers. If the genesis commitment is already set,
+    /// Sets the genesis commitment for the client. If the client is already connected, it will be
+    /// updated to use the new commitment on subsequent requests. If the client is not connected,
+    /// the commitment will be used when it connects. If the genesis commitment is already set,
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
+        self.ensure_connected().await?;
+
         if self.genesis_commitment.read().is_some() {
             // Genesis commitment is already set, ignoring the new value.
             return Ok(());
         }
 
-        *self.genesis_commitment.write() = Some(commitment);
-        self.connect().await
+        self.genesis_commitment.write().replace(commitment);
+
+        // If a client is connected, we modify it to use the new genesis commitment.
+        let mut client_guard = self.client.write();
+        if let Some(client) = client_guard.as_mut() {
+            client.set_genesis_commitment(commitment);
+        }
+
+        Ok(())
     }
 
     async fn submit_proven_transaction(
@@ -277,63 +288,69 @@ impl NodeRpcClient for TonicRpcClient {
     async fn get_account_proofs(
         &self,
         account_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: Vec<AccountCode>,
+        known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
-        let requested_accounts = account_requests.len();
-        let mut rpc_account_requests: Vec<
-            proto::rpc_store::account_proofs_request::AccountRequest,
-        > = Vec::with_capacity(account_requests.len());
-
-        for foreign_account in account_requests {
-            rpc_account_requests.push(proto::rpc_store::account_proofs_request::AccountRequest {
-                account_id: Some(foreign_account.account_id().into()),
-                storage_requests: foreign_account.storage_slot_requirements().into(),
-            });
+        if account_requests.is_empty() {
+            let (header, _) = self.get_block_header_by_number(None, false).await?;
+            return Ok((header.block_num(), Vec::new()));
         }
 
-        let known_account_codes: BTreeMap<Word, AccountCode> =
-            known_account_codes.into_iter().map(|c| (c.commitment(), c)).collect();
-
-        let request = proto::rpc_store::AccountProofsRequest {
-            account_requests: rpc_account_requests,
-            include_headers: Some(true),
-            code_commitments: known_account_codes.keys().map(Into::into).collect(),
-        };
+        let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
+            known_account_codes.values().cloned().map(|c| (c.commitment(), c)).collect();
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api
-            .get_account_proofs(request)
-            .await
-            .map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
-            })?
-            .into_inner();
+        let mut block_num: Option<BlockNumber> = None;
+        let mut account_proofs = Vec::with_capacity(account_requests.len());
 
-        let mut account_proofs = Vec::with_capacity(response.account_proofs.len());
-        let block_num = response.block_num.into();
+        // Request proofs one-by-one using the singular API
+        for foreign_account in account_requests {
+            let account_id = foreign_account.account_id();
 
-        // sanity check response
-        if requested_accounts != response.account_proofs.len() {
-            return Err(RpcError::ExpectedDataMissing(
-                "AccountProof did not contain all account IDs".to_string(),
-            ));
-        }
+            // Only request details for public accounts; include known code commitment for this
+            // account when available
+            let account_details = if account_id.is_public() {
+                let code_commitment = known_account_codes
+                    .get(&account_id)
+                    .map(|code| proto::primitives::Digest::from(code.commitment()));
+                Some(proto::rpc_store::account_proof_request::AccountDetailsRequest {
+                    code_commitment,
+                    storage_requests: foreign_account.storage_slot_requirements().into(),
+                })
+            } else {
+                None
+            };
 
-        for account in response.account_proofs {
-            let account_witness: AccountWitness = account
+            let request = proto::rpc_store::AccountProofRequest {
+                account_id: Some(account_id.into()),
+                account_details,
+            };
+
+            let response = rpc_api
+                .get_account_proof(request)
+                .await
+                .map_err(|status| {
+                    RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
+                })?
+                .into_inner();
+
+            let this_block_num: BlockNumber = response.block_num.into();
+            if block_num.is_none() {
+                block_num = Some(this_block_num);
+            }
+
+            let account_witness: AccountWitness = response
                 .witness
                 .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
                 .try_into()?;
 
-            // Because we set `include_headers` to true, for any public account we requested we
-            // should have the corresponding `state_header` field
+            // For public accounts, details should be present when requested
             let headers = if account_witness.id().is_public() {
                 Some(
-                    account
-                        .state_header
-                        .ok_or(RpcError::ExpectedDataMissing("Account.StateHeader".to_string()))?
-                        .into_domain(account_witness.id(), &known_account_codes)?,
+                    response
+                        .details
+                        .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
+                        .into_domain(&known_codes_by_commitment)?,
                 )
             } else {
                 None
@@ -344,7 +361,7 @@ impl NodeRpcClient for TonicRpcClient {
             account_proofs.push(proof);
         }
 
-        Ok((block_num, account_proofs))
+        Ok((block_num.expect("at least one request present"), account_proofs))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
@@ -368,21 +385,24 @@ impl NodeRpcClient for TonicRpcClient {
         response.into_inner().try_into()
     }
 
-    async fn check_nullifiers_by_prefix(
+    async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = proto::rpc_store::CheckNullifiersByPrefixRequest {
+        let request = proto::rpc_store::SyncNullifiersRequest {
             nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
             prefix_len: 16,
-            block_num: block_num.as_u32(),
+            block_range: Some(BlockRange {
+                block_from: block_num.as_u32(),
+                block_to: None,
+            }),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers_by_prefix(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiersByPrefix, status)
+        let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
         })?;
         let response = response.into_inner();
         let nullifiers = response
@@ -461,6 +481,8 @@ impl From<&Status> for GrpcError {
 mod tests {
     use std::boxed::Box;
 
+    use miden_objects::Word;
+
     use super::TonicRpcClient;
     use crate::rpc::{Endpoint, NodeRpcClient};
 
@@ -485,5 +507,49 @@ mod tests {
         let client = TonicRpcClient::new(endpoint, 10000);
         let client: Box<TonicRpcClient> = client.into();
         tokio::task::spawn(async move { dyn_trait_send_fut(client).await });
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_sets_the_commitment_when_its_not_already_set() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        assert!(client.genesis_commitment.read().is_none());
+
+        let commitment = Word::default();
+        client.set_genesis_commitment(commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
+        use miden_objects::Felt;
+
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        let initial_commitment = Word::default();
+        client.set_genesis_commitment(initial_commitment).await.unwrap();
+
+        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        client.set_genesis_commitment(new_commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);
+    }
+
+    #[tokio::test]
+    async fn set_genesis_commitment_updates_the_client_if_already_connected() {
+        let endpoint = &Endpoint::devnet();
+        let client = TonicRpcClient::new(endpoint, 10000);
+
+        // "Connect" the client
+        client.connect().await.unwrap();
+
+        let commitment = Word::default();
+        client.set_genesis_commitment(commitment).await.unwrap();
+
+        assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
+        assert!(client.client.read().as_ref().is_some());
     }
 }
