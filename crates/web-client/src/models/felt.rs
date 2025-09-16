@@ -1,6 +1,7 @@
-use crate::models::miden_arrays::FeltArray;
 use miden_objects::Felt as NativeFelt;
 use wasm_bindgen::prelude::*;
+
+use crate::models::miden_arrays::FeltArray;
 
 #[derive(Clone, Copy)]
 #[wasm_bindgen]

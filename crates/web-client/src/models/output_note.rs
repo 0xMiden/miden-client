@@ -1,6 +1,7 @@
-use crate::models::miden_arrays::OutputNoteArray;
 use miden_objects::note::{
-    Note as NativeNote, NoteHeader as NativeNoteHeader, PartialNote as NativePartialNote,
+    Note as NativeNote,
+    NoteHeader as NativeNoteHeader,
+    PartialNote as NativePartialNote,
 };
 use miden_objects::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
@@ -12,6 +13,7 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::partial_note::PartialNote;
 use super::word::Word;
+use crate::models::miden_arrays::OutputNoteArray;
 
 #[derive(Clone)]
 #[wasm_bindgen]

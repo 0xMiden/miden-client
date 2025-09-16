@@ -1,25 +1,32 @@
 use miden_client::transaction::{
-    ForeignAccount as NativeForeignAccount, NoteArgs as NativeNoteArgs,
+    ForeignAccount as NativeForeignAccount,
+    NoteArgs as NativeNoteArgs,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
 };
 use miden_objects::Word as NativeWord;
 use miden_objects::note::{
-    Note as NativeNote, NoteDetails as NativeNoteDetails, NoteId as NativeNoteId,
-    NoteRecipient as NativeNoteRecipient, NoteTag as NativeNoteTag,
+    Note as NativeNote,
+    NoteDetails as NativeNoteDetails,
+    NoteId as NativeNoteId,
+    NoteRecipient as NativeNoteRecipient,
+    NoteTag as NativeNoteTag,
 };
 use miden_objects::transaction::{
-    OutputNote as NativeOutputNote, TransactionScript as NativeTransactionScript,
+    OutputNote as NativeOutputNote,
+    TransactionScript as NativeTransactionScript,
 };
 use miden_objects::vm::AdviceMap as NativeAdviceMap;
 use wasm_bindgen::prelude::*;
 
 use crate::models::advice_map::AdviceMap;
 use crate::models::foreign_account::ForeignAccount;
-use crate::models::miden_arrays::NoteAndArgsArray;
-use crate::models::miden_arrays::NoteDetailsAndTagArray;
-use crate::models::miden_arrays::NoteIdAndArgsArray;
-use crate::models::miden_arrays::NoteRecipientArray;
-use crate::models::miden_arrays::OutputNoteArray;
+use crate::models::miden_arrays::{
+    NoteAndArgsArray,
+    NoteDetailsAndTagArray,
+    NoteIdAndArgsArray,
+    NoteRecipientArray,
+    OutputNoteArray,
+};
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;

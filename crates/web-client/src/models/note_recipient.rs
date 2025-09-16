@@ -1,7 +1,7 @@
-use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 use miden_objects::Word as NativeWord;
 use miden_objects::note::{
-    NoteInputs as NativeNoteInputs, NoteRecipient as NativeNoteRecipient,
+    NoteInputs as NativeNoteInputs,
+    NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,
 };
 use wasm_bindgen::prelude::*;
@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 use super::note_inputs::NoteInputs;
 use super::note_script::NoteScript;
 use super::word::Word;
+use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
 #[derive(Clone)]
 #[wasm_bindgen]

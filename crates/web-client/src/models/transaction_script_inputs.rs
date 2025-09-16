@@ -1,9 +1,9 @@
-use crate::models::miden_arrays::TransactionScriptInputPairArray;
 use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
 use super::word::Word;
+use crate::models::miden_arrays::TransactionScriptInputPairArray;
 
 #[derive(Clone)]
 #[wasm_bindgen]

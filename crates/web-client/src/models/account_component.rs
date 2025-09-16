@@ -1,6 +1,7 @@
 use miden_lib::account::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
 use miden_objects::account::{
-    AccountComponent as NativeAccountComponent, StorageSlot as NativeStorageSlot,
+    AccountComponent as NativeAccountComponent,
+    StorageSlot as NativeStorageSlot,
 };
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
 use wasm_bindgen::prelude::*;

@@ -96,8 +96,8 @@ const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
         window.client.newWallet(window.AccountStorageMode.private(), true)
       )
     );
-    const account_ids = accounts.map((account) => account.id());
-    const array = new window.AccountIdArray(account_ids);
+    const accountIds = accounts.map((account) => account.id());
+    const array = new window.AccountIdArray(accountIds);
     array.replaceAt(5, accountToSet.id());
     return array.at(5).toString() == accountToSet.id().toString();
   }, {});
