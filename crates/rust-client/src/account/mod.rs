@@ -38,6 +38,7 @@
 use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
@@ -68,6 +69,7 @@ use super::Client;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
+use crate::sync::NoteTagRecord;
 
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
@@ -149,12 +151,30 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
+                let default_address =
+                    AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.into()).await?;
+                let default_address_note_tag = default_address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                self.store.add_note_tag(note_tag_record).await?;
+
+                let mut addresses: Vec<AccountIdAddress> = vec![default_address];
+
+                let account_interface: AccountInterface = account.into();
+                if account_interface
+                    .components()
+                    .iter()
+                    .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
+                {
+                    addresses
+                        .push(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+                }
 
                 self.store
-                    .insert_account(account, account_seed)
+                    .insert_account(account, account_seed, addresses)
                     .await
                     .map_err(ClientError::StoreError)
             },

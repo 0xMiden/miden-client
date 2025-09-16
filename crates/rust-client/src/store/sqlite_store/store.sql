@@ -165,4 +165,12 @@ CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
+);
+
+-- Create addresses table
+CREATE TABLE addresses (
+    address BLOB NOT NULL UNIQUE,   -- the address
+    id UNSIGNED BIG INT NOT NULL,   -- associated Account ID.
+
+    PRIMARY KEY (address)
 )
