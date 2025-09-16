@@ -81,6 +81,31 @@ In this section, we show you how to make private transactions and send funds to 
 
 Wanna do more? [Sending public notes](p2p-public.md)
 
+## Using the node transport network
+
+The steps above assume that the client owns both accounts. To exchange notes with other users, the note transport network can be used.
+For this the sender (account A) will need the address (bech32 string) of the recipient (account B). By using the address, the sender will securely encrypt the private note, being only decryptable by the receiver.
+
+After creating the note (step 1 above), get the created note ID with `miden-client notes --list`. Then send that note through the note transport network,
+
+```sh
+miden-client notes --send <note-id> <address-B>
+```
+
+Then the recipient can fetch that note using `miden-client sync`, or more specifically,
+
+```sh
+miden-client notes --fetch
+```
+
+The note will then be available to be consumed.
+
+> [!NOTE]
+> The client will fetch notes for tracked note tags.
+> By default, note tags are derived from the recipient's account ID. However these can also be random to increase privacy.
+> In this case, to track a specific tag, run `miden-client tags --add <tag>`.
+
+
 ## Congratulations!
 
 You have successfully configured and used the Miden client to interact with a Miden rollup and faucet.

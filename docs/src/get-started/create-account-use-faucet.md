@@ -55,7 +55,7 @@ Save the account ID for a future step.
 3. Paste this ID into the **Request test tokens** input field on the faucet website and click **Send Private Note**.
 
 > **Tip**
-> You can also click **Send Public Note**. If you do this, the note's details will be public and you will not need to download and import it, so you can skip to [Sync the client](#sync-the-client).
+> You can also click **Send Public Note**. If you do this, the note's details will be public and you will not need to download and import it. Optionally run `miden-client --notes fetch`, and skip to [Sync the client](#sync-the-client) (which also fetches the new note).
 
 4. After a few seconds your browser should download - or prompt you to download - a file called `note.mno` (mno = Miden note). It contains the funds the faucet sent to your address.
 

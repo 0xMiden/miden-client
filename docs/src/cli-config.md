@@ -23,6 +23,10 @@ max_block_number_delta = 256
 [rpc]
 endpoint = { protocol = "http", host = "localhost", port = 57291 }
 timeout_ms = 10000
+
+[note-transport] # optional
+endpoint = "http://localhost:57292"
+timeout_ms = 10000
 ```
 
 The TOML file should reside in same the directory from which you run the CLI.
@@ -123,3 +127,13 @@ miden-client init --block-delta 256
 ### Environment variables
 
 - `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.
+
+### Note Transport
+
+A `note-transport` section is used to configure the connection to the Miden Note Transport node used in the exchange of private notes. It contains the following fields:
+- `endpoint`: The endpoint of the Miden Note Transport node;
+- `timeout-ms`: The timeout employed in client requests to the node.
+
+> [!Note]
+> - Running the node locally for development is encouraged.
+> - However, the endpoint can point to any remote node.
