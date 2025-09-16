@@ -445,17 +445,21 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, _script_root: Word) -> Result<NoteScript, RpcError> {
+    async fn get_note_script_by_root(
+        &self,
+        _script_root: Word,
+    ) -> Result<miden_objects::note::NoteScript, RpcError> {
         // For the mock implementation, we'll return a simple note script
         // In a real implementation, this would look up the script by its root hash
         use alloc::sync::Arc;
 
-        use miden_objects::MastForest;
         use miden_objects::note::NoteScript;
         use miden_objects::vm::Program;
+        use miden_objects::{MastForest, MastNodeId};
 
         let mast_forest = Arc::new(MastForest::new());
-        let program = Program::new(mast_forest, miden_core::MastNodeId::new(0)); // Simple placeholder program
+        let node_id = MastNodeId::from_usize_safe(0, &mast_forest).unwrap();
+        let program = Program::new(mast_forest, node_id); // Simple placeholder program
         let script = NoteScript::new(program);
 
         Ok(script)

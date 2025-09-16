@@ -2,6 +2,7 @@ use alloc::string::String;
 use core::fmt::Write;
 use core::ops::{Deref, DerefMut};
 
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 use api_client_wrapper::{ApiClient, InnerClient};
 use miden_objects::Word;
 use tonic::metadata::AsciiMetadataValue;
@@ -118,6 +119,7 @@ pub(crate) mod api_client_wrapper {
     }
 }
 
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 impl Deref for ApiClient {
     type Target = InnerClient;
     fn deref(&self) -> &Self::Target {
@@ -125,6 +127,7 @@ impl Deref for ApiClient {
     }
 }
 
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 impl DerefMut for ApiClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client

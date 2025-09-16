@@ -34,11 +34,13 @@ use crate::rpc::generated::rpc_store::BlockRange;
 use crate::transaction::ForeignAccount;
 
 mod api_client;
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 use api_client::api_client_wrapper::ApiClient;
 
 // TONIC RPC CLIENT
 // ================================================================================================
 
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 /// Client for the Node RPC API using tonic.
 ///
 /// If the `tonic` feature is enabled, this client will use a `tonic::transport::Channel` to
@@ -56,6 +58,7 @@ pub struct TonicRpcClient {
     genesis_commitment: RwLock<Option<Word>>,
 }
 
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 impl TonicRpcClient {
     /// Returns a new instance of [`TonicRpcClient`] that'll do calls to the provided [`Endpoint`]
     /// with the given timeout in milliseconds.
@@ -94,6 +97,7 @@ impl TonicRpcClient {
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg(any(target_arch = "wasm32", feature = "tonic"))]
 impl NodeRpcClient for TonicRpcClient {
     /// Sets the genesis commitment for the client. If the client is already connected, it will be
     /// updated to use the new commitment on subsequent requests. If the client is not connected,
@@ -408,12 +412,17 @@ impl NodeRpcClient for TonicRpcClient {
         let nullifier_updates = response
             .nullifiers
             .into_iter()
-            .map(|update| {
+            .filter_map(|update| {
                 // Convert the protobuf NullifierUpdate to our domain type
-                NullifierUpdate {
-                    nullifier: update.nullifier.unwrap_or_default().into(),
-                    block_num: update.block_num.unwrap_or(0),
+                if let Some(digest) = update.nullifier
+                    && let Ok(word) = TryInto::<Word>::try_into(digest)
+                {
+                    return Some(NullifierUpdate {
+                        nullifier: word.into(),
+                        block_num: update.block_num,
+                    });
                 }
+                None
             })
             .collect();
 
