@@ -5,7 +5,6 @@ use super::WebStore;
 mod js_bindings;
 use js_bindings::idxdb_force_import_store;
 use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::JsFuture;
 
 use crate::promise::await_ok;
 

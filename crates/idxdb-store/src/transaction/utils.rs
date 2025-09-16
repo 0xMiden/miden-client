@@ -13,7 +13,6 @@ use miden_client::transaction::{
 };
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
 use crate::promise::await_ok;

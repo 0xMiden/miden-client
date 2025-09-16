@@ -8,8 +8,6 @@ use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
 use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_client::utils::Deserializable;
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use crate::promise::{await_js, await_js_value, await_ok};
