@@ -38,7 +38,7 @@ use miden_objects::account::{
 use miden_objects::address::AccountIdAddress;
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks};
+use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
@@ -56,15 +56,6 @@ pub(crate) mod data_store;
 
 mod errors;
 pub use errors::*;
-
-#[cfg(all(feature = "sqlite", feature = "idxdb"))]
-compile_error!("features `sqlite` and `idxdb` are mutually exclusive");
-
-#[cfg(feature = "sqlite")]
-pub mod sqlite_store;
-
-#[cfg(feature = "idxdb")]
-pub mod web_store;
 
 mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
@@ -332,6 +323,48 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // PARTIAL MMR
+    // --------------------------------------------------------------------------------------------
+
+    /// Builds the current view of the chain's [`PartialMmr`]. Because we want to add all new
+    /// authentication nodes that could come from applying the MMR updates, we need to track all
+    /// known leaves thus far.
+    ///
+    /// The default implementation is based on [`Store::get_partial_blockchain_nodes`],
+    /// [`Store::get_partial_blockchain_peaks_by_block_num`] and [`Store::get_block_header_by_num`]
+    async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
+        let current_block_num = self.get_sync_height().await?;
+
+        let tracked_nodes = self.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
+        let current_peaks =
+            self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
+
+        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
+        // we can get an MMR based on those peaks, add the current block number and align it with
+        // the set of all nodes in the store.
+        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
+        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
+        // before calling `from_parts`
+        //
+        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
+        // for tracked blocks in the MMR. This would however block us from the convenience of
+        // just getting all nodes from the store.
+
+        let (current_block, has_client_notes) = self
+            .get_block_header_by_num(current_block_num)
+            .await?
+            .expect("Current block should be in the store");
+
+        let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
+        let has_client_notes = has_client_notes.into();
+        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+
+        let current_partial_mmr =
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+
+        Ok(current_partial_mmr)
+    }
 
     // ACCOUNT VAULT AND STORE
     // --------------------------------------------------------------------------------------------

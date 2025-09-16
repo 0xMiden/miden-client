@@ -18,25 +18,29 @@ PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
+EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
+
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo clippy --workspace --exclude miden-client-web --exclude testing-remote-prover --all-targets -- -D warnings
+	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --all-targets -- -D warnings
 	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
-clippy-wasm: rust-client-ts-build ## Run Clippy for the miden-client-web package
+clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
 	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
+	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo +nightly fix --workspace --exclude miden-client-web --exclude testing-remote-prover --allow-staged --allow-dirty --all-targets
+fix: ## Run Fix with configs, building tests with proper features to avoid type split.
+	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
 	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
-fix-wasm: ## Run Fix for the miden-client-web package
+fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
 	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
+	cargo +nightly fix --package miden-idxdb-store --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
 
 .PHONY: format
 format: ## Run format using nightly toolchain
@@ -63,7 +67,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn lint
+	cd crates/idxdb-store/src/ && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -87,7 +91,7 @@ typedoc: rust-client-ts-build ## Generate web client package documentation.
 
 .PHONY: test
 test: ## Run tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-docs
 test-docs: ## Run documentation tests
@@ -110,7 +114,7 @@ stop-node: ## Stop the testing node server
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
 SHARD_PARAMETER ?= ""
@@ -127,8 +131,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration
-	cargo nextest run --workspace --exclude miden-client-web --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary
@@ -158,25 +162,27 @@ install-tests: ## Install the tests binary
 # --- Building ------------------------------------------------------------------------------------
 
 build: ## Build the CLI binary, client library and tests binary in release mode
-	CODEGEN=1 cargo build --workspace --exclude miden-client-web --exclude testing-remote-prover --release --locked
+	CODEGEN=1 cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --locked
 	cargo build --package testing-remote-prover --release --locked
 
-build-wasm: rust-client-ts-build ## Build the client library for wasm32
+build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
+	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
-	cd $(RUST_CLIENT_DIR)/src/store/web_store && yarn && yarn build
+	cd crates/idxdb-store/src && yarn && yarn build
 
 # --- Check ---------------------------------------------------------------------------------------
 
 .PHONY: check
 check: ## Build the CLI binary and client library in release mode
-	cargo check --workspace --exclude miden-client-web --exclude testing-remote-prover --release
+	cargo check --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release
 
 .PHONY: check-wasm
-check-wasm: ## Build the client library for wasm32
+check-wasm: ## Check the wasm packages (web client and idxdb store)
 	cargo check --package miden-client-web --target wasm32-unknown-unknown
+	cargo check --package miden-idxdb-store --target wasm32-unknown-unknown
 
 ## --- Setup --------------------------------------------------------------------------------------
 
@@ -200,7 +206,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	# Web-related
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
-	yarn --cwd $(RUST_CLIENT_DIR)/src/store/web_store --silent
+	yarn --cwd crates/idxdb-store/src --silent
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"
