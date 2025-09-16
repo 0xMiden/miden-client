@@ -4,13 +4,16 @@ pub enum ArrayError {
     #[error("out of bounds access -- tried to access at index: {index} with length {length}")]
     OutOfBounds { index: usize, length: usize },
 }
-macro_rules! export_js_miden_array {
+macro_rules! declare_js_miden_arrays {
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {
+    pub mod miden_arrays {
+        use crate::js_error_with_context;
+        use wasm_bindgen::prelude::*;
         $(
             #[wasm_bindgen(inspectable)]
             #[derive(Clone)]
             pub struct $miden_type_array_name {
-                __inner: Vec<$miden_type_name>,
+                pub (crate) __inner: Vec<$miden_type_name>,
                 length: usize,
             }
 
@@ -74,11 +77,18 @@ macro_rules! export_js_miden_array {
                 }
             }
 
+            impl From<&$miden_type_array_name> for Vec<$miden_type_name> {
+                fn from(array: &$miden_type_array_name) -> Self {
+                    return array.__inner.clone();
+                }
+            }
+
             impl From<Vec<$miden_type_name>> for $miden_type_array_name {
                 fn from(vec: Vec<$miden_type_name>) -> Self {
                     Self::new(Some(vec))
                 }
             }
         )+
+    }
     };
 }

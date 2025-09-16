@@ -100,10 +100,7 @@ pub mod transaction_status;
 pub mod transaction_summary;
 pub mod word;
 
-use crate::js_error_with_context;
-use wasm_bindgen::prelude::wasm_bindgen;
-// FIXME: these types need the clone trait
-export_js_miden_array! {
+declare_js_miden_arrays! {
     (crate::models::account::Account) -> AccountArray,
     (crate::models::account_builder::AccountBuilder) -> AccountBuilderArray,
     (crate::models::account_code::AccountCode) -> AccountCodeArray,
@@ -166,14 +163,16 @@ export_js_miden_array! {
     (crate::models::transaction_request::TransactionRequest) -> TransactionRequestArray,
     (crate::models::transaction_result::TransactionResult) -> TransactionResultArray,
     (crate::models::transaction_script::TransactionScript) -> TransactionScriptArray,
-    (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputsPairArray,
+    (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
     (crate::models::transaction_status::TransactionStatus) -> TransactionStatusArray,
     (crate::models::transaction_summary::TransactionSummary) -> TransactionSummaryArray,
     (crate::models::word::Word) -> WordArray,
-    // FIXME: Conflicting arrays already exists for these types
-    // (crate::models::felt::Felt) -> FeltArray,
-    // (crate::models::note_details::NoteDetails) -> NoteDetailsArray,
-    // (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
+    (crate::models::felt::Felt) -> FeltArray,
+    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
+    (crate::models::note_details::NoteDetails) -> NoteDetailsArray,
+    (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
+    (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
+    (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
     // FIXME: Types that need clone
     // (crate::models::transaction_kernel::TransactionKernel) -> TransactionKernelArray,
     // (crate::models::basic_fungible_faucet_component::BasicFungibleFaucetComponent) -> BasicFungibleFaucetComponentArray,

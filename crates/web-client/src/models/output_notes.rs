@@ -1,12 +1,11 @@
+use super::output_note::OutputNote;
+use super::word::Word;
 use miden_objects::transaction::OutputNotes as NativeOutputNotes;
 use wasm_bindgen::prelude::*;
 
-use super::output_note::OutputNote;
-use super::word::Word;
-
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct OutputNotes(NativeOutputNotes);
+pub struct OutputNotes(pub(crate) NativeOutputNotes);
 
 #[wasm_bindgen]
 impl OutputNotes {

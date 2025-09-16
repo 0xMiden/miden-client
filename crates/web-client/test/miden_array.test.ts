@@ -17,17 +17,7 @@ const collectArrayTypes = async ({
   return await page.evaluate(async ({}) => {
     return Object.entries(window.MidenArrays).reduce(
       (arrayTypeNames, [arrayTypeName, _]) => {
-        // FIXME: Avoid filtering these before finishing PR.
-        if (
-          arrayTypeName != "FeltArray" &&
-          arrayTypeName != "NoteDetailsArray" &&
-          arrayTypeName != "OutputNotesArray" &&
-          !arrayTypeName.startsWith("Note") &&
-          arrayTypeName != "RecipientArray" &&
-          arrayTypeName != "TransactionScriptInputPairArray"
-        ) {
-          arrayTypeNames.push(arrayTypeName);
-        }
+        arrayTypeNames.push(arrayTypeName);
         return arrayTypeNames;
       },
       []
@@ -40,28 +30,18 @@ const instanceEmptyArrays = async ({ page }: { page: typeof Page }) => {
     for (const [arrayName, arrayBuilder] of Object.entries(
       window.MidenArrays
     )) {
-      // FIXME: Avoid filtering these before finishing PR.
-      if (
-        arrayName != "FeltArray" &&
-        arrayName != "NoteDetailsArray" &&
-        arrayName != "OutputNotesArray" &&
-        !arrayName.startsWith("Note") &&
-        arrayName != "RecipientArray" &&
-        arrayName != "TransactionScriptInputPairArray"
-      ) {
-        try {
-          const array = new window.MidenArrays[arrayName]();
-          console.log(array);
-          if (array.length() != 0) {
-            throw new Error(
-              `Newly created array of type ${arrayName} should be zero`
-            );
-          }
-        } catch (err) {
+      try {
+        const array = new window.MidenArrays[arrayName]();
+        console.log(array);
+        if (array.length() != 0) {
           throw new Error(
-            `Failed to build and/or access miden array of type ${arrayName}: ${err}`
+            `Newly created array of type ${arrayName} should be zero`
           );
         }
+      } catch (err) {
+        throw new Error(
+          `Failed to build and/or access miden array of type ${arrayName}: ${err}`
+        );
       }
     }
     return true;

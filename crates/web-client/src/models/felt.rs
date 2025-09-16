@@ -1,3 +1,4 @@
+use crate::models::miden_arrays::FeltArray;
 use miden_objects::Felt as NativeFelt;
 use wasm_bindgen::prelude::*;
 
@@ -51,46 +52,11 @@ impl From<&Felt> for NativeFelt {
     }
 }
 
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct FeltArray(Vec<Felt>);
-
-#[wasm_bindgen]
-impl FeltArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(felts_array: Option<Vec<Felt>>) -> FeltArray {
-        let felts = felts_array.unwrap_or_default();
-        FeltArray(felts)
-    }
-
-    pub fn append(&mut self, felt: &Felt) {
-        self.0.push(*felt);
-    }
-}
-
 // CONVERSIONS
 // ================================================================================================
 
-impl From<FeltArray> for Vec<NativeFelt> {
-    fn from(felt_array: FeltArray) -> Self {
-        felt_array.0.into_iter().map(Into::into).collect()
-    }
-}
-
 impl From<&FeltArray> for Vec<NativeFelt> {
     fn from(felt_array: &FeltArray) -> Self {
-        felt_array.0.iter().map(Into::into).collect()
-    }
-}
-
-impl From<FeltArray> for Vec<Felt> {
-    fn from(felt_array: FeltArray) -> Self {
-        felt_array.0
-    }
-}
-
-impl From<&FeltArray> for Vec<Felt> {
-    fn from(felt_array: &FeltArray) -> Self {
-        felt_array.0.clone()
+        felt_array.__inner.iter().map(Into::into).collect()
     }
 }

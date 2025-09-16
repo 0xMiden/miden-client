@@ -1,3 +1,4 @@
+use crate::models::miden_arrays::TransactionScriptInputPairArray;
 use miden_objects::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
@@ -45,33 +46,18 @@ impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     }
 }
 
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct TransactionScriptInputPairArray(Vec<TransactionScriptInputPair>);
-
-#[wasm_bindgen]
-impl TransactionScriptInputPairArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        transaction_script_input_pairs: Option<Vec<TransactionScriptInputPair>>,
-    ) -> TransactionScriptInputPairArray {
-        let transaction_script_input_pairs = transaction_script_input_pairs.unwrap_or_default();
-        TransactionScriptInputPairArray(transaction_script_input_pairs)
-    }
-
-    pub fn push(&mut self, transaction_script_input_pair: &TransactionScriptInputPair) {
-        self.0.push(transaction_script_input_pair.clone());
-    }
-}
-
 impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array.0.into_iter().map(Into::into).collect()
+        transaction_script_input_pair_array
+            .__inner
+            .into_iter()
+            .map(Into::into)
+            .collect()
     }
 }
 
 impl From<&TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: &TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array.0.iter().map(Into::into).collect()
+        transaction_script_input_pair_array.__inner.iter().map(Into::into).collect()
     }
 }
