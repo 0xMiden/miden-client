@@ -5,6 +5,7 @@
 ### Features
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+* Added `GetNoteScriptByRoot` RPC endpoint implementation for fetching note scripts by their root hash.
 
 ### Changes
 
