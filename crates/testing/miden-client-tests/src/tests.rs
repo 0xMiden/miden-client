@@ -394,23 +394,23 @@ async fn sync_state_mmr() {
 
     // Try reconstructing the partial_mmr from what's in the database
     // TODO: re-enable this
-    // let partial_mmr = client.test_store().build_current_partial_mmr().await.unwrap();
-    // assert!(partial_mmr.forest().num_leaves() >= 6);
-    // assert!(partial_mmr.open(0).unwrap().is_none());
-    // assert!(partial_mmr.open(1).unwrap().is_some());
-    // assert!(partial_mmr.open(2).unwrap().is_none());
-    // assert!(partial_mmr.open(3).unwrap().is_none());
-    // assert!(partial_mmr.open(4).unwrap().is_some());
-    // assert!(partial_mmr.open(5).unwrap().is_none());
+    let partial_mmr = client.test_store().get_current_partial_mmr().await.unwrap();
+    assert!(partial_mmr.forest().num_leaves() >= 6);
+    assert!(partial_mmr.open(0).unwrap().is_none());
+    assert!(partial_mmr.open(1).unwrap().is_some());
+    assert!(partial_mmr.open(2).unwrap().is_none());
+    assert!(partial_mmr.open(3).unwrap().is_none());
+    assert!(partial_mmr.open(4).unwrap().is_some());
+    assert!(partial_mmr.open(5).unwrap().is_none());
 
     // // Ensure the proofs are valid
-    // let mmr_proof = partial_mmr.open(1).unwrap().unwrap();
-    // let (block_1, _) = rpc_api.get_block_header_by_number(Some(1.into()), false).await.unwrap();
-    // partial_mmr.peaks().verify(block_1.commitment(), mmr_proof).unwrap();
+    let mmr_proof = partial_mmr.open(1).unwrap().unwrap();
+    let (block_1, _) = rpc_api.get_block_header_by_number(Some(1.into()), false).await.unwrap();
+    partial_mmr.peaks().verify(block_1.commitment(), mmr_proof).unwrap();
 
-    // let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
-    // let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
-    // partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
+    let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
+    let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
+    partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
 
     // the blocks for both notes should be stored as they are relevant for the client's accounts
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);

@@ -1216,7 +1216,7 @@ where
             let summary = self.sync_state().await?;
 
             if summary.block_num != block_num {
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                 self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
                     .await?;
             }
