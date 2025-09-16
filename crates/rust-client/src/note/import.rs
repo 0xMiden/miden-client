@@ -185,7 +185,7 @@ where
             if block_height < current_block_num {
                 // If the note is committed in the past we need to manually fetch the block
                 // header and MMR proof to verify the inclusion proof.
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
                 let block_header = self
                     .get_and_store_authenticated_block(block_height, &mut current_partial_mmr)
@@ -229,7 +229,7 @@ where
 
         match committed_note_data {
             Some((metadata, inclusion_proof)) => {
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                 let block_header = self
                     .get_and_store_authenticated_block(
                         inclusion_proof.location().block_num(),

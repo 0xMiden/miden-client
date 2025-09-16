@@ -19,20 +19,10 @@ ignored = ["getrandom"]
 crate-type = ["lib"]
 
 [features]
-default = ["std", "tonic/channel"]
-idxdb = [
-  "dep:base64",
-  "dep:console_error_panic_hook",
-  "dep:getrandom",
-  "dep:serde",
-  "dep:serde-wasm-bindgen",
-  "dep:wasm-bindgen",
-  "dep:wasm-bindgen-futures",
-]
-sqlite = ["dep:deadpool", "dep:deadpool-sync", "dep:rusqlite", "dep:rusqlite_migration", "std"]
-std = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing = ["dep:miden-testing", "dep:uuid", "miden-objects/testing", "miden-tx/testing"]
-tonic = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
+default   = ["std", "tonic/channel"]
+std       = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
+testing   = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+tonic     = ["std", "tonic/tls-native-roots", "tonic/tls-ring", "tonic/transport"]
 web-tonic = ["dep:getrandom", "dep:tonic-web-wasm-client"]
 
 [dependencies]
@@ -44,28 +34,18 @@ miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
 
 # External dependencies
-anyhow                   = { workspace = true }
-async-trait              = { workspace = true }
-base64                   = { optional = true, version = "0.22" }
-chrono                   = { optional = false, version = "0.4" }
-console_error_panic_hook = { optional = true, version = "0.1" }
-deadpool                 = { default-features = false, features = ["managed", "rt_tokio_1"], optional = true, version = "0.12" }
-deadpool-sync            = { optional = true, version = "0.1" }
-getrandom                = { features = ["wasm_js"], optional = true, version = "0.3" }
-hex                      = { version = "0.4" }
-prost                    = { default-features = false, features = ["derive"], version = "0.13" }
-rand                     = { workspace = true }
-rusqlite                 = { features = ["array", "bundled", "vtab"], optional = true, version = "0.36" }
-rusqlite_migration       = { optional = true, version = "2.1" }
-serde                    = { optional = true, workspace = true }
-serde-wasm-bindgen       = { optional = true, version = "0.6" }
-thiserror                = { workspace = true }
-tonic                    = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
-tonic-web-wasm-client    = { default-features = false, optional = true, version = "0.7" }
-tracing                  = { workspace = true }
-uuid                     = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
-wasm-bindgen             = { features = ["serde-serialize"], optional = true, version = "0.2" }
-wasm-bindgen-futures     = { optional = true, version = "0.4" }
+anyhow                = { workspace = true }
+async-trait           = { workspace = true }
+chrono                = { optional = false, version = "0.4" }
+getrandom             = { features = ["wasm_js"], optional = true, version = "0.3" }
+hex                   = { workspace = true }
+prost                 = { default-features = false, features = ["derive"], version = "0.13" }
+rand                  = { workspace = true }
+thiserror             = { workspace = true }
+tonic                 = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
+tonic-web-wasm-client = { default-features = false, optional = true, version = "0.7" }
+tracing               = { workspace = true }
+uuid                  = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
@@ -81,12 +61,13 @@ protox                 = { version = "0.7" }
 tonic-build            = { version = "0.13" }
 
 [dev-dependencies]
-miden-client  = { features = ["sqlite", "testing", "tonic"], path = "." }
-miden-lib     = { features = ["testing"], workspace = true }
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
-miden-testing = { default-features = false, workspace = true }
-tokio         = { workspace = true }
-web-sys       = { features = ["console"], version = "0.3" }
+miden-client              = { features = ["std", "testing"], path = "." }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store", version = "0.12" }
+miden-lib                 = { features = ["testing"], workspace = true }
+miden-objects             = { default-features = false, features = ["testing"], workspace = true }
+miden-testing             = { default-features = false, workspace = true }
+tokio                     = { workspace = true }
+web-sys                   = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true

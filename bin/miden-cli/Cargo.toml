@@ -16,12 +16,10 @@ version.workspace      = true
 name = "miden-client"
 path = "src/main.rs"
 
-[features]
-default = []
-
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.12" }
+miden-client              = { features = ["tonic"], path = "../../crates/rust-client", version = "0.12" }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store", version = "0.12" }
 
 # Miden dependencies
 miden-lib     = { workspace = true }
