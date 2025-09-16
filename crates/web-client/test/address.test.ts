@@ -1,12 +1,12 @@
 import { expect, Page } from "@playwright/test";
 import test from "./playwright.global.setup";
-import { AddressInterface, AccountId, Address, NetworkId } from "../js";
+import { AddressInterface, AccountId } from "../js";
 const instanceAddress = async ({
   page,
   accountId,
   _interface,
 }: {
-  page: typeof Page;
+  page: Page;
   accountId?: typeof AccountId;
   _interface: typeof AddressInterface;
 }) => {

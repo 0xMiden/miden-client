@@ -4,7 +4,10 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/idxdb-store",
   "crates/rust-client",
+  "crates/sqlite-store",
+  "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
@@ -23,17 +26,15 @@ version      = "0.12.0"
 [workspace.dependencies]
 # Miden dependencies
 miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-node-block-producer = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "tomyrd-update-next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "tomyrd-update-next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-remote-prover = { branch = "tomyrd-update-next", features = [
-  "concurrent",
-], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "tomyrd-update-next", default-features = false, features = [
+miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
 miden-testing = { branch = "next", default-features = false, features = [
@@ -43,7 +44,9 @@ paste = "1.0.15"
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
-async-trait = "0.1"
+async-trait = { version = "0.1" }
+chrono      = { version = "0.4" }
+hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
