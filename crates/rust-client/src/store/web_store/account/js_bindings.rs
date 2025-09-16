@@ -8,11 +8,15 @@ use miden_tx::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
+// INDEXED DB BINDINGS
+// ================================================================================================
+    
 // Account IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/accounts.js")]
 extern "C" {
     // GETS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
+
     #[wasm_bindgen(js_name = getAccountIds)]
     pub fn idxdb_get_account_ids() -> js_sys::Promise;
 
@@ -41,7 +45,7 @@ extern "C" {
     pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
 
     // INSERTS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = insertAccountCode)]
     pub fn idxdb_insert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
@@ -81,17 +85,20 @@ extern "C" {
     pub fn idxdb_get_foreign_account_code(account_ids: Vec<String>) -> js_sys::Promise;
 
     // UPDATES
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = lockAccount)]
     pub fn idxdb_lock_account(account_id: String) -> js_sys::Promise;
 
     // DELETES
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = undoAccountStates)]
     pub fn idxdb_undo_account_states(account_hashes: Vec<String>) -> js_sys::Promise;
 }
+
+// VAULT ASSET
+// ================================================================================================
 
 /// An object that contains a serialized vault asset
 #[wasm_bindgen(getter_with_clone, inspectable)]
@@ -122,6 +129,10 @@ impl JsVaultAsset {
     }
 }
 
+
+// STORAGE SLOT
+// ================================================================================================
+
 /// A JavaScript representation of a storage slot in an account.
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone)]
@@ -150,6 +161,9 @@ impl JsStorageSlot {
         }
     }
 }
+
+// STORAGE MAP ENTRY
+// ================================================================================================
 
 /// A JavaScript representation of a storage map entry in an account.
 #[wasm_bindgen(getter_with_clone, inspectable)]

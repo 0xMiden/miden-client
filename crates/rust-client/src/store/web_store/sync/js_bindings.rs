@@ -16,7 +16,7 @@ use crate::store::web_store::transaction::utils::SerializedTransactionData;
 #[wasm_bindgen(module = "/src/store/web_store/js/sync.js")]
 extern "C" {
     // GETS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = getSyncHeight)]
     pub fn idxdb_get_sync_height() -> js_sys::Promise;
@@ -25,7 +25,7 @@ extern "C" {
     pub fn idxdb_get_note_tags() -> js_sys::Promise;
 
     // INSERTS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = addNoteTag)]
     pub fn idxdb_add_note_tag(
@@ -38,7 +38,7 @@ extern "C" {
     pub fn idxdb_apply_state_sync(state_update: JsStateSyncUpdate) -> js_sys::Promise;
 
     // DELETES
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
     #[wasm_bindgen(js_name = removeNoteTag)]
     pub fn idxdb_remove_note_tag(
         tag: Vec<u8>,
