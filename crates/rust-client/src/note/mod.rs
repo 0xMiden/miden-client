@@ -95,6 +95,7 @@ pub use miden_objects::note::{
     NoteType,
     Nullifier,
 };
+pub use miden_objects::transaction::ToInputNoteCommitments;
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
@@ -102,7 +103,6 @@ pub use note_update_tracker::{
     NoteUpdateType,
     OutputNoteUpdate,
 };
-
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
 where

@@ -4,7 +4,10 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/idxdb-store",
   "crates/rust-client",
+  "crates/sqlite-store",
+  "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
@@ -40,7 +43,9 @@ miden-tx = { branch = "next", default-features = false, git = "https://github.co
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
-async-trait = "0.1"
+async-trait = { version = "0.1" }
+chrono      = { version = "0.4" }
+hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
