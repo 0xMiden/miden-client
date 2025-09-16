@@ -1,5 +1,5 @@
 # This workflow checks if the version number in the `package.json` file of the `web-client` 
-# package has been bumped when there are changes in the `web-client` or `web_store` 
+# package has been bumped when there are changes in the `web-client` or `idxdb-store` 
 # directories. If the version number has not been bumped, it fails the workflow with 
 # an error message.
 
@@ -68,7 +68,7 @@ jobs:
           steps.base.outputs.version == steps.head.outputs.version &&
           steps.skip.outputs.bypass != 'true'
         run: |
-          echo "::error ::You modified code under web-client or web_store but did not bump the version in crates/web-client/package.json. Bump the version or add the 'bypass-sdk-version-bump' label to the PR."
+          echo "::error ::You modified code under web-client or idxdb-store but did not bump the version in crates/web-client/package.json. Bump the version or add the 'bypass-sdk-version-bump' label to the PR."
           echo "::error ::Base and head version are both '${{ steps.head.outputs.version }}'."
           exit 1
 

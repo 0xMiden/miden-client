@@ -40,7 +40,7 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -70,9 +70,6 @@ pub use endpoint::Endpoint;
 mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
-
-#[cfg(all(feature = "tonic", feature = "web-tonic"))]
-compile_error!("features `tonic` and `web-tonic` are mutually exclusive");
 
 #[cfg(any(feature = "tonic", feature = "web-tonic"))]
 mod tonic_client;
@@ -165,12 +162,12 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<NoteSyncInfo, RpcError>;
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
-    /// `/CheckNullifiersByPrefix` RPC endpoint.
+    /// `/SyncNullifiers` RPC endpoint.
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
-    async fn check_nullifiers_by_prefix(
+    async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_num: BlockNumber,
@@ -189,7 +186,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: Vec<AccountCode>,
+        known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
@@ -197,13 +194,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `block_num` parameter is the block number to start the search from.
     ///
     /// The default implementation of this method uses
-    /// [`NodeRpcClient::check_nullifiers_by_prefix`].
+    /// [`NodeRpcClient::sync_nullifiers`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
         block_num: BlockNumber,
     ) -> Result<Option<u32>, RpcError> {
-        let nullifiers = self.check_nullifiers_by_prefix(&[nullifier.prefix()], block_num).await?;
+        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num).await?;
 
         Ok(nullifiers
             .iter()
@@ -304,7 +301,7 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug)]
 pub enum NodeRpcClientEndpoint {
     CheckNullifiers,
-    CheckNullifiersByPrefix,
+    SyncNullifiers,
     GetAccountDetails,
     GetAccountStateDelta,
     GetAccountProofs,
@@ -322,8 +319,8 @@ impl fmt::Display for NodeRpcClientEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
-            NodeRpcClientEndpoint::CheckNullifiersByPrefix => {
-                write!(f, "check_nullifiers_by_prefix")
+            NodeRpcClientEndpoint::SyncNullifiers => {
+                write!(f, "sync_nullifiers")
             },
             NodeRpcClientEndpoint::GetAccountDetails => write!(f, "get_account_details"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),

@@ -1,8 +1,10 @@
+// TODO: remove once miden-base#1878 is solved
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
 use miden_client::auth::AuthSecretKey;
-use miden_client::crypto::SecretKey;
+use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
@@ -22,15 +24,18 @@ const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::n
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
-pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
-pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
-pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -104,7 +109,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     Ok(())
 }
 
-pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+#[ignore = "ignoring due to bug, see miden-base#1878"]
+pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
