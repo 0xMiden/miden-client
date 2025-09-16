@@ -4,6 +4,10 @@ pub enum ArrayError {
     #[error("out of bounds access -- tried to access at index: {index} with length {length}")]
     OutOfBounds { index: usize, length: usize },
 }
+/// Generates JS-exportable arrays that will run within the WASM
+/// memory space. Also, since we're always cloning and not exposing
+/// the inner vec as public, this new wrapper array should avoid
+/// potential borrowing issues when interacting between JS and WASM.
 macro_rules! declare_js_miden_arrays {
     ($(($miden_type_name:path) -> $miden_type_array_name:ident),+ $(,)?) => {
     pub mod miden_arrays {

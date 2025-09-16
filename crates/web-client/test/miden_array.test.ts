@@ -9,6 +9,7 @@ import {
   MidenArrays,
 } from "../js";
 
+// Return each array import as a string array.
 const collectArrayTypes = async ({
   page,
 }: {

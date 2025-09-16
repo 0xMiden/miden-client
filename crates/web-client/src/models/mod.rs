@@ -100,6 +100,7 @@ pub mod transaction_status;
 pub mod transaction_summary;
 pub mod word;
 
+/// Declare arrays for each exported models.
 declare_js_miden_arrays! {
     (crate::models::account::Account) -> AccountArray,
     (crate::models::account_builder::AccountBuilder) -> AccountBuilderArray,
