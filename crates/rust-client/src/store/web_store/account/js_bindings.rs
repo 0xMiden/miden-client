@@ -33,6 +33,9 @@ extern "C" {
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
     pub fn idxdb_get_account_auth_by_pub_key(pub_key: String) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = getAccountAddresses)]
+    pub fn idxdb_get_account_addresses(account_id: String) -> js_sys::Promise;
+
     // INSERTS
     // ================================================================================================
 
@@ -60,6 +63,9 @@ extern "C" {
         commitment: String,
         account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = insertAccountAddress)]
+    pub fn idxdb_insert_account_address(account_id: String, address: Vec<u8>) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = insertAccountAuth)]
     pub fn idxdb_insert_account_auth(pub_key: String, secret_key: String) -> js_sys::Promise;

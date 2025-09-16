@@ -3,6 +3,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::address::AccountIdAddress;
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::{AccountIdError, Word};
 use miden_tx::utils::{Deserializable, Serializable};
@@ -10,6 +11,12 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
+use crate::store::web_store::account::js_bindings::idxdb_get_account_addresses;
+use crate::store::web_store::account::models::AccountIdAddressIdxdbObject;
+use crate::store::web_store::account::utils::{
+    insert_account_addresses,
+    parse_account_address_idxdb_object,
+};
 use crate::store::{AccountRecord, AccountStatus, StoreError};
 
 mod js_bindings;
@@ -131,6 +138,29 @@ impl WebStore {
         account_header
     }
 
+    pub(crate) async fn get_account_addresses(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+        let account_id_str = account_id.to_string();
+
+        let promise = idxdb_get_account_addresses(account_id_str);
+        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to fetch account addresses: {js_error:?}",))
+        })?;
+
+        let account_addresses_idxdb: Vec<AccountIdAddressIdxdbObject> = from_value(js_value)
+            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+
+        let mut account_addresses = vec![];
+        for account_address_idxdb in account_addresses_idxdb {
+            let (account_address, _) = parse_account_address_idxdb_object(account_address_idxdb)?;
+            account_addresses.push(account_address);
+        }
+
+        Ok(account_addresses)
+    }
+
     pub(crate) async fn get_account(
         &self,
         account_id: AccountId,
@@ -153,7 +183,9 @@ impl WebStore {
             account_header.nonce(),
         );
 
-        Ok(Some(AccountRecord::new(account, status)))
+        let addresses = self.get_account_addresses(account_id).await?;
+
+        Ok(Some(AccountRecord::new(account, status, addresses)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
@@ -206,6 +238,7 @@ impl WebStore {
         &self,
         account: &Account,
         account_seed: Option<Word>,
+        addresses: Vec<AccountIdAddress>,
     ) -> Result<(), StoreError> {
         insert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
@@ -221,6 +254,10 @@ impl WebStore {
 
         insert_account_record(account, account_seed).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
+        })?;
+
+        insert_account_addresses(account, addresses).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
         })?;
 
         Ok(())

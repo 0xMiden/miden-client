@@ -49,6 +49,13 @@ pub struct AccountRecordIdxdbObject {
     pub locked: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountIdAddressIdxdbObject {
+    pub address: Vec<u8>,
+    pub id: String,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForeignAccountCodeIdxdbObject {

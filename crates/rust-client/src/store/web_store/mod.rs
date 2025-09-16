@@ -13,6 +13,7 @@ use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_objects::address::AccountIdAddress;
 use miden_objects::asset::AssetVault;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
@@ -182,8 +183,9 @@ impl Store for WebStore {
         &self,
         account: &Account,
         account_seed: Option<Word>,
+        addresses: Vec<AccountIdAddress>,
     ) -> Result<(), StoreError> {
-        self.insert_account(account, account_seed).await
+        self.insert_account(account, account_seed, addresses).await
     }
 
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError> {
@@ -247,6 +249,13 @@ impl Store for WebStore {
         account_id: AccountId,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
+    }
+
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+        self.get_addresses_by_account_id(account_id).await
     }
 }
 
