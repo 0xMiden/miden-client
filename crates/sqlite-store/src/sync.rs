@@ -89,10 +89,8 @@ impl SqliteStore {
         tag: NoteTag,
         cursor: u64,
     ) -> Result<bool, StoreError> {
-        const QUERY: &str = "UPDATE tags SET transport_layer_cursor = ? WHERE tag = ?";
-
-        let rows_affected =
-            conn.execute(QUERY, params![cursor, tag.to_bytes()]).into_store_error()?;
+        let tx = conn.transaction().into_store_error()?;
+        let rows_affected = update_note_tag_cursor_tx(&tx, tag, cursor)?;
 
         Ok(rows_affected > 0)
     }
@@ -220,4 +218,15 @@ pub(super) fn remove_note_tag_tx(
         .into_store_error()?;
 
     Ok(removed_tags)
+}
+
+pub(super) fn update_note_tag_cursor_tx(
+    tx: &Transaction<'_>,
+    tag: NoteTag,
+    cursor: u64,
+) -> Result<usize, StoreError> {
+    const QUERY: &str = "UPDATE tags SET transport_layer_cursor = ? WHERE tag = ?";
+    let rows_affected = tx.execute(QUERY, params![cursor, tag.to_bytes()]).into_store_error()?;
+
+    Ok(rows_affected)
 }
