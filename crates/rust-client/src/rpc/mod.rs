@@ -289,6 +289,9 @@ pub trait NodeRpcClient: Send + Sync {
     }
 
     /// Fetches the note script with the specified root.
+    ///
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 }
 
