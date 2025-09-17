@@ -1,7 +1,5 @@
 use miden_objects::note::{
-    Note as NativeNote,
-    NoteHeader as NativeNoteHeader,
-    PartialNote as NativePartialNote,
+    Note as NativeNote, NoteHeader as NativeNoteHeader, PartialNote as NativePartialNote,
 };
 use miden_objects::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
@@ -93,23 +91,6 @@ impl From<&OutputNote> for NativeOutputNote {
         output_note.0.clone()
     }
 }
-
-// #[derive(Clone)]
-// #[wasm_bindgen]
-// pub struct OutputNotesArray(Vec<OutputNote>);
-
-// #[wasm_bindgen]
-// impl OutputNotesArray {
-//     #[wasm_bindgen(constructor)]
-//     pub fn new(output_notes_array: Option<Vec<OutputNote>>) -> OutputNotesArray {
-//         let output_notes = output_notes_array.unwrap_or_default();
-//         OutputNotesArray(output_notes)
-//     }
-
-//     pub fn append(&mut self, output_note: &OutputNote) {
-//         self.0.push(output_note.clone());
-//     }
-// }
 
 // CONVERSIONS
 // ================================================================================================
