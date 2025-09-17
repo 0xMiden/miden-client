@@ -12,11 +12,14 @@ miden-client = { version = "0.11" }
 
 ## Crate Features
 
-| Features     | Description                                                                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tonic`      | Includes `TonicRpcClient`, a `std`-compatible Tonic client to communicate with Miden node. This relies on the `tonic` for the inner transport.  **Disabled by default.**                                                        |
-| `web-tonic`  | Includes `TonicRpcClient`, a `wasm`-compatible Tonic client to communicate with the Miden node. This relies on `tonic-web-wasm-client` for the inner transport. **Disabled by default.**                                   |
-| `testing`    | Enables functions meant to be used in testing environments. **Disabled by default.**             |
+| Features  | Description |
+| --------- | ----------- |
+| `std`     | Enables std support and concurrent execution in `miden-tx`. Enabled by default for native targets. |
+| `testing` | Enables functions meant to be used in testing environments. Disabled by default. |
+
+RPC transport is selected automatically by target:
+- Native targets use `tonic` transport with TLS.
+- `wasm32` targets use `tonic-web-wasm-client`.
 
 ### Store and RpcClient implementations
 

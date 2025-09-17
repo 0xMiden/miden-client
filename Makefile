@@ -67,7 +67,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd crates/idxdb-store/src/ && yarn && yarn lint
+	cd crates/idxdb-store/src && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
