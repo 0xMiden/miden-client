@@ -22,6 +22,7 @@ crate-type = ["lib"]
 default = ["std"]
 std = [
   "miden-objects/std",
+  "miden-private-transport-proto/transport",
   "miden-remote-prover-client/std",
   "miden-tx/concurrent",
   "tonic/tls-native-roots",
@@ -35,7 +36,7 @@ tonic = []
 # Miden dependencies
 miden-lib                     = { workspace = true }
 miden-objects                 = { workspace = true }
-miden-private-transport-proto = { git = "https://github.com/0xMiden/miden-private-transport" }
+miden-private-transport-proto = { default-features = false, git = "https://github.com/0xMiden/miden-private-transport" }
 miden-remote-prover-client    = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-testing                 = { optional = true, workspace = true }
 miden-tx                      = { workspace = true }
