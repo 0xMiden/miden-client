@@ -33,6 +33,7 @@ use {
 };
 
 use super::{NoteInfo, NoteStream, TransportError};
+use crate::rpc::Endpoint;
 
 #[cfg(feature = "tonic")]
 type Service = Timeout<Channel>;
@@ -49,9 +50,9 @@ pub struct CanonicalNoteTransportClient {
 impl CanonicalNoteTransportClient {
     /// gRPC client constructor
     #[cfg(feature = "tonic")]
-    pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, TransportError> {
+    pub async fn connect(endpoint: &Endpoint, timeout_ms: u64) -> Result<Self, TransportError> {
         let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = Channel::from_shared(endpoint.clone())
+        let channel = Channel::from_shared(endpoint.to_string())
             .map_err(|e| err!("Failed to create channel: {e}"))?
             .tls_config(tls)
             .map_err(|e| err!("Failed to setup TLS: {e}"))?
@@ -68,8 +69,8 @@ impl CanonicalNoteTransportClient {
 
     /// gRPC client (WASM) constructor
     #[cfg(feature = "web-tonic")]
-    pub async fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, TransportError> {
-        let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
+    pub async fn connect(endpoint: &Endpoint, _timeout_ms: u64) -> Result<Self, TransportError> {
+        let wasm_client = tonic_web_wasm_client::Client::new(endpoint.to_string());
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenPrivateTransportClient::new(wasm_client);
 
