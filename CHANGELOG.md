@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.11.6 (2025-09-16)
+## 0.11.6 (2025-09-18)
 
 * Added a way to retrieve a secret key in the client given a pub key ([#1293](https://github.com/0xMiden/miden-client/pull/1293)).
 * Reexported all authentication components from `miden-lib` ([#1297](https://github.com/0xMiden/miden-client/pull/1297)).
 * Added `Signature` to the list of exported types in `index.d.ts`([#1303](https://github.com/0xMiden/miden-client/pull/1303)).
+* Patched `miden-base` dependencies to 0.11.4 ([#1314](https://github.com/0xMiden/miden-client/pull/1314)).
 
 ## 0.11.4 (2025-09-11)
 
