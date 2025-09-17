@@ -105,12 +105,16 @@ test.describe("get_input_note", () => {
       return {
         hasScript: !!fetchedNoteScript,
         originalScriptRoot: scriptRoot.toString(),
-        fetchedScriptRoot: fetchedNoteScript ? fetchedNoteScript.root().toString() : null,
+        fetchedScriptRoot: fetchedNoteScript
+          ? fetchedNoteScript.root().toString()
+          : null,
       };
     });
 
     expect(scriptResult.hasScript).toBe(true);
-    expect(scriptResult.fetchedScriptRoot).toEqual(scriptResult.originalScriptRoot);
+    expect(scriptResult.fetchedScriptRoot).toEqual(
+      scriptResult.originalScriptRoot
+    );
   });
 });
 

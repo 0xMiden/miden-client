@@ -4,3 +4,7 @@
 
 # Generated JS (codegen)
 crates/idxdb-store/src/js/**
+
+# Test artifacts
+crates/web-client/playwright-report/**
+crates/web-client/test-results/**
