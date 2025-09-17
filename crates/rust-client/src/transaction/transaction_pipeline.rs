@@ -109,14 +109,9 @@ impl TransactionPipeline {
 
         if ignore_invalid_notes {
             // Remove invalid notes
-            input_notes = get_valid_input_notes(
-                account.id(),
-                input_notes,
-                tx_args.clone(),
-                executor,
-                &block_ref,
-            )
-            .await?;
+            input_notes =
+                get_valid_input_notes(account.id(), input_notes, &tx_args, executor, &block_ref)
+                    .await?;
         }
 
         // Execute the transaction and get the witness
@@ -248,7 +243,7 @@ fn validate_basic_account_request(
 async fn get_valid_input_notes(
     account_id: AccountId,
     mut input_notes: InputNotes<InputNote>,
-    tx_args: TransactionArgs,
+    tx_args: &TransactionArgs,
     executor: &TransactionExecutor<'_, '_, ClientDataStore, impl TransactionAuthenticator + Sync>,
     block_ref: &BlockNumber,
 ) -> Result<InputNotes<InputNote>, ClientError> {
