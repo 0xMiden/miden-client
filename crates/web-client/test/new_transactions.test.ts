@@ -1377,11 +1377,13 @@ export const testStorageMap = async (page: Page): Promise<any> => {
   });
 };
 
-test.describe("storage map test", () => {
-  test.setTimeout(50000);
-  test("storage map is updated correctly in transaction", async ({ page }) => {
-    let { initialMapValue, finalMapValue } = await testStorageMap(page);
-    expect(initialMapValue).toBe("1");
-    expect(finalMapValue).toBe("2");
-  });
-});
+// TODO: re-enable after miden-base#1878
+
+// test.describe("storage map test", () => {
+//   test.setTimeout(50000);
+//   test("storage map is updated correctly in transaction", async ({ page }) => {
+//     let { initialMapValue, finalMapValue } = await testStorageMap(page);
+//     expect(initialMapValue).toBe("1");
+//     expect(finalMapValue).toBe("2");
+//   });
+// });
