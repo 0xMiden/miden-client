@@ -305,7 +305,7 @@ pub struct Client<AUTH> {
     max_block_number_delta: Option<u32>,
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Transport Layer.
-    transport_api: Option<Box<dyn NoteTransportClient>>,
+    transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 /// Construction and access methods.
@@ -348,7 +348,7 @@ where
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
-        transport_api: Option<Box<dyn NoteTransportClient>>,
+        transport_api: Option<Arc<dyn NoteTransportClient>>,
     ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 

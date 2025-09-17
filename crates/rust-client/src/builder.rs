@@ -61,7 +61,7 @@ pub struct ClientBuilder<AUTH> {
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
     /// An optional custom transport layer client.
-    transport_api: Option<Box<dyn NoteTransportClient>>,
+    transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -169,7 +169,7 @@ where
 
     /// Sets a custom transport layer client directly.
     #[must_use]
-    pub fn transport_layer(mut self, client: Box<dyn NoteTransportClient>) -> Self {
+    pub fn transport_layer(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
         self.transport_api = Some(client);
         self
     }

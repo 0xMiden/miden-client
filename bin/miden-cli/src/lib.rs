@@ -201,7 +201,7 @@ impl Cli {
             )
             .await
             .map_err(|e| CliError::Client(e.into()))?;
-            builder = builder.transport_layer(Box::new(client));
+            builder = builder.transport_layer(Arc::new(client));
         }
 
         let mut client = builder.build().await?;

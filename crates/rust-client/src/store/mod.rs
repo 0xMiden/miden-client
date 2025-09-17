@@ -45,6 +45,7 @@ use miden_objects::{AccountError, Word};
 
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
+use crate::transport::TransportLayerUpdate;
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -336,6 +337,32 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    /// Applies transport layer update
+    ///
+    /// An update involves:
+    /// - Insert fetched notes;
+    /// - Update pagination cursor used in note fetching.
+    async fn apply_transport_layer_update(
+        &self,
+        transport_layer_update: TransportLayerUpdate,
+    ) -> Result<(), StoreError> {
+        // TODO: change to single-cursor approach
+        for note_update in &transport_layer_update.note_updates {
+            self.update_note_tag_cursor(
+                note_update.header().metadata().tag(),
+                transport_layer_update.cursor,
+            )
+            .await?;
+        }
+        let input_notes = transport_layer_update
+            .note_updates
+            .into_iter()
+            .map(InputNoteRecord::from)
+            .collect::<Vec<_>>();
+        self.upsert_input_notes(&input_notes).await?;
+        Ok(())
+    }
 
     // PARTIAL MMR
     // --------------------------------------------------------------------------------------------
