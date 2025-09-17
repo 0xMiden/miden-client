@@ -56,16 +56,6 @@ getrandom             = { features = ["wasm_js"], version = "0.3" }
 tonic-web-wasm-client = { default-features = false, version = "0.7" }
 web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# Enable transport + TLS features for native targets
-tonic = { default-features = false, features = [
-  "codegen",
-  "prost",
-  "tls-native-roots",
-  "tls-ring",
-  "transport",
-], version = "0.13" }
-
 [build-dependencies]
 miden-lib              = { workspace = true }
 miden-node-proto-build = { workspace = true }
