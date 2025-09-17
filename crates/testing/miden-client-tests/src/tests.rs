@@ -5,6 +5,7 @@ use std::println;
 use std::string::ToString;
 use std::sync::Arc;
 
+use miden_client::account::{AccountIdAddress, AddressInterface};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteRelevance;
@@ -12,6 +13,7 @@ use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::NoteTagSource;
+use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
@@ -2035,6 +2037,45 @@ async fn storage_and_vault_proofs() {
         assert_eq!(value, map.get(&MAP_KEY.into()));
         assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
+}
+
+#[tokio::test]
+async fn account_addresses_basic_wallet() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account = Account::mock(
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+    );
+
+    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
+
+    let undspecified_default_address =
+        AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+    assert!(retrieved_acc.addresses().contains(&undspecified_default_address));
+
+    let basic_wallet_address = AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
+    assert!(retrieved_acc.addresses().contains(&basic_wallet_address));
+}
+
+#[tokio::test]
+async fn account_addresses_non_basic_wallet() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account = Account::mock_non_fungible_faucet(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET);
+
+    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
+
+    let undspecified_default_address =
+        AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+    assert!(retrieved_acc.addresses().contains(&undspecified_default_address));
+
+    let basic_wallet_address = AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
+    assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
 // HELPERS
