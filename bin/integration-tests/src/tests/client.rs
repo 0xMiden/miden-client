@@ -35,9 +35,6 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
-    use miden_client_sqlite_store::SqliteStore;
-
-    let sqlite_store = SqliteStore::new(store_config).await?;
 
     let sqlite_store = SqliteStore::new(store_config).await?;
 

@@ -19,9 +19,17 @@ ignored = ["getrandom"]
 crate-type = ["lib"]
 
 [features]
-default   = ["std"]
-std       = ["miden-objects/std", "miden-remote-prover-client/std", "miden-tx/concurrent"]
-testing   = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+default = ["std"]
+std = [
+  "miden-objects/std",
+  "miden-remote-prover-client/std",
+  "miden-tx/concurrent",
+  "tonic/tls-native-roots",
+  "tonic/tls-ring",
+  "tonic/transport",
+]
+testing = ["dep:miden-testing", "dep:uuid", "miden-lib/testing", "miden-objects/testing", "miden-tx/testing"]
+tonic = []
 
 [dependencies]
 # Miden dependencies
@@ -44,13 +52,19 @@ tracing     = { workspace = true }
 uuid        = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
-tonic-web-wasm-client = { default-features = false, version = "0.7" }
 getrandom             = { features = ["wasm_js"], version = "0.3" }
+tonic-web-wasm-client = { default-features = false, version = "0.7" }
+web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Enable transport + TLS features for native targets
-tonic = { version = "0.13", default-features = false, features = ["codegen", "prost", "transport", "tls-native-roots", "tls-ring"] }
+tonic = { default-features = false, features = [
+  "codegen",
+  "prost",
+  "tls-native-roots",
+  "tls-ring",
+  "transport",
+], version = "0.13" }
 
 [build-dependencies]
 miden-lib              = { workspace = true }

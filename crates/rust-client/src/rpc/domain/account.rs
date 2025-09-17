@@ -219,7 +219,6 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
     /// # Errors
     /// - If account code is missing both on `self` and `known_account_codes`
     /// - If data cannot be correctly deserialized
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
