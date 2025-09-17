@@ -8,12 +8,9 @@ use std::vec::Vec;
 use miden_client::Word;
 use miden_client::crypto::MerkleStore;
 use miden_client::note::{NoteUpdateTracker, ToInputNoteCommitments};
-use miden_client::store::{
-    input_note_states::ExpectedNoteState,
-    InputNoteState,
-    StoreError,
-    TransactionFilter,
-};
+use miden_client::store::input_note_states::ExpectedNoteState;
+use miden_client::store::{InputNoteState, StoreError, TransactionFilter};
+use miden_client::sync::NoteTagRecord;
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,
@@ -23,7 +20,6 @@ use miden_client::transaction::{
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
-use miden_client::sync::NoteTagRecord;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 

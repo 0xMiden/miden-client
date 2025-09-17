@@ -75,11 +75,11 @@ use miden_objects::account::{Account, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::AccountInputs;
+use miden_objects::transaction::{AccountInputs, TransactionArgs};
 use miden_objects::{AssetError, Felt, Word};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use miden_tx::{DataStore, TransactionExecutor};
+use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
@@ -956,54 +956,6 @@ where
         }
     }
 
-    async fn get_valid_input_notes(
-        &self,
-        account: Account,
-        mut input_notes: InputNotes<InputNote>,
-        tx_args: TransactionArgs,
-    ) -> Result<InputNotes<InputNote>, ClientError> {
-        loop {
-            let data_store = ClientDataStore::new(self.store.clone());
-
-            data_store.mast_store().load_account_code(account.code());
-            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
-                .check_notes_consumability(
-                    account.id(),
-                    self.store.get_sync_height().await?,
-                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
-                    tx_args.clone(),
-                )
-                .await?;
-
-            if execution.failed.is_empty() {
-                break;
-            }
-
-            let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
-            let filtered_input_notes = InputNotes::new(
-                input_notes
-                    .into_iter()
-                    .filter(|note| !failed_note_ids.contains(&note.id()))
-                    .collect(),
-            )
-            .expect("Created from a valid input notes list");
-
-            input_notes = filtered_input_notes;
-        }
-
-        Ok(input_notes)
-    }
-
-    /// Retrieves the account interface for the specified account.
-    pub(crate) async fn get_account_interface(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountInterface, ClientError> {
-        let account: Account = self.try_get_account(account_id).await?.into();
-
-        Ok(AccountInterface::from(&account))
-    }
     /// Returns foreign account inputs for the required foreign accounts specified by the
     /// transaction request.
     ///
@@ -1117,33 +1069,6 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
                 todo!("For now, all details should be held in OutputNote::Fulls")
             },
         })
-}
-
-/// Validates that the executed transaction's output recipients match what was expected in the
-/// transaction request.
-fn validate_executed_transaction(
-    executed_transaction: &ExecutedTransaction,
-    expected_output_recipients: &[NoteRecipient],
-) -> Result<(), ClientError> {
-    let tx_output_recipient_digests = executed_transaction
-        .output_notes()
-        .iter()
-        .filter_map(|n| n.recipient().map(NoteRecipient::digest))
-        .collect::<Vec<_>>();
-
-    let missing_recipient_digest: Vec<Word> = expected_output_recipients
-        .iter()
-        .filter_map(|recipient| {
-            (!tx_output_recipient_digests.contains(&recipient.digest()))
-                .then_some(recipient.digest())
-        })
-        .collect();
-
-    if !missing_recipient_digest.is_empty() {
-        return Err(ClientError::MissingOutputRecipients(missing_recipient_digest));
-    }
-
-    Ok(())
 }
 
 fn collect_assets<'a>(

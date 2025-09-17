@@ -254,7 +254,12 @@ async fn get_valid_input_notes(
 ) -> Result<InputNotes<InputNote>, ClientError> {
     loop {
         let execution = NoteConsumptionChecker::new(executor)
-            .check_notes_consumability(account_id, *block_ref, input_notes.clone(), tx_args.clone())
+            .check_notes_consumability(
+                account_id,
+                *block_ref,
+                input_notes.iter().map(|n| n.clone().into_note()).collect(),
+                tx_args.clone(),
+            )
             .await?;
 
         if execution.failed.is_empty() {

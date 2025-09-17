@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 
 use miden_client::Word;
 use miden_client::account::Account;
-use miden_client::store::{StoreError, TransactionFilter};
+use miden_client::note::NoteUpdateTracker;
+use miden_client::store::input_note_states::ExpectedNoteState;
+use miden_client::store::{InputNoteState, StoreError, TransactionFilter};
+use miden_client::sync::NoteTagRecord;
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,
@@ -18,10 +21,6 @@ use wasm_bindgen_futures::JsFuture;
 use super::WebStore;
 use super::account::utils::update_account;
 use super::note::utils::apply_note_updates_tx;
-use miden_client::note::NoteUpdateTracker;
-use miden_client::store::input_note_states::ExpectedNoteState;
-use miden_client::store::InputNoteState;
-use miden_client::sync::NoteTagRecord;
 use crate::sql_error::SqlResultExt;
 
 mod js_bindings;
