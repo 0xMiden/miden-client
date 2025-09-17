@@ -72,7 +72,9 @@ mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
 
+#[cfg(feature = "tonic")]
 mod tonic_client;
+#[cfg(feature = "tonic")]
 pub use tonic_client::TonicRpcClient;
 
 use crate::store::InputNoteRecord;

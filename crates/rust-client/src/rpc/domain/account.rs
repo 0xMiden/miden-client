@@ -209,6 +209,7 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
 // FROM PROTO ACCOUNT HEADERS
 // ================================================================================================
 
+#[cfg(feature = "tonic")]
 impl proto::rpc_store::account_proof::AccountDetailsResponse {
     /// Converts the RPC response into `StateHeaders`.
     ///
