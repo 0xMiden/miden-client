@@ -416,7 +416,7 @@ export async function insertAccountAddress(
     // Perform the insert using Dexie
     await addresses.put(data);
   } catch (error) {
-    logWebStoreError(error, `Error inserting address with value: ${address}`);
+    logWebStoreError(error, `Error inserting address with value: ${String(address)}`);
   }
 }
 

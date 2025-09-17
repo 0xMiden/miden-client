@@ -324,7 +324,7 @@ export async function insertAccountAddress(address, accountId) {
         await addresses.put(data);
     }
     catch (error) {
-        logWebStoreError(error, `Error inserting address with value: ${address}`);
+        logWebStoreError(error, `Error inserting address with value: ${String(address)}`);
     }
 }
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {
