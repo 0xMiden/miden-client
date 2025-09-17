@@ -18,7 +18,7 @@ impl TransportLayerCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        if !client.transport_layer().is_enabled() {
+        if !client.is_transport_layer_enabled() {
             return Err(CliError::Config(
                 "Missing configuration".to_string().into(),
                 "Please provide a [transport-layer] configuration to use the transport layer"
@@ -53,7 +53,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
     let (_netid, address) =
         Address::from_bech32(address).map_err(|e| CliError::Input(e.to_string()))?;
 
-    client.transport_layer().send_note(note, &address).await?;
+    client.send_private_note(note, &address).await?;
 
     Ok(())
 }
@@ -65,7 +65,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
 ///
 /// Fetched notes are stored in the store.
 async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError> {
-    client.transport_layer().fetch_notes().await?;
+    client.fetch_private_notes().await?;
 
     Ok(())
 }

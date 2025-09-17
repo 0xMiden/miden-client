@@ -22,6 +22,7 @@ use miden_private_transport_proto::miden_private_transport::{
     StreamNotesUpdate,
     TransportNote,
 };
+use miden_tx::utils::sync::RwLock;
 use tonic::{Request, Streaming};
 use tonic_health::pb::HealthCheckRequest;
 use tonic_health::pb::health_client::HealthClient;
@@ -41,10 +42,9 @@ type Service = Timeout<Channel>;
 type Service = tonic_web_wasm_client::Client;
 
 /// gRPC client
-#[derive(Clone)]
 pub struct CanonicalNoteTransportClient {
-    client: MidenPrivateTransportClient<Service>,
-    health_client: HealthClient<Service>,
+    client: RwLock<MidenPrivateTransportClient<Service>>,
+    health_client: RwLock<HealthClient<Service>>,
 }
 
 impl CanonicalNoteTransportClient {
@@ -64,7 +64,10 @@ impl CanonicalNoteTransportClient {
         let health_client = HealthClient::new(timeout_channel.clone());
         let client = MidenPrivateTransportClient::new(timeout_channel);
 
-        Ok(Self { client, health_client })
+        Ok(Self {
+            client: RwLock::new(client),
+            health_client: RwLock::new(health_client),
+        })
     }
 
     /// gRPC client (WASM) constructor
@@ -74,7 +77,20 @@ impl CanonicalNoteTransportClient {
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenPrivateTransportClient::new(wasm_client);
 
-        Ok(Self { client, health_client })
+        Ok(Self {
+            client: RwLock::new(client),
+            health_client: RwLock::new(health_client),
+        })
+    }
+
+    /// Get a lock to the main client
+    fn api(&self) -> MidenPrivateTransportClient<Service> {
+        self.client.read().clone()
+    }
+
+    /// Get a lock to the health client
+    fn health_api(&self) -> HealthClient<Service> {
+        self.health_client.read().clone()
     }
 
     /// Send a note
@@ -82,7 +98,7 @@ impl CanonicalNoteTransportClient {
     /// Pushes a note to the transport layer.
     /// While the note header goes in plaintext, the provided note details can be encrypted.
     pub async fn send_note(
-        &mut self,
+        &self,
         header: NoteHeader,
         details: Vec<u8>,
     ) -> Result<(), TransportError> {
@@ -90,7 +106,7 @@ impl CanonicalNoteTransportClient {
             note: Some(TransportNote { header: header.to_bytes(), details }),
         };
 
-        self.client
+        self.api()
             .send_note(Request::new(request))
             .await
             .map_err(|e| err!("Send note failed: {e:?}"))?;
@@ -103,14 +119,14 @@ impl CanonicalNoteTransportClient {
     /// Downloads notes for a given tag.
     /// Only notes labelled after the provided cursor are returned.
     pub async fn fetch_notes(
-        &mut self,
+        &self,
         tag: NoteTag,
         cursor: u64,
     ) -> Result<Vec<NoteInfo>, TransportError> {
         let request = FetchNotesRequest { tag: tag.as_u32(), cursor };
 
         let response = self
-            .client
+            .api()
             .fetch_notes(Request::new(request))
             .await
             .map_err(|e| err!("Fetch notes failed: {e:?}"))?;
@@ -140,14 +156,14 @@ impl CanonicalNoteTransportClient {
     /// Subscribes to a given tag.
     /// New notes are received periodically.
     pub async fn stream_notes(
-        &mut self,
+        &self,
         tag: NoteTag,
         cursor: u64,
     ) -> Result<NoteStreamAdapter, TransportError> {
         let request = StreamNotesRequest { tag: tag.as_u32(), cursor };
 
         let response = self
-            .client
+            .api()
             .stream_notes(request)
             .await
             .map_err(|e| err!("Stream notes failed: {e:?}"))?;
@@ -161,7 +177,7 @@ impl CanonicalNoteTransportClient {
         });
 
         let response = self
-            .health_client
+            .health_api()
             .check(request)
             .await
             .map_err(|e| err!("Health check failed: {e}"))?
@@ -179,16 +195,12 @@ impl CanonicalNoteTransportClient {
 #[cfg_attr(not(feature = "web-tonic"), async_trait::async_trait)]
 #[cfg_attr(feature = "web-tonic", async_trait::async_trait(?Send))]
 impl super::NoteTransportClient for CanonicalNoteTransportClient {
-    async fn send_note(
-        &mut self,
-        header: NoteHeader,
-        details: Vec<u8>,
-    ) -> Result<(), TransportError> {
+    async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError> {
         self.send_note(header, details).await
     }
 
     async fn fetch_notes(
-        &mut self,
+        &self,
         tag: NoteTag,
         cursor: u64,
     ) -> Result<Vec<NoteInfo>, TransportError> {
@@ -196,7 +208,7 @@ impl super::NoteTransportClient for CanonicalNoteTransportClient {
     }
 
     async fn stream_notes(
-        &mut self,
+        &self,
         tag: NoteTag,
         cursor: u64,
     ) -> Result<Box<dyn NoteStream>, TransportError> {

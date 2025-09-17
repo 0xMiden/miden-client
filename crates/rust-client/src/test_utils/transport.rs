@@ -71,11 +71,11 @@ impl MockNoteTransportApi {
 }
 
 impl MockNoteTransportApi {
-    pub fn send_note(&mut self, header: NoteHeader, details_bytes: Vec<u8>) {
+    pub fn send_note(&self, header: NoteHeader, details_bytes: Vec<u8>) {
         self.mock_node.write().add_note(header, details_bytes);
     }
 
-    pub fn fetch_notes(&mut self, tag: NoteTag, cursor: u64) -> Vec<NoteInfo> {
+    pub fn fetch_notes(&self, tag: NoteTag, cursor: u64) -> Vec<NoteInfo> {
         self.mock_node.read().get_notes(tag, cursor)
     }
 }
@@ -93,17 +93,13 @@ impl NoteStream for DummyNoteStream {}
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NoteTransportClient for MockNoteTransportApi {
-    async fn send_note(
-        &mut self,
-        header: NoteHeader,
-        details: Vec<u8>,
-    ) -> Result<(), TransportError> {
+    async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError> {
         self.send_note(header, details);
         Ok(())
     }
 
     async fn fetch_notes(
-        &mut self,
+        &self,
         tag: NoteTag,
         cursor: u64,
     ) -> Result<Vec<NoteInfo>, TransportError> {
@@ -111,7 +107,7 @@ impl NoteTransportClient for MockNoteTransportApi {
     }
 
     async fn stream_notes(
-        &mut self,
+        &self,
         _tag: NoteTag,
         _cursor: u64,
     ) -> Result<Box<dyn NoteStream>, TransportError> {
