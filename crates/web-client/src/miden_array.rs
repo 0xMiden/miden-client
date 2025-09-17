@@ -31,7 +31,7 @@ macro_rules! declare_js_miden_arrays {
                 }
 
                 /// Get element at index, will always return a clone to avoid aliasing issues.
-                pub fn at(&self, index: usize) -> Result<$miden_type_name, wasm_bindgen::JsValue> {
+                pub fn get(&self, index: usize) -> Result<$miden_type_name, wasm_bindgen::JsValue> {
                     match self.__inner.get(index) {
                         Some(value) => Ok(value.clone()),
                         None => {

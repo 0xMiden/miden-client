@@ -99,7 +99,7 @@ const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
     const accountIds = accounts.map((account) => account.id());
     const array = new window.AccountIdArray(accountIds);
     array.replaceAt(5, accountToSet.id());
-    return array.at(5).toString() == accountToSet.id().toString();
+    return array.get(5).toString() == accountToSet.id().toString();
   }, {});
 };
 
@@ -113,7 +113,7 @@ const outOfBoundsArrayAccess = async ({
   return await page.evaluate(
     async ({ index }) => {
       const array = new window.AccountIdArray([]);
-      return array.at(index);
+      return array.get(index);
     },
     { index }
   );
@@ -158,12 +158,12 @@ const arrayReturnsClone = async ({
         accounts[i] = account.id();
       }
       const array = new window.AccountIdArray(accounts);
-      let cloned = array.at(index);
+      let cloned = array.get(index);
       cloned = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true
       );
-      let original = array.at(index);
+      let original = array.get(index);
       return cloned !== original;
     },
     { index }
