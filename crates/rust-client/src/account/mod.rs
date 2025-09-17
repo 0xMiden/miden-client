@@ -170,8 +170,14 @@ impl<AUTH> Client<AUTH> {
                     .iter()
                     .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
                 {
-                    addresses
-                        .push(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+                    let basic_wallet_address =
+                        AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
+                    let basic_wallet_note_tag = basic_wallet_address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(basic_wallet_note_tag, account.id());
+                    self.store.add_note_tag(note_tag_record).await?;
+
+                    addresses.push(basic_wallet_address);
                 }
 
                 self.store
