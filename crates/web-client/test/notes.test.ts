@@ -91,29 +91,26 @@ test.describe("get_input_note", () => {
   test("get note script by root", async ({ page }) => {
     await setupWalletAndFaucet(page);
 
-    // Create a note with a well-known script that always has a script
-    const scriptRoot = await page.evaluate(async () => {
-      // Use a well-known script that always exists
-      const noteScript = window.NoteScript.p2id();
-      return noteScript.root().toString();
-    });
-
     // Test GetNoteScriptByRoot endpoint
-    const scriptResult = await page.evaluate(async (scriptRootHex: string) => {
+    const scriptResult = await page.evaluate(async () => {
+      // Create a note with a well-known script that always has a script
+      const noteScript = window.NoteScript.p2id();
+      const scriptRoot = noteScript.root();
+
       const endpoint = new window.Endpoint("http://localhost:57291");
       const rpcClient = new window.RpcClient(endpoint);
 
-      const scriptRoot = window.Word.fromHex(scriptRootHex);
-      const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+      const fetchedNoteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
 
       return {
-        hasScript: !!noteScript,
-        scriptRoot: noteScript ? noteScript.root().toString() : null,
+        hasScript: !!fetchedNoteScript,
+        originalScriptRoot: scriptRoot.toString(),
+        fetchedScriptRoot: fetchedNoteScript ? fetchedNoteScript.root().toString() : null,
       };
-    }, scriptRoot);
+    });
 
     expect(scriptResult.hasScript).toBe(true);
-    expect(scriptResult.scriptRoot).toEqual(scriptRoot);
+    expect(scriptResult.fetchedScriptRoot).toEqual(scriptResult.originalScriptRoot);
   });
 });
 
