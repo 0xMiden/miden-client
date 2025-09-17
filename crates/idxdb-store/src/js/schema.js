@@ -20,6 +20,7 @@ var Table;
     Table["AccountVaults"] = "accountVaults";
     Table["AccountAuth"] = "accountAuth";
     Table["Accounts"] = "accounts";
+    Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
     Table["TransactionScripts"] = "transactionScripts";
     Table["InputNotes"] = "inputNotes";
@@ -38,6 +39,7 @@ db.version(1).stores({
     [Table.AccountVaults]: indexes("root"),
     [Table.AccountAuth]: indexes("pubKey"),
     [Table.Accounts]: indexes("&accountCommitment", "id", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.Addresses]: indexes("id", "address"),
     [Table.Transactions]: indexes("id"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
     [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
@@ -63,6 +65,7 @@ const accountStorages = db.table(Table.AccountStorage);
 const accountVaults = db.table(Table.AccountVaults);
 const accountAuths = db.table(Table.AccountAuth);
 const accounts = db.table(Table.Accounts);
+const addresses = db.table(Table.Addresses);
 const transactions = db.table(Table.Transactions);
 const transactionScripts = db.table(Table.TransactionScripts);
 const inputNotes = db.table(Table.InputNotes);
@@ -73,5 +76,5 @@ const blockHeaders = db.table(Table.BlockHeaders);
 const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
 const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
-export { db, accountCodes, accountStorages, accountVaults, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, };
+export { db, accountCodes, accountStorages, accountVaults, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, };
 //# sourceMappingURL=schema.js.map

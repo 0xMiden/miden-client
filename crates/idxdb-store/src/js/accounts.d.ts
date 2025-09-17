@@ -43,11 +43,13 @@ export declare function getAccountAssetVault(vaultRoot: string): Promise<{
 export declare function getAccountAuthByPubKey(pubKey: string): Promise<{
     secretKey: string;
 }>;
+export declare function getAccountAddresses(accountId: string): Promise<import("./schema.js").IAddress[] | undefined>;
 export declare function insertAccountCode(codeRoot: string, code: Uint8Array): Promise<void>;
 export declare function insertAccountStorage(storageRoot: string, storageSlots: Uint8Array): Promise<void>;
 export declare function insertAccountAssetVault(vaultRoot: string, assets: Uint8Array): Promise<void>;
 export declare function insertAccountRecord(accountId: string, codeRoot: string, storageRoot: string, vaultRoot: string, nonce: string, committed: boolean, commitment: string, accountSeed: Uint8Array | undefined): Promise<void>;
 export declare function insertAccountAuth(pubKey: string, secretKey: string): Promise<void>;
+export declare function insertAccountAddress(address: Uint8Array, accountId: string): Promise<void>;
 export declare function upsertForeignAccountCode(accountId: string, code: Uint8Array, codeRoot: string): Promise<void>;
 export declare function getForeignAccountCode(accountIds: string[]): Promise<{
     accountId: string;

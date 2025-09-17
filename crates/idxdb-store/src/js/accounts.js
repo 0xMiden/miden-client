@@ -1,4 +1,4 @@
-import { accountCodes, accountStorages, accountVaults, accountAuths, accounts, foreignAccountCode, } from "./schema.js";
+import { accountCodes, accountStorages, accountVaults, accountAuths, accounts, addresses, foreignAccountCode, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
@@ -219,6 +219,23 @@ export async function getAccountAuthByPubKey(pubKey) {
     };
     return data;
 }
+export async function getAccountAddresses(accountId) {
+    try {
+        // Fetch all records matching the given accountId
+        const allMatchingRecords = await addresses
+            .where("id")
+            .equals(accountId)
+            .toArray();
+        if (allMatchingRecords.length === 0) {
+            console.log("No address records found for given account ID.");
+            return [];
+        }
+        return allMatchingRecords;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error while fetching account addresses for id: ${accountId}`);
+    }
+}
 // INSERT FUNCTIONS
 export async function insertAccountCode(codeRoot, code) {
     try {
@@ -294,6 +311,20 @@ export async function insertAccountAuth(pubKey, secretKey) {
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKey}`);
+    }
+}
+export async function insertAccountAddress(address, accountId) {
+    try {
+        // Prepare the data object to insert
+        const data = {
+            address,
+            id: accountId,
+        };
+        // Perform the insert using Dexie
+        await addresses.put(data);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting address with value: ${address}`);
     }
 }
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {

@@ -13,6 +13,7 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
+    AccountIdAddress,
     AccountIdPrefix,
     AccountStorage,
     StorageMap,
@@ -128,9 +129,12 @@ impl SqliteStore {
             return Ok(None);
         };
 
+        let addresses = query_account_addresses(conn, header.id())?;
+
         Ok(Some(AccountRecord::new(
             Account::from_parts(header.id(), vault, storage, account_code, header.nonce()),
             status,
+            addresses,
         )))
     }
 
@@ -139,6 +143,7 @@ impl SqliteStore {
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account: &Account,
         account_seed: Option<Word>,
+        addresses: Vec<AccountIdAddress>,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -152,6 +157,8 @@ impl SqliteStore {
 
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
+
+        Self::insert_addresses(&tx, addresses.into_iter(), account.id())?;
 
         tx.commit().into_store_error()?;
 
@@ -337,6 +344,13 @@ impl SqliteStore {
         let proof = SmtProof::new(path, leaf)?;
 
         Ok((item, StorageMapWitness::new(proof)))
+    }
+
+    pub(crate) fn get_account_addresses(
+        conn: &mut Connection,
+        account_id: AccountId,
+    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+        query_account_addresses(conn, account_id)
     }
 
     // ACCOUNT DELTA HELPERS
@@ -784,6 +798,21 @@ impl SqliteStore {
 
         Ok(())
     }
+
+    fn insert_addresses(
+        tx: &Transaction<'_>,
+        addresses: impl Iterator<Item = AccountIdAddress>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        for address in addresses {
+            const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
+            let serialized_addres: [u8; AccountIdAddress::SERIALIZED_SIZE] = address.into();
+            tx.execute(QUERY, params![serialized_addres, account_id.to_hex(),])
+                .into_store_error()?;
+        }
+
+        Ok(())
+    }
 }
 
 // HELPERS
@@ -980,6 +1009,28 @@ fn query_account_headers(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
+fn query_account_addresses(
+    conn: &Connection,
+    account_id: AccountId,
+) -> Result<Vec<AccountIdAddress>, StoreError> {
+    const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
+
+    let query = format!("{ADDRESS_QUERY} WHERE ID = '{}'", account_id.to_hex());
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map([], |row| {
+            let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = row.get(0)?;
+            Ok(address)
+        })
+        .into_store_error()?
+        .map(|result| {
+            let serialized_address = result.into_store_error()?;
+            let address = AccountIdAddress::try_from(serialized_address).unwrap(); // TODO: handle unwrap
+            Ok(address)
+        })
+        .collect::<Result<Vec<AccountIdAddress>, StoreError>>()
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -994,7 +1045,9 @@ mod tests {
         AccountDelta,
         AccountHeader,
         AccountId,
+        AccountIdAddress,
         AccountType,
+        AddressInterface,
         StorageMap,
         StorageSlot,
     };
@@ -1087,7 +1140,8 @@ mod tests {
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
-        store.insert_account(&account, Some(seed)).await?;
+        let default_address = AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+        store.insert_account(&account, Some(seed), vec![default_address]).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
@@ -1175,7 +1229,8 @@ mod tests {
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
-        store.insert_account(&account, None).await?;
+        let default_address = AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+        store.insert_account(&account, None, vec![default_address]).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, EMPTY_WORD);
