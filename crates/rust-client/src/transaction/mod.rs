@@ -74,12 +74,12 @@ use core::fmt::{self};
 use miden_objects::account::{Account, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::{AccountInputs, TransactionArgs};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteTag};
+use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
-use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{DataStore, TransactionExecutor};
 use tracing::info;
 
 use super::Client;

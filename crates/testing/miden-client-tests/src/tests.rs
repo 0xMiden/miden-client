@@ -24,7 +24,6 @@ use miden_client::testing::common::{
     consume_notes,
     create_test_store_path,
     execute_failing_tx,
-    execute_tx,
     mint_and_consume,
     mint_note,
     setup_two_wallets_and_faucet,

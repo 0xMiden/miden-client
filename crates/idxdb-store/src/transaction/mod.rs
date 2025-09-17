@@ -21,7 +21,6 @@ use wasm_bindgen_futures::JsFuture;
 use super::WebStore;
 use super::account::utils::update_account;
 use super::note::utils::apply_note_updates_tx;
-use crate::sql_error::SqlResultExt;
 
 mod js_bindings;
 use js_bindings::idxdb_get_transactions;
