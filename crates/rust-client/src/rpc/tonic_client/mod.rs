@@ -391,7 +391,7 @@ impl NodeRpcClient for TonicRpcClient {
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-        
+
         let mut all_nullifiers = Vec::new();
         let mut current_block_from = block_num.as_u32();
         let mut iteration_count = 0;
