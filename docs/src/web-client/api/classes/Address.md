@@ -46,7 +46,7 @@
 
 ##### network\_id
 
-[`NetworkId`](../type-aliases/NetworkId.md)
+[`NetworkId`](../enumerations/NetworkId.md)
 
 #### Returns
 

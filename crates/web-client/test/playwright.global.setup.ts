@@ -35,10 +35,12 @@ export const test = base.extend<{ forEachTest: void }>({
             AccountVaultDelta,
             AccountHeader,
             AccountId,
+            AccountInterface,
             AccountStorageMode,
             AccountStorageRequirements,
             AccountType,
             Address,
+            AddressInterface,
             AdviceMap,
             Assembler,
             AssemblerUtils,
@@ -51,6 +53,7 @@ export const test = base.extend<{ forEachTest: void }>({
             FungibleAsset,
             FungibleAssetDelta,
             Library,
+            NetworkId,
             Note,
             NoteAndArgs,
             NoteAndArgsArray,
@@ -112,9 +115,12 @@ export const test = base.extend<{ forEachTest: void }>({
           window.AccountVaultDelta = AccountVaultDelta;
           window.AccountHeader = AccountHeader;
           window.AccountId = AccountId;
+          window.AccountInterface = AccountInterface;
           window.AccountStorageMode = AccountStorageMode;
           window.AccountStorageRequirements = AccountStorageRequirements;
           window.AccountType = AccountType;
+          window.Address = Address;
+          window.AddressInterface = AddressInterface;
           window.AdviceMap = AdviceMap;
           window.Assembler = Assembler;
           window.AssemblerUtils = AssemblerUtils;
@@ -128,6 +134,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.FungibleAsset = FungibleAsset;
           window.FungibleAssetDelta = FungibleAssetDelta;
           window.Library = Library;
+          window.NetworkId = NetworkId;
           window.Note = Note;
           window.NoteAndArgs = NoteAndArgs;
           window.NoteAndArgsArray = NoteAndArgsArray;
@@ -173,7 +180,6 @@ export const test = base.extend<{ forEachTest: void }>({
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
-          window.Address = Address;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};
@@ -234,6 +240,21 @@ export const test = base.extend<{ forEachTest: void }>({
             const client = await WebClient.createClient(rpcUrl, initSeed);
             window.client = client;
             await window.client.syncState();
+          };
+
+          window.helpers.parseNetworkId = (networkId) => {
+            const map = {
+              mm: window.NetworkId.Mainnet,
+              mtst: window.NetworkId.Testnet,
+              mdev: window.NetworkId.Devnet,
+            };
+            const parsedNetworkId = map[networkId];
+            if (parsedNetworkId === undefined) {
+              throw new Error(
+                `Invalid network ID: ${networkId}. Expected one of: ${Object.keys(map).join(", ")}`
+              );
+            }
+            return parsedNetworkId;
           };
         },
         {

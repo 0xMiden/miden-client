@@ -1,12 +1,12 @@
 import { expect, Page } from "@playwright/test";
 import test from "./playwright.global.setup";
-import { AddressInterface, AccountId, Address, NetworkId } from "../js";
+import { AddressInterface, AccountId } from "../js";
 const instanceAddress = async ({
   page,
   accountId,
   _interface,
 }: {
-  page: typeof Page;
+  page: Page;
   accountId?: typeof AccountId;
   _interface: typeof AddressInterface;
 }) => {
@@ -33,6 +33,7 @@ const instanceAddress = async ({
 const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
   return await page.evaluate(async (bech32Prefix) => {
     const client = window.client;
+    const parsedNetworkId = window.helpers.parseNetworkId(bech32Prefix);
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true
@@ -41,7 +42,7 @@ const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
       newAccount.id(),
       "BasicWallet"
     );
-    return address.toBech32(bech32Prefix);
+    return address.toBech32(parsedNetworkId);
   }, networkId);
 };
 
@@ -50,8 +51,9 @@ const instanceAddressFromBech32 = async (
   bech32EncodedAddress: string
 ) => {
   return await page.evaluate(async (bech32EncodedAddress) => {
+    const parsedNetworkId = window.helpers.parseNetworkId("mtst");
     const address = window.Address.fromBech32(bech32EncodedAddress);
-    return address.toBech32("mtst") === bech32EncodedAddress;
+    return address.toBech32(parsedNetworkId) === bech32EncodedAddress;
   }, bech32EncodedAddress);
 };
 

@@ -7,7 +7,6 @@ use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
 use miden_objects::note::{Note, NoteId};
-use miden_objects::transaction::{InputNote, InputNotes};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
@@ -127,8 +126,6 @@ where
         )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
-        let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
-            .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -143,7 +140,7 @@ where
             .check_notes_consumability(
                 account.id(),
                 self.store.get_sync_height().await?,
-                input_notes,
+                vec![note.clone()],
                 tx_args,
             )
             .await?;

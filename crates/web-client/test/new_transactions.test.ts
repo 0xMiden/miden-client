@@ -350,7 +350,7 @@ export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
-): Promise<boolean> => {
+): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
       debugger;
