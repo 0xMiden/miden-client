@@ -390,29 +390,69 @@ impl NodeRpcClient for TonicRpcClient {
         prefixes: &[u16],
         block_num: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = proto::rpc_store::SyncNullifiersRequest {
-            nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
-            prefix_len: 16,
-            block_range: Some(BlockRange {
-                block_from: block_num.as_u32(),
-                block_to: None,
-            }),
-        };
+        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
+        
+        let mut all_nullifiers = Vec::new();
+        let mut current_block_from = block_num.as_u32();
+        let mut iteration_count = 0;
 
-        let mut rpc_api = self.ensure_connected().await?;
+        loop {
+            iteration_count += 1;
+            if iteration_count > MAX_ITERATIONS {
+                return Err(RpcError::InvalidResponse(
+                    "Too many pagination iterations, possible infinite loop".to_string(),
+                ));
+            }
 
-        let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
-        })?;
-        let response = response.into_inner();
-        let nullifiers = response
-            .nullifiers
-            .iter()
-            .map(TryFrom::try_from)
-            .collect::<Result<Vec<NullifierUpdate>, _>>()
-            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+            let request = proto::rpc_store::SyncNullifiersRequest {
+                nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
+                prefix_len: 16,
+                block_range: Some(BlockRange {
+                    block_from: current_block_from,
+                    block_to: None,
+                }),
+            };
 
-        Ok(nullifiers)
+            let mut rpc_api = self.ensure_connected().await?;
+
+            let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
+            })?;
+            let response = response.into_inner();
+
+            // Convert nullifiers for this batch
+            let batch_nullifiers = response
+                .nullifiers
+                .iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<Vec<NullifierUpdate>, _>>()
+                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+
+            all_nullifiers.extend(batch_nullifiers);
+
+            // Check if we need to fetch more pages
+            if let Some(pagination_info) = response.pagination_info {
+                // If the pagination block_num is less than the chain tip, there might be more data
+                // We need to continue from the next block
+                if pagination_info.block_num < pagination_info.chain_tip {
+                    // Ensure we're making progress to avoid infinite loops
+                    if pagination_info.block_num < current_block_from {
+                        return Err(RpcError::InvalidResponse(
+                            "Invalid pagination: block_num went backwards".to_string(),
+                        ));
+                    }
+                    current_block_from = pagination_info.block_num + 1;
+                } else {
+                    // We've reached the chain tip, no more data to fetch
+                    break;
+                }
+            } else {
+                // No pagination info means this is not a paginated response, so we're done
+                break;
+            }
+        }
+
+        Ok(all_nullifiers)
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
