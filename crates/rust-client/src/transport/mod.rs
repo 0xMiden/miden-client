@@ -1,4 +1,5 @@
 pub mod errors;
+#[cfg(any(feature = "tonic", feature = "web-tonic"))]
 pub mod grpc;
 
 use alloc::boxed::Box;
