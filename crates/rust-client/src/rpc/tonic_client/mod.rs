@@ -394,16 +394,11 @@ impl NodeRpcClient for TonicRpcClient {
 
         let mut all_nullifiers = Vec::new();
         let mut current_block_from = block_num.as_u32();
-        let mut iteration_count = 0;
 
-        loop {
-            iteration_count += 1;
-            if iteration_count > MAX_ITERATIONS {
-                return Err(RpcError::InvalidResponse(
-                    "Too many pagination iterations, possible infinite loop".to_string(),
-                ));
-            }
+        // Establish RPC connection once before the loop
+        let mut rpc_api = self.ensure_connected().await?;
 
+        for _ in 0..MAX_ITERATIONS {
             let request = proto::rpc_store::SyncNullifiersRequest {
                 nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
                 prefix_len: 16,
@@ -412,8 +407,6 @@ impl NodeRpcClient for TonicRpcClient {
                     block_to: None,
                 }),
             };
-
-            let mut rpc_api = self.ensure_connected().await?;
 
             let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
                 RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
@@ -431,28 +424,29 @@ impl NodeRpcClient for TonicRpcClient {
             all_nullifiers.extend(batch_nullifiers);
 
             // Check if we need to fetch more pages
-            if let Some(pagination_info) = response.pagination_info {
-                // If the pagination block_num is less than the chain tip, there might be more data
-                // We need to continue from the next block
-                if pagination_info.block_num < pagination_info.chain_tip {
+            if let Some(page) = response.pagination_info {
+                if page.block_num < page.chain_tip {
                     // Ensure we're making progress to avoid infinite loops
-                    if pagination_info.block_num < current_block_from {
+                    if page.block_num < current_block_from {
                         return Err(RpcError::InvalidResponse(
-                            "Invalid pagination: block_num went backwards".to_string(),
+                            "invalid pagination: block_num went backwards".to_string(),
                         ));
                     }
-                    current_block_from = pagination_info.block_num + 1;
+                    current_block_from = page.block_num + 1;
                 } else {
                     // We've reached the chain tip, no more data to fetch
-                    break;
+                    return Ok(all_nullifiers);
                 }
             } else {
                 // No pagination info means this is not a paginated response, so we're done
-                break;
+                return Ok(all_nullifiers);
             }
         }
 
-        Ok(all_nullifiers)
+        // If we exit the loop, we've hit the iteration limit
+        Err(RpcError::InvalidResponse(
+            "too many pagination iterations, possible infinite loop".to_string(),
+        ))
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
