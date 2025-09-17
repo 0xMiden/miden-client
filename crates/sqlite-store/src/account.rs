@@ -806,8 +806,8 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         for address in addresses {
             const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
-            let serialized_addres: [u8; AccountIdAddress::SERIALIZED_SIZE] = address.into();
-            tx.execute(QUERY, params![serialized_addres, account_id.to_hex(),])
+            let serialized_address: [u8; AccountIdAddress::SERIALIZED_SIZE] = address.into();
+            tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
                 .into_store_error()?;
         }
 
