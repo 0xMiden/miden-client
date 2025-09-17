@@ -45,7 +45,7 @@ impl CanonicalNoteTransportClient {
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, TransportError> {
         let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = Channel::from_shared(endpoint.clone())
+        let channel = Channel::from_shared(endpoint.to_string())
             .map_err(|e| err!("Failed to create channel: {e}"))?
             .tls_config(tls)
             .map_err(|e| err!("Failed to setup TLS: {e}"))?

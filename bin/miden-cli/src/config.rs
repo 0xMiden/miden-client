@@ -33,6 +33,8 @@ pub struct CliConfig {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     pub max_block_number_delta: Option<u32>,
+    /// Describes settings related to the transport layer endpoint.
+    pub transport_layer: Option<TransportLayerConfig>,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -67,6 +69,7 @@ impl Default for CliConfig {
             remote_prover_endpoint: None,
             component_template_directory: Path::new(DEFAULT_COMPONENT_TEMPLATE_DIR).to_path_buf(),
             max_block_number_delta: None,
+            transport_layer: None,
         }
     }
 }
@@ -84,6 +87,27 @@ pub struct RpcConfig {
 }
 
 impl Default for RpcConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: Endpoint::default().into(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+// TRANSPORT LAYER CONFIG
+// ================================================================================================
+
+/// Settings for the transport layer client.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TransportLayerConfig {
+    /// Address of the Miden Transport Layer node to connect to.
+    pub endpoint: CliEndpoint,
+    /// Timeout for the Transport Layer RPC api requests, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for TransportLayerConfig {
     fn default() -> Self {
         Self {
             endpoint: Endpoint::default().into(),

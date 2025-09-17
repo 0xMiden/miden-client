@@ -1,5 +1,5 @@
 pub mod errors;
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 pub mod grpc;
 
 use alloc::boxed::Box;
@@ -10,16 +10,12 @@ use futures::Stream;
 use miden_lib::utils::{Deserializable, DeserializationError, Serializable};
 use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
-use miden_tx::auth::TransactionAuthenticator;
 
 pub use self::errors::TransportError;
 use crate::{Client, ClientError};
 
 /// Client transport layer methods.
-impl<'a, AUTH> Client<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync + 'static,
-{
+impl<'a, AUTH> Client<AUTH> {
     pub fn transport_layer(&'a mut self) -> TransportLayer<'a, AUTH> {
         TransportLayer::new(self)
     }
