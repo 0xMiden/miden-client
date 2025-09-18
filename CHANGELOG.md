@@ -12,7 +12,7 @@
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
-* All accounts now have a single default address upon creation ([#1308](https://github.com/0xMiden/miden-client/pull/1308)).
+* Added single default address on accounts creation ([#1308](https://github.com/0xMiden/miden-client/pull/1308)).
 
 ## 0.11.3 (2025-09-08)
 
