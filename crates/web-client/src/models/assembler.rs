@@ -8,6 +8,7 @@ use crate::models::note_script::NoteScript;
 use crate::models::transaction_script::TransactionScript;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Assembler(NativeAssembler);
 
 #[wasm_bindgen]

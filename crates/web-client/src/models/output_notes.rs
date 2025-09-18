@@ -6,7 +6,7 @@ use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct OutputNotes(NativeOutputNotes);
+pub struct OutputNotes(pub(crate) NativeOutputNotes);
 
 #[wasm_bindgen]
 impl OutputNotes {

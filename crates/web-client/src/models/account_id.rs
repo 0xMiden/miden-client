@@ -14,7 +14,7 @@ use super::felt::Felt;
 use crate::js_error_with_context;
 
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
 #[wasm_bindgen]

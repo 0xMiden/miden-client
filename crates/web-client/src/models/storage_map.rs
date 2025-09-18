@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use crate::models::word::Word;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct StorageMap(NativeStorageMap);
 
 #[wasm_bindgen]

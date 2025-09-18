@@ -206,7 +206,9 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
         let transactionResult = await client.newTransaction(
@@ -309,7 +311,9 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdeNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
         let transactionResult = await client.newTransaction(

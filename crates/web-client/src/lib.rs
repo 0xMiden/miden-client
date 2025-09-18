@@ -15,6 +15,8 @@ pub mod account;
 pub mod export;
 pub mod helpers;
 pub mod import;
+#[macro_use]
+pub(crate) mod miden_array;
 pub mod mock;
 pub mod models;
 pub mod new_account;

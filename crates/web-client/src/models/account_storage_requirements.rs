@@ -29,6 +29,7 @@ impl SlotAndKeys {
     }
 }
 
+#[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountStorageRequirements(NativeAccountStorageRequirements);
 

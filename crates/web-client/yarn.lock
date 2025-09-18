@@ -299,9 +299,9 @@
     "@types/node" "*"
 
 "@wasm-tool/rollup-plugin-rust@^3.0.3":
-  version "3.0.4"
-  resolved "https://registry.npmjs.org/@wasm-tool/rollup-plugin-rust/-/rollup-plugin-rust-3.0.4.tgz"
-  integrity sha512-chkbVEcaPS0wcapi9uGdP8U4Txup8z0Ezys5LMKVZn4Sl43x+V2mAGZ2wbR5V8moQQj4er7UOzBQWHuFRRtBwg==
+  version "3.0.5"
+  resolved "https://registry.npmjs.org/@wasm-tool/rollup-plugin-rust/-/rollup-plugin-rust-3.0.5.tgz"
+  integrity sha512-L3TyDtmrmAY4XdlZAZKMomDManfrKHLQHjDeFNJKi4LjPQRwWUnPoS0yV44NWy+pKXVKlv7wbdkaTmhiFJRmLg==
   dependencies:
     "@iarna/toml" "^2.2.5"
     "@rollup/pluginutils" "^5.1.4"

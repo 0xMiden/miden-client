@@ -20,12 +20,14 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::advice_map::AdviceMap;
 use crate::models::foreign_account::ForeignAccount;
-use crate::models::note_recipient::RecipientArray;
-use crate::models::output_note::OutputNotesArray;
+use crate::models::miden_arrays::{
+    NoteAndArgsArray,
+    NoteDetailsAndTagArray,
+    NoteIdAndArgsArray,
+    NoteRecipientArray,
+    OutputNoteArray,
+};
 use crate::models::transaction_request::TransactionRequest;
-use crate::models::transaction_request::note_and_args::NoteAndArgsArray;
-use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTagArray;
-use crate::models::transaction_request::note_id_and_args::NoteIdAndArgsArray;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
 
@@ -57,7 +59,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &OutputNotesArray) -> Self {
+    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Self {
         let native_output_notes: Vec<NativeOutputNote> = notes.into();
         self.0 = self.0.own_output_notes(native_output_notes);
         self
@@ -71,7 +73,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withExpectedOutputRecipients")]
-    pub fn with_expected_output_notes(mut self, recipients: &RecipientArray) -> Self {
+    pub fn with_expected_output_notes(mut self, recipients: &NoteRecipientArray) -> Self {
         let native_recipients: Vec<NativeNoteRecipient> = recipients.into();
         self.0 = self.0.expected_output_recipients(native_recipients);
         self

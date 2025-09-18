@@ -6,6 +6,7 @@ use crate::models::account_id::AccountId;
 use crate::models::account_storage_requirements::AccountStorageRequirements;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct ForeignAccount(NativeForeignAccount);
 
 #[wasm_bindgen]

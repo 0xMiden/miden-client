@@ -52,32 +52,3 @@ impl From<&NativeNoteDetails> for NoteDetails {
         NoteDetails(note_details.clone())
     }
 }
-
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct NoteDetailsArray(Vec<NoteDetails>);
-
-#[wasm_bindgen]
-impl NoteDetailsArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(note_details_array: Option<Vec<NoteDetails>>) -> NoteDetailsArray {
-        let note_details_array = note_details_array.unwrap_or_default();
-        NoteDetailsArray(note_details_array)
-    }
-
-    pub fn push(&mut self, note_details: &NoteDetails) {
-        self.0.push(note_details.clone());
-    }
-}
-
-impl From<NoteDetailsArray> for Vec<NativeNoteDetails> {
-    fn from(note_details_array: NoteDetailsArray) -> Self {
-        note_details_array.0.into_iter().map(Into::into).collect()
-    }
-}
-
-impl From<&NoteDetailsArray> for Vec<NativeNoteDetails> {
-    fn from(note_details_array: &NoteDetailsArray) -> Self {
-        note_details_array.0.iter().map(Into::into).collect()
-    }
-}

@@ -77,6 +77,23 @@ const {
   WebClient: WasmWebClient, // Alias the WASM-exported WebClient
 } = wasm;
 
+// Take each exported array type and organize them under a single object.
+// Then, export it under the name "MidenArrays". So, the array types will effectively
+// be "name-spaced" under "MidenArrays" when the library is imported in another project.
+const buildTypedErraysExport = async (exportObject) => {
+  return Object.entries(exportObject).reduce(
+    (exports, [exportName, _export]) => {
+      if (exportName.endsWith("Array")) {
+        exports[exportName] = _export;
+      }
+      return exports;
+    },
+    {}
+  );
+};
+
+const MidenArrays = await buildTypedErraysExport(wasm);
+
 export {
   Account,
   AccountBuilder,
@@ -149,6 +166,7 @@ export {
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
   Word,
+  MidenArrays,
 };
 
 /**
