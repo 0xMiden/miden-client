@@ -149,9 +149,8 @@ CREATE TABLE state_sync (
 
 -- Create tags table
 CREATE TABLE tags (
-    tag BLOB NOT NULL,                       -- the serialized tag
-    source BLOB NOT NULL,                    -- the serialized tag source
-    transport_layer_cursor UNSIGNED BIG INT  -- transport layer tag cursor
+    tag BLOB NOT NULL,    -- the serialized tag
+    source BLOB NOT NULL  -- the serialized tag source
 );
 
 -- insert initial row into state_sync table
@@ -175,4 +174,16 @@ CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
-)
+);
+
+-- Create transport layer cursor table
+CREATE TABLE transport_layer_cursor (
+    cursor UNSIGNED BIG INT -- transport layer tag cursor for note fetch pagination
+);
+
+-- Insert initial row into transport_layer_cursor table
+INSERT OR IGNORE INTO transport_layer_cursor (cursor)
+SELECT 0
+WHERE (
+    SELECT COUNT(*) FROM transport_layer_cursor
+) = 0;

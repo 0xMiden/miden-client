@@ -2610,7 +2610,7 @@ dependencies = [
 [[package]]
 name = "miden-private-transport-proto"
 version = "0.1.0"
-source = "git+https://github.com/0xMiden/miden-private-transport#0ded1e7bfe65c1722abdd3d14e905e90fb219a91"
+source = "git+https://github.com/0xMiden/miden-private-transport#3b9a4e4a38bbe95e4eeda71fb95d5ba03300182d"
 dependencies = [
  "prost",
  "prost-types",

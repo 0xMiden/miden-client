@@ -317,11 +317,6 @@ pub trait Store: Send + Sync {
     /// Otherwise returns true.
     async fn remove_note_tag(&self, tag: NoteTagRecord) -> Result<usize, StoreError>;
 
-    /// Updates the transport layer cursor for a given note tag.
-    ///
-    /// This is used to track the last cursor position when fetching notes from the transport layer.
-    async fn update_note_tag_cursor(&self, tag: NoteTag, cursor: u64) -> Result<bool, StoreError>;
-
     /// Returns the block number of the last state sync block.
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError>;
 
@@ -338,7 +333,20 @@ pub trait Store: Send + Sync {
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
 
-    /// Applies transport layer update
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets the transport layer cursor.
+    ///
+    /// This is used to reduce the number of fetched notes from the transport layer.
+    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError>;
+
+    /// Updates the transport layer cursor.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the transport layer.
+    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError>;
+
+    /// Applies a transport layer update
     ///
     /// An update involves:
     /// - Insert fetched notes;
@@ -347,14 +355,7 @@ pub trait Store: Send + Sync {
         &self,
         transport_layer_update: TransportLayerUpdate,
     ) -> Result<(), StoreError> {
-        // TODO: change to single-cursor approach
-        for note_update in &transport_layer_update.note_updates {
-            self.update_note_tag_cursor(
-                note_update.header().metadata().tag(),
-                transport_layer_update.cursor,
-            )
-            .await?;
-        }
+        self.update_transport_layer_cursor(transport_layer_update.cursor).await?;
         let input_notes = transport_layer_update
             .note_updates
             .into_iter()

@@ -20,21 +20,19 @@ use crate::{insert_sql, subst};
 
 impl SqliteStore {
     pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
-        const QUERY: &str = "SELECT tag, source, transport_layer_cursor FROM tags";
+        const QUERY: &str = "SELECT tag, source FROM tags";
 
         conn.prepare(QUERY)
             .into_store_error()?
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
             .expect("no binding parameters used in query")
             .map(|result| {
-                let (tag, source, transport_layer_cursor): (Vec<u8>, Vec<u8>, Option<u64>) =
-                    result.into_store_error()?;
+                let (tag, source): (Vec<u8>, Vec<u8>) = result.into_store_error()?;
                 Ok(NoteTagRecord {
                     tag: NoteTag::read_from_bytes(&tag)
                         .map_err(StoreError::DataDeserializationError)?,
                     source: NoteTagSource::read_from_bytes(&source)
                         .map_err(StoreError::DataDeserializationError)?,
-                    transport_layer_cursor,
                 })
             })
             .collect::<Result<Vec<NoteTagRecord>, _>>()
@@ -82,17 +80,6 @@ impl SqliteStore {
         tx.commit().into_store_error()?;
 
         Ok(removed_tags)
-    }
-
-    pub(super) fn update_note_tag_cursor(
-        conn: &mut Connection,
-        tag: NoteTag,
-        cursor: u64,
-    ) -> Result<bool, StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-        let rows_affected = update_note_tag_cursor_tx(&tx, tag, cursor)?;
-
-        Ok(rows_affected > 0)
     }
 
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
@@ -155,7 +142,6 @@ impl SqliteStore {
                     Some(NoteTagRecord {
                         tag: note.metadata().expect("Committed notes should have metadata").tag(),
                         source: NoteTagSource::Note(note.id()),
-                        transport_layer_cursor: None,
                     })
                 } else {
                     None
@@ -218,15 +204,4 @@ pub(super) fn remove_note_tag_tx(
         .into_store_error()?;
 
     Ok(removed_tags)
-}
-
-pub(super) fn update_note_tag_cursor_tx(
-    tx: &Transaction<'_>,
-    tag: NoteTag,
-    cursor: u64,
-) -> Result<usize, StoreError> {
-    const QUERY: &str = "UPDATE tags SET transport_layer_cursor = ? WHERE tag = ?";
-    let rows_affected = tx.execute(QUERY, params![cursor, tag.to_bytes()]).into_store_error()?;
-
-    Ok(rows_affected)
 }

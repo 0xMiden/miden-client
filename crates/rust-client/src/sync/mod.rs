@@ -55,7 +55,7 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
@@ -144,18 +144,7 @@ where
             .map(|(acc_header, _)| acc_header)
             .collect();
 
-        let note_tag_records = self.store.get_note_tags().await?;
-        // Unique tags, cursors
-        let note_tags_pg = note_tag_records
-            .iter()
-            .map(|record| (record.tag, record.transport_layer_cursor.unwrap_or(0)))
-            .collect::<BTreeMap<_, _>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        // Unique tags
-        let note_tags: BTreeSet<_> = note_tags_pg.iter().map(|&(tag, _)| tag).collect();
-        // Get largest cursor. TODO: move to single-cursor approach
-        let cursor = note_tags_pg.iter().map(|&(_, cursor)| cursor).max().unwrap_or(0);
+        let note_tags: BTreeSet<_> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
         let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
@@ -196,7 +185,8 @@ where
         // Transport layer update
         // TODO We can run both sync_state, fetch_notes futures in parallel
         let transport_layer_update = if let Some(mut transport_layer) = transport_layer {
-            let update = transport_layer.fetch_notes(cursor, &note_tags).await?;
+            let cursor = self.store.get_transport_layer_cursor().await?;
+            let update = transport_layer.fetch_notes(cursor, note_tags).await?;
             Some(update)
         } else {
             None

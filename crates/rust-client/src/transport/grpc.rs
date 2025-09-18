@@ -46,12 +46,12 @@ impl CanonicalNoteTransportClient {
     pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, TransportError> {
         let tls = ClientTlsConfig::new().with_native_roots();
         let channel = Channel::from_shared(endpoint.to_string())
-            .map_err(|e| err!("Failed to create channel: {e}"))?
+            .map_err(|e| TransportError::Connection(format!("Failed to create channel: {e}")))?
             .tls_config(tls)
-            .map_err(|e| err!("Failed to setup TLS: {e}"))?
+            .map_err(|e| TransportError::Connection(format!("Failed to setup TLS: {e}")))?
             .connect()
             .await
-            .map_err(|e| err!("Failed to connect: {e}"))?;
+            .map_err(|e| TransportError::Connection(format!("Failed to connect: {e}")))?;
         let timeout = Duration::from_millis(timeout_ms);
         let timeout_channel = Timeout::new(channel, timeout);
         let health_client = HealthClient::new(timeout_channel.clone());
@@ -109,14 +109,15 @@ impl CanonicalNoteTransportClient {
 
     /// Fetch notes
     ///
-    /// Downloads notes for a given tag.
-    /// Only notes labelled after the provided cursor are returned.
+    /// Downloads notes for given tags.
+    /// Returns notes labelled after the provided cursor (pagination), and an updated cursor.
     pub async fn fetch_notes(
         &self,
-        tag: NoteTag,
+        tags: &[NoteTag],
         cursor: u64,
-    ) -> Result<Vec<NoteInfo>, TransportError> {
-        let request = FetchNotesRequest { tag: tag.as_u32(), cursor };
+    ) -> Result<(Vec<NoteInfo>, u64), TransportError> {
+        let tags_int = tags.iter().map(NoteTag::as_u32).collect();
+        let request = FetchNotesRequest { tags: tags_int, cursor };
 
         let response = self
             .api()
@@ -129,19 +130,13 @@ impl CanonicalNoteTransportClient {
         // Convert protobuf notes to internal format and track the most recent received timestamp
         let mut notes = Vec::new();
 
-        for pg_note in response.notes {
-            let note = pg_note.note.ok_or_else(|| err!("Fetched note has no data".to_string()))?;
-            let header = NoteHeader::read_from_bytes(&note.header)
-                .map_err(|e| err!("Invalid note header: {e:?}"))?;
+        for pnote in response.notes {
+            let header = NoteHeader::read_from_bytes(&pnote.header)?;
 
-            notes.push(NoteInfo {
-                header,
-                details_bytes: note.details,
-                cursor: pg_note.cursor,
-            });
+            notes.push(NoteInfo { header, details_bytes: pnote.details });
         }
 
-        Ok(notes)
+        Ok((notes, response.cursor))
     }
 
     /// Stream notes
@@ -194,10 +189,10 @@ impl super::NoteTransportClient for CanonicalNoteTransportClient {
 
     async fn fetch_notes(
         &self,
-        tag: NoteTag,
+        tags: &[NoteTag],
         cursor: u64,
-    ) -> Result<Vec<NoteInfo>, TransportError> {
-        self.fetch_notes(tag, cursor).await
+    ) -> Result<(Vec<NoteInfo>, u64), TransportError> {
+        self.fetch_notes(tags, cursor).await
     }
 
     async fn stream_notes(
@@ -230,17 +225,10 @@ impl Stream for NoteStreamAdapter {
             Poll::Ready(Some(Ok(update))) => {
                 // Convert StreamNotesUpdate to Vec<NoteInfo>
                 let mut notes = Vec::new();
-                for pg_note in update.notes {
-                    if let Some(note) = pg_note.note {
-                        let header = NoteHeader::read_from_bytes(&note.header)
-                            .map_err(|e| err!("Invalid note header: {e:?}"))?;
+                for pnote in update.notes {
+                    let header = NoteHeader::read_from_bytes(&pnote.header)?;
 
-                        notes.push(NoteInfo {
-                            header,
-                            details_bytes: note.details,
-                            cursor: pg_note.cursor,
-                        });
-                    }
+                    notes.push(NoteInfo { header, details_bytes: pnote.details });
                 }
                 Poll::Ready(Some(Ok(notes)))
             },
