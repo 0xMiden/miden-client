@@ -389,10 +389,12 @@ impl NodeRpcClient for TonicRpcClient {
         &self,
         prefixes: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
 
         let mut all_nullifiers = Vec::new();
+        let mut seen_nullifiers = BTreeSet::new();
         let mut current_block_from = block_num.as_u32();
 
         // Establish RPC connection once before the loop
@@ -404,7 +406,7 @@ impl NodeRpcClient for TonicRpcClient {
                 prefix_len: 16,
                 block_range: Some(BlockRange {
                     block_from: current_block_from,
-                    block_to: None,
+                    block_to: block_to.map(|b| b.as_u32()),
                 }),
             };
 
@@ -421,11 +423,20 @@ impl NodeRpcClient for TonicRpcClient {
                 .collect::<Result<Vec<NullifierUpdate>, _>>()
                 .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-            all_nullifiers.extend(batch_nullifiers);
+            // Check for duplicates and add to results
+            for nullifier_update in batch_nullifiers {
+                if !seen_nullifiers.insert(nullifier_update.nullifier) {
+                    return Err(RpcError::InvalidResponse(
+                        "duplicate nullifier found in response".to_string(),
+                    ));
+                }
+                all_nullifiers.push(nullifier_update);
+            }
 
             // Check if we need to fetch more pages
             if let Some(page) = response.pagination_info {
-                if page.block_num < page.chain_tip {
+                let target_block = block_to.map(|b| b.as_u32()).unwrap_or(page.chain_tip);
+                if page.block_num < target_block {
                     // Ensure we're making progress to avoid infinite loops
                     if page.block_num < current_block_from {
                         return Err(RpcError::InvalidResponse(
@@ -434,7 +445,7 @@ impl NodeRpcClient for TonicRpcClient {
                     }
                     current_block_from = page.block_num + 1;
                 } else {
-                    // We've reached the chain tip, no more data to fetch
+                    // We've reached our target block, no more data to fetch
                     return Ok(all_nullifiers);
                 }
             } else {

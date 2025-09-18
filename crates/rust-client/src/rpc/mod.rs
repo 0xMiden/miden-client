@@ -167,10 +167,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
+    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
+    ///   to the network chain tip.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
@@ -200,7 +203,7 @@ pub trait NodeRpcClient: Send + Sync {
         nullifier: &Nullifier,
         block_num: BlockNumber,
     ) -> Result<Option<u32>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num).await?;
+        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
 
         Ok(nullifiers
             .iter()

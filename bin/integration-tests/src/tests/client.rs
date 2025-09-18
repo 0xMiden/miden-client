@@ -1161,7 +1161,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into())
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
         .await
         .unwrap()
         .pop()
