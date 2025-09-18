@@ -252,6 +252,17 @@ impl Store for WebStore {
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
     }
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError> {
+        self.get_transport_layer_cursor().await
+    }
+
+    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+        self.update_transport_layer_cursor(cursor).await
+    }
 }
 
 // UTILS
