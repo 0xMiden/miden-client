@@ -209,19 +209,20 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
           .build();
 
-        let transactionResult = await client.newTransaction(
+        let transactionUpdate = await client.newTransaction(
           senderAccountId,
           transactionRequest
         );
 
-        await client.submitTransaction(transactionResult);
+        await client.submitTransaction(transactionUpdate);
 
         await window.helpers.waitForTransaction(
-          transactionResult.executedTransaction().id().toHex()
+          transactionUpdate.executedTransaction().id().toHex()
         );
 
-        let createdNoteId = transactionResult
-          .createdNotes()
+        let createdNoteId = transactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -230,15 +231,15 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionResult = await client.newTransaction(
+        let consumeTransactionUpdate = await client.newTransaction(
           targetAccountId,
           consumeTransactionRequest
         );
 
-        await client.submitTransaction(consumeTransactionResult);
+        await client.submitTransaction(consumeTransactionUpdate);
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
 
         let senderAccountBalance = (await client.getAccount(senderAccountId))
@@ -312,19 +313,20 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
           .build();
 
-        let transactionResult = await client.newTransaction(
+        let transactionUpdate = await client.newTransaction(
           senderAccountId,
           transactionRequest
         );
 
-        await client.submitTransaction(transactionResult);
+        await client.submitTransaction(transactionUpdate);
 
         await window.helpers.waitForTransaction(
-          transactionResult.executedTransaction().id().toHex()
+          transactionUpdate.executedTransaction().id().toHex()
         );
 
-        let createdNoteId = transactionResult
-          .createdNotes()
+        let createdNoteId = transactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -333,15 +335,15 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionResult = await client.newTransaction(
+        let consumeTransactionUpdate = await client.newTransaction(
           targetAccountId,
           consumeTransactionRequest
         );
 
-        await client.submitTransaction(consumeTransactionResult);
+        await client.submitTransaction(consumeTransactionUpdate);
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
 
         let senderAccountBalance = (await client.getAccount(senderAccountId))

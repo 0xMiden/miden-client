@@ -18,7 +18,7 @@ import {
 // NEW_MINT_TRANSACTION TESTS
 // =======================================================================================================
 
-interface MultipleMintsTransactionResult {
+interface MultipleMintsTransactionUpdate {
   transactionIds: string[];
   createdNoteIds: string[];
   numOutputNotesCreated: number;
@@ -31,7 +31,7 @@ const multipleMintsTest = async (
   targetAccount: string,
   faucetAccount: string,
   withRemoteProver: boolean = false
-): Promise<MultipleMintsTransactionResult> => {
+): Promise<MultipleMintsTransactionUpdate> => {
   return await testingPage.evaluate(
     async ({ targetAccount, faucetAccount, withRemoteProver }) => {
       const client = window.client;
@@ -59,32 +59,38 @@ const multipleMintsTest = async (
           BigInt(1000)
         );
 
-        const mintTransactionResult = await client.newTransaction(
+        const mintTransactionUpdate = await client.newTransaction(
           faucetAccountId,
           mintTransactionRequest
         );
 
         if (withRemoteProver && window.remoteProverUrl != null) {
           await client.submitTransaction(
-            mintTransactionResult,
+            mintTransactionUpdate,
             window.remoteProverInstance
           );
         } else {
-          await client.submitTransaction(mintTransactionResult);
+          await client.submitTransaction(mintTransactionUpdate);
         }
 
         await window.helpers.waitForTransaction(
-          mintTransactionResult.executedTransaction().id().toHex()
+          mintTransactionUpdate.executedTransaction().id().toHex()
         );
 
         result.createdNoteIds.push(
-          mintTransactionResult.createdNotes().notes()[0].id().toString()
+          mintTransactionUpdate
+            .executedTransaction()
+            .outputNotes()
+            .notes()[0]
+            .id()
+            .toString()
         );
         result.transactionIds.push(
-          mintTransactionResult.executedTransaction().id().toHex()
+          mintTransactionUpdate.executedTransaction().id().toHex()
         );
-        result.numOutputNotesCreated += mintTransactionResult
-          .createdNotes()
+        result.numOutputNotesCreated += mintTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .numNotes();
       }
 
@@ -93,22 +99,22 @@ const multipleMintsTest = async (
         const consumeTransactionRequest = client.newConsumeTransactionRequest([
           result.createdNoteIds[i],
         ]);
-        const consumeTransactionResult = await client.newTransaction(
+        const consumeTransactionUpdate = await client.newTransaction(
           targetAccountId,
           consumeTransactionRequest
         );
 
         if (withRemoteProver && window.remoteProverUrl != null) {
           await client.submitTransaction(
-            consumeTransactionResult,
+            consumeTransactionUpdate,
             window.remoteProverInstance
           );
         } else {
-          await client.submitTransaction(consumeTransactionResult);
+          await client.submitTransaction(consumeTransactionUpdate);
         }
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
       }
 
@@ -192,7 +198,7 @@ test.describe("consume transaction tests", () => {
 // NEW_SEND_TRANSACTION TESTS
 // =======================================================================================================
 
-interface SendTransactionResult {
+interface SendTransactionUpdate {
   senderAccountBalance: string;
   changedTargetBalance: string;
 }
@@ -202,7 +208,7 @@ export const sendTransactionTest = async (
   senderAccount: string,
   targetAccount: string,
   faucetAccount: string
-): Promise<SendTransactionResult> => {
+): Promise<SendTransactionUpdate> => {
   return await testingPage.evaluate(
     async ({ senderAccount, targetAccount, faucetAccount }) => {
       const client = window.client;
@@ -548,22 +554,22 @@ export const customTransaction = async (
         .build();
 
       // Execute and Submit Transaction
-      let transactionResult = await client.newTransaction(
+      let transactionUpdate = await client.newTransaction(
         faucetAccount.id(),
         transactionRequest
       );
 
       if (withRemoteProver && window.remoteProverUrl != null) {
         await client.submitTransaction(
-          transactionResult,
+          transactionUpdate,
           window.remoteProverInstance
         );
       } else {
-        await client.submitTransaction(transactionResult);
+        await client.submitTransaction(transactionUpdate);
       }
 
       await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
+        transactionUpdate.executedTransaction().id().toHex()
       );
 
       // Just like in the miden test, you can modify this script to get the execution to fail
@@ -596,22 +602,22 @@ export const customTransaction = async (
         .build();
 
       // Execute and Submit Transaction
-      let transactionResult2 = await client.newTransaction(
+      let TransactionUpdate2 = await client.newTransaction(
         walletAccount.id(),
         transactionRequest2
       );
 
       if (withRemoteProver && window.remoteProverUrl != null) {
         await client.submitTransaction(
-          transactionResult2,
+          TransactionUpdate2,
           window.remoteProverInstance
         );
       } else {
-        await client.submitTransaction(transactionResult2);
+        await client.submitTransaction(TransactionUpdate2);
       }
 
       await window.helpers.waitForTransaction(
-        transactionResult2.executedTransaction().id().toHex()
+        TransactionUpdate2.executedTransaction().id().toHex()
       );
     },
     {
@@ -697,15 +703,15 @@ const customTxWithMultipleNotes = async (
         )
         .build();
 
-      let transactionResult = await client.newTransaction(
+      let transactionUpdate = await client.newTransaction(
         senderAccountId,
         transactionRequest
       );
 
-      await client.submitTransaction(transactionResult);
+      await client.submitTransaction(transactionUpdate);
 
       await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
+        transactionUpdate.executedTransaction().id().toHex()
       );
     },
     {
@@ -885,11 +891,11 @@ export const customAccountComponent = async (
       .withCustomScript(txScript)
       .build();
 
-    let txResult = await client.newTransaction(
+    let txUpdate = await client.newTransaction(
       accountBuilderResult.account.id(),
       txIncrementRequest
     );
-    await client.submitTransaction(txResult);
+    await client.submitTransaction(txUpdate);
   });
 };
 
@@ -904,7 +910,7 @@ test.describe("custom account component tests", () => {
 // DISCARDED TRANSACTIONS TESTS
 // ================================================================================================
 
-interface DiscardedTransactionResult {
+interface DiscardedTransactionUpdate {
   discardedTransactions: TransactionRecord[];
   commitmentBeforeTx: string;
   commitmentAfterTx: string;
@@ -913,7 +919,7 @@ interface DiscardedTransactionResult {
 
 export const discardedTransaction = async (
   testingPage: Page
-): Promise<DiscardedTransactionResult> => {
+): Promise<DiscardedTransactionUpdate> => {
   return await testingPage.evaluate(async () => {
     const client = window.client;
 
@@ -940,26 +946,29 @@ export const discardedTransaction = async (
       window.NoteType.Private,
       BigInt(1000)
     );
-    let mintTransactionResult = await client.newTransaction(
+    let mintTransactionUpdate = await client.newTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
-    await client.submitTransaction(mintTransactionResult);
-    let createdNotes = mintTransactionResult.createdNotes().notes();
+    await client.submitTransaction(mintTransactionUpdate);
+    let createdNotes = mintTransactionUpdate
+      .executedTransaction()
+      .outputNotes()
+      .notes();
     let createdNoteIds = createdNotes.map((note: Note) => note.id().toString());
     await window.helpers.waitForTransaction(
-      mintTransactionResult.executedTransaction().id().toHex()
+      mintTransactionUpdate.executedTransaction().id().toHex()
     );
 
     const senderConsumeTransactionRequest =
       client.newConsumeTransactionRequest(createdNoteIds);
-    let senderConsumeTransactionResult = await client.newTransaction(
+    let senderConsumeTransactionUpdate = await client.newTransaction(
       senderAccount.id(),
       senderConsumeTransactionRequest
     );
-    await client.submitTransaction(senderConsumeTransactionResult);
+    await client.submitTransaction(senderConsumeTransactionUpdate);
     await window.helpers.waitForTransaction(
-      senderConsumeTransactionResult.executedTransaction().id().toHex()
+      senderConsumeTransactionUpdate.executedTransaction().id().toHex()
     );
 
     let sendTransactionRequest = client.newSendTransactionRequest(
@@ -971,18 +980,21 @@ export const discardedTransaction = async (
       1,
       null
     );
-    let sendTransactionResult = await client.newTransaction(
+    let sendTransactionUpdate = await client.newTransaction(
       senderAccount.id(),
       sendTransactionRequest
     );
-    await client.submitTransaction(sendTransactionResult);
-    let sendCreatedNotes = sendTransactionResult.createdNotes().notes();
+    await client.submitTransaction(sendTransactionUpdate);
+    let sendCreatedNotes = sendTransactionUpdate
+      .executedTransaction()
+      .outputNotes()
+      .notes();
     let sendCreatedNoteIds = sendCreatedNotes.map((note: Note) =>
       note.id().toString()
     );
 
     await window.helpers.waitForTransaction(
-      sendTransactionResult.executedTransaction().id().toHex()
+      sendTransactionUpdate.executedTransaction().id().toHex()
     );
 
     let noteIdAndArgs = new window.NoteIdAndArgs(
@@ -1019,12 +1031,12 @@ export const discardedTransaction = async (
     }
 
     // Target tries consuming but the transaction will not be submitted
-    let targetTxResult = await client.newTransaction(
+    let targetTxUpdate = await client.newTransaction(
       targetAccount.id(),
       consumeTransactionRequest
     );
 
-    await client.testingApplyTransaction(targetTxResult);
+    await client.applyTransaction(targetTxUpdate);
     // Get the account state after the transaction is applied
     const accountStateAfterTx = (await client.getAccount(
       targetAccount.id()
@@ -1185,13 +1197,13 @@ export const counterAccountComponent = async (
       .withCustomScript(txScript)
       .build();
 
-    let txResult = await client.newTransaction(
+    let txUpdate = await client.newTransaction(
       accountBuilderResult.account.id(),
       txIncrementRequest
     );
-    await client.submitTransaction(txResult);
+    await client.submitTransaction(txUpdate);
     await window.helpers.waitForTransaction(
-      txResult.executedTransaction().id().toHex()
+      txUpdate.executedTransaction().id().toHex()
     );
 
     // Create transaction with network note
@@ -1231,14 +1243,14 @@ export const counterAccountComponent = async (
       )
       .build();
 
-    let transactionResult = await client.newTransaction(
+    let transactionUpdate = await client.newTransaction(
       nativeAccount.id(),
       transactionRequest
     );
 
-    await client.submitTransaction(transactionResult);
+    await client.submitTransaction(transactionUpdate);
     await window.helpers.waitForTransaction(
-      transactionResult.executedTransaction().id().toHex()
+      transactionUpdate.executedTransaction().id().toHex()
     );
 
     // Wait for network account to update

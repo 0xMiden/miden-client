@@ -136,7 +136,7 @@ const consumeTransactionResult = await webClient.newTransaction(
   consumeTransactionRequest
 );
 
-// Submit the transaction to the node
+// Submit the transaction to the node and store it locally
 await webClient.submitTransaction(consumeTransactionResult);
 
 // Need to sync state again (in a loop) until the node verifies the transaction

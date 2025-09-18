@@ -42,6 +42,7 @@ use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
+use crate::note::NoteUpdateTracker;
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
@@ -104,7 +105,7 @@ pub trait Store: Send + Sync {
     ) -> Result<Vec<TransactionRecord>, StoreError>;
 
     /// Applies a transaction, atomically updating the current state based on the
-    /// [`TransactionStoreUpdate`].
+    /// [`TransactionStoreUpdate`] and [`NoteUpdateTracker`].
     ///
     /// An update involves:
     /// - Updating the stored account which is being modified by the transaction.
@@ -113,7 +114,11 @@ pub trait Store: Send + Sync {
     /// - Updating the input notes that are being processed by the transaction.
     /// - Inserting the new tracked tags into the store.
     /// - Inserting the transaction into the store to track.
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError>;
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError>;
 
     // NOTES
     // --------------------------------------------------------------------------------------------

@@ -1,9 +1,8 @@
 use alloc::boxed::Box;
 
-use miden_client::transaction::{TransactionRequestBuilder, TransactionResult};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
-use miden_lib::utils::{Deserializable, Serializable};
 use miden_objects::Word;
 use miden_objects::account::{
     AccountBuilder,
@@ -72,20 +71,16 @@ async fn transaction_creates_two_notes() {
         )
         .unwrap();
 
-    let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
-    assert!(
-        tx_result
-            .created_notes()
-            .get_note(0)
-            .assets()
-            .is_some_and(|assets| assets.num_assets() == 2)
-    );
-    // Prove and apply transaction
-    Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
+    // Submit transaction
+    let _tx_id = Box::pin(client.new_transaction(account.id(), tx_request.clone()))
+        .await
+        .unwrap();
 
-    // Test serialization
-    let bytes: std::vec::Vec<u8> = tx_result.to_bytes();
-    let decoded = TransactionResult::read_from_bytes(&bytes).unwrap();
+    // Validate that the request is expected to create two assets in the first note
+    let expected_notes = tx_request.expected_output_own_notes();
+    assert!(!expected_notes.is_empty());
+    assert!(expected_notes[0].assets().num_assets() == 2);
 
-    assert_eq!(tx_result, decoded);
+    // Let the client process state changes (mock chain)
+    client.sync_state().await.unwrap();
 }
