@@ -126,7 +126,7 @@
 
 ##### recipients
 
-[`RecipientArray`](RecipientArray.md)
+[`NoteRecipientArray`](NoteRecipientArray.md)
 
 #### Returns
 
@@ -158,7 +158,7 @@
 
 ##### notes
 
-[`OutputNotesArray`](OutputNotesArray.md)
+[`OutputNoteArray`](OutputNoteArray.md)
 
 #### Returns
 

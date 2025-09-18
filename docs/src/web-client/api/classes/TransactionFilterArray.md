@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / TransactionFilterArray
 
-# Class: OutputNotesArray
+# Class: TransactionFilterArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new TransactionFilterArray**(`elements`?): `TransactionFilterArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`TransactionFilter`](TransactionFilter.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`TransactionFilterArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`TransactionFilter`](TransactionFilter.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`TransactionFilter`](TransactionFilter.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`TransactionFilter`](TransactionFilter.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`TransactionFilter`](TransactionFilter.md)
 
 #### Returns
 

@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / SignatureArray
 
-# Class: OutputNotesArray
+# Class: SignatureArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new SignatureArray**(`elements`?): `SignatureArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`Signature`](Signature.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`SignatureArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`Signature`](Signature.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`Signature`](Signature.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`Signature`](Signature.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`Signature`](Signature.md)
 
 #### Returns
 

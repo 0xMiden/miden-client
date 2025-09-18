@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / NoteHeaderArray
 
-# Class: OutputNotesArray
+# Class: NoteHeaderArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new NoteHeaderArray**(`elements`?): `NoteHeaderArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`NoteHeader`](NoteHeader.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`NoteHeaderArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`NoteHeader`](NoteHeader.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`NoteHeader`](NoteHeader.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`NoteHeader`](NoteHeader.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`NoteHeader`](NoteHeader.md)
 
 #### Returns
 

@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / InputNoteRecordArray
 
-# Class: OutputNotesArray
+# Class: InputNoteRecordArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new InputNoteRecordArray**(`elements`?): `InputNoteRecordArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`InputNoteRecord`](InputNoteRecord.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`InputNoteRecordArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`InputNoteRecord`](InputNoteRecord.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`InputNoteRecord`](InputNoteRecord.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`InputNoteRecord`](InputNoteRecord.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`InputNoteRecord`](InputNoteRecord.md)
 
 #### Returns
 

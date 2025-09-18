@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / AdviceInputsArray
 
-# Class: OutputNotesArray
+# Class: AdviceInputsArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new AdviceInputsArray**(`elements`?): `AdviceInputsArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`AdviceInputs`](AdviceInputs.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`AdviceInputsArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`AdviceInputs`](AdviceInputs.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`AdviceInputs`](AdviceInputs.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`AdviceInputs`](AdviceInputs.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`AdviceInputs`](AdviceInputs.md)
 
 #### Returns
 

@@ -2,25 +2,25 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../README.md) / AccountStorageRequirementsArray
 
-# Class: OutputNotesArray
+# Class: AccountStorageRequirementsArray
 
 ## Constructors
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new AccountStorageRequirementsArray**(`elements`?): `AccountStorageRequirementsArray`
 
 #### Parameters
 
 ##### elements?
 
-[`OutputNotes`](OutputNotes.md)[]
+[`AccountStorageRequirements`](AccountStorageRequirements.md)[]
 
 #### Returns
 
-`OutputNotesArray`
+`AccountStorageRequirementsArray`
 
 ## Methods
 
@@ -36,7 +36,7 @@
 
 ### get()
 
-> **get**(`index`): [`OutputNotes`](OutputNotes.md)
+> **get**(`index`): [`AccountStorageRequirements`](AccountStorageRequirements.md)
 
 Get element at index, will always return a clone to avoid aliasing issues.
 
@@ -48,7 +48,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`AccountStorageRequirements`](AccountStorageRequirements.md)
 
 ***
 
@@ -70,7 +70,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### element
 
-[`OutputNotes`](OutputNotes.md)
+[`AccountStorageRequirements`](AccountStorageRequirements.md)
 
 #### Returns
 
@@ -90,7 +90,7 @@ Get element at index, will always return a clone to avoid aliasing issues.
 
 ##### elem
 
-[`OutputNotes`](OutputNotes.md)
+[`AccountStorageRequirements`](AccountStorageRequirements.md)
 
 #### Returns
 

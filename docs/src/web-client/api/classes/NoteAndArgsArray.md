@@ -10,11 +10,11 @@
 
 ### Constructor
 
-> **new NoteAndArgsArray**(`note_and_args`?): `NoteAndArgsArray`
+> **new NoteAndArgsArray**(`elements`?): `NoteAndArgsArray`
 
 #### Parameters
 
-##### note\_and\_args?
+##### elements?
 
 [`NoteAndArgs`](NoteAndArgs.md)[]
 
@@ -34,16 +34,88 @@
 
 ***
 
-### push()
+### get()
 
-> **push**(`note_and_args`): `void`
+> **get**(`index`): [`NoteAndArgs`](NoteAndArgs.md)
+
+Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Parameters
 
-##### note\_and\_args
+##### index
+
+`number`
+
+#### Returns
+
+[`NoteAndArgs`](NoteAndArgs.md)
+
+***
+
+### length()
+
+> **length**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
+### push()
+
+> **push**(`element`): `void`
+
+#### Parameters
+
+##### element
 
 [`NoteAndArgs`](NoteAndArgs.md)
 
 #### Returns
 
 `void`
+
+***
+
+### replaceAt()
+
+> **replaceAt**(`index`, `elem`): `void`
+
+#### Parameters
+
+##### index
+
+`number`
+
+##### elem
+
+[`NoteAndArgs`](NoteAndArgs.md)
+
+#### Returns
+
+`void`
+
+***
+
+### toJSON()
+
+> **toJSON**(): `Object`
+
+* Return copy of self without private attributes.
+
+#### Returns
+
+`Object`
+
+***
+
+### toString()
+
+> **toString**(): `string`
+
+Return stringified version of self.
+
+#### Returns
+
+`string`
