@@ -3,6 +3,7 @@ const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 
 const {
+  ScriptBuilder,
   Account,
   AccountBuilder,
   AccountComponent,
@@ -94,6 +95,7 @@ export {
   Address,
   AddressInterface,
   AdviceMap,
+  ScriptBuilder,
   Assembler,
   AssemblerUtils,
   AuthSecretKey,
