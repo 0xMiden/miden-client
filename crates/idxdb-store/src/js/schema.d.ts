@@ -77,6 +77,10 @@ export interface IStateSync {
     id: number;
     blockNum: string;
 }
+export interface ITransportLayerCursor {
+    id: number;
+    cursor: number;
+}
 export interface IBlockHeader {
     blockNum: string;
     header: Uint8Array;
@@ -114,6 +118,7 @@ declare const db: Dexie & {
     outputNotes: Dexie.Table<IOutputNote, string>;
     notesScripts: Dexie.Table<INotesScript, string>;
     stateSync: Dexie.Table<IStateSync, number>;
+    transportLayerCursor: Dexie.Table<ITransportLayerCursor, number>;
     blockHeaders: Dexie.Table<IBlockHeader, string>;
     partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
     tags: Dexie.Table<ITag, number>;
@@ -132,9 +137,10 @@ declare const inputNotes: import("dexie").Table<IInputNote, string, IInputNote>;
 declare const outputNotes: import("dexie").Table<IOutputNote, string, IOutputNote>;
 declare const notesScripts: import("dexie").Table<INotesScript, string, INotesScript>;
 declare const stateSync: import("dexie").Table<IStateSync, number, IStateSync>;
+declare const transportLayerCursor: import("dexie").Table<ITransportLayerCursor, number, ITransportLayerCursor>;
 declare const blockHeaders: import("dexie").Table<IBlockHeader, string, IBlockHeader>;
 declare const partialBlockchainNodes: import("dexie").Table<IPartialBlockchainNode, string, IPartialBlockchainNode>;
 declare const tags: import("dexie").Table<ITag, number, ITag>;
 declare const foreignAccountCode: import("dexie").Table<IForeignAccountCode, string, IForeignAccountCode>;
 declare const settings: import("dexie").Table<ISetting, string, ISetting>;
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, transportLayerCursor, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };

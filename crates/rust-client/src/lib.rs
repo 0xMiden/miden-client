@@ -58,6 +58,7 @@
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::rpc::{Endpoint, TonicRpcClient};
 //! use miden_client::store::Store;
+//! use miden_client::transport::grpc::CanonicalNoteTransportClient;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
@@ -85,6 +86,10 @@
 //! // 256 is simply an example value.
 //! let max_block_number_delta = Some(256);
 //!
+//! // Optionally, connect to the transport layer to exchange private notes.
+//! let transport_endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57292));
+//! let transport_api = CanonicalNoteTransportClient::connect(&transport_endpoint, 10_000).await?;
+//!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
@@ -101,6 +106,7 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
+//!     Some(Arc::new(transport_api)),
 //! )
 //! .await
 //! .unwrap();
