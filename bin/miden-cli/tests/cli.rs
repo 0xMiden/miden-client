@@ -758,6 +758,7 @@ async fn create_rust_client_with_store_path(
             )?,
             None,
             None,
+            None,
         )
         .await?,
         keystore,

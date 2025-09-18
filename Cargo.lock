@@ -2153,6 +2153,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "futures",
  "getrandom 0.3.3",
  "hex",
  "miden-client",
@@ -2160,6 +2161,7 @@ dependencies = [
  "miden-lib",
  "miden-node-proto-build",
  "miden-objects",
+ "miden-private-transport-proto",
  "miden-remote-prover-client",
  "miden-testing",
  "miden-tx",
@@ -2172,7 +2174,9 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
+ "tonic-health",
  "tonic-web-wasm-client",
+ "tower",
  "tracing",
  "uuid",
  "web-sys",
@@ -2602,6 +2606,17 @@ dependencies = [
  "thiserror 2.0.16",
  "toml 0.9.5",
  "winter-rand-utils",
+]
+
+[[package]]
+name = "miden-private-transport-proto"
+version = "0.1.0"
+source = "git+https://github.com/0xMiden/miden-private-transport#3b9a4e4a38bbe95e4eeda71fb95d5ba03300182d"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-build",
 ]
 
 [[package]]

@@ -62,13 +62,14 @@ use core::cmp::max;
 
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{NoteId, NoteTag};
+use miden_objects::note::NoteId;
 use miden_objects::transaction::{PartialBlockchain, TransactionId};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use crate::note::NoteScreener;
 use crate::store::{NoteFilter, TransactionFilter};
+use crate::transport::TransportLayer;
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -125,6 +126,11 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
+        let transport_layer = self
+            .transport_api
+            .as_ref()
+            .map(|transport_api| TransportLayer::new(transport_api.clone()));
+
         // Get current state of the client
         let accounts = self
             .store
@@ -134,7 +140,7 @@ where
             .map(|(acc_header, _)| acc_header)
             .collect();
 
-        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
+        let note_tags: BTreeSet<_> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
         let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
@@ -165,12 +171,22 @@ where
             .sync_state(
                 PartialBlockchain::new(current_partial_mmr, block_headers)?,
                 accounts,
-                note_tags,
+                note_tags.clone(),
                 unspent_input_notes,
                 unspent_output_notes,
                 uncommitted_transactions,
             )
             .await?;
+
+        // Transport layer update
+        // TODO We can run both sync_state, fetch_notes futures in parallel
+        let transport_layer_update = if let Some(mut transport_layer) = transport_layer {
+            let cursor = self.store.get_transport_layer_cursor().await?;
+            let update = transport_layer.fetch_notes(cursor, note_tags).await?;
+            Some(update)
+        } else {
+            None
+        };
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
 
@@ -179,6 +195,13 @@ where
             .apply_state_sync(state_sync_update)
             .await
             .map_err(ClientError::StoreError)?;
+
+        if let Some(transport_layer_update) = transport_layer_update {
+            self.store
+                .apply_transport_layer_update(transport_layer_update)
+                .await
+                .map_err(ClientError::StoreError)?;
+        }
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;

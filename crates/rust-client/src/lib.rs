@@ -58,6 +58,7 @@
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::rpc::{Endpoint, TonicRpcClient};
 //! use miden_client::store::Store;
+//! use miden_client::transport::grpc::CanonicalNoteTransportClient;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
@@ -85,6 +86,10 @@
 //! // 256 is simply an example value.
 //! let max_block_number_delta = Some(256);
 //!
+//! // Optionally, connect to the transport layer to exchange private notes.
+//! let transport_endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57292));
+//! let transport_api = CanonicalNoteTransportClient::connect(&transport_endpoint, 10_000).await?;
+//!
 //! // Instantiate the client using a Tonic RPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
@@ -101,6 +106,7 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
+//!     Some(Arc::new(transport_api)),
 //! )
 //! .await
 //! .unwrap();
@@ -128,6 +134,7 @@ pub mod rpc;
 pub mod store;
 pub mod sync;
 pub mod transaction;
+pub mod transport;
 pub mod utils;
 
 #[cfg(feature = "std")]
@@ -242,6 +249,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
+use transport::NoteTransportClient;
 
 // MIDEN CLIENT
 // ================================================================================================
@@ -275,6 +283,9 @@ pub struct Client<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
+    /// the Miden Transport Layer.
+    transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 /// Construction and access methods.
@@ -289,8 +300,8 @@ where
     ///
     /// ## Arguments
     ///
-    /// - `api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect to
-    ///   the Miden node.
+    /// - `rpc_api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect
+    ///   to the Miden node.
     /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
     ///   serial numbers, etc. This can be any RNG that implements the [`FeltRng`] trait.
     /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
@@ -303,6 +314,8 @@ where
     ///   pending transactions.
     /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
     ///   behind the network for transactions and account proofs to be considered valid.
+    /// - `transport_api`: An instance of [`NoteTransportClient`] which provides a way for the
+    ///   client to connect to the Miden Transport Layer.
     ///
     /// # Errors
     ///
@@ -315,6 +328,7 @@ where
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
+        transport_api: Option<Arc<dyn NoteTransportClient>>,
     ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
@@ -332,6 +346,7 @@ where
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
+            transport_api,
         })
     }
 

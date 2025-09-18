@@ -41,6 +41,7 @@ pub mod import;
 pub mod note;
 pub mod sync;
 pub mod transaction;
+pub mod transport;
 
 #[wasm_bindgen(module = "/src/web_store/js/utils.js")]
 extern "C" {
@@ -249,6 +250,17 @@ impl Store for WebStore {
         account_id: AccountId,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
+    }
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError> {
+        self.get_transport_layer_cursor().await
+    }
+
+    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+        self.update_transport_layer_cursor(cursor).await
     }
 }
 

@@ -44,6 +44,7 @@ use miden_objects::{AccountError, Word};
 
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
+use crate::transport::TransportLayerUpdate;
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -315,6 +316,38 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets the transport layer cursor.
+    ///
+    /// This is used to reduce the number of fetched notes from the transport layer.
+    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError>;
+
+    /// Updates the transport layer cursor.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the transport layer.
+    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError>;
+
+    /// Applies a transport layer update
+    ///
+    /// An update involves:
+    /// - Insert fetched notes;
+    /// - Update pagination cursor used in note fetching.
+    async fn apply_transport_layer_update(
+        &self,
+        transport_layer_update: TransportLayerUpdate,
+    ) -> Result<(), StoreError> {
+        self.update_transport_layer_cursor(transport_layer_update.cursor).await?;
+        let input_notes = transport_layer_update
+            .note_updates
+            .into_iter()
+            .map(InputNoteRecord::from)
+            .collect::<Vec<_>>();
+        self.upsert_input_notes(&input_notes).await?;
+        Ok(())
+    }
 
     // PARTIAL MMR
     // --------------------------------------------------------------------------------------------
