@@ -3,7 +3,6 @@ pub mod errors;
 pub mod grpc;
 
 use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -43,20 +42,27 @@ impl<AUTH> Client<AUTH> {
     /// Fetch notes for tracked note tags
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
         if let Some(api) = self.transport_api.as_mut() {
-            let note_tag_records = self.store.get_note_tags().await?;
-            // Unique tags, cursors
-            let note_tags_pg = note_tag_records
-                .iter()
-                .map(|record| (record.tag, record.transport_layer_cursor.unwrap_or(0)))
-                .collect::<BTreeMap<_, _>>()
-                .into_iter()
-                .collect::<Vec<_>>();
             // Unique tags
-            let note_tags: BTreeSet<_> = note_tags_pg.iter().map(|&(tag, _)| tag).collect();
-            // Get largest cursor. TODO: move to single-cursor approach
-            let cursor = note_tags_pg.iter().map(|&(_, cursor)| cursor).max().unwrap_or(0);
+            let note_tags = self.store.get_unique_note_tags().await?;
+            // Get global cursor
+            let cursor = self.store.get_transport_layer_cursor().await?;
 
-            let update = TransportLayer::new(api.clone()).fetch_notes(cursor, &note_tags).await?;
+            let update = TransportLayer::new(api.clone()).fetch_notes(cursor, note_tags).await?;
+
+            self.store.apply_transport_layer_update(update).await?;
+        }
+        Ok(())
+    }
+
+    /// Fetches all notes for given tags
+    pub async fn fetch_all_private_notes<I>(&mut self, tags: I) -> Result<(), ClientError>
+    where
+        I: IntoIterator<Item = NoteTag>,
+    {
+        if let Some(api) = self.transport_api.as_mut() {
+            let update = TransportLayer::new(api.clone())
+                .fetch_notes(0, tags.into_iter().collect::<Vec<_>>())
+                .await?;
 
             self.store.apply_transport_layer_update(update).await?;
         }
@@ -84,31 +90,28 @@ impl TransportLayer {
 
     /// Fetch notes for provided note tags with pagination
     ///
-    /// Only notes after the pairing cursor for each tag are fetched.
-    pub(crate) async fn fetch_notes<'t, I>(
+    /// Only notes after the pairing cursor are requested.
+    pub(crate) async fn fetch_notes<I>(
         &mut self,
         cursor: u64,
         tags: I,
     ) -> Result<TransportLayerUpdate, ClientError>
     where
-        I: IntoIterator<Item = &'t NoteTag>,
+        I: IntoIterator<Item = NoteTag>,
     {
         let mut note_updates = vec![];
-        let mut latest_cursor = cursor;
-        // Fetch notes for all tracked tags
-        for &tag in tags {
-            let note_infos = self.api.fetch_notes(tag, cursor).await?;
-            for note_info in &note_infos {
-                // e2ee impl hint:
-                // for key in self.store.decryption_keys() try
-                // key.decrypt(details_bytes_encrypted)
-                let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-                note_updates.push(note);
-                latest_cursor = latest_cursor.max(note_info.cursor);
-            }
+        // Fetch notes
+        let (note_infos, rcursor) =
+            self.api.fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor).await?;
+        for note_info in &note_infos {
+            // e2ee impl hint:
+            // for key in self.store.decryption_keys() try
+            // key.decrypt(details_bytes_encrypted)
+            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
+            note_updates.push(note);
         }
 
-        let update = TransportLayerUpdate { note_updates, cursor: latest_cursor };
+        let update = TransportLayerUpdate { note_updates, cursor: rcursor };
 
         Ok(update)
     }
@@ -121,11 +124,15 @@ pub trait NoteTransportClient: Send + Sync {
     /// Send a note with optionally encrypted details
     async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError>;
 
-    /// Fetch notes for a given tag
+    /// Fetch notes for given tags
     ///
-    /// Only notes after the given cursor will be fetched.
-    async fn fetch_notes(&self, tag: NoteTag, cursor: u64)
-    -> Result<Vec<NoteInfo>, TransportError>;
+    /// Downloads notes for given tags.
+    /// Returns notes labelled after the provided cursor (pagination), and an updated cursor.
+    async fn fetch_notes(
+        &self,
+        tag: &[NoteTag],
+        cursor: u64,
+    ) -> Result<(Vec<NoteInfo>, u64), TransportError>;
 
     /// Stream notes for a given tag
     async fn stream_notes(
@@ -145,8 +152,6 @@ pub struct NoteInfo {
     pub header: NoteHeader,
     /// Note details, can be encrypted
     pub details_bytes: Vec<u8>,
-    /// Note transport layer cursor
-    pub cursor: u64,
 }
 
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {

@@ -32,11 +32,7 @@ impl<AUTH> Client<AUTH> {
     pub async fn add_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
         match self
             .store
-            .add_note_tag(NoteTagRecord {
-                tag,
-                source: NoteTagSource::User,
-                transport_layer_cursor: None,
-            })
+            .add_note_tag(NoteTagRecord { tag, source: NoteTagSource::User })
             .await
             .map_err(Into::into)
         {
@@ -53,11 +49,7 @@ impl<AUTH> Client<AUTH> {
     pub async fn remove_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
         if self
             .store
-            .remove_note_tag(NoteTagRecord {
-                tag,
-                source: NoteTagSource::User,
-                transport_layer_cursor: None,
-            })
+            .remove_note_tag(NoteTagRecord { tag, source: NoteTagSource::User })
             .await?
             == 0
         {
@@ -73,7 +65,6 @@ impl<AUTH> Client<AUTH> {
 pub struct NoteTagRecord {
     pub tag: NoteTag,
     pub source: NoteTagSource,
-    pub transport_layer_cursor: Option<u64>,
 }
 
 /// Represents the source of the tag. This is used to differentiate between tags that are added by
@@ -93,7 +84,6 @@ impl NoteTagRecord {
         Self {
             tag,
             source: NoteTagSource::Note(note_id),
-            transport_layer_cursor: None,
         }
     }
 
@@ -101,7 +91,6 @@ impl NoteTagRecord {
         Self {
             tag,
             source: NoteTagSource::Account(account_id),
-            transport_layer_cursor: None,
         }
     }
 }
