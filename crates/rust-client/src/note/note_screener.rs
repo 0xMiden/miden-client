@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
+use async_trait::async_trait;
 use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
@@ -11,7 +12,6 @@ use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
-use tonic::async_trait;
 
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
