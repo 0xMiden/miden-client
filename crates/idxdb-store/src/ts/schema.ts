@@ -173,7 +173,7 @@ db.version(1).stores({
     "storageRoot",
     "vaultRoot"
   ),
-  [Table.Addresses]: indexes("id", "address"),
+  [Table.Addresses]: indexes("id"),
   [Table.Transactions]: indexes("id"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),

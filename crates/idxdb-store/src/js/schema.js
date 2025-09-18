@@ -39,7 +39,7 @@ db.version(1).stores({
     [Table.AccountVaults]: indexes("root"),
     [Table.AccountAuth]: indexes("pubKey"),
     [Table.Accounts]: indexes("&accountCommitment", "id", "codeRoot", "storageRoot", "vaultRoot"),
-    [Table.Addresses]: indexes("id", "address"),
+    [Table.Addresses]: indexes("id"),
     [Table.Transactions]: indexes("id"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
     [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),

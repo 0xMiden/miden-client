@@ -2052,9 +2052,9 @@ async fn account_addresses_basic_wallet() {
     client.add_account(&account, Some(Word::default()), false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let undspecified_default_address =
+    let unspecified_default_address =
         AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
-    assert!(retrieved_acc.addresses().contains(&undspecified_default_address));
+    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
     let basic_wallet_address = AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
     assert!(retrieved_acc.addresses().contains(&basic_wallet_address));
@@ -2070,9 +2070,9 @@ async fn account_addresses_non_basic_wallet() {
     client.add_account(&account, Some(Word::default()), false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let undspecified_default_address =
+    let unspecified_default_address =
         AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
-    assert!(retrieved_acc.addresses().contains(&undspecified_default_address));
+    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
     let basic_wallet_address = AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));

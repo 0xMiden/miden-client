@@ -1025,7 +1025,7 @@ fn query_account_addresses(
         .into_store_error()?
         .map(|result| {
             let serialized_address = result.into_store_error()?;
-            let address = AccountIdAddress::try_from(serialized_address).unwrap(); // TODO: handle unwrap
+            let address = AccountIdAddress::try_from(serialized_address)?;
             Ok(address)
         })
         .collect::<Result<Vec<AccountIdAddress>, StoreError>>()
