@@ -435,7 +435,7 @@ impl NodeRpcClient for TonicRpcClient {
 
             // Check if we need to fetch more pages
             if let Some(page) = response.pagination_info {
-                let target_block = block_to.map(|b| b.as_u32()).unwrap_or(page.chain_tip);
+                let target_block = block_to.map_or(page.chain_tip, |b| b.as_u32());
                 if page.block_num < target_block {
                     // Ensure we're making progress to avoid infinite loops
                     if page.block_num < current_block_from {

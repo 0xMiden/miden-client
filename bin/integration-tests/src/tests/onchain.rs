@@ -171,7 +171,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let (_, status) = client_1
         .get_account_header_by_id(faucet_account_id)
         .await?
-        .with_context(|| format!("Faucet account {} not found", faucet_account_id))?;
+        .with_context(|| format!("Faucet account {faucet_account_id} not found"))?;
     let faucet_seed = status.seed().cloned();
 
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;

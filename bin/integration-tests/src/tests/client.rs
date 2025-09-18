@@ -947,7 +947,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .with_context(|| {
-            format!("Transaction with id {} not found in discarded transactions", tx_id)
+            format!("Transaction with id {tx_id} not found in discarded transactions")
         })?;
     assert!(matches!(
         tx_record.status,
