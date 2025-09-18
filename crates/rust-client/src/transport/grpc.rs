@@ -72,7 +72,7 @@ impl CanonicalNoteTransportClient {
 
     /// gRPC client (WASM) constructor
     #[cfg(feature = "web-tonic")]
-    pub async fn connect(endpoint: &Endpoint, _timeout_ms: u64) -> Result<Self, TransportError> {
+    pub fn connect(endpoint: &Endpoint, _timeout_ms: u64) -> Result<Self, TransportError> {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint.to_string());
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenPrivateTransportClient::new(wasm_client);

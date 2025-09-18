@@ -27,6 +27,7 @@ enum Table {
   OutputNotes = "outputNotes",
   NotesScripts = "notesScripts",
   StateSync = "stateSync",
+  TransportLayerCursor = "transportLayerCursor",
   BlockHeaders = "blockHeaders",
   PartialBlockchainNodes = "partialBlockchainNodes",
   Tags = "tags",
@@ -112,6 +113,11 @@ export interface IStateSync {
   blockNum: string;
 }
 
+export interface ITransportLayerCursor {
+  id: number;
+  cursor: number;
+}
+
 export interface IBlockHeader {
   blockNum: string;
   header: Uint8Array;
@@ -148,6 +154,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
+  transportLayerCursor: Dexie.Table<ITransportLayerCursor, number>;
   blockHeaders: Dexie.Table<IBlockHeader, string>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
@@ -177,6 +184,7 @@ db.version(1).stores({
   ),
   [Table.NotesScripts]: indexes("scriptRoot"),
   [Table.StateSync]: indexes("id"),
+  [Table.TransportLayerCursor]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
   [Table.PartialBlockchainNodes]: indexes("id"),
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
@@ -207,6 +215,9 @@ const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
 const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
 const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
 const stateSync = db.table<IStateSync, number>(Table.StateSync);
+const transportLayerCursor = db.table<ITransportLayerCursor, number>(
+  Table.TransportLayerCursor
+);
 const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
 const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
   Table.PartialBlockchainNodes
@@ -229,6 +240,7 @@ export {
   outputNotes,
   notesScripts,
   stateSync,
+  transportLayerCursor,
   blockHeaders,
   partialBlockchainNodes,
   tags,

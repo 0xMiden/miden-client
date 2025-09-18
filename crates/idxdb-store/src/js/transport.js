@@ -1,6 +1,5 @@
 import { transportLayerCursor } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
-
 export async function getTransportLayerCursor() {
     try {
         const record = await transportLayerCursor.get(1);
@@ -11,7 +10,6 @@ export async function getTransportLayerCursor() {
         return 0;
     }
 }
-
 export async function updateTransportLayerCursor(cursor) {
     try {
         await transportLayerCursor.put({ id: 1, cursor: cursor });
@@ -20,3 +18,4 @@ export async function updateTransportLayerCursor(cursor) {
         logWebStoreError(error, "Error updating transport layer cursor");
     }
 }
+//# sourceMappingURL=transport.js.map
