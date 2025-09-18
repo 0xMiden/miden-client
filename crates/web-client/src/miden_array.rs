@@ -66,8 +66,8 @@ macro_rules! declare_js_miden_arrays {
                     }
                 }
 
-                pub fn push(&mut self, element: $miden_type_name) {
-                    self.__inner.push(element);
+                pub fn push(&mut self, element: &$miden_type_name) {
+                    self.__inner.push(element.clone());
                 }
 
                 pub fn length(&self) -> usize {

@@ -101,6 +101,14 @@ pub mod transaction_summary;
 pub mod word;
 
 declare_js_miden_arrays! {
+    // TODO: Types that do not implement RefWasmAbi:
+    // (crate::models::account_type::AccountType) -> AccountTypeArray,
+    // (crate::models::note_type::NoteType) -> NoteTypeArray,
+    // (crate::models::input_note_state::InputNoteState) -> InputNoteStateArray,
+    // TODO: These types are missing the Clone trait
+    // (crate::models::transaction_kernel::TransactionKernel) -> TransactionKernelArray,
+    // (crate::models::basic_fungible_faucet_component::BasicFungibleFaucetComponent) -> BasicFungibleFaucetComponentArray,
+    // (crate::models::sync_summary::SyncSummary) -> SyncSummaryArray,
     (crate::models::account::Account) -> AccountArray,
     (crate::models::account_builder::AccountBuilder) -> AccountBuilderArray,
     (crate::models::account_code::AccountCode) -> AccountCodeArray,
@@ -111,7 +119,6 @@ declare_js_miden_arrays! {
     (crate::models::account_storage::AccountStorage) -> AccountStorageArray,
     (crate::models::account_storage_mode::AccountStorageMode) -> AccountStorageModeArray,
     (crate::models::account_storage_requirements::AccountStorageRequirements) -> AccountStorageRequirementsArray,
-    (crate::models::account_type::AccountType) -> AccountTypeArray,
     (crate::models::address::Address) -> AddressArray,
     (crate::models::advice_inputs::AdviceInputs) -> AdviceInputsArray,
     (crate::models::advice_map::AdviceMap) -> AdviceMapArray,
@@ -126,12 +133,10 @@ declare_js_miden_arrays! {
     (crate::models::fungible_asset::FungibleAsset) -> FungibleAssetArray,
     (crate::models::input_note::InputNote) -> InputNoteArray,
     (crate::models::input_note_record::InputNoteRecord) -> InputNoteRecordArray,
-    (crate::models::input_note_state::InputNoteState) -> InputNoteStateArray,
     (crate::models::input_notes::InputNotes) -> InputNotesArray,
     (crate::models::library::Library) -> LibraryArray,
     (crate::models::merkle_path::MerklePath) -> MerklePathArray,
     (crate::models::note::Note) -> NoteArray,
-    (crate::models::note_assets::NoteAssets) -> NoteAssetsArray,
     (crate::models::note_execution_hint::NoteExecutionHint) -> NoteExecutionHintArray,
     (crate::models::note_execution_mode::NoteExecutionMode) -> NoteExecutionModeArray,
     (crate::models::note_filter::NoteFilter) -> NoteFilterArray,
@@ -144,7 +149,6 @@ declare_js_miden_arrays! {
     (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
     (crate::models::note_script::NoteScript) -> NoteScriptArray,
     (crate::models::note_tag::NoteTag) -> NoteTagArray,
-    (crate::models::note_type::NoteType) -> NoteTypeArray,
     (crate::models::output_note::OutputNote) -> OutputNoteArray,
     (crate::models::partial_note::PartialNote) -> PartialNoteArray,
     (crate::models::provers::TransactionProver) -> TransactionProverArray,
@@ -173,9 +177,4 @@ declare_js_miden_arrays! {
     (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
     (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
     (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
-    // FIXME: Types that need clone
-    // (crate::models::transaction_kernel::TransactionKernel) -> TransactionKernelArray,
-    // (crate::models::basic_fungible_faucet_component::BasicFungibleFaucetComponent) -> BasicFungibleFaucetComponentArray,
-    // (crate::models::sync_summary::SyncSummary) -> SyncSummaryArray,
 }
-// }

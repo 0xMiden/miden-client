@@ -80,7 +80,7 @@ const instanceAccountArrayFromAccounts = async ({
       );
       accounts[i] = account.id();
     }
-    const array = new window.AccountIdArray(accounts);
+    const array = new window.MidenArrays.AccountIdArray(accounts);
     return array.length();
   }, {});
 };
@@ -97,7 +97,7 @@ const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
       )
     );
     const accountIds = accounts.map((account) => account.id());
-    const array = new window.AccountIdArray(accountIds);
+    const array = new window.MidenArrays.AccountIdArray(accountIds);
     array.replaceAt(5, accountToSet.id());
     return array.get(5).toString() == accountToSet.id().toString();
   }, {});
@@ -112,7 +112,7 @@ const outOfBoundsArrayAccess = async ({
 }) => {
   return await page.evaluate(
     async ({ index }) => {
-      const array = new window.AccountIdArray([]);
+      const array = new window.MidenArrays.AccountIdArray([]);
       return array.get(index);
     },
     { index }
@@ -133,7 +133,7 @@ const outOfBoundsReplace = async ({
         true
       );
       const accountId = wallet.id();
-      const array = new window.AccountIdArray([]);
+      const array = new window.MidenArrays.AccountIdArray([]);
       return array.replaceAt(index, accountId);
     },
     { index }
@@ -157,7 +157,7 @@ const arrayReturnsClone = async ({
         );
         accounts[i] = account.id();
       }
-      const array = new window.AccountIdArray(accounts);
+      const array = new window.MidenArrays.AccountIdArray(accounts);
       let cloned = array.get(index);
       cloned = await window.client.newWallet(
         window.AccountStorageMode.private(),
