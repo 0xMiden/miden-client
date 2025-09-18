@@ -40,6 +40,8 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Fetch notes for tracked note tags
+    ///
+    /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
         if let Some(api) = self.transport_api.as_mut() {
             // Unique tags
@@ -54,15 +56,14 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Fetches all notes for given tags
-    pub async fn fetch_all_private_notes<I>(&mut self, tags: I) -> Result<(), ClientError>
-    where
-        I: IntoIterator<Item = NoteTag>,
-    {
+    /// Fetches all notes for tracked note tags
+    ///
+    /// All notes stored in the transport layer will be fetched.
+    pub async fn fetch_all_private_notes<I>(&mut self) -> Result<(), ClientError> {
         if let Some(api) = self.transport_api.as_mut() {
-            let update = TransportLayer::new(api.clone())
-                .fetch_notes(0, tags.into_iter().collect::<Vec<_>>())
-                .await?;
+            let note_tags = self.store.get_unique_note_tags().await?;
+
+            let update = TransportLayer::new(api.clone()).fetch_notes(0, note_tags).await?;
 
             self.store.apply_transport_layer_update(update).await?;
         }
