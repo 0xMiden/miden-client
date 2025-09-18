@@ -240,7 +240,7 @@ export async function getAccountStorageMaps(roots: string[]) {
   }
 }
 
-export async function getVaultAssets(vaultRoot: string) {
+export async function getAccountVaultAssets(vaultRoot: string) {
   try {
     // Fetch all records matching the given root
     const allMatchingRecords = await accountAssets

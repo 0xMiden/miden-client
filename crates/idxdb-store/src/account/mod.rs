@@ -32,8 +32,8 @@ use js_bindings::{
     idxdb_get_account_ids,
     idxdb_get_account_storage,
     idxdb_get_account_storage_maps,
+    idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
-    idxdb_get_vault_assets,
     idxdb_lock_account,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
@@ -230,7 +230,7 @@ impl WebStore {
     }
 
     pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
-        let promise = idxdb_get_vault_assets(root.to_hex());
+        let promise = idxdb_get_account_vault_assets(root.to_hex());
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch vault assets: {js_error:?}",))
         })?;

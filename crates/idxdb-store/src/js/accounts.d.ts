@@ -40,7 +40,7 @@ export declare function getAccountStorage(storageCommitment: string): Promise<{
     slotType: number;
 }[] | undefined>;
 export declare function getAccountStorageMaps(roots: string[]): Promise<IStorageMapEntry[] | undefined>;
-export declare function getVaultAssets(vaultRoot: string): Promise<{
+export declare function getAccountVaultAssets(vaultRoot: string): Promise<{
     asset: string;
 }[] | undefined>;
 export declare function getAccountAuthByPubKey(pubKey: string): Promise<{

@@ -188,7 +188,7 @@ export async function getAccountStorageMaps(roots) {
         logWebStoreError(error, `Error fetching account storage maps for roots ${roots.join(", ")}`);
     }
 }
-export async function getVaultAssets(vaultRoot) {
+export async function getAccountVaultAssets(vaultRoot) {
     try {
         // Fetch all records matching the given root
         const allMatchingRecords = await accountAssets
