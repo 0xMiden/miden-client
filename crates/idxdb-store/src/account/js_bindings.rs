@@ -38,7 +38,7 @@ extern "C" {
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
     pub fn idxdb_get_account_storage_maps(roots: Vec<String>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = getVaultAssets)]
+    #[wasm_bindgen(js_name = getAccountVaultAssets)]
     pub fn idxdb_get_account_vault_assets(vault_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAuthByPubKey)]
