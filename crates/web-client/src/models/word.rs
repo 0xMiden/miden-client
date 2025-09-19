@@ -30,7 +30,7 @@ impl Word {
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
         let native_word = NativeWord::try_from(hex).map_err(|err| {
-            JsValue::from_str(&format!("error instantiating Word from hex: {}", err))
+            JsValue::from_str(&format!("error instantiating Word from hex: {err}"))
         })?;
         Ok(Word(native_word))
     }
