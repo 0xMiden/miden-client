@@ -4,7 +4,10 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/idxdb-store",
   "crates/rust-client",
+  "crates/sqlite-store",
+  "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
@@ -34,13 +37,14 @@ miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { branch = "next", default-features = false, features = [
-], git = "https://github.com/0xMiden/miden-base" }
+miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
-async-trait = "0.1"
+async-trait = { version = "0.1" }
+chrono      = { version = "0.4" }
+hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }

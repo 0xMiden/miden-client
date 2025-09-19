@@ -27,9 +27,9 @@ use super::{
     NoteSyncInfo,
     RpcError,
     StateSyncInfo,
-    generated as proto,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
 use crate::transaction::ForeignAccount;
 
