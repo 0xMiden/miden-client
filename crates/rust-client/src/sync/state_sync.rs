@@ -396,8 +396,10 @@ impl StateSync {
             .map(|nullifier| nullifier.prefix())
             .collect();
 
-        let mut new_nullifiers =
-            self.rpc_api.sync_nullifiers(&nullifiers_tags, current_block_num, None).await?;
+        let mut new_nullifiers = self
+            .rpc_api
+            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(state_sync_update.block_num))
+            .await?;
 
         // Discard nullifiers that are newer than the current block (this might happen if the block
         // changes between the sync_state and the check_nullifier calls)

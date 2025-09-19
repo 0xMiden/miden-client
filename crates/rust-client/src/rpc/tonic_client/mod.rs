@@ -435,23 +435,24 @@ impl NodeRpcClient for TonicRpcClient {
 
             // Check if we need to fetch more pages
             if let Some(page) = response.pagination_info {
-                let target_block = block_to.map_or(page.chain_tip, |b| b.as_u32());
-                if page.block_num < target_block {
-                    // Ensure we're making progress to avoid infinite loops
-                    if page.block_num < current_block_from {
-                        return Err(RpcError::InvalidResponse(
-                            "invalid pagination: block_num went backwards".to_string(),
-                        ));
-                    }
-                    current_block_from = page.block_num + 1;
-                } else {
-                    // We've reached our target block, no more data to fetch
-                    return Ok(all_nullifiers);
+                // Ensure we're making progress to avoid infinite loops
+                if page.block_num < current_block_from {
+                    return Err(RpcError::InvalidResponse(
+                        "invalid pagination: block_num went backwards".to_string(),
+                    ));
                 }
-            } else {
-                // No pagination info means this is not a paginated response, so we're done
-                return Ok(all_nullifiers);
+
+                // Calculate target block as minimum between block_to and chain_tip
+                let target_block =
+                    block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+
+                if page.block_num < target_block {
+                    current_block_from = page.block_num + 1;
+                    continue;
+                }
             }
+            // No pagination info or we've reached/passed the target so we're done
+            return Ok(all_nullifiers);
         }
 
         // If we exit the loop, we've hit the iteration limit
