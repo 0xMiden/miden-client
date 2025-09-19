@@ -2,6 +2,7 @@
 //! in the client's store.
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use miden_tx::utils::{Deserializable, Serializable};
 
@@ -45,5 +46,10 @@ impl<AUTH> Client<AUTH> {
     /// Deletes the setting value from the store.
     pub async fn remove_value(&mut self, key: String) -> Result<(), ClientError> {
         self.store.remove_value(key).await.map_err(Into::into)
+    }
+
+    /// Returns all the setting keys from the store.
+    pub async fn list_keys(&self) -> Result<Vec<String>, ClientError> {
+        self.store.list_keys().await.map_err(Into::into)
     }
 }

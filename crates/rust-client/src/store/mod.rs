@@ -299,6 +299,9 @@ pub trait Store: Send + Sync {
     /// Deletes a value from the `settings` table.
     async fn remove_value(&self, key: String) -> Result<(), StoreError>;
 
+    /// Returns all the keys from the `settings` table.
+    async fn list_keys(&self) -> Result<Vec<String>, StoreError>;
+
     // SYNC
     // --------------------------------------------------------------------------------------------
 

@@ -182,6 +182,13 @@ pub fn remove_value(conn: &Connection, name: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
+pub fn list_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
+    let mut stmt = conn.prepare("SELECT name FROM settings")?;
+    stmt.query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(Into::into)
+}
+
 /// Checks if a table exists in the database.
 pub fn table_exists(transaction: &Transaction, table_name: &str) -> rusqlite::Result<bool> {
     Ok(transaction

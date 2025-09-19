@@ -264,6 +264,10 @@ impl Store for WebStore {
     async fn remove_value(&self, _key: String) -> Result<(), StoreError> {
         unimplemented!()
     }
+
+    async fn list_keys(&self) -> Result<Vec<String>, StoreError> {
+        unimplemented!()
+    }
 }
 
 #[wasm_bindgen(module = "/src/store/web_store/js/utils.js")]
