@@ -1,3 +1,5 @@
+import { IStorageMapEntry } from "./schema.js";
+import { JsStorageMapEntry, JsStorageSlot, JsVaultAsset } from "./sync.js";
 export declare function getAccountIds(): Promise<unknown[] | undefined>;
 export declare function getAllAccountHeaders(): Promise<{
     id: string;
@@ -32,20 +34,22 @@ export declare function getAccountCode(codeRoot: string): Promise<{
     root: string;
     code: string;
 } | null | undefined>;
-export declare function getAccountStorage(storageRoot: string): Promise<{
-    root: string;
-    storage: string;
-} | null | undefined>;
-export declare function getAccountAssetVault(vaultRoot: string): Promise<{
-    root: string;
-    assets: string;
-} | null | undefined>;
+export declare function getAccountStorage(storageCommitment: string): Promise<{
+    slotIndex: number;
+    slotValue: string;
+    slotType: number;
+}[] | undefined>;
+export declare function getAccountStorageMaps(roots: string[]): Promise<IStorageMapEntry[] | undefined>;
+export declare function getAccountVaultAssets(vaultRoot: string): Promise<{
+    asset: string;
+}[] | undefined>;
 export declare function getAccountAuthByPubKey(pubKey: string): Promise<{
     secretKey: string;
 }>;
 export declare function insertAccountCode(codeRoot: string, code: Uint8Array): Promise<void>;
-export declare function insertAccountStorage(storageRoot: string, storageSlots: Uint8Array): Promise<void>;
-export declare function insertAccountAssetVault(vaultRoot: string, assets: Uint8Array): Promise<void>;
+export declare function insertAccountStorage(storageSlots: JsStorageSlot[]): Promise<void>;
+export declare function insertStorageMapEntries(entries: JsStorageMapEntry[]): Promise<void>;
+export declare function insertVaultAssets(assets: JsVaultAsset[]): Promise<void>;
 export declare function insertAccountRecord(accountId: string, codeRoot: string, storageRoot: string, vaultRoot: string, nonce: string, committed: boolean, commitment: string, accountSeed: Uint8Array | undefined): Promise<void>;
 export declare function insertAccountAuth(pubKey: string, secretKey: string): Promise<void>;
 export declare function upsertForeignAccountCode(accountId: string, code: Uint8Array, codeRoot: string): Promise<void>;

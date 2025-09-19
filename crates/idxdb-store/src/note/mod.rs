@@ -11,12 +11,11 @@ use miden_client::store::{
     OutputNoteState,
     StoreError,
 };
-use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::{Array, Promise};
 
 use super::WebStore;
+use crate::promise::await_js;
 
 mod js_bindings;
 use js_bindings::{
@@ -40,12 +39,8 @@ impl WebStore {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<InputNoteRecord>, StoreError> {
-        let js_value =
-            JsFuture::from(filter.to_input_notes_promise()).await.map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to get input notes: {js_error:?}"))
-            })?;
-        let input_notes_idxdb: Vec<InputNoteIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let input_notes_idxdb: Vec<InputNoteIdxdbObject> =
+            await_js(filter.to_input_notes_promise(), "failed to get input notes").await?;
 
         input_notes_idxdb
             .into_iter()
@@ -57,13 +52,8 @@ impl WebStore {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError> {
-        let js_value =
-            JsFuture::from(filter.to_output_note_promise()).await.map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to get output notes: {js_error:?}"))
-            })?;
-
-        let output_notes_idxdb: Vec<OutputNoteIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let output_notes_idxdb: Vec<OutputNoteIdxdbObject> =
+            await_js(filter.to_output_note_promise(), "failed to get output notes").await?;
 
         output_notes_idxdb
             .into_iter()
@@ -75,13 +65,8 @@ impl WebStore {
         &self,
     ) -> Result<Vec<Nullifier>, StoreError> {
         let promise = idxdb_get_unspent_input_note_nullifiers();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to get unspent input note nullifiers: {js_error:?}"
-            ))
-        })?;
-        let nullifiers_as_str: Vec<String> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let nullifiers_as_str: Vec<String> =
+            await_js(promise, "failed to get unspent input note nullifiers").await?;
 
         nullifiers_as_str
             .into_iter()

@@ -8,10 +8,9 @@ use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
 use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_client::utils::Deserializable;
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
+use crate::promise::{await_js, await_js_value, await_ok};
 
 mod js_bindings;
 use js_bindings::{
@@ -62,9 +61,7 @@ impl WebStore {
             partial_blockchain_peaks,
             has_client_notes,
         );
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert block header: {js_error:?}",))
-        })?;
+        await_ok(promise, "failed to insert block header").await?;
 
         Ok(())
     }
@@ -79,11 +76,8 @@ impl WebStore {
             .collect();
 
         let promise = idxdb_get_block_headers(formatted_block_numbers_list);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get block headers: {js_error:?}",))
-        })?;
-        let block_headers_idxdb: Vec<Option<BlockHeaderIdxdbObject>> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let block_headers_idxdb: Vec<Option<BlockHeaderIdxdbObject>> =
+            await_js(promise, "failed to get block headers").await?;
 
         // Transform the list of Option<BlockHeaderIdxdbObject> to a list of results
         let results: Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> = block_headers_idxdb
@@ -103,11 +97,8 @@ impl WebStore {
 
     pub(crate) async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
         let promise = idxdb_get_tracked_block_headers();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get tracked block headers: {js_error:?}",))
-        })?;
-        let block_headers_idxdb: Vec<BlockHeaderIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let block_headers_idxdb: Vec<BlockHeaderIdxdbObject> =
+            await_js(promise, "failed to get tracked block headers").await?;
 
         let results: Result<Vec<BlockHeader>, StoreError> = block_headers_idxdb
             .into_iter()
@@ -128,11 +119,8 @@ impl WebStore {
         match filter {
             PartialBlockchainFilter::All => {
                 let promise = idxdb_get_partial_blockchain_nodes_all();
-                let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-                    StoreError::DatabaseError(format!(
-                        "failed to get all partial blockchain nodes: {js_error:?}",
-                    ))
-                })?;
+                let js_value =
+                    await_js_value(promise, "failed to get all partial blockchain nodes").await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
             },
             PartialBlockchainFilter::List(ids) => {
@@ -140,11 +128,8 @@ impl WebStore {
                     ids.iter().map(|id| (Into::<usize>::into(*id)).to_string()).collect();
 
                 let promise = idxdb_get_partial_blockchain_nodes(formatted_list);
-                let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-                    StoreError::DatabaseError(format!(
-                        "failed to get partial blockchain nodes: {js_error:?}",
-                    ))
-                })?;
+                let js_value =
+                    await_js_value(promise, "failed to get partial blockchain nodes").await?;
                 process_partial_blockchain_nodes_from_js_value(js_value)
             },
         }
@@ -157,13 +142,8 @@ impl WebStore {
         let block_num_as_str = block_num.to_string();
 
         let promise = idxdb_get_partial_blockchain_peaks_by_block_num(block_num_as_str);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to get partial blockchain peaks by block number: {js_error:?}",
-            ))
-        })?;
-        let mmr_peaks_idxdb: PartialBlockchainPeaksIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let mmr_peaks_idxdb: PartialBlockchainPeaksIdxdbObject =
+            await_js(promise, "failed to get partial blockchain peaks by block number").await?;
 
         if let Some(peaks) = mmr_peaks_idxdb.peaks {
             let mmr_peaks_nodes: Vec<Word> = Vec::<Word>::read_from_bytes(&peaks)?;
@@ -189,20 +169,14 @@ impl WebStore {
         }
 
         let promise = idxdb_insert_partial_blockchain_nodes(serialized_node_ids, serialized_nodes);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to insert partial blockchain nodes: {js_error:?}",
-            ))
-        })?;
+        await_ok(promise, "failed to insert partial blockchain nodes").await?;
 
         Ok(())
     }
 
     pub(crate) async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
         let promise = idxdb_prune_irrelevant_blocks();
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to prune block header: {js_error:?}",))
-        })?;
+        await_ok(promise, "failed to prune block header").await?;
 
         Ok(())
     }
