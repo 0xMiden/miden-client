@@ -41,3 +41,23 @@
 #### Returns
 
 [`Word`](Word.md)
+
+***
+
+### getMapItem()
+
+> **getMapItem**(`index`, `key`): [`Word`](Word.md)
+
+#### Parameters
+
+##### index
+
+`number`
+
+##### key
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)

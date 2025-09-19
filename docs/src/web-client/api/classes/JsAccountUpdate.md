@@ -26,11 +26,11 @@ ID for this account.
 
 ***
 
-### assetBytes
+### assets
 
-> **assetBytes**: `Uint8Array`
+> **assets**: [`JsVaultAsset`](JsVaultAsset.md)[]
 
-Serialized asset data for this account.
+The account's asset vault.
 
 ***
 
@@ -66,6 +66,14 @@ The account's transaction nonce as a string.
 
 ***
 
+### storageMapEntries
+
+> **storageMapEntries**: [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
+
+Serialized storage map entries for this account.
+
+***
+
 ### storageRoot
 
 > **storageRoot**: `string`
@@ -76,7 +84,7 @@ The merkle root of the account's storage trie.
 
 ### storageSlots
 
-> **storageSlots**: `Uint8Array`
+> **storageSlots**: [`JsStorageSlot`](JsStorageSlot.md)[]
 
 Serialized storage slot data for this account.
 
