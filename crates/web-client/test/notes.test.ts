@@ -10,6 +10,7 @@ import {
   setupConsumedNote,
   getInputNotes,
   setupMintedNote,
+  setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
 import {
@@ -92,7 +93,7 @@ test.describe("get_input_note", () => {
     await setupWalletAndFaucet(page);
 
     // First, we need to get a note script root from an existing note
-    const { consumedNoteId } = await setupConsumedNote(page);
+    const { consumedNoteId } = await setupConsumedNote(page, true);
 
     // Get the note to extract its script root
     const noteData = await page.evaluate(async (_consumedNoteId: string) => {
@@ -103,42 +104,35 @@ test.describe("get_input_note", () => {
       const fetchedNotes = await rpcClient.getNotesById([noteId]);
 
       if (fetchedNotes.length > 0 && fetchedNotes[0].inputNote) {
-        const scriptRoot = fetchedNotes[0].inputNote.script().root();
+        const scriptRoot = fetchedNotes[0].inputNote.note().script().root();
         return {
-          scriptRoot: scriptRoot.toString(),
+          scriptRoot: scriptRoot.toHex(),
           hasScript: true,
         };
       }
 
-      return { scriptRoot: null, hasScript: false };
+      return { scriptRoot: "", hasScript: false };
     }, consumedNoteId);
 
-    if (noteData.hasScript) {
-      // Test GetNoteScriptByRoot endpoint
-      const scriptResult = await page.evaluate(
-        async (scriptRootHex: string) => {
-          const endpoint = new window.Endpoint("http://localhost:57291");
-          const rpcClient = new window.RpcClient(endpoint);
+    // Test GetNoteScriptByRoot endpoint
+    const retrievedScript = await page.evaluate(
+      async (scriptRootHex: string) => {
+        const endpoint = new window.Endpoint("http://localhost:57291");
+        const rpcClient = new window.RpcClient(endpoint);
 
-          const scriptRoot = window.Word.fromHex(scriptRootHex);
-          const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+        const scriptRoot = window.Word.fromHex(scriptRootHex);
+        const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
 
-          return {
-            hasScript: !!noteScript,
-            scriptRoot: noteScript ? noteScript.root().toString() : null,
-          };
-        },
-        noteData.scriptRoot
-      );
+        return {
+          hasScript: !!noteScript,
+          scriptRoot: noteScript ? noteScript.root().toHex() : null,
+        };
+      },
+      noteData.scriptRoot
+    );
 
-      expect(scriptResult.hasScript).toBe(true);
-      expect(scriptResult.scriptRoot).toEqual(noteData.scriptRoot);
-    } else {
-      // Skip test if no script available
-      console.log(
-        "Skipping GetNoteScriptByRoot test - no script available for the note"
-      );
-    }
+    expect(retrievedScript.hasScript).toBe(true);
+    expect(retrievedScript.scriptRoot).toEqual(noteData.scriptRoot);
   });
 });
 
