@@ -6,7 +6,7 @@ use miden_objects::Word;
 use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -450,6 +450,17 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(block)
+    }
+
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+        let note = self
+            .get_available_notes()
+            .iter()
+            .find(|note| note.note().is_some_and(|n| n.script().root() == root))
+            .unwrap()
+            .clone();
+
+        Ok(note.note().unwrap().script().clone())
     }
 }
 

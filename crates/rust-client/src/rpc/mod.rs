@@ -54,7 +54,7 @@ use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
@@ -291,6 +291,12 @@ pub trait NodeRpcClient: Send + Sync {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }
+
+    /// Fetches the note script with the specified root.
+    ///
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -310,6 +316,7 @@ pub enum NodeRpcClientEndpoint {
     SyncState,
     SubmitProvenTx,
     SyncNotes,
+    GetNoteScriptByRoot,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -330,6 +337,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
+            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
         }
     }
 }
