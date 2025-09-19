@@ -406,6 +406,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         from_block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -413,7 +414,13 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                if prefixes.contains(&nullifier.prefix()) && block_num >= from_block_num {
+                let within_range = if let Some(to_block) = block_to {
+                    block_num >= from_block_num && block_num <= to_block
+                } else {
+                    block_num >= from_block_num
+                };
+
+                if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num: block_num.as_u32() })
                 } else {
                     None

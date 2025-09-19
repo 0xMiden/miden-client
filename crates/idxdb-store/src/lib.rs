@@ -48,6 +48,7 @@ pub mod chain_data;
 pub mod export;
 pub mod import;
 pub mod note;
+mod promise;
 pub mod sync;
 pub mod transaction;
 

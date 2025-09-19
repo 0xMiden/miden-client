@@ -62,6 +62,7 @@ pub use miden_objects::{
         AccountType,
         StorageMap,
         StorageSlot,
+        StorageSlotType,
     },
     address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
 };
@@ -85,7 +86,6 @@ pub mod component {
         FeltRepresentation,
         InitStorageData,
         StorageEntry,
-        StorageSlotType,
         StorageValueName,
         TemplateType,
         WordRepresentation,

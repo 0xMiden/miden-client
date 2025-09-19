@@ -9,8 +9,9 @@
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
 //!
-//! In addition, the module provides implementations for different environments (e.g. tonic-based or
-//! web-based) via feature flags ( `tonic` and `web-tonic`).
+//! The client implementation adapts to the target environment automatically:
+//! - Native targets use `tonic` transport with TLS.
+//! - `wasm32` targets use `tonic-web-wasm-client` transport.
 //!
 //! ## Example
 //!
@@ -71,9 +72,9 @@ mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
 
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 mod tonic_client;
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 pub use tonic_client::TonicRpcClient;
 
 use crate::store::InputNoteRecord;
@@ -167,10 +168,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
+    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
+    ///   to the network chain tip.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
@@ -200,7 +204,7 @@ pub trait NodeRpcClient: Send + Sync {
         nullifier: &Nullifier,
         block_num: BlockNumber,
     ) -> Result<Option<u32>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num).await?;
+        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
 
         Ok(nullifiers
             .iter()

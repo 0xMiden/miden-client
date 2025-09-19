@@ -18,7 +18,8 @@ export async function openDatabase(): Promise<boolean> {
 enum Table {
   AccountCode = "accountCode",
   AccountStorage = "accountStorage",
-  AccountVaults = "accountVaults",
+  AccountAssets = "accountAssets",
+  StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
   Accounts = "accounts",
   Addresses = "addresses",
@@ -40,13 +41,23 @@ export interface IAccountCode {
 }
 
 export interface IAccountStorage {
-  root: string;
-  slots: Uint8Array;
+  commitment: string;
+  slotIndex: number;
+  slotValue: string;
+  slotType: number;
 }
 
-export interface IAccountVault {
+export interface IStorageMapEntry {
   root: string;
-  assets: Uint8Array;
+  key: string;
+  value: string;
+}
+
+export interface IAccountAsset {
+  root: string;
+  vaultKey: string;
+  faucetIdPrefix: string;
+  asset: string;
 }
 
 export interface IAccountAuth {
@@ -145,7 +156,8 @@ export interface IForeignAccountCode {
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountVaults: Dexie.Table<IAccountVault, string>;
+  accountAssets: Dexie.Table<IAccountAsset, string>;
+  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accounts: Dexie.Table<IAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
@@ -163,8 +175,9 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
 
 db.version(1).stores({
   [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("root"),
-  [Table.AccountVaults]: indexes("root"),
+  [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+  [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+  [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKey"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
@@ -204,7 +217,10 @@ db.on("populate", () => {
 
 const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
 const accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
-const accountVaults = db.table<IAccountVault, string>(Table.AccountVaults);
+const storageMapEntries = db.table<IStorageMapEntry, string>(
+  Table.StorageMapEntries
+);
+const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
 const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
 const accounts = db.table<IAccount, string>(Table.Accounts);
 const addresses = db.table<IAddress, string>(Table.Addresses);
@@ -229,7 +245,8 @@ export {
   db,
   accountCodes,
   accountStorages,
-  accountVaults,
+  storageMapEntries,
+  accountAssets,
   accountAuths,
   accounts,
   addresses,

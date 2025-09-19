@@ -7,16 +7,16 @@ Rust library, which can be used by other project to programmatically interact wi
 In order to utilize the `miden-client` library, you can add the dependency to your project's `Cargo.toml` file:
 
 ````toml
-miden-client = { version = "0.11" }
+miden-client = { version = "0.12" }
 ````
 
 ## Crate Features
 
-| Features     | Description                                                                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tonic`      | Includes `TonicRpcClient`, a `std`-compatible Tonic client to communicate with Miden node. This relies on the `tonic` for the inner transport.  **Disabled by default.**                                                        |
-| `web-tonic`  | Includes `TonicRpcClient`, a `wasm`-compatible Tonic client to communicate with the Miden node. This relies on `tonic-web-wasm-client` for the inner transport. **Disabled by default.**                                   |
-| `testing`    | Enables functions meant to be used in testing environments. **Disabled by default.**             |
+| Features  | Description |
+| --------- | ----------- |
+| `tonic`   | Includes `TonicRpcClient`, a Tonic client to communicate with a Miden node. Uses `tonic` transport with TLS on native targets and `tonic-web-wasm-client` on `wasm32`. **Disabled by default.** |
+| `std`     | Enables `std` support and concurrent execution in `miden-tx`. Enabled by default for native targets. |
+| `testing` | Enables functions meant for testing environments. **Disabled by default.** |
 
 ### Store and RpcClient implementations
 
