@@ -1,9 +1,8 @@
 //! The `settings` module provides methods for managing arbitrary setting values that are persisted
 //! in the client's store.
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
-use miden_objects::account::AccountId;
 use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
@@ -21,22 +20,22 @@ impl<AUTH> Client<AUTH> {
     // SETTINGS ACCESSORS
     // --------------------------------------------------------------------------------------------
 
-    /// Sets a setting value in the store.
-    pub async fn set_setting_value<T: Serializable>(
+    /// Sets a setting value in the store. It can then be retrieved using `get_value`.
+    pub async fn set_value<T: Serializable>(
         &mut self,
         key: String,
         value: T,
     ) -> Result<(), ClientError> {
-        self.store.set_setting_value(key, value.to_bytes()).await.map_err(Into::into)
+        self.store.set_value(key, value.to_bytes()).await.map_err(Into::into)
     }
 
-    /// Retrieves a setting value from the store.
-    pub async fn get_setting_value<T: Deserializable>(
+    /// Retrieves the value for `key`, or `None` if it hasn’t been set.
+    pub async fn get_value<T: Deserializable>(
         &self,
         key: String,
     ) -> Result<Option<T>, ClientError> {
         self.store
-            .get_setting_value(key)
+            .get_value(key)
             .await
             .map(|value| value.map(|value| Deserializable::read_from_bytes(&value)))?
             .transpose()
@@ -44,28 +43,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Deletes the setting value from the store.
-    pub async fn delete_setting_value(&mut self, key: String) -> Result<(), ClientError> {
-        self.store.delete_setting_value(key).await.map_err(Into::into)
-    }
-
-    // DEFAULT ACCOUNT ID
-    // --------------------------------------------------------------------------------------------
-
-    /// Retrieves the default account ID from the store.
-    pub async fn get_default_account_id(&self) -> Result<Option<AccountId>, ClientError> {
-        self.get_setting_value("default_account_id".to_string()).await
-    }
-
-    /// Sets the default account ID in the store.
-    pub async fn set_default_account_id(
-        &mut self,
-        account_id: AccountId,
-    ) -> Result<(), ClientError> {
-        self.set_setting_value("default_account_id".to_string(), account_id).await
-    }
-
-    /// Deletes the default account ID from the store.
-    pub async fn delete_default_account_id(&mut self) -> Result<(), ClientError> {
-        self.delete_setting_value("default_account_id".to_string()).await
+    pub async fn remove_value(&mut self, key: String) -> Result<(), ClientError> {
+        self.store.remove_value(key).await.map_err(Into::into)
     }
 }

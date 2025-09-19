@@ -13,6 +13,8 @@ use crate::errors::CliError;
 use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id};
 use crate::{client_binary_name, create_dynamic_table};
 
+pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
+
 // ACCOUNT COMMAND
 // ================================================================================================
 
@@ -59,10 +61,17 @@ impl AccountCmd {
             } => {
                 match id {
                     None => {
-                        display_default_account_id(&client).await?;
+                        let default_account: AccountId = client
+                            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
+                            .await?
+                            .ok_or(CliError::Config(
+                                "Default account".to_string().into(),
+                                "No default account found in the client's store".to_string(),
+                            ))?;
+                        println!("Current default account ID: {default_account}");
                     },
                     Some(id) if id == "none" => {
-                        client.delete_default_account_id().await?;
+                        client.remove_value(DEFAULT_ACCOUNT_ID_KEY.to_string()).await?;
                         println!("Removing default account...");
                     },
                     Some(id) => {
@@ -71,7 +80,7 @@ impl AccountCmd {
                         // Check whether we're tracking that account
                         let (account, _) = client.try_get_account_header(account_id).await?;
 
-                        client.set_default_account_id(account.id()).await?;
+                        client.set_value(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id()).await?;
                         println!("Setting default account to {id}...");
                     },
                 }
@@ -277,27 +286,20 @@ fn account_type_display_name(account_id: &AccountId) -> Result<String, CliError>
     })
 }
 
-/// Loads config file and displays current default account ID.
-async fn display_default_account_id<AUTH>(client: &Client<AUTH>) -> Result<(), CliError> {
-    let default_account = client.get_default_account_id().await?.ok_or(CliError::Config(
-        "Default account".to_string().into(),
-        "No default account found in the client's store".to_string(),
-    ))?;
-    println!("Current default account ID: {default_account}");
-    Ok(())
-}
-
-/// Sets the provided account ID as the default account and updates the config file, if not set
-/// already.
+/// Sets the provided account ID as the default account in the client's store, if not set already.
 pub(crate) async fn set_default_account_if_unset<AUTH>(
     client: &mut Client<AUTH>,
     account_id: AccountId,
 ) -> Result<(), CliError> {
-    if client.get_default_account_id().await?.is_some() {
+    if client
+        .get_value::<AccountId>(DEFAULT_ACCOUNT_ID_KEY.to_string())
+        .await?
+        .is_some()
+    {
         return Ok(());
     }
 
-    client.set_default_account_id(account_id).await?;
+    client.set_value(DEFAULT_ACCOUNT_ID_KEY.to_string(), account_id).await?;
 
     println!("Setting account {account_id} as the default account ID.");
     println!(

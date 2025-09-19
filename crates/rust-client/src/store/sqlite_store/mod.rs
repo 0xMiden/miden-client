@@ -44,11 +44,7 @@ use super::{
     TransactionFilter,
 };
 use crate::store::StoreError;
-use crate::store::sqlite_store::db_management::utils::{
-    delete_settings_value,
-    get_settings_value,
-    set_settings_value,
-};
+use crate::store::sqlite_store::db_management::utils::{get_value, remove_value, set_value};
 use crate::store::sqlite_store::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -360,18 +356,16 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn set_setting_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| set_settings_value(conn, &key, &value))
-            .await
+    async fn set_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| set_value(conn, &key, &value)).await
     }
 
-    async fn get_setting_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
-        self.interact_with_connection(move |conn| get_settings_value(conn, &key)).await
+    async fn get_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.interact_with_connection(move |conn| get_value(conn, &key)).await
     }
 
-    async fn delete_setting_value(&self, key: String) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| delete_settings_value(conn, &key))
-            .await
+    async fn remove_value(&self, key: String) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| remove_value(conn, &key)).await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

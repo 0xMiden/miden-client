@@ -158,21 +158,14 @@ pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) 
     Ok(())
 }
 
-pub fn get_settings_value<T: FromSql>(
-    conn: &mut Connection,
-    name: &str,
-) -> Result<Option<T>, StoreError> {
+pub fn get_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
     conn.transaction()?
         .query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
         .optional()
         .map_err(Into::into)
 }
 
-pub fn set_settings_value<T: ToSql>(
-    conn: &Connection,
-    name: &str,
-    value: &T,
-) -> Result<(), StoreError> {
+pub fn set_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<(), StoreError> {
     let count =
         conn.execute(insert_sql!(settings { name, value } | REPLACE), params![name, value])?;
 
@@ -181,7 +174,7 @@ pub fn set_settings_value<T: ToSql>(
     Ok(())
 }
 
-pub fn delete_settings_value(conn: &Connection, name: &str) -> Result<(), StoreError> {
+pub fn remove_value(conn: &Connection, name: &str) -> Result<(), StoreError> {
     let count = conn.execute("DELETE FROM settings WHERE name = $1", params![name])?;
 
     debug_assert_eq!(count, 1);

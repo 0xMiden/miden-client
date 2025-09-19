@@ -291,13 +291,13 @@ pub trait Store: Send + Sync {
     // --------------------------------------------------------------------------------------------
 
     /// Adds a value to the `settings` table.
-    async fn set_setting_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError>;
+    async fn set_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError>;
 
     /// Retrieves a value from the `settings` table.
-    async fn get_setting_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
+    async fn get_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
 
     /// Deletes a value from the `settings` table.
-    async fn delete_setting_value(&self, key: String) -> Result<(), StoreError>;
+    async fn remove_value(&self, key: String) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
