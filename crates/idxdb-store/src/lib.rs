@@ -254,6 +254,9 @@ impl Store for WebStore {
         self.get_account_storage(account_id).await
     }
 
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
     async fn set_value(&self, _key: String, _value: Vec<u8>) -> Result<(), StoreError> {
         unimplemented!()
     }
