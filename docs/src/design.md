@@ -40,6 +40,7 @@ Currently, these include:
 - `GetBlockByNumber`: Returns a proven block given a specific block number.
 - `GetBlockHeaderByNumber`: Returns the block header information given a specific block number.
 - `GetNotesById`: Returns a list of notes given a specific note ID. The available information for each note will depend on the note type (public or private).
+- `GetNoteScriptByRoot`: Returns the script associated with a specific note root.
 - `SubmitProvenTransaction`: Sends a locally-proved transaction to the node for inclusion in the blockchain.
 - `SyncNotes`: Asks the node for information about notes that have been created or consumed.
 - `SyncState`: Asks the node for information relevant to the client. For example, specific account changes, whether relevant notes have been created or consumed, etc.
