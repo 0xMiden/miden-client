@@ -2,11 +2,11 @@ use std::env::{self, temp_dir};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use anyhow::Result;
 use assert_cmd::Command;
 use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -20,7 +20,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::rpc::{Endpoint, TonicRpcClient};
+use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -31,10 +31,9 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
-use miden_client::{self, Client, ExecutionOptions, Felt};
+use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::CliKeyStore;
 use miden_client_sqlite_store::SqliteStore;
-use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
 
@@ -744,24 +743,17 @@ async fn create_rust_client_with_store_path(
 
     let keystore = CliKeyStore::new(temp_dir())?;
 
-    Ok((
-        TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
-            rng,
-            store,
-            Some(std::sync::Arc::new(keystore.clone())),
-            ExecutionOptions::new(
-                Some(MAX_TX_EXECUTION_CYCLES),
-                MIN_TX_EXECUTION_CYCLES,
-                false,
-                true,
-            )?,
-            None,
-            None,
-        )
-        .await?,
-        keystore,
-    ))
+    let builder = ClientBuilder::new()
+        .store(store)
+        .tonic_rpc_client(&endpoint, Some(10_000))
+        .rng(rng)
+        .authenticator(std::sync::Arc::new(keystore.clone()))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_graceful_blocks(None);
+
+    let client: TestClient = builder.build().await?;
+
+    Ok((client, keystore))
 }
 
 /// Executes a command and asserts that it fails but does not panic.
