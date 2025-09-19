@@ -90,6 +90,22 @@
 
 ***
 
+### fromHex()
+
+> `static` **fromHex**(`hex`): `Word`
+
+#### Parameters
+
+##### hex
+
+`string`
+
+#### Returns
+
+`Word`
+
+***
+
 ### newFromFelts()
 
 > `static` **newFromFelts**(`felt_vec`): `Word`
