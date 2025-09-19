@@ -306,6 +306,7 @@ impl NodeRpcClient for TonicRpcClient {
         // Request proofs one-by-one using the singular API
         for foreign_account in account_requests {
             let account_id = foreign_account.account_id();
+            let storage_requirements = foreign_account.storage_slot_requirements();
 
             // Only request details for public accounts; include known code commitment for this
             // account when available
@@ -315,7 +316,7 @@ impl NodeRpcClient for TonicRpcClient {
                     .map(|code| proto::primitives::Digest::from(code.commitment()));
                 Some(proto::rpc_store::account_proof_request::AccountDetailsRequest {
                     code_commitment,
-                    storage_requests: foreign_account.storage_slot_requirements().into(),
+                    storage_requests: storage_requirements.clone().into(),
                 })
             } else {
                 None
@@ -350,7 +351,7 @@ impl NodeRpcClient for TonicRpcClient {
                     response
                         .details
                         .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(&known_codes_by_commitment)?,
+                        .into_domain(&known_codes_by_commitment, &storage_requirements)?,
                 )
             } else {
                 None

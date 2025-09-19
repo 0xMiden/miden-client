@@ -281,9 +281,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         builder = builder.with_component(component);
     }
 
-    let (account, seed) = builder
+    let account = builder
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
+
+    let seed = account.seed().expect("newly built account should always contain a seed");
 
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair))

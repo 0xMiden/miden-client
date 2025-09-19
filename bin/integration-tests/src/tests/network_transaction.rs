@@ -118,12 +118,16 @@ async fn get_counter_contract_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .storage_mode(storage_mode)
         .with_component(counter_component)
         .with_auth_component(incr_nonce_auth)
         .build()
         .context("failed to build account with counter contract")?;
+
+    let seed = account
+        .seed()
+        .expect("newly built account should always contain a seed");
 
     Ok((account, seed))
 }

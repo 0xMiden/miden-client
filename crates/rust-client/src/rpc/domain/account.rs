@@ -223,6 +223,7 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
+        storage_requirements: &AccountStorageRequirements,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
@@ -273,8 +274,16 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
                     stringify!(smt_proof),
                 ))?;
             let proof = miden_objects::crypto::merkle::SmtProof::try_from(smt_opening)?;
-            let witness = StorageMapWitness::new(proof);
             let key: u8 = storage_slot.try_into().expect("there are no more than 256 slots");
+
+            let requested_keys = storage_requirements.inner().get(&key).ok_or(
+                crate::rpc::RpcError::InvalidResponse(format!(
+                    "missing storage requirements for slot {key}"
+                )),
+            )?;
+
+            let witness = StorageMapWitness::new(proof, requested_keys.iter().copied())
+                .map_err(|err| crate::rpc::RpcError::InvalidResponse(format!("{err}")))?;
 
             storage_slot_proofs.entry(key).or_default().push(witness);
         }

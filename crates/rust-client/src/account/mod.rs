@@ -304,7 +304,7 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let (account, _) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(public_key))

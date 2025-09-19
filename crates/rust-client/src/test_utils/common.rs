@@ -79,13 +79,15 @@ pub async fn insert_new_wallet_with_seed(
 
     keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    let seed = account.seed().expect("newly built account should always contain a seed");
 
     client.add_account(&account, Some(seed), false).await?;
 
@@ -111,13 +113,15 @@ pub async fn insert_new_fungible_faucet(
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
         .expect("u64 can be safely converted to a field element");
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
+
+    let seed = account.seed().expect("newly built faucet account should always contain a seed");
 
     client.add_account(&account, Some(seed), false).await?;
     Ok((account, seed, key_pair))

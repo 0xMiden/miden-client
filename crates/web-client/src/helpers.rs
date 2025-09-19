@@ -43,7 +43,7 @@ pub(crate) async fn generate_wallet(
     let mut init_seed = [0u8; 32];
     rng.fill_bytes(&mut init_seed);
 
-    let (new_account, account_seed) = AccountBuilder::new(init_seed)
+    let new_account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode.into())
         .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
@@ -51,5 +51,7 @@ pub(crate) async fn generate_wallet(
         .build()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
 
-    Ok((new_account, *account_seed, key_pair))
+    let account_seed = new_account.seed().expect("newly built wallet should always contain a seed");
+
+    Ok((new_account, account_seed, key_pair))
 }
