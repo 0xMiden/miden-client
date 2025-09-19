@@ -6,7 +6,6 @@ use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
-use miden_client::account::component::StorageSlotType;
 use miden_client::account::{
     Account,
     AccountCode,
@@ -17,6 +16,7 @@ use miden_client::account::{
     AccountStorage,
     StorageMap,
     StorageSlot,
+    StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerklePath, MerkleStore, SmtLeaf, SmtProof};

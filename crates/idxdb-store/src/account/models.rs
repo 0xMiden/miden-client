@@ -16,18 +16,25 @@ pub struct AccountCodeIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 pub struct AccountStorageIdxdbObject {
-    pub root: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub storage: Vec<u8>,
+    pub slot_index: u8,
+    pub slot_value: String,
+    pub slot_type: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountVaultIdxdbObject {
+pub struct StorageMapEntryIdxdbObject {
     pub root: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub assets: Vec<u8>,
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountAssetIdxdbObject {
+    pub asset: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
