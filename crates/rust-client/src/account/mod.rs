@@ -85,10 +85,12 @@ pub mod component {
         FeltRepresentation,
         InitStorageData,
         StorageEntry,
+        StorageSlotType,
         StorageValueName,
         TemplateType,
         WordRepresentation,
     };
+    pub use miden_objects::vm::Package;
 }
 
 // CLIENT METHODS

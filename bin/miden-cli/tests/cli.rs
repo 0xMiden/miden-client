@@ -29,12 +29,16 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::{
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+    OutputNote,
+    TransactionRequestBuilder,
+};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, ExecutionOptions, Felt};
 use miden_client_cli::CliKeyStore;
 use miden_client_sqlite_store::SqliteStore;
-use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
 
