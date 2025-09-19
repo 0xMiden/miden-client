@@ -23,7 +23,7 @@ pub trait NoteConsumabilityChecker: Send + Sync {
     ) -> Result<Option<NoteRelevance>, NoteScreenerError>;
 }
 
-/// Default adapter that mirrors today's behavior using the base NoteConsumptionChecker.
+/// Default checker that tries to consume the note in a transaction to see if it's consumable.
 pub struct StandardConsumabilityChecker<AUTH> {
     store: Arc<dyn Store>,
     authenticator: Arc<AUTH>,
