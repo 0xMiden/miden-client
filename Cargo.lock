@@ -864,9 +864,9 @@ dependencies = [
 
 [[package]]
 name = "diesel"
-version = "2.3.1"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb300b92bb5f1a44ce412aeb36a7387931bf7a5238b4570bc1d0b9c8a78fde4e"
+checksum = "e8496eeb328dce26ee9d9b73275d396d9bddb433fa30106cf6056dd8c3c2764c"
 dependencies = [
  "bigdecimal",
  "diesel_derives",
@@ -881,9 +881,9 @@ dependencies = [
 
 [[package]]
 name = "diesel_derives"
-version = "2.3.2"
+version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8dc7010a1e9f98f10c746da308c3da09416a87498731cc18cc666f55b5fc53d"
+checksum = "09af0e983035368439f1383011cd87c46f41da81d0f21dc3727e2857d5a43c8e"
 dependencies = [
  "diesel_table_macro_syntax",
  "dsl_auto_type",
@@ -2139,7 +2139,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2349,7 +2349,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2417,7 +2417,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2445,7 +2445,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2465,7 +2465,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2487,7 +2487,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "fs-err",
  "miette",
@@ -2499,7 +2499,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2526,7 +2526,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2557,7 +2557,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2584,7 +2584,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2637,7 +2637,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2653,6 +2653,7 @@ dependencies = [
  "miden-tx",
  "miden-tx-batch-prover",
  "miette",
+ "opentelemetry",
  "pingora",
  "pingora-core",
  "pingora-limits",
@@ -2674,13 +2675,14 @@ dependencies = [
  "tonic-web",
  "tower-http",
  "tracing",
+ "tracing-opentelemetry",
  "uuid",
 ]
 
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#4d3475158dd155525c1b662bcfdb15db40c5c352"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#1946a24e0296add42a93af5df94bf1c8463e67d2"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2714,7 +2716,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2734,7 +2736,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2749,7 +2751,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#fdf7c0e47191277a95f0ce29abb7b2d7f0a9d754"
+source = "git+https://github.com/0xMiden/miden-base?branch=tomyrd-fix-partial-storage-map#ac7e6d394b0a11cd18eba851b121f2ad64668a3a"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -4864,11 +4866,12 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83bde6f1ec10e72d583d91623c939f623002284ef622b87de38cfd546cbf2031"
+checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
 dependencies = [
  "deranged",
+ "itoa",
  "num-conv",
  "powerfmt",
  "serde",

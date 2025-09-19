@@ -1,5 +1,3 @@
-// TODO: remove once miden-base#1878 is solved
-#![allow(dead_code)]
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
@@ -24,18 +22,15 @@ const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::n
 const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
-#[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn ignore_test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
+pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
-#[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
-#[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
+pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -109,8 +104,7 @@ pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Res
     Ok(())
 }
 
-#[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -298,7 +292,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .await?
             .context("failed to find foreign account after deploiyng")?
             .into();
-        ForeignAccount::private(foreign_account)
+        ForeignAccount::private(&foreign_account)
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
@@ -347,12 +341,16 @@ fn foreign_account_with_code(
     let secret_key = SecretKey::new();
     let auth_component = AuthRpoFalcon512::new(secret_key.public_key());
 
-    let (account, seed) = AccountBuilder::new(Default::default())
+    let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
         .with_auth_component(auth_component)
         .storage_mode(storage_mode)
         .build()
         .context("failed to build foreign account")?;
+
+    let seed = account
+        .seed()
+        .expect("newly built foreign account should always contain a seed");
 
     let proc_root = get_item_component
         .mast_forest()

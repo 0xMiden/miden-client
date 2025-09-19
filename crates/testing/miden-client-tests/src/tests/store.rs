@@ -45,8 +45,8 @@ pub async fn try_add_account() {
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
-    let (id, vault, storage, code, _) = account.into_parts();
-    let account = Account::from_parts(id, vault, storage, code, ZERO);
+    let (id, vault, storage, code, _, seed) = account.into_parts();
+    let account = Account::new_unchecked(id, vault, storage, code, ZERO, seed);
 
     assert!(client.add_account(&account, None, false).await.is_err());
     assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());

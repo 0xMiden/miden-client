@@ -158,12 +158,13 @@ impl WebStore {
         let assets = self.get_vault_assets(account_header.vault_root()).await?;
         let account_vault = AssetVault::new(&assets)?;
 
-        let account = Account::from_parts(
+        let account = Account::new_unchecked(
             account_header.id(),
             account_vault,
             account_storage,
             account_code,
             account_header.nonce(),
+            status.seed().copied(),
         );
 
         Ok(Some(AccountRecord::new(account, status)))

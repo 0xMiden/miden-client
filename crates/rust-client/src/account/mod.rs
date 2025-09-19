@@ -124,11 +124,12 @@ impl<AUTH> Client<AUTH> {
     pub async fn add_account(
         &mut self,
         account: &Account,
+        // TODO: rmeove this parameter
         account_seed: Option<Word>,
         overwrite: bool,
     ) -> Result<(), ClientError> {
         let account_seed = if account.is_new() {
-            if account_seed.is_none() {
+            if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
             }
             account_seed
@@ -304,7 +305,7 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let (account, _) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(public_key))

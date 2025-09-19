@@ -128,10 +128,16 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        Ok(Some(AccountRecord::new(
-            Account::from_parts(header.id(), vault, storage, account_code, header.nonce()),
-            status,
-        )))
+        let account = Account::new_unchecked(
+            header.id(),
+            vault,
+            storage,
+            account_code,
+            header.nonce(),
+            status.seed().copied(),
+        );
+
+        Ok(Some(AccountRecord::new(account, status)))
     }
 
     pub(crate) fn insert_account(
@@ -329,14 +335,15 @@ impl SqliteStore {
         };
 
         let item = map.get(&key);
-
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
-        let (value, path) = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
-        let leaf = SmtLeaf::new_single(key, value);
+        // TODO: change the api of get_storage_map_item_proof
+        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1;
+        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
-        Ok((item, StorageMapWitness::new(proof)))
+        // TODO: unwrap
+        Ok((item, StorageMapWitness::new(proof, [key]).unwrap()))
     }
 
     // ACCOUNT DELTA HELPERS
@@ -1082,11 +1089,12 @@ mod tests {
         .with_supports_all_types();
 
         // Create and insert an account
-        let (account, seed) = AccountBuilder::new([0; 32])
+        let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
+        let seed = account.seed().expect("newly built account should always contain a seed");
         store.insert_account(&account, Some(seed)).await?;
 
         let mut storage_delta = AccountStorageDelta::new();

@@ -26,11 +26,10 @@ impl WebClient {
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let (new_account, account_seed, key_pair) =
-                generate_wallet(storage_mode, mutable, init_seed).await?;
+            let (new_account, key_pair) = generate_wallet(storage_mode, mutable, init_seed).await?;
 
             client
-                .add_account(&new_account, Some(account_seed.into()), false)
+                .add_account(&new_account, None, false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
@@ -72,7 +71,7 @@ impl WebClient {
             let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
 
-            let (new_account, seed) = match AccountBuilder::new(init_seed)
+            let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
                 .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -88,6 +87,8 @@ impl WebClient {
                     return Err(JsValue::from_str(&error_message));
                 },
             };
+
+            let seed = new_account.seed().expect("newly built faucet should always contain a seed");
 
             keystore
                 .expect("KeyStore should be initialized")
