@@ -2,13 +2,13 @@
 resolver = "2"
 
 members = [
-  #"bin/integration-tests",
+  "bin/integration-tests",
   "bin/miden-cli",
   "crates/idxdb-store",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
-  #"crates/testing/node-builder",
+  "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
 ]
