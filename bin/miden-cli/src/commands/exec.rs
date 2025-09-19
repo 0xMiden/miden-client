@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use miden_client::auth::TransactionAuthenticator;
+use miden_client::transaction::AdviceInputs;
 use miden_client::{Client, Felt, Word};
-use miden_objects::vm::AdviceInputs;
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::errors::CliError;
