@@ -74,11 +74,7 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
-pub use consumability_checker::{
-    NoteConsumabilityChecker,
-    NoteExecutionCheck,
-    StandardConsumabilityChecker,
-};
+pub use consumability_checker::{NoteConsumabilityChecker, StandardConsumabilityChecker};
 pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
 pub use miden_lib::note::well_known_note::WellKnownNote;
 pub use miden_lib::note::{create_p2id_note, create_swap_note};

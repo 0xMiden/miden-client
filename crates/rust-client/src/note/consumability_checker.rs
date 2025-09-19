@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use miden_lib::account::interface::AccountInterface;
 use miden_objects::account::Account;
@@ -13,13 +12,6 @@ use crate::note::NoteRelevance;
 use crate::store::Store;
 use crate::store::data_store::ClientDataStore;
 use crate::transaction::TransactionRequestBuilder;
-
-/// Lightweight result type for note execution checks used by the client.
-#[derive(Debug, Default, Clone)]
-pub struct NoteExecutionCheck {
-    pub successful: Vec<Note>,
-    pub failed: Vec<Note>,
-}
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
