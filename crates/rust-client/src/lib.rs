@@ -243,6 +243,8 @@ use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
+use crate::note::NoteConsumabilityChecker;
+
 // MIDEN CLIENT
 // ================================================================================================
 
@@ -275,6 +277,8 @@ pub struct Client<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// Checker used to determine note consumability by executing test transactions.
+    checker: Arc<dyn NoteConsumabilityChecker>,
 }
 
 /// Construction and access methods.
@@ -313,6 +317,7 @@ where
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
+        checker: Arc<dyn NoteConsumabilityChecker>,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
     ) -> Result<Self, ClientError> {
@@ -330,6 +335,7 @@ where
             tx_prover,
             authenticator,
             exec_options,
+            checker,
             tx_graceful_blocks,
             max_block_number_delta,
         })
