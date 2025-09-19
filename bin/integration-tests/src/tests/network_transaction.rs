@@ -125,9 +125,7 @@ async fn get_counter_contract_account(
         .build()
         .context("failed to build account with counter contract")?;
 
-    let seed = account
-        .seed()
-        .expect("newly built account should always contain a seed");
+    let seed = account.seed().expect("newly built account should always contain a seed");
 
     Ok((account, seed))
 }

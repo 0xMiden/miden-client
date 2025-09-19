@@ -335,11 +335,11 @@ impl SqliteStore {
         };
 
         let item = map.get(&key);
-
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
-        let (value, path) = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
-        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), value);
+        // TODO: change the api of get_storage_map_item_proof
+        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1;
+        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
         // TODO: unwrap

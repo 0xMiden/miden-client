@@ -26,7 +26,7 @@ pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()>
     standard_fpi(AccountStorageMode::Public, client_config).await
 }
 
-pub async fn standard_fpi_private(client_config: ClientConfig) -> Result<()> {
+pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
     standard_fpi(AccountStorageMode::Private, client_config).await
 }
 
@@ -292,7 +292,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .await?
             .context("failed to find foreign account after deploiyng")?
             .into();
-        ForeignAccount::private(foreign_account)
+        ForeignAccount::private(&foreign_account)
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;

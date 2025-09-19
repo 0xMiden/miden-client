@@ -26,11 +26,10 @@ impl WebClient {
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let (new_account, account_seed, key_pair) =
-                generate_wallet(storage_mode, mutable, init_seed).await?;
+            let (new_account, key_pair) = generate_wallet(storage_mode, mutable, init_seed).await?;
 
             client
-                .add_account(&new_account, Some(account_seed.into()), false)
+                .add_account(&new_account, None, false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
