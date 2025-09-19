@@ -1,5 +1,3 @@
-// TODO: remove once miden-base#1878 is solved
-#![allow(dead_code)]
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
@@ -106,8 +104,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     Ok(())
 }
 
-#[ignore = "ignoring due to bug, see miden-base#1878"]
-pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
+pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (mut client, mut keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 

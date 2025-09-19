@@ -2024,7 +2024,7 @@ async fn storage_and_vault_proofs() {
         assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path());
 
         // Check that specific map item proof matches the one in the storage
-        let (value, proof) = client
+        let (value, _proof) = client
             .test_store()
             .get_account_map_item(account_id, 1, MAP_KEY.into())
             .await
