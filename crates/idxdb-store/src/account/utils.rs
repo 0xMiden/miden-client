@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountId,
     AccountIdAddress,
     AccountStorage,
+    StorageSlot,
 };
 use miden_client::asset::AssetVault;
 use miden_client::store::{AccountStatus, StoreError};
