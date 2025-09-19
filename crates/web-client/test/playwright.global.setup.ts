@@ -85,6 +85,7 @@ export const test = base.extend<{ forEachTest: void }>({
             Word,
             WebClient,
             MockWebClient,
+            ScriptBuilder,
           } = await import("./index.js");
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
@@ -166,6 +167,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
+          window.ScriptBuilder = ScriptBuilder;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};

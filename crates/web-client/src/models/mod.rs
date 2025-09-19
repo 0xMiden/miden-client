@@ -80,7 +80,6 @@ pub mod partial_note;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
-pub mod script_builder;
 pub mod secret_key;
 pub mod signature;
 pub mod signing_inputs;
