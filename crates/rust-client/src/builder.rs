@@ -9,6 +9,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
+use crate::note::{NoteConsumabilityChecker, StandardConsumabilityChecker};
 use crate::rpc::NodeRpcClient;
 use crate::store::Store;
 use crate::{Client, ClientError, DebugMode};
@@ -59,6 +60,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// Optional injected checker to customize note consumability checks.
+    checker: Option<Arc<dyn NoteConsumabilityChecker>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -72,18 +75,26 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
+            checker: None,
         }
     }
 }
 
 impl<AUTH> ClientBuilder<AUTH>
 where
-    AUTH: BuilderAuthenticator,
+    AUTH: BuilderAuthenticator + Sync + Send,
 {
     /// Create a new `ClientBuilder` with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Optionally provide a custom consumability checker.
+    #[must_use]
+    pub fn consumability_checker(mut self, checker: Arc<dyn NoteConsumabilityChecker>) -> Self {
+        self.checker = Some(checker);
+        self
     }
 
     /// Enable or disable debug mode.
@@ -212,6 +223,20 @@ where
             None => None,
         };
 
+        let checker = if let Some(checker) = self.checker {
+            checker
+        } else {
+            if authenticator.is_none() {
+                return Err(ClientError::ClientInitializationError(
+                    "To use the default consumability checker, an authenticator must be specified. Call `.authenticator(...)`.".into(),
+                ));
+            }
+            Arc::new(StandardConsumabilityChecker::new(
+                store.clone(),
+                authenticator.clone().unwrap(),
+            ))
+        };
+
         Client::new(
             rpc_api,
             rng,
@@ -224,6 +249,7 @@ where
                 self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
+            checker,
             self.tx_graceful_blocks,
             self.max_block_number_delta,
         )

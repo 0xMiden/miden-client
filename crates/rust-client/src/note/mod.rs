@@ -66,6 +66,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
 use crate::{Client, ClientError, IdPrefixFetchError};
 
+mod consumability_checker;
 mod import;
 mod note_screener;
 mod note_update_tracker;
@@ -73,6 +74,11 @@ mod note_update_tracker;
 // RE-EXPORTS
 // ================================================================================================
 
+pub use consumability_checker::{
+    NoteConsumabilityChecker,
+    NoteExecutionCheck,
+    StandardConsumabilityChecker,
+};
 pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
 pub use miden_lib::note::well_known_note::WellKnownNote;
 pub use miden_lib::note::{create_p2id_note, create_swap_note};
@@ -137,7 +143,7 @@ where
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.checker.clone());
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
@@ -167,7 +173,7 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(self.store.clone(), self.checker.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await

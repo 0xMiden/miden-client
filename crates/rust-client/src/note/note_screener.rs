@@ -4,21 +4,19 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use async_trait::async_trait;
-use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
-use miden_objects::account::{Account, AccountId};
+use miden_objects::account::AccountId;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::{AccountError, AssetError};
-use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::NoteCheckerError;
 use thiserror::Error;
 
+use super::consumability_checker::NoteConsumabilityChecker;
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
-use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::TransactionRequestError;
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -50,19 +48,16 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
-pub struct NoteScreener<AUTH> {
+pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
-    /// A reference to the transaction authenticator
-    authenticator: Option<Arc<AUTH>>,
+    /// A checker used to validate consumability of notes.
+    checker: Arc<dyn NoteConsumabilityChecker>,
 }
 
-impl<AUTH> NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
-    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator }
+impl NoteScreener {
+    pub fn new(store: Arc<dyn Store>, checker: Arc<dyn NoteConsumabilityChecker>) -> Self {
+        Self { store, checker }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -85,7 +80,7 @@ where
                 .await?
                 .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
 
-            match self.check_standard_consumability(account_record.account(), note).await {
+            match self.checker.check_notes_consumability(account_record.account(), note).await {
                 Ok(Some(relevance)) => {
                     note_relevances.push((id, relevance));
                 },
@@ -107,47 +102,6 @@ where
         }
 
         Ok(note_relevances)
-    }
-
-    /// Tries to execute a standard consume transaction to check if the note is consumable by the
-    /// account.
-    async fn check_standard_consumability(
-        &self,
-        account: &Account,
-        note: &Note,
-    ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
-        let transaction_request =
-            TransactionRequestBuilder::new().build_consume_notes(vec![note.id()])?;
-
-        let tx_script = transaction_request.build_transaction_script(
-            &AccountInterface::from(account),
-            crate::DebugMode::Enabled,
-        )?;
-
-        let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
-
-        let data_store = ClientDataStore::new(self.store.clone());
-        let mut transaction_executor = TransactionExecutor::new(&data_store);
-        if let Some(authenticator) = &self.authenticator {
-            transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
-        }
-
-        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
-
-        data_store.mast_store().load_account_code(account.code());
-        let note_execution_check = consumption_checker
-            .check_notes_consumability(
-                account.id(),
-                self.store.get_sync_height().await?,
-                vec![note.clone()],
-                tx_args,
-            )
-            .await?;
-        if !note_execution_check.successful.is_empty() {
-            return Ok(Some(NoteRelevance::Now));
-        }
-
-        Ok(None)
     }
 
     /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
@@ -180,10 +134,7 @@ where
 // ================================================================================================
 
 #[async_trait(?Send)]
-impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
-where
-    AUTH: TransactionAuthenticator + Sync,
-{
+impl OnNoteReceived for NoteScreener {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
     /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]
