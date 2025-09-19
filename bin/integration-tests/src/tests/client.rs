@@ -947,7 +947,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .with_context(|| {
-            format!("Transaction with id {} not found in discarded transactions", tx_id)
+            format!("Transaction with id {tx_id} not found in discarded transactions")
         })?;
     assert!(matches!(
         tx_record.status,
@@ -1161,7 +1161,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into())
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
         .await
         .unwrap()
         .pop()
