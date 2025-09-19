@@ -35,6 +35,7 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
+use miden_objects::address::AccountIdAddress;
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
@@ -254,6 +255,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         account_seed: Option<Word>,
+        addresses: Vec<AccountIdAddress>,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -269,6 +271,12 @@ pub trait Store: Send + Sync {
         &self,
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
+
+    /// Retrieves all [`AccountIdAddress`] objects that correspond to the provided account ID.
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<AccountIdAddress>, StoreError>;
 
     /// Updates an existing [`Account`] with a new state.
     ///
