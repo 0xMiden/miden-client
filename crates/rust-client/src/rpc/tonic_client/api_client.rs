@@ -59,7 +59,7 @@ pub(crate) mod api_client_wrapper {
 // CLIENT
 // ================================================================================================
 
-#[cfg(feature = "tonic")]
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod api_client_wrapper {
     use alloc::boxed::Box;
     use alloc::string::String;
