@@ -2,6 +2,7 @@ import { Page } from "puppeteer";
 import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
+  AccountFile,
   AccountBuilder,
   AccountComponent,
   AccountDelta,
@@ -78,6 +79,7 @@ declare global {
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
+    AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
