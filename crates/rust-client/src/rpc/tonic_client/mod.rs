@@ -8,7 +8,7 @@ use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_objects::utils::Deserializable;
 use miden_tx::utils::Serializable;
@@ -389,30 +389,76 @@ impl NodeRpcClient for TonicRpcClient {
         &self,
         prefixes: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        let request = proto::rpc_store::SyncNullifiersRequest {
-            nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
-            prefix_len: 16,
-            block_range: Some(BlockRange {
-                block_from: block_num.as_u32(),
-                block_to: None,
-            }),
-        };
+        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
 
+        let mut all_nullifiers = Vec::new();
+        let mut seen_nullifiers = BTreeSet::new();
+        let mut current_block_from = block_num.as_u32();
+
+        // Establish RPC connection once before the loop
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
-        })?;
-        let response = response.into_inner();
-        let nullifiers = response
-            .nullifiers
-            .iter()
-            .map(TryFrom::try_from)
-            .collect::<Result<Vec<NullifierUpdate>, _>>()
-            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+        for _ in 0..MAX_ITERATIONS {
+            let request = proto::rpc_store::SyncNullifiersRequest {
+                nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
+                prefix_len: 16,
+                block_range: Some(BlockRange {
+                    block_from: current_block_from,
+                    block_to: block_to.map(|b| b.as_u32()),
+                }),
+            };
 
-        Ok(nullifiers)
+            let response = rpc_api.sync_nullifiers(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncNullifiers, status)
+            })?;
+            let response = response.into_inner();
+
+            // Convert nullifiers for this batch
+            let batch_nullifiers = response
+                .nullifiers
+                .iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<Vec<NullifierUpdate>, _>>()
+                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+
+            // Check for duplicates and add to results
+            for nullifier_update in batch_nullifiers {
+                if !seen_nullifiers.insert(nullifier_update.nullifier) {
+                    return Err(RpcError::InvalidResponse(
+                        "duplicate nullifier found in response".to_string(),
+                    ));
+                }
+                all_nullifiers.push(nullifier_update);
+            }
+
+            // Check if we need to fetch more pages
+            if let Some(page) = response.pagination_info {
+                // Ensure we're making progress to avoid infinite loops
+                if page.block_num < current_block_from {
+                    return Err(RpcError::InvalidResponse(
+                        "invalid pagination: block_num went backwards".to_string(),
+                    ));
+                }
+
+                // Calculate target block as minimum between block_to and chain_tip
+                let target_block =
+                    block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
+
+                if page.block_num < target_block {
+                    current_block_from = page.block_num + 1;
+                    continue;
+                }
+            }
+            // No pagination info or we've reached/passed the target so we're done
+            return Ok(all_nullifiers);
+        }
+
+        // If we exit the loop, we've hit the iteration limit
+        Err(RpcError::InvalidResponse(
+            "too many pagination iterations, possible infinite loop".to_string(),
+        ))
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
@@ -448,6 +494,25 @@ impl NodeRpcClient for TonicRpcClient {
             ))?)?;
 
         Ok(block)
+    }
+
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+        let request = proto::note::NoteRoot { root: Some(root.into()) };
+
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.get_note_script_by_root(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNoteScriptByRoot, status)
+        })?;
+
+        let response = response.into_inner();
+        let note_script = NoteScript::try_from(
+            response
+                .script
+                .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
+        )?;
+
+        Ok(note_script)
     }
 }
 

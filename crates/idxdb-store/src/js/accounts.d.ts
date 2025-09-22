@@ -46,11 +46,11 @@ export declare function getAccountVaultAssets(vaultRoot: string): Promise<{
 export declare function getAccountAuthByPubKey(pubKey: string): Promise<{
     secretKey: string;
 }>;
-export declare function insertAccountCode(codeRoot: string, code: Uint8Array): Promise<void>;
-export declare function insertAccountStorage(storageSlots: JsStorageSlot[]): Promise<void>;
-export declare function insertStorageMapEntries(entries: JsStorageMapEntry[]): Promise<void>;
-export declare function insertVaultAssets(assets: JsVaultAsset[]): Promise<void>;
-export declare function insertAccountRecord(accountId: string, codeRoot: string, storageRoot: string, vaultRoot: string, nonce: string, committed: boolean, commitment: string, accountSeed: Uint8Array | undefined): Promise<void>;
+export declare function upsertAccountCode(codeRoot: string, code: Uint8Array): Promise<void>;
+export declare function upsertAccountStorage(storageSlots: JsStorageSlot[]): Promise<void>;
+export declare function upsertStorageMapEntries(entries: JsStorageMapEntry[]): Promise<void>;
+export declare function upsertVaultAssets(assets: JsVaultAsset[]): Promise<void>;
+export declare function upsertAccountRecord(accountId: string, codeRoot: string, storageRoot: string, vaultRoot: string, nonce: string, committed: boolean, commitment: string, accountSeed: Uint8Array | undefined): Promise<void>;
 export declare function insertAccountAuth(pubKey: string, secretKey: string): Promise<void>;
 export declare function upsertForeignAccountCode(accountId: string, code: Uint8Array, codeRoot: string): Promise<void>;
 export declare function getForeignAccountCode(accountIds: string[]): Promise<{
