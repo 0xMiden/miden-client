@@ -890,6 +890,26 @@ export const customAccountComponent = async (
       txIncrementRequest
     );
     await client.submitTransaction(txResult);
+
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    // Fetch the updated account state from the client
+    const updated = await client.getAccount(accountBuilderResult.account.id());
+
+    // Read a map value from storage slot 1 with key 0x0
+    const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
+    // NOTE: the map slot is in index 2 because the auth component takes one slot
+    const retrieveMapKey = updated?.storage().getMapItem(2, keyZero);
+
+    const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+
+    if (retrieveMapKey?.toHex() !== expected.toHex()) {
+      throw new Error(
+        `unexpected Word: got ${retrieveMapKey?.toHex()} expected ${expected.toHex()}`
+      );
+    }
   });
 };
 

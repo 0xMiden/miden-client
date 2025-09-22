@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteAndArgsArray**(`note_and_args`?): `NoteAndArgsArray`
+> **new NoteAndArgsArray**(`note_and_args?`): `NoteAndArgsArray`
 
 #### Parameters
 
