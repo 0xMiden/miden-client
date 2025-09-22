@@ -137,4 +137,4 @@ declare const partialBlockchainNodes: import("dexie").Table<IPartialBlockchainNo
 declare const tags: import("dexie").Table<ITag, number, ITag>;
 declare const foreignAccountCode: import("dexie").Table<IForeignAccountCode, string, IForeignAccountCode>;
 declare const settings: import("dexie").Table<ISetting, string, ISetting>;
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };

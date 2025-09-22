@@ -128,22 +128,6 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### deleteSettingValue()
-
-> **deleteSettingValue**(`key`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### key
-
-`string`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
 ### exportAccountFile()
 
 > **exportAccountFile**(`account_id`): `Promise`\<`any`\>
@@ -326,22 +310,6 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### getSettingValue()
-
-> **getSettingValue**(`key`): `Promise`\<`any`\>
-
-#### Parameters
-
-##### key
-
-`string`
-
-#### Returns
-
-`Promise`\<`any`\>
-
-***
-
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -365,6 +333,22 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
+
+***
+
+### getValue()
+
+> **getValue**(`key`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
 
 ***
 
@@ -433,6 +417,16 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+***
+
+### listKeys()
+
+> **listKeys**(): `Promise`\<`string`[]\>
+
+#### Returns
+
+`Promise`\<`string`[]\>
 
 ***
 
@@ -696,6 +690,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeValue()
+
+> **removeValue**(`key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### serializeMockChain()
 
 > **serializeMockChain**(): `Uint8Array`
@@ -708,9 +718,9 @@ Returns the inner serialized mock chain if it exists.
 
 ***
 
-### setSettingValue()
+### setValue()
 
-> **setSettingValue**(`key`, `value`): `Promise`\<`void`\>
+> **setValue**(`key`, `value`): `Promise`\<`void`\>
 
 #### Parameters
 

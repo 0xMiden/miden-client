@@ -56,6 +56,12 @@ impl WebClient {
 
     #[wasm_bindgen(js_name = "listKeys")]
     pub async fn list_keys(&mut self) -> Result<Vec<String>, JsValue> {
-        unimplemented!()
+        if let Some(client) = self.get_mut_inner() {
+            client.list_keys().await.map_err(|err| {
+                js_error_with_context(err, "failed to list setting keys in the store")
+            })
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
     }
 }

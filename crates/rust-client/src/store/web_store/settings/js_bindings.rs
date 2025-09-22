@@ -7,12 +7,15 @@ use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 // Settings IndexedDB Operations
 #[wasm_bindgen(module = "/src/store/web_store/js/settings.js")]
 extern "C" {
-    #[wasm_bindgen(js_name = getSettingValue)]
-    pub fn idxdb_get_setting_value(key: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = getValue)]
+    pub fn idxdb_get_value(key: String) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertSettingValue)]
-    pub fn idxdb_insert_setting_value(key: String, value: Vec<u8>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = insertValue)]
+    pub fn idxdb_insert_value(key: String, value: Vec<u8>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = deleteSettingValue)]
-    pub fn idxdb_delete_setting_value(key: String) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = removeValue)]
+    pub fn idxdb_remove_value(key: String) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = listKeys)]
+    pub fn idxdb_list_keys() -> js_sys::Promise;
 }

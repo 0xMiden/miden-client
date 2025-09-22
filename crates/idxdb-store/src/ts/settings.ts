@@ -1,7 +1,7 @@
 import { settings } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
-export async function getSettingValue(key: string) {
+export async function getValue(key: string) {
   try {
     // Fetch all records matching the given key
     const allMatchingRecords = await settings
@@ -29,7 +29,7 @@ export async function getSettingValue(key: string) {
   }
 }
 
-export async function insertSettingValue(
+export async function insertValue(
   key: string,
   value: Uint8Array
 ): Promise<void> {
@@ -47,10 +47,19 @@ export async function insertSettingValue(
   }
 }
 
-export async function deleteSettingValue(key: string): Promise<void> {
+export async function removeValue(key: string): Promise<void> {
   try {
     await settings.where("key").equals(key).delete();
   } catch (error) {
     logWebStoreError(error, `Error deleting setting with key: ${key}`);
+  }
+}
+
+export async function listKeys() {
+  try {
+    const keys: string[] = await settings.toArray().then((settings) => settings.map((setting) => setting.key));
+    return keys;
+  } catch (error) {
+    logWebStoreError(error, `Error listing setting keys`);
   }
 }
