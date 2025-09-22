@@ -27,6 +27,16 @@ impl Word {
         Word(native_word)
     }
 
+    /// Creates a Word from a hex string.
+    /// Fails if the provided string is not a valid hex representation of a Word.
+    #[wasm_bindgen(js_name = "fromHex")]
+    pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
+        let native_word = NativeWord::try_from(hex).map_err(|err| {
+            JsValue::from_str(&format!("error instantiating Word from hex: {err}"))
+        })?;
+        Ok(Word(native_word))
+    }
+
     #[wasm_bindgen(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {

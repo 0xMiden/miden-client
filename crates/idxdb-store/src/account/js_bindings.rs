@@ -50,20 +50,20 @@ extern "C" {
     // INSERTS
     // --------------------------------------------------------------------------------------------
 
-    #[wasm_bindgen(js_name = insertAccountCode)]
-    pub fn idxdb_insert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = upsertAccountCode)]
+    pub fn idxdb_upsert_account_code(code_root: String, code: Vec<u8>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountStorage)]
-    pub fn idxdb_insert_account_storage(storage_slots: Vec<JsStorageSlot>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = upsertAccountStorage)]
+    pub fn idxdb_upsert_account_storage(storage_slots: Vec<JsStorageSlot>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertStorageMapEntries)]
-    pub fn idxdb_insert_storage_map_entries(entries: Vec<JsStorageMapEntry>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = upsertStorageMapEntries)]
+    pub fn idxdb_upsert_storage_map_entries(entries: Vec<JsStorageMapEntry>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertVaultAssets)]
-    pub fn idxdb_insert_vault_assets(assets: Vec<JsVaultAsset>) -> js_sys::Promise;
+    #[wasm_bindgen(js_name = upsertVaultAssets)]
+    pub fn idxdb_upsert_vault_assets(assets: Vec<JsVaultAsset>) -> js_sys::Promise;
 
-    #[wasm_bindgen(js_name = insertAccountRecord)]
-    pub fn idxdb_insert_account_record(
+    #[wasm_bindgen(js_name = upsertAccountRecord)]
+    pub fn idxdb_upsert_account_record(
         id: String,
         code_root: String,
         storage_root: String,

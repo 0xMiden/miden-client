@@ -240,7 +240,7 @@ export async function getAccountAddresses(accountId) {
     }
 }
 // INSERT FUNCTIONS
-export async function insertAccountCode(codeRoot, code) {
+export async function upsertAccountCode(codeRoot, code) {
     try {
         // Prepare the data object to insert
         const data = {
@@ -254,7 +254,7 @@ export async function insertAccountCode(codeRoot, code) {
         logWebStoreError(error, `Error inserting code with root: ${codeRoot}`);
     }
 }
-export async function insertAccountStorage(storageSlots) {
+export async function upsertAccountStorage(storageSlots) {
     try {
         let processedSlots = storageSlots.map((slot) => {
             return {
@@ -270,7 +270,7 @@ export async function insertAccountStorage(storageSlots) {
         logWebStoreError(error, `Error inserting storage slots`);
     }
 }
-export async function insertStorageMapEntries(entries) {
+export async function upsertStorageMapEntries(entries) {
     try {
         let processedEntries = entries.map((entry) => {
             return {
@@ -285,7 +285,7 @@ export async function insertStorageMapEntries(entries) {
         logWebStoreError(error, `Error inserting storage map entries`);
     }
 }
-export async function insertVaultAssets(assets) {
+export async function upsertVaultAssets(assets) {
     try {
         let processedAssets = assets.map((asset) => {
             return {
@@ -301,7 +301,7 @@ export async function insertVaultAssets(assets) {
         logWebStoreError(error, `Error inserting assets`);
     }
 }
-export async function insertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
+export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaultRoot, nonce, committed, commitment, accountSeed) {
     try {
         const data = {
             id: accountId,
@@ -314,7 +314,7 @@ export async function insertAccountRecord(accountId, codeRoot, storageRoot, vaul
             accountCommitment: commitment,
             locked: false,
         };
-        await accounts.add(data);
+        await accounts.put(data);
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account: ${accountId}`);
@@ -350,7 +350,7 @@ export async function insertAccountAddress(address, accountId) {
 }
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {
     try {
-        await insertAccountCode(codeRoot, code);
+        await upsertAccountCode(codeRoot, code);
         const data = {
             accountId,
             codeRoot,

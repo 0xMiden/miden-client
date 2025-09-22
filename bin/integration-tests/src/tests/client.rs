@@ -7,7 +7,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteType};
+use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -1173,9 +1173,21 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap()
         .pop()
         .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
+    let retrieved_note_script = client
+        .test_rpc_api()
+        .get_note_script_by_root(note.script().root())
+        .await
+        .unwrap();
+
+    // Remove debug decorators from original note script, as they are not persisted on submission
+    // https://github.com/0xMiden/miden-base/issues/1812
+    let mut mast = (*note.script().mast()).clone();
+    mast.strip_decorators();
+    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
+    assert_eq!(note_script, retrieved_note_script);
 
     Ok(())
 }

@@ -308,7 +308,7 @@ export async function getAccountAddresses(accountId: string) {
 
 // INSERT FUNCTIONS
 
-export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
+export async function upsertAccountCode(codeRoot: string, code: Uint8Array) {
   try {
     // Prepare the data object to insert
     const data = {
@@ -323,7 +323,7 @@ export async function insertAccountCode(codeRoot: string, code: Uint8Array) {
   }
 }
 
-export async function insertAccountStorage(storageSlots: JsStorageSlot[]) {
+export async function upsertAccountStorage(storageSlots: JsStorageSlot[]) {
   try {
     let processedSlots = storageSlots.map((slot) => {
       return {
@@ -340,7 +340,7 @@ export async function insertAccountStorage(storageSlots: JsStorageSlot[]) {
   }
 }
 
-export async function insertStorageMapEntries(entries: JsStorageMapEntry[]) {
+export async function upsertStorageMapEntries(entries: JsStorageMapEntry[]) {
   try {
     let processedEntries = entries.map((entry) => {
       return {
@@ -356,7 +356,7 @@ export async function insertStorageMapEntries(entries: JsStorageMapEntry[]) {
   }
 }
 
-export async function insertVaultAssets(assets: JsVaultAsset[]) {
+export async function upsertVaultAssets(assets: JsVaultAsset[]) {
   try {
     let processedAssets = assets.map((asset) => {
       return {
@@ -372,7 +372,7 @@ export async function insertVaultAssets(assets: JsVaultAsset[]) {
     logWebStoreError(error, `Error inserting assets`);
   }
 }
-export async function insertAccountRecord(
+export async function upsertAccountRecord(
   accountId: string,
   codeRoot: string,
   storageRoot: string,
@@ -395,7 +395,7 @@ export async function insertAccountRecord(
       locked: false,
     };
 
-    await accounts.add(data as IAccount);
+    await accounts.put(data as IAccount);
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
   }
@@ -446,7 +446,7 @@ export async function upsertForeignAccountCode(
   codeRoot: string
 ) {
   try {
-    await insertAccountCode(codeRoot, code);
+    await upsertAccountCode(codeRoot, code);
 
     const data = {
       accountId,

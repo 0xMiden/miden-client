@@ -55,12 +55,12 @@ use models::{
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault,
-    insert_account_code,
-    insert_account_record,
-    insert_account_storage,
     parse_account_record_idxdb_object,
     update_account,
+    upsert_account_asset_vault,
+    upsert_account_code,
+    upsert_account_record,
+    upsert_account_storage,
 };
 
 impl WebStore {
@@ -285,19 +285,19 @@ impl WebStore {
         account_seed: Option<Word>,
         addresses: Vec<AccountIdAddress>,
     ) -> Result<(), StoreError> {
-        insert_account_code(account.code()).await.map_err(|js_error| {
+        upsert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
 
-        insert_account_storage(account.storage()).await.map_err(|js_error| {
+        upsert_account_storage(account.storage()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
         })?;
 
-        insert_account_asset_vault(account.vault()).await.map_err(|js_error| {
+        upsert_account_asset_vault(account.vault()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
         })?;
 
-        insert_account_record(account, account_seed).await.map_err(|js_error| {
+        upsert_account_record(account, account_seed).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 
