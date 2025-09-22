@@ -36,7 +36,7 @@ pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Re
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
 pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
@@ -118,7 +118,7 @@ pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Res
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
 pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
