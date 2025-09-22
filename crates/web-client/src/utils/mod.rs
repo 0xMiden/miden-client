@@ -3,7 +3,7 @@ use miden_objects::utils::SliceReader;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
-pub mod assembler_utils;
+// pub mod assembler_utils;
 
 use crate::js_error_with_context;
 
