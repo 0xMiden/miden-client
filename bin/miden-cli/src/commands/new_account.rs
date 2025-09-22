@@ -9,7 +9,7 @@ use miden_client::Client;
 use miden_client::account::component::COMPONENT_TEMPLATE_EXTENSION;
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthSecretKey, TransactionAuthenticator};
-use miden_client::crypto::SecretKey;
+use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_lib::account::auth::AuthRpoFalcon512;

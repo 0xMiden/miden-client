@@ -11,6 +11,7 @@ miden-client = { version = "0.11" }
 Spin up a client using the following Rust code and supplying a store and RPC endpoint. 
 
 ```rust
+use miden_client_sqlite_store::SqliteStore;
 let sqlite_store = SqliteStore::new("path/to/store".try_into()?).await?;
 let store = Arc::new(sqlite_store);
 

@@ -9,8 +9,9 @@
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
 //!
-//! In addition, the module provides implementations for different environments (e.g. tonic-based or
-//! web-based) via feature flags ( `tonic` and `web-tonic`).
+//! The client implementation adapts to the target environment automatically:
+//! - Native targets use `tonic` transport with TLS.
+//! - `wasm32` targets use `tonic-web-wasm-client` transport.
 //!
 //! ## Example
 //!
@@ -53,7 +54,7 @@ use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
@@ -71,12 +72,9 @@ mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
 
-#[cfg(all(feature = "tonic", feature = "web-tonic"))]
-compile_error!("features `tonic` and `web-tonic` are mutually exclusive");
-
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 mod tonic_client;
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 pub use tonic_client::TonicRpcClient;
 
 use crate::store::InputNoteRecord;
@@ -170,10 +168,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
+    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
+    ///   to the network chain tip.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
@@ -203,7 +204,7 @@ pub trait NodeRpcClient: Send + Sync {
         nullifier: &Nullifier,
         block_num: BlockNumber,
     ) -> Result<Option<u32>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num).await?;
+        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
 
         Ok(nullifiers
             .iter()
@@ -290,6 +291,12 @@ pub trait NodeRpcClient: Send + Sync {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }
+
+    /// Fetches the note script with the specified root.
+    ///
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -309,6 +316,7 @@ pub enum NodeRpcClientEndpoint {
     SyncState,
     SubmitProvenTx,
     SyncNotes,
+    GetNoteScriptByRoot,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -329,6 +337,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
+            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
         }
     }
 }

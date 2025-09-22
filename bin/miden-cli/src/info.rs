@@ -6,6 +6,7 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
+use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 use crate::load_config_file;
 
@@ -30,7 +31,7 @@ async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
     println!(
         "Default account: {}",
         client
-            .get_default_account_id()
+            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
             .await?
             .map_or("-".to_string(), AccountId::to_hex)
     );

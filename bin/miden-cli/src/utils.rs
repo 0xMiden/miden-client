@@ -8,6 +8,7 @@ use miden_objects::address::Address;
 
 use super::config::CliConfig;
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
+use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 use crate::faucet_details_map::FaucetDetailsMap;
 
@@ -29,7 +30,7 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
         account_id_prefix
     } else {
         client
-            .get_default_account_id()
+            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
             .await?
             .map(AccountId::to_hex)
             .ok_or(CliError::Input("No input account ID nor default account defined".to_string()))?

@@ -58,8 +58,8 @@
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::rpc::{Endpoint, TonicRpcClient};
 //! use miden_client::store::Store;
-//! use miden_client::store::sqlite_store::SqliteStore;
 //! use miden_client::{Client, ExecutionOptions, Felt};
+//! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
 //! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 //! use rand::Rng;
@@ -137,9 +137,6 @@ pub mod builder;
 #[cfg(feature = "testing")]
 mod test_utils;
 
-#[cfg(test)]
-pub mod tests;
-
 mod errors;
 
 // RE-EXPORTS
@@ -161,6 +158,7 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
+        AccountStorageDelta,
         AccountVaultDelta,
         FungibleAssetDelta,
         NonFungibleAssetDelta,
@@ -171,6 +169,7 @@ pub mod asset {
         AssetVault,
         FungibleAsset,
         NonFungibleAsset,
+        NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -180,6 +179,7 @@ pub mod asset {
 pub mod auth {
     pub use miden_lib::AuthScheme;
     pub use miden_objects::account::AuthSecretKey;
+    pub use miden_tx::auth::signatures::get_falcon_signature;
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
 
@@ -192,9 +192,14 @@ pub mod block {
 /// network. It re-exports commonly used types and random number generators like `FeltRng` from
 /// the `miden_objects` crate.
 pub mod crypto {
-    pub use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
+    pub mod rpo_falcon512 {
+        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+    }
+
+    pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
+        Forest,
         InOrderIndex,
         LeafIndex,
         MerklePath,
@@ -204,13 +209,14 @@ pub mod crypto {
         MmrPeaks,
         MmrProof,
         NodeIndex,
+        SMT_DEPTH,
         SmtLeaf,
         SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
-pub use errors::{AuthenticationError, ClientError, IdPrefixFetchError};
+pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
 pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
