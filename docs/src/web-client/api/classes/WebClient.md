@@ -66,22 +66,6 @@
 
 ***
 
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url`?, `seed`?): `Promise`\<`any`\>

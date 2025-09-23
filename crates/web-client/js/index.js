@@ -3,7 +3,6 @@ const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 
 const {
-  ScriptBuilder,
   Account,
   AccountBuilder,
   AccountComponent,
@@ -19,8 +18,6 @@ const {
   Address,
   AddressInterface,
   AdviceMap,
-  Assembler,
-  AssemblerUtils,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -57,6 +54,8 @@ const {
   PublicKey,
   Rpo256,
   RpcClient,
+  ScriptBuilder,
+  ScriptBuilderMode,
   SecretKey,
   Signature,
   SigningInputs,
@@ -96,8 +95,7 @@ export {
   AddressInterface,
   AdviceMap,
   ScriptBuilder,
-  Assembler,
-  AssemblerUtils,
+  ScriptBuilderMode,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,

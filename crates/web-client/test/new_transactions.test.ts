@@ -521,7 +521,7 @@ export const customTransaction = async (
             end
         `;
 
-      let builder = new window.ScriptBuilder(true);
+      let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.FeltArray([
@@ -837,7 +837,7 @@ export const customAccountComponent = async (
         end
       `;
     const client = window.client;
-    let builder = new window.ScriptBuilder(true);
+    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
     let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
@@ -1067,7 +1067,7 @@ export const discardedTransaction = async (
   });
 };
 
-test.describe("@debug discarded_transaction tests", () => {
+test.describe("discarded_transaction tests", () => {
   test("transaction gets discarded", async ({ page }) => {
     const result = await discardedTransaction(page);
 
@@ -1131,7 +1131,7 @@ export const counterAccountComponent = async (
     // Create counter account
     let emptyStorageSlot = window.StorageSlot.emptyValue();
 
-    let builder = new window.ScriptBuilder(false);
+    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Normal);
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,

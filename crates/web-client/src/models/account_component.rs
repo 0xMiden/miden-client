@@ -1,12 +1,13 @@
-use crate::models::script_builder::ScriptBuilder;
 use miden_lib::account::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
 use miden_objects::account::{
-    AccountComponent as NativeAccountComponent, StorageSlot as NativeStorageSlot,
+    AccountComponent as NativeAccountComponent,
+    StorageSlot as NativeStorageSlot,
 };
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 
@@ -23,13 +24,9 @@ impl AccountComponent {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        NativeAccountComponent::compile(
-            account_code,
-            builder.clone_assembler().into(),
-            native_slots,
-        )
-        .map(AccountComponent)
-        .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
+        NativeAccountComponent::compile(account_code, builder.clone_assembler(), native_slots)
+            .map(AccountComponent)
+            .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
 
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]

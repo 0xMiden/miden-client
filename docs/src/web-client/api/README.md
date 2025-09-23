@@ -12,6 +12,7 @@
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
+- [ScriptBuilderMode](enumerations/ScriptBuilderMode.md)
 
 ## Classes
 
@@ -31,8 +32,6 @@
 - [Address](classes/Address.md)
 - [AdviceInputs](classes/AdviceInputs.md)
 - [AdviceMap](classes/AdviceMap.md)
-- [Assembler](classes/Assembler.md)
-- [AssemblerUtils](classes/AssemblerUtils.md)
 - [AssetVault](classes/AssetVault.md)
 - [AuthSecretKey](classes/AuthSecretKey.md)
 - [BasicFungibleFaucetComponent](classes/BasicFungibleFaucetComponent.md)
@@ -89,6 +88,7 @@
 - [RecipientArray](classes/RecipientArray.md)
 - [RpcClient](classes/RpcClient.md)
 - [Rpo256](classes/Rpo256.md)
+- [ScriptBuilder](classes/ScriptBuilder.md)
 - [SecretKey](classes/SecretKey.md)
 - [SerializedInputNoteData](classes/SerializedInputNoteData.md)
 - [SerializedOutputNoteData](classes/SerializedOutputNoteData.md)
@@ -104,7 +104,6 @@
 - [TransactionArgs](classes/TransactionArgs.md)
 - [TransactionFilter](classes/TransactionFilter.md)
 - [TransactionId](classes/TransactionId.md)
-- [TransactionKernel](classes/TransactionKernel.md)
 - [TransactionProver](classes/TransactionProver.md)
 - [TransactionRecord](classes/TransactionRecord.md)
 - [TransactionRequest](classes/TransactionRequest.md)

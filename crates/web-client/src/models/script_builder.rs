@@ -1,8 +1,5 @@
-use crate::js_error_with_context;
-use crate::models::library::Library;
-use crate::models::note_script::NoteScript;
-use crate::models::transaction_script::TransactionScript;
 use alloc::string::ToString;
+
 use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::ScriptBuilder as NativeScriptBuilder;
 use miden_objects::assembly::diagnostics::Report;
@@ -10,6 +7,11 @@ use miden_objects::assembly::{
     Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind,
 };
 use wasm_bindgen::prelude::*;
+
+use crate::js_error_with_context;
+use crate::models::library::Library;
+use crate::models::note_script::NoteScript;
+use crate::models::transaction_script::TransactionScript;
 
 #[derive(Clone)]
 #[wasm_bindgen(inspectable)]
@@ -31,14 +33,11 @@ pub enum ScriptBuilderMode {
 
 #[wasm_bindgen]
 impl ScriptBuilder {
-    /// Instance a ScriptBuilder. Will use debug mode (or not), depending
+    /// Instance a `ScriptBuilder`. Will use debug mode (or not), depending
     /// on the mode passed when initially instanced.
     #[wasm_bindgen(constructor)]
     pub fn new(mode: ScriptBuilderMode) -> Self {
-        let in_debug_mode = match mode {
-            ScriptBuilderMode::Debug => true,
-            ScriptBuilderMode::Normal => false,
-        };
+        let in_debug_mode = mode.into();
         let builder = NativeScriptBuilder::new(in_debug_mode);
         let assembler =
             TransactionKernel::assembler_with_source_manager(builder.source_manager().clone())
@@ -51,12 +50,12 @@ impl ScriptBuilder {
         self.builder.link_module(module_path, module_code).map_err(|e| {
             js_error_with_context(
                 e,
-                &format!("script builder: failed to link module with path {}", module_path),
+                &format!("script builder: failed to link module with path {module_path}"),
             )
         })?;
         self.assembler.compile_and_statically_link(module_code).map_err(|e| {
             let err_msg =
-                format_assembler_error(e, "script builder: assembler failed to link module");
+                format_assembler_error(&e, "script builder: assembler failed to link module");
             JsValue::from(err_msg)
         })?;
         Ok(())
@@ -66,11 +65,11 @@ impl ScriptBuilder {
     pub fn link_static_library(&mut self, library: &Library) -> Result<(), JsValue> {
         let library: NativeLibrary = library.into();
         self.builder.link_static_library(&library).map_err(|e| {
-            js_error_with_context(e, &format!("script builder: failed to link static library"))
+            js_error_with_context(e, "script builder: failed to link static library")
         })?;
         self.assembler.link_static_library(&library).map_err(|e| {
             let err_msg = format_assembler_error(
-                e,
+                &e,
                 "script builder: assembler failed to link static library",
             );
             JsValue::from_str(&err_msg)
@@ -82,11 +81,11 @@ impl ScriptBuilder {
     pub fn link_dynamic_library(&mut self, library: &Library) -> Result<(), JsValue> {
         let library: NativeLibrary = library.into();
         self.builder.link_dynamic_library(&library).map_err(|e| {
-            js_error_with_context(e, &format!("script builder: failed to link dynamic library"))
+            js_error_with_context(e, "script builder: failed to link dynamic library")
         })?;
         self.assembler.link_dynamic_library(&library).map_err(|e| {
             let err_msg = format_assembler_error(
-                e,
+                &e,
                 "script builder: assembler failed to link dynamic library",
             );
             JsValue::from_str(&err_msg)
@@ -119,17 +118,13 @@ impl ScriptBuilder {
     pub fn build_library(&self, library_path: &str, source_code: &str) -> Result<Library, JsValue> {
         let library_path = LibraryPath::new(library_path).map_err(|e| {
             js_error_with_context(
-                e,
-                &format!(
-                    "script builder: failed to build library -- could not create library_path with path {}",
-                    library_path
-                ),
+                e, "script builder: failed to build library -- could not create library_path with path {library_path}",
             )
         })?;
         let module = Module::parser(ModuleKind::Library)
             .parse_str(library_path, source_code, self.builder.source_manager().as_ref())
             .map_err(|e| {
-                let err_msg = format_assembler_error(e, "error while parsing module");
+                let err_msg = format_assembler_error(&e, "error while parsing module");
                 JsValue::from(err_msg)
             })?;
 
@@ -138,29 +133,41 @@ impl ScriptBuilder {
             Ok(native_library) => Ok(native_library.into()),
             Err(error_report) => {
                 let err_msg =
-                    format_assembler_error(error_report, "error while assembling library");
+                    format_assembler_error(&error_report, "error while assembling library");
                 Err(JsValue::from(err_msg))
             },
         }
     }
 
     /// Returns the inner assembler . This is because multiple "compile" functions
-    /// in miden_lib to consume an Assembler, so we need to clone the value.
+    /// in `miden_lib` to consume an Assembler, so we need to clone the value.
     pub(crate) fn clone_assembler(&self) -> Assembler {
         self.assembler.clone()
     }
 }
 
+// HELPERS
+// ================================================================================================
 // The assembler type returns a miette::Report instead of an Err, so this
 // takes the report and returns it as an error.
-fn format_assembler_error(err_report: Report, extra_context: &str) -> String {
+fn format_assembler_error(err_report: &Report, extra_context: &str) -> String {
     let error = err_report
         .chain()
         .into_iter()
         .map(ToString::to_string)
         .collect::<Vec<String>>()
         .join("\n");
-    let err_msg =
-        format!("script builder: {}: failed to build given library: \n {}", error, extra_context);
-    return err_msg;
+
+    format!("script builder: {}: failed to build given library: \n {}", error, extra_context)
+}
+
+// CONVERSIONS
+// ================================================================================================
+impl From<ScriptBuilderMode> for bool {
+    fn from(value: ScriptBuilderMode) -> Self {
+        match value {
+            ScriptBuilderMode::Debug => true,
+            ScriptBuilderMode::Normal => false,
+        }
+    }
 }
