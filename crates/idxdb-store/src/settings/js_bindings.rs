@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
 // Settings IndexedDB Operations
-#[wasm_bindgen(module = "/src/store/web_store/js/settings.js")]
+#[wasm_bindgen(module = "/src/js/settings.js")]
 extern "C" {
     #[wasm_bindgen(js_name = getValue)]
     pub fn idxdb_get_value(key: String) -> js_sys::Promise;

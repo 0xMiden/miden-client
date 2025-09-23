@@ -46,7 +46,9 @@ export async function removeValue(key) {
 }
 export async function listKeys() {
     try {
-        const keys = await settings.toArray().then((settings) => settings.map((setting) => setting.key));
+        const keys = await settings
+            .toArray()
+            .then((settings) => settings.map((setting) => setting.key));
         return keys;
     }
     catch (error) {

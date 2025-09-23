@@ -11,7 +11,6 @@ test.describe("settings tests", () => {
       const value = await client.getValue("test");
 
       return JSON.stringify(value) === JSON.stringify(testValue);
-
     });
     expect(isValid).toEqual(true);
   });
@@ -25,7 +24,6 @@ test.describe("settings tests", () => {
       const keys = await client.listKeys();
 
       return JSON.stringify(keys) === JSON.stringify([testKey]);
-
     });
     expect(isValid).toEqual(true);
   });

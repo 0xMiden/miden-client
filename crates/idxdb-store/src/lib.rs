@@ -42,6 +42,7 @@ pub mod export;
 pub mod import;
 pub mod note;
 mod promise;
+pub mod settings;
 pub mod sync;
 pub mod transaction;
 

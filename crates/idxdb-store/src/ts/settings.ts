@@ -57,7 +57,9 @@ export async function removeValue(key: string): Promise<void> {
 
 export async function listKeys() {
   try {
-    const keys: string[] = await settings.toArray().then((settings) => settings.map((setting) => setting.key));
+    const keys: string[] = await settings
+      .toArray()
+      .then((settings) => settings.map((setting) => setting.key));
     return keys;
   } catch (error) {
     logWebStoreError(error, `Error listing setting keys`);
