@@ -76,7 +76,7 @@ use crate::sync::NoteTagRecord;
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
 
-    pub use miden_lib::account::auth::AuthRpoFalcon512;
+    pub use miden_lib::account::auth::*;
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
