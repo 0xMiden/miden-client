@@ -16,11 +16,7 @@ use crate::tests::create_test_client;
 fn create_account_data(account_id: u128) -> AccountFile {
     let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
 
-    AccountFile::new(
-        account.clone(),
-        Some(Word::default()),
-        vec![AuthSecretKey::RpoFalcon512(SecretKey::new())],
-    )
+    AccountFile::new(account.clone(), vec![AuthSecretKey::RpoFalcon512(SecretKey::new())])
 }
 
 pub fn create_initial_accounts_data() -> Vec<AccountFile> {

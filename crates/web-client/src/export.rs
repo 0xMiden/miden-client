@@ -86,7 +86,6 @@ impl WebClient {
                 .ok_or(JsValue::from_str("No account found"))?;
 
             let keystore = self.keystore.clone().expect("Keystore not initialized");
-            let account_seed = account.seed();
             let account = account.into();
 
             let mut key_pairs = vec![];
@@ -103,7 +102,7 @@ impl WebClient {
                 );
             }
 
-            let account_data = AccountFile::new(account, account_seed, key_pairs);
+            let account_data = AccountFile::new(account, key_pairs);
 
             let serialized_input_note_bytes =
                 serde_wasm_bindgen::to_value(&account_data.to_bytes())

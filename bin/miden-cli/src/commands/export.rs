@@ -88,7 +88,6 @@ async fn export_account<AUTH>(
         .get_account(account_id)
         .await?
         .ok_or(CliError::Export(format!("Account with ID {account_id} not found")))?;
-    let account_seed = account.seed();
 
     let account: Account = account.into();
 

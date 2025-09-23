@@ -26,7 +26,7 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
             let account_id = account_data.account.id().to_string();
 
-            let AccountFile { account, account_seed, auth_secret_keys } = account_data;
+            let AccountFile { account, auth_secret_keys } = account_data;
 
             let account_to_add = if let Some(seed) = account_seed {
                 let (id, vault, storage, code, nonce, _) = account.into_parts();

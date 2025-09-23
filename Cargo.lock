@@ -1556,7 +1556,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.0",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2420,7 +2420,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "futures",
@@ -2448,7 +2448,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "futures",
@@ -2468,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2490,7 +2490,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "fs-err",
  "miette",
@@ -2502,7 +2502,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "futures",
@@ -2529,7 +2529,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2560,7 +2560,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2640,7 +2640,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2685,7 +2685,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#10e99501c3980d9efdb9bc6719d304974e2be4a7"
+source = "git+https://github.com/0xMiden/miden-node?branch=igamigo-partial-map-fix#e77f290ccc8cd372f7de0ea486005c9eeaaa043e"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -3418,7 +3418,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "sfv",
- "socket2 0.5.10",
+ "socket2 0.6.0",
  "strum",
  "strum_macros",
  "tokio",

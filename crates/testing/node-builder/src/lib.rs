@@ -381,11 +381,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let (id, vault, storage, code, _, seed) = account.into_parts();
     let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, seed);
 
-    Ok(AccountFile::new(
-        updated_account,
-        None,
-        vec![AuthSecretKey::RpoFalcon512(secret)],
-    ))
+    Ok(AccountFile::new(updated_account, vec![AuthSecretKey::RpoFalcon512(secret)]))
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {
