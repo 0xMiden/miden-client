@@ -86,7 +86,7 @@ impl WebClient {
                 .ok_or(JsValue::from_str("No account found"))?;
 
             let keystore = self.keystore.clone().expect("Keystore not initialized");
-            let account_seed = account.seed().copied();
+            let account_seed = account.seed();
             let account = account.into();
 
             let mut key_pairs = vec![];

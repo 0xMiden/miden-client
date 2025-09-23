@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -217,7 +218,6 @@ impl MockRpcApi {
         mock_chain.prove_until_block(current_height + num_blocks).unwrap();
     }
 }
-use alloc::boxed::Box;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
@@ -345,9 +345,9 @@ impl NodeRpcClient for MockRpcApi {
             .unwrap();
 
         if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            Ok(FetchedAccount::Public(account.clone(), summary))
+            Ok(FetchedAccount::new_public(account.clone(), summary))
         } else {
-            Ok(FetchedAccount::Private(account_id, summary))
+            Ok(FetchedAccount::new_private(account_id, summary))
         }
     }
 

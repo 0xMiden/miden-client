@@ -45,11 +45,15 @@ pub async fn try_add_account() {
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
-    let (id, vault, storage, code, _) = account.into_parts();
-    let account = Account::from_parts(id, vault, storage, code, ZERO);
+    let (id, vault, storage, code, ..) = account.into_parts();
+    let account_without_seed =
+        Account::new_unchecked(id, vault.clone(), storage.clone(), code.clone(), ZERO, None);
+    assert!(client.add_account(&account_without_seed, false).await.is_err());
 
-    assert!(client.add_account(&account, None, false).await.is_err());
-    assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
+    let account_with_seed =
+        Account::new_unchecked(id, vault, storage, code, ZERO, Some(Word::default()));
+
+    assert!(client.add_account(&account_with_seed, false).await.is_ok());
 }
 
 #[tokio::test]
@@ -60,10 +64,7 @@ async fn load_accounts_test() {
     let created_accounts_data = create_initial_accounts_data();
 
     for account_data in created_accounts_data.clone() {
-        client
-            .add_account(&account_data.account, account_data.account_seed, false)
-            .await
-            .unwrap();
+        client.add_account(&account_data.account, false).await.unwrap();
     }
 
     let expected_accounts: Vec<Account> = created_accounts_data

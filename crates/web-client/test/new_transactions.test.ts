@@ -416,7 +416,7 @@ export const customTransaction = async (
 
 
             proc.add_note_assets_to_account
-                push.0 exec.note::get_assets
+                push.0 exec.active_note::get_inputs
                 # => [num_of_assets, 0 = ptr, ...]
 
                 # compute the pointer at which we should stop iterating
@@ -498,7 +498,7 @@ export const customTransaction = async (
                 # => []
 
                 # store the note inputs to memory starting at address 0
-                push.0 exec.note::get_inputs
+                push.0 exec.active_note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
                 # make sure the number of inputs is 2
@@ -861,11 +861,7 @@ export const customAccountComponent = async (
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     await client.syncState();
 
@@ -1175,11 +1171,7 @@ export const counterAccountComponent = async (
       .withComponent(counterAccountComponent)
       .build();
 
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
@@ -1337,11 +1329,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      bumpItemAccountBuilderResult.account,
-      bumpItemAccountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(bumpItemAccountBuilderResult.account, false);
 
     let initialMapValue = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
@@ -1397,13 +1385,11 @@ export const testStorageMap = async (page: Page): Promise<any> => {
   });
 };
 
-// TODO: re-enable after miden-base#1878
-
-// test.describe("storage map test", () => {
-//   test.setTimeout(50000);
-//   test("storage map is updated correctly in transaction", async ({ page }) => {
-//     let { initialMapValue, finalMapValue } = await testStorageMap(page);
-//     expect(initialMapValue).toBe("1");
-//     expect(finalMapValue).toBe("2");
-//   });
-// });
+test.describe("storage map test", () => {
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue } = await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
+  });
+});

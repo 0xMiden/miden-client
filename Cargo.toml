@@ -24,21 +24,25 @@ rust-version = "1.89"
 version      = "0.12.0"
 
 [workspace.dependencies]
-# Miden dependencies
-miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+# Miden base/protocol dependencies
+miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-tx      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+
+# Miden node dependencies
+miden-node-block-producer = { branch = "igamigo-partial-map-fix", git = "https://github.com/0xMiden/miden-node" }
+miden-node-ntx-builder = { branch = "igamigo-partial-map-fix", git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "igamigo-partial-map-fix", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-rpc = { branch = "igamigo-partial-map-fix", git = "https://github.com/0xMiden/miden-node" }
+miden-node-store = { branch = "igamigo-partial-map-fix", git = "https://github.com/0xMiden/miden-node" }
+miden-node-utils = { branch = "igamigo-partial-map-fix", git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover = { branch = "igamigo-partial-map-fix", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover-client = { branch = "igamigo-partial-map-fix", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

@@ -26,13 +26,29 @@ impl WebClient {
                 .map_err(|err| err.to_string())?;
             let account_id = account_data.account.id().to_string();
 
+            let AccountFile { account, account_seed, auth_secret_keys } = account_data;
+
+            let account_to_add = if let Some(seed) = account_seed {
+                let (id, vault, storage, code, nonce, _) = account.into_parts();
+                miden_client::account::Account::new_unchecked(
+                    id,
+                    vault,
+                    storage,
+                    code,
+                    nonce,
+                    Some(seed),
+                )
+            } else {
+                account
+            };
+
             client
-                .add_account(&account_data.account, account_data.account_seed, false)
+                .add_account(&account_to_add, false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             let keystore = keystore.expect("KeyStore should be initialized");
-            for key in account_data.auth_secret_keys {
+            for key in auth_secret_keys {
                 keystore.add_key(&key).await.map_err(|err| err.to_string())?;
             }
 
@@ -51,7 +67,7 @@ impl WebClient {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, _, key_pair) =
+        let (generated_acct, key_pair) =
             generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed)).await?;
 
         let native_id = generated_acct.id();

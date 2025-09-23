@@ -66,7 +66,7 @@ use miden_objects::account::{
     StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
-use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
@@ -190,7 +190,7 @@ async fn insert_basic_account() {
     assert!(fetched_account_data.is_ok());
 
     let fetched_account = fetched_account_data.unwrap().unwrap();
-    let fetched_account_seed = fetched_account.seed().copied();
+    let fetched_account_seed = fetched_account.seed();
     let fetched_account: Account = fetched_account.into();
 
     // Validate header has matching data
@@ -221,7 +221,7 @@ async fn insert_faucet_account() {
     assert!(fetched_account_data.is_ok());
 
     let fetched_account = fetched_account_data.unwrap().unwrap();
-    let fetched_account_seed = fetched_account.seed().copied();
+    let fetched_account_seed = fetched_account.seed();
     let fetched_account: Account = fetched_account.into();
 
     // Validate header has matching data
@@ -245,8 +245,8 @@ async fn insert_same_account_twice_fails() {
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
     );
 
-    assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
-    assert!(client.add_account(&account, Some(Word::default()), false).await.is_err());
+    assert!(client.add_account(&account, false).await.is_ok());
+    assert!(client.add_account(&account, false).await.is_err());
 }
 
 #[tokio::test]
@@ -266,7 +266,7 @@ async fn account_code() {
     let reconstructed_code = AccountCode::read_from_bytes(&account_code_bytes).unwrap();
     assert_eq!(*account_code, reconstructed_code);
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
     assert_eq!(*account.code(), *retrieved_acc.account().code());
 }
@@ -281,7 +281,7 @@ async fn get_account_by_id() {
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
     );
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     // Retrieving an existing account should succeed
     let (acc_from_db, _account_seed) = match client.get_account_header_by_id(account.id()).await {
@@ -393,7 +393,6 @@ async fn sync_state_mmr() {
     );
 
     // Try reconstructing the partial_mmr from what's in the database
-    // TODO: re-enable this
     let partial_mmr = client.test_store().get_current_partial_mmr().await.unwrap();
     assert!(partial_mmr.forest().num_leaves() >= 6);
     assert!(partial_mmr.open(0).unwrap().is_none());
@@ -931,7 +930,7 @@ async fn p2id_transfer() {
     assert!(current_notes.is_empty());
 
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
-    let seed = regular_account.seed().copied();
+    let seed = regular_account.seed();
     let regular_account: Account = regular_account.into();
 
     // The seed should not be retrieved due to the account not being new
@@ -1878,7 +1877,7 @@ async fn empty_storage_map() {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -1889,7 +1888,7 @@ async fn empty_storage_map() {
 
     let account_id = account.id();
 
-    client.add_account(&account, Some(seed), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let fetched_account = client.get_account(account_id).await.unwrap().unwrap();
 
@@ -1919,7 +1918,6 @@ const BUMP_MAP_CODE: &str = "export.bump_map_item
                 end";
 
 #[tokio::test]
-#[ignore = "ignoring due to bug, see miden-base#1878"]
 async fn storage_and_vault_proofs() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
@@ -1967,7 +1965,7 @@ async fn storage_and_vault_proofs() {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -1976,7 +1974,7 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 
@@ -2012,14 +2010,16 @@ async fn storage_and_vault_proofs() {
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
-        let (asset, proof) = client
+        let (asset, witness) = client
             .test_store()
             .get_account_asset(account_id, faucet_account_id.prefix())
             .await
             .unwrap()
             .unwrap();
 
-        assert_eq!(&proof, vault.asset_tree().open(&asset.vault_key()).path());
+        let expected_witness =
+            AssetWitness::new(vault.asset_tree().open(&asset.vault_key())).unwrap();
+        assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
         let (value, proof) = client
@@ -2139,7 +2139,7 @@ async fn insert_new_wallet(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -2147,7 +2147,9 @@ async fn insert_new_wallet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    let seed = account.seed().expect("newly built account should always contain a seed");
+
+    client.add_account(&account, false).await?;
 
     Ok((account, seed))
 }
@@ -2170,7 +2172,7 @@ async fn insert_new_fungible_faucet(
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
         .expect("u64 can be safely converted to a field element");
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -2178,6 +2180,8 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    let seed = account.seed().expect("newly built faucet account should always contain a seed");
+
+    client.add_account(&account, false).await?;
     Ok((account, seed))
 }

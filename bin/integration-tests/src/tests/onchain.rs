@@ -168,14 +168,8 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    let (_, status) = client_1
-        .get_account_header_by_id(faucet_account_id)
-        .await?
-        .with_context(|| format!("Faucet account {faucet_account_id} not found"))?;
-    let faucet_seed = status.seed().cloned();
-
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
-    client_2.add_account(&faucet_account_header, faucet_seed, false).await?;
+    client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token
     println!("First client consuming note");
@@ -333,7 +327,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let (faucet_account_header, ..) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
-    let (first_regular_account, _, secret_key) = insert_new_wallet_with_seed(
+    let (first_regular_account, secret_key) = insert_new_wallet_with_seed(
         &mut client_1,
         AccountStorageMode::Public,
         &keystore_1,
