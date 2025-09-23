@@ -210,8 +210,6 @@ impl SqliteStore {
 
         tx.execute(QUERY, params![account_id.to_hex(), code.commitment().to_string()])
             .into_store_error()?;
-
-        Self::insert_account_code(&tx, code)?;
         tx.commit().into_store_error()
     }
 
