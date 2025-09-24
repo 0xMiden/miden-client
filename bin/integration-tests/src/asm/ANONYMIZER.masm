@@ -1,4 +1,5 @@
 use.miden::note
+use.miden::output_note
 use.miden::tx
 
 # CONSTANTS
@@ -24,7 +25,11 @@ const.ERR_ANONYMIZER_WRONG_NUMBER_OF_ASSETS="wrong number of assets"
 #! - RECIPIENT
 #! - [hint, note_type, aux, tag]
 begin
+    # drop note arguments
+    dropw
+
     # store note inputs into memory starting at address 0
+    # TODO use active_note once changes propagate to client repo
     push.0 exec.note::get_inputs
     # => [num_inputs, inputs_ptr]
 
@@ -41,20 +46,20 @@ begin
 
     padw mem_loadw.8
     # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
+    debug.stack
 
     # create a note using inputs
-    debug.stack
-    # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
-    exec.tx::create_note
+    exec.output_note::create
     debug.stack.5
     # => [note_idx, ASSET]
 
     debug.stack
 
-    # => [note_idx, ASSET, pad(11)]
+    movdn.4
+    # => [ASSET, note_idx, pad(11)]
     # add asset to the note
-    call.tx::add_asset_to_note
-    # => [note_idx]
+    exec.output_note::add_asset
+    # => [ASSET, note_idx]
 
     # clean stack
     dropw dropw dropw dropw

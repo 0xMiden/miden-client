@@ -7,7 +7,8 @@ use miden_client::account::component::{
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::TransactionAuthenticator;
-use miden_client::crypto::{FeltRng, SecretKey};
+use miden_client::crypto::FeltRng;
+use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -87,18 +88,13 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
     println!("consuming anonymizer note");
 
-    client_2.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
-    client_2.sync_state().await?;
-    let input_note_record = client_2.get_input_note(anonymizer_note.id()).await?.unwrap();
-    assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
-
     client.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
     client.sync_state().await?;
     let input_note_record = client.get_input_note(anonymizer_note.id()).await?.unwrap();
-    // state is unverified :(
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
 
     let tx_request = TransactionRequestBuilder::new()
+        .expected_output_recipients(vec![anonymized_note_details.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note.id()])
         .unwrap();
     execute_tx_and_sync(&mut client, anonymizer_account.id(), tx_request).await?;
