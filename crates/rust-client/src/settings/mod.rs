@@ -49,7 +49,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Returns all the setting keys from the store.
-    pub async fn list_settings_keys(&self) -> Result<Vec<String>, ClientError> {
+    pub async fn list_setting_keys(&self) -> Result<Vec<String>, ClientError> {
         self.store.list_setting_keys().await.map_err(Into::into)
     }
 }

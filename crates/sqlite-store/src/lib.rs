@@ -12,7 +12,13 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
-use db_management::utils::{apply_migrations, get_setting, list_keys, remove_setting, set_setting};
+use db_management::utils::{
+    apply_migrations,
+    get_setting,
+    list_setting_keys,
+    remove_setting,
+    set_setting,
+};
 use miden_client::Word;
 use miden_client::account::{
     Account,
@@ -366,7 +372,7 @@ impl Store for SqliteStore {
     }
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
-        self.interact_with_connection(move |conn| list_keys(conn)).await
+        self.interact_with_connection(move |conn| list_setting_keys(conn)).await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

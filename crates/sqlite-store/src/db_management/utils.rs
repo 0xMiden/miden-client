@@ -187,7 +187,7 @@ pub fn remove_setting(conn: &Connection, name: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
-pub fn list_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
+pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
     let mut stmt = conn.prepare("SELECT name FROM settings").into_store_error()?;
     stmt.query_map([], |row| row.get::<_, String>(0))
         .into_store_error()?

@@ -57,7 +57,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "listSettingKeys")]
     pub async fn list_setting_keys(&mut self) -> Result<Vec<String>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            client.list_settings_keys().await.map_err(|err| {
+            client.list_setting_keys().await.map_err(|err| {
                 js_error_with_context(err, "failed to list setting keys in the store")
             })
         } else {
