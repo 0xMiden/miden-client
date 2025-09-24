@@ -17,6 +17,7 @@
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274))
+* [BREAKING] Removed WebClient's compileNoteScript method and both TransactionScript and NoteScript compile methods, the new ScriptBuilder should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 
 ## 0.11.6 (2025-09-18)
 

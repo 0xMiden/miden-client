@@ -12,7 +12,7 @@
 
 > **new ScriptBuilder**(`mode`): `ScriptBuilder`
 
-Instance a ScriptBuilder. Will use debug mode (or not), depending
+Instance a `ScriptBuilder`. Will use debug mode (or not), depending
 on the mode passed when initially instanced.
 
 #### Parameters

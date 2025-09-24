@@ -50,22 +50,6 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
