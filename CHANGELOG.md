@@ -8,6 +8,7 @@
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 * Implemented functions for lazy loading on webstore [(#1184)](https://github.com/0xMiden/miden-client/pull/1184).
 * Added a `GetNoteScriptByRoot` call to the `RpcClient` ([#1311](https://github.com/0xMiden/miden-client/pull/1311)).
+* Implemented shared source manager for better error reporting ([#1275](https://github.com/0xMiden/miden-client/pull/1275)).
 
 ### Changes
 
