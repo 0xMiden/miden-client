@@ -122,6 +122,7 @@ pub use miden_objects::transaction::{
     TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+pub use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
     DataStoreError,

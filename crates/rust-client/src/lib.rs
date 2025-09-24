@@ -217,7 +217,7 @@ pub mod crypto {
 }
 
 pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
+pub use miden_objects::{EMPTY_WORD, Felt, ONE, PrettyPrint, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
@@ -235,7 +235,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::ScriptBuilder;
+pub use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
 use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;

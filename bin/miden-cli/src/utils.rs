@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 use figment::Figment;
 use figment::providers::{Format, Toml};
 use miden_client::Client;
-use miden_client::account::AccountId;
-use miden_objects::address::Address;
+use miden_client::account::{AccountId, Address};
 use tracing::info;
 
 use super::config::CliConfig;
