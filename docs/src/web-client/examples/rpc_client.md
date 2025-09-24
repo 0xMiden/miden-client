@@ -23,9 +23,9 @@ try {
 
 For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
 
-- [Endpoint](docs/src/web-client/api/classes/Endpoint.md) - Represents a network endpoint for the RPC client.
-- [RpcClient](docs/src/web-client/api/classes/RpcClient.md) - Client for interacting with a Miden node via RPC.
-- [NoteId](docs/src/web-client/api/classes/NoteId.md) - Represents a unique identifier for a note.
+- [Endpoint](../api/classes/Endpoint.md) - Represents a network endpoint for the RPC client.
+- [RpcClient](../api/classes/RpcClient.md) - Client for interacting with a Miden node via RPC.
+- [NoteId](../api/classes/NoteId.md) - Represents a unique identifier for a note.
 
-For a complete list of available classes and utilities, see the [SDK API Reference](docs/src/web-client/api/README.md).
+For a complete list of available classes and utilities, see the [SDK API Reference](../api/README.md).
 
