@@ -11,10 +11,7 @@ use tonic::service::Interceptor;
 // WEB CLIENT
 // ================================================================================================
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "web-tonic"))]
-compile_error!("The `web-tonic` feature is only supported when targeting wasm32.");
-
-#[cfg(feature = "web-tonic")]
+#[cfg(target_arch = "wasm32")]
 pub(crate) mod api_client_wrapper {
     use alloc::string::String;
 
@@ -62,7 +59,7 @@ pub(crate) mod api_client_wrapper {
 // CLIENT
 // ================================================================================================
 
-#[cfg(feature = "tonic")]
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod api_client_wrapper {
     use alloc::boxed::Box;
     use alloc::string::String;

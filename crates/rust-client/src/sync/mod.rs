@@ -143,7 +143,7 @@ where
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
 
         // Build current partial MMR
-        let current_partial_mmr = self.build_current_partial_mmr().await?;
+        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
         let all_block_numbers = (0..current_partial_mmr.forest().num_leaves())
             .filter_map(|block_num| {

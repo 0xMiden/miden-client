@@ -57,6 +57,7 @@ export {
   RpcClient,
   SecretKey,
   SerializedAccountHeader,
+  Signature,
   SigningInputs,
   SlotAndKeys,
   SlotAndKeysArray,

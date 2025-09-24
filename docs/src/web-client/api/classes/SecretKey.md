@@ -88,7 +88,7 @@
 
 ### withRng()
 
-> `static` **withRng**(`seed`?): `SecretKey`
+> `static` **withRng**(`seed?`): `SecretKey`
 
 #### Parameters
 

@@ -7,7 +7,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteType};
+use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -27,6 +27,7 @@ use miden_client::transaction::{
     TransactionStatus,
     TransactionWitness,
 };
+use miden_client_sqlite_store::SqliteStore;
 
 use crate::tests::config::ClientConfig;
 
@@ -35,12 +36,12 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
+    let sqlite_store = SqliteStore::new(store_config).await?;
+
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .tonic_rpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
-        .sqlite_store(
-            store_config.to_str().context("failed to convert store config path to string")?,
-        )
+        .store(Arc::new(sqlite_store))
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;
@@ -946,7 +947,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .with_context(|| {
-            format!("Transaction with id {} not found in discarded transactions", tx_id)
+            format!("Transaction with id {tx_id} not found in discarded transactions")
         })?;
     assert!(matches!(
         tx_record.status,
@@ -1160,7 +1161,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into())
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
         .await
         .unwrap()
         .pop()
@@ -1172,9 +1173,21 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap()
         .pop()
         .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
+    let retrieved_note_script = client
+        .test_rpc_api()
+        .get_note_script_by_root(note.script().root())
+        .await
+        .unwrap();
+
+    // Remove debug decorators from original note script, as they are not persisted on submission
+    // https://github.com/0xMiden/miden-base/issues/1812
+    let mut mast = (*note.script().mast()).clone();
+    mast.strip_decorators();
+    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
+    assert_eq!(note_script, retrieved_note_script);
 
     Ok(())
 }

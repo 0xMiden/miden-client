@@ -344,7 +344,7 @@ export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
-): Promise<boolean> => {
+): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
       debugger;
@@ -888,6 +888,26 @@ export const customAccountComponent = async (
       txIncrementRequest
     );
     await client.submitTransaction(txResult);
+
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    // Fetch the updated account state from the client
+    const updated = await client.getAccount(accountBuilderResult.account.id());
+
+    // Read a map value from storage slot 1 with key 0x0
+    const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
+    // NOTE: the map slot is in index 2 because the auth component takes one slot
+    const retrieveMapKey = updated?.storage().getMapItem(2, keyZero);
+
+    const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+
+    if (retrieveMapKey?.toHex() !== expected.toHex()) {
+      throw new Error(
+        `unexpected Word: got ${retrieveMapKey?.toHex()} expected ${expected.toHex()}`
+      );
+    }
   });
 };
 
@@ -1251,3 +1271,131 @@ test.describe("counter account component tests", () => {
     expect(finalCounter).toEqual("2");
   });
 });
+
+export const testStorageMap = async (page: Page): Promise<any> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    await client.syncState();
+
+    // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
+    // --------------------------------------------------------------------------
+
+    const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
+    const FPI_STORAGE_VALUE = new window.Word(
+      new BigUint64Array([0n, 0n, 0n, 1n])
+    );
+
+    let storageMap = new window.StorageMap();
+    storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+
+    const accountCode = `export.bump_map_item
+                    # map key
+                    push.1.1.1.1 # Map key
+                    # item index
+                    push.0
+                    # => [index, KEY]
+                    exec.::miden::account::get_map_item
+                    add.1
+                    push.1.1.1.1 # Map key
+                    push.0
+                    # => [index, KEY, BUMPED_VALUE]
+                    exec.::miden::account::set_map_item
+                    dropw
+                    # => [OLD_VALUE]
+                    dupw
+                    push.0
+                    # Set a new item each time as the value keeps changing
+                    exec.::miden::account::set_map_item
+                    dropw dropw
+                end
+        `;
+
+    let bumpItemComponent = window.AccountComponent.compile(
+      accountCode,
+      window.TransactionKernel.assembler(),
+      [window.StorageSlot.map(storageMap)]
+    ).withSupportsAllTypes();
+
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    let secretKey = window.SecretKey.withRng(walletSeed);
+    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+
+    let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
+      .withAuthComponent(authComponent)
+      .withComponent(bumpItemComponent)
+      .storageMode(window.AccountStorageMode.public())
+      .build();
+
+    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.newAccount(
+      bumpItemAccountBuilderResult.account,
+      bumpItemAccountBuilderResult.seed,
+      false
+    );
+
+    let initialMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    // Deploy counter account
+    let assembler = window.TransactionKernel.assembler();
+
+    let accountComponentLib =
+      window.AssemblerUtils.createAccountComponentLibrary(
+        assembler,
+        "external_contract::bump_item_contract",
+        accountCode
+      );
+
+    let txScript = window.TransactionScript.compile(
+      `use.external_contract::bump_item_contract
+      begin
+          call.bump_item_contract::bump_map_item
+      end`,
+      assembler.withLibrary(accountComponentLib)
+    );
+
+    let txIncrementRequest = new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .build();
+
+    let txResult = await client.newTransaction(
+      bumpItemAccountBuilderResult.account.id(),
+      txIncrementRequest
+    );
+    await client.submitTransaction(txResult);
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    let finalMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    return {
+      initialMapValue: initialMapValue
+        ?.replace(/^0x/, "")
+        .replace(/^0+|0+$/g, ""),
+      finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+    };
+  });
+};
+
+// TODO: re-enable after miden-base#1878
+
+// test.describe("storage map test", () => {
+//   test.setTimeout(50000);
+//   test("storage map is updated correctly in transaction", async ({ page }) => {
+//     let { initialMapValue, finalMapValue } = await testStorageMap(page);
+//     expect(initialMapValue).toBe("1");
+//     expect(finalMapValue).toBe("2");
+//   });
+// });
