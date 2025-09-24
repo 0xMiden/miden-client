@@ -1,7 +1,6 @@
 use miden_objects::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
-use crate::models::assembler::Assembler;
 use crate::models::word::Word;
 
 #[derive(Clone)]
@@ -12,13 +11,6 @@ pub struct TransactionScript(NativeTransactionScript);
 impl TransactionScript {
     pub fn root(&self) -> Word {
         self.0.root().into()
-    }
-
-    // TODO: Replace this for ScriptBuilder
-    pub fn compile(script_code: &str, assembler: Assembler) -> Result<TransactionScript, JsValue> {
-        let tx_script: TransactionScript = assembler.compile_transaction_script(script_code)?;
-
-        Ok(tx_script)
     }
 }
 
