@@ -710,7 +710,7 @@ Returns the inner serialized mock chain if it exists.
 
 ### submitTransaction()
 
-> **submitTransaction**(`transaction_update`, `prover`?): `Promise`\<`void`\>
+> **submitTransaction**(`transaction_update`, `prover?`): `Promise`\<`void`\>
 
 #### Parameters
 
