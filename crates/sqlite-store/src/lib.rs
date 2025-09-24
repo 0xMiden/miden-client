@@ -290,7 +290,7 @@ impl Store for SqliteStore {
                 &merkle_store,
                 &cloned_account,
                 account_seed,
-                initial_address,
+                &initial_address,
             )
         })
         .await
