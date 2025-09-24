@@ -326,6 +326,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -349,22 +365,6 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
-
-***
-
-### getValue()
-
-> **getValue**(`key`): `Promise`\<`any`\>
-
-#### Parameters
-
-##### key
-
-`string`
-
-#### Returns
-
-`Promise`\<`any`\>
 
 ***
 
@@ -436,9 +436,9 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### listKeys()
+### listSettingKeys()
 
-> **listKeys**(): `Promise`\<`string`[]\>
+> **listSettingKeys**(): `Promise`\<`string`[]\>
 
 #### Returns
 
@@ -690,13 +690,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### removeTag()
+### removeSetting()
 
-> **removeTag**(`tag`): `Promise`\<`void`\>
+> **removeSetting**(`key`): `Promise`\<`void`\>
 
 #### Parameters
 
-##### tag
+##### key
 
 `string`
 
@@ -706,13 +706,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### removeValue()
+### removeTag()
 
-> **removeValue**(`key`): `Promise`\<`void`\>
+> **removeTag**(`tag`): `Promise`\<`void`\>
 
 #### Parameters
 
-##### key
+##### tag
 
 `string`
 
@@ -734,9 +734,9 @@ Returns the inner serialized mock chain if it exists.
 
 ***
 
-### setValue()
+### setSetting()
 
-> **setValue**(`key`, `value`): `Promise`\<`void`\>
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
 
 #### Parameters
 

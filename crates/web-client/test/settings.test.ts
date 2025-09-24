@@ -6,9 +6,9 @@ test.describe("settings tests", () => {
     const isValid = await page.evaluate(async () => {
       const client = window.client;
       const testValue: number[] = [1, 2, 3, 4];
-      await client.setValue("test", testValue);
+      await client.setSetting("test", testValue);
 
-      const value = await client.getValue("test");
+      const value = await client.getSetting("test");
 
       return JSON.stringify(value) === JSON.stringify(testValue);
     });
@@ -19,9 +19,9 @@ test.describe("settings tests", () => {
     const isValid = await page.evaluate(async () => {
       const client = window.client;
       const testKey: string = "test";
-      await client.setValue(testKey, [1, 2, 3, 4]);
+      await client.setSetting(testKey, [1, 2, 3, 4]);
 
-      const keys = await client.listKeys();
+      const keys = await client.listSettingKeys();
 
       return JSON.stringify(keys) === JSON.stringify([testKey]);
     });
@@ -32,11 +32,11 @@ test.describe("settings tests", () => {
     const isValid = await page.evaluate(async () => {
       const client = window.client;
       const testValue: number[] = [5, 6, 7, 8];
-      await client.setValue("test", testValue);
-      await client.removeValue("test");
+      await client.setSetting("test", testValue);
+      await client.removeSetting("test");
 
-      const resultAfterDelete = await client.getValue("test");
-      const listAfterDelete = await client.listKeys();
+      const resultAfterDelete = await client.getSetting("test");
+      const listAfterDelete = await client.listSettingKeys();
 
       return resultAfterDelete === undefined && listAfterDelete.length === 0;
     });

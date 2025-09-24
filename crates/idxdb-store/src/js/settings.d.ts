@@ -1,7 +1,7 @@
-export declare function getValue(key: string): Promise<{
+export declare function getSetting(key: string): Promise<{
     key: string;
     value: string;
 } | null | undefined>;
-export declare function insertValue(key: string, value: Uint8Array): Promise<void>;
-export declare function removeValue(key: string): Promise<void>;
-export declare function listKeys(): Promise<string[] | undefined>;
+export declare function insertSetting(key: string, value: Uint8Array): Promise<void>;
+export declare function removeSetting(key: string): Promise<void>;
+export declare function listSettingKeys(): Promise<string[] | undefined>;

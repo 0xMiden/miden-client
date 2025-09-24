@@ -258,20 +258,20 @@ impl Store for WebStore {
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
-    async fn set_value(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.set_value(key, value).await
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.set_setting(key, value).await
     }
 
-    async fn get_value(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
-        self.get_value(key).await
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.get_setting(key).await
     }
 
-    async fn remove_value(&self, key: String) -> Result<(), StoreError> {
-        self.remove_value(key).await
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError> {
+        self.remove_setting(key).await
     }
 
-    async fn list_keys(&self) -> Result<Vec<String>, StoreError> {
-        self.list_keys().await
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
+        self.list_setting_keys().await
     }
 }
 

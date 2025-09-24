@@ -62,7 +62,7 @@ impl AccountCmd {
                 match id {
                     None => {
                         let default_account: AccountId = client
-                            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
+                            .get_setting(DEFAULT_ACCOUNT_ID_KEY.to_string())
                             .await?
                             .ok_or(CliError::Config(
                                 "Default account".to_string().into(),
@@ -71,7 +71,7 @@ impl AccountCmd {
                         println!("Current default account ID: {default_account}");
                     },
                     Some(id) if id == "none" => {
-                        client.remove_value(DEFAULT_ACCOUNT_ID_KEY.to_string()).await?;
+                        client.remove_setting(DEFAULT_ACCOUNT_ID_KEY.to_string()).await?;
                         println!("Removing default account...");
                     },
                     Some(id) => {
@@ -80,7 +80,9 @@ impl AccountCmd {
                         // Check whether we're tracking that account
                         let (account, _) = client.try_get_account_header(account_id).await?;
 
-                        client.set_value(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id()).await?;
+                        client
+                            .set_setting(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id())
+                            .await?;
                         println!("Setting default account to {id}...");
                     },
                 }
@@ -292,14 +294,14 @@ pub(crate) async fn set_default_account_if_unset<AUTH>(
     account_id: AccountId,
 ) -> Result<(), CliError> {
     if client
-        .get_value::<AccountId>(DEFAULT_ACCOUNT_ID_KEY.to_string())
+        .get_setting::<AccountId>(DEFAULT_ACCOUNT_ID_KEY.to_string())
         .await?
         .is_some()
     {
         return Ok(());
     }
 
-    client.set_value(DEFAULT_ACCOUNT_ID_KEY.to_string(), account_id).await?;
+    client.set_setting(DEFAULT_ACCOUNT_ID_KEY.to_string(), account_id).await?;
 
     println!("Setting account {account_id} as the default account ID.");
     println!(

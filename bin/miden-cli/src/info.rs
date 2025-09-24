@@ -31,7 +31,7 @@ async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
     println!(
         "Default account: {}",
         client
-            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
+            .get_setting(DEFAULT_ACCOUNT_ID_KEY.to_string())
             .await?
             .map_or("-".to_string(), AccountId::to_hex)
     );
