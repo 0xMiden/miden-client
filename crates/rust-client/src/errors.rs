@@ -77,7 +77,7 @@ pub enum ClientError {
     #[error("rpc api error")]
     RpcError(#[from] RpcError),
     #[error("recency condition error: {0}")]
-    RecencyConditionError(String),
+    RecencyConditionError(&'static str),
     #[error("note screener error")]
     NoteScreenerError(#[from] NoteScreenerError),
     #[error("store error")]
@@ -90,12 +90,38 @@ pub enum ClientError {
     TransactionProvingError(#[from] TransactionProverError),
     #[error("transaction request error")]
     TransactionRequestError(#[from] TransactionRequestError),
+    #[error("transaction pipeline error: {0}")]
+    TransactionPipelineError(#[from] TransactionPipelineError),
     #[error("transaction script builder error")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+}
+
+#[derive(Debug, Error)]
+pub enum TransactionPipelineError {
+    #[error("transaction has not been executed")]
+    NotExecuted,
+    #[error("transaction proof has not been generated")]
+    ProofNotGenerated,
+    #[error("transaction has not been submitted")]
+    NotSubmitted,
+    #[error("recency condition not met")]
+    RecencyCondition,
+    #[error("missing expected output recipients")]
+    MissingOutputRecipients(Vec<Word>),
+    #[error("asset error")]
+    Asset(#[from] AssetError),
+    #[error("rpc api error")]
+    Rpc(#[from] RpcError),
+    #[error("transaction executor error")]
+    Executor(#[from] TransactionExecutorError),
+    #[error("transaction prover error")]
+    Prover(#[from] TransactionProverError),
+    #[error("transaction request error")]
+    Request(#[from] TransactionRequestError),
 }
 
 // CONVERSIONS

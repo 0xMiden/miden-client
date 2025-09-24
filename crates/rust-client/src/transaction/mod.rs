@@ -83,12 +83,12 @@ use miden_tx::{DataStore, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
-use crate::ClientError;
 use crate::note::{NoteScreener, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter};
+use crate::{ClientError, TransactionPipelineError};
 
 mod request;
 mod transaction_pipeline;
@@ -517,11 +517,17 @@ where
     // TRANSACTION
     // --------------------------------------------------------------------------------------------
 
-    pub fn build_transaction_pipeline(&self) -> TransactionPipeline {
+    // TODO: should we remove this and just keep `Client::execute_transaction`?
+    /// Creates a new [`TransactionPipeline`] for the input [`TransactionRequest`].
+    pub fn new_transaction_pipeline(
+        &self,
+        transaction_request: TransactionRequest,
+    ) -> TransactionPipeline {
         TransactionPipeline::new(
             self.rpc_api.clone(),
             self.max_block_number_delta,
             self.in_debug_mode().into(),
+            transaction_request,
         )
     }
 
@@ -531,25 +537,21 @@ where
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
-    pub async fn new_transaction(
+    pub async fn submit_new_transaction(
         &mut self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionId, ClientError> {
-        let (executed_transaction, transaction_pipeline) =
+        let mut transaction_pipeline =
             self.execute_transaction(account_id, transaction_request).await?;
 
-        let tx_id = executed_transaction.id();
+        let tx_id = transaction_pipeline.id()?;
 
-        let proven_transaction = transaction_pipeline
-            .prove_transaction(executed_transaction.clone(), self.prover())
-            .await?;
+        transaction_pipeline.prove_transaction(self.prover()).await?;
 
-        let submission_height =
-            transaction_pipeline.submit_proven_transaction(proven_transaction).await?;
+        transaction_pipeline.submit_proven_transaction().await?;
 
-        let transaction_update =
-            transaction_pipeline.get_transaction_update(submission_height, executed_transaction);
+        let transaction_update = transaction_pipeline.get_transaction_update()?;
 
         self.apply_transaction(transaction_update).await?;
 
@@ -557,8 +559,9 @@ where
     }
 
     /// Executes a transaction specified by the request against the specified account but does not
-    /// submit it to the network or update the local database. The executed transaction is returned
-    /// along with the component needed to continue with the transaction pipeline.
+    /// submit it to the network or update the local database. The returned [`TransactionPipeline`]
+    /// retains all intermediate artifacts (request, execution results, proofs) needed to continue
+    /// with the transaction lifecycle.
     ///
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
@@ -567,7 +570,7 @@ where
         &mut self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
-    ) -> Result<(ExecutedTransaction, TransactionPipeline), ClientError> {
+    ) -> Result<TransactionPipeline, ClientError> {
         // Ensure authenticated notes have their inclusion proofs (a.k.a they're in a committed
         // state)
         let authenticated_input_note_ids: Vec<NoteId> =
@@ -604,24 +607,52 @@ where
 
         let account = self.try_get_account(account_id).await?.into();
 
+        self.validate_transaction_request(&account, block_num, &transaction_request)
+            .await?;
+
         let data_store = ClientDataStore::new(self.store.clone());
 
-        let mut transaction_pipeline = self.build_transaction_pipeline();
+        data_store.mast_store().load_account_code(account.code());
+        for fpi_account in &foreign_account_inputs {
+            data_store.mast_store().load_account_code(fpi_account.code());
+        }
 
-        Ok((
-            transaction_pipeline
-                .execute_transaction(
-                    account,
-                    transaction_request,
-                    foreign_account_inputs,
-                    input_notes,
-                    &data_store,
-                    &self.build_executor(&data_store)?,
-                    block_num,
-                )
-                .await?,
-            transaction_pipeline,
-        ))
+        let mut transaction_pipeline = self.new_transaction_pipeline(transaction_request);
+
+        transaction_pipeline
+            .execute_transaction(
+                account,
+                foreign_account_inputs,
+                input_notes,
+                &self.build_executor(&data_store)?,
+                block_num,
+            )
+            .await?;
+
+        Ok(transaction_pipeline)
+    }
+
+    async fn validate_transaction_request(
+        &self,
+        account: &Account,
+        block_ref: BlockNumber,
+        transaction_request: &TransactionRequest,
+    ) -> Result<(), ClientError> {
+        if let Some(max_block_number_delta) = self.max_block_number_delta {
+            let current_chain_tip =
+                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
+
+            if current_chain_tip > block_ref + max_block_number_delta {
+                return Err(TransactionPipelineError::RecencyCondition.into());
+            }
+        }
+
+        if account.is_faucet() {
+            // TODO(SantiagoPittella): Add faucet validations.
+            Ok(())
+        } else {
+            self.validate_basic_account_request(transaction_request, account).await
+        }
     }
 
     /// Applies the [`TransactionStoreUpdate`] to the local store, updating the account's state and
@@ -653,6 +684,14 @@ where
         self.store.apply_transaction(tx_update, note_updates).await?;
         info!("Transaction stored.");
         Ok(())
+    }
+
+    /// Submits a proven transaction to the network via the RPC API.
+    pub async fn submit_proven_transaction(
+        &self,
+        proven_transaction: ProvenTransaction,
+    ) -> Result<BlockNumber, ClientError> {
+        Ok(self.rpc_api.submit_proven_transaction(proven_transaction).await?)
     }
 
     /// Executes the provided transaction script against the specified account, and returns the
@@ -940,8 +979,7 @@ where
 
             if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
                 return Err(ClientError::RecencyConditionError(
-                    "The client is too far behind the chain tip to execute the transaction"
-                        .to_string(),
+                    "the client is too far behind the chain tip to execute the transaction",
                 ));
             }
         }

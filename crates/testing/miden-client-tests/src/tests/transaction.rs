@@ -72,7 +72,7 @@ async fn transaction_creates_two_notes() {
         .unwrap();
 
     // Submit transaction
-    let _tx_id = Box::pin(client.new_transaction(account.id(), tx_request.clone()))
+    let _tx_id = Box::pin(client.submit_new_transaction(account.id(), tx_request.clone()))
         .await
         .unwrap();
 

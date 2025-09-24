@@ -215,7 +215,13 @@ pub mod crypto {
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
-pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
+pub use errors::{
+    AccountError,
+    AuthenticationError,
+    ClientError,
+    IdPrefixFetchError,
+    TransactionPipelineError,
+};
 pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;

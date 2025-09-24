@@ -1,10 +1,9 @@
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::ToString;
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_objects::Word;
 use miden_objects::account::{Account, AccountId};
-use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::{
@@ -14,20 +13,15 @@ use miden_objects::transaction::{
     InputNotes,
     ProvenTransaction,
     TransactionArgs,
+    TransactionId,
 };
-use miden_objects::{AssetError, Word};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{NoteConsumptionChecker, TransactionExecutor};
 
 use crate::rpc::NodeRpcClient;
 use crate::store::data_store::ClientDataStore;
-use crate::transaction::{
-    TransactionProver,
-    TransactionRequest,
-    TransactionScriptTemplate,
-    TransactionStoreUpdate,
-};
-use crate::{ClientError, DebugMode};
+use crate::transaction::{TransactionProver, TransactionRequest, TransactionStoreUpdate};
+use crate::{ClientError, DebugMode, TransactionPipelineError};
 
 #[derive(Clone)]
 pub struct TransactionPipeline {
@@ -38,26 +32,43 @@ pub struct TransactionPipeline {
     max_block_number_delta: Option<u32>,
     /// Indicates whether scripts should be assembled in debug mode or not.
     debug_mode: DebugMode,
-    /// Future notes that are expected to be created as a result of the transaction.
+    /// Transaction request that describes the transaction to run through the pipeline.
+    transaction_request: TransactionRequest,
+    /// Executed transaction produced after running the script.
+    executed_transaction: Option<ExecutedTransaction>,
+    /// Proven transaction generated after proving the execution.
+    proven_transaction: Option<ProvenTransaction>,
+    /// Future notes expected to be created as a result of the transaction.
     future_notes: Vec<(NoteDetails, NoteTag)>,
+    /// Block height returned by the node after the proven transaction submission.
+    submission_height: Option<BlockNumber>,
 }
 
 impl TransactionPipeline {
+    /// Creates a new [`TransactionPipeline`].
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
         max_block_number_delta: Option<u32>,
         debug_mode: DebugMode,
+        transaction_request: TransactionRequest,
     ) -> Self {
         Self {
             rpc_api,
             max_block_number_delta,
             debug_mode,
+            transaction_request,
+            executed_transaction: None,
+            proven_transaction: None,
             future_notes: Vec::new(),
+            submission_height: None,
         }
     }
 
+    // PIPELINE DISPATCHERS
+    // --------------------------------------------------------------------------------------------
+
     /// Creates and executes a transaction specified by the request against the specified account,
-    /// but doesn't change the local database.
+    /// storing the resulting [`ExecutedTransaction`] inside the pipeline.
     ///
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
@@ -67,15 +78,16 @@ impl TransactionPipeline {
     ///
     /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] output
     ///   notes are not a subset of executor's output notes.
-    /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
-    /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
+    /// - Returns [`ClientError::TransactionPipelineError`] wrapping a
+    ///   [`TransactionPipelineError::Executor`] if the execution fails.
+    /// - Returns [`ClientError::TransactionPipelineError`] wrapping a
+    ///   [`TransactionPipelineError::Request`] if the request is invalid.
     pub async fn execute_transaction(
         &mut self,
+        // TODO: this should be a partial account
         account: Account,
-        transaction_request: TransactionRequest,
         foreign_account_inputs: Vec<AccountInputs>,
         mut input_notes: InputNotes<InputNote>,
-        data_store: &ClientDataStore,
         executor: &TransactionExecutor<
             '_,
             '_,
@@ -83,29 +95,26 @@ impl TransactionPipeline {
             impl TransactionAuthenticator + Sync,
         >,
         block_ref: BlockNumber,
-    ) -> Result<ExecutedTransaction, ClientError> {
-        // Validates the transaction request before executing
-        self.validate_request(&account, &transaction_request, block_ref, &input_notes)
-            .await?;
-
-        let output_recipients =
-            transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
+    ) -> Result<(), ClientError> {
+        let output_recipients = self
+            .transaction_request
+            .expected_output_recipients()
+            .cloned()
+            .collect::<Vec<_>>();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
-            transaction_request.expected_future_notes().cloned().collect();
+            self.transaction_request.expected_future_notes().cloned().collect();
 
-        let tx_script =
-            transaction_request.build_transaction_script(&(&account).into(), self.debug_mode)?;
+        let tx_script = self
+            .transaction_request
+            .build_transaction_script(&(&account).into(), self.debug_mode)?;
 
-        let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
+        let ignore_invalid_notes = self.transaction_request.ignore_invalid_input_notes();
 
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
-
-        let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
-
-        data_store.mast_store().load_account_code(account.code());
+        let tx_args = self
+            .transaction_request
+            .clone()
+            .into_transaction_args(tx_script, foreign_account_inputs);
 
         if ignore_invalid_notes {
             // Remove invalid notes
@@ -122,124 +131,124 @@ impl TransactionPipeline {
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
 
         self.future_notes = future_notes;
+        self.proven_transaction = None;
+        self.submission_height = None;
+        self.executed_transaction = Some(executed_transaction);
 
-        Ok(executed_transaction)
+        Ok(())
     }
 
-    /// Validates that the specified transaction request can be executed by the specified account.
-    ///
-    /// This does't guarantee that the transaction will succeed, but it's useful to avoid submitting
-    /// transactions that are guaranteed to fail. Some of the validations include:
-    /// - That the account has enough balance to cover the outgoing assets.
-    /// - That the reference block is not too far behind the chain tip.
-    pub async fn validate_request(
-        &mut self,
-        account: &Account,
-        transaction_request: &TransactionRequest,
-        block_ref: BlockNumber,
-        input_notes: &InputNotes<InputNote>,
-    ) -> Result<(), ClientError> {
-        if let Some(max_block_number_delta) = self.max_block_number_delta {
-            let current_chain_tip =
-                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
-
-            if current_chain_tip > block_ref + max_block_number_delta {
-                return Err(ClientError::RecencyConditionError(
-                    "The reference block is too far behind the chain tip to execute the transaction"
-                        .to_string(),
-                ));
-            }
-        }
-
-        if account.is_faucet() {
-            // TODO(SantiagoPittella): Add faucet validations.
-            Ok(())
-        } else {
-            validate_basic_account_request(transaction_request, account, input_notes)
-        }
-    }
-
+    /// Generates a proof for the executed transaction stored in this pipeline, caching the
+    /// resulting [`ProvenTransaction`] for later submission.
     pub async fn prove_transaction(
-        &self,
-        executed_transaction: ExecutedTransaction,
+        &mut self,
         prover: Arc<dyn TransactionProver + Send + Sync>,
     ) -> Result<ProvenTransaction, ClientError> {
-        Ok(prover.prove(executed_transaction.into()).await?)
-    }
-
-    pub async fn submit_proven_transaction(
-        &self,
-        proven_transaction: ProvenTransaction,
-    ) -> Result<BlockNumber, ClientError> {
-        Ok(self.rpc_api.submit_proven_transaction(proven_transaction).await?)
-    }
-
-    pub fn get_transaction_update(
-        self,
-        submission_height: BlockNumber,
-        executed_transaction: ExecutedTransaction,
-    ) -> TransactionStoreUpdate {
-        TransactionStoreUpdate {
-            submission_height,
-            executed_transaction,
-            future_notes: self.future_notes,
+        if let Some(proven) = &self.proven_transaction {
+            return Ok(proven.clone());
         }
+
+        let executed =
+            self.executed_transaction.clone().ok_or(TransactionPipelineError::NotExecuted)?;
+
+        let proven = prover.prove(executed.clone().into()).await?;
+        self.proven_transaction = Some(proven.clone());
+
+        Ok(proven)
+    }
+
+    /// Submits the proven transaction previously generated by [`Self::prove_transaction`].
+    pub async fn submit_proven_transaction(&mut self) -> Result<BlockNumber, ClientError> {
+        if let Some(height) = self.submission_height {
+            return Ok(height);
+        }
+
+        let proven = self
+            .proven_transaction
+            .clone()
+            .ok_or(TransactionPipelineError::ProofNotGenerated)?;
+
+        let submission_height = self.rpc_api.submit_proven_transaction(proven).await?;
+        self.submission_height = Some(submission_height);
+
+        Ok(submission_height)
+    }
+
+    // ACCESSORS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns a reference to the [`TransactionRequest`] of this pipeline.
+    pub fn request(&self) -> &TransactionRequest {
+        &self.transaction_request
+    }
+
+    /// Returns the [`TransactionId`] corresponding to the transaciton, or an error if it has not
+    /// yet been executed.
+    pub fn id(&self) -> Result<TransactionId, ClientError> {
+        Ok(self.executed_transaction()?.id())
+    }
+
+    /// Returns a reference to the [`TransactionRequest`] of this pipeline, or `None` if the
+    /// executing step has not been performed.
+    pub fn executed_transaction(&self) -> Result<&ExecutedTransaction, ClientError> {
+        self.executed_transaction.as_ref().ok_or(TransactionPipelineError::NotExecuted)
+    }
+
+    /// Returns a reference to the [`ProvenTransaction`] of this pipeline, or `None` if the proving
+    /// step was still not performed.
+    pub fn proven_transaction(&self) -> Option<&ProvenTransaction> {
+        self.proven_transaction.as_ref()
+    }
+
+    /// Returns the block number that was returned when the transaciton was submitted to the
+    /// newtork, or `None` if the submission step was still not performed.
+    pub fn submission_height(&self) -> Option<BlockNumber> {
+        self.submission_height
+    }
+
+    /// Returns a reference to notes that might be created as a result of future transactions.
+    ///
+    /// An example of this could be when a note created by this [`TransactionPipeline`] contains a
+    /// script that creates other notes, which would be created when thie first note is
+    /// consumed.
+    pub fn future_notes(&self) -> &[(NoteDetails, NoteTag)] {
+        &self.future_notes
+    }
+
+    /// Returns the [`TransactionStoreUpdate`] using the submission height recorded by the
+    /// pipeline via [`Self::submit_proven_transaction`].
+    pub fn get_transaction_update(&self) -> Result<TransactionStoreUpdate, ClientError> {
+        let executed =
+            self.executed_transaction.clone().ok_or(TransactionPipelineError::NotExecuted)?;
+        let submission_height =
+            self.submission_height.ok_or(TransactionPipelineError::NotSubmitted)?;
+
+        Ok(TransactionStoreUpdate::new(
+            executed,
+            submission_height,
+            self.future_notes.clone(),
+        ))
+    }
+
+    /// Returns a [`TransactionStoreUpdate`] using the provided submission height.
+    ///
+    /// This is useful when the transaction has not been submitted yet but the caller still wants
+    /// to persist the execution results locally (e.g. to mark a transaction as pending).
+    pub fn get_transaction_update_with_height(
+        &self,
+        submission_height: BlockNumber,
+    ) -> Result<TransactionStoreUpdate, ClientError> {
+        let executed =
+            self.executed_transaction.clone().ok_or(TransactionPipelineError::NotExecuted)?;
+
+        let height = self.submission_height.unwrap_or(submission_height);
+
+        Ok(TransactionStoreUpdate::new(executed, height, self.future_notes.clone()))
     }
 }
+
 // HELPERS
 // ================================================================================================
-
-fn validate_basic_account_request(
-    transaction_request: &TransactionRequest,
-    account: &Account,
-    input_notes: &InputNotes<InputNote>,
-) -> Result<(), ClientError> {
-    // Get outgoing assets
-    let (fungible_balance_map, non_fungible_set) = get_outgoing_assets(transaction_request);
-
-    // Get incoming assets
-    let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
-        collect_assets(input_notes.iter().flat_map(|note| note.note().assets().iter()));
-
-    // Check if the account balance plus incoming assets is greater than or equal to the
-    // outgoing fungible assets
-    for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
-        let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
-        if account_asset_amount + incoming_balance < amount {
-            return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
-                minuend: account_asset_amount,
-                subtrahend: amount,
-            }));
-        }
-    }
-
-    // Check if the account balance plus incoming assets is greater than or equal to the
-    // outgoing non fungible assets
-    for non_fungible in non_fungible_set {
-        match account.vault().has_non_fungible_asset(non_fungible) {
-            Ok(true) => (),
-            Ok(false) => {
-                // Check if the non fungible asset is in the incoming assets
-                if !incoming_non_fungible_balance_set.contains(&non_fungible) {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(
-                            non_fungible.faucet_id_prefix(),
-                        ),
-                    ));
-                }
-            },
-            _ => {
-                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id_prefix(),
-                )));
-            },
-        }
-    }
-
-    Ok(())
-}
-
 async fn get_valid_input_notes(
     account_id: AccountId,
     mut input_notes: InputNotes<InputNote>,
@@ -302,56 +311,4 @@ fn validate_executed_transaction(
     }
 
     Ok(())
-}
-
-/// Helper to get the account outgoing assets.
-///
-/// Any outgoing assets resulting from executing note scripts but not present in expected output
-/// notes wouldn't be included.
-fn get_outgoing_assets(
-    transaction_request: &TransactionRequest,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-    // Get own notes assets
-    let mut own_notes_assets = match transaction_request.script_template() {
-        Some(TransactionScriptTemplate::SendNotes(notes)) => notes
-            .iter()
-            .map(|note| (note.id(), note.assets().clone()))
-            .collect::<BTreeMap<_, _>>(),
-        _ => BTreeMap::default(),
-    };
-    // Get transaction output notes assets
-    let mut output_notes_assets = transaction_request
-        .expected_output_own_notes()
-        .into_iter()
-        .map(|note| (note.id(), note.assets().clone()))
-        .collect::<BTreeMap<_, _>>();
-
-    // Merge with own notes assets and delete duplicates
-    output_notes_assets.append(&mut own_notes_assets);
-
-    // Create a map of the fungible and non-fungible assets in the output notes
-    let outgoing_assets = output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
-
-    collect_assets(outgoing_assets)
-}
-
-fn collect_assets<'a>(
-    assets: impl Iterator<Item = &'a Asset>,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
-    let mut fungible_balance_map = BTreeMap::new();
-    let mut non_fungible_set = BTreeSet::new();
-
-    assets.for_each(|asset| match asset {
-        Asset::Fungible(fungible) => {
-            fungible_balance_map
-                .entry(fungible.faucet_id())
-                .and_modify(|balance| *balance += fungible.amount())
-                .or_insert(fungible.amount());
-        },
-        Asset::NonFungible(non_fungible) => {
-            non_fungible_set.insert(*non_fungible);
-        },
-    });
-
-    (fungible_balance_map, non_fungible_set)
 }

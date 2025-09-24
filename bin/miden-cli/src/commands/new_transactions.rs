@@ -383,8 +383,10 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     delegated_proving: bool,
 ) -> Result<(), CliError> {
     println!("Executing transaction...");
-    let (executed_transaction, transaction_pipeline) =
+    let mut transaction_pipeline =
         client.execute_transaction(account_id, transaction_request.clone()).await?;
+
+    let executed_transaction = transaction_pipeline.executed_transaction()?.clone();
 
     // Show delta and ask for confirmation
     print_transaction_details(&executed_transaction)?;
@@ -423,18 +425,15 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         client.prover()
     };
 
-    let proven_tx = transaction_pipeline
-        .prove_transaction(executed_transaction.clone(), prover)
-        .await?;
+    transaction_pipeline.prove_transaction(prover).await?;
 
     println!("Submitting transaction to node...");
 
-    let submit_height = transaction_pipeline.submit_proven_transaction(proven_tx).await?;
+    transaction_pipeline.submit_proven_transaction().await?;
 
     println!("Applying transaction to store...");
 
-    let tx_update =
-        transaction_pipeline.get_transaction_update(submit_height, executed_transaction);
+    let tx_update = transaction_pipeline.get_transaction_update()?;
     client.apply_transaction(tx_update).await?;
 
     println!("Successfully created transaction.");

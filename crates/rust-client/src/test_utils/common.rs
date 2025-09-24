@@ -133,7 +133,7 @@ pub async fn execute_failing_tx(
     println!("Executing transaction...");
     // We compare string since we can't compare the error directly
     assert_eq!(
-        Box::pin(client.new_transaction(account_id, tx_request))
+        Box::pin(client.submit_new_transaction(account_id, tx_request))
             .await
             .unwrap_err()
             .to_string(),
@@ -147,7 +147,7 @@ pub async fn execute_tx_and_sync(
     account_id: AccountId,
     tx_request: TransactionRequest,
 ) -> Result<()> {
-    let transaction_id = Box::pin(client.new_transaction(account_id, tx_request)).await?;
+    let transaction_id = Box::pin(client.submit_new_transaction(account_id, tx_request)).await?;
     wait_for_tx(client, transaction_id).await?;
     Ok(())
 }
@@ -334,9 +334,10 @@ pub async fn mint_note(
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    let tx_id = Box::pin(client.new_transaction(fungible_asset.faucet_id(), tx_request.clone()))
-        .await
-        .unwrap();
+    let tx_id =
+        Box::pin(client.submit_new_transaction(fungible_asset.faucet_id(), tx_request.clone()))
+            .await
+            .unwrap();
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
@@ -354,7 +355,7 @@ pub async fn consume_notes(
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(input_notes.iter().map(Note::id).collect())
         .unwrap();
-    Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap()
+    Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap()
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -391,7 +392,7 @@ pub async fn assert_note_cannot_be_consumed_twice(
         .build_consume_notes(vec![note_to_consume_id])
         .unwrap();
 
-    match Box::pin(client.new_transaction(consuming_account_id, tx_request)).await {
+    match Box::pin(client.submit_new_transaction(consuming_account_id, tx_request)).await {
         Err(ClientError::TransactionRequestError(
             TransactionRequestError::InputNoteAlreadyConsumed(_),
         )) => {},
@@ -441,13 +442,13 @@ pub async fn execute_tx_and_consume_output_notes(
         .map(|note| (note, None::<NoteArgs>))
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
-    Box::pin(client.new_transaction(executor, tx_request)).await.unwrap();
+    Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
-    Box::pin(client.new_transaction(consumer, tx_request)).await.unwrap()
+    Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()
 }
 
 /// Mints assets for the target account and consumes them immediately without waiting for the first

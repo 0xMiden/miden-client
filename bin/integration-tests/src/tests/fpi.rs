@@ -221,7 +221,7 @@ pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
-    _ = client2.new_transaction(native_account.id(), tx_request).await?;
+    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     Ok(())
 }
@@ -324,7 +324,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
-    _ = client2.new_transaction(native_account.id(), tx_request).await?;
+    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -404,7 +404,7 @@ async fn deploy_foreign_account(
     println!("Deploying foreign account");
 
     let tx_id = client
-        .new_transaction(
+        .submit_new_transaction(
             foreign_account_id,
             TransactionRequestBuilder::new()
                 .build()

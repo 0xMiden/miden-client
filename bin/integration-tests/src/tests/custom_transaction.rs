@@ -101,7 +101,12 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
         .build()?;
 
     // This fails because of {asserted_value} having the incorrect number passed in
-    assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
+    assert!(
+        client
+            .submit_new_transaction(regular_account.id(), transaction_request)
+            .await
+            .is_err()
+    );
 
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
@@ -118,7 +123,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let deserialized_transaction_request = TransactionRequest::read_from_bytes(&buffer)?;
     assert_eq!(transaction_request, deserialized_transaction_request);
 
-    let tx_id = client.new_transaction(regular_account.id(), transaction_request).await?;
+    let tx_id = client.submit_new_transaction(regular_account.id(), transaction_request).await?;
     let transaction = client
         .get_transactions(TransactionFilter::Ids(vec![tx_id]))
         .await?

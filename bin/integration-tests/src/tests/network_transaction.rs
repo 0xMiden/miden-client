@@ -90,7 +90,7 @@ async fn deploy_counter_contract(
     let tx_increment_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
 
     // Execute the transaction locally
-    let tx_id = client.new_transaction(acc.id(), tx_increment_request).await?;
+    let tx_id = client.submit_new_transaction(acc.id(), tx_increment_request).await?;
     wait_for_tx(client, tx_id).await?;
 
     Ok(acc)
@@ -194,32 +194,26 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .own_output_notes(vec![OutputNote::Full(network_note.clone())])
         .build()?;
 
-    let (bump_transaction, transaction_pipeline) =
-        client.execute_transaction(wallet.id(), tx_request).await?;
-    let tx_update = transaction_pipeline
-        .get_transaction_update(client.get_sync_height().await?, bump_transaction.clone());
+    let mut bump_pipeline = client.execute_transaction(wallet.id(), tx_request).await?;
+    let tx_update = bump_pipeline
+        .get_transaction_update_with_height(client.get_sync_height().await?)
+        .unwrap();
     client.apply_transaction(tx_update).await?;
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(vec![(network_note, None)])
         .build()?;
 
-    let (consume_transaction, transaction_pipeline) =
-        client.execute_transaction(native_account.id(), tx_request).await?;
+    let mut consume_pipeline = client.execute_transaction(native_account.id(), tx_request).await?;
 
-    let bump_proof = transaction_pipeline
-        .prove_transaction(bump_transaction, client.prover())
-        .await?;
-    let consume_proof = transaction_pipeline
-        .prove_transaction(consume_transaction.clone(), client.prover())
-        .await?;
+    bump_pipeline.prove_transaction(client.prover()).await?;
+    consume_pipeline.prove_transaction(client.prover()).await?;
 
     // Submit both transactions
-    transaction_pipeline.submit_proven_transaction(bump_proof).await?;
-    transaction_pipeline.submit_proven_transaction(consume_proof).await?;
+    bump_pipeline.submit_proven_transaction().await?;
+    consume_pipeline.submit_proven_transaction().await?;
 
-    let tx_update = transaction_pipeline
-        .get_transaction_update(client.get_sync_height().await?, consume_transaction);
+    let tx_update = consume_pipeline.get_transaction_update().unwrap();
     client.apply_transaction(tx_update).await?;
 
     wait_for_blocks(&mut client, 2).await;

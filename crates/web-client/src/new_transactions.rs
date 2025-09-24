@@ -25,7 +25,7 @@ impl WebClient {
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionStoreUpdate, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let (executed_transaction, transaction_pipeline) =
+            let transaction_pipeline =
                 Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()))
                     .await
                     .map_err(|err| {
@@ -36,8 +36,9 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get sync height"))?;
 
-            let transaction_update =
-                transaction_pipeline.get_transaction_update(current_height, executed_transaction);
+            let transaction_update = transaction_pipeline
+                .get_transaction_update_with_height(current_height)
+                .map_err(|err| js_error_with_context(err, "failed to build transaction update"))?;
 
             Ok(transaction_update.into())
         } else {
@@ -54,16 +55,12 @@ impl WebClient {
         let native_transaction_update: NativeTransactionStoreUpdate = transaction_update.into();
         if let Some(client) = self.get_mut_inner() {
             let prover = prover.map(|p| p.get_prover()).unwrap_or(client.prover());
-            let transaction_pipeline = client.build_transaction_pipeline();
+            let witness = native_transaction_update.executed_transaction().clone().into();
+            let proven_tx = prover.prove(witness).await.map_err(|err| {
+                js_error_with_context(err, "failed to prove transaction before submission")
+            })?;
 
-            let proven_tx = transaction_pipeline
-                .prove_transaction(native_transaction_update.executed_transaction().clone(), prover)
-                .await
-                .map_err(|err| {
-                    js_error_with_context(err, "failed to prove transaction before submission")
-                })?;
-
-            transaction_pipeline.submit_proven_transaction(proven_tx).await.map_err(|err| {
+            client.submit_proven_transaction(proven_tx).await.map_err(|err| {
                 js_error_with_context(err, "failed to submit transaction to the network")
             })?;
 
