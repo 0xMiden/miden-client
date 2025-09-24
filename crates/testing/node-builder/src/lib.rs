@@ -378,8 +378,8 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     //
     // The genesis block is special in that accounts are "deplyed" without transactions and
     // therefore we need bump the nonce manually to uphold this invariant.
-    let (id, vault, storage, code, _, seed) = account.into_parts();
-    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, seed);
+    let (id, vault, storage, code, _, _) = account.into_parts();
+    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
 
     Ok(AccountFile::new(updated_account, vec![AuthSecretKey::RpoFalcon512(secret)]))
 }
