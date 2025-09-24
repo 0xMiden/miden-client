@@ -4,7 +4,11 @@ use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::ScriptBuilder as NativeScriptBuilder;
 use miden_objects::assembly::diagnostics::Report;
 use miden_objects::assembly::{
-    Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind,
+    Assembler,
+    Library as NativeLibrary,
+    LibraryPath,
+    Module,
+    ModuleKind,
 };
 use wasm_bindgen::prelude::*;
 
@@ -151,14 +155,9 @@ impl ScriptBuilder {
 // The assembler type returns a miette::Report instead of an Err, so this
 // takes the report and returns it as an error.
 fn format_assembler_error(err_report: &Report, extra_context: &str) -> String {
-    let error = err_report
-        .chain()
-        .into_iter()
-        .map(ToString::to_string)
-        .collect::<Vec<String>>()
-        .join("\n");
+    let error = err_report.chain().map(ToString::to_string).collect::<Vec<String>>().join("\n");
 
-    format!("script builder: {}: failed to build given library: \n {}", error, extra_context)
+    format!("script builder: {error}: failed to build given library: \n {extra_context}")
 }
 
 // CONVERSIONS
