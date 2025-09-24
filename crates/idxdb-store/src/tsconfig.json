@@ -9,7 +9,7 @@
     "removeComments": false,
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "Node",
     "outDir": "./js",
     "strict": true,
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
