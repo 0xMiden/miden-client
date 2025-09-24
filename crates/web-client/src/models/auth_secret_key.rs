@@ -1,6 +1,6 @@
+use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
 use miden_client::utils::Serializable;
-use miden_objects::account::AuthSecretKey as NativeAuthSecretKey;
-use miden_objects::{Felt as NativeFelt, Word as NativeWord};
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

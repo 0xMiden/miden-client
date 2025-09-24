@@ -1,4 +1,4 @@
-use miden_objects::account::AccountBuilder as NativeAccountBuilder;
+use miden_client::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

@@ -1,4 +1,4 @@
-use miden_objects::Felt as NativeFelt;
+use miden_client::Felt as NativeFelt;
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Copy)]

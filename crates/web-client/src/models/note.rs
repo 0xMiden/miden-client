@@ -1,10 +1,8 @@
-use miden_client::note::Note as NativeNote;
+use miden_client::asset::Asset as NativeAsset;
+use miden_client::crypto::RpoRandomCoin;
+use miden_client::note::{Note as NativeNote, NoteAssets as NativeNoteAssets};
+use miden_client::{BlockNumber as NativeBlockNumber, Felt as NativeFelt};
 use miden_lib::note::{create_p2id_note, create_p2ide_note};
-use miden_objects::Felt as NativeFelt;
-use miden_objects::asset::Asset as NativeAsset;
-use miden_objects::block::BlockNumber as NativeBlockNumber;
-use miden_objects::crypto::rand::RpoRandomCoin;
-use miden_objects::note::NoteAssets as NativeNoteAssets;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;

@@ -80,7 +80,7 @@ use miden_objects::account::{Account, AccountDelta, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::{AccountInputs, TransactionArgs};
+use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -117,8 +117,10 @@ pub use miden_objects::transaction::{
     OutputNote,
     OutputNotes,
     ProvenTransaction,
+    TransactionArgs,
     TransactionId,
     TransactionScript,
+    TransactionSummary,
     TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};

@@ -28,7 +28,7 @@ miden-client = { default-features = false, features = ["testing", "tonic"], path
 
 # Miden dependencies
 miden-lib     = { workspace = true }
-miden-objects = { workspace = true }
+
 # External dependencies
 hex                  = { version = "0.4" }
 rand                 = { workspace = true }
@@ -37,8 +37,7 @@ wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
-miden-lib     = { default-features = false, features = ["testing"], workspace = true }
-miden-objects = { default-features = false, features = ["testing"], workspace = true }
+miden-lib = { default-features = false, features = ["testing"], workspace = true }
 web-sys       = { features = ["console"], version = "0.3" }
 
 [lints]

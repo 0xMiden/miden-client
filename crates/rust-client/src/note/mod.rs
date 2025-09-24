@@ -85,15 +85,18 @@ pub use miden_objects::note::{
     NoteExecutionHint,
     NoteExecutionMode,
     NoteFile,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteInputs,
+    NoteLocation,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
     NoteTag,
     NoteType,
     Nullifier,
+    PartialNote,
 };
 pub use miden_objects::transaction::ToInputNoteCommitments;
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
