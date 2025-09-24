@@ -177,6 +177,7 @@ pub mod asset {
 /// network.
 pub mod auth {
     pub use miden_lib::AuthScheme;
+    pub use miden_lib::account::auth::AuthRpoFalcon512;
     pub use miden_objects::account::AuthSecretKey;
     pub use miden_tx::auth::signatures::get_falcon_signature;
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
@@ -254,7 +255,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::{ScriptBuilder, SliceReader};
+pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
 pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
