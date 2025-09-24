@@ -30,7 +30,7 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
         account_id_prefix
     } else {
         client
-            .get_value(DEFAULT_ACCOUNT_ID_KEY.to_string())
+            .get_setting(DEFAULT_ACCOUNT_ID_KEY.to_string())
             .await?
             .map(AccountId::to_hex)
             .ok_or(CliError::Input("No input account ID nor default account defined".to_string()))?

@@ -159,7 +159,7 @@ pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) 
     Ok(())
 }
 
-pub fn get_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
+pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
     conn.transaction()
         .into_store_error()?
         .query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
@@ -167,7 +167,7 @@ pub fn get_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option
         .into_store_error()
 }
 
-pub fn set_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<(), StoreError> {
+pub fn set_setting<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<(), StoreError> {
     let count = conn
         .execute(insert_sql!(settings { name, value } | REPLACE), params![name, value])
         .into_store_error()?;
@@ -177,7 +177,7 @@ pub fn set_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<(
     Ok(())
 }
 
-pub fn remove_value(conn: &Connection, name: &str) -> Result<(), StoreError> {
+pub fn remove_setting(conn: &Connection, name: &str) -> Result<(), StoreError> {
     let count = conn
         .execute("DELETE FROM settings WHERE name = $1", params![name])
         .into_store_error()?;
@@ -187,7 +187,7 @@ pub fn remove_value(conn: &Connection, name: &str) -> Result<(), StoreError> {
     Ok(())
 }
 
-pub fn list_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
+pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
     let mut stmt = conn.prepare("SELECT name FROM settings").into_store_error()?;
     stmt.query_map([], |row| row.get::<_, String>(0))
         .into_store_error()?

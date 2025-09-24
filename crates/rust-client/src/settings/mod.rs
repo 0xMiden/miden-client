@@ -21,22 +21,22 @@ impl<AUTH> Client<AUTH> {
     // SETTINGS ACCESSORS
     // --------------------------------------------------------------------------------------------
 
-    /// Sets a setting value in the store. It can then be retrieved using `get_value`.
-    pub async fn set_value<T: Serializable>(
+    /// Sets a setting value in the store. It can then be retrieved using `get_setting`.
+    pub async fn set_setting<T: Serializable>(
         &mut self,
         key: String,
         value: T,
     ) -> Result<(), ClientError> {
-        self.store.set_value(key, value.to_bytes()).await.map_err(Into::into)
+        self.store.set_setting(key, value.to_bytes()).await.map_err(Into::into)
     }
 
     /// Retrieves the value for `key`, or `None` if it hasn’t been set.
-    pub async fn get_value<T: Deserializable>(
+    pub async fn get_setting<T: Deserializable>(
         &self,
         key: String,
     ) -> Result<Option<T>, ClientError> {
         self.store
-            .get_value(key)
+            .get_setting(key)
             .await
             .map(|value| value.map(|value| Deserializable::read_from_bytes(&value)))?
             .transpose()
@@ -44,12 +44,12 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Deletes the setting value from the store.
-    pub async fn remove_value(&mut self, key: String) -> Result<(), ClientError> {
-        self.store.remove_value(key).await.map_err(Into::into)
+    pub async fn remove_setting(&mut self, key: String) -> Result<(), ClientError> {
+        self.store.remove_setting(key).await.map_err(Into::into)
     }
 
     /// Returns all the setting keys from the store.
-    pub async fn list_keys(&self) -> Result<Vec<String>, ClientError> {
-        self.store.list_keys().await.map_err(Into::into)
+    pub async fn list_setting_keys(&self) -> Result<Vec<String>, ClientError> {
+        self.store.list_setting_keys().await.map_err(Into::into)
     }
 }
