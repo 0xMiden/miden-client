@@ -272,7 +272,7 @@ pub trait Store: Send + Sync {
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
 
-    /// Retrieves all [`AccountIdAddress`] objects that correspond to the provided account ID.
+    /// Retrieves all [`Address`] objects that correspond to the provided account ID.
     async fn get_addresses_by_account_id(
         &self,
         account_id: AccountId,

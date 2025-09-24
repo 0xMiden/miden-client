@@ -159,7 +159,7 @@ impl SqliteStore {
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account_seed)?;
 
-        Self::insert_address(&tx, initial_address, account.id())?;
+        Self::insert_address(&tx, &initial_address, account.id())?;
 
         tx.commit().into_store_error()?;
 
@@ -804,13 +804,13 @@ impl SqliteStore {
 
     fn insert_address(
         tx: &Transaction<'_>,
-        address: Address,
+        address: &Address,
         account_id: AccountId,
     ) -> Result<(), StoreError> {
         const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
         let serialized_address = match address {
             Address::AccountId(addr) => {
-                let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = addr.into();
+                let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = addr.clone().into();
                 serialized.to_vec()
             },
             _ => vec![], // Should never get here
