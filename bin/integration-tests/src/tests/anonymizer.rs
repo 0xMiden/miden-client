@@ -23,7 +23,7 @@ use miden_client::note::{
     NoteType,
     build_p2id_recipient,
 };
-use miden_client::store::InputNoteState;
+use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{Client, ClientRng, Felt, ScriptBuilder, Word};
@@ -97,7 +97,19 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
         .expected_output_recipients(vec![anonymized_note_details.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note.id()])
         .unwrap();
-    execute_tx_and_sync(&mut client, anonymizer_account.id(), tx_request).await?;
+    let tx_id = execute_tx(&mut client, anonymizer_account.id(), tx_request.clone()).await;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let tx_record = client
+        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+        .await?
+        .pop()
+        .unwrap();
+
+    assert_eq!(
+        tx_record.details.output_notes.get_note(0).metadata().sender(),
+        anonymizer_account.id()
+    );
 
     Ok(())
 }
