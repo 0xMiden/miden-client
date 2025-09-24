@@ -182,7 +182,7 @@ where
             let mut note_changed =
                 note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
-            if block_height < current_block_num {
+            if block_height <= current_block_num {
                 // If the note is committed in the past we need to manually fetch the block
                 // header and MMR proof to verify the inclusion proof.
                 let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;

@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteMetadata**(`sender`, `note_type`, `note_tag`, `note_execution_hint`, `aux`?): `NoteMetadata`
+> **new NoteMetadata**(`sender`, `note_type`, `note_tag`, `note_execution_hint`, `aux?`): `NoteMetadata`
 
 #### Parameters
 

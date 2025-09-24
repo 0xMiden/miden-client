@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteIdAndArgs**(`note_id`, `args`?): `NoteIdAndArgs`
+> **new NoteIdAndArgs**(`note_id`, `args?`): `NoteIdAndArgs`
 
 #### Parameters
 

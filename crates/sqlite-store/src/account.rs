@@ -203,6 +203,8 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
+        Self::insert_account_code(&tx, code)?;
+
         const QUERY: &str =
             insert_sql!(foreign_account_code { account_id, code_commitment } | REPLACE);
 
