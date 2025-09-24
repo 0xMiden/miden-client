@@ -5,7 +5,7 @@ use core::fmt::Display;
 
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountId};
-use miden_objects::address::AccountIdAddress;
+use miden_objects::address::Address;
 
 /// Represents a stored account state along with its status.
 ///
@@ -19,11 +19,11 @@ pub struct AccountRecord {
     /// Status of the tracked account.
     status: AccountStatus,
     /// Addresses that the account can be referred as.
-    addresses: Vec<AccountIdAddress>,
+    addresses: Vec<Address>,
 }
 
 impl AccountRecord {
-    pub fn new(account: Account, status: AccountStatus, addresses: Vec<AccountIdAddress>) -> Self {
+    pub fn new(account: Account, status: AccountStatus, addresses: Vec<Address>) -> Self {
         Self { account, status, addresses }
     }
 
@@ -43,7 +43,7 @@ impl AccountRecord {
         self.status.seed()
     }
 
-    pub fn addresses(&self) -> &Vec<AccountIdAddress> {
+    pub fn addresses(&self) -> &Vec<Address> {
         &self.addresses
     }
 }

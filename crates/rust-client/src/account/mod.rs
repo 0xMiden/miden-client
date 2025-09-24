@@ -38,7 +38,6 @@
 use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
@@ -152,8 +151,10 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
-                let default_address =
-                    AccountIdAddress::new(account.id(), AddressInterface::Unspecified);
+                let default_address = Address::AccountId(AccountIdAddress::new(
+                    account.id(),
+                    AddressInterface::Unspecified,
+                ));
 
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
@@ -162,26 +163,8 @@ impl<AUTH> Client<AUTH> {
                     NoteTagRecord::with_account_source(default_address_note_tag, account.id());
                 self.store.add_note_tag(note_tag_record).await?;
 
-                let mut addresses: Vec<AccountIdAddress> = vec![default_address];
-
-                let account_interface: AccountInterface = account.into();
-                if account_interface
-                    .components()
-                    .iter()
-                    .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
-                {
-                    let basic_wallet_address =
-                        AccountIdAddress::new(account.id(), AddressInterface::BasicWallet);
-                    let basic_wallet_note_tag = basic_wallet_address.to_note_tag();
-                    let note_tag_record =
-                        NoteTagRecord::with_account_source(basic_wallet_note_tag, account.id());
-                    self.store.add_note_tag(note_tag_record).await?;
-
-                    addresses.push(basic_wallet_address);
-                }
-
                 self.store
-                    .insert_account(account, account_seed, addresses)
+                    .insert_account(account, account_seed, default_address)
                     .await
                     .map_err(ClientError::StoreError)
             },

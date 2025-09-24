@@ -35,7 +35,7 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
-use miden_objects::address::AccountIdAddress;
+use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
@@ -255,7 +255,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         account_seed: Option<Word>,
-        addresses: Vec<AccountIdAddress>,
+        initial_address: Address,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -276,7 +276,7 @@ pub trait Store: Send + Sync {
     async fn get_addresses_by_account_id(
         &self,
         account_id: AccountId,
-    ) -> Result<Vec<AccountIdAddress>, StoreError>;
+    ) -> Result<Vec<Address>, StoreError>;
 
     /// Updates an existing [`Account`] with a new state.
     ///

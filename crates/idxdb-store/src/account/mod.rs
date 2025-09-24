@@ -7,9 +7,9 @@ use miden_client::account::{
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdAddress,
     AccountIdError,
     AccountStorage,
+    Address,
     StorageMap,
     StorageSlot,
     StorageSlotType,
@@ -24,7 +24,7 @@ use wasm_bindgen_futures::JsFuture;
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
 use crate::account::models::AccountIdAddressIdxdbObject;
-use crate::account::utils::{insert_account_addresses, parse_account_address_idxdb_object};
+use crate::account::utils::{insert_account_address, parse_account_address_idxdb_object};
 
 mod js_bindings;
 pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
@@ -151,7 +151,7 @@ impl WebStore {
     pub(crate) async fn get_account_addresses(
         &self,
         account_id: AccountId,
-    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+    ) -> Result<Vec<Address>, StoreError> {
         let account_id_str = account_id.to_string();
 
         let promise = idxdb_get_account_addresses(account_id_str);
@@ -165,7 +165,7 @@ impl WebStore {
         let mut account_addresses = vec![];
         for account_address_idxdb in account_addresses_idxdb {
             let (account_address, _) = parse_account_address_idxdb_object(account_address_idxdb)?;
-            account_addresses.push(account_address);
+            account_addresses.push(Address::AccountId(account_address));
         }
 
         Ok(account_addresses)
@@ -283,7 +283,7 @@ impl WebStore {
         &self,
         account: &Account,
         account_seed: Option<Word>,
-        addresses: Vec<AccountIdAddress>,
+        initial_address: Address,
     ) -> Result<(), StoreError> {
         upsert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
@@ -301,7 +301,7 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 
-        insert_account_addresses(account, addresses).await.map_err(|js_error| {
+        insert_account_address(account, initial_address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
         })?;
 

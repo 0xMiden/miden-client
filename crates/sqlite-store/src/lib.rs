@@ -21,6 +21,7 @@ use miden_client::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    Address,
 };
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::block::BlockHeader;
@@ -41,7 +42,6 @@ use miden_client::store::{
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
-use miden_objects::address::AccountIdAddress;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 
@@ -279,7 +279,7 @@ impl Store for SqliteStore {
         &self,
         account: &Account,
         account_seed: Option<Word>,
-        addresses: Vec<AccountIdAddress>,
+        initial_address: Address,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let merkle_store = self.merkle_store.clone();
@@ -290,7 +290,7 @@ impl Store for SqliteStore {
                 &merkle_store,
                 &cloned_account,
                 account_seed,
-                addresses,
+                initial_address,
             )
         })
         .await
@@ -410,7 +410,7 @@ impl Store for SqliteStore {
     async fn get_addresses_by_account_id(
         &self,
         account_id: AccountId,
-    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+    ) -> Result<Vec<Address>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_addresses(conn, account_id)
         })

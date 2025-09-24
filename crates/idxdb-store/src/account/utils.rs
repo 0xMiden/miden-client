@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountId,
     AccountIdAddress,
     AccountStorage,
+    Address,
     StorageSlot,
 };
 use miden_client::asset::AssetVault;
@@ -100,16 +101,17 @@ pub async fn upsert_account_record(
     Ok(())
 }
 
-pub async fn insert_account_addresses(
-    account: &Account,
-    addresses: Vec<AccountIdAddress>,
-) -> Result<(), JsValue> {
-    for address in addresses {
-        let account_id_str = account.id().to_string();
-        let serialized_address: [u8; AccountIdAddress::SERIALIZED_SIZE] = address.into();
-        let promise = idxdb_insert_account_address(account_id_str, serialized_address.to_vec());
-        JsFuture::from(promise).await?;
-    }
+pub async fn insert_account_address(account: &Account, address: Address) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let serialized_address = match address {
+        Address::AccountId(addr) => {
+            let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = addr.into();
+            serialized.to_vec()
+        },
+        _ => vec![], // Should never get here
+    };
+    let promise = idxdb_insert_account_address(account_id_str, serialized_address);
+    JsFuture::from(promise).await?;
 
     Ok(())
 }
