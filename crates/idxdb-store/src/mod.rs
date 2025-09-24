@@ -186,9 +186,9 @@ impl Store for WebStore {
         &self,
         account: &Account,
         account_seed: Option<Word>,
-        addresses: Vec<AccountIdAddress>,
+        initial_address: Address,
     ) -> Result<(), StoreError> {
-        self.insert_account(account, account_seed, addresses).await
+        self.insert_account(account, account_seed, initial_address).await
     }
 
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError> {

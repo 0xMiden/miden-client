@@ -148,16 +148,17 @@ pub fn parse_account_record_idxdb_object(
 
 pub fn parse_account_address_idxdb_object(
     account_address_idxdb: AccountIdAddressIdxdbObject,
-) -> Result<(AccountIdAddress, AccountId), StoreError> {
+) -> Result<(Address, AccountId), StoreError> {
     let native_account_id: AccountId = AccountId::from_hex(&account_address_idxdb.id)?;
 
     let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = account_address_idxdb
         .address
         .try_into()
         .map_err(|_| StoreError::ParsingError("invalid address length".to_string()))?;
-    let native_address = AccountIdAddress::try_from(address).map_err(|err| {
-        StoreError::ParsingError(format!("failed to parse address from bytes: {err}"))
-    })?;
+    let native_address =
+        Address::AccountId(AccountIdAddress::try_from(address).map_err(|err| {
+            StoreError::ParsingError(format!("failed to parse address from bytes: {err}"))
+        })?);
     Ok((native_address, native_account_id))
 }
 

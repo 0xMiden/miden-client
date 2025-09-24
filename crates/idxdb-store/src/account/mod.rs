@@ -165,7 +165,7 @@ impl WebStore {
         let mut account_addresses = vec![];
         for account_address_idxdb in account_addresses_idxdb {
             let (account_address, _) = parse_account_address_idxdb_object(account_address_idxdb)?;
-            account_addresses.push(Address::AccountId(account_address));
+            account_addresses.push(account_address);
         }
 
         Ok(account_addresses)
