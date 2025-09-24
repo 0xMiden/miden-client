@@ -38,6 +38,16 @@
 
 ***
 
+### getPublicKeys()
+
+> **getPublicKeys**(): [`Word`](Word.md)[]
+
+#### Returns
+
+[`Word`](Word.md)[]
+
+***
+
 ### id()
 
 > **id**(): [`AccountId`](AccountId.md)

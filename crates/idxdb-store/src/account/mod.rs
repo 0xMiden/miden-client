@@ -2,7 +2,6 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::Word;
 use miden_client::account::{
     Account,
     AccountCode,
@@ -10,24 +9,30 @@ use miden_client::account::{
     AccountId,
     AccountIdError,
     AccountStorage,
+    StorageMap,
+    StorageSlot,
+    StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
-use miden_client::utils::{Deserializable, Serializable};
+use miden_client::utils::Serializable;
+use miden_client::{Felt, Word};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 
 mod js_bindings;
+pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use js_bindings::{
-    idxdb_get_account_asset_vault,
     idxdb_get_account_code,
     idxdb_get_account_header,
     idxdb_get_account_header_by_commitment,
     idxdb_get_account_headers,
     idxdb_get_account_ids,
     idxdb_get_account_storage,
+    idxdb_get_account_storage_maps,
+    idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
     idxdb_lock_account,
     idxdb_undo_account_states,
@@ -36,21 +41,22 @@ use js_bindings::{
 
 mod models;
 use models::{
+    AccountAssetIdxdbObject,
     AccountCodeIdxdbObject,
     AccountRecordIdxdbObject,
     AccountStorageIdxdbObject,
-    AccountVaultIdxdbObject,
     ForeignAccountCodeIdxdbObject,
+    StorageMapEntryIdxdbObject,
 };
 
 pub(crate) mod utils;
 use utils::{
-    insert_account_asset_vault,
-    insert_account_code,
-    insert_account_record,
-    insert_account_storage,
     parse_account_record_idxdb_object,
     update_account,
+    upsert_account_asset_vault,
+    upsert_account_code,
+    upsert_account_record,
+    upsert_account_storage,
 };
 
 impl WebStore {
@@ -187,26 +193,61 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
         })?;
 
-        let account_storage_idxdb: AccountStorageIdxdbObject = from_value(js_value)
+        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
-        Ok(AccountStorage::read_from_bytes(&account_storage_idxdb.storage)?)
+        let promise = idxdb_get_account_storage_maps(
+            account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
+        );
+        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
+        })?;
+
+        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> = from_value(js_value)
+            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+
+        let mut maps = BTreeMap::new();
+        for entry in account_maps_idxdb {
+            let map = maps.entry(entry.root).or_insert_with(StorageMap::new);
+            map.insert(Word::try_from(entry.key)?, Word::try_from(entry.value)?);
+        }
+
+        let slots: Vec<StorageSlot> = account_storage_idxdb
+            .into_iter()
+            .map(|slot| {
+                let slot_type = StorageSlotType::try_from(Felt::new(slot.slot_type))
+                    .map_err(StoreError::DatabaseError)?;
+                Ok(match slot_type {
+                    StorageSlotType::Value => StorageSlot::Value(Word::try_from(&slot.slot_value)?),
+                    StorageSlotType::Map => {
+                        StorageSlot::Map(maps.remove(&slot.slot_value).unwrap_or_default())
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        Ok(AccountStorage::new(slots)?)
     }
 
-    pub(super) async fn get_vault_assets(
-        &self,
-        commitment: Word,
-    ) -> Result<Vec<Asset>, StoreError> {
-        let commitment_serialized = commitment.to_string();
-
-        let promise = idxdb_get_account_asset_vault(commitment_serialized);
+    pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
+        let promise = idxdb_get_account_vault_assets(root.to_hex());
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to fetch vault assets: {js_error:?}",))
         })?;
-        let vault_assets_idxdb: AccountVaultIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
+            from_value(js_value).map_err(|err| {
+                StoreError::DatabaseError(format!("failed to deserialize DEBUG {err:?}"))
+            })?;
 
-        Ok(Vec::<Asset>::read_from_bytes(&vault_assets_idxdb.assets)?)
+        let assets = vault_assets_idxdb
+            .into_iter()
+            .map(|asset| {
+                let word = Word::try_from(&asset.asset)?;
+                Ok(Asset::try_from(word)?)
+            })
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        Ok(assets)
     }
 
     pub(crate) async fn insert_account(
@@ -214,19 +255,19 @@ impl WebStore {
         account: &Account,
         account_seed: Option<Word>,
     ) -> Result<(), StoreError> {
-        insert_account_code(account.code()).await.map_err(|js_error| {
+        upsert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
 
-        insert_account_storage(account.storage()).await.map_err(|js_error| {
+        upsert_account_storage(account.storage()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
         })?;
 
-        insert_account_asset_vault(account.vault()).await.map_err(|js_error| {
+        upsert_account_asset_vault(account.vault()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
         })?;
 
-        insert_account_record(account, account_seed).await.map_err(|js_error| {
+        upsert_account_record(account, account_seed).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 

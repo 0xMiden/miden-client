@@ -355,7 +355,7 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     }
 
     for module in modules {
-        result.push_str(&format!("use miden_client_integration_tests::tests::{}::*;\n", module));
+        result.push_str(&format!("use miden_client_integration_tests::tests::{module}::*;\n"));
     }
 
     result.push('\n');
@@ -434,7 +434,7 @@ fn generate_test_case_vector(test_cases: &[TestCaseInfo]) -> String {
     }
 
     for module in modules {
-        result.push_str(&format!("use crate::tests::{}::*;\n", module));
+        result.push_str(&format!("use crate::tests::{module}::*;\n"));
     }
 
     // Generate test cases string

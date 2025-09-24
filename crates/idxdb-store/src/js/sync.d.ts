@@ -41,9 +41,10 @@ interface SerializedTransactionData {
 }
 interface JsAccountUpdate {
     storageRoot: string;
-    storageSlots: Uint8Array;
+    storageSlots: JsStorageSlot[];
+    storageMapEntries: JsStorageMapEntry[];
     assetVaultRoot: string;
-    assetBytes: Uint8Array;
+    assets: JsVaultAsset[];
     accountId: string;
     codeRoot: string;
     committed: boolean;
@@ -64,6 +65,23 @@ interface JsStateSyncUpdate {
     serializedOutputNotes: SerializedOutputNoteData[];
     accountUpdates: JsAccountUpdate[];
     transactionUpdates: SerializedTransactionData[];
+}
+export interface JsVaultAsset {
+    root: string;
+    vaultKey: string;
+    faucetIdPrefix: string;
+    asset: string;
+}
+export interface JsStorageSlot {
+    commitment: string;
+    slotIndex: number;
+    slotValue: string;
+    slotType: number;
+}
+export interface JsStorageMapEntry {
+    root: string;
+    key: string;
+    value: string;
 }
 export declare function applyStateSync(stateUpdate: JsStateSyncUpdate): Promise<void>;
 export {};

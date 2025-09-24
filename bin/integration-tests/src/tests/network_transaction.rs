@@ -146,7 +146,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         Word::from([ZERO, ZERO, ZERO, Felt::new(1)])
     );
 
-    let (native_account, _native_seed, _) =
+    let (native_account, ..) =
         insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
 
     let mut network_notes = vec![];

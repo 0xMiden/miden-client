@@ -28,7 +28,8 @@ pub enum NetworkId {
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum AccountInterface {
-    BasicWallet = 0,
+    Unspecified = 0,
+    BasicWallet = 1,
 }
 
 #[wasm_bindgen]
@@ -37,17 +38,6 @@ impl AccountId {
     pub fn from_hex(hex: &str) -> AccountId {
         let native_account_id = NativeAccountId::from_hex(hex).unwrap();
         AccountId(native_account_id)
-    }
-
-    #[wasm_bindgen(js_name = "fromBech32")]
-    pub fn from_bech32(bech32: &str) -> AccountId {
-        let Address::AccountId(account_id_address) =
-            Address::from_bech32(bech32).expect("expected a valid bech32 address").1
-        else {
-            panic!("expected an account ID address");
-        };
-
-        AccountId(account_id_address.id())
     }
 
     #[wasm_bindgen(js_name = "isFaucet")]
@@ -149,6 +139,7 @@ impl From<AccountInterface> for NativeAccountInterface {
     fn from(account_interface: AccountInterface) -> Self {
         match account_interface {
             AccountInterface::BasicWallet => NativeAccountInterface::BasicWallet,
+            AccountInterface::Unspecified => NativeAccountInterface::Unspecified,
         }
     }
 }

@@ -68,7 +68,7 @@ impl ClientConfig {
             let sqlite_store = SqliteStore::new(store_config)
                 .await
                 .with_context(|| "failed to create SQLite store")?;
-            std::sync::Arc::new(sqlite_store)
+            Arc::new(sqlite_store)
         };
 
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {

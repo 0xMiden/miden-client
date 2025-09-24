@@ -10,6 +10,7 @@ import {
   setupConsumedNote,
   getInputNotes,
   setupMintedNote,
+  setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
 import {
@@ -86,6 +87,52 @@ test.describe("get_input_note", () => {
     expect(rpcResult[0].noteId).toEqual(consumedNoteId);
     expect(rpcResult[0].hasMetadata).toBe(true);
     expect(rpcResult[0].hasInputNote).toBe(false); // Private notes don't include input_note
+  });
+
+  test("get note script by root", async ({ page }) => {
+    await setupWalletAndFaucet(page);
+
+    // First, we need to get a note script root from an existing note
+    const { consumedNoteId } = await setupConsumedNote(page, true);
+
+    // Get the note to extract its script root
+    const noteData = await page.evaluate(async (_consumedNoteId: string) => {
+      const endpoint = new window.Endpoint("http://localhost:57291");
+      const rpcClient = new window.RpcClient(endpoint);
+
+      const noteId = window.NoteId.fromHex(_consumedNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteId]);
+
+      if (fetchedNotes.length > 0 && fetchedNotes[0].inputNote) {
+        const scriptRoot = fetchedNotes[0].inputNote.note().script().root();
+        return {
+          scriptRoot: scriptRoot.toHex(),
+          hasScript: true,
+        };
+      }
+
+      return { scriptRoot: "", hasScript: false };
+    }, consumedNoteId);
+
+    // Test GetNoteScriptByRoot endpoint
+    const retrievedScript = await page.evaluate(
+      async (scriptRootHex: string) => {
+        const endpoint = new window.Endpoint("http://localhost:57291");
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const scriptRoot = window.Word.fromHex(scriptRootHex);
+        const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+
+        return {
+          hasScript: !!noteScript,
+          scriptRoot: noteScript ? noteScript.root().toHex() : null,
+        };
+      },
+      noteData.scriptRoot
+    );
+
+    expect(retrievedScript.hasScript).toBe(true);
+    expect(retrievedScript.scriptRoot).toEqual(noteData.scriptRoot);
   });
 });
 

@@ -42,6 +42,7 @@ pub mod import;
 pub mod note;
 pub mod sync;
 pub mod transaction;
+mod promise;
 
 #[wasm_bindgen(module = "/src/web_store/js/utils.js")]
 extern "C" {
@@ -60,6 +61,7 @@ pub struct WebStore {}
 
 impl WebStore {
     pub async fn new() -> Result<WebStore, JsValue> {
+        console_error_panic_hook::set_once();
         JsFuture::from(setup_indexed_db()).await?;
         Ok(WebStore {})
     }

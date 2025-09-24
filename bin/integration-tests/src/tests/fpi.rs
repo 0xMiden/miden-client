@@ -36,7 +36,7 @@ pub async fn ignore_test_standard_fpi_private(client_config: ClientConfig) -> Re
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
 pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
     // Deploy a foreign account
@@ -59,9 +59,6 @@ pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Res
     .await?;
     let foreign_account_id = foreign_account.id();
 
-    let (wallet, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore).await?;
-
     let code = format!(
         "
         use.miden::tx
@@ -82,15 +79,25 @@ pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Res
     );
 
     let tx_script = client.script_builder().compile_tx_script(&code)?;
-    _ = client.sync_state().await?;
+    client.sync_state().await?;
 
     // Wait for a couple of blocks so that the account gets committed
-    _ = wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await;
 
     let storage_requirements =
         AccountStorageRequirements::new([(1u8, &[StorageMapKey::from(MAP_KEY)])]);
 
-    let output_stack = client
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
+
+    let (wallet, ..) =
+        insert_new_wallet(&mut client2, AccountStorageMode::Private, &keystore2).await?;
+
+    let output_stack = client2
         .execute_program(
             wallet.id(),
             tx_script,
@@ -111,7 +118,7 @@ pub async fn ignore_test_fpi_execute_program(client_config: ClientConfig) -> Res
 
 #[ignore = "ignoring due to bug, see miden-base#1878"]
 pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
-    let (mut client, mut keystore) = client_config.into_client().await?;
+    let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
@@ -163,9 +170,6 @@ pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result
 
     println!("Calling FPI function inside a FPI function with new account");
 
-    let (native_account, _native_seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
-
     let tx_script = format!(
         "
         use.miden::tx
@@ -206,7 +210,20 @@ pub async fn ignore_test_nested_fpi_calls(client_config: ClientConfig) -> Result
     ];
 
     let tx_request = builder.foreign_accounts(foreign_accounts).build()?;
-    client.new_transaction(native_account.id(), tx_request).await?;
+
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
+
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
+
+    let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
+
+    client2.submit_transaction(tx_result).await?;
     Ok(())
 }
 
@@ -245,9 +262,6 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 
     println!("Calling FPI functions with new account");
 
-    let (native_account, _native_seed, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
-
     let tx_script = format!(
         "
         use.miden::tx
@@ -270,10 +284,10 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     );
 
     let tx_script = ScriptBuilder::new(true).compile_tx_script(tx_script)?;
-    _ = client.sync_state().await?;
+    client.sync_state().await?;
 
     // Wait for a couple of blocks so that the account gets committed
-    _ = wait_for_blocks(&mut client, 2).await;
+    wait_for_blocks(&mut client, 2).await;
 
     // Before the transaction there are no cached foreign accounts
     let foreign_accounts =
@@ -300,12 +314,25 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
-    client.new_transaction(native_account.id(), tx_request).await?;
+
+    // We create a new client here to force the creation of a new, fresh prover with no previous
+    // MAST forest data.
+    let (mut client2, keystore2) =
+        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
+            .into_client()
+            .await?;
+
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
+
+    let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
+
+    client2.submit_transaction(tx_result).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
         let foreign_accounts =
-            client.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
+            client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
         assert_eq!(foreign_accounts.len(), 1);
     }
     Ok(())
