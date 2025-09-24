@@ -1,3 +1,4 @@
+use miden_client::auth::NoAuth;
 use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
@@ -67,7 +68,7 @@ impl AccountBuilder {
 
     #[wasm_bindgen(js_name = "withNoAuthComponent")]
     pub fn with_no_auth_component(mut self) -> Self {
-        self.0 = self.0.with_auth_component(miden_lib::account::auth::NoAuth);
+        self.0 = self.0.with_auth_component(NoAuth);
         self
     }
 
