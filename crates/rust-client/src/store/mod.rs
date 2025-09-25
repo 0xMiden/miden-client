@@ -249,7 +249,11 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, account_id: AccountId)
     -> Result<Option<AccountRecord>, StoreError>;
 
-    /// Inserts an [`Account`] along with the seed used to create it.
+    /// Inserts an [`Account`] to the store.
+    /// 
+    /// # Errors
+    /// 
+    /// - If the account is new and does not contain a seed
     async fn insert_account(&self, account: &Account) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known

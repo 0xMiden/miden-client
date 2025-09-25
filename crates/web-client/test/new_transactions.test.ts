@@ -417,7 +417,7 @@ export const customTransaction = async (
             begin
                 # push data from the advice map into the advice stack
                 adv.push_mapval
-                # => [NOTE_ARG] 
+                # => [NOTE_ARG]
 
                 # memory address where to write the data
                 push.${memAddress}
@@ -435,7 +435,7 @@ export const customTransaction = async (
                 # => [data_mem_address]
                 mem_loadw
                 # => [NOTE_ARG_1]
-                
+
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
                 # => []
 
@@ -467,7 +467,7 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.active_note::add_assets_to_account    
+                exec.active_note::add_assets_to_account
                 # => [...]
             end
         `;

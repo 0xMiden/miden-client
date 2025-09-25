@@ -97,7 +97,7 @@ pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-) -> Result<(Account, Word, SecretKey), ClientError> {
+) -> Result<(Account, SecretKey), ClientError> {
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
@@ -119,10 +119,8 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    let seed = account.seed().expect("newly built faucet account should always contain a seed");
-
     client.add_account(&account, false).await?;
-    Ok((account, seed, key_pair))
+    Ok((account, key_pair))
 }
 
 /// Executes a transaction and asserts that it fails with the expected error.

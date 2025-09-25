@@ -214,7 +214,7 @@ async fn insert_faucet_account() {
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
     assert!(account_insert_result.is_ok());
 
-    let (account, account_seed) = account_insert_result.unwrap();
+    let account = account_insert_result.unwrap();
 
     // Fetch Account
     let fetched_account_data = client.get_account(account.id()).await;
@@ -488,7 +488,7 @@ async fn mint_transaction() {
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Faucet account generation
-    let (faucet, _seed) =
+    let faucet =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
             .await
             .unwrap();
@@ -2158,7 +2158,7 @@ async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
-) -> Result<(Account, Word), ClientError> {
+) -> Result<Account, ClientError> {
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
@@ -2180,8 +2180,6 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    let seed = account.seed().expect("newly built faucet account should always contain a seed");
-
     client.add_account(&account, false).await?;
-    Ok((account, seed))
+    Ok((account))
 }
