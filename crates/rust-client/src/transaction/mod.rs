@@ -56,7 +56,7 @@
 //!     )?;
 //!
 //!     // Execute and submit the transaction. This returns the transaction ID.
-//!     let _tx_id: TransactionId = client.new_transaction(sender_id, tx_request).await?;
+//!     let _tx_id: TransactionId = client.submit_new_transaction(sender_id, tx_request).await?;
 //!
 //!     Ok(())
 //! }

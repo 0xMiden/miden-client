@@ -8,6 +8,26 @@
 
 ## Methods
 
+### accountDelta()
+
+> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+
+#### Returns
+
+[`AccountDelta`](AccountDelta.md)
+
+***
+
+### createdNotes()
+
+> **createdNotes**(): [`OutputNotes`](OutputNotes.md)
+
+#### Returns
+
+[`OutputNotes`](OutputNotes.md)
+
+***
+
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
