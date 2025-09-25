@@ -44,3 +44,6 @@ keystore/
 # Ignore files that spawn using `cargo run`
 miden-node.pid
 data/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
