@@ -890,6 +890,26 @@ export const customAccountComponent = async (
       txIncrementRequest
     );
     await client.submitTransaction(txResult);
+
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    // Fetch the updated account state from the client
+    const updated = await client.getAccount(accountBuilderResult.account.id());
+
+    // Read a map value from storage slot 1 with key 0x0
+    const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
+    // NOTE: the map slot is in index 2 because the auth component takes one slot
+    const retrieveMapKey = updated?.storage().getMapItem(2, keyZero);
+
+    const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+
+    if (retrieveMapKey?.toHex() !== expected.toHex()) {
+      throw new Error(
+        `unexpected Word: got ${retrieveMapKey?.toHex()} expected ${expected.toHex()}`
+      );
+    }
   });
 };
 
@@ -1123,11 +1143,6 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
-    const incrNonceAuthCode = `use.miden::account
-        export.auth__basic
-          exec.account::incr_nonce
-          drop
-        end`;
     const client = window.client;
 
     // Create counter account
@@ -1143,15 +1158,9 @@ export const counterAccountComponent = async (
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let incrNonceAuth = window.AccountComponent.compile(
-      incrNonceAuthCode,
-      assembler,
-      []
-    ).withSupportsAllTypes();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .storageMode(window.AccountStorageMode.network())
-      .withAuthComponent(incrNonceAuth)
+      .withNoAuthComponent()
       .withComponent(counterAccountComponent)
       .build();
 
@@ -1307,16 +1316,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.withRng(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
-
     let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
-      .withAuthComponent(authComponent)
+      .withNoAuthComponent()
       .withComponent(bumpItemComponent)
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
     await client.newAccount(
       bumpItemAccountBuilderResult.account,
       bumpItemAccountBuilderResult.seed,
