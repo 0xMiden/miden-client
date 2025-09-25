@@ -525,7 +525,6 @@ where
     ) -> TransactionPipeline {
         TransactionPipeline::new(
             self.rpc_api.clone(),
-            self.max_block_number_delta,
             self.in_debug_mode().into(),
             transaction_request,
         )

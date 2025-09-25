@@ -101,7 +101,6 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // Create transactions
     let mut transaction_pipeline_1 =
         client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
-    let executed_tx_1 = transaction_pipeline_1.executed_transaction().unwrap().clone();
     let transaction_id_1 = transaction_pipeline_1.id().unwrap();
     transaction_pipeline_1.prove_transaction(client.prover()).await.unwrap();
     transaction_pipeline_1.submit_proven_transaction().await.unwrap();
@@ -110,7 +109,6 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
 
     let mut transaction_pipeline_2 =
         client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
-    let executed_tx_2 = transaction_pipeline_2.executed_transaction().unwrap().clone();
     let transaction_id_2 = transaction_pipeline_2.id().unwrap();
     transaction_pipeline_2.prove_transaction(client.prover()).await.unwrap();
     transaction_pipeline_2.submit_proven_transaction().await.unwrap();
