@@ -23,7 +23,6 @@ miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../
 
 # Miden dependencies
 miden-lib     = { workspace = true }
-miden-objects = { workspace = true }
 
 # External dependencies
 clap               = { features = ["derive"], version = "4.5" }
@@ -41,9 +40,9 @@ tracing-subscriber = { version = "0.3" }
 [build-dependencies]
 miden-client  = { path = "../../crates/rust-client", version = "0.12" }
 miden-lib     = { workspace = true }
-miden-objects = { workspace = true }
 
 [dev-dependencies]
+miden-client  = { path = "../../crates/rust-client", version = "0.12", features = ["testing"] }
 anyhow     = { workspace = true }
 assert_cmd = { version = "2.0" }
 predicates = { version = "3.0" }
