@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use core::fmt::Write;
 
 use idxdb_store::WebStore;
+use miden_client::note::StandardConsumabilityChecker;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{Client, ExecutionOptions};
@@ -121,6 +122,10 @@ impl WebClient {
                     false,
                 )
                 .expect("Default executor's options should always be valid"),
+                Arc::new(StandardConsumabilityChecker::new(
+                    web_store.clone(),
+                    Arc::new(keystore.clone()),
+                )),
                 None,
                 None,
             )
