@@ -23,7 +23,9 @@ impl AccountDelta {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<AccountDelta, JsValue> {
-        deserialize_from_uint8array::<NativeAccountDelta>(bytes).map(AccountDelta)
+        deserialize_from_uint8array::<NativeAccountDelta>(bytes)
+            .map(AccountDelta)
+            .map_err(Into::into)
     }
 
     pub fn id(&self) -> AccountId {
