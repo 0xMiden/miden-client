@@ -1,9 +1,8 @@
 use std::error::Error;
 
-use miden_client::ClientError;
 use miden_client::keystore::KeyStoreError;
+use miden_client::{AccountError, AccountIdError, AssetError, ClientError, NetworkIdError};
 use miden_lib::utils::ScriptBuilderError;
-use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miette::Diagnostic;
 use thiserror::Error;
 

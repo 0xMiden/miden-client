@@ -226,7 +226,15 @@ pub mod vm {
     pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 }
 
-pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
+pub use errors::{
+    AccountError,
+    AccountIdError,
+    AssetError,
+    AuthenticationError,
+    ClientError,
+    IdPrefixFetchError,
+    NetworkIdError,
+};
 pub use miden_objects::{
     EMPTY_WORD,
     Felt,

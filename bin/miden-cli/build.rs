@@ -6,13 +6,13 @@ use miden_client::account::component::{
     AccountComponentTemplate,
     COMPONENT_TEMPLATE_EXTENSION,
 };
+use miden_client::assembly::Library;
+use miden_client::utils::Serializable;
 use miden_lib::account::components::{
     basic_fungible_faucet_library,
     basic_wallet_library,
     rpo_falcon_512_library,
 };
-use miden_lib::utils::Serializable;
-use miden_objects::assembly::Library;
 
 fn main() {
     build_component_template(&PathBuf::from("templates/basic-wallet.toml"), basic_wallet_library());
