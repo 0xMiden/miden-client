@@ -43,7 +43,7 @@ impl Note {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Note, JsValue> {
-        deserialize_from_uint8array::<NativeNote>(bytes).map(Note)
+        deserialize_from_uint8array::<NativeNote>(bytes).map(Note).map_err(Into::into)
     }
 
     pub fn id(&self) -> NoteId {

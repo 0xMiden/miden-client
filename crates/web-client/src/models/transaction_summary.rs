@@ -19,7 +19,9 @@ impl TransactionSummary {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionSummary, JsValue> {
-        deserialize_from_uint8array::<NativeTransactionSummary>(bytes).map(TransactionSummary)
+        deserialize_from_uint8array::<NativeTransactionSummary>(bytes)
+            .map(TransactionSummary)
+            .map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = "accountDelta")]

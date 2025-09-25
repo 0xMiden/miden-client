@@ -53,7 +53,8 @@ impl SecretKey {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<SecretKey, JsValue> {
-        let native_secret_key = deserialize_from_uint8array::<NativeSecretKey>(bytes)?;
+        let native_secret_key =
+            deserialize_from_uint8array::<NativeSecretKey>(bytes).map_err(Into::<JsValue>::into)?;
         Ok(SecretKey(native_secret_key))
     }
 }

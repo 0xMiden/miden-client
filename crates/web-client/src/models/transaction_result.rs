@@ -51,7 +51,9 @@ impl TransactionResult {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionResult, JsValue> {
-        deserialize_from_uint8array::<NativeTransactionResult>(bytes).map(TransactionResult)
+        deserialize_from_uint8array::<NativeTransactionResult>(bytes)
+            .map(TransactionResult)
+            .map_err(Into::into)
     }
 }
 
