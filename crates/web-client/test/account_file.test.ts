@@ -1,11 +1,13 @@
 import test from "./playwright.global.setup";
 import { expect } from "@playwright/test";
-import { setupWalletAndFaucet, clearStore, getAccount } from "./webClientTestUtils";
+import {
+  setupWalletAndFaucet,
+  clearStore,
+  getAccount,
+} from "./webClientTestUtils";
 
 test.describe("AccountFile", () => {
-  test("it serializes and deserializes an account file", async ({
-    page,
-  }) => {
+  test("it serializes and deserializes an account file", async ({ page }) => {
     const { accountId } = await setupWalletAndFaucet(page);
 
     const accountFileBytes = await page.evaluate(async (accountId) => {
