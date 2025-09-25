@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteAssets**(`assets_array`?): `NoteAssets`
+> **new NoteAssets**(`assets_array?`): `NoteAssets`
 
 #### Parameters
 
