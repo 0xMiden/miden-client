@@ -21,10 +21,10 @@ test.describe("AccountFile", () => {
 
       // Serialize the AccountFile object back to bytes
       const reserialized = accountFile.serialize();
-      return reserialized;
+      return Array.from(reserialized);
     }, accountFileBytes);
 
-    expect(reserializedBytes).toEqual(accountFileBytes);
+    expect(reserializedBytes).toEqual(Array.from(accountFileBytes));
 
     await clearStore(page);
 
