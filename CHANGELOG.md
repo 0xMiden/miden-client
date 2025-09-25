@@ -9,7 +9,7 @@
 * Implemented functions for lazy loading on webstore [(#1184)](https://github.com/0xMiden/miden-client/pull/1184).
 * Added a `GetNoteScriptByRoot` call to the `RpcClient` ([#1311](https://github.com/0xMiden/miden-client/pull/1311)).
 * Added `NoAuth` component to the web client ([#1330](https://github.com/0xMiden/miden-client/pull/1330)).
-* Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries.
+* Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 
 ### Changes
 
