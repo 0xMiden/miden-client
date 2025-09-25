@@ -344,8 +344,10 @@ impl SqliteStore {
         let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
-        // TODO: unwrap
-        Ok((item, StorageMapWitness::new(proof, [key]).unwrap()))
+        let witness = StorageMapWitness::new(proof, [key])
+            .map_err(|err| StoreError::StorageMapError(err.to_string()))?;
+
+        Ok((item, witness))
     }
 
     // ACCOUNT DELTA HELPERS

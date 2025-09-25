@@ -250,9 +250,9 @@ pub trait Store: Send + Sync {
     -> Result<Option<AccountRecord>, StoreError>;
 
     /// Inserts an [`Account`] to the store.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// - If the account is new and does not contain a seed
     async fn insert_account(&self, account: &Account) -> Result<(), StoreError>;
 

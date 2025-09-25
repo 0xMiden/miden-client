@@ -92,7 +92,7 @@ use miden_objects::testing::account_id::{
 use miden_objects::transaction::{InputNote, OutputNote};
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
-use miden_testing::{MockChain, MockChainBuilder};
+use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore};
 
@@ -115,7 +115,7 @@ async fn input_notes_round_trip() {
         .await
         .unwrap();
     // generate test data
-    let available_notes = rpc_api.get_available_notes();
+    let available_notes = rpc_api.get_public_available_notes();
 
     // insert notes into database
     for note in &available_notes {
@@ -215,6 +215,7 @@ async fn insert_faucet_account() {
     assert!(account_insert_result.is_ok());
 
     let account = account_insert_result.unwrap();
+    let account_seed = account.seed().expect("newly built account should always contain a seed");
 
     // Fetch Account
     let fetched_account_data = client.get_account(account.id()).await;
@@ -304,7 +305,7 @@ async fn sync_state() {
     let expected_notes = rpc_api
         .get_available_notes()
         .into_iter()
-        .map(|n| n.note().unwrap().clone())
+        .filter_map(|n| n.note().cloned())
         .collect::<Vec<Note>>();
 
     for note in &expected_notes {
@@ -355,7 +356,7 @@ async fn sync_state_mmr() {
     let notes = rpc_api
         .get_available_notes()
         .into_iter()
-        .map(|n| n.note().unwrap().clone())
+        .filter_map(|n| n.note().cloned())
         .collect::<Vec<Note>>();
 
     for note in &notes {
@@ -488,10 +489,9 @@ async fn mint_transaction() {
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Faucet account generation
-    let faucet =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -560,10 +560,9 @@ async fn transaction_request_expiration() {
     client.sync_state().await.unwrap();
 
     let current_height = client.get_sync_height().await.unwrap();
-    let (faucet, _seed) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     let transaction_request = TransactionRequestBuilder::new()
         .expiration_delta(5)
@@ -595,10 +594,9 @@ async fn import_processing_note_returns_error() {
         .unwrap();
 
     // Faucet account generation
-    let (faucet, _seed) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     // Test submitting a mint transaction
     let transaction_request = TransactionRequestBuilder::new()
@@ -643,10 +641,9 @@ async fn import_processing_note_returns_error() {
 async fn note_without_asset() {
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    let (faucet, _seed) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
@@ -769,10 +766,9 @@ async fn real_note_roundtrip() {
     let (wallet, _seed) = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
         .unwrap();
-    let (faucet, _seed) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
@@ -825,8 +821,7 @@ async fn added_notes() {
     let faucet_account_header =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await
-            .unwrap()
-            .0;
+            .unwrap();
 
     // Mint some asset for an account not tracked by the client. It should not be stored as an
     // input note afterwards since it is not being tracked by the client
@@ -1658,10 +1653,9 @@ async fn subsequent_discarded_transactions() {
 async fn missing_recipient_digest() {
     let (mut client, _, keystore) = create_test_client().await;
 
-    let (faucet, _seed) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
 
     let dummy_recipient = NoteRecipient::new(
         Word::default(),
@@ -1983,8 +1977,7 @@ async fn storage_and_vault_proofs() {
         let faucet_account =
             insert_new_fungible_faucet(&mut client, AccountStorageMode::Public, &keystore)
                 .await
-                .unwrap()
-                .0;
+                .unwrap();
 
         let faucet_account_id = faucet_account.id();
 
@@ -2092,10 +2085,25 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
             .tag(NoteTag::for_local_use_case(0, 0).unwrap().into())
             .build()
             .unwrap();
+    let spawn_note_1 =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
+    let spawn_note_2 =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&note_second)).unwrap();
     let mut mock_chain = mock_chain_builder.build().unwrap();
 
     // Block 1: Create first note
-    mock_chain.add_pending_note(OutputNote::Full(note_first));
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
+            .unwrap()
+            .extend_expected_output_notes(vec![OutputNote::Full(note_first)])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
     mock_chain.prove_next_block().unwrap();
 
     // Block 2
@@ -2104,13 +2112,25 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
     // Block 3
     mock_chain.prove_next_block().unwrap();
 
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(mock_account.id(), &[], &[spawn_note_2])
+            .unwrap()
+            .extend_expected_output_notes(vec![OutputNote::Full(note_second.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+
     // Block 4: Create second note
-    mock_chain.add_pending_note(OutputNote::Full(note_second.clone()));
     mock_chain.prove_next_block().unwrap();
 
     let transaction = Box::pin(
         mock_chain
-            .build_tx_context(mock_account, &[note_second.id()], &[])
+            .build_tx_context(mock_account.id(), &[], &[note_second])
             .unwrap()
             .build()
             .unwrap()
@@ -2181,5 +2201,5 @@ async fn insert_new_fungible_faucet(
         .unwrap();
 
     client.add_account(&account, false).await?;
-    Ok((account))
+    Ok(account)
 }

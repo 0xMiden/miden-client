@@ -36,7 +36,7 @@ use crate::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use crate::{Client, ClientError, Word};
+use crate::{Client, ClientError};
 
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
 pub type TestClient = Client<TestClientKeyStore>;
@@ -299,7 +299,7 @@ pub async fn setup_two_wallets_and_faucet(
     anyhow::ensure!(input_notes.is_empty(), "Expected empty input notes for clean state");
 
     // Create faucet account
-    let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
+    let (faucet_account, _) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
         .with_context(|| "failed to insert new fungible faucet account")?;
 
@@ -326,7 +326,7 @@ pub async fn setup_wallet_and_faucet(
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Account)> {
-    let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
+    let (faucet_account, _) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
         .with_context(|| "failed to insert new fungible faucet account")?;
 

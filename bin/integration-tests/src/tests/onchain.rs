@@ -31,7 +31,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     wait_for_node(&mut client_3).await;
 
     // Create faucet account
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
 
     // Create regular accounts
@@ -155,7 +155,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .await?;
     wait_for_node(&mut client_2).await;
 
-    let (faucet_account_header, _, secret_key) =
+    let (faucet_account_header, secret_key) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
     let (first_regular_account, ..) =
@@ -324,7 +324,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let mut user_seed = [0u8; 32];
     client_1.rng().fill_bytes(&mut user_seed);
 
-    let (faucet_account_header, ..) =
+    let (faucet_account_header, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
     let (first_regular_account, secret_key) = insert_new_wallet_with_seed(

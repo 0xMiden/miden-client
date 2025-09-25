@@ -1027,7 +1027,7 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
 pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
 
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
             .await?;
 
@@ -1085,7 +1085,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
 
 pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 

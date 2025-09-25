@@ -212,6 +212,28 @@ impl MockRpcApi {
         self.mock_chain.read().committed_notes().values().cloned().collect()
     }
 
+    pub fn get_public_available_notes(&self) -> Vec<MockChainNote> {
+        self.mock_chain
+            .read()
+            .committed_notes()
+            .values()
+            .into_iter()
+            .filter(|n| matches!(n, MockChainNote::Public(_, _)))
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_private_available_notes(&self) -> Vec<MockChainNote> {
+        self.mock_chain
+            .read()
+            .committed_notes()
+            .values()
+            .into_iter()
+            .filter(|n| matches!(n, MockChainNote::Private(_, _, _)))
+            .cloned()
+            .collect()
+    }
+
     pub fn advance_blocks(&self, num_blocks: u32) {
         let current_height = self.get_chain_tip_block_num();
         let mut mock_chain = self.mock_chain.write();
