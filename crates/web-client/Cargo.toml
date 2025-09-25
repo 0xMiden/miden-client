@@ -34,7 +34,7 @@ wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [dev-dependencies]
-web-sys       = { features = ["console"], version = "0.3" }
+web-sys = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true
