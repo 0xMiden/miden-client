@@ -1090,11 +1090,6 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
-    const incrNonceAuthCode = `use.miden::account
-        export.auth__basic
-          exec.account::incr_nonce
-          drop
-        end`;
     const client = window.client;
 
     // Create counter account
@@ -1110,15 +1105,9 @@ export const counterAccountComponent = async (
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let incrNonceAuth = window.AccountComponent.compile(
-      incrNonceAuthCode,
-      assembler,
-      []
-    ).withSupportsAllTypes();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .storageMode(window.AccountStorageMode.network())
-      .withAuthComponent(incrNonceAuth)
+      .withNoAuthComponent()
       .withComponent(counterAccountComponent)
       .build();
 
