@@ -435,7 +435,7 @@ export async function insertAccountAddress(
   } catch (error) {
     logWebStoreError(
       error,
-      `Error inserting address with value: ${String(address)}`
+      `Error inserting address with value: ${String(address)} for the account ID ${accountId}`
     );
   }
 }

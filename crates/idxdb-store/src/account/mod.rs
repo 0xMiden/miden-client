@@ -162,13 +162,10 @@ impl WebStore {
         let account_addresses_idxdb: Vec<AccountIdAddressIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
-        let mut account_addresses = vec![];
-        for account_address_idxdb in account_addresses_idxdb {
-            let (account_address, _) = parse_account_address_idxdb_object(account_address_idxdb)?;
-            account_addresses.push(account_address);
-        }
-
-        Ok(account_addresses)
+        account_addresses_idxdb
+            .into_iter()
+            .map(|obj| parse_account_address_idxdb_object(obj).map(|(addr, _)| addr))
+            .collect::<Result<Vec<Address>, StoreError>>()
     }
 
     pub(crate) async fn get_account(
