@@ -1,4 +1,5 @@
-use miden_client::account::AccountBuilder as NativeAccountBuilder;
+use miden_client::auth::NoAuth;
+use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -62,6 +63,12 @@ impl AccountBuilder {
     #[wasm_bindgen(js_name = "withAuthComponent")]
     pub fn with_auth_component(mut self, account_component: &AccountComponent) -> Self {
         self.0 = self.0.with_auth_component(account_component);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withNoAuthComponent")]
+    pub fn with_no_auth_component(mut self) -> Self {
+        self.0 = self.0.with_auth_component(NoAuth);
         self
     }
 
