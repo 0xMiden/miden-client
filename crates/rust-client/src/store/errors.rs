@@ -10,6 +10,7 @@ use miden_objects::{
     AssetError,
     AssetVaultError,
     NoteError,
+    StorageMapError,
     TransactionScriptError,
     Word,
     WordError,
@@ -72,9 +73,8 @@ pub enum StoreError {
     QueryError(String),
     #[error("error with the SMT proof")]
     SmtProofError(#[from] SmtProofError),
-    // TODO: change the inner type to StorageMapError once miden-base/1938 is merged
     #[error("error with a storage map")]
-    StorageMapError(String),
+    StorageMapError(#[from] StorageMapError),
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]

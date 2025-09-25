@@ -344,8 +344,7 @@ impl SqliteStore {
         let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
-        let witness = StorageMapWitness::new(proof, [key])
-            .map_err(|err| StoreError::StorageMapError(err.to_string()))?;
+        let witness = StorageMapWitness::new(proof, [key])?;
 
         Ok((item, witness))
     }
