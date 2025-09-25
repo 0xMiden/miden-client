@@ -361,7 +361,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = SecretKey::with_rng(&mut get_rpo_random_coin(&mut rng));
 
-    let (account, account_seed) = create_basic_fungible_faucet(
+    let account = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
@@ -378,14 +378,10 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     //
     // The genesis block is special in that accounts are "deplyed" without transactions and
     // therefore we need bump the nonce manually to uphold this invariant.
-    let (id, vault, storage, code, _) = account.into_parts();
-    let updated_account = Account::from_parts(id, vault, storage, code, ONE);
+    let (id, vault, storage, code, ..) = account.into_parts();
+    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
 
-    Ok(AccountFile::new(
-        updated_account,
-        Some(account_seed),
-        vec![AuthSecretKey::RpoFalcon512(secret)],
-    ))
+    Ok(AccountFile::new(updated_account, vec![AuthSecretKey::RpoFalcon512(secret)]))
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {

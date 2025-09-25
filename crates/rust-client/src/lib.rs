@@ -166,6 +166,7 @@ pub mod asset {
     pub use miden_objects::asset::{
         Asset,
         AssetVault,
+        AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,

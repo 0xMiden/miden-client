@@ -410,58 +410,9 @@ export const customTransaction = async (
             # assets, otherwise it could have been boiled down to the assert.
 
             use.miden::account
-            use.miden::note
+            use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
-
-
-            proc.add_note_assets_to_account
-                push.0 exec.note::get_assets
-                # => [num_of_assets, 0 = ptr, ...]
-
-                # compute the pointer at which we should stop iterating
-                mul.4 dup.1 add
-                # => [end_ptr, ptr, ...]
-
-                # pad the stack and move the pointer to the top
-                padw movup.5
-                # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                # compute the loop latch
-                dup dup.6 neq
-                # => [latch, ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                while.true
-                    # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                    # save the pointer so that we can use it later
-                    dup movdn.5
-                    # => [ptr, 0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # load the asset
-                    mem_loadw
-                    # => [ASSET, ptr, end_ptr, ...]
-
-                    # pad the stack before call
-                    padw swapw padw padw swapdw
-                    # => [ASSET, pad(12), ptr, end_ptr, ...]
-
-                    # add asset to the account
-                    call.wallet::receive_asset
-                    # => [pad(16), ptr, end_ptr, ...]
-
-                    # clean the stack after call
-                    dropw dropw dropw
-                    # => [0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # increment the pointer and compare it to the end_ptr
-                    movup.4 add.4 dup dup.6 neq
-                    # => [latch, ptr+4, ASSET, end_ptr, ...]
-                end
-
-                # clear the stack
-                drop dropw drop
-            end
 
             begin
                 # push data from the advice map into the advice stack
@@ -478,7 +429,7 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-
+                
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
@@ -498,7 +449,7 @@ export const customTransaction = async (
                 # => []
 
                 # store the note inputs to memory starting at address 0
-                push.0 exec.note::get_inputs
+                push.0 exec.active_note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
                 # make sure the number of inputs is 2
@@ -516,7 +467,7 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.add_note_assets_to_account
+                exec.active_note::add_assets_to_account
                 # => [...]
             end
         `;
@@ -861,11 +812,7 @@ export const customAccountComponent = async (
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     await client.syncState();
 
@@ -1164,11 +1111,7 @@ export const counterAccountComponent = async (
       .withComponent(counterAccountComponent)
       .build();
 
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
@@ -1316,17 +1259,17 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
+    let secretKey = window.SecretKey.withRng(walletSeed);
+    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+
     let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
-      .withNoAuthComponent()
+      .withAuthComponent(authComponent)
       .withComponent(bumpItemComponent)
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.newAccount(
-      bumpItemAccountBuilderResult.account,
-      bumpItemAccountBuilderResult.seed,
-      false
-    );
+    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.newAccount(bumpItemAccountBuilderResult.account, false);
 
     let initialMapValue = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
@@ -1382,13 +1325,11 @@ export const testStorageMap = async (page: Page): Promise<any> => {
   });
 };
 
-// TODO: re-enable after miden-base#1878
-
-// test.describe("storage map test", () => {
-//   test.setTimeout(50000);
-//   test("storage map is updated correctly in transaction", async ({ page }) => {
-//     let { initialMapValue, finalMapValue } = await testStorageMap(page);
-//     expect(initialMapValue).toBe("1");
-//     expect(finalMapValue).toBe("2");
-//   });
-// });
+test.describe("storage map test", () => {
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue } = await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
+  });
+});

@@ -549,7 +549,7 @@ mod tests {
                     AccountStorageRequirements::new([(5u8, &[Word::default()])]),
                 )
                 .unwrap(),
-                ForeignAccount::private(account).unwrap(),
+                ForeignAccount::private(&account).unwrap(),
             ])
             .own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),

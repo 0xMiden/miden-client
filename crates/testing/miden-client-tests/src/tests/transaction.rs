@@ -58,7 +58,7 @@ async fn transaction_creates_two_notes() {
         .build_existing()
         .unwrap();
 
-    client.add_account(&account, None, false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
