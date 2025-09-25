@@ -84,7 +84,7 @@
 
 ### createClient()
 
-> **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
+> **createClient**(`node_url`?, `seed`?): `Promise`\<`any`\>
 
 Creates a new client with the given node URL and optional seed.
 If `node_url` is `None`, it defaults to the testnet endpoint.
@@ -107,7 +107,7 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ### createMockClient()
 
-> **createMockClient**(`seed?`, `serialized_mock_chain?`): `Promise`\<`any`\>
+> **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
 
 Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
 applications as it uses a mock chain that simulates the behavior of a real node.
@@ -248,7 +248,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### getConsumableNotes()
 
-> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
+> **getConsumableNotes**(`account_id`?): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -532,7 +532,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newSendTransactionRequest()
 
-> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest.md)
+> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height`?, `timelock_height`?): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
@@ -632,7 +632,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `init_seed`?): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -694,7 +694,7 @@ Returns the inner serialized mock chain if it exists.
 
 ### submitTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
+> **submitTransaction**(`transaction_result`, `prover`?): `Promise`\<`void`\>
 
 #### Parameters
 

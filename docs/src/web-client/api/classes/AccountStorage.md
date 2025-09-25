@@ -49,7 +49,7 @@
 > **getMapEntries**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
 
 Returns all entries from the storage map at the given index.
-Returns an empty array if the slot is not a map or if the index is out of bounds.
+Returns None if the slot is not a map or if the index is out of bounds.
 
 #### Parameters
 

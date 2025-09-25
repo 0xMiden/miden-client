@@ -12,7 +12,7 @@ Represents a note fetched from a Miden node via RPC.
 
 ### Constructor
 
-> **new FetchedNote**(`note_id`, `metadata`, `input_note?`): `FetchedNote`
+> **new FetchedNote**(`note_id`, `metadata`, `input_note`?): `FetchedNote`
 
 Create a note with an optional `InputNote`.
 

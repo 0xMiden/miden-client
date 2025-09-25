@@ -25,24 +25,21 @@ impl AccountStorage {
     }
 
     /// Returns all entries from the storage map at the given index.
-    /// Returns an empty array if the slot is not a map or if the index is out of bounds.
+    /// Returns None if the slot is not a map or if the index is out of bounds.
     #[wasm_bindgen(js_name = "getMapEntries")]
-    pub fn get_map_entries(&self, index: u8) -> Vec<JsStorageMapEntry> {
+    pub fn get_map_entries(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
         let slots = self.0.slots();
-        if index as usize >= slots.len() {
-            return Vec::new();
-        }
-
-        match &slots[index as usize] {
-            StorageSlot::Map(map) => map
-                .entries()
-                .map(|(key, value)| JsStorageMapEntry {
-                    root: map.root().to_hex(),
-                    key: key.to_hex(),
-                    value: value.to_hex(),
-                })
-                .collect(),
-            StorageSlot::Value(_) => Vec::new(),
+        match slots.get(index as usize) {
+            Some(StorageSlot::Map(map)) => Some(
+                map.entries()
+                    .map(|(key, value)| JsStorageMapEntry {
+                        root: map.root().to_hex(),
+                        key: key.to_hex(),
+                        value: value.to_hex(),
+                    })
+                    .collect(),
+            ),
+            _ => None,
         }
     }
 }

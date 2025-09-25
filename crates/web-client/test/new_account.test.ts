@@ -192,7 +192,9 @@ test.describe("new_faucet tests", () => {
 // =======================================================================================================
 
 test.describe("AccountStorage.getMapEntries tests", () => {
-  test("returns empty array for non-map storage slot", async ({ page }) => {
+  test("returns null for invalid indices and adds test for storage map", async ({
+    page,
+  }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
@@ -208,51 +210,22 @@ test.describe("AccountStorage.getMapEntries tests", () => {
         throw new Error("Account not found");
       }
 
-      // Try to get map entries from slot 0 (should be empty for a new account)
-      const mapEntries = accountRecord.storage().getMapEntries(0);
+      const storage = accountRecord.storage();
+
+      // Test non-map storage slot (slot 0 should be empty for a new account)
+      const nonMapResult = storage.getMapEntries(0);
+
+      // Test out of bounds index
+      const outOfBoundsResult = storage.getMapEntries(255);
 
       return {
-        entriesCount: mapEntries.length,
-        entries: mapEntries.map((entry) => ({
-          root: entry.root,
-          key: entry.key,
-          value: entry.value,
-        })),
+        nonMap: nonMapResult,
+        outOfBounds: outOfBoundsResult,
       };
     });
 
-    // For a new account, slot 0 should be empty, so getMapEntries should return an empty array
-    expect(result.entriesCount).toEqual(0);
-    expect(result.entries).toEqual([]);
-  });
-
-  test("returns empty array for out of bounds index", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
-      // Create a new wallet
-      const account = await client.newWallet(
-        window.AccountStorageMode.private(),
-        true
-      );
-
-      // Get the account to access its storage
-      const accountRecord = await client.getAccount(account.id());
-      if (!accountRecord) {
-        throw new Error("Account not found");
-      }
-
-      // Try to get map entries from a high index (should be out of bounds)
-      const mapEntries = accountRecord.storage().getMapEntries(255);
-
-      return {
-        entriesCount: mapEntries.length,
-        entries: mapEntries,
-      };
-    });
-
-    // For an out of bounds index, getMapEntries should return an empty array
-    expect(result.entriesCount).toEqual(0);
-    expect(result.entries).toEqual([]);
+    // For invalid cases, getMapEntries should return undefined
+    expect(result.nonMap).toBeUndefined();
+    expect(result.outOfBounds).toBeUndefined();
   });
 });

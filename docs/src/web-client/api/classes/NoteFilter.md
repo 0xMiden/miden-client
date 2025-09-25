@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteFilter**(`note_type`, `note_ids?`): `NoteFilter`
+> **new NoteFilter**(`note_type`, `note_ids`?): `NoteFilter`
 
 #### Parameters
 
