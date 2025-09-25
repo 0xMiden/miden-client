@@ -178,6 +178,7 @@ pub mod asset {
 /// network.
 pub mod auth {
     pub use miden_lib::AuthScheme;
+    pub use miden_lib::account::auth::NoAuth;
     pub use miden_objects::account::AuthSecretKey;
     pub use miden_tx::auth::signatures::get_falcon_signature;
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
