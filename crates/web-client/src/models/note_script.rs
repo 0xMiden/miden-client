@@ -24,7 +24,9 @@ impl NoteScript {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<NoteScript, JsValue> {
-        deserialize_from_uint8array::<NativeNoteScript>(bytes).map(NoteScript)
+        deserialize_from_uint8array::<NativeNoteScript>(bytes)
+            .map(NoteScript)
+            .map_err(Into::into)
     }
 
     pub fn p2id() -> Self {
