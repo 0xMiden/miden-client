@@ -2043,7 +2043,7 @@ async fn account_addresses_basic_wallet() {
         AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
     );
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
     let unspecified_default_address =
@@ -2063,7 +2063,7 @@ async fn account_addresses_non_basic_wallet() {
 
     let account = Account::mock_non_fungible_faucet(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET);
 
-    client.add_account(&account, Some(Word::default()), false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
     let unspecified_default_address =

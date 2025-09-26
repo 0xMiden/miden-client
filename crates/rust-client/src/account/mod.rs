@@ -159,7 +159,10 @@ impl<AUTH> Client<AUTH> {
                     NoteTagRecord::with_account_source(default_address_note_tag, account.id());
                 self.store.add_note_tag(note_tag_record).await?;
 
-                self.store.insert_account(account, default_address).await.map_err(ClientError::StoreError)
+                self.store
+                    .insert_account(account, default_address)
+                    .await
+                    .map_err(ClientError::StoreError)
             },
             Some(tracked_account) => {
                 if !overwrite {

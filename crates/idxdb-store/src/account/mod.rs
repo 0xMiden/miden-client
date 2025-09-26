@@ -277,7 +277,11 @@ impl WebStore {
         Ok(assets)
     }
 
-    pub(crate) async fn insert_account(&self, account: &Account, initial_address: Address) -> Result<(), StoreError> {
+    pub(crate) async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
         upsert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;

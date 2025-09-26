@@ -190,7 +190,11 @@ impl Store for WebStore {
     // ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    async fn insert_account(&self, account: &Account, initial_address: Address) -> Result<(), StoreError> {
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
         self.insert_account(account, initial_address).await
     }
 

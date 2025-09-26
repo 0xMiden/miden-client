@@ -275,7 +275,11 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn insert_account(&self, account: &Account, initial_address: Address) -> Result<(), StoreError> {
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let merkle_store = self.merkle_store.clone();
 

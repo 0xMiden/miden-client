@@ -130,7 +130,6 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let addresses = query_account_addresses(conn, header.id())?;
         let account = Account::new_unchecked(
             header.id(),
             vault,
@@ -138,10 +137,10 @@ impl SqliteStore {
             account_code,
             header.nonce(),
             status.seed().copied(),
-            addresses,
         );
 
-        Ok(Some(AccountRecord::new(account, status)))
+        let addresses = query_account_addresses(conn, header.id())?;
+        Ok(Some(AccountRecord::new(account, status, addresses)))
     }
 
     pub(crate) fn insert_account(

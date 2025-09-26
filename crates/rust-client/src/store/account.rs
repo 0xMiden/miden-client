@@ -31,7 +31,7 @@ impl AccountRecord {
             debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
         }
 
-        Self { account, status }
+        Self { account, status, addresses }
     }
 
     pub fn account(&self) -> &Account {

@@ -255,7 +255,11 @@ pub trait Store: Send + Sync {
     /// # Errors
     ///
     /// - If the account is new and does not contain a seed
-    async fn insert_account(&self, account: &Account,initial_address: Address) -> Result<(), StoreError>;
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
     /// script roots and added to the `GetForeignAccountCode` request.
