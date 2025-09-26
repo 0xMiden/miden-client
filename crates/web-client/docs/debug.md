@@ -69,3 +69,24 @@ Also, you should seed friendlier stack-traces:
 ![stack-trace-example](./stack-trace-example.png)
 
 
+## Relevant changes
+
+This changes are already reflected in the codebase, but the settings to make the dev build have debug symbols are the following:
+
+1. The root Cargo.toml needs to optimize the dev profile for size, otherwise it wont compile:
+```
+[profile.dev]
+opt-level = "s"
+```
+2. In the rollup.config.js the relevante options for the rust plugin are:
+```
+{
+   extraArgs: {
+       wasmBindgen: [ "--keep-debug"],
+   } 
+   optimize: {
+       release: false,
+       rustc: false
+   }
+}
+```
