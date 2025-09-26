@@ -23,9 +23,9 @@ use miden_client::account::{
     AccountStorage,
     Address,
 };
-use miden_client::asset::{Asset, AssetVault};
+use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
@@ -275,23 +275,12 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn insert_account(
-        &self,
-        account: &Account,
-        account_seed: Option<Word>,
-        initial_address: Address,
-    ) -> Result<(), StoreError> {
+    async fn insert_account(&self, account: &Account, initial_address: Address) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(
-                conn,
-                &merkle_store,
-                &cloned_account,
-                account_seed,
-                &initial_address,
-            )
+            SqliteStore::insert_account(conn, &merkle_store, &cloned_account, &initial_address)
         })
         .await
     }
@@ -375,7 +364,7 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_asset(conn, &merkle_store, account_id, faucet_id_prefix)

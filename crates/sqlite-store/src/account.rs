@@ -20,8 +20,8 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault, FungibleAsset, NonFungibleDeltaAction};
-use miden_client::crypto::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
+use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
+use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
@@ -131,19 +131,23 @@ impl SqliteStore {
         };
 
         let addresses = query_account_addresses(conn, header.id())?;
-
-        Ok(Some(AccountRecord::new(
-            Account::from_parts(header.id(), vault, storage, account_code, header.nonce()),
-            status,
+        let account = Account::new_unchecked(
+            header.id(),
+            vault,
+            storage,
+            account_code,
+            header.nonce(),
+            status.seed().copied(),
             addresses,
-        )))
+        );
+
+        Ok(Some(AccountRecord::new(account, status)))
     }
 
     pub(crate) fn insert_account(
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account: &Account,
-        account_seed: Option<Word>,
         initial_address: &Address,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
@@ -157,7 +161,7 @@ impl SqliteStore {
         )?;
 
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
-        Self::insert_account_header(&tx, &account.into(), account_seed)?;
+        Self::insert_account_header(&tx, &account.into(), account.seed())?;
 
         Self::insert_address(&tx, initial_address, account.id())?;
 
@@ -292,7 +296,7 @@ impl SqliteStore {
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
@@ -309,9 +313,10 @@ impl SqliteStore {
 
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
-        let merkle_path = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+        let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+        let witness = AssetWitness::new(proof)?;
 
-        Ok(Some((asset, merkle_path)))
+        Ok(Some((asset, witness)))
     }
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
@@ -339,14 +344,16 @@ impl SqliteStore {
         };
 
         let item = map.get(&key);
-
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
-        let (value, path) = get_storage_map_item_proof(&merkle_store, map.root(), key)?;
-        let leaf = SmtLeaf::new_single(key, value);
+        // TODO: change the api of get_storage_map_item_proof
+        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1;
+        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
-        Ok((item, StorageMapWitness::new(proof)))
+        let witness = StorageMapWitness::new(proof, [key])?;
+
+        Ok((item, witness))
     }
 
     pub(crate) fn get_account_addresses(
@@ -1144,14 +1151,15 @@ mod tests {
         .with_supports_all_types();
 
         // Create and insert an account
-        let (account, seed) = AccountBuilder::new([0; 32])
+        let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
             .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
+
         let default_address =
             Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
-        store.insert_account(&account, Some(seed), default_address).await?;
+        store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
@@ -1241,7 +1249,7 @@ mod tests {
             .build_existing()?;
         let default_address =
             Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
-        store.insert_account(&account, None, default_address).await?;
+        store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, EMPTY_WORD);
