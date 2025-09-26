@@ -326,6 +326,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -417,6 +433,16 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+***
+
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+#### Returns
+
+`Promise`\<`string`[]\>
 
 ***
 
@@ -660,6 +686,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -685,6 +727,26 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 
