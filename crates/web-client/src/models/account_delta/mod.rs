@@ -1,4 +1,4 @@
-use miden_objects::account::AccountDelta as NativeAccountDelta;
+use miden_client::account::AccountDelta as NativeAccountDelta;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

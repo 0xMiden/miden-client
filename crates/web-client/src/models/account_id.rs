@@ -1,11 +1,12 @@
 use std::str::FromStr;
 
-use miden_objects::Felt as NativeFelt;
-use miden_objects::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
-use miden_objects::address::{
+use miden_client::Felt as NativeFelt;
+use miden_client::account::AccountId as NativeAccountId;
+use miden_client::address::{
     AccountIdAddress,
     Address,
     AddressInterface as NativeAccountInterface,
+    NetworkId as NativeNetworkId,
 };
 use wasm_bindgen::prelude::*;
 

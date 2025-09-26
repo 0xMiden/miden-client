@@ -1,4 +1,4 @@
-use miden_objects::asset::AssetVault as NativeAssetVault;
+use miden_client::asset::AssetVault as NativeAssetVault;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;

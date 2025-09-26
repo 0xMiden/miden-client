@@ -31,7 +31,7 @@ pub async fn test_onchain_notes_flow(client_config: ClientConfig) -> Result<()> 
     wait_for_node(&mut client_3).await;
 
     // Create faucet account
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
 
     // Create regular accounts
@@ -155,7 +155,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .await?;
     wait_for_node(&mut client_2).await;
 
-    let (faucet_account_header, _, secret_key) =
+    let (faucet_account_header, secret_key) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
     let (first_regular_account, ..) =
@@ -168,14 +168,8 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    let (_, status) = client_1
-        .get_account_header_by_id(faucet_account_id)
-        .await?
-        .with_context(|| format!("Faucet account {} not found", faucet_account_id))?;
-    let faucet_seed = status.seed().cloned();
-
     keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
-    client_2.add_account(&faucet_account_header, faucet_seed, false).await?;
+    client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token
     println!("First client consuming note");
@@ -330,10 +324,10 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     let mut user_seed = [0u8; 32];
     client_1.rng().fill_bytes(&mut user_seed);
 
-    let (faucet_account_header, ..) =
+    let (faucet_account_header, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Public, &keystore_1).await?;
 
-    let (first_regular_account, _, secret_key) = insert_new_wallet_with_seed(
+    let (first_regular_account, secret_key) = insert_new_wallet_with_seed(
         &mut client_1,
         AccountStorageMode::Public,
         &keystore_1,

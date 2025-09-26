@@ -8,6 +8,7 @@ use core::num::ParseIntError;
 use miden_lib::AuthScheme;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterface;
+pub use miden_lib::utils::ScriptBuilderError;
 use miden_objects::Word;
 use miden_objects::account::Account;
 pub use miden_tx::utils::sync::{LazyLock, RwLock, RwLockReadGuard, RwLockWriteGuard};

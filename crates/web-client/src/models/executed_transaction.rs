@@ -1,7 +1,7 @@
-use miden_objects::transaction::ExecutedTransaction as NativeExecutedTransaction;
+use miden_client::account::AccountHeader as NativeAccountHeader;
+use miden_client::transaction::ExecutedTransaction as NativeExecutedTransaction;
 use wasm_bindgen::prelude::*;
 
-use super::account::Account;
 use super::account_delta::AccountDelta;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
@@ -26,13 +26,14 @@ impl ExecutedTransaction {
         self.0.account_id().into()
     }
 
-    #[wasm_bindgen(js_name = "initialAccount")]
-    pub fn initial_account(&self) -> Account {
-        self.0.initial_account().into()
+    //TODO: Expose partial account
+    #[wasm_bindgen(js_name = "initialAccountHeader")]
+    pub fn initial_account_header(&self) -> AccountHeader {
+        NativeAccountHeader::from(self.0.initial_account()).into()
     }
 
-    #[wasm_bindgen(js_name = "finalAccount")]
-    pub fn final_account(&self) -> AccountHeader {
+    #[wasm_bindgen(js_name = "finalAccountHeader")]
+    pub fn final_account_header(&self) -> AccountHeader {
         self.0.final_account().into()
     }
 

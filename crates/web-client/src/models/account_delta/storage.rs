@@ -1,4 +1,4 @@
-use miden_objects::account::AccountStorageDelta as NativeAccountStorageDelta;
+use miden_client::asset::AccountStorageDelta as NativeAccountStorageDelta;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

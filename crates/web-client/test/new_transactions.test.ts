@@ -344,7 +344,7 @@ export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
-): Promise<boolean> => {
+): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
       debugger;
@@ -410,58 +410,9 @@ export const customTransaction = async (
             # assets, otherwise it could have been boiled down to the assert.
 
             use.miden::account
-            use.miden::note
+            use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
-
-
-            proc.add_note_assets_to_account
-                push.0 exec.note::get_assets
-                # => [num_of_assets, 0 = ptr, ...]
-
-                # compute the pointer at which we should stop iterating
-                mul.4 dup.1 add
-                # => [end_ptr, ptr, ...]
-
-                # pad the stack and move the pointer to the top
-                padw movup.5
-                # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                # compute the loop latch
-                dup dup.6 neq
-                # => [latch, ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                while.true
-                    # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                    # save the pointer so that we can use it later
-                    dup movdn.5
-                    # => [ptr, 0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # load the asset
-                    mem_loadw
-                    # => [ASSET, ptr, end_ptr, ...]
-
-                    # pad the stack before call
-                    padw swapw padw padw swapdw
-                    # => [ASSET, pad(12), ptr, end_ptr, ...]
-
-                    # add asset to the account
-                    call.wallet::receive_asset
-                    # => [pad(16), ptr, end_ptr, ...]
-
-                    # clean the stack after call
-                    dropw dropw dropw
-                    # => [0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # increment the pointer and compare it to the end_ptr
-                    movup.4 add.4 dup dup.6 neq
-                    # => [latch, ptr+4, ASSET, end_ptr, ...]
-                end
-
-                # clear the stack
-                drop dropw drop
-            end
 
             begin
                 # push data from the advice map into the advice stack
@@ -478,7 +429,7 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-
+                
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
@@ -498,7 +449,7 @@ export const customTransaction = async (
                 # => []
 
                 # store the note inputs to memory starting at address 0
-                push.0 exec.note::get_inputs
+                push.0 exec.active_note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
                 # make sure the number of inputs is 2
@@ -516,7 +467,7 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.add_note_assets_to_account
+                exec.active_note::add_assets_to_account
                 # => [...]
             end
         `;
@@ -861,11 +812,7 @@ export const customAccountComponent = async (
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     await client.syncState();
 
@@ -1143,11 +1090,6 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
-    const incrNonceAuthCode = `use.miden::account
-        export.auth__basic
-          exec.account::incr_nonce
-          drop
-        end`;
     const client = window.client;
 
     // Create counter account
@@ -1163,23 +1105,13 @@ export const counterAccountComponent = async (
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let incrNonceAuth = window.AccountComponent.compile(
-      incrNonceAuthCode,
-      assembler,
-      []
-    ).withSupportsAllTypes();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .storageMode(window.AccountStorageMode.network())
-      .withAuthComponent(incrNonceAuth)
+      .withNoAuthComponent()
       .withComponent(counterAccountComponent)
       .build();
 
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
@@ -1277,5 +1209,127 @@ test.describe("counter account component tests", () => {
   }) => {
     let finalCounter = await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
+  });
+});
+
+export const testStorageMap = async (page: Page): Promise<any> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    await client.syncState();
+
+    // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
+    // --------------------------------------------------------------------------
+
+    const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
+    const FPI_STORAGE_VALUE = new window.Word(
+      new BigUint64Array([0n, 0n, 0n, 1n])
+    );
+
+    let storageMap = new window.StorageMap();
+    storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+
+    const accountCode = `export.bump_map_item
+                    # map key
+                    push.1.1.1.1 # Map key
+                    # item index
+                    push.0
+                    # => [index, KEY]
+                    exec.::miden::account::get_map_item
+                    add.1
+                    push.1.1.1.1 # Map key
+                    push.0
+                    # => [index, KEY, BUMPED_VALUE]
+                    exec.::miden::account::set_map_item
+                    dropw
+                    # => [OLD_VALUE]
+                    dupw
+                    push.0
+                    # Set a new item each time as the value keeps changing
+                    exec.::miden::account::set_map_item
+                    dropw dropw
+                end
+        `;
+
+    let bumpItemComponent = window.AccountComponent.compile(
+      accountCode,
+      window.TransactionKernel.assembler(),
+      [window.StorageSlot.map(storageMap)]
+    ).withSupportsAllTypes();
+
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    let secretKey = window.SecretKey.withRng(walletSeed);
+    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+
+    let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
+      .withAuthComponent(authComponent)
+      .withComponent(bumpItemComponent)
+      .storageMode(window.AccountStorageMode.public())
+      .build();
+
+    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.newAccount(bumpItemAccountBuilderResult.account, false);
+
+    let initialMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    // Deploy counter account
+    let assembler = window.TransactionKernel.assembler();
+
+    let accountComponentLib =
+      window.AssemblerUtils.createAccountComponentLibrary(
+        assembler,
+        "external_contract::bump_item_contract",
+        accountCode
+      );
+
+    let txScript = window.TransactionScript.compile(
+      `use.external_contract::bump_item_contract
+      begin
+          call.bump_item_contract::bump_map_item
+      end`,
+      assembler.withLibrary(accountComponentLib)
+    );
+
+    let txIncrementRequest = new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .build();
+
+    let txResult = await client.newTransaction(
+      bumpItemAccountBuilderResult.account.id(),
+      txIncrementRequest
+    );
+    await client.submitTransaction(txResult);
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    let finalMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    return {
+      initialMapValue: initialMapValue
+        ?.replace(/^0x/, "")
+        .replace(/^0+|0+$/g, ""),
+      finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+    };
+  });
+};
+
+test.describe("storage map test", () => {
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue } = await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
   });
 });

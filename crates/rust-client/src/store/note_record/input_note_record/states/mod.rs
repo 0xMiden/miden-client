@@ -87,20 +87,8 @@ impl InputNoteState {
         }
     }
 
-    pub(crate) fn metadata(&self) -> Option<&NoteMetadata> {
-        self.inner().metadata()
-    }
-
-    pub(crate) fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
-        self.inner().inclusion_proof()
-    }
-
-    pub(crate) fn consumer_transaction_id(&self) -> Option<&TransactionId> {
-        self.inner().consumer_transaction_id()
-    }
-
     /// Returns a unique identifier for each note state.
-    pub(crate) fn discriminant(&self) -> u8 {
+    pub fn discriminant(&self) -> u8 {
         match self {
             InputNoteState::Expected(_) => Self::STATE_EXPECTED,
             InputNoteState::Unverified(_) => Self::STATE_UNVERIFIED,
@@ -116,6 +104,18 @@ impl InputNoteState {
             },
             InputNoteState::ConsumedExternal(_) => Self::STATE_CONSUMED_EXTERNAL,
         }
+    }
+
+    pub(crate) fn metadata(&self) -> Option<&NoteMetadata> {
+        self.inner().metadata()
+    }
+
+    pub(crate) fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
+        self.inner().inclusion_proof()
+    }
+
+    pub(crate) fn consumer_transaction_id(&self) -> Option<&TransactionId> {
+        self.inner().consumer_transaction_id()
     }
 
     /// Returns a new state to reflect that the note has received an inclusion proof. The proof is

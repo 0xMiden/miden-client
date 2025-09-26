@@ -1,5 +1,5 @@
+use miden_client::note::NoteId as NativeNoteId;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
-use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
 use crate::models::note_id::NoteId;

@@ -1,4 +1,4 @@
-use miden_objects::asset::TokenSymbol as NativeTokenSymbol;
+use miden_client::asset::TokenSymbol as NativeTokenSymbol;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
