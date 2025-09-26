@@ -25,7 +25,7 @@ use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
 use rusqlite::types::Value;
-use rusqlite::{Connection, Params, Transaction, named_params, params};
+use rusqlite::{Connection, OptionalExtension, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::merkle_store::{
@@ -288,28 +288,26 @@ impl SqliteStore {
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        vault_root: Word,
+        vault_key: Word,
+    ) -> Result<AssetWitness, StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let Some(asset) = query_vault_assets(
-            conn,
-            "faucet_id_prefix = ? AND root = ?",
-            params![faucet_id_prefix.to_hex(), header.vault_root().to_hex()],
-        )?
-        .into_iter()
-        .next() else {
-            return Ok(None);
-        };
+        // if header.vault_root() != vault_root {
+        //     return Ok(None);
+        // }
+
+        const ACCOUNT_ASSET_QUERY: &str =
+            "SELECT asset FROM account_assets WHERE root = ? AND vault_key = ? LIMIT 1";
 
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
-        let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+        let proof = get_asset_proof(&merkle_store, vault_root, &asset)?;
         let witness = AssetWitness::new(proof)?;
 
-        Ok(Some((asset, witness)))
+        Ok(witness)
     }
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
@@ -318,35 +316,59 @@ impl SqliteStore {
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
-        index: u8,
+        storage_commitment: Word,
+        map_root: Word,
         key: Word,
-    ) -> Result<(Word, StorageMapWitness), StoreError> {
+    ) -> Result<Option<(Word, StorageMapWitness)>, StoreError> {
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let StorageSlot::Map(map) = query_storage_slots(
-            conn,
-            "commitment = ? AND slot_index = ?",
-            params![header.storage_commitment().to_hex(), index],
-        )?
-        .remove(&index)
-        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
-        else {
-            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        if header.storage_commitment() != storage_commitment {
+            return Ok(None);
+        }
+
+        const SLOT_QUERY: &str =
+            "SELECT slot_type FROM account_storage WHERE commitment = ? AND slot_value = ? LIMIT 1";
+
+        let slot_type = conn
+            .prepare(SLOT_QUERY)
+            .into_store_error()?
+            .query_row(params![storage_commitment.to_hex(), map_root.to_hex()], |row| {
+                row.get::<_, Vec<u8>>(0)
+            })
+            .optional()
+            .into_store_error()?
+            .map(|bytes| StorageSlotType::read_from_bytes(&bytes))
+            .transpose()?;
+
+        let Some(StorageSlotType::Map) = slot_type else {
+            return Ok(None);
         };
 
-        let item = map.get(&key);
+        const MAP_ENTRY_QUERY: &str =
+            "SELECT value FROM storage_map_entries WHERE root = ? AND key = ? LIMIT 1";
+
+        let stored_value = conn
+            .prepare(MAP_ENTRY_QUERY)
+            .into_store_error()?
+            .query_row(params![map_root.to_hex(), key.to_hex()], |row| row.get::<_, String>(0))
+            .optional()
+            .into_store_error()?
+            .map(|value| Word::try_from(value))
+            .transpose()?;
+
+        let value = stored_value.unwrap_or_default();
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
         // TODO: change the api of get_storage_map_item_proof
-        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1;
-        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
+        let path = get_storage_map_item_proof(&merkle_store, map_root, key)?.1;
+        let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), value);
         let proof = SmtProof::new(path, leaf)?;
 
         let witness = StorageMapWitness::new(proof, [key])?;
 
-        Ok((item, witness))
+        Ok(Some((value, witness)))
     }
 
     // ACCOUNT DELTA HELPERS

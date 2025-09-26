@@ -20,14 +20,7 @@ use db_management::utils::{
     set_setting,
 };
 use miden_client::Word;
-use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-};
+use miden_client::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
@@ -384,11 +377,12 @@ impl Store for SqliteStore {
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        vault_root: Word,
+        vault_key: Word,
+    ) -> Result<AssetWitness, StoreError> {
         let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_asset(conn, &merkle_store, account_id, faucet_id_prefix)
+            SqliteStore::get_account_asset(conn, &merkle_store, account_id, vault_root, vault_key)
         })
         .await
     }
@@ -406,13 +400,21 @@ impl Store for SqliteStore {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        storage_commitment: Word,
+        map_root: Word,
         key: Word,
-    ) -> Result<(Word, StorageMapWitness), StoreError> {
+    ) -> Result<Option<(Word, StorageMapWitness)>, StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+            SqliteStore::get_account_map_item(
+                conn,
+                &merkle_store,
+                account_id,
+                storage_commitment,
+                map_root,
+                key,
+            )
         })
         .await
     }
