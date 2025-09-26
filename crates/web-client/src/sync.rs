@@ -1,5 +1,5 @@
+use miden_client::asset::{Asset as NativeAsset, FungibleAsset as NativeFungibleAsset};
 use miden_client::note::build_swap_tag as native_build_swap_tag;
-use miden_objects::asset::{Asset as NativeAsset, FungibleAsset as NativeFungibleAsset};
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;

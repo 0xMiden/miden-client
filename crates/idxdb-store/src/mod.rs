@@ -271,7 +271,7 @@ impl Store for WebStore {
     }
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
-        unimplemented!()
+        self.list_setting_keys().await
     }
 }
 

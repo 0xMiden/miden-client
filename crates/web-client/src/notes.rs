@@ -1,6 +1,6 @@
 use miden_client::Word;
+use miden_client::note::{NoteId, NoteScript as NativeNoteScript};
 use miden_client::store::OutputNoteRecord;
-use miden_objects::note::{NoteId, NoteScript as NativeNoteScript};
 use wasm_bindgen::prelude::*;
 
 use super::models::note_script::NoteScript;
