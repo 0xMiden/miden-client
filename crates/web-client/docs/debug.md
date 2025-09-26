@@ -66,6 +66,6 @@ You should also be able to see the rust source in the devtools source tab:
 ![source-example](./source-example.png)
 
 Also, you should seed friendlier stack-traces:
-![strack-trace-example](./stack-trace-example.png)
+![stack-trace-example](./stack-trace-example.png)
 
 
