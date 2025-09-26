@@ -2011,8 +2011,7 @@ async fn storage_and_vault_proofs() {
             .unwrap()
             .unwrap();
 
-        let expected_witness =
-            AssetWitness::new(vault.asset_tree().open(&asset.vault_key())).unwrap();
+        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage

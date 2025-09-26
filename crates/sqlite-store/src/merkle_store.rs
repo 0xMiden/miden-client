@@ -3,6 +3,7 @@ use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
+use miden_objects::crypto::merkle::Smt;
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
 pub fn get_asset_proof(
@@ -37,7 +38,12 @@ pub fn update_asset_nodes(
 
 /// Inserts the asset vault SMT nodes to the merkle store.
 pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
-    merkle_store.extend(vault.asset_tree().inner_nodes());
+    // We need to build the SMT from the vault iterable entries as
+    // we don't have direct access to the vault's SMT nodes.
+    // Safe unwrap as we are sure that the vault's SMT nodes are valid.
+    let smt =
+        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key(), asset.into()))).unwrap();
+    merkle_store.extend(smt.inner_nodes());
 }
 
 /// Retrieves the Merkle proof for a specific storage map item in the merkle store.

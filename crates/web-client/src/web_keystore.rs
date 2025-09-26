@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
-use miden_client::auth::{AuthSecretKey, SigningInputs, TransactionAuthenticator};
+use miden_client::auth::{AuthSecretKey, Signature, SigningInputs, TransactionAuthenticator};
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{Deserializable, RwLock, Serializable};
 use miden_client::{AuthenticationError, Felt, Word};
@@ -78,6 +78,8 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
 
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
-        miden_client::auth::get_falcon_signature(&k, message, &mut *rng)
+
+        let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
+        Ok(signature.to_prepared_signature())
     }
 }
