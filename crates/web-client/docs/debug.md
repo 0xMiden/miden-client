@@ -43,8 +43,6 @@ We can generate a debug build with symbols to help us trace these errors, this d
    Custom start=0x04c347b3 end=0x059ae810 (size=0x00d7a05d) ".debug_loc"
    Custom start=0x059ae815 end=0x09113060 (size=0x0376484b) ".debug_info"
  ```
- 
-
     
 ## Using the debug symbols
 
