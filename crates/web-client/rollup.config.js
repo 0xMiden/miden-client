@@ -59,11 +59,12 @@ export default [
         extraArgs: {
           cargo: [...baseCargoArgs],
           wasmOpt: wasmOptArgs,
+          wasmBindgen: devMode ? ["--keep-debug"] : [],
         },
         experimental: {
           typescriptDeclarationDir: "dist/crates",
         },
-        optimize: { release: true, rustc: true },
+        optimize: { release: !devMode, rustc: !devMode },
       }),
       resolve(),
       commonjs(),
