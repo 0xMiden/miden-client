@@ -26,12 +26,12 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
+use miden_objects::Word;
 use miden_objects::account::{
     Account,
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     StorageMapWitness,
     StorageSlot,
@@ -41,7 +41,6 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
-use miden_objects::{AccountError, Word};
 
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -386,16 +385,12 @@ pub trait Store: Send + Sync {
     async fn get_account_asset(
         &self,
         account_id: AccountId,
-        faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        _vault_root: Word,
+        vault_key: Word,
+    ) -> Result<AssetWitness, StoreError> {
+        // TODO: check for root equivalence
         let vault = self.get_account_vault(account_id).await?;
-        let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
-            return Ok(None);
-        };
-
-        let witness = AssetWitness::new(vault.asset_tree().open(&asset.vault_key()))?;
-
-        Ok(Some((asset, witness)))
+        Ok(vault.open(vault_key))
     }
 
     /// Retrieves the storage for a specific account.
@@ -410,18 +405,36 @@ pub trait Store: Send + Sync {
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
-        index: u8,
+        storage_commitment: Word,
+        map_root: Word,
         key: Word,
-    ) -> Result<(Word, StorageMapWitness), StoreError> {
+    ) -> Result<Option<(Word, StorageMapWitness)>, StoreError> {
         let storage = self.get_account_storage(account_id).await?;
-        let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
-            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        if storage.commitment() != storage_commitment {
+            return Ok(None);
+        }
+
+        let Some(map) = storage
+            .slots()
+            .iter()
+            .filter_map(|slot| {
+                if let StorageSlot::Map(map) = slot
+                    && map.root() == map_root
+                {
+                    Some(map)
+                } else {
+                    None
+                }
+            })
+            .next()
+        else {
+            return Ok(None);
         };
 
         let value = map.get(&key);
         let witness = map.open(&key);
 
-        Ok((value, witness))
+        Ok(Some((value, witness)))
     }
 }
 

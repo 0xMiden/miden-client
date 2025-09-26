@@ -2004,28 +2004,40 @@ async fn storage_and_vault_proofs() {
         assert_eq!(account.vault().root(), vault.root());
 
         // Check that specific asset proof matches the one in the vault
+        let expected_asset = account
+            .vault()
+            .assets()
+            .find(|a| a.faucet_id_prefix() == faucet_account_id.prefix())
+            .expect("expected minted asset to be present");
+
         let (asset, witness) = client
             .test_store()
-            .get_account_asset(account_id, faucet_account_id.prefix())
+            .get_account_asset(account_id, account.vault().root(), expected_asset.vault_key())
             .await
             .unwrap()
             .unwrap();
 
-        let expected_witness =
-            AssetWitness::new(vault.asset_tree().open(&asset.vault_key())).unwrap();
+        assert_eq!(asset, expected_asset);
+
+        let expected_witness = vault.open(asset.vault_key());
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
-        let (value, proof) = client
-            .test_store()
-            .get_account_map_item(account_id, 1, MAP_KEY.into())
-            .await
-            .unwrap();
-
         let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
             panic!("Expected a map storage slot");
         };
 
+        let (value, proof) = client
+            .test_store()
+            .get_account_map_item(
+                account_id,
+                account.storage().commitment(),
+                map.root(),
+                MAP_KEY.into(),
+            )
+            .await
+            .unwrap()
+            .expect("expected map witness");
         assert_eq!(value, map.get(&MAP_KEY.into()));
         assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
