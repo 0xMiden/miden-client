@@ -8,6 +8,7 @@ use miden_client::keystore::KeyStoreError;
 use miden_client::utils::RwLock;
 use miden_client::{AuthenticationError, Felt, Word};
 use miden_lib::utils::{Deserializable, Serializable};
+use miden_objects::account::Signature;
 use rand::Rng;
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
@@ -79,6 +80,8 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
 
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
-        miden_client::auth::get_falcon_signature(&k, message, &mut *rng)
+
+        let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
+        Ok(signature.to_prepared_signature())
     }
 }
