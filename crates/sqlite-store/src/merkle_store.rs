@@ -42,8 +42,7 @@ pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
     // we don't have direct access to the vault's SMT nodes.
     // Safe unwrap as we are sure that the vault's SMT nodes are valid.
     let smt =
-        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key(), asset.clone().into())))
-            .unwrap();
+        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key(), asset.into()))).unwrap();
     merkle_store.extend(smt.inner_nodes());
 }
 
