@@ -2,7 +2,7 @@
 
 ## 0.11.7 (2025-09-26)
 
-* Fixed an issue where AccountId was being left as null-pointer ([#1340](https://github.com/0xMiden/miden-client/pull/1340)).
+* Fixed an issue where `AccountId` was being left as null-pointer ([#1340](https://github.com/0xMiden/miden-client/pull/1340)).
 
 ## 0.11.6 (2025-09-18)
 
