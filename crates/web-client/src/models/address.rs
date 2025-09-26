@@ -1,6 +1,7 @@
 use miden_objects::account::NetworkId as NativeNetworkId;
 use miden_objects::address::{
-    AccountIdAddress as NativeAccountIdAddress, Address as NativeAddress,
+    AccountIdAddress as NativeAccountIdAddress,
+    Address as NativeAddress,
     AddressInterface as NativeAddressInterface,
 };
 use wasm_bindgen::JsValue;
