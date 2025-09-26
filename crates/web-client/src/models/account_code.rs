@@ -1,4 +1,4 @@
-use miden_objects::account::AccountCode as NativeAccountCode;
+use miden_client::account::AccountCode as NativeAccountCode;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;

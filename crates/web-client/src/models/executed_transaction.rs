@@ -1,5 +1,5 @@
-use miden_objects::account::AccountHeader as NativeAccountHeader;
-use miden_objects::transaction::ExecutedTransaction as NativeExecutedTransaction;
+use miden_client::account::AccountHeader as NativeAccountHeader;
+use miden_client::transaction::ExecutedTransaction as NativeExecutedTransaction;
 use wasm_bindgen::prelude::*;
 
 use super::account_delta::AccountDelta;

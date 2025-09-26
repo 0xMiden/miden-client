@@ -3,12 +3,10 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
-use miden_client::auth::{AuthSecretKey, SigningInputs, TransactionAuthenticator};
+use miden_client::auth::{AuthSecretKey, Signature, SigningInputs, TransactionAuthenticator};
 use miden_client::keystore::KeyStoreError;
-use miden_client::utils::RwLock;
+use miden_client::utils::{Deserializable, RwLock, Serializable};
 use miden_client::{AuthenticationError, Felt, Word};
-use miden_lib::utils::{Deserializable, Serializable};
-use miden_objects::account::Signature;
 use rand::Rng;
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)

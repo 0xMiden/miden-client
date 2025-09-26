@@ -1,12 +1,11 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
+use miden_client::address::{AccountIdAddress, Address, AddressInterface};
 use miden_client::asset::Asset;
 use miden_client::rpc::{NodeRpcClient, TonicRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
-use miden_client::{Client, ZERO};
-use miden_objects::PrettyPrint;
-use miden_objects::address::{AccountIdAddress, Address, AddressInterface};
+use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;

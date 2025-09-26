@@ -1,4 +1,4 @@
-use miden_objects::crypto::dsa::rpo_falcon512::Signature as NativeSignature;
+use miden_client::crypto::rpo_falcon512::Signature as NativeSignature;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

@@ -3,11 +3,16 @@ use alloc::sync::Arc;
 use core::fmt::Write;
 
 use idxdb_store::WebStore;
+use miden_client::crypto::RpoRandomCoin;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
-use miden_client::{Client, ExecutionOptions};
-use miden_objects::crypto::rand::RpoRandomCoin;
-use miden_objects::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_client::{
+    Client,
+    ExecutionOptions,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
