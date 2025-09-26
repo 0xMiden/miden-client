@@ -24,7 +24,8 @@ We can generate a debug build with symbols to help us trace these errors, this d
   4. (Optional), to double check the debug symbols have been generated, you can install
   the Web Assembly Binary Toolkit. A few sources are:
   - [brew package manger](https://formulae.brew.sh/formula/wabt)
--[nix packages ](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
+  
+  - [nix packages](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
  - [ubuntu](https://launchpad.net/ubuntu/+source/wabt)  (not tested)
  - [source](https://github.com/WebAssembly/wabt).
  The wabt package provides an `wasm-obj` binary, which you can use like so:
