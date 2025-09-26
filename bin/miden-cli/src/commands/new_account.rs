@@ -279,7 +279,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         builder = builder.with_component(component);
     }
 
-    let (account, seed) = builder
+    let account = builder
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
@@ -287,7 +287,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
         .map_err(CliError::KeyStore)?;
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(&account, false).await?;
 
     if deploy {
         deploy_account(client, &account).await?;

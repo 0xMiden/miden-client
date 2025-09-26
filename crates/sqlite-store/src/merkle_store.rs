@@ -1,7 +1,7 @@
 use miden_client::Word;
 use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf};
+use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
@@ -9,8 +9,11 @@ pub fn get_asset_proof(
     merkle_store: &MerkleStore,
     vault_root: Word,
     asset: &Asset,
-) -> Result<MerklePath, StoreError> {
-    Ok(merkle_store.get_path(vault_root, get_node_index(asset.vault_key())?)?.path)
+) -> Result<SmtProof, StoreError> {
+    let path = merkle_store.get_path(vault_root, get_node_index(asset.vault_key())?)?.path;
+    let leaf = SmtLeaf::new_single(asset.vault_key(), (*asset).into());
+
+    Ok(SmtProof::new(path, leaf)?)
 }
 
 /// Updates the merkle store with the new asset values.

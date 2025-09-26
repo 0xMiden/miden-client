@@ -1,3 +1,4 @@
+use miden_client::auth::NoAuth;
 use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
@@ -65,11 +66,18 @@ impl AccountBuilder {
         self
     }
 
+    #[wasm_bindgen(js_name = "withNoAuthComponent")]
+    pub fn with_no_auth_component(mut self) -> Self {
+        self.0 = self.0.with_auth_component(NoAuth);
+        self
+    }
+
     pub fn build(self) -> Result<AccountBuilderResult, JsValue> {
-        let (account, seed) = self
+        let account = self
             .0
             .build()
             .map_err(|err| js_error_with_context(err, "Failed to build account"))?;
+        let seed = account.seed().expect("newly built account should always contain a seed");
         Ok(AccountBuilderResult {
             account: account.into(),
             seed: seed.into(),

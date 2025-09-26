@@ -105,3 +105,13 @@
 #### Returns
 
 `AccountBuilder`
+
+***
+
+### withNoAuthComponent()
+
+> **withNoAuthComponent**(): `AccountBuilder`
+
+#### Returns
+
+`AccountBuilder`
