@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AssemblerUtils
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AssemblerUtils
+[@demox-labs/miden-sdk](../index) / AssemblerUtils
 
 # Class: AssemblerUtils
 
@@ -20,13 +25,13 @@
 
 ### createAccountComponentLibrary()
 
-> `static` **createAccountComponentLibrary**(`assembler`, `library_path`, `source_code`): [`Library`](Library.md)
+> `static` **createAccountComponentLibrary**(`assembler`, `library_path`, `source_code`): [`Library`](Library)
 
 #### Parameters
 
 ##### assembler
 
-[`Assembler`](Assembler.md)
+[`Assembler`](Assembler)
 
 ##### library\_path
 
@@ -38,4 +43,4 @@
 
 #### Returns
 
-[`Library`](Library.md)
+[`Library`](Library)

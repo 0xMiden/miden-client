@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: PublicKey
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / PublicKey
+[@demox-labs/miden-sdk](../index) / PublicKey
 
 # Class: PublicKey
 
@@ -36,11 +41,11 @@
 
 ##### message
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### signature
 
-[`Signature`](Signature.md)
+[`Signature`](Signature)
 
 #### Returns
 
@@ -56,11 +61,11 @@
 
 ##### signing\_inputs
 
-[`SigningInputs`](SigningInputs.md)
+[`SigningInputs`](SigningInputs)
 
 ##### signature
 
-[`Signature`](Signature.md)
+[`Signature`](Signature)
 
 #### Returns
 

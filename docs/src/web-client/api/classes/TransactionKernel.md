@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionKernel
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionKernel
+[@demox-labs/miden-sdk](../index) / TransactionKernel
 
 # Class: TransactionKernel
 
@@ -20,8 +25,8 @@
 
 ### assembler()
 
-> `static` **assembler**(): [`Assembler`](Assembler.md)
+> `static` **assembler**(): [`Assembler`](Assembler)
 
 #### Returns
 
-[`Assembler`](Assembler.md)
+[`Assembler`](Assembler)

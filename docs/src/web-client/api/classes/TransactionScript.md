@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionScript
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionScript
+[@demox-labs/miden-sdk](../index) / TransactionScript
 
 # Class: TransactionScript
 
@@ -20,11 +25,11 @@
 
 ### root()
 
-> **root**(): [`Word`](Word.md)
+> **root**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -40,7 +45,7 @@
 
 ##### assembler
 
-[`Assembler`](Assembler.md)
+[`Assembler`](Assembler)
 
 #### Returns
 

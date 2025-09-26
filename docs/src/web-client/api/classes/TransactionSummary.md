@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionSummary
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionSummary
+[@demox-labs/miden-sdk](../index) / TransactionSummary
 
 # Class: TransactionSummary
 
@@ -10,11 +15,11 @@
 
 ### accountDelta()
 
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+> **accountDelta**(): [`AccountDelta`](AccountDelta)
 
 #### Returns
 
-[`AccountDelta`](AccountDelta.md)
+[`AccountDelta`](AccountDelta)
 
 ***
 
@@ -30,31 +35,31 @@
 
 ### inputNotes()
 
-> **inputNotes**(): [`InputNotes`](InputNotes.md)
+> **inputNotes**(): [`InputNotes`](InputNotes)
 
 #### Returns
 
-[`InputNotes`](InputNotes.md)
+[`InputNotes`](InputNotes)
 
 ***
 
 ### outputNotes()
 
-> **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+> **outputNotes**(): [`OutputNotes`](OutputNotes)
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`OutputNotes`](OutputNotes)
 
 ***
 
 ### salt()
 
-> **salt**(): [`Word`](Word.md)
+> **salt**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 

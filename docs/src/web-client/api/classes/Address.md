@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Address
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Address
+[@demox-labs/miden-sdk](../index) / Address
 
 # Class: Address
 
@@ -10,11 +15,11 @@
 
 ### accountId()
 
-> **accountId**(): [`AccountId`](AccountId.md)
+> **accountId**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -30,11 +35,11 @@
 
 ### interface()
 
-> **interface**(): [`AddressInterface`](../type-aliases/AddressInterface.md)
+> **interface**(): [`AddressInterface`](../type-aliases/AddressInterface)
 
 #### Returns
 
-[`AddressInterface`](../type-aliases/AddressInterface.md)
+[`AddressInterface`](../type-aliases/AddressInterface)
 
 ***
 
@@ -46,7 +51,7 @@
 
 ##### network\_id
 
-[`NetworkId`](../enumerations/NetworkId.md)
+[`NetworkId`](../enumerations/NetworkId)
 
 #### Returns
 
@@ -68,11 +73,11 @@
 
 ### toNoteTag()
 
-> **toNoteTag**(): [`NoteTag`](NoteTag.md)
+> **toNoteTag**(): [`NoteTag`](NoteTag)
 
 #### Returns
 
-[`NoteTag`](NoteTag.md)
+[`NoteTag`](NoteTag)
 
 ***
 
@@ -96,11 +101,11 @@ Return stringified version of self.
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### \_interface
 
-[`AddressInterface`](../type-aliases/AddressInterface.md)
+[`AddressInterface`](../type-aliases/AddressInterface)
 
 #### Returns
 

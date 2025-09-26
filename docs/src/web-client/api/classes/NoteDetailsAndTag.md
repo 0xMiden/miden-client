@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteDetailsAndTag
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteDetailsAndTag
+[@demox-labs/miden-sdk](../index) / NoteDetailsAndTag
 
 # Class: NoteDetailsAndTag
 
@@ -16,11 +21,11 @@
 
 ##### note\_details
 
-[`NoteDetails`](NoteDetails.md)
+[`NoteDetails`](NoteDetails)
 
 ##### tag
 
-[`NoteTag`](NoteTag.md)
+[`NoteTag`](NoteTag)
 
 #### Returns
 
@@ -30,13 +35,13 @@
 
 ### noteDetails
 
-> `readonly` **noteDetails**: [`NoteDetails`](NoteDetails.md)
+> `readonly` **noteDetails**: [`NoteDetails`](NoteDetails)
 
 ***
 
 ### tag
 
-> `readonly` **tag**: [`NoteTag`](NoteTag.md)
+> `readonly` **tag**: [`NoteTag`](NoteTag)
 
 ## Methods
 

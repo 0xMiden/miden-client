@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: JsStorageSlot
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsStorageSlot
+[@demox-labs/miden-sdk](../index) / JsStorageSlot
 
 # Class: JsStorageSlot
 

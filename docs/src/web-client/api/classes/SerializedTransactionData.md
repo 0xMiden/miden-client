@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SerializedTransactionData
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SerializedTransactionData
+[@demox-labs/miden-sdk](../index) / SerializedTransactionData
 
 # Class: SerializedTransactionData
 

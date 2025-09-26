@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: InputNoteRecord
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNoteRecord
+[@demox-labs/miden-sdk](../index) / InputNoteRecord
 
 # Class: InputNoteRecord
 
@@ -20,11 +25,11 @@
 
 ### details()
 
-> **details**(): [`NoteDetails`](NoteDetails.md)
+> **details**(): [`NoteDetails`](NoteDetails)
 
 #### Returns
 
-[`NoteDetails`](NoteDetails.md)
+[`NoteDetails`](NoteDetails)
 
 ***
 
@@ -40,21 +45,21 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### inclusionProof()
 
-> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+> **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof)
 
 #### Returns
 
-[`NoteInclusionProof`](NoteInclusionProof.md)
+[`NoteInclusionProof`](NoteInclusionProof)
 
 ***
 
@@ -90,11 +95,11 @@
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): [`NoteMetadata`](NoteMetadata)
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ***
 
@@ -110,8 +115,8 @@
 
 ### state()
 
-> **state**(): [`InputNoteState`](../enumerations/InputNoteState.md)
+> **state**(): [`InputNoteState`](../enumerations/InputNoteState)
 
 #### Returns
 
-[`InputNoteState`](../enumerations/InputNoteState.md)
+[`InputNoteState`](../enumerations/InputNoteState)

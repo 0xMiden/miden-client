@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: StorageSlot
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / StorageSlot
+[@demox-labs/miden-sdk](../index) / StorageSlot
 
 # Class: StorageSlot
 
@@ -36,7 +41,7 @@
 
 ##### value
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
@@ -52,7 +57,7 @@
 
 ##### storage\_map
 
-[`StorageMap`](StorageMap.md)
+[`StorageMap`](StorageMap)
 
 #### Returns
 

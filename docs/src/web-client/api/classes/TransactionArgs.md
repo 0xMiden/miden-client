@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionArgs
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionArgs
+[@demox-labs/miden-sdk](../index) / TransactionArgs
 
 # Class: TransactionArgs
 
@@ -10,11 +15,11 @@
 
 ### adviceInputs()
 
-> **adviceInputs**(): [`AdviceInputs`](AdviceInputs.md)
+> **adviceInputs**(): [`AdviceInputs`](AdviceInputs)
 
 #### Returns
 
-[`AdviceInputs`](AdviceInputs.md)
+[`AdviceInputs`](AdviceInputs)
 
 ***
 
@@ -30,24 +35,24 @@
 
 ### getNoteArgs()
 
-> **getNoteArgs**(`note_id`): [`Word`](Word.md)
+> **getNoteArgs**(`note_id`): [`Word`](Word)
 
 #### Parameters
 
 ##### note\_id
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### txScript()
 
-> **txScript**(): [`TransactionScript`](TransactionScript.md)
+> **txScript**(): [`TransactionScript`](TransactionScript)
 
 #### Returns
 
-[`TransactionScript`](TransactionScript.md)
+[`TransactionScript`](TransactionScript)

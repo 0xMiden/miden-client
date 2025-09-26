@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: ConsumableNoteRecord
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ConsumableNoteRecord
+[@demox-labs/miden-sdk](../index) / ConsumableNoteRecord
 
 # Class: ConsumableNoteRecord
 
@@ -16,11 +21,11 @@
 
 ##### input\_note\_record
 
-[`InputNoteRecord`](InputNoteRecord.md)
+[`InputNoteRecord`](InputNoteRecord)
 
 ##### note\_consumability
 
-[`NoteConsumability`](NoteConsumability.md)[]
+[`NoteConsumability`](NoteConsumability)[]
 
 #### Returns
 
@@ -40,18 +45,18 @@
 
 ### inputNoteRecord()
 
-> **inputNoteRecord**(): [`InputNoteRecord`](InputNoteRecord.md)
+> **inputNoteRecord**(): [`InputNoteRecord`](InputNoteRecord)
 
 #### Returns
 
-[`InputNoteRecord`](InputNoteRecord.md)
+[`InputNoteRecord`](InputNoteRecord)
 
 ***
 
 ### noteConsumability()
 
-> **noteConsumability**(): [`NoteConsumability`](NoteConsumability.md)[]
+> **noteConsumability**(): [`NoteConsumability`](NoteConsumability)[]
 
 #### Returns
 
-[`NoteConsumability`](NoteConsumability.md)[]
+[`NoteConsumability`](NoteConsumability)[]

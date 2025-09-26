@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: IntoUnderlyingSource
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / IntoUnderlyingSource
+[@demox-labs/miden-sdk](../index) / IntoUnderlyingSource
 
 # Class: IntoUnderlyingSource
 

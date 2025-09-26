@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteTag
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteTag
+[@demox-labs/miden-sdk](../index) / NoteTag
 
 # Class: NoteTag
 
@@ -20,11 +25,11 @@
 
 ### executionMode()
 
-> **executionMode**(): [`NoteExecutionMode`](NoteExecutionMode.md)
+> **executionMode**(): [`NoteExecutionMode`](NoteExecutionMode)
 
 #### Returns
 
-[`NoteExecutionMode`](NoteExecutionMode.md)
+[`NoteExecutionMode`](NoteExecutionMode)
 
 ***
 
@@ -84,7 +89,7 @@
 
 ##### execution
 
-[`NoteExecutionMode`](NoteExecutionMode.md)
+[`NoteExecutionMode`](NoteExecutionMode)
 
 #### Returns
 
@@ -100,7 +105,7 @@
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 

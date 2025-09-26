@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Endpoint
+draft: true
+---
 
-***
+[**@demox-labs/miden-sdk**](../index)
 
-[@demox-labs/miden-sdk](../README.md) / Endpoint
+---
+
+[@demox-labs/miden-sdk](../index) / Endpoint
 
 # Class: Endpoint
 
@@ -25,7 +30,7 @@ Creates an endpoint from a URL string.
 
 `string`
 
-The URL string (e.g., <https://localhost:57291>)
+The URL string (e.g., `https://localhost:57291`)
 
 #### Returns
 
@@ -43,7 +48,7 @@ throws an error if the URL is invalid
 
 Returns the host of the endpoint.
 
-***
+---
 
 ### port
 
@@ -51,7 +56,7 @@ Returns the host of the endpoint.
 
 Returns the port of the endpoint.
 
-***
+---
 
 ### protocol
 
@@ -69,7 +74,7 @@ Returns the protocol of the endpoint.
 
 `void`
 
-***
+---
 
 ### toString()
 
@@ -81,7 +86,7 @@ Returns the string representation of the endpoint.
 
 `string`
 
-***
+---
 
 ### devnet()
 
@@ -93,7 +98,7 @@ Returns the endpoint for the Miden devnet.
 
 `Endpoint`
 
-***
+---
 
 ### localhost()
 
@@ -101,13 +106,13 @@ Returns the endpoint for the Miden devnet.
 
 Returns the endpoint for a local Miden node.
 
-Uses <http://localhost:57291>
+Uses `http://localhost:57291`
 
 #### Returns
 
 `Endpoint`
 
-***
+---
 
 ### testnet()
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountInterface
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountInterface
+[@demox-labs/miden-sdk](../index) / AccountInterface
 
 # Enumeration: AccountInterface
 

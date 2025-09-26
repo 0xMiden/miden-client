@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AdviceInputs
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AdviceInputs
+[@demox-labs/miden-sdk](../index) / AdviceInputs
 
 # Class: AdviceInputs
 
@@ -20,24 +25,24 @@
 
 ### mappedValues()
 
-> **mappedValues**(`key`): [`Felt`](Felt.md)[]
+> **mappedValues**(`key`): [`Felt`](Felt)[]
 
 #### Parameters
 
 ##### key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 ***
 
 ### stack()
 
-> **stack**(): [`Felt`](Felt.md)[]
+> **stack**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteConsumability
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteConsumability
+[@demox-labs/miden-sdk](../index) / NoteConsumability
 
 # Class: NoteConsumability
 
@@ -10,11 +15,11 @@
 
 ### accountId()
 
-> **accountId**(): [`AccountId`](AccountId.md)
+> **accountId**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 

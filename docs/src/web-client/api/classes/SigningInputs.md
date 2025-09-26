@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SigningInputs
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SigningInputs
+[@demox-labs/miden-sdk](../index) / SigningInputs
 
 # Class: SigningInputs
 
@@ -26,21 +31,21 @@
 
 ### toCommitment()
 
-> **toCommitment**(): [`Word`](Word.md)
+> **toCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### toElements()
 
-> **toElements**(): [`Felt`](Felt.md)[]
+> **toElements**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 ***
 
@@ -52,7 +57,7 @@
 
 ##### felts
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 #### Returns
 
@@ -68,7 +73,7 @@
 
 ##### word
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
@@ -84,7 +89,7 @@
 
 ##### summary
 
-[`TransactionSummary`](TransactionSummary.md)
+[`TransactionSummary`](TransactionSummary)
 
 #### Returns
 

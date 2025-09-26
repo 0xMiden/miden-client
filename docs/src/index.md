@@ -1,6 +1,15 @@
-# Overview
+---
+title: Client
+sidebar_position: 1
+---
 
-The Miden client in Rust contains, the Miden client library and the Miden client cli.
+# Miden-client
+
+The Miden client currently has three main components:
+
+1. [Miden client library](#miden-client-library).
+2. [Miden client CLI](#miden-client-cli).
+3. [Miden web client](#miden-web-client).
 
 ### Miden client library
 
@@ -14,4 +23,8 @@ The Miden client also includes a command-line interface (CLI) that serves as a w
 
 The CLI provides commands for interacting with the Miden rollup, such as submitting transactions, syncing with the network, and managing account data.
 
-More information about the CLI can be found in the [CLI section](./cli-reference.md).
+More information about the CLI can be found in the [CLI section](./cli-reference).
+
+### Miden web client
+
+The Miden web client is a web-based interface that allows users to interact with the Miden rollup through a browser. It wraps most of the functionality of the Rust library and provides a user-friendly interface for managing accounts, submitting transactions, and monitoring activity on the network.

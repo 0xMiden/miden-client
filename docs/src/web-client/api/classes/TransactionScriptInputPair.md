@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionScriptInputPair
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionScriptInputPair
+[@demox-labs/miden-sdk](../index) / TransactionScriptInputPair
 
 # Class: TransactionScriptInputPair
 
@@ -16,11 +21,11 @@
 
 ##### word
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### felts
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 #### Returns
 
@@ -30,11 +35,11 @@
 
 ### felts()
 
-> **felts**(): [`Felt`](Felt.md)[]
+> **felts**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 ***
 
@@ -50,8 +55,8 @@
 
 ### word()
 
-> **word**(): [`Word`](Word.md)
+> **word**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

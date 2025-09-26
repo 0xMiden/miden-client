@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AddressInterface
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AddressInterface
+[@demox-labs/miden-sdk](../index) / AddressInterface
 
 # Type Alias: AddressInterface
 

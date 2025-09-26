@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountId
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountId
+[@demox-labs/miden-sdk](../index) / AccountId
 
 # Class: AccountId
 
@@ -40,21 +45,21 @@
 
 ### prefix()
 
-> **prefix**(): [`Felt`](Felt.md)
+> **prefix**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
 ### suffix()
 
-> **suffix**(): [`Felt`](Felt.md)
+> **suffix**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
@@ -71,11 +76,11 @@ testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
 
 ##### network\_id
 
-[`NetworkId`](../enumerations/NetworkId.md)
+[`NetworkId`](../enumerations/NetworkId)
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`AccountInterface`](../enumerations/AccountInterface)
 
 #### Returns
 
@@ -98,7 +103,7 @@ network ID.
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`AccountInterface`](../enumerations/AccountInterface)
 
 #### Returns
 

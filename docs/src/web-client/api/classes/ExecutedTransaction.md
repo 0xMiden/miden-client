@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: ExecutedTransaction
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ExecutedTransaction
+[@demox-labs/miden-sdk](../index) / ExecutedTransaction
 
 # Class: ExecutedTransaction
 

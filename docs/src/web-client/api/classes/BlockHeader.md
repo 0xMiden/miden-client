@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: BlockHeader
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / BlockHeader
+[@demox-labs/miden-sdk](../index) / BlockHeader
 
 # Class: BlockHeader
 
@@ -10,11 +15,11 @@
 
 ### accountRoot()
 
-> **accountRoot**(): [`Word`](Word.md)
+> **accountRoot**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -30,21 +35,21 @@
 
 ### chainCommitment()
 
-> **chainCommitment**(): [`Word`](Word.md)
+> **chainCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -60,51 +65,51 @@
 
 ### noteRoot()
 
-> **noteRoot**(): [`Word`](Word.md)
+> **noteRoot**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### nullifierRoot()
 
-> **nullifierRoot**(): [`Word`](Word.md)
+> **nullifierRoot**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### prevBlockCommitment()
 
-> **prevBlockCommitment**(): [`Word`](Word.md)
+> **prevBlockCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### proofCommitment()
 
-> **proofCommitment**(): [`Word`](Word.md)
+> **proofCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### subCommitment()
 
-> **subCommitment**(): [`Word`](Word.md)
+> **subCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -120,21 +125,21 @@
 
 ### txCommitment()
 
-> **txCommitment**(): [`Word`](Word.md)
+> **txCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### txKernelCommitment()
 
-> **txKernelCommitment**(): [`Word`](Word.md)
+> **txKernelCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 

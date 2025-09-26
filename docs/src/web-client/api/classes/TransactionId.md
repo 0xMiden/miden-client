@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionId
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionId
+[@demox-labs/miden-sdk](../index) / TransactionId
 
 # Class: TransactionId
 
@@ -20,11 +25,11 @@
 
 ### asElements()
 
-> **asElements**(): [`Felt`](Felt.md)[]
+> **asElements**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 ***
 
@@ -40,11 +45,11 @@
 
 ### inner()
 
-> **inner**(): [`Word`](Word.md)
+> **inner**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 

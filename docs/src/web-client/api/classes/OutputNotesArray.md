@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: OutputNotesArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotesArray
+[@demox-labs/miden-sdk](../index) / OutputNotesArray
 
 # Class: OutputNotesArray
 
@@ -16,7 +21,7 @@
 
 ##### output\_notes\_array?
 
-[`OutputNote`](OutputNote.md)[]
+[`OutputNote`](OutputNote)[]
 
 #### Returns
 
@@ -32,7 +37,7 @@
 
 ##### output\_note
 
-[`OutputNote`](OutputNote.md)
+[`OutputNote`](OutputNote)
 
 #### Returns
 

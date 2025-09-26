@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: PartialNote
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / PartialNote
+[@demox-labs/miden-sdk](../index) / PartialNote
 
 # Class: PartialNote
 
@@ -10,11 +15,11 @@
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): [`NoteAssets`](NoteAssets)
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ***
 
@@ -30,28 +35,28 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): [`NoteMetadata`](NoteMetadata)
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ***
 
 ### recipientDigest()
 
-> **recipientDigest**(): [`Word`](Word.md)
+> **recipientDigest**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

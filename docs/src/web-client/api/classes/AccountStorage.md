@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountStorage
+draft: true
+---
 
-***
+[**@demox-labs/miden-sdk**](../index.md)
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorage
+---
+
+[@demox-labs/miden-sdk](../index.md) / AccountStorage
 
 # Class: AccountStorage
 
@@ -10,13 +15,13 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
-***
+---
 
 ### free()
 
@@ -26,11 +31,11 @@
 
 `void`
 
-***
+---
 
 ### getItem()
 
-> **getItem**(`index`): [`Word`](Word.md)
+> **getItem**(`index`): [`Word`](Word)
 
 #### Parameters
 
@@ -40,13 +45,13 @@
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
-***
+---
 
 ### getMapItem()
 
-> **getMapItem**(`index`, `key`): [`Word`](Word.md)
+> **getMapItem**(`index`, `key`): [`Word`](Word)
 
 #### Parameters
 
@@ -56,8 +61,8 @@
 
 ##### key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

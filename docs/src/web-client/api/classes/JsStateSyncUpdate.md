@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: JsStateSyncUpdate
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsStateSyncUpdate
+[@demox-labs/miden-sdk](../index) / JsStateSyncUpdate
 
 # Class: JsStateSyncUpdate
 
@@ -14,7 +19,7 @@ under sync.js
 
 ### accountUpdates
 
-> **accountUpdates**: [`JsAccountUpdate`](JsAccountUpdate.md)[]
+> **accountUpdates**: [`JsAccountUpdate`](JsAccountUpdate)[]
 
 Account state updates included in this sync.
 
@@ -49,7 +54,7 @@ IDs of note tags that should be removed from the client's local state.
 
 ### flattenedNewBlockHeaders
 
-> **flattenedNewBlockHeaders**: [`FlattenedU8Vec`](FlattenedU8Vec.md)
+> **flattenedNewBlockHeaders**: [`FlattenedU8Vec`](FlattenedU8Vec)
 
 The new block headers for this state update, serialized into a flattened byte array.
 
@@ -57,7 +62,7 @@ The new block headers for this state update, serialized into a flattened byte ar
 
 ### flattenedPartialBlockChainPeaks
 
-> **flattenedPartialBlockChainPeaks**: [`FlattenedU8Vec`](FlattenedU8Vec.md)
+> **flattenedPartialBlockChainPeaks**: [`FlattenedU8Vec`](FlattenedU8Vec)
 
 Flattened byte array containing partial blockchain peaks used for merkle tree
 verification.
@@ -76,7 +81,7 @@ representing the block number for the header at that same index.
 
 ### serializedInputNotes
 
-> **serializedInputNotes**: [`SerializedInputNoteData`](SerializedInputNoteData.md)[]
+> **serializedInputNotes**: [`SerializedInputNoteData`](SerializedInputNoteData)[]
 
 Input notes for this state update in serialized form.
 
@@ -100,7 +105,7 @@ The actual authentication node data corresponding to the IDs above.
 
 ### serializedOutputNotes
 
-> **serializedOutputNotes**: [`SerializedOutputNoteData`](SerializedOutputNoteData.md)[]
+> **serializedOutputNotes**: [`SerializedOutputNoteData`](SerializedOutputNoteData)[]
 
 Output notes created in this state update in serialized form.
 
@@ -108,7 +113,7 @@ Output notes created in this state update in serialized form.
 
 ### transactionUpdates
 
-> **transactionUpdates**: [`SerializedTransactionData`](SerializedTransactionData.md)[]
+> **transactionUpdates**: [`SerializedTransactionData`](SerializedTransactionData)[]
 
 Transaction data for transactions included in this update.
 

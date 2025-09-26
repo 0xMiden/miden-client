@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: RecipientArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / RecipientArray
+[@demox-labs/miden-sdk](../index) / RecipientArray
 
 # Class: RecipientArray
 
@@ -16,7 +21,7 @@
 
 ##### recipient\_array?
 
-[`NoteRecipient`](NoteRecipient.md)[]
+[`NoteRecipient`](NoteRecipient)[]
 
 #### Returns
 
@@ -42,7 +47,7 @@
 
 ##### recipient
 
-[`NoteRecipient`](NoteRecipient.md)
+[`NoteRecipient`](NoteRecipient)
 
 #### Returns
 

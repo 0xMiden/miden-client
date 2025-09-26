@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountVaultDelta
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountVaultDelta
+[@demox-labs/miden-sdk](../index) / AccountVaultDelta
 
 # Class: AccountVaultDelta
 
@@ -10,11 +15,11 @@
 
 ### addedFungibleAssets()
 
-> **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+> **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset)[]
 
 #### Returns
 
-[`FungibleAsset`](FungibleAsset.md)[]
+[`FungibleAsset`](FungibleAsset)[]
 
 ***
 
@@ -30,11 +35,11 @@
 
 ### fungible()
 
-> **fungible**(): [`FungibleAssetDelta`](FungibleAssetDelta.md)
+> **fungible**(): [`FungibleAssetDelta`](FungibleAssetDelta)
 
 #### Returns
 
-[`FungibleAssetDelta`](FungibleAssetDelta.md)
+[`FungibleAssetDelta`](FungibleAssetDelta)
 
 ***
 
@@ -50,11 +55,11 @@
 
 ### removedFungibleAssets()
 
-> **removedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+> **removedFungibleAssets**(): [`FungibleAsset`](FungibleAsset)[]
 
 #### Returns
 
-[`FungibleAsset`](FungibleAsset.md)[]
+[`FungibleAsset`](FungibleAsset)[]
 
 ***
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionScriptInputPairArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionScriptInputPairArray
+[@demox-labs/miden-sdk](../index) / TransactionScriptInputPairArray
 
 # Class: TransactionScriptInputPairArray
 
@@ -16,7 +21,7 @@
 
 ##### transaction\_script\_input\_pairs?
 
-[`TransactionScriptInputPair`](TransactionScriptInputPair.md)[]
+[`TransactionScriptInputPair`](TransactionScriptInputPair)[]
 
 #### Returns
 
@@ -42,7 +47,7 @@
 
 ##### transaction\_script\_input\_pair
 
-[`TransactionScriptInputPair`](TransactionScriptInputPair.md)
+[`TransactionScriptInputPair`](TransactionScriptInputPair)
 
 #### Returns
 

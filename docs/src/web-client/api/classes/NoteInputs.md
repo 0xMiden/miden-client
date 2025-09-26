@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteInputs
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteInputs
+[@demox-labs/miden-sdk](../index) / NoteInputs
 
 # Class: NoteInputs
 
@@ -16,7 +21,7 @@
 
 ##### felt\_array
 
-[`FeltArray`](FeltArray.md)
+[`FeltArray`](FeltArray)
 
 #### Returns
 
@@ -36,8 +41,8 @@
 
 ### values()
 
-> **values**(): [`Felt`](Felt.md)[]
+> **values**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]

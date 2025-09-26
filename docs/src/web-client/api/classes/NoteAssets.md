@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteAssets
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteAssets
+[@demox-labs/miden-sdk](../index) / NoteAssets
 
 # Class: NoteAssets
 
@@ -16,7 +21,7 @@
 
 ##### assets\_array?
 
-[`FungibleAsset`](FungibleAsset.md)[]
+[`FungibleAsset`](FungibleAsset)[]
 
 #### Returns
 
@@ -36,11 +41,11 @@
 
 ### fungibleAssets()
 
-> **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+> **fungibleAssets**(): [`FungibleAsset`](FungibleAsset)[]
 
 #### Returns
 
-[`FungibleAsset`](FungibleAsset.md)[]
+[`FungibleAsset`](FungibleAsset)[]
 
 ***
 
@@ -52,7 +57,7 @@
 
 ##### asset
 
-[`FungibleAsset`](FungibleAsset.md)
+[`FungibleAsset`](FungibleAsset)
 
 #### Returns
 

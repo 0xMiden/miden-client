@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionRecord
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionRecord
+[@demox-labs/miden-sdk](../index) / TransactionRecord
 
 # Class: TransactionRecord
 
@@ -10,11 +15,11 @@
 
 ### accountId()
 
-> **accountId**(): [`AccountId`](AccountId.md)
+> **accountId**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -40,11 +45,11 @@
 
 ### finalAccountState()
 
-> **finalAccountState**(): [`Word`](Word.md)
+> **finalAccountState**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -60,48 +65,48 @@
 
 ### id()
 
-> **id**(): [`TransactionId`](TransactionId.md)
+> **id**(): [`TransactionId`](TransactionId)
 
 #### Returns
 
-[`TransactionId`](TransactionId.md)
+[`TransactionId`](TransactionId)
 
 ***
 
 ### initAccountState()
 
-> **initAccountState**(): [`Word`](Word.md)
+> **initAccountState**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### inputNoteNullifiers()
 
-> **inputNoteNullifiers**(): [`Word`](Word.md)[]
+> **inputNoteNullifiers**(): [`Word`](Word)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 ***
 
 ### outputNotes()
 
-> **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+> **outputNotes**(): [`OutputNotes`](OutputNotes)
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`OutputNotes`](OutputNotes)
 
 ***
 
 ### transactionStatus()
 
-> **transactionStatus**(): [`TransactionStatus`](TransactionStatus.md)
+> **transactionStatus**(): [`TransactionStatus`](TransactionStatus)
 
 #### Returns
 
-[`TransactionStatus`](TransactionStatus.md)
+[`TransactionStatus`](TransactionStatus)

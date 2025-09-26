@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteMetadata
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteMetadata
+[@demox-labs/miden-sdk](../index) / NoteMetadata
 
 # Class: NoteMetadata
 
@@ -16,23 +21,23 @@
 
 ##### sender
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### note\_tag
 
-[`NoteTag`](NoteTag.md)
+[`NoteTag`](NoteTag)
 
 ##### note\_execution\_hint
 
-[`NoteExecutionHint`](NoteExecutionHint.md)
+[`NoteExecutionHint`](NoteExecutionHint)
 
 ##### aux?
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 #### Returns
 
@@ -52,28 +57,28 @@
 
 ### noteType()
 
-> **noteType**(): [`NoteType`](../enumerations/NoteType.md)
+> **noteType**(): [`NoteType`](../enumerations/NoteType)
 
 #### Returns
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ***
 
 ### sender()
 
-> **sender**(): [`AccountId`](AccountId.md)
+> **sender**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
 ### tag()
 
-> **tag**(): [`NoteTag`](NoteTag.md)
+> **tag**(): [`NoteTag`](NoteTag)
 
 #### Returns
 
-[`NoteTag`](NoteTag.md)
+[`NoteTag`](NoteTag)

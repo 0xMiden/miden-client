@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: OutputNotes
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNotes
+[@demox-labs/miden-sdk](../index) / OutputNotes
 
 # Class: OutputNotes
 
@@ -10,11 +15,11 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -30,7 +35,7 @@
 
 ### getNote()
 
-> **getNote**(`index`): [`OutputNote`](OutputNote.md)
+> **getNote**(`index`): [`OutputNote`](OutputNote)
 
 #### Parameters
 
@@ -40,7 +45,7 @@
 
 #### Returns
 
-[`OutputNote`](OutputNote.md)
+[`OutputNote`](OutputNote)
 
 ***
 
@@ -56,11 +61,11 @@
 
 ### notes()
 
-> **notes**(): [`OutputNote`](OutputNote.md)[]
+> **notes**(): [`OutputNote`](OutputNote)[]
 
 #### Returns
 
-[`OutputNote`](OutputNote.md)[]
+[`OutputNote`](OutputNote)[]
 
 ***
 

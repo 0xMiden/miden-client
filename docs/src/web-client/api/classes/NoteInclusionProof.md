@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteInclusionProof
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteInclusionProof
+[@demox-labs/miden-sdk](../index) / NoteInclusionProof
 
 # Class: NoteInclusionProof
 
@@ -20,18 +25,18 @@
 
 ### location()
 
-> **location**(): [`NoteLocation`](NoteLocation.md)
+> **location**(): [`NoteLocation`](NoteLocation)
 
 #### Returns
 
-[`NoteLocation`](NoteLocation.md)
+[`NoteLocation`](NoteLocation)
 
 ***
 
 ### notePath()
 
-> **notePath**(): [`MerklePath`](MerklePath.md)
+> **notePath**(): [`MerklePath`](MerklePath)
 
 #### Returns
 
-[`MerklePath`](MerklePath.md)
+[`MerklePath`](MerklePath)

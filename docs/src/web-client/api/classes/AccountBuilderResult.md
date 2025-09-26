@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountBuilderResult
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountBuilderResult
+[@demox-labs/miden-sdk](../index) / AccountBuilderResult
 
 # Class: AccountBuilderResult
 
@@ -10,13 +15,13 @@
 
 ### account
 
-> `readonly` **account**: [`Account`](Account.md)
+> `readonly` **account**: [`Account`](Account)
 
 ***
 
 ### seed
 
-> `readonly` **seed**: [`Word`](Word.md)
+> `readonly` **seed**: [`Word`](Word)
 
 ## Methods
 

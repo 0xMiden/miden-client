@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SerializedOutputNoteData
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SerializedOutputNoteData
+[@demox-labs/miden-sdk](../index) / SerializedOutputNoteData
 
 # Class: SerializedOutputNoteData
 

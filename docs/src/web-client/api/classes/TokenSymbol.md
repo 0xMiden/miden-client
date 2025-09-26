@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TokenSymbol
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TokenSymbol
+[@demox-labs/miden-sdk](../index) / TokenSymbol
 
 # Class: TokenSymbol
 

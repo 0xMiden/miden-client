@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionResult
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionResult
+[@demox-labs/miden-sdk](../index) / TransactionResult
 
 # Class: TransactionResult
 
@@ -10,11 +15,11 @@
 
 ### accountDelta()
 
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+> **accountDelta**(): [`AccountDelta`](AccountDelta)
 
 #### Returns
 
-[`AccountDelta`](AccountDelta.md)
+[`AccountDelta`](AccountDelta)
 
 ***
 
@@ -30,31 +35,31 @@
 
 ### consumedNotes()
 
-> **consumedNotes**(): [`InputNotes`](InputNotes.md)
+> **consumedNotes**(): [`InputNotes`](InputNotes)
 
 #### Returns
 
-[`InputNotes`](InputNotes.md)
+[`InputNotes`](InputNotes)
 
 ***
 
 ### createdNotes()
 
-> **createdNotes**(): [`OutputNotes`](OutputNotes.md)
+> **createdNotes**(): [`OutputNotes`](OutputNotes)
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`OutputNotes`](OutputNotes)
 
 ***
 
 ### executedTransaction()
 
-> **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+> **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction)
 
 #### Returns
 
-[`ExecutedTransaction`](ExecutedTransaction.md)
+[`ExecutedTransaction`](ExecutedTransaction)
 
 ***
 
@@ -80,11 +85,11 @@
 
 ### transactionArguments()
 
-> **transactionArguments**(): [`TransactionArgs`](TransactionArgs.md)
+> **transactionArguments**(): [`TransactionArgs`](TransactionArgs)
 
 #### Returns
 
-[`TransactionArgs`](TransactionArgs.md)
+[`TransactionArgs`](TransactionArgs)
 
 ***
 

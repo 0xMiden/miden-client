@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: InputNotes
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNotes
+[@demox-labs/miden-sdk](../index) / InputNotes
 
 # Class: InputNotes
 
@@ -10,11 +15,11 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -30,7 +35,7 @@
 
 ### getNote()
 
-> **getNote**(`index`): [`InputNote`](InputNote.md)
+> **getNote**(`index`): [`InputNote`](InputNote)
 
 #### Parameters
 
@@ -40,7 +45,7 @@
 
 #### Returns
 
-[`InputNote`](InputNote.md)
+[`InputNote`](InputNote)
 
 ***
 
@@ -56,11 +61,11 @@
 
 ### notes()
 
-> **notes**(): [`InputNote`](InputNote.md)[]
+> **notes**(): [`InputNote`](InputNote)[]
 
 #### Returns
 
-[`InputNote`](InputNote.md)[]
+[`InputNote`](InputNote)[]
 
 ***
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: InputNoteState
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNoteState
+[@demox-labs/miden-sdk](../index) / InputNoteState
 
 # Enumeration: InputNoteState
 

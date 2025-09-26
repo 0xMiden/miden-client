@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteDetails
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteDetails
+[@demox-labs/miden-sdk](../index) / NoteDetails
 
 # Class: NoteDetails
 
@@ -16,11 +21,11 @@
 
 ##### note\_assets
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ##### note\_recipient
 
-[`NoteRecipient`](NoteRecipient.md)
+[`NoteRecipient`](NoteRecipient)
 
 #### Returns
 
@@ -30,11 +35,11 @@
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): [`NoteAssets`](NoteAssets)
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ***
 
@@ -50,18 +55,18 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### recipient()
 
-> **recipient**(): [`NoteRecipient`](NoteRecipient.md)
+> **recipient**(): [`NoteRecipient`](NoteRecipient)
 
 #### Returns
 
-[`NoteRecipient`](NoteRecipient.md)
+[`NoteRecipient`](NoteRecipient)

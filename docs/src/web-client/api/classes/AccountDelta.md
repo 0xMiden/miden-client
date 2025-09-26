@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountDelta
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountDelta
+[@demox-labs/miden-sdk](../index) / AccountDelta
 
 # Class: AccountDelta
 
@@ -20,11 +25,11 @@
 
 ### id()
 
-> **id**(): [`AccountId`](AccountId.md)
+> **id**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -40,11 +45,11 @@
 
 ### nonceDelta()
 
-> **nonceDelta**(): [`Felt`](Felt.md)
+> **nonceDelta**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
@@ -60,21 +65,21 @@
 
 ### storage()
 
-> **storage**(): [`AccountStorageDelta`](AccountStorageDelta.md)
+> **storage**(): [`AccountStorageDelta`](AccountStorageDelta)
 
 #### Returns
 
-[`AccountStorageDelta`](AccountStorageDelta.md)
+[`AccountStorageDelta`](AccountStorageDelta)
 
 ***
 
 ### vault()
 
-> **vault**(): [`AccountVaultDelta`](AccountVaultDelta.md)
+> **vault**(): [`AccountVaultDelta`](AccountVaultDelta)
 
 #### Returns
 
-[`AccountVaultDelta`](AccountVaultDelta.md)
+[`AccountVaultDelta`](AccountVaultDelta)
 
 ***
 

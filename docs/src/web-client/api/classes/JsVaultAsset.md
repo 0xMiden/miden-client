@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: JsVaultAsset
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsVaultAsset
+[@demox-labs/miden-sdk](../index) / JsVaultAsset
 
 # Class: JsVaultAsset
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: MerklePath
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / MerklePath
+[@demox-labs/miden-sdk](../index) / MerklePath
 
 # Class: MerklePath
 
@@ -10,7 +15,7 @@
 
 ### computeRoot()
 
-> **computeRoot**(`index`, `node`): [`Word`](Word.md)
+> **computeRoot**(`index`, `node`): [`Word`](Word)
 
 #### Parameters
 
@@ -20,11 +25,11 @@
 
 ##### node
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -50,11 +55,11 @@
 
 ### nodes()
 
-> **nodes**(): [`Word`](Word.md)[]
+> **nodes**(): [`Word`](Word)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 ***
 
@@ -70,11 +75,11 @@
 
 ##### node
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### root
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 

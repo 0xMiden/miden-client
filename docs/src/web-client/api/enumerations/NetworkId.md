@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NetworkId
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NetworkId
+[@demox-labs/miden-sdk](../index) / NetworkId
 
 # Enumeration: NetworkId
 
