@@ -7,7 +7,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{BlockNumber, NoteFile, NoteScript, NoteType};
+use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -110,7 +110,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // it to the node (since we need the submission height).
     let store_update = TransactionStoreUpdate::new(
         transaction_pipeline_1.executed_transaction().cloned()?,
-        BlockNumber::from(client.get_sync_height().await?),
+        client.get_sync_height().await?,
         vec![],
     );
     client.apply_transaction(store_update).await?;
