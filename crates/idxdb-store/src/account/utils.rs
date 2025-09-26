@@ -6,7 +6,9 @@ use miden_client::account::{
     AccountCode,
     AccountHeader,
     AccountId,
+    AccountIdAddress,
     AccountStorage,
+    Address,
     StorageSlot,
 };
 use miden_client::asset::AssetVault;
@@ -26,7 +28,8 @@ use super::js_bindings::{
     idxdb_upsert_storage_map_entries,
     idxdb_upsert_vault_assets,
 };
-use super::models::AccountRecordIdxdbObject;
+use crate::account::js_bindings::idxdb_insert_account_address;
+use crate::account::models::{AccountIdAddressIdxdbObject, AccountRecordIdxdbObject};
 
 pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -95,6 +98,21 @@ pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     Ok(())
 }
 
+pub async fn insert_account_address(account: &Account, address: Address) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let serialized_address = match address {
+        Address::AccountId(addr) => {
+            let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = addr.into();
+            serialized.to_vec()
+        },
+        _ => vec![], // Should never get here
+    };
+    let promise = idxdb_insert_account_address(account_id_str, serialized_address);
+    JsFuture::from(promise).await?;
+
+    Ok(())
+}
+
 pub fn parse_account_record_idxdb_object(
     account_header_idxdb: AccountRecordIdxdbObject,
 ) -> Result<(AccountHeader, AccountStatus), StoreError> {
@@ -123,6 +141,22 @@ pub fn parse_account_record_idxdb_object(
     };
 
     Ok((account_header, status))
+}
+
+pub fn parse_account_address_idxdb_object(
+    account_address_idxdb: AccountIdAddressIdxdbObject,
+) -> Result<(Address, AccountId), StoreError> {
+    let native_account_id: AccountId = AccountId::from_hex(&account_address_idxdb.id)?;
+
+    let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = account_address_idxdb
+        .address
+        .try_into()
+        .map_err(|_| StoreError::ParsingError("invalid address length".to_string()))?;
+    let native_address =
+        Address::AccountId(AccountIdAddress::try_from(address).map_err(|err| {
+            StoreError::ParsingError(format!("failed to parse address from bytes: {err}"))
+        })?);
+    Ok((native_address, native_account_id))
 }
 
 pub async fn update_account(new_account_state: &Account) -> Result<(), JsValue> {

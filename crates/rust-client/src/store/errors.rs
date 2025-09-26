@@ -7,6 +7,7 @@ use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
     AccountError,
     AccountIdError,
+    AddressError,
     AssetError,
     AssetVaultError,
     NoteError,
@@ -37,6 +38,8 @@ pub enum StoreError {
     AccountDataNotFound(AccountId),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("address error")]
+    AddressError(#[from] AddressError),
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
     #[error("account commitment {0} already exists")]

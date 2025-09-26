@@ -13,7 +13,14 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_client::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
+};
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
@@ -183,8 +190,12 @@ impl Store for WebStore {
     // ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    async fn insert_account(&self, account: &Account) -> Result<(), StoreError> {
-        self.insert_account(account).await
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
+        self.insert_account(account, initial_address).await
     }
 
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError> {
@@ -248,6 +259,13 @@ impl Store for WebStore {
         account_id: AccountId,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
+    }
+
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError> {
+        self.get_account_addresses(account_id).await
     }
 }
 
