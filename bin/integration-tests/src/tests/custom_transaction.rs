@@ -59,10 +59,10 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _seed, _) =
+    let (regular_account, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
-    let (fungible_faucet, _seed, _) =
+    let (fungible_faucet, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 
@@ -156,10 +156,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _seed, _) =
+    let (regular_account, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
-    let (fungible_faucet, _seed, _) =
+    let (fungible_faucet, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 

@@ -258,6 +258,7 @@ pub trait NodeRpcClient: Send + Sync {
             let response = self.get_account_details(local_account.id()).await?;
 
             if let FetchedAccount::Public(account, _) = response {
+                let account = *account;
                 // We should only return an account if it's newer, otherwise we ignore it
                 if account.nonce().as_int() > local_account.nonce().as_int() {
                     public_accounts.push(account);

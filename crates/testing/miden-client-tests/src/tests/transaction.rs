@@ -1,16 +1,19 @@
 use alloc::boxed::Box;
 
-use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::ClientError;
+use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::Word;
 use miden_objects::account::{
     AccountBuilder,
     AccountComponent,
+    AccountStorageMode,
     AuthSecretKey,
     StorageMap,
     StorageSlot,
 };
+use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::note::NoteType;
@@ -21,7 +24,7 @@ use miden_objects::testing::account_id::{
 };
 
 use super::PaymentNoteDescription;
-use crate::tests::create_test_client;
+use crate::tests::{create_test_client, setup_wallet_and_faucet};
 
 #[tokio::test]
 async fn transaction_creates_two_notes() {
@@ -57,7 +60,7 @@ async fn transaction_creates_two_notes() {
         .build_existing()
         .unwrap();
 
-    client.add_account(&account, None, false).await.unwrap();
+    client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();
     let tx_request = TransactionRequestBuilder::new()
         .build_pay_to_id(
@@ -83,4 +86,43 @@ async fn transaction_creates_two_notes() {
 
     // Let the client process state changes (mock chain)
     client.sync_state().await.unwrap();
+}
+
+#[tokio::test]
+async fn transaction_error_reports_source_line() {
+    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (wallet, _) = setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    let failing_script = client
+        .script_builder()
+        .compile_tx_script("begin push.0 push.2 assert_eq end")
+        .unwrap();
+
+    let tx_request =
+        TransactionRequestBuilder::new().custom_script(failing_script).build().unwrap();
+
+    let err = Box::pin(client.execute_transaction(wallet.id(), tx_request))
+        .await
+        .err()
+        .expect("transaction should fail for assertion");
+
+    let source_snippet = "push.0 push.2";
+    match err {
+        ClientError::TransactionExecutorError(
+            TransactionExecutorError::TransactionProgramExecutionFailed(exec_err),
+        ) => {
+            let mut rendered = String::new();
+            GraphicalReportHandler::new()
+                .render_report(&mut rendered, exec_err.as_ref())
+                .unwrap();
+
+            assert!(
+                rendered.contains(source_snippet),
+                "expected execution error to include script snippet; got:\n{rendered}"
+            );
+        },
+        other => panic!("unexpected error variant: {other:?}"),
+    }
 }

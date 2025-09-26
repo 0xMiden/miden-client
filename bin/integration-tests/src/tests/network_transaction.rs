@@ -78,9 +78,9 @@ async fn deploy_counter_contract(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
 ) -> Result<Account> {
-    let (acc, seed) = get_counter_contract_account(client, storage_mode).await?;
+    let acc = get_counter_contract_account(client, storage_mode).await?;
 
-    client.add_account(&acc, Some(seed), false).await?;
+    client.add_account(&acc, false).await?;
 
     let mut script_builder = ScriptBuilder::new(true);
     script_builder.link_dynamic_library(&counter_contract_library())?;
@@ -99,7 +99,7 @@ async fn deploy_counter_contract(
 async fn get_counter_contract_account(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
-) -> Result<(Account, Word)> {
+) -> Result<Account> {
     let counter_component = AccountComponent::compile(
         COUNTER_CONTRACT,
         TransactionKernel::assembler(),
@@ -116,15 +116,16 @@ async fn get_counter_contract_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .storage_mode(storage_mode)
         .with_component(counter_component)
         .with_auth_component(incr_nonce_auth)
         .build()
         .context("failed to build account with counter contract")?;
 
-    Ok((account, seed))
+    Ok(account)
 }
+
 // TESTS
 // ================================================================================================
 

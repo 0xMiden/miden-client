@@ -611,6 +611,8 @@ where
 
         let data_store = ClientDataStore::new(self.store.clone());
 
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+
         data_store.mast_store().load_account_code(account.code());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
@@ -723,6 +725,8 @@ where
 
         let data_store = ClientDataStore::new(self.store.clone());
 
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 
@@ -775,7 +779,11 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.source_manager.clone(),
+        );
 
         for note in notes_from_output(executed_tx.output_notes()) {
             // TODO: check_relevance() should have the option to take multiple notes
@@ -1082,6 +1090,7 @@ where
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
         }
+        executor = executor.with_source_manager(self.source_manager.clone());
 
         Ok(executor)
     }
