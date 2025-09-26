@@ -432,17 +432,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newAccount()
 
-> **newAccount**(`account`, `account_seed`, `overwrite`): `Promise`\<`void`\>
+> **newAccount**(`account`, `overwrite`): `Promise`\<`void`\>
 
 #### Parameters
 
 ##### account
 
 [`Account`](Account.md)
-
-##### account\_seed
-
-[`Word`](Word.md)
 
 ##### overwrite
 

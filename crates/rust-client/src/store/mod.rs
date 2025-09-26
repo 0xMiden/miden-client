@@ -35,9 +35,9 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
-use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
@@ -249,12 +249,12 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, account_id: AccountId)
     -> Result<Option<AccountRecord>, StoreError>;
 
-    /// Inserts an [`Account`] along with the seed used to create it.
-    async fn insert_account(
-        &self,
-        account: &Account,
-        account_seed: Option<Word>,
-    ) -> Result<(), StoreError>;
+    /// Inserts an [`Account`] to the store.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is new and does not contain a seed
+    async fn insert_account(&self, account: &Account) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
     /// script roots and added to the `GetForeignAccountCode` request.
@@ -364,22 +364,22 @@ pub trait Store: Send + Sync {
     /// Retrieves the asset vault for a specific account.
     async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
 
-    /// Retrieves a specific asset from the account's vault along with its Merkle proof.
+    /// Retrieves a specific asset from the account's vault along with its Merkle witness.
     ///
     /// The default implementation of this method uses [`Store::get_account_vault`].
     async fn get_account_asset(
         &self,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let vault = self.get_account_vault(account_id).await?;
         let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
             return Ok(None);
         };
 
-        let path = vault.asset_tree().open(&asset.vault_key()).into_parts().0;
+        let witness = AssetWitness::new(vault.asset_tree().open(&asset.vault_key()))?;
 
-        Ok(Some((asset, path)))
+        Ok(Some((asset, witness)))
     }
 
     /// Retrieves the storage for a specific account.
