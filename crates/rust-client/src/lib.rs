@@ -229,15 +229,8 @@ pub mod vm {
     pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 }
 
-pub use errors::{
-    AccountError,
-    AccountIdError,
-    AssetError,
-    AuthenticationError,
-    ClientError,
-    IdPrefixFetchError,
-    NetworkIdError,
-};
+pub use errors::*;
+use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_objects::{
     EMPTY_WORD,
     Felt,
