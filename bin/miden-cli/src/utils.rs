@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use figment::Figment;
@@ -7,10 +5,10 @@ use figment::providers::{Format, Toml};
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::Address;
-use tracing::info;
 
 use super::config::CliConfig;
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
+use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
 use crate::faucet_details_map::FaucetDetailsMap;
 
@@ -31,10 +29,10 @@ pub(crate) async fn get_input_acc_id_by_prefix_or_default<AUTH>(
     let account_id_str = if let Some(account_id_prefix) = account_id {
         account_id_prefix
     } else {
-        let (cli_config, _) = load_config_file()?;
-
-        cli_config
-            .default_account_id
+        client
+            .get_setting(DEFAULT_ACCOUNT_ID_KEY.to_string())
+            .await?
+            .map(AccountId::to_hex)
             .ok_or(CliError::Input("No input account ID nor default account defined".to_string()))?
     };
 
@@ -77,20 +75,6 @@ pub(crate) async fn parse_account_id<AUTH>(
             ))),
         }
     }
-}
-
-pub(crate) fn update_config(config_path: &Path, client_config: &CliConfig) -> Result<(), CliError> {
-    let config_as_toml_string = toml::to_string_pretty(&client_config).map_err(|err| {
-        CliError::Config("Failed to parse config file as TOML".to_string().into(), err.to_string())
-    })?;
-
-    info!("Writing config file at: {:?}", config_path);
-    let mut file_handle = File::options().write(true).truncate(true).open(config_path)?;
-
-    file_handle.write_all(config_as_toml_string.as_bytes())?;
-
-    println!("Config updated successfully");
-    Ok(())
 }
 
 /// Loads config file from current directory and default filename and returns it alongside its path.

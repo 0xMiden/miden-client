@@ -21,7 +21,7 @@ use miden_client::utils::Deserializable;
 use rand::RngCore;
 use tracing::debug;
 
-use crate::commands::account::maybe_set_default_account;
+use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
 use crate::{CliKeyStore, client_binary_name, load_config_file};
 
@@ -122,8 +122,6 @@ impl NewWalletCmd {
         )
         .await?;
 
-        let (mut current_config, _) = load_config_file()?;
-
         println!("Successfully created new wallet.");
         println!(
             "To view account details execute {} account -s {}",
@@ -131,7 +129,7 @@ impl NewWalletCmd {
             new_account.id().to_hex()
         );
 
-        maybe_set_default_account(&mut current_config, new_account.id())?;
+        set_default_account_if_unset(&mut client, new_account.id()).await?;
 
         Ok(())
     }
@@ -280,7 +278,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         builder = builder.with_component(component);
     }
 
-    let (account, seed) = builder
+    let account = builder
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
@@ -288,7 +286,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
         .map_err(CliError::KeyStore)?;
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(&account, false).await?;
 
     if deploy {
         deploy_account(client, &account).await?;

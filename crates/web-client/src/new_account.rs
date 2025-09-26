@@ -10,7 +10,6 @@ use wasm_bindgen::prelude::*;
 use super::models::account::Account;
 use super::models::account_storage_mode::AccountStorageMode;
 use super::models::secret_key::SecretKey;
-use super::models::word::Word;
 use crate::helpers::generate_wallet;
 use crate::{WebClient, js_error_with_context};
 
@@ -25,11 +24,10 @@ impl WebClient {
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let (new_account, account_seed, key_pair) =
-                generate_wallet(storage_mode, mutable, init_seed).await?;
+            let (new_account, key_pair) = generate_wallet(storage_mode, mutable, init_seed).await?;
 
             client
-                .add_account(&new_account, Some(account_seed.into()), false)
+                .add_account(&new_account, false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
@@ -71,7 +69,7 @@ impl WebClient {
             let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
 
-            let (new_account, seed) = match AccountBuilder::new(init_seed)
+            let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
                 .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -94,7 +92,7 @@ impl WebClient {
                 .await
                 .map_err(|err| err.to_string())?;
 
-            match client.add_account(&new_account, Some(seed), false).await {
+            match client.add_account(&new_account, false).await {
                 Ok(_) => Ok(new_account.into()),
                 Err(err) => {
                     let error_message = format!("Failed to insert new faucet: {err:?}");
@@ -107,16 +105,12 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "newAccount")]
-    pub async fn new_account(
-        &mut self,
-        account: &Account,
-        account_seed: Option<Word>,
-        overwrite: bool,
-    ) -> Result<(), JsValue> {
+    pub async fn new_account(&mut self, account: &Account, overwrite: bool) -> Result<(), JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let account_seed = account_seed.map(Into::into);
+            let native_account = account.into();
+
             client
-                .add_account(&account.into(), account_seed, overwrite)
+                .add_account(&native_account, overwrite)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
             Ok(())
