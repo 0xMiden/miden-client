@@ -9,7 +9,7 @@ We can generate a debug build with symbols to help us trace these errors, this d
     - yarn
     - rust
     - Chrome browser
-    - You will need to install this [extension](https://chromewebstore.google.com/detail/cc++-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb).
+    - You will need to install this [extension](https://goo.gle/wasm-debugging-extension).
       Despite the name, it will also work with WASM-generated Rust Files
     
 ## Building with debug symbols
