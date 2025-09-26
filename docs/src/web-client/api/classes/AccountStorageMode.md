@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountStorageMode
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorageMode
+[@demox-labs/miden-sdk](../index) / AccountStorageMode
 
 # Class: AccountStorageMode
 

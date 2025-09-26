@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AssetVault
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AssetVault
+[@demox-labs/miden-sdk](../index) / AssetVault
 
 # Class: AssetVault
 
@@ -20,11 +25,11 @@
 
 ### fungibleAssets()
 
-> **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+> **fungibleAssets**(): [`FungibleAsset`](FungibleAsset)[]
 
 #### Returns
 
-[`FungibleAsset`](FungibleAsset.md)[]
+[`FungibleAsset`](FungibleAsset)[]
 
 ***
 
@@ -36,7 +41,7 @@
 
 ##### faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
@@ -46,8 +51,8 @@
 
 ### root()
 
-> **root**(): [`Word`](Word.md)
+> **root**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

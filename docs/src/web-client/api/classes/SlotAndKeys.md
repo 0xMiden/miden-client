@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SlotAndKeys
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SlotAndKeys
+[@demox-labs/miden-sdk](../index) / SlotAndKeys
 
 # Class: SlotAndKeys
 
@@ -20,7 +25,7 @@
 
 ##### storage\_map\_keys
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 #### Returns
 
@@ -40,11 +45,11 @@
 
 ### storage\_map\_keys()
 
-> **storage\_map\_keys**(): [`Word`](Word.md)[]
+> **storage\_map\_keys**(): [`Word`](Word)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 ***
 

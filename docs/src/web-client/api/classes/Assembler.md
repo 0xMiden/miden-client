@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Assembler
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Assembler
+[@demox-labs/miden-sdk](../index) / Assembler
 
 # Class: Assembler
 
@@ -10,7 +15,7 @@
 
 ### compileNoteScript()
 
-> **compileNoteScript**(`note_script`): [`NoteScript`](NoteScript.md)
+> **compileNoteScript**(`note_script`): [`NoteScript`](NoteScript)
 
 #### Parameters
 
@@ -20,13 +25,13 @@
 
 #### Returns
 
-[`NoteScript`](NoteScript.md)
+[`NoteScript`](NoteScript)
 
 ***
 
 ### compileTransactionScript()
 
-> **compileTransactionScript**(`note_script`): [`TransactionScript`](TransactionScript.md)
+> **compileTransactionScript**(`note_script`): [`TransactionScript`](TransactionScript)
 
 #### Parameters
 
@@ -36,7 +41,7 @@
 
 #### Returns
 
-[`TransactionScript`](TransactionScript.md)
+[`TransactionScript`](TransactionScript)
 
 ***
 
@@ -74,7 +79,7 @@
 
 ##### library
 
-[`Library`](Library.md)
+[`Library`](Library)
 
 #### Returns
 

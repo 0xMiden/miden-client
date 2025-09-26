@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: InputNote
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / InputNote
+[@demox-labs/miden-sdk](../index) / InputNote
 
 # Class: InputNote
 
@@ -20,38 +25,38 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### location()
 
-> **location**(): [`NoteLocation`](NoteLocation.md)
+> **location**(): [`NoteLocation`](NoteLocation)
 
 #### Returns
 
-[`NoteLocation`](NoteLocation.md)
+[`NoteLocation`](NoteLocation)
 
 ***
 
 ### note()
 
-> **note**(): [`Note`](Note.md)
+> **note**(): [`Note`](Note)
 
 #### Returns
 
-[`Note`](Note.md)
+[`Note`](Note)
 
 ***
 
 ### proof()
 
-> **proof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+> **proof**(): [`NoteInclusionProof`](NoteInclusionProof)
 
 #### Returns
 
-[`NoteInclusionProof`](NoteInclusionProof.md)
+[`NoteInclusionProof`](NoteInclusionProof)

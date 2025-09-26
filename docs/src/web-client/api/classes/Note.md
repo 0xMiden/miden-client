@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Note
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Note
+[@demox-labs/miden-sdk](../index) / Note
 
 # Class: Note
 
@@ -16,15 +21,15 @@
 
 ##### note\_assets
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ##### note\_metadata
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ##### note\_recipient
 
-[`NoteRecipient`](NoteRecipient.md)
+[`NoteRecipient`](NoteRecipient)
 
 #### Returns
 
@@ -34,11 +39,11 @@
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): [`NoteAssets`](NoteAssets)
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ***
 
@@ -54,41 +59,41 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): [`NoteMetadata`](NoteMetadata)
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ***
 
 ### recipient()
 
-> **recipient**(): [`NoteRecipient`](NoteRecipient.md)
+> **recipient**(): [`NoteRecipient`](NoteRecipient)
 
 #### Returns
 
-[`NoteRecipient`](NoteRecipient.md)
+[`NoteRecipient`](NoteRecipient)
 
 ***
 
 ### script()
 
-> **script**(): [`NoteScript`](NoteScript.md)
+> **script**(): [`NoteScript`](NoteScript)
 
 #### Returns
 
-[`NoteScript`](NoteScript.md)
+[`NoteScript`](NoteScript)
 
 ***
 
@@ -110,15 +115,15 @@
 
 ##### sender
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### target
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### assets
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ##### reclaim\_height
 
@@ -130,11 +135,11 @@
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### aux
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 #### Returns
 
@@ -150,23 +155,23 @@
 
 ##### sender
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### target
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### assets
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### aux
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 #### Returns
 

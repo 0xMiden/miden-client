@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionRequest
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionRequest
+[@demox-labs/miden-sdk](../index) / TransactionRequest
 
 # Class: TransactionRequest
 
@@ -10,31 +15,31 @@
 
 ### authArg()
 
-> **authArg**(): [`Word`](Word.md)
+> **authArg**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### expectedFutureNotes()
 
-> **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+> **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag)[]
 
 #### Returns
 
-[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+[`NoteDetailsAndTag`](NoteDetailsAndTag)[]
 
 ***
 
 ### expectedOutputOwnNotes()
 
-> **expectedOutputOwnNotes**(): [`Note`](Note.md)[]
+> **expectedOutputOwnNotes**(): [`Note`](Note)[]
 
 #### Returns
 
-[`Note`](Note.md)[]
+[`Note`](Note)[]
 
 ***
 
@@ -50,11 +55,11 @@
 
 ### scriptArg()
 
-> **scriptArg**(): [`Word`](Word.md)
+> **scriptArg**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 

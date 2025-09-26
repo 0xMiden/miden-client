@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: ExecutedTransaction
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ExecutedTransaction
+[@demox-labs/miden-sdk](../index) / ExecutedTransaction
 
 # Class: ExecutedTransaction
 
@@ -10,41 +15,41 @@
 
 ### accountDelta()
 
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+> **accountDelta**(): [`AccountDelta`](AccountDelta)
 
 #### Returns
 
-[`AccountDelta`](AccountDelta.md)
+[`AccountDelta`](AccountDelta)
 
 ***
 
 ### accountId()
 
-> **accountId**(): [`AccountId`](AccountId.md)
+> **accountId**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
 ### blockHeader()
 
-> **blockHeader**(): [`BlockHeader`](BlockHeader.md)
+> **blockHeader**(): [`BlockHeader`](BlockHeader)
 
 #### Returns
 
-[`BlockHeader`](BlockHeader.md)
+[`BlockHeader`](BlockHeader)
 
 ***
 
 ### finalAccount()
 
-> **finalAccount**(): [`AccountHeader`](AccountHeader.md)
+> **finalAccount**(): [`AccountHeader`](AccountHeader)
 
 #### Returns
 
-[`AccountHeader`](AccountHeader.md)
+[`AccountHeader`](AccountHeader)
 
 ***
 
@@ -60,48 +65,48 @@
 
 ### id()
 
-> **id**(): [`TransactionId`](TransactionId.md)
+> **id**(): [`TransactionId`](TransactionId)
 
 #### Returns
 
-[`TransactionId`](TransactionId.md)
+[`TransactionId`](TransactionId)
 
 ***
 
 ### initialAccount()
 
-> **initialAccount**(): [`Account`](Account.md)
+> **initialAccount**(): [`Account`](Account)
 
 #### Returns
 
-[`Account`](Account.md)
+[`Account`](Account)
 
 ***
 
 ### inputNotes()
 
-> **inputNotes**(): [`InputNotes`](InputNotes.md)
+> **inputNotes**(): [`InputNotes`](InputNotes)
 
 #### Returns
 
-[`InputNotes`](InputNotes.md)
+[`InputNotes`](InputNotes)
 
 ***
 
 ### outputNotes()
 
-> **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+> **outputNotes**(): [`OutputNotes`](OutputNotes)
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+[`OutputNotes`](OutputNotes)
 
 ***
 
 ### txArgs()
 
-> **txArgs**(): [`TransactionArgs`](TransactionArgs.md)
+> **txArgs**(): [`TransactionArgs`](TransactionArgs)
 
 #### Returns
 
-[`TransactionArgs`](TransactionArgs.md)
+[`TransactionArgs`](TransactionArgs)

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FungibleAsset
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FungibleAsset
+[@demox-labs/miden-sdk](../index) / FungibleAsset
 
 # Class: FungibleAsset
 
@@ -16,7 +21,7 @@
 
 ##### faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### amount
 
@@ -40,11 +45,11 @@
 
 ### faucetId()
 
-> **faucetId**(): [`AccountId`](AccountId.md)
+> **faucetId**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -60,8 +65,8 @@
 
 ### intoWord()
 
-> **intoWord**(): [`Word`](Word.md)
+> **intoWord**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionRequestBuilder
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionRequestBuilder
+[@demox-labs/miden-sdk](../index) / TransactionRequestBuilder
 
 # Class: TransactionRequestBuilder
 
@@ -20,11 +25,11 @@
 
 ### build()
 
-> **build**(): [`TransactionRequest`](TransactionRequest.md)
+> **build**(): [`TransactionRequest`](TransactionRequest)
 
 #### Returns
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 ***
 
@@ -36,7 +41,7 @@
 
 ##### advice\_map
 
-[`AdviceMap`](AdviceMap.md)
+[`AdviceMap`](AdviceMap)
 
 #### Returns
 
@@ -62,7 +67,7 @@
 
 ##### auth\_arg
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
@@ -78,7 +83,7 @@
 
 ##### notes
 
-[`NoteIdAndArgsArray`](NoteIdAndArgsArray.md)
+[`NoteIdAndArgsArray`](NoteIdAndArgsArray)
 
 #### Returns
 
@@ -94,7 +99,7 @@
 
 ##### script
 
-[`TransactionScript`](TransactionScript.md)
+[`TransactionScript`](TransactionScript)
 
 #### Returns
 
@@ -110,7 +115,7 @@
 
 ##### note\_details\_and\_tag
 
-[`NoteDetailsAndTagArray`](NoteDetailsAndTagArray.md)
+[`NoteDetailsAndTagArray`](NoteDetailsAndTagArray)
 
 #### Returns
 
@@ -126,7 +131,7 @@
 
 ##### recipients
 
-[`RecipientArray`](RecipientArray.md)
+[`RecipientArray`](RecipientArray)
 
 #### Returns
 
@@ -142,7 +147,7 @@
 
 ##### foreign\_accounts
 
-[`ForeignAccount`](ForeignAccount.md)[]
+[`ForeignAccount`](ForeignAccount)[]
 
 #### Returns
 
@@ -158,7 +163,7 @@
 
 ##### notes
 
-[`OutputNotesArray`](OutputNotesArray.md)
+[`OutputNotesArray`](OutputNotesArray)
 
 #### Returns
 
@@ -174,7 +179,7 @@
 
 ##### script\_arg
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
@@ -190,7 +195,7 @@
 
 ##### notes
 
-[`NoteAndArgsArray`](NoteAndArgsArray.md)
+[`NoteAndArgsArray`](NoteAndArgsArray)
 
 #### Returns
 

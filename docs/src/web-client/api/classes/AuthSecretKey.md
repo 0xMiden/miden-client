@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AuthSecretKey
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AuthSecretKey
+[@demox-labs/miden-sdk](../index) / AuthSecretKey
 
 # Class: AuthSecretKey
 
@@ -20,18 +25,18 @@
 
 ### getRpoFalcon512PublicKeyAsWord()
 
-> **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word.md)
+> **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### getRpoFalcon512SecretKeyAsFelts()
 
-> **getRpoFalcon512SecretKeyAsFelts**(): [`Felt`](Felt.md)[]
+> **getRpoFalcon512SecretKeyAsFelts**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]

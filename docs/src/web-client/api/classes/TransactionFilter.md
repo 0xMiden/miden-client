@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionFilter
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionFilter
+[@demox-labs/miden-sdk](../index) / TransactionFilter
 
 # Class: TransactionFilter
 
@@ -52,7 +57,7 @@
 
 ##### ids
 
-[`TransactionId`](TransactionId.md)[]
+[`TransactionId`](TransactionId)[]
 
 #### Returns
 

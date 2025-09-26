@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FeltArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FeltArray
+[@demox-labs/miden-sdk](../index) / FeltArray
 
 # Class: FeltArray
 
@@ -16,7 +21,7 @@
 
 ##### felts\_array?
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 #### Returns
 
@@ -32,7 +37,7 @@
 
 ##### felt
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 #### Returns
 

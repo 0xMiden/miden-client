@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FungibleAssetDelta
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FungibleAssetDelta
+[@demox-labs/miden-sdk](../index) / FungibleAssetDelta
 
 # Class: FungibleAssetDelta
 
@@ -16,7 +21,7 @@
 
 ##### faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
@@ -26,11 +31,11 @@
 
 ### assets()
 
-> **assets**(): [`FungibleAssetDeltaItem`](FungibleAssetDeltaItem.md)[]
+> **assets**(): [`FungibleAssetDeltaItem`](FungibleAssetDeltaItem)[]
 
 #### Returns
 
-[`FungibleAssetDeltaItem`](FungibleAssetDeltaItem.md)[]
+[`FungibleAssetDeltaItem`](FungibleAssetDeltaItem)[]
 
 ***
 

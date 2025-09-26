@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: OutputNote
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / OutputNote
+[@demox-labs/miden-sdk](../index) / OutputNote
 
 # Class: OutputNote
 
@@ -10,11 +15,11 @@
 
 ### assets()
 
-> **assets**(): [`NoteAssets`](NoteAssets.md)
+> **assets**(): [`NoteAssets`](NoteAssets)
 
 #### Returns
 
-[`NoteAssets`](NoteAssets.md)
+[`NoteAssets`](NoteAssets)
 
 ***
 
@@ -30,41 +35,41 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### intoFull()
 
-> **intoFull**(): [`Note`](Note.md)
+> **intoFull**(): [`Note`](Note)
 
 #### Returns
 
-[`Note`](Note.md)
+[`Note`](Note)
 
 ***
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): [`NoteMetadata`](NoteMetadata)
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ***
 
 ### recipientDigest()
 
-> **recipientDigest**(): [`Word`](Word.md)
+> **recipientDigest**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -86,7 +91,7 @@
 
 ##### note
 
-[`Note`](Note.md)
+[`Note`](Note)
 
 #### Returns
 
@@ -102,7 +107,7 @@
 
 ##### note\_header
 
-[`NoteHeader`](NoteHeader.md)
+[`NoteHeader`](NoteHeader)
 
 #### Returns
 
@@ -118,7 +123,7 @@
 
 ##### partial\_note
 
-[`PartialNote`](PartialNote.md)
+[`PartialNote`](PartialNote)
 
 #### Returns
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: WebClient
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / WebClient
+[@demox-labs/miden-sdk](../index) / WebClient
 
 # Class: WebClient
 
@@ -26,7 +31,7 @@
 
 ##### secret\_key
 
-[`SecretKey`](SecretKey.md)
+[`SecretKey`](SecretKey)
 
 #### Returns
 
@@ -52,7 +57,7 @@
 
 ### compileNoteScript()
 
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
+> **compileNoteScript**(`script`): [`NoteScript`](NoteScript)
 
 #### Parameters
 
@@ -62,13 +67,13 @@
 
 #### Returns
 
-[`NoteScript`](NoteScript.md)
+[`NoteScript`](NoteScript)
 
 ***
 
 ### compileTxScript()
 
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
+> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript)
 
 #### Parameters
 
@@ -78,7 +83,7 @@
 
 #### Returns
 
-[`TransactionScript`](TransactionScript.md)
+[`TransactionScript`](TransactionScript)
 
 ***
 
@@ -136,7 +141,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
@@ -206,65 +211,65 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### getAccount()
 
-> **getAccount**(`account_id`): `Promise`\<[`Account`](Account.md)\>
+> **getAccount**(`account_id`): `Promise`\<[`Account`](Account)\>
 
 #### Parameters
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
-`Promise`\<[`Account`](Account.md)\>
+`Promise`\<[`Account`](Account)\>
 
 ***
 
 ### getAccountAuthByPubKey()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`SecretKey`](SecretKey.md)\>
+> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`SecretKey`](SecretKey)\>
 
 #### Parameters
 
 ##### pub\_key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-`Promise`\<[`SecretKey`](SecretKey.md)\>
+`Promise`\<[`SecretKey`](SecretKey)\>
 
 ***
 
 ### getAccounts()
 
-> **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
+> **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader)[]\>
 
 #### Returns
 
-`Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
+`Promise`\<[`AccountHeader`](AccountHeader)[]\>
 
 ***
 
 ### getConsumableNotes()
 
-> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
+> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord)[]\>
 
 #### Parameters
 
 ##### account\_id?
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
-`Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
+`Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord)[]\>
 
 ***
 
 ### getInputNote()
 
-> **getInputNote**(`note_id`): `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)\>
+> **getInputNote**(`note_id`): `Promise`\<[`InputNoteRecord`](InputNoteRecord)\>
 
 #### Parameters
 
@@ -274,23 +279,23 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-`Promise`\<[`InputNoteRecord`](InputNoteRecord.md)\>
+`Promise`\<[`InputNoteRecord`](InputNoteRecord)\>
 
 ***
 
 ### getInputNotes()
 
-> **getInputNotes**(`filter`): `Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
+> **getInputNotes**(`filter`): `Promise`\<[`InputNoteRecord`](InputNoteRecord)[]\>
 
 #### Parameters
 
 ##### filter
 
-[`NoteFilter`](NoteFilter.md)
+[`NoteFilter`](NoteFilter)
 
 #### Returns
 
-`Promise`\<[`InputNoteRecord`](InputNoteRecord.md)[]\>
+`Promise`\<[`InputNoteRecord`](InputNoteRecord)[]\>
 
 ***
 
@@ -318,7 +323,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ##### filter
 
-[`NoteFilter`](NoteFilter.md)
+[`NoteFilter`](NoteFilter)
 
 #### Returns
 
@@ -338,17 +343,17 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### getTransactions()
 
-> **getTransactions**(`transaction_filter`): `Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
+> **getTransactions**(`transaction_filter`): `Promise`\<[`TransactionRecord`](TransactionRecord)[]\>
 
 #### Parameters
 
 ##### transaction\_filter
 
-[`TransactionFilter`](TransactionFilter.md)
+[`TransactionFilter`](TransactionFilter)
 
 #### Returns
 
-`Promise`\<[`TransactionRecord`](TransactionRecord.md)[]\>
+`Promise`\<[`TransactionRecord`](TransactionRecord)[]\>
 
 ***
 
@@ -360,7 +365,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 #### Returns
 
@@ -402,7 +407,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### importPublicAccountFromSeed()
 
-> **importPublicAccountFromSeed**(`init_seed`, `mutable`): `Promise`\<[`Account`](Account.md)\>
+> **importPublicAccountFromSeed**(`init_seed`, `mutable`): `Promise`\<[`Account`](Account)\>
 
 #### Parameters
 
@@ -416,7 +421,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-`Promise`\<[`Account`](Account.md)\>
+`Promise`\<[`Account`](Account)\>
 
 ***
 
@@ -438,11 +443,11 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ##### account
 
-[`Account`](Account.md)
+[`Account`](Account)
 
 ##### account\_seed
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### overwrite
 
@@ -456,7 +461,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newConsumeTransactionRequest()
 
-> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest.md)
+> **newConsumeTransactionRequest**(`list_of_note_ids`): [`TransactionRequest`](TransactionRequest)
 
 #### Parameters
 
@@ -466,19 +471,19 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 ***
 
 ### newFaucet()
 
-> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`): `Promise`\<[`Account`](Account.md)\>
+> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`): `Promise`\<[`Account`](Account)\>
 
 #### Parameters
 
 ##### storage\_mode
 
-[`AccountStorageMode`](AccountStorageMode.md)
+[`AccountStorageMode`](AccountStorageMode)
 
 ##### non\_fungible
 
@@ -498,27 +503,27 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-`Promise`\<[`Account`](Account.md)\>
+`Promise`\<[`Account`](Account)\>
 
 ***
 
 ### newMintTransactionRequest()
 
-> **newMintTransactionRequest**(`target_account_id`, `faucet_id`, `note_type`, `amount`): [`TransactionRequest`](TransactionRequest.md)
+> **newMintTransactionRequest**(`target_account_id`, `faucet_id`, `note_type`, `amount`): [`TransactionRequest`](TransactionRequest)
 
 #### Parameters
 
 ##### target\_account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### amount
 
@@ -526,31 +531,31 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 ***
 
 ### newSendTransactionRequest()
 
-> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest.md)
+> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest)
 
 #### Parameters
 
 ##### sender\_account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### target\_account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### amount
 
@@ -566,23 +571,23 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 ***
 
 ### newSwapTransactionRequest()
 
-> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](TransactionRequest.md)
+> **newSwapTransactionRequest**(`sender_account_id`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`, `note_type`, `payback_note_type`): [`TransactionRequest`](TransactionRequest)
 
 #### Parameters
 
 ##### sender\_account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### offered\_asset\_faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### offered\_asset\_amount
 
@@ -590,7 +595,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ##### requested\_asset\_faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### requested\_asset\_amount
 
@@ -598,47 +603,47 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### payback\_note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 #### Returns
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 ***
 
 ### newTransaction()
 
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult)\>
 
 #### Parameters
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### transaction\_request
 
-[`TransactionRequest`](TransactionRequest.md)
+[`TransactionRequest`](TransactionRequest)
 
 #### Returns
 
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
+`Promise`\<[`TransactionResult`](TransactionResult)\>
 
 ***
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account)\>
 
 #### Parameters
 
 ##### storage\_mode
 
-[`AccountStorageMode`](AccountStorageMode.md)
+[`AccountStorageMode`](AccountStorageMode)
 
 ##### mutable
 
@@ -650,7 +655,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-`Promise`\<[`Account`](Account.md)\>
+`Promise`\<[`Account`](Account)\>
 
 ***
 
@@ -700,11 +705,11 @@ Returns the inner serialized mock chain if it exists.
 
 ##### transaction\_result
 
-[`TransactionResult`](TransactionResult.md)
+[`TransactionResult`](TransactionResult)
 
 ##### prover?
 
-[`TransactionProver`](TransactionProver.md)
+[`TransactionProver`](TransactionProver)
 
 #### Returns
 
@@ -714,11 +719,11 @@ Returns the inner serialized mock chain if it exists.
 
 ### syncState()
 
-> **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+> **syncState**(): `Promise`\<[`SyncSummary`](SyncSummary)\>
 
 #### Returns
 
-`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+`Promise`\<[`SyncSummary`](SyncSummary)\>
 
 ***
 
@@ -730,7 +735,7 @@ Returns the inner serialized mock chain if it exists.
 
 ##### tx\_result
 
-[`TransactionResult`](TransactionResult.md)
+[`TransactionResult`](TransactionResult)
 
 #### Returns
 
@@ -750,17 +755,17 @@ Returns the inner serialized mock chain if it exists.
 
 ### buildSwapTag()
 
-> `static` **buildSwapTag**(`note_type`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`): [`NoteTag`](NoteTag.md)
+> `static` **buildSwapTag**(`note_type`, `offered_asset_faucet_id`, `offered_asset_amount`, `requested_asset_faucet_id`, `requested_asset_amount`): [`NoteTag`](NoteTag)
 
 #### Parameters
 
 ##### note\_type
 
-[`NoteType`](../enumerations/NoteType.md)
+[`NoteType`](../enumerations/NoteType)
 
 ##### offered\_asset\_faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### offered\_asset\_amount
 
@@ -768,7 +773,7 @@ Returns the inner serialized mock chain if it exists.
 
 ##### requested\_asset\_faucet\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### requested\_asset\_amount
 
@@ -776,4 +781,4 @@ Returns the inner serialized mock chain if it exists.
 
 #### Returns
 
-[`NoteTag`](NoteTag.md)
+[`NoteTag`](NoteTag)

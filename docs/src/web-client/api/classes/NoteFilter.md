@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteFilter
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteFilter
+[@demox-labs/miden-sdk](../index) / NoteFilter
 
 # Class: NoteFilter
 
@@ -16,11 +21,11 @@
 
 ##### note\_type
 
-[`NoteFilterTypes`](../enumerations/NoteFilterTypes.md)
+[`NoteFilterTypes`](../enumerations/NoteFilterTypes)
 
 ##### note\_ids?
 
-[`NoteId`](NoteId.md)[]
+[`NoteId`](NoteId)[]
 
 #### Returns
 

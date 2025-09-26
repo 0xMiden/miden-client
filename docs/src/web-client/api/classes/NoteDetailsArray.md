@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteDetailsArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteDetailsArray
+[@demox-labs/miden-sdk](../index) / NoteDetailsArray
 
 # Class: NoteDetailsArray
 
@@ -16,7 +21,7 @@
 
 ##### note\_details\_array?
 
-[`NoteDetails`](NoteDetails.md)[]
+[`NoteDetails`](NoteDetails)[]
 
 #### Returns
 
@@ -42,7 +47,7 @@
 
 ##### note\_details
 
-[`NoteDetails`](NoteDetails.md)
+[`NoteDetails`](NoteDetails)
 
 #### Returns
 

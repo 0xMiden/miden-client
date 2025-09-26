@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountStorage
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorage
+[@demox-labs/miden-sdk](../index) / AccountStorage
 
 # Class: AccountStorage
 
@@ -10,13 +15,13 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 Returns a commitment to this storage.
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -32,7 +37,7 @@ Returns a commitment to this storage.
 
 ### getItem()
 
-> **getItem**(`index`): [`Word`](Word.md)
+> **getItem**(`index`): [`Word`](Word)
 
 Returns an item from the storage at the specified index.
 
@@ -46,7 +51,7 @@ The slot index in storage.
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 The stored `Word`, or `undefined` if not found.
 
@@ -59,7 +64,7 @@ Errors:
 
 ### getMapItem()
 
-> **getMapItem**(`index`, `key`): [`Word`](Word.md)
+> **getMapItem**(`index`, `key`): [`Word`](Word)
 
 Retrieves a map item from a map located in storage at the specified index.
 
@@ -73,13 +78,13 @@ The slot index in storage.
 
 ##### key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 The key used to look up the map item.
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 The stored `Word`, or `undefined` if not found.
 

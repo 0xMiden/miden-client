@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FetchedNote
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FetchedNote
+[@demox-labs/miden-sdk](../index) / FetchedNote
 
 # Class: FetchedNote
 
@@ -20,15 +25,15 @@ Create a note with an optional `InputNote`.
 
 ##### note\_id
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ##### metadata
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)
 
 ##### input\_note?
 
-[`InputNote`](InputNote.md)
+[`InputNote`](InputNote)
 
 #### Returns
 
@@ -38,7 +43,7 @@ Create a note with an optional `InputNote`.
 
 ### inputNote
 
-> `readonly` **inputNote**: [`InputNote`](InputNote.md)
+> `readonly` **inputNote**: [`InputNote`](InputNote)
 
 The full [`InputNote`] with inclusion proof.
 
@@ -49,7 +54,7 @@ For private notes, it will be ``None`.
 
 ### metadata
 
-> `readonly` **metadata**: [`NoteMetadata`](NoteMetadata.md)
+> `readonly` **metadata**: [`NoteMetadata`](NoteMetadata)
 
 The note's metadata, including sender, tag, and other properties.
 Available for both private and public notes.
@@ -58,7 +63,7 @@ Available for both private and public notes.
 
 ### noteId
 
-> `readonly` **noteId**: [`NoteId`](NoteId.md)
+> `readonly` **noteId**: [`NoteId`](NoteId)
 
 The unique identifier of the note.
 
@@ -66,7 +71,7 @@ The unique identifier of the note.
 
 ### noteType
 
-> `readonly` **noteType**: [`NoteType`](../enumerations/NoteType.md)
+> `readonly` **noteType**: [`NoteType`](../enumerations/NoteType)
 
 ## Methods
 

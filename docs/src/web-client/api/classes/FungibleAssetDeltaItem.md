@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FungibleAssetDeltaItem
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FungibleAssetDeltaItem
+[@demox-labs/miden-sdk](../index) / FungibleAssetDeltaItem
 
 # Class: FungibleAssetDeltaItem
 
@@ -16,7 +21,7 @@
 
 ### faucetId
 
-> `readonly` **faucetId**: [`AccountId`](AccountId.md)
+> `readonly` **faucetId**: [`AccountId`](AccountId)
 
 ## Methods
 

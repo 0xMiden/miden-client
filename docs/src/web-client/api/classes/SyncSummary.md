@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SyncSummary
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SyncSummary
+[@demox-labs/miden-sdk](../index) / SyncSummary
 
 # Class: SyncSummary
 
@@ -20,31 +25,31 @@
 
 ### committedNotes()
 
-> **committedNotes**(): [`NoteId`](NoteId.md)[]
+> **committedNotes**(): [`NoteId`](NoteId)[]
 
 #### Returns
 
-[`NoteId`](NoteId.md)[]
+[`NoteId`](NoteId)[]
 
 ***
 
 ### committedTransactions()
 
-> **committedTransactions**(): [`TransactionId`](TransactionId.md)[]
+> **committedTransactions**(): [`TransactionId`](TransactionId)[]
 
 #### Returns
 
-[`TransactionId`](TransactionId.md)[]
+[`TransactionId`](TransactionId)[]
 
 ***
 
 ### consumedNotes()
 
-> **consumedNotes**(): [`NoteId`](NoteId.md)[]
+> **consumedNotes**(): [`NoteId`](NoteId)[]
 
 #### Returns
 
-[`NoteId`](NoteId.md)[]
+[`NoteId`](NoteId)[]
 
 ***
 
@@ -70,11 +75,11 @@
 
 ### updatedAccounts()
 
-> **updatedAccounts**(): [`AccountId`](AccountId.md)[]
+> **updatedAccounts**(): [`AccountId`](AccountId)[]
 
 #### Returns
 
-[`AccountId`](AccountId.md)[]
+[`AccountId`](AccountId)[]
 
 ***
 

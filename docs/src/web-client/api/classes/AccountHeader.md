@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountHeader
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountHeader
+[@demox-labs/miden-sdk](../index) / AccountHeader
 
 # Class: AccountHeader
 
@@ -10,21 +15,21 @@
 
 ### codeCommitment()
 
-> **codeCommitment**(): [`Word`](Word.md)
+> **codeCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -40,38 +45,38 @@
 
 ### id()
 
-> **id**(): [`AccountId`](AccountId.md)
+> **id**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
 ### nonce()
 
-> **nonce**(): [`Felt`](Felt.md)
+> **nonce**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
 ### storageCommitment()
 
-> **storageCommitment**(): [`Word`](Word.md)
+> **storageCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
 ### vaultCommitment()
 
-> **vaultCommitment**(): [`Word`](Word.md)
+> **vaultCommitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

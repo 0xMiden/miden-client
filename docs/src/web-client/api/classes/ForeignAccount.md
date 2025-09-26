@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: ForeignAccount
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ForeignAccount
+[@demox-labs/miden-sdk](../index) / ForeignAccount
 
 # Class: ForeignAccount
 
@@ -10,11 +15,11 @@
 
 ### account\_id()
 
-> **account\_id**(): [`AccountId`](AccountId.md)
+> **account\_id**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -30,11 +35,11 @@
 
 ### storage\_slot\_requirements()
 
-> **storage\_slot\_requirements**(): [`AccountStorageRequirements`](AccountStorageRequirements.md)
+> **storage\_slot\_requirements**(): [`AccountStorageRequirements`](AccountStorageRequirements)
 
 #### Returns
 
-[`AccountStorageRequirements`](AccountStorageRequirements.md)
+[`AccountStorageRequirements`](AccountStorageRequirements)
 
 ***
 
@@ -46,11 +51,11 @@
 
 ##### account\_id
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ##### storage\_requirements
 
-[`AccountStorageRequirements`](AccountStorageRequirements.md)
+[`AccountStorageRequirements`](AccountStorageRequirements)
 
 #### Returns
 

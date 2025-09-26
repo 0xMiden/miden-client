@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: FlattenedU8Vec
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / FlattenedU8Vec
+[@demox-labs/miden-sdk](../index) / FlattenedU8Vec
 
 # Class: FlattenedU8Vec
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: RpcClient
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / RpcClient
+[@demox-labs/miden-sdk](../index) / RpcClient
 
 # Class: RpcClient
 
@@ -20,7 +25,7 @@ Creates a new RPC client instance.
 
 ##### endpoint
 
-[`Endpoint`](Endpoint.md)
+[`Endpoint`](Endpoint)
 
 Endpoint to connect to.
 
@@ -42,7 +47,7 @@ Endpoint to connect to.
 
 ### getNotesById()
 
-> **getNotesById**(`note_ids`): `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
+> **getNotesById**(`note_ids`): `Promise`\<[`FetchedNote`](FetchedNote)[]\>
 
 Fetches notes by their IDs from the connected Miden node.
 
@@ -50,13 +55,13 @@ Fetches notes by their IDs from the connected Miden node.
 
 ##### note\_ids
 
-[`NoteId`](NoteId.md)[]
+[`NoteId`](NoteId)[]
 
 Array of [`NoteId`] objects to fetch
 
 #### Returns
 
-`Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
+`Promise`\<[`FetchedNote`](FetchedNote)[]\>
 
 Promise that resolves to  different data depending on the note type:
 - Private notes: Returns only `note_id` and `metadata`. The `input_note` field will be

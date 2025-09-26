@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: StorageMap
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / StorageMap
+[@demox-labs/miden-sdk](../index) / StorageMap
 
 # Class: StorageMap
 
@@ -30,18 +35,18 @@
 
 ### insert()
 
-> **insert**(`key`, `value`): [`Word`](Word.md)
+> **insert**(`key`, `value`): [`Word`](Word)
 
 #### Parameters
 
 ##### key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### value
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

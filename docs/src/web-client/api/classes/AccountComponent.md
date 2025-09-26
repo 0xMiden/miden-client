@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountComponent
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountComponent
+[@demox-labs/miden-sdk](../index) / AccountComponent
 
 # Class: AccountComponent
 
@@ -56,11 +61,11 @@
 
 ##### assembler
 
-[`Assembler`](Assembler.md)
+[`Assembler`](Assembler)
 
 ##### storage\_slots
 
-[`StorageSlot`](StorageSlot.md)[]
+[`StorageSlot`](StorageSlot)[]
 
 #### Returns
 
@@ -76,7 +81,7 @@
 
 ##### secret\_key
 
-[`SecretKey`](SecretKey.md)
+[`SecretKey`](SecretKey)
 
 #### Returns
 

@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: SecretKey
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SecretKey
+[@demox-labs/miden-sdk](../index) / SecretKey
 
 # Class: SecretKey
 
@@ -20,11 +25,11 @@
 
 ### publicKey()
 
-> **publicKey**(): [`PublicKey`](PublicKey.md)
+> **publicKey**(): [`PublicKey`](PublicKey)
 
 #### Returns
 
-[`PublicKey`](PublicKey.md)
+[`PublicKey`](PublicKey)
 
 ***
 
@@ -40,33 +45,33 @@
 
 ### sign()
 
-> **sign**(`message`): [`Signature`](Signature.md)
+> **sign**(`message`): [`Signature`](Signature)
 
 #### Parameters
 
 ##### message
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 
-[`Signature`](Signature.md)
+[`Signature`](Signature)
 
 ***
 
 ### signData()
 
-> **signData**(`signing_inputs`): [`Signature`](Signature.md)
+> **signData**(`signing_inputs`): [`Signature`](Signature)
 
 #### Parameters
 
 ##### signing\_inputs
 
-[`SigningInputs`](SigningInputs.md)
+[`SigningInputs`](SigningInputs)
 
 #### Returns
 
-[`Signature`](Signature.md)
+[`Signature`](Signature)
 
 ***
 

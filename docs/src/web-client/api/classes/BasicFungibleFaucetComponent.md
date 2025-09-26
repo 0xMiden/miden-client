@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: BasicFungibleFaucetComponent
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / BasicFungibleFaucetComponent
+[@demox-labs/miden-sdk](../index) / BasicFungibleFaucetComponent
 
 # Class: BasicFungibleFaucetComponent
 
@@ -30,21 +35,21 @@
 
 ### maxSupply()
 
-> **maxSupply**(): [`Felt`](Felt.md)
+> **maxSupply**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
 ### symbol()
 
-> **symbol**(): [`TokenSymbol`](TokenSymbol.md)
+> **symbol**(): [`TokenSymbol`](TokenSymbol)
 
 #### Returns
 
-[`TokenSymbol`](TokenSymbol.md)
+[`TokenSymbol`](TokenSymbol)
 
 ***
 
@@ -56,7 +61,7 @@
 
 ##### account
 
-[`Account`](Account.md)
+[`Account`](Account)
 
 #### Returns
 

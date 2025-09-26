@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteId
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteId
+[@demox-labs/miden-sdk](../index) / NoteId
 
 # Class: NoteId
 
@@ -16,11 +21,11 @@
 
 ##### recipient\_digest
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### asset\_commitment\_digest
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 

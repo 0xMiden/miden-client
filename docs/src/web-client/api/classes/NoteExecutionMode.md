@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteExecutionMode
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteExecutionMode
+[@demox-labs/miden-sdk](../index) / NoteExecutionMode
 
 # Class: NoteExecutionMode
 

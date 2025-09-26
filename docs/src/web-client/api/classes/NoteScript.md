@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteScript
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteScript
+[@demox-labs/miden-sdk](../index) / NoteScript
 
 # Class: NoteScript
 
@@ -20,11 +25,11 @@
 
 ### root()
 
-> **root**(): [`Word`](Word.md)
+> **root**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 

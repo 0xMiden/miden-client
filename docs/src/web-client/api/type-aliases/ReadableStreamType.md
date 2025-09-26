@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: ReadableStreamType
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / ReadableStreamType
+[@demox-labs/miden-sdk](../index) / ReadableStreamType
 
 # Type Alias: ReadableStreamType
 

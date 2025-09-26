@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Account
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Account
+[@demox-labs/miden-sdk](../index) / Account
 
 # Class: Account
 
@@ -10,21 +15,21 @@
 
 ### code()
 
-> **code**(): [`AccountCode`](AccountCode.md)
+> **code**(): [`AccountCode`](AccountCode)
 
 #### Returns
 
-[`AccountCode`](AccountCode.md)
+[`AccountCode`](AccountCode)
 
 ***
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -40,21 +45,21 @@
 
 ### getPublicKeys()
 
-> **getPublicKeys**(): [`Word`](Word.md)[]
+> **getPublicKeys**(): [`Word`](Word)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 ***
 
 ### id()
 
-> **id**(): [`AccountId`](AccountId.md)
+> **id**(): [`AccountId`](AccountId)
 
 #### Returns
 
-[`AccountId`](AccountId.md)
+[`AccountId`](AccountId)
 
 ***
 
@@ -110,11 +115,11 @@
 
 ### nonce()
 
-> **nonce**(): [`Felt`](Felt.md)
+> **nonce**(): [`Felt`](Felt)
 
 #### Returns
 
-[`Felt`](Felt.md)
+[`Felt`](Felt)
 
 ***
 
@@ -130,21 +135,21 @@
 
 ### storage()
 
-> **storage**(): [`AccountStorage`](AccountStorage.md)
+> **storage**(): [`AccountStorage`](AccountStorage)
 
 #### Returns
 
-[`AccountStorage`](AccountStorage.md)
+[`AccountStorage`](AccountStorage)
 
 ***
 
 ### vault()
 
-> **vault**(): [`AssetVault`](AssetVault.md)
+> **vault**(): [`AssetVault`](AssetVault)
 
 #### Returns
 
-[`AssetVault`](AssetVault.md)
+[`AssetVault`](AssetVault)
 
 ***
 

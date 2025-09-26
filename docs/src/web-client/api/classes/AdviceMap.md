@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AdviceMap
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AdviceMap
+[@demox-labs/miden-sdk](../index) / AdviceMap
 
 # Class: AdviceMap
 
@@ -30,18 +35,18 @@
 
 ### insert()
 
-> **insert**(`key`, `value`): [`Felt`](Felt.md)[]
+> **insert**(`key`, `value`): [`Felt`](Felt)[]
 
 #### Parameters
 
 ##### key
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### value
 
-[`FeltArray`](FeltArray.md)
+[`FeltArray`](FeltArray)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]

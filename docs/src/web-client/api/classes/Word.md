@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: Word
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Word
+[@demox-labs/miden-sdk](../index) / Word
 
 # Class: Word
 
@@ -46,11 +51,11 @@
 
 ### toFelts()
 
-> **toFelts**(): [`Felt`](Felt.md)[]
+> **toFelts**(): [`Felt`](Felt)[]
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 ***
 
@@ -98,7 +103,7 @@
 
 ##### felt\_vec
 
-[`Felt`](Felt.md)[]
+[`Felt`](Felt)[]
 
 #### Returns
 

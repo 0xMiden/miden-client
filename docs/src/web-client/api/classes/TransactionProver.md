@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: TransactionProver
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionProver
+[@demox-labs/miden-sdk](../index) / TransactionProver
 
 # Class: TransactionProver
 

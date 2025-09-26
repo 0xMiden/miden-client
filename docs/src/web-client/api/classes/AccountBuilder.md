@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountBuilder
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountBuilder
+[@demox-labs/miden-sdk](../index) / AccountBuilder
 
 # Class: AccountBuilder
 
@@ -32,7 +37,7 @@
 
 ##### account\_type
 
-[`AccountType`](../enumerations/AccountType.md)
+[`AccountType`](../enumerations/AccountType)
 
 #### Returns
 
@@ -42,11 +47,11 @@
 
 ### build()
 
-> **build**(): [`AccountBuilderResult`](AccountBuilderResult.md)
+> **build**(): [`AccountBuilderResult`](AccountBuilderResult)
 
 #### Returns
 
-[`AccountBuilderResult`](AccountBuilderResult.md)
+[`AccountBuilderResult`](AccountBuilderResult)
 
 ***
 
@@ -68,7 +73,7 @@
 
 ##### storage\_mode
 
-[`AccountStorageMode`](AccountStorageMode.md)
+[`AccountStorageMode`](AccountStorageMode)
 
 #### Returns
 
@@ -84,7 +89,7 @@
 
 ##### account\_component
 
-[`AccountComponent`](AccountComponent.md)
+[`AccountComponent`](AccountComponent)
 
 #### Returns
 
@@ -100,7 +105,7 @@
 
 ##### account\_component
 
-[`AccountComponent`](AccountComponent.md)
+[`AccountComponent`](AccountComponent)
 
 #### Returns
 

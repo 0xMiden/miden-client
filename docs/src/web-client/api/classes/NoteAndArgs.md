@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteAndArgs
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteAndArgs
+[@demox-labs/miden-sdk](../index) / NoteAndArgs
 
 # Class: NoteAndArgs
 
@@ -16,11 +21,11 @@
 
 ##### note
 
-[`Note`](Note.md)
+[`Note`](Note)
 
 ##### args?
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 #### Returns
 

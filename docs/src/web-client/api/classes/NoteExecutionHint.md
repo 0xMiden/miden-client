@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteExecutionHint
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteExecutionHint
+[@demox-labs/miden-sdk](../index) / NoteExecutionHint
 
 # Class: NoteExecutionHint
 

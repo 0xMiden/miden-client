@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteRecipient
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteRecipient
+[@demox-labs/miden-sdk](../index) / NoteRecipient
 
 # Class: NoteRecipient
 
@@ -16,15 +21,15 @@
 
 ##### serial\_num
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ##### note\_script
 
-[`NoteScript`](NoteScript.md)
+[`NoteScript`](NoteScript)
 
 ##### inputs
 
-[`NoteInputs`](NoteInputs.md)
+[`NoteInputs`](NoteInputs)
 
 #### Returns
 
@@ -34,11 +39,11 @@
 
 ### digest()
 
-> **digest**(): [`Word`](Word.md)
+> **digest**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -54,28 +59,28 @@
 
 ### inputs()
 
-> **inputs**(): [`NoteInputs`](NoteInputs.md)
+> **inputs**(): [`NoteInputs`](NoteInputs)
 
 #### Returns
 
-[`NoteInputs`](NoteInputs.md)
+[`NoteInputs`](NoteInputs)
 
 ***
 
 ### script()
 
-> **script**(): [`NoteScript`](NoteScript.md)
+> **script**(): [`NoteScript`](NoteScript)
 
 #### Returns
 
-[`NoteScript`](NoteScript.md)
+[`NoteScript`](NoteScript)
 
 ***
 
 ### serialNum()
 
-> **serialNum**(): [`Word`](Word.md)
+> **serialNum**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)

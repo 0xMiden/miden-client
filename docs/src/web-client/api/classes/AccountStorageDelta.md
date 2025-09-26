@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountStorageDelta
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorageDelta
+[@demox-labs/miden-sdk](../index) / AccountStorageDelta
 
 # Class: AccountStorageDelta
 
@@ -40,11 +45,11 @@
 
 ### values()
 
-> **values**(): [`Word`](Word.md)[]
+> **values**(): [`Word`](Word)[]
 
 #### Returns
 
-[`Word`](Word.md)[]
+[`Word`](Word)[]
 
 ***
 

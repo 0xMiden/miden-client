@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteAndArgsArray
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteAndArgsArray
+[@demox-labs/miden-sdk](../index) / NoteAndArgsArray
 
 # Class: NoteAndArgsArray
 
@@ -16,7 +21,7 @@
 
 ##### note\_and\_args?
 
-[`NoteAndArgs`](NoteAndArgs.md)[]
+[`NoteAndArgs`](NoteAndArgs)[]
 
 #### Returns
 
@@ -42,7 +47,7 @@
 
 ##### note\_and\_args
 
-[`NoteAndArgs`](NoteAndArgs.md)
+[`NoteAndArgs`](NoteAndArgs)
 
 #### Returns
 

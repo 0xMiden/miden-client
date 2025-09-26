@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: NoteHeader
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / NoteHeader
+[@demox-labs/miden-sdk](../index) / NoteHeader
 
 # Class: NoteHeader
 
@@ -10,11 +15,11 @@
 
 ### commitment()
 
-> **commitment**(): [`Word`](Word.md)
+> **commitment**(): [`Word`](Word)
 
 #### Returns
 
-[`Word`](Word.md)
+[`Word`](Word)
 
 ***
 
@@ -30,18 +35,18 @@
 
 ### id()
 
-> **id**(): [`NoteId`](NoteId.md)
+> **id**(): [`NoteId`](NoteId)
 
 #### Returns
 
-[`NoteId`](NoteId.md)
+[`NoteId`](NoteId)
 
 ***
 
 ### metadata()
 
-> **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+> **metadata**(): [`NoteMetadata`](NoteMetadata)
 
 #### Returns
 
-[`NoteMetadata`](NoteMetadata.md)
+[`NoteMetadata`](NoteMetadata)

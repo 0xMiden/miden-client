@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: JsAccountUpdate
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / JsAccountUpdate
+[@demox-labs/miden-sdk](../index) / JsAccountUpdate
 
 # Class: JsAccountUpdate
 

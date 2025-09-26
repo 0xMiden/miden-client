@@ -1,8 +1,13 @@
-[**@demox-labs/miden-sdk**](../README.md)
+---
+title: AccountStorageRequirements
+draft: true
+---
+
+[**@demox-labs/miden-sdk**](../index)
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / AccountStorageRequirements
+[@demox-labs/miden-sdk](../index) / AccountStorageRequirements
 
 # Class: AccountStorageRequirements
 
@@ -36,7 +41,7 @@
 
 ##### slots\_and\_keys
 
-[`SlotAndKeys`](SlotAndKeys.md)[]
+[`SlotAndKeys`](SlotAndKeys)[]
 
 #### Returns
 
