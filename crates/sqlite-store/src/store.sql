@@ -66,9 +66,7 @@ CREATE TABLE accounts (
     account_seed BLOB NULL,                     -- Account seed used to generate the ID. Expected to be NULL for non-new accounts
     locked BOOLEAN NOT NULL,                    -- True if the account is locked, false if not.
     PRIMARY KEY (account_commitment),
-    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),
-
-    CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
+    FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
 
 CREATE UNIQUE INDEX idx_account_commitment ON accounts(account_commitment);
@@ -104,7 +102,7 @@ CREATE TABLE input_notes (
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
 
-    PRIMARY KEY (note_id)
+    PRIMARY KEY (note_id),
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
 );
 
@@ -165,4 +163,4 @@ CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
-)
+);
