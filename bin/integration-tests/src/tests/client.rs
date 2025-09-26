@@ -7,7 +7,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{BlockNumber, NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -25,6 +25,7 @@ use miden_client::transaction::{
     TransactionProverError,
     TransactionRequestBuilder,
     TransactionStatus,
+    TransactionStoreUpdate,
     TransactionWitness,
 };
 use miden_client_sqlite_store::SqliteStore;
@@ -103,14 +104,23 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
         client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
     let transaction_id_1 = transaction_pipeline_1.id().unwrap();
     transaction_pipeline_1.prove_transaction(client.prover()).await.unwrap();
-    transaction_pipeline_1.submit_proven_transaction().await.unwrap();
-    let tx_update = transaction_pipeline_1.get_transaction_update().unwrap();
-    client.apply_transaction(tx_update).await.unwrap();
+
+    // NOTE: we manually construct a [`TransactionStoreUpdate`] because we want to submit both
+    // proofs at the same time, but we can't apply the transaction to the store before submitting
+    // it to the node (since we need the submission height).
+    let store_update = TransactionStoreUpdate::new(
+        transaction_pipeline_1.executed_transaction().cloned()?,
+        BlockNumber::from(client.get_sync_height().await?),
+        vec![],
+    );
+    client.apply_transaction(store_update).await?;
 
     let mut transaction_pipeline_2 =
         client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
     let transaction_id_2 = transaction_pipeline_2.id().unwrap();
     transaction_pipeline_2.prove_transaction(client.prover()).await.unwrap();
+
+    transaction_pipeline_1.submit_proven_transaction().await.unwrap();
     transaction_pipeline_2.submit_proven_transaction().await.unwrap();
     let tx_update = transaction_pipeline_2.get_transaction_update().unwrap();
     client.apply_transaction(tx_update).await.unwrap();
