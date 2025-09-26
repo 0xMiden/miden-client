@@ -50,6 +50,22 @@
 
 ***
 
+### applyTransaction()
+
+> **applyTransaction**(`tx_update`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### tx\_update
+
+[`TransactionStoreUpdate`](TransactionStoreUpdate.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### compileNoteScript()
 
 > **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
@@ -608,7 +624,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newTransaction()
 
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 #### Parameters
 
@@ -622,7 +638,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 #### Returns
 
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 ***
 
@@ -690,13 +706,13 @@ Returns the inner serialized mock chain if it exists.
 
 ### submitTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
+> **submitTransaction**(`transaction_update`, `prover?`): `Promise`\<`void`\>
 
 #### Parameters
 
-##### transaction\_result
+##### transaction\_update
 
-[`TransactionResult`](TransactionResult.md)
+[`TransactionStoreUpdate`](TransactionStoreUpdate.md)
 
 ##### prover?
 
@@ -715,22 +731,6 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-***
-
-### testingApplyTransaction()
-
-> **testingApplyTransaction**(`tx_result`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### tx\_result
-
-[`TransactionResult`](TransactionResult.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 

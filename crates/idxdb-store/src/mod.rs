@@ -30,10 +30,11 @@ use miden_client::store::{
     StoreError,
     TransactionFilter,
 };
+use miden_client::note::NoteUpdateTracker;
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{JsFuture, js_sys};
+use wasm_bindgen_futures::{js_sys, JsFuture};
 
 pub mod account;
 pub mod chain_data;
@@ -107,8 +108,12 @@ impl Store for WebStore {
         self.get_transactions(transaction_filter).await
     }
 
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
-        self.apply_transaction(tx_update).await
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError> {
+        self.apply_transaction(tx_update, note_updates).await
     }
 
     // NOTES

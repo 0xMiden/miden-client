@@ -69,7 +69,7 @@ const {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
@@ -145,7 +145,7 @@ export {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
@@ -379,13 +379,13 @@ export class WebClient {
       }
       const serializedAccountId = accountId.toString();
       const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedTransactionResultBytes = await this.callMethodWithWorker(
+      const serializedTransactionUpdateBytes = await this.callMethodWithWorker(
         MethodName.NEW_TRANSACTION,
         serializedAccountId,
         serializedTransactionRequest
       );
-      return wasm.TransactionResult.deserialize(
-        new Uint8Array(serializedTransactionResultBytes)
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(serializedTransactionUpdateBytes)
       );
     } catch (error) {
       console.error("INDEX.JS: Error in newTransaction:", error.toString());
@@ -393,16 +393,16 @@ export class WebClient {
     }
   }
 
-  async submitTransaction(transactionResult, prover = undefined) {
+  async submitTransaction(transactionUpdate, prover = undefined) {
     try {
       if (!this.worker) {
         return await this.wasmWebClient.submitTransaction(
-          transactionResult,
+          transactionUpdate,
           prover
         );
       }
-      const serializedTransactionResult = transactionResult.serialize();
-      const args = [serializedTransactionResult];
+      const serializedTransactionUpdate = transactionUpdate.serialize();
+      const args = [serializedTransactionUpdate];
 
       // If a prover is provided, serialize it and add it to the args.
       if (prover) {
@@ -518,16 +518,16 @@ export class MockWebClient extends WebClient {
     }
   }
 
-  async submitTransaction(transactionResult, prover = undefined) {
+  async submitTransaction(transactionUpdate, prover = undefined) {
     try {
       if (!this.worker) {
         return await this.wasmWebClient.submitTransaction(
-          transactionResult,
+          transactionUpdate,
           prover
         );
       }
-      const serializedTransactionResult = transactionResult.serialize();
-      const args = [serializedTransactionResult];
+      const serializedTransactionUpdate = transactionUpdate.serialize();
+      const args = [serializedTransactionUpdate];
 
       // If a prover is provided, serialize it and add it to the args.
       if (prover) {

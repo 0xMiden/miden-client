@@ -91,7 +91,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionKernel,
             TransactionProver,
             TransactionRequest,
-            TransactionResult,
+            TransactionStoreUpdate,
             TransactionRequestBuilder,
             TransactionScript,
             TransactionScriptInputPair,
@@ -171,7 +171,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionKernel = TransactionKernel;
           window.TransactionProver = TransactionProver;
           window.TransactionRequest = TransactionRequest;
-          window.TransactionResult = TransactionResult;
+          window.TransactionStoreUpdate = TransactionStoreUpdate;
           window.TransactionRequestBuilder = TransactionRequestBuilder;
           window.TransactionScript = TransactionScript;
           window.TransactionScriptInputPair = TransactionScriptInputPair;
