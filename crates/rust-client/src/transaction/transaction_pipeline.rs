@@ -23,6 +23,19 @@ use crate::store::data_store::ClientDataStore;
 use crate::transaction::{TransactionProver, TransactionRequest, TransactionStoreUpdate};
 use crate::{ClientError, DebugMode, TransactionPipelineError};
 
+/// A helper component for executing transactions.
+///
+/// A [`TransactionPipeline`] takes the initial state required to execute a transaction, and
+/// maintains it alongside the lifecycle of the transaction itself.
+/// Specifically, it tracks the progress from a [`TransactionRequest`] up to a
+/// [`TransactionStoreUpdate`], which can then be applied to a client's [`crate::Store`].
+/// Each new state of the transaction can be dispatched by the following functions, expected to be
+/// executed sequentially:
+///
+/// - [`TransactionPipeline::new`]
+/// - [`TransactionPipeline::execute_transaction`]
+/// - [`TransactionPipeline::prove_transaction`]
+/// - [`TransactionPipeline::submit_proven_transaction`]
 #[derive(Clone)]
 pub struct TransactionPipeline {
     /// The RPC client used to communicate with the node.
@@ -64,10 +77,6 @@ impl TransactionPipeline {
 
     /// Creates and executes a transaction specified by the request against the specified account,
     /// storing the resulting [`ExecutedTransaction`] inside the pipeline.
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
-    /// have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     ///
     /// # Errors
     ///
@@ -253,6 +262,7 @@ impl TransactionPipeline {
 
 // HELPERS
 // ================================================================================================
+
 async fn get_valid_input_notes(
     account_id: AccountId,
     mut input_notes: InputNotes<InputNote>,
