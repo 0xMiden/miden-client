@@ -1,7 +1,6 @@
 use miden_objects::account::NetworkId as NativeNetworkId;
 use miden_objects::address::{
-    AccountIdAddress as NativeAccountIdAddress,
-    Address as NativeAddress,
+    AccountIdAddress as NativeAccountIdAddress, Address as NativeAddress,
     AddressInterface as NativeAddressInterface,
 };
 use wasm_bindgen::JsValue;
@@ -25,7 +24,7 @@ pub enum AddressInterface {
 #[wasm_bindgen]
 impl Address {
     #[wasm_bindgen(js_name = "fromAccountId")]
-    // Can't pass the proper AdressInterface enum here since wasm_bindgen does not derive the ref
+    // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
     pub fn from_account_id(account_id: &AccountId, interface: &str) -> Result<Self, JsValue> {
