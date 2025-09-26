@@ -137,9 +137,7 @@ impl TryFrom<AccountProof> for AccountInputs {
             // discard slot indices - not needed for execution
             let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
             for (_, slots) in storage_slots {
-                let storage_map = PartialStorageMap::new(PartialSmt::from_proofs(
-                    slots.into_iter().map(Into::into),
-                )?);
+                let storage_map = PartialStorageMap::from_witnesses(slots.into_iter())?;
                 storage_map_proofs.push(storage_map);
             }
 
@@ -152,7 +150,8 @@ impl TryFrom<AccountProof> for AccountInputs {
                     // We don't use vault information so we leave it empty
                     PartialVault::new(PartialSmt::new())
                         .expect("Empty partial vault shouldn't fail"),
-                ),
+                    None,
+                )?,
                 witness,
             ));
         }

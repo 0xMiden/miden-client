@@ -70,17 +70,14 @@ pub async fn upsert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), 
     Ok(())
 }
 
-pub async fn upsert_account_record(
-    account: &Account,
-    account_seed: Option<Word>,
-) -> Result<(), JsValue> {
+pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let code_root = account.code().commitment().to_string();
     let storage_root = account.storage().commitment().to_string();
     let vault_root = account.vault().root().to_string();
     let committed = account.is_public();
     let nonce = account.nonce().to_string();
-    let account_seed = account_seed.map(|seed| seed.to_bytes());
+    let account_seed = account.seed().map(|seed| seed.to_bytes());
     let commitment = account.commitment().to_string();
 
     let promise = idxdb_upsert_account_record(
@@ -131,5 +128,5 @@ pub fn parse_account_record_idxdb_object(
 pub async fn update_account(new_account_state: &Account) -> Result<(), JsValue> {
     upsert_account_storage(new_account_state.storage()).await?;
     upsert_account_asset_vault(new_account_state.vault()).await?;
-    upsert_account_record(new_account_state, None).await
+    upsert_account_record(new_account_state).await
 }
