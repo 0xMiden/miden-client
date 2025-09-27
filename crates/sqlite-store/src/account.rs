@@ -678,7 +678,22 @@ impl SqliteStore {
         let nonce = u64_to_value(account.nonce().as_int());
         let commitment = account.commitment().to_string();
 
-        let account_seed = account_seed.map(|seed| seed.to_bytes());
+        // Determine the account_seed value to use based on the new requirements
+        let account_seed_bytes = if account_seed.is_some() {
+            // When account_seed is Some, use it
+            account_seed.map(|seed| seed.to_bytes())
+        } else if account.nonce().as_int() > 0 {
+            // When account_seed is None but nonce > 0, set to None
+            None
+        } else {
+            // When account_seed is None and nonce = 0, preserve existing seed
+            // Get the current seed from the database
+            const GET_SEED_QUERY: &str = "SELECT account_seed FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1";
+            tx.query_row(GET_SEED_QUERY, params![id], |row| {
+                let existing_seed: Option<Vec<u8>> = row.get(0)?;
+                Ok(existing_seed)
+            }).unwrap_or(None)
+        };
 
         const QUERY: &str = insert_sql!(
             accounts {
@@ -701,7 +716,7 @@ impl SqliteStore {
                 storage_commitment,
                 vault_root,
                 nonce,
-                account_seed,
+                account_seed_bytes,
                 commitment,
                 false,
             ],

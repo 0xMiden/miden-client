@@ -92,8 +92,6 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
-    println!("consuming anonymizer note");
-
     client.import_note(NoteFile::NoteId(anonymizer_note_1.id())).await?;
     client.import_note(NoteFile::NoteId(anonymizer_note_2.id())).await?;
     client.sync_state().await?;
@@ -102,6 +100,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
     let input_note_record = client.get_input_note(anonymizer_note_2.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
 
+    println!("consuming anonymizer note");
     let tx_request = TransactionRequestBuilder::new()
         .expected_output_recipients(vec![anonymized_note_details_1.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note_1.id()])
@@ -121,6 +120,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
     );
 
     // now try another transaction against the anonymizer account
+    println!("consuming anonymizer note 2");
     let tx_request = TransactionRequestBuilder::new()
         .expected_output_recipients(vec![anonymized_note_details_2.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note_2.id()])
