@@ -77,25 +77,53 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
     println!("creating note with accountA");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
-    let (anonymizer_note, anonymized_note_details) =
+    let (anonymizer_note_1, anonymized_note_details_1) =
+        create_anonymizer_note(sender.id(), target.id(), asset.into(), client.rng())?;
+
+    let (anonymizer_note_2, anonymized_note_details_2) =
         create_anonymizer_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(anonymizer_note.clone())])
+        .own_output_notes(vec![
+            OutputNote::Full(anonymizer_note_1.clone()),
+            OutputNote::Full(anonymizer_note_2.clone()),
+        ])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
     println!("consuming anonymizer note");
 
-    client.import_note(NoteFile::NoteId(anonymizer_note.id())).await?;
+    client.import_note(NoteFile::NoteId(anonymizer_note_1.id())).await?;
+    client.import_note(NoteFile::NoteId(anonymizer_note_2.id())).await?;
     client.sync_state().await?;
-    let input_note_record = client.get_input_note(anonymizer_note.id()).await?.unwrap();
+    let input_note_record = client.get_input_note(anonymizer_note_1.id()).await?.unwrap();
+    assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
+    let input_note_record = client.get_input_note(anonymizer_note_2.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
 
     let tx_request = TransactionRequestBuilder::new()
-        .expected_output_recipients(vec![anonymized_note_details.recipient().clone()])
-        .build_consume_notes(vec![anonymizer_note.id()])
+        .expected_output_recipients(vec![anonymized_note_details_1.recipient().clone()])
+        .build_consume_notes(vec![anonymizer_note_1.id()])
+        .unwrap();
+    let tx_id = execute_tx(&mut client, anonymizer_account.id(), tx_request.clone()).await;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let tx_record = client
+        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+        .await?
+        .pop()
+        .unwrap();
+
+    assert_eq!(
+        tx_record.details.output_notes.get_note(0).metadata().sender(),
+        anonymizer_account.id()
+    );
+
+    // now try another transaction against the anonymizer account
+    let tx_request = TransactionRequestBuilder::new()
+        .expected_output_recipients(vec![anonymized_note_details_2.recipient().clone()])
+        .build_consume_notes(vec![anonymizer_note_2.id()])
         .unwrap();
     let tx_id = execute_tx(&mut client, anonymizer_account.id(), tx_request.clone()).await;
     wait_for_tx(&mut client, tx_id).await?;
