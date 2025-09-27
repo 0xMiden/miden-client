@@ -12,6 +12,7 @@
         * [Features](./features.md)
         * [Design](./design.md)
         * [Library](./library.md)
+        * [Debugging](./debugging.md)
         * [CLI](./cli-reference.md)
             + [Config](./cli-config.md)
         * [Examples](./examples.md)
