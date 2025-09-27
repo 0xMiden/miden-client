@@ -25,6 +25,12 @@
 
 ---
 
+# Debugging
+
+- [Debugging guide](./debugging.md)
+
+---
+
 # CLI
 
 - [CLI](./cli-reference.md)
