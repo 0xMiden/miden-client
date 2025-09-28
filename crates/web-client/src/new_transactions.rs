@@ -1,12 +1,11 @@
-use miden_client::note::BlockNumber;
+use miden_client::asset::FungibleAsset;
+use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
 use miden_client::transaction::{
     PaymentNoteDescription,
     SwapTransactionData,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionResult as NativeTransactionResult,
 };
-use miden_objects::asset::FungibleAsset;
-use miden_objects::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;

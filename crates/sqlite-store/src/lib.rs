@@ -7,12 +7,18 @@
 use std::boxed::Box;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::string::ToString;
+use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
-use db_management::utils::apply_migrations;
+use db_management::utils::{
+    apply_migrations,
+    get_setting,
+    list_setting_keys,
+    remove_setting,
+    set_setting,
+};
 use miden_client::Word;
 use miden_client::account::{
     Account,
@@ -347,6 +353,22 @@ impl Store for SqliteStore {
             SqliteStore::get_foreign_account_code(conn, account_ids)
         })
         .await
+    }
+
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| set_setting(conn, &key, &value)).await
+    }
+
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.interact_with_connection(move |conn| get_setting(conn, &key)).await
+    }
+
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| remove_setting(conn, &key)).await
+    }
+
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
+        self.interact_with_connection(move |conn| list_setting_keys(conn)).await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
