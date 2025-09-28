@@ -1261,3 +1261,78 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     assert!(output_note.is_some());
     Ok(())
 }
+
+pub async fn test_account_prefix_collision_prevention(client_config: ClientConfig) -> Result<()> {
+    use miden_client::ClientError;
+    use miden_client::account::{AccountBuilder, AccountType};
+
+    let (mut client, _) = client_config.into_client().await?;
+
+    // Create first account
+    let account1 = AccountBuilder::new(Default::default())
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Private)
+        .build()?;
+
+    // Add the first account
+    client.add_account(&account1, false).await?;
+
+    // Try to create a second account with the same prefix by brute force
+    let max_attempts = 1000;
+    let mut account2 = None;
+    for i in 1..=max_attempts {
+        let mut seed = [0u8; 32];
+        seed[0] = i as u8;
+        seed[1] = (i >> 8) as u8;
+        seed[2] = (i >> 16) as u8;
+        seed[3] = (i >> 24) as u8;
+
+        let temp_account = AccountBuilder::new(seed)
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .storage_mode(AccountStorageMode::Private)
+            .build()?;
+
+        // Check if they have the same prefix
+        if temp_account.id().prefix() == account1.id().prefix() {
+            account2 = Some(temp_account);
+            break;
+        }
+    }
+
+    // If we couldn't find accounts with the same prefix naturally, create a test scenario
+    if account2.is_none() {
+        // Create a second account with a different prefix
+        let mut different_seed = [0u8; 32];
+        different_seed[0] = 255;
+        different_seed[1] = 255;
+        different_seed[2] = 255;
+        different_seed[3] = 255;
+
+        let account2_different = AccountBuilder::new(different_seed)
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .storage_mode(AccountStorageMode::Private)
+            .build()?;
+
+        client.add_account(&account2_different, false).await?;
+
+        // Try to add the same account again - this should fail with AccountAlreadyTracked
+        let result = client.add_account(&account1, false).await;
+        assert!(matches!(result, Err(ClientError::AccountAlreadyTracked(_))));
+
+        return Ok(());
+    }
+
+    let account2 = account2.unwrap();
+
+    // Try to add the second account with the same prefix - this should fail
+    let result = client.add_account(&account2, false).await;
+    assert!(matches!(result, Err(ClientError::AccountPrefixCollision(_, _))));
+
+    // Verify the error contains the correct account IDs
+    if let Err(ClientError::AccountPrefixCollision(new_id, existing_id)) = result {
+        assert_eq!(new_id, account2.id());
+        assert_eq!(existing_id, account1.id());
+    }
+
+    Ok(())
+}

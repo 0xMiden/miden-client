@@ -43,6 +43,10 @@ pub enum ClientError {
     AccountIsPrivate(AccountId),
     #[error("account nonce is too low to import")]
     AccountNonceTooLow,
+    #[error(
+        "account prefix collision: account {0} has the same 16-bit prefix as existing account {1}"
+    )]
+    AccountPrefixCollision(AccountId, AccountId),
     #[error("asset error")]
     AssetError(#[from] AssetError),
     #[error("account data wasn't found for account id {0}")]

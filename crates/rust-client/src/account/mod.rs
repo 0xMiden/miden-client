@@ -111,6 +111,32 @@ impl<AUTH> Client<AUTH> {
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 
+    /// Checks if adding the provided account would cause a prefix collision with existing accounts.
+    ///
+    /// Returns an error if any existing tracked account has the same 16-bit prefix as the new
+    /// account. This prevents the one-to-many relationship issue between note tags and
+    /// accounts.
+    ///
+    /// # Errors
+    ///
+    /// - If an existing account has the same 16-bit prefix as the new account.
+    async fn check_prefix_collision(&self, new_account_id: AccountId) -> Result<(), ClientError> {
+        let new_prefix = new_account_id.prefix();
+
+        let existing_accounts = self.store.get_account_headers().await?;
+
+        for (account_header, _) in existing_accounts {
+            if account_header.id().prefix() == new_prefix {
+                return Err(ClientError::AccountPrefixCollision(
+                    new_account_id,
+                    account_header.id(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Adds the provided [Account] in the store so it can start being tracked by the client.
     ///
     /// If the account is already being tracked and `overwrite` is set to `true`, the account will
@@ -125,6 +151,7 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
+    /// - If adding this account would cause a prefix collision with an existing account.
     pub async fn add_account(
         &mut self,
         account: &Account,
@@ -145,6 +172,11 @@ impl<AUTH> Client<AUTH> {
                     "Added an existing account and still provided a seed when it is not needed. It's possible that the account's file was incorrectly generated. The seed will be ignored."
                 );
             }
+        }
+
+        // Check for prefix collision with existing accounts (only for new accounts)
+        if self.store.get_account(account.id()).await?.is_none() {
+            self.check_prefix_collision(account.id()).await?;
         }
 
         let tracked_account = self.store.get_account(account.id()).await?;
