@@ -11,6 +11,6 @@ pub enum NoteTransportError {
     Connection(String),
     #[error("deserialization error: {0}")]
     Deserialization(#[from] DeserializationError),
-    #[error("transport error: {0}")]
-    Other(#[from] anyhow::Error),
+    #[error("transport layer error: {0}")]
+    TransportLayer(String),
 }

@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use anyhow::anyhow as err;
 use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_objects::utils::{Deserializable, Serializable};
@@ -101,7 +100,7 @@ impl CanonicalNoteTransportClient {
         self.api()
             .send_note(Request::new(request))
             .await
-            .map_err(|e| err!("Send note failed: {e:?}"))?;
+            .map_err(|e| NoteTransportError::TransportLayer(format!("Send note failed: {e:?}")))?;
 
         Ok(())
     }
@@ -118,11 +117,9 @@ impl CanonicalNoteTransportClient {
         let tags_int = tags.iter().map(NoteTag::as_u32).collect();
         let request = FetchNotesRequest { tags: tags_int, cursor };
 
-        let response = self
-            .api()
-            .fetch_notes(Request::new(request))
-            .await
-            .map_err(|e| err!("Fetch notes failed: {e:?}"))?;
+        let response = self.api().fetch_notes(Request::new(request)).await.map_err(|e| {
+            NoteTransportError::TransportLayer(format!("Fetch notes failed: {e:?}"))
+        })?;
 
         let response = response.into_inner();
 
@@ -149,11 +146,9 @@ impl CanonicalNoteTransportClient {
     ) -> Result<NoteStreamAdapter, NoteTransportError> {
         let request = StreamNotesRequest { tag: tag.as_u32(), cursor };
 
-        let response = self
-            .api()
-            .stream_notes(request)
-            .await
-            .map_err(|e| err!("Stream notes failed: {e:?}"))?;
+        let response = self.api().stream_notes(request).await.map_err(|e| {
+            NoteTransportError::TransportLayer(format!("Stream notes failed: {e:?}"))
+        })?;
         Ok(NoteStreamAdapter::new(response.into_inner()))
     }
 
@@ -167,7 +162,7 @@ impl CanonicalNoteTransportClient {
             .health_api()
             .check(request)
             .await
-            .map_err(|e| err!("Health check failed: {e}"))?
+            .map_err(|e| NoteTransportError::TransportLayer(format!("Health check failed: {e}")))?
             .into_inner();
 
         let serving = matches!(
@@ -175,7 +170,9 @@ impl CanonicalNoteTransportClient {
             tonic_health::pb::health_check_response::ServingStatus::Serving
         );
 
-        serving.then_some(()).ok_or_else(|| err!("Service is not serving").into())
+        serving
+            .then_some(())
+            .ok_or_else(|| NoteTransportError::TransportLayer("Service is not serving".into()))
     }
 }
 
@@ -235,9 +232,9 @@ impl Stream for NoteStreamAdapter {
                 }
                 Poll::Ready(Some(Ok(notes)))
             },
-            Poll::Ready(Some(Err(status))) => {
-                Poll::Ready(Some(Err(err!("tonic status: {status}").into())))
-            },
+            Poll::Ready(Some(Err(status))) => Poll::Ready(Some(Err(
+                NoteTransportError::TransportLayer(format!("tonic status: {status}")),
+            ))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
