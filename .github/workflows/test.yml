@@ -98,7 +98,7 @@ jobs:
         if: steps.dist-cache.outputs.cache-hit != 'true'
         run: |
           cd ./crates/web-client
-          yarn build
+          MIDEN_WEB_DEV=true yarn run build
 
       - name: Save cache - dist folder
         if: steps.dist-cache.outputs.cache-hit != 'true'

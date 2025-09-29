@@ -18,7 +18,7 @@ We can generate a debug build with symbols to help us trace these errors. This d
    ```yarn build-dev```
 3. Once it finishes, the Rust build log should print this:
   ```
-    Finished `dev` profile [optimized + debuginfo] target(s) in 38.33s
+    Finished `release` profile [optimized + debuginfo] target(s) in 38.33s
   ```
   4. (Optional) To double-check that debug symbols were generated, install the WebAssembly Binary Toolkit (WABT). Sources:
   - [brew package manager](https://formulae.brew.sh/formula/wabt)
@@ -65,22 +65,25 @@ Also, you should seed friendlier stack-traces:
 
 ## Relevant changes
 
-These changes are already reflected in the codebase, but the settings to make the dev build have debug symbols are the following:
+These changes are already reflected in the codebase, but the settings to make the release build have debug symbols are the following:
 
-1. The root `Cargo.toml` needs to optimize the dev profile for size, otherwise it won't compile:
-```
-[profile.dev]
-opt-level = "s"
-```
-2. In the `rollup.config.js` the relevant options for the Rust plugin are:
+1. In the `rollup.config.js` the relevant options for the Rust plugin are:
 ```
 {
    extraArgs: {
        wasmBindgen: [ "--keep-debug"],
    } 
-   optimize: {
-       release: false,
-       rustc: false
-   }
 }
+```
+2. The rollup plugin also calls cargo internally, which needs these arguments to add debug symbols:
+   
+```javascript
+const cargoArgsUseDebugSymbols = [
+  // Generate debug symbols for the release cargo profile.
+  "--config",
+  "profile.release.debug='full'",
+  // Do not remove debug symbols from the final binary,
+  "--config",
+  "profile.release.strip='none'",
+];
 ```
