@@ -4,6 +4,8 @@ This guide helps you troubleshoot common issues and understand the end-to-end li
 
 ### TL;DR checklist
 
+> Note: This section applies to the Miden CLI client. Guidance for the Rust and Web clients may differ.
+
 - Ensure you are running commands in the same directory that contains `miden-client.toml`.
 - If you need a clean local state, delete the SQLite store file referenced by `store_filepath` (default: `store.sqlite3`). It will be recreated automatically on the next command.
 - Verify your node RPC endpoint is reachable and correct in `miden-client.toml`.
@@ -111,5 +113,6 @@ Key states the CLI surfaces:
 
 - CLI debug flag and environment variable are documented in `CLI` and `Config` docs.
 - Common error enums originate from the client and RPC layers.
+
 
 
