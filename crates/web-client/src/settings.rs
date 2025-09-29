@@ -5,6 +5,7 @@ use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
+    /// Retrieves the setting value for `key`, or `None` if it hasn’t been set.
     #[wasm_bindgen(js_name = "getSetting")]
     pub async fn get_setting(&mut self, key: String) -> Result<Option<JsValue>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
@@ -27,6 +28,7 @@ impl WebClient {
         }
     }
 
+    /// Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
     #[wasm_bindgen(js_name = "setSetting")]
     pub async fn set_setting(&mut self, key: String, value: JsValue) -> Result<(), JsValue> {
         let value_bytes: Vec<u8> = from_value(value).map_err(|err| {
@@ -42,6 +44,7 @@ impl WebClient {
         }
     }
 
+    /// Deletes a setting key-value from the store.
     #[wasm_bindgen(js_name = "removeSetting")]
     pub async fn remove_setting(&mut self, key: String) -> Result<(), JsValue> {
         if let Some(client) = self.get_mut_inner() {
@@ -54,6 +57,7 @@ impl WebClient {
         }
     }
 
+    /// Returns all the existing setting keys from the store.
     #[wasm_bindgen(js_name = "listSettingKeys")]
     pub async fn list_setting_keys(&mut self) -> Result<Vec<String>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
