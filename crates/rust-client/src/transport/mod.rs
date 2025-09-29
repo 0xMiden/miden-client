@@ -12,7 +12,7 @@ use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
 use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
 
-pub use self::errors::TransportError;
+pub use self::errors::NoteTransportError;
 use crate::{Client, ClientError};
 
 /// Client transport layer methods.
@@ -123,7 +123,11 @@ impl TransportLayer {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait NoteTransportClient: Send + Sync {
     /// Send a note with optionally encrypted details
-    async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError>;
+    async fn send_note(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+    ) -> Result<(), NoteTransportError>;
 
     /// Fetch notes for given tags
     ///
@@ -133,18 +137,21 @@ pub trait NoteTransportClient: Send + Sync {
         &self,
         tag: &[NoteTag],
         cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), TransportError>;
+    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError>;
 
     /// Stream notes for a given tag
     async fn stream_notes(
         &self,
         tag: NoteTag,
         cursor: u64,
-    ) -> Result<Box<dyn NoteStream>, TransportError>;
+    ) -> Result<Box<dyn NoteStream>, NoteTransportError>;
 }
 
 /// Stream trait for note streaming
-pub trait NoteStream: Stream<Item = Result<Vec<NoteInfo>, TransportError>> + Send + Unpin {}
+pub trait NoteStream:
+    Stream<Item = Result<Vec<NoteInfo>, NoteTransportError>> + Send + Unpin
+{
+}
 
 /// Information about a note in API responses
 #[derive(Debug, Clone)]

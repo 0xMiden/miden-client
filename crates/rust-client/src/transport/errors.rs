@@ -4,7 +4,7 @@ use miden_lib::utils::DeserializationError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum TransportError {
+pub enum NoteTransportError {
     #[error("transport layer is not enabled")]
     Disabled,
     #[error("connection error: {0}")]

@@ -27,7 +27,7 @@ use {
     tower::timeout::Timeout,
 };
 
-use super::{NoteInfo, NoteStream, TransportError};
+use super::{NoteInfo, NoteStream, NoteTransportError};
 
 #[cfg(not(target_arch = "wasm32"))]
 type Service = Timeout<Channel>;
@@ -42,16 +42,15 @@ pub struct CanonicalNoteTransportClient {
 
 impl CanonicalNoteTransportClient {
     /// gRPC client constructor
-    #[cfg(not(target_arch = "wasm32"))]
-    pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, TransportError> {
+    pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let tls = ClientTlsConfig::new().with_native_roots();
         let channel = Channel::from_shared(endpoint.to_string())
-            .map_err(|e| TransportError::Connection(format!("Failed to create channel: {e}")))?
+            .map_err(|e| NoteTransportError::Connection(format!("Failed to create channel: {e}")))?
             .tls_config(tls)
-            .map_err(|e| TransportError::Connection(format!("Failed to setup TLS: {e}")))?
+            .map_err(|e| NoteTransportError::Connection(format!("Failed to setup TLS: {e}")))?
             .connect()
             .await
-            .map_err(|e| TransportError::Connection(format!("Failed to connect: {e}")))?;
+            .map_err(|e| NoteTransportError::Connection(format!("Failed to connect: {e}")))?;
         let timeout = Duration::from_millis(timeout_ms);
         let timeout_channel = Timeout::new(channel, timeout);
         let health_client = HealthClient::new(timeout_channel.clone());
@@ -65,7 +64,7 @@ impl CanonicalNoteTransportClient {
 
     /// gRPC client (WASM) constructor
     #[cfg(target_arch = "wasm32")]
-    pub async fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, TransportError> {
+    pub async fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenPrivateTransportClient::new(wasm_client);
@@ -94,7 +93,7 @@ impl CanonicalNoteTransportClient {
         &self,
         header: NoteHeader,
         details: Vec<u8>,
-    ) -> Result<(), TransportError> {
+    ) -> Result<(), NoteTransportError> {
         let request = SendNoteRequest {
             note: Some(TransportNote { header: header.to_bytes(), details }),
         };
@@ -115,7 +114,7 @@ impl CanonicalNoteTransportClient {
         &self,
         tags: &[NoteTag],
         cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), TransportError> {
+    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
         let tags_int = tags.iter().map(NoteTag::as_u32).collect();
         let request = FetchNotesRequest { tags: tags_int, cursor };
 
@@ -147,7 +146,7 @@ impl CanonicalNoteTransportClient {
         &self,
         tag: NoteTag,
         cursor: u64,
-    ) -> Result<NoteStreamAdapter, TransportError> {
+    ) -> Result<NoteStreamAdapter, NoteTransportError> {
         let request = StreamNotesRequest { tag: tag.as_u32(), cursor };
 
         let response = self
@@ -159,7 +158,7 @@ impl CanonicalNoteTransportClient {
     }
 
     /// gRPC-standardized server health-check
-    pub async fn health_check(&mut self) -> Result<(), TransportError> {
+    pub async fn health_check(&mut self) -> Result<(), NoteTransportError> {
         let request = tonic::Request::new(HealthCheckRequest {
             service: String::new(), // empty string -> whole server
         });
@@ -183,7 +182,11 @@ impl CanonicalNoteTransportClient {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl super::NoteTransportClient for CanonicalNoteTransportClient {
-    async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError> {
+    async fn send_note(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+    ) -> Result<(), NoteTransportError> {
         self.send_note(header, details).await
     }
 
@@ -191,7 +194,7 @@ impl super::NoteTransportClient for CanonicalNoteTransportClient {
         &self,
         tags: &[NoteTag],
         cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), TransportError> {
+    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
         self.fetch_notes(tags, cursor).await
     }
 
@@ -199,7 +202,7 @@ impl super::NoteTransportClient for CanonicalNoteTransportClient {
         &self,
         tag: NoteTag,
         cursor: u64,
-    ) -> Result<Box<dyn NoteStream>, TransportError> {
+    ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
         let stream = self.stream_notes(tag, cursor).await?;
         Ok(Box::new(stream))
     }
@@ -218,7 +221,7 @@ impl NoteStreamAdapter {
 }
 
 impl Stream for NoteStreamAdapter {
-    type Item = Result<Vec<NoteInfo>, TransportError>;
+    type Item = Result<Vec<NoteInfo>, NoteTransportError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match Pin::new(&mut self.inner).poll_next(cx) {

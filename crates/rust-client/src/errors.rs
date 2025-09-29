@@ -24,7 +24,7 @@ use crate::note::NoteScreenerError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
-use crate::transport::TransportError;
+use crate::transport::NoteTransportError;
 
 // CLIENT ERROR
 // ================================================================================================
@@ -72,6 +72,8 @@ pub enum ClientError {
     NoteImportError(String),
     #[error("error while converting input note")]
     NoteRecordConversionError(#[from] NoteRecordError),
+    #[error("transport api error")]
+    NoteTransportError(#[from] NoteTransportError),
     #[error("no consumable note for account {0}")]
     NoConsumableNoteForAccount(AccountId),
     #[error("rpc api error")]
@@ -90,8 +92,6 @@ pub enum ClientError {
     TransactionProvingError(#[from] TransactionProverError),
     #[error("transaction request error")]
     TransactionRequestError(#[from] TransactionRequestError),
-    #[error("transport api error")]
-    TransportError(#[from] TransportError),
     #[error("transaction script builder error")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]

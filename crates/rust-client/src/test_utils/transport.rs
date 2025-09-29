@@ -10,7 +10,7 @@ use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_tx::utils::sync::RwLock;
 
-use crate::transport::{NoteInfo, NoteStream, NoteTransportClient, TransportError};
+use crate::transport::{NoteInfo, NoteStream, NoteTransportClient, NoteTransportError};
 
 /// Mock Note Transport Node
 ///
@@ -87,7 +87,7 @@ impl MockNoteTransportApi {
 
 pub struct DummyNoteStream {}
 impl Stream for DummyNoteStream {
-    type Item = Result<Vec<NoteInfo>, TransportError>;
+    type Item = Result<Vec<NoteInfo>, NoteTransportError>;
 
     fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(None)
@@ -98,7 +98,11 @@ impl NoteStream for DummyNoteStream {}
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NoteTransportClient for MockNoteTransportApi {
-    async fn send_note(&self, header: NoteHeader, details: Vec<u8>) -> Result<(), TransportError> {
+    async fn send_note(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+    ) -> Result<(), NoteTransportError> {
         self.send_note(header, details);
         Ok(())
     }
@@ -107,7 +111,7 @@ impl NoteTransportClient for MockNoteTransportApi {
         &self,
         tags: &[NoteTag],
         cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), TransportError> {
+    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
         Ok(self.fetch_notes(tags, cursor))
     }
 
@@ -115,7 +119,7 @@ impl NoteTransportClient for MockNoteTransportApi {
         &self,
         _tag: NoteTag,
         _cursor: u64,
-    ) -> Result<Box<dyn NoteStream>, TransportError> {
+    ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
         Ok(Box::new(DummyNoteStream {}))
     }
 }
