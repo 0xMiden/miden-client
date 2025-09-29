@@ -18,10 +18,10 @@
 * [BREAKING] Incremented MSRV to 1.89.
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
-<<<<<<< HEAD
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
+* [BREAKING] Added connectivity to the Transport Layer, adding a new `Client` field and `Store` methods ([#1296](https://github.com/0xMiden/miden-client/pull/1296)).
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
 
 ## 0.11.8 (2025-09-29)
@@ -45,9 +45,6 @@
 * Added a way to retrieve map items in web client ([#1282](https://github.com/0xMiden/miden-client/pull/1282)).
 * Defined `AccountInterface.Unspecified` in web client ([#1286](https://github.com/0xMiden/miden-client/pull/1286)).
 * Removed `AccountId.fromBech32` ([#1288](https://github.com/0xMiden/miden-client/pull/1288)).
-=======
-* [BREAKING] Added connectivity to the Transport Layer, adding a new `Client` field and `Store` methods ([#1296](https://github.com/0xMiden/miden-client/pull/1296)).
->>>>>>> 6122054b (Relax CI)
 
 ## 0.11.3 (2025-09-08)
 
