@@ -1,13 +1,6 @@
-use alloc::string::ToString;
-
 use miden_client::ScriptBuilder as NativeScriptBuilder;
 use miden_client::assembly::{
-    Assembler,
-    Library as NativeLibrary,
-    LibraryPath,
-    Module,
-    ModuleKind,
-    Report,
+    Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind, PrintDiagnostic, Report,
 };
 use miden_client::transaction::TransactionKernel;
 use wasm_bindgen::prelude::*;
@@ -157,9 +150,9 @@ impl ScriptBuilder {
 // The assembler type returns a miette::Report instead of an Err, so this
 // takes the report and returns it as an error.
 fn format_assembler_error(err_report: &Report, extra_context: &str) -> String {
-    let error = err_report.chain().map(ToString::to_string).collect::<Vec<String>>().join("\n");
+    let error = PrintDiagnostic::new(&err_report);
 
-    format!("script builder: {error}: failed to build given library: \n {extra_context}")
+    format!("script builder error {extra_context}: {error} ")
 }
 
 // CONVERSIONS
