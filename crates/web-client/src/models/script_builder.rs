@@ -99,7 +99,9 @@ impl ScriptBuilder {
         // it would leave the JS side with a null value on, so we have to clone it to compile
         // the given program.
         let cloned = self.builder.clone();
-        let compiled_tx_script = cloned.compile_tx_script(tx_script).unwrap();
+        let compiled_tx_script = cloned
+            .compile_tx_script(tx_script)
+            .map_err(|err| js_error_with_context(err, "failed to compile transaction script"))?;
         Ok(compiled_tx_script.into())
     }
 

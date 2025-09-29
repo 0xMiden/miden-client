@@ -7,11 +7,7 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{
-    Client,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
+    Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
 };
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -52,6 +48,7 @@ impl Default for WebClient {
 impl WebClient {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
+        console_error_panic_hook::set_once();
         WebClient {
             inner: None,
             store: None,

@@ -32,6 +32,7 @@ rand                 = { workspace = true }
 serde-wasm-bindgen   = { version = "0.6" }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
+console_error_panic_hook = "0.1.7"
 
 [dev-dependencies]
 web-sys = { features = ["console"], version = "0.3" }

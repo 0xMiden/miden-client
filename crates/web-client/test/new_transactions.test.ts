@@ -347,7 +347,6 @@ export const customTransaction = async (
 ): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
-      debugger;
       const client = window.client;
 
       const walletAccount = await client.newWallet(
@@ -1241,9 +1240,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                 end
         `;
 
+    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
     let bumpItemComponent = window.AccountComponent.compile(
       accountCode,
-      window.TransactionKernel.assembler(),
+      builder,
       [window.StorageSlot.map(storageMap)]
     ).withSupportsAllTypes();
 
@@ -1270,21 +1270,19 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       ?.toHex();
 
     // Deploy counter account
-    let assembler = window.TransactionKernel.assembler();
 
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "external_contract::bump_item_contract",
-        accountCode
-      );
+    let accountComponentLib = builder.buildLibrary(
+      "external_contract::bump_item_contract",
+      accountCode
+    );
 
-    let txScript = window.TransactionScript.compile(
+    builder.linkDynamicLibrary(accountComponentLib);
+
+    let txScript = builder.compileTxScript(
       `use.external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
-      end`,
-      assembler.withLibrary(accountComponentLib)
+      end`
     );
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
