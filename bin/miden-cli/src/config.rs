@@ -6,6 +6,7 @@ use std::str::FromStr;
 use figment::value::{Dict, Map};
 use figment::{Metadata, Profile, Provider};
 use miden_client::rpc::Endpoint;
+use miden_client::transport::TRANSPORT_LAYER_DEFAULT_ENDPOINT;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
@@ -102,7 +103,7 @@ impl Default for RpcConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TransportLayerConfig {
     /// Address of the Miden Transport Layer node to connect to.
-    pub endpoint: CliEndpoint,
+    pub endpoint: String,
     /// Timeout for the Transport Layer RPC api requests, in milliseconds.
     pub timeout_ms: u64,
 }
@@ -110,7 +111,7 @@ pub struct TransportLayerConfig {
 impl Default for TransportLayerConfig {
     fn default() -> Self {
         Self {
-            endpoint: Endpoint::default().into(),
+            endpoint: TRANSPORT_LAYER_DEFAULT_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }

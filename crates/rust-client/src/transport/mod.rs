@@ -15,6 +15,8 @@ use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
 pub use self::errors::NoteTransportError;
 use crate::{Client, ClientError};
 
+pub const TRANSPORT_LAYER_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
+
 /// Client transport layer methods.
 impl<AUTH> Client<AUTH> {
     /// Check if the transport layer is configured
