@@ -22,10 +22,8 @@ We can generate a debug build with symbols to help us trace these errors. This d
   ```
   4. (Optional) To double-check that debug symbols were generated, install the WebAssembly Binary Toolkit (WABT). Sources:
   - [brew package manager](https://formulae.brew.sh/formula/wabt)
-  
   - [nix packages](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
- - [ubuntu](https://launchpad.net/ubuntu/+source/wabt)  (not tested)
- - [source](https://github.com/WebAssembly/wabt).
+  - [source](https://github.com/WebAssembly/wabt).
  The WABT package provides an `wasm-obj` binary, which you can use like so:
  ```
  wasm-objdump --headers dist/workers/assets/miden_client_web.wasm
