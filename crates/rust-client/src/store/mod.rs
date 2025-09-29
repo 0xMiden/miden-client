@@ -356,12 +356,7 @@ pub trait Store: Send + Sync {
         transport_layer_update: TransportLayerUpdate,
     ) -> Result<(), StoreError> {
         self.update_transport_layer_cursor(transport_layer_update.cursor).await?;
-        let input_notes = transport_layer_update
-            .note_updates
-            .into_iter()
-            .map(InputNoteRecord::from)
-            .collect::<Vec<_>>();
-        self.upsert_input_notes(&input_notes).await?;
+        self.upsert_input_notes(&transport_layer_update.note_updates).await?;
         Ok(())
     }
 

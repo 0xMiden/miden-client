@@ -13,6 +13,7 @@ use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
 use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
+use crate::store::InputNoteRecord;
 use crate::{Client, ClientError};
 
 pub const TRANSPORT_LAYER_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
@@ -93,7 +94,7 @@ pub struct TransportLayerUpdate {
     /// Pagination cursor for next fetch
     pub cursor: u64,
     /// Fetched notes
-    pub note_updates: Vec<Note>,
+    pub note_updates: Vec<InputNoteRecord>,
 }
 
 impl TransportLayer {
@@ -121,7 +122,8 @@ impl TransportLayer {
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
             let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            note_updates.push(note);
+            let input_note = InputNoteRecord::from(note);
+            note_updates.push(input_note);
         }
 
         let update = TransportLayerUpdate { note_updates, cursor: rcursor };
