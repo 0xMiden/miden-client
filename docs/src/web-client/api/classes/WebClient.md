@@ -330,6 +330,8 @@ Meant to be used in conjunction with the `force_import_store` method
 
 > **getSetting**(`key`): `Promise`\<`any`\>
 
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
 #### Parameters
 
 ##### key
@@ -439,6 +441,8 @@ Meant to be used in conjunction with the `force_import_store` method
 ### listSettingKeys()
 
 > **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
 
 #### Returns
 
@@ -690,6 +694,8 @@ Meant to be used in conjunction with the `force_import_store` method
 
 > **removeSetting**(`key`): `Promise`\<`void`\>
 
+Deletes a setting key-value from the store.
+
 #### Parameters
 
 ##### key
@@ -733,6 +739,8 @@ Returns the inner serialized mock chain if it exists.
 ### setSetting()
 
 > **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
 
 #### Parameters
 
