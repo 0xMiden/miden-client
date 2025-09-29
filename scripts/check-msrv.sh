@@ -83,8 +83,15 @@ while IFS=$'\t' read -r pkg_id package_name manifest_path rust_version; do
 
   echo "   Current MSRV: $current_msrv"
 
+  # Add wasm target for WASM packages
+  msrv_cmd="cargo msrv verify --manifest-path \"$package_dir/Cargo.toml\""
+  if [[ "$package_name" == "miden-client-web" || "$package_name" == "miden-idxdb-store" ]]; then
+    msrv_cmd="$msrv_cmd --target wasm32-unknown-unknown"
+    echo "   Using wasm target for $package_name"
+  fi
+
   # Try to verify the MSRV
-  if ! cargo msrv verify --manifest-path "$package_dir/Cargo.toml" >/dev/null 2>&1; then
+  if ! eval "$msrv_cmd" >/dev/null 2>&1; then
     echo "ERROR: MSRV check failed for $package_name"
     failed_packages="$failed_packages $package_name"
 
@@ -95,11 +102,12 @@ while IFS=$'\t' read -r pkg_id package_name manifest_path rust_version; do
     if [[ -z "$latest_stable" ]]; then latest_stable="1.81.0"; fi
 
     # Search for the actual MSRV starting from the current one
-    if actual_msrv=$(cargo msrv find \
-          --manifest-path "$package_dir/Cargo.toml" \
-          --min "$current_msrv" \
-          --max "$latest_stable" \
-          --output-format minimal 2>/dev/null); then
+    find_cmd="cargo msrv find --manifest-path \"$package_dir/Cargo.toml\" --min \"$current_msrv\" --max \"$latest_stable\" --output-format minimal"
+    if [[ "$package_name" == "miden-client-web" || "$package_name" == "miden-idxdb-store" ]]; then
+      find_cmd="$find_cmd --target wasm32-unknown-unknown"
+    fi
+
+    if actual_msrv=$(eval "$find_cmd" 2>/dev/null); then
       echo "   Found actual MSRV: $actual_msrv"
       echo ""
       echo "ERROR SUMMARY for $package_name:"

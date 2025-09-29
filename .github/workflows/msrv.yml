@@ -23,14 +23,11 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y jq
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-msrv
         run: cargo install cargo-msrv
-      - name: Cache rustup toolchains
-        run: rustup update
-      - name: add wasm target (needed by web-client)
-        run: rustup target add wasm32-unknown-unknown
       - name: Check MSRV for each workspace member
         run: |
-          chmod +x scripts/check-msrv.sh
           ./scripts/check-msrv.sh
