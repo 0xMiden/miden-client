@@ -1,4 +1,4 @@
-use miden_objects::transaction::TransactionScript as NativeTransactionScript;
+use miden_client::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;

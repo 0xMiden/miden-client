@@ -3,11 +3,13 @@ use std::sync::LazyLock;
 use std::vec::Vec;
 
 use miden_client::crypto::{Blake3_160, Blake3Digest};
+use miden_client::store::StoreError;
 use rusqlite::types::FromSql;
 use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
 use rusqlite_migration::{M, Migrations, SchemaVersion};
 
 use super::errors::SqliteStoreError;
+use crate::sql_error::SqlResultExt;
 
 // MACROS
 // ================================================================================================
@@ -73,11 +75,11 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
     let version_before = MIGRATIONS.current_version(conn)?;
 
     if let SchemaVersion::Inside(ver) = version_before {
-        if !table_exists(&conn.transaction()?, "settings")? {
-            return Err(SqliteStoreError::MissingSettingsTable);
+        if !table_exists(&conn.transaction()?, "migrations")? {
+            return Err(SqliteStoreError::MissingMigrationsTable);
         }
 
-        let last_schema_version: usize = get_settings_value(conn, DB_SCHEMA_VERSION_FIELD)?
+        let last_schema_version: usize = get_migrations_value(conn, DB_SCHEMA_VERSION_FIELD)?
             .ok_or_else(|| {
                 SqliteStoreError::DatabaseError("Schema version not found".to_string())
             })?;
@@ -89,11 +91,12 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
         }
 
         let expected_hash = &*MIGRATION_HASHES[ver.get() - 1];
-        let actual_hash =
-            hex::decode(get_settings_value::<String>(conn, DB_MIGRATION_HASH_FIELD)?.ok_or_else(
-                || SqliteStoreError::DatabaseError("Migration hash not found".to_string()),
-            )?)
-            .map_err(|e| SqliteStoreError::HexDecodeError(e.to_string()))?;
+        let actual_hash = hex::decode(
+            get_migrations_value::<String>(conn, DB_MIGRATION_HASH_FIELD)?.ok_or_else(|| {
+                SqliteStoreError::DatabaseError("Migration hash not found".to_string())
+            })?,
+        )
+        .map_err(|e| SqliteStoreError::HexDecodeError(e.to_string()))?;
 
         if actual_hash != expected_hash {
             return Err(SqliteStoreError::MigrationHashMismatch);
@@ -106,11 +109,11 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
 
     if version_before != version_after {
         let new_hash = hex::encode(&*MIGRATION_HASHES[MIGRATION_HASHES.len() - 1]);
-        set_settings_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
+        set_migrations_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
     }
 
     let new_schema_version = schema_version(conn)?;
-    set_settings_value(conn, DB_SCHEMA_VERSION_FIELD, &new_schema_version)?;
+    set_migrations_value(conn, DB_SCHEMA_VERSION_FIELD, &new_schema_version)?;
 
     Ok(())
 }
@@ -141,19 +144,55 @@ fn remove_spaces(str: &str) -> String {
     str.chars().filter(|chr| !chr.is_whitespace()).collect()
 }
 
-pub fn get_settings_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>> {
+pub fn get_migrations_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>> {
     conn.transaction()?
-        .query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
+        .query_row("SELECT value FROM migrations WHERE name = $1", params![name], |row| row.get(0))
         .optional()
 }
 
-pub fn set_settings_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<()> {
+pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<()> {
     let count =
-        conn.execute(insert_sql!(settings { name, value } | REPLACE), params![name, value])?;
+        conn.execute(insert_sql!(migrations { name, value } | REPLACE), params![name, value])?;
 
     debug_assert_eq!(count, 1);
 
     Ok(())
+}
+
+pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
+    conn.transaction()
+        .into_store_error()?
+        .query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
+        .optional()
+        .into_store_error()
+}
+
+pub fn set_setting<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<(), StoreError> {
+    let count = conn
+        .execute(insert_sql!(settings { name, value } | REPLACE), params![name, value])
+        .into_store_error()?;
+
+    debug_assert_eq!(count, 1);
+
+    Ok(())
+}
+
+pub fn remove_setting(conn: &Connection, name: &str) -> Result<(), StoreError> {
+    let count = conn
+        .execute("DELETE FROM settings WHERE name = $1", params![name])
+        .into_store_error()?;
+
+    debug_assert_eq!(count, 1);
+
+    Ok(())
+}
+
+pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
+    let mut stmt = conn.prepare("SELECT name FROM settings").into_store_error()?;
+    stmt.query_map([], |row| row.get::<_, String>(0))
+        .into_store_error()?
+        .collect::<Result<Vec<String>, _>>()
+        .into_store_error()
 }
 
 /// Checks if a table exists in the database.

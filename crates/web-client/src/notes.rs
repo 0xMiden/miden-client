@@ -1,6 +1,6 @@
 use miden_client::Word;
+use miden_client::note::NoteId;
 use miden_client::store::OutputNoteRecord;
-use miden_objects::note::NoteId;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;

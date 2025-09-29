@@ -21,6 +21,13 @@ pub struct AccountRecord {
 
 impl AccountRecord {
     pub fn new(account: Account, status: AccountStatus) -> Self {
+        // TODO: remove this?
+        #[cfg(debug_assertions)]
+        {
+            let account_seed = account.seed();
+            debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
+        }
+
         Self { account, status }
     }
 
@@ -36,8 +43,8 @@ impl AccountRecord {
         self.status.is_locked()
     }
 
-    pub fn seed(&self) -> Option<&Word> {
-        self.status.seed()
+    pub fn seed(&self) -> Option<Word> {
+        self.account.seed()
     }
 }
 

@@ -7,12 +7,18 @@
 use std::boxed::Box;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
-use std::string::ToString;
+use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
-use db_management::utils::apply_migrations;
+use db_management::utils::{
+    apply_migrations,
+    get_setting,
+    list_setting_keys,
+    remove_setting,
+    set_setting,
+};
 use miden_client::Word;
 use miden_client::account::{
     Account,
@@ -22,9 +28,9 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
 };
-use miden_client::asset::{Asset, AssetVault};
+use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
@@ -274,16 +280,12 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn insert_account(
-        &self,
-        account: &Account,
-        account_seed: Option<Word>,
-    ) -> Result<(), StoreError> {
+    async fn insert_account(&self, account: &Account) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &merkle_store, &cloned_account, account_seed)
+            SqliteStore::insert_account(conn, &merkle_store, &cloned_account)
         })
         .await
     }
@@ -353,6 +355,22 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| set_setting(conn, &key, &value)).await
+    }
+
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.interact_with_connection(move |conn| get_setting(conn, &key)).await
+    }
+
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| remove_setting(conn, &key)).await
+    }
+
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
+        self.interact_with_connection(move |conn| list_setting_keys(conn)).await
+    }
+
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.interact_with_connection(SqliteStore::get_unspent_input_note_nullifiers)
             .await
@@ -367,7 +385,7 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_asset(conn, &merkle_store, account_id, faucet_id_prefix)

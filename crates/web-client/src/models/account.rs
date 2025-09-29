@@ -1,5 +1,5 @@
+use miden_client::account::{Account as NativeAccount, AccountType as NativeAccountType};
 use miden_client::utils::get_public_keys_from_account;
-use miden_objects::account::{Account as NativeAccount, AccountType as NativeAccountType};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

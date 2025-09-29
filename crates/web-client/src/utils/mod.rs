@@ -1,5 +1,5 @@
+use miden_client::SliceReader;
 use miden_client::utils::{Deserializable, Serializable};
-use miden_objects::utils::SliceReader;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

@@ -1,14 +1,9 @@
 use alloc::string::ToString;
 
-use miden_lib::transaction::TransactionKernel;
-use miden_lib::utils::ScriptBuilder as NativeScriptBuilder;
-use miden_objects::assembly::diagnostics::Report;
-use miden_objects::assembly::{
-    Assembler,
-    Library as NativeLibrary,
-    LibraryPath,
-    Module,
-    ModuleKind,
+use miden_client::{
+    ScriptBuilder as NativeScriptBuilder,
+    assembly::{Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind, Report},
+    transaction::TransactionKernel,
 };
 use wasm_bindgen::prelude::*;
 
