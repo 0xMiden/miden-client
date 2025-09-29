@@ -1,4 +1,4 @@
-use miden_objects::account::AccountStorage as NativeAccountStorage;
+use miden_client::account::AccountStorage as NativeAccountStorage;
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;

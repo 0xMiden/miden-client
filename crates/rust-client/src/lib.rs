@@ -125,6 +125,7 @@ pub mod account;
 pub mod keystore;
 pub mod note;
 pub mod rpc;
+pub mod settings;
 pub mod store;
 pub mod sync;
 pub mod transaction;
@@ -179,7 +180,7 @@ pub mod asset {
 /// network.
 pub mod auth {
     pub use miden_lib::AuthScheme;
-    pub use miden_lib::account::auth::NoAuth;
+    pub use miden_lib::account::auth::{AuthRpoFalcon512, NoAuth};
     pub use miden_objects::account::AuthSecretKey;
     pub use miden_tx::auth::signatures::get_falcon_signature;
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
@@ -195,7 +196,7 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey, Signature};
     }
 
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
@@ -218,8 +219,29 @@ pub mod crypto {
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
-pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
+/// Provides types for working with addresses within the Miden network.
+pub mod address {
+    pub use miden_objects::address::{AccountIdAddress, Address, AddressInterface, NetworkId};
+}
+
+/// Provides types for working with the virtual machine within the Miden network.
+pub mod vm {
+    pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+}
+
+pub use errors::*;
+use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
+pub use miden_objects::{
+    EMPTY_WORD,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+    ONE,
+    PrettyPrint,
+    StarkField,
+    Word,
+    ZERO,
+};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
@@ -237,10 +259,8 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::ScriptBuilder;
-use miden_objects::assembly::DefaultSourceManager;
-use miden_objects::assembly::debuginfo::SourceManagerSync;
-use miden_objects::block::BlockNumber;
+pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
+pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
