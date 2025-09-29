@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### addedFungibleAssets()
 
 > **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]

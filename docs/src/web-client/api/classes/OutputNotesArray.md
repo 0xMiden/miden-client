@@ -24,6 +24,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### append()
 
 > **append**(`output_note`): `void`

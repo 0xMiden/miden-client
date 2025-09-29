@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### compileNoteScript()
 
 > **compileNoteScript**(`note_script`): [`NoteScript`](NoteScript.md)
