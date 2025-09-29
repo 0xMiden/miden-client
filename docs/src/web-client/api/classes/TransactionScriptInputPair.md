@@ -28,16 +28,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### felts()
 
 > **felts**(): [`Felt`](Felt.md)[]

@@ -8,16 +8,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### computeRoot()
 
 > **computeRoot**(`index`, `node`): [`Word`](Word.md)

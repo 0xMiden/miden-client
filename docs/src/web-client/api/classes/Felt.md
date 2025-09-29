@@ -24,16 +24,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### asInt()
 
 > **asInt**(): `bigint`
