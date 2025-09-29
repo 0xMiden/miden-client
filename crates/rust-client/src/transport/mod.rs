@@ -30,14 +30,15 @@ impl<AUTH> Client<AUTH> {
         note: Note,
         _address: &Address,
     ) -> Result<(), ClientError> {
-        if let Some(api) = self.transport_api.as_mut() {
-            let header = *note.header();
-            let details = NoteDetails::from(note);
-            let details_bytes = details.to_bytes();
-            // e2ee impl hint:
-            // address.key().encrypt(details_bytes)
-            api.send_note(header, details_bytes).await?;
-        }
+        let api = self.get_transport_api()?;
+
+        let header = *note.header();
+        let details = NoteDetails::from(note);
+        let details_bytes = details.to_bytes();
+        // e2ee impl hint:
+        // address.key().encrypt(details_bytes)
+        api.send_note(header, details_bytes).await?;
+
         Ok(())
     }
 
@@ -45,16 +46,17 @@ impl<AUTH> Client<AUTH> {
     ///
     /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        if let Some(api) = self.transport_api.as_mut() {
-            // Unique tags
-            let note_tags = self.store.get_unique_note_tags().await?;
-            // Get global cursor
-            let cursor = self.store.get_transport_layer_cursor().await?;
+        let api = self.get_transport_api()?;
 
-            let update = TransportLayer::new(api.clone()).fetch_notes(cursor, note_tags).await?;
+        // Unique tags
+        let note_tags = self.store.get_unique_note_tags().await?;
+        // Get global cursor
+        let cursor = self.store.get_transport_layer_cursor().await?;
 
-            self.store.apply_transport_layer_update(update).await?;
-        }
+        let update = TransportLayer::new(api).fetch_notes(cursor, note_tags).await?;
+
+        self.store.apply_transport_layer_update(update).await?;
+
         Ok(())
     }
 
@@ -62,14 +64,22 @@ impl<AUTH> Client<AUTH> {
     ///
     /// All notes stored in the transport layer will be fetched.
     pub async fn fetch_all_private_notes<I>(&mut self) -> Result<(), ClientError> {
-        if let Some(api) = self.transport_api.as_mut() {
-            let note_tags = self.store.get_unique_note_tags().await?;
+        let api = self.get_transport_api()?;
 
-            let update = TransportLayer::new(api.clone()).fetch_notes(0, note_tags).await?;
+        let note_tags = self.store.get_unique_note_tags().await?;
 
-            self.store.apply_transport_layer_update(update).await?;
-        }
+        let update = TransportLayer::new(api.clone()).fetch_notes(0, note_tags).await?;
+
+        self.store.apply_transport_layer_update(update).await?;
+
         Ok(())
+    }
+
+    /// Returns the Transport layer client, if configured
+    pub(crate) fn get_transport_api(
+        &self,
+    ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
+        self.transport_api.clone().ok_or(NoteTransportError::Disabled)
     }
 }
 
