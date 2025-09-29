@@ -2,12 +2,11 @@
 
 When debugging WASM, it can be hard to trace the origin of an error since stack traces are not really useful.
 The typical situation is that you're running a frontend app from JS and get an unreadeable stacktrace.
-We can generate a debug build with symbols to help us trace these errors, this document is the setup for it.
-
+We can generate a debug build with symbols to help us trace these errors. This doc explains how to set it up.
 
 ## Requirements
-    - yarn
-    - rust
+    - `yarn`
+    - Compatible Rust version
     - Chrome browser
     - You will need to install this [extension](https://goo.gle/wasm-debugging-extension).
       Despite the name, it will also work with WASM-generated Rust Files
@@ -17,18 +16,17 @@ We can generate a debug build with symbols to help us trace these errors, this d
 1. cd into to the root of the web-client project, that is: `miden-client/crates/web-client`.
 2. build the dev profile with: 
    ```yarn build-dev```
-3. Once it finishes, the rust build log should print this:
+3. Once it finishes, the Rust build log should print this:
   ```
     Finished `dev` profile [optimized + debuginfo] target(s) in 38.33s
   ```
-  4. (Optional), to double check the debug symbols have been generated, you can install
-  the Web Assembly Binary Toolkit. A few sources are:
-  - [brew package manger](https://formulae.brew.sh/formula/wabt)
+  4. (Optional) To double-check that debug symbols were generated, install the WebAssembly Binary Toolkit (WABT). Sources:
+  - [brew package manager](https://formulae.brew.sh/formula/wabt)
   
   - [nix packages](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
  - [ubuntu](https://launchpad.net/ubuntu/+source/wabt)  (not tested)
  - [source](https://github.com/WebAssembly/wabt).
- The wabt package provides an `wasm-obj` binary, which you can use like so:
+ The WABT package provides an `wasm-obj` binary, which you can use like so:
  ```
  wasm-objdump --headers dist/workers/assets/miden_client_web.wasm
  ```
@@ -46,10 +44,10 @@ We can generate a debug build with symbols to help us trace these errors, this d
     
 ## Using the debug symbols
 
-Once you have both the debug wasm and the chrome extension, we need to link
+Once you have both the debug WASM and the Chrome extension, we need to link
 the dependency to the JS app we're debugging .
 
-1. Link the package, cd to: `miden-client/crates/web-client and run:
+1. Link the package, cd to: `miden-client/crates/web-client` and run:
 ```
 yarn link 
 ```
@@ -69,14 +67,14 @@ Also, you should seed friendlier stack-traces:
 
 ## Relevant changes
 
-This changes are already reflected in the codebase, but the settings to make the dev build have debug symbols are the following:
+These changes are already reflected in the codebase, but the settings to make the dev build have debug symbols are the following:
 
-1. The root Cargo.toml needs to optimize the dev profile for size, otherwise it wont compile:
+1. The root `Cargo.toml` needs to optimize the dev profile for size, otherwise it won't compile:
 ```
 [profile.dev]
 opt-level = "s"
 ```
-2. In the rollup.config.js the relevante options for the rust plugin are:
+2. In the `rollup.config.js` the relevant options for the Rust plugin are:
 ```
 {
    extraArgs: {
