@@ -52,7 +52,6 @@ rand         = { workspace = true }
 thiserror    = { workspace = true }
 tonic        = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
 tonic-health = { version = "0.13" }
-tower        = { features = ["timeout"], version = "0.5" }
 tracing      = { workspace = true }
 uuid         = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
 

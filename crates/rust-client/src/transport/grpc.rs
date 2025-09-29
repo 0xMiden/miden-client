@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -23,13 +23,12 @@ use tonic_health::pb::health_client::HealthClient;
 use {
     std::time::Duration,
     tonic::transport::{Channel, ClientTlsConfig},
-    tower::timeout::Timeout,
 };
 
 use super::{NoteInfo, NoteStream, NoteTransportError};
 
 #[cfg(not(target_arch = "wasm32"))]
-type Service = Timeout<Channel>;
+type Service = Channel;
 #[cfg(target_arch = "wasm32")]
 type Service = tonic_web_wasm_client::Client;
 
@@ -42,18 +41,18 @@ pub struct CanonicalNoteTransportClient {
 impl CanonicalNoteTransportClient {
     /// gRPC client constructor
     pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, NoteTransportError> {
+        let endpoint = tonic::transport::Endpoint::try_from(endpoint)
+            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
+            .timeout(Duration::from_millis(timeout_ms));
         let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = Channel::from_shared(endpoint.to_string())
-            .map_err(|e| NoteTransportError::Connection(format!("Failed to create channel: {e}")))?
+        let channel = endpoint
             .tls_config(tls)
-            .map_err(|e| NoteTransportError::Connection(format!("Failed to setup TLS: {e}")))?
+            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
             .connect()
             .await
-            .map_err(|e| NoteTransportError::Connection(format!("Failed to connect: {e}")))?;
-        let timeout = Duration::from_millis(timeout_ms);
-        let timeout_channel = Timeout::new(channel, timeout);
-        let health_client = HealthClient::new(timeout_channel.clone());
-        let client = MidenPrivateTransportClient::new(timeout_channel);
+            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
+        let health_client = HealthClient::new(channel.clone());
+        let client = MidenPrivateTransportClient::new(channel);
 
         Ok(Self {
             client: RwLock::new(client),

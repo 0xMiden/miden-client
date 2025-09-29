@@ -2179,7 +2179,6 @@ dependencies = [
  "tonic-build",
  "tonic-health",
  "tonic-web-wasm-client",
- "tower",
  "tracing",
  "uuid",
  "web-sys",
