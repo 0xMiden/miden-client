@@ -1,10 +1,15 @@
 use alloc::string::ToString;
 
-use miden_client::{
-    ScriptBuilder as NativeScriptBuilder,
-    assembly::{Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind, Report},
-    transaction::TransactionKernel,
+use miden_client::ScriptBuilder as NativeScriptBuilder;
+use miden_client::assembly::{
+    Assembler,
+    Library as NativeLibrary,
+    LibraryPath,
+    Module,
+    ModuleKind,
+    Report,
 };
+use miden_client::transaction::TransactionKernel;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
