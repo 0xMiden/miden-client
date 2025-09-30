@@ -12,8 +12,8 @@
 
 > **new ScriptBuilder**(`mode`): `ScriptBuilder`
 
-Instance a `ScriptBuilder`. Will use debug mode (or not), depending
-on the mode passed when initially instanced.
+Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when initially instanced.
+[Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
 
 #### Parameters
 
@@ -30,6 +30,11 @@ on the mode passed when initially instanced.
 ### buildLibrary()
 
 > **buildLibrary**(`library_path`, `source_code`): [`Library`](Library.md)
+
+Given a Library Path, and a source code, turn it into a Library.
+E.g. A path library can be 'miden::my_contract'. When turned into a library,
+this can be used from another script with an import statement, following the
+previous example: `use.miden::my_contract'.
 
 #### Parameters
 
@@ -51,6 +56,9 @@ on the mode passed when initially instanced.
 
 > **compileNoteScript**(`program`): [`NoteScript`](NoteScript.md)
 
+Given a Note Script's source code, compiles it with the available
+modules under this builder. Returns the compiled script.
+
 #### Parameters
 
 ##### program
@@ -66,6 +74,9 @@ on the mode passed when initially instanced.
 ### compileTxScript()
 
 > **compileTxScript**(`tx_script`): [`TransactionScript`](TransactionScript.md)
+
+Given a Transaction Script's source code, compiles it with the available
+modules under this builder. Returns the compiled script.
 
 #### Parameters
 
@@ -93,6 +104,13 @@ on the mode passed when initially instanced.
 
 > **linkDynamicLibrary**(`library`): `void`
 
+This is useful to dynamically link the [`Library`] of a foreign account
+that is invoked using foreign procedure invocation (FPI). Its code is available
+on-chain and so it does not have to be copied into the script code.
+
+For all other use cases not involving FPI, link the library statically.
+Receives as argument the library to be linked.
+
 #### Parameters
 
 ##### library
@@ -108,6 +126,9 @@ on the mode passed when initially instanced.
 ### linkModule()
 
 > **linkModule**(`module_path`, `module_code`): `void`
+
+Given a module_path (something like 'my_lib::module') and source code, this will
+statically link it for use with scripts to be built with this builder.
 
 #### Parameters
 
@@ -128,6 +149,13 @@ on the mode passed when initially instanced.
 ### linkStaticLibrary()
 
 > **linkStaticLibrary**(`library`): `void`
+
+Statically links the given library.
+
+Static linking means the library code is copied into the script code.
+Use this for most libraries that are not available on-chain.
+
+Receives as argument the library to link.
 
 #### Parameters
 

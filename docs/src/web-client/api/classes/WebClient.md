@@ -96,6 +96,16 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### createScriptBuilder()
+
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+
+#### Returns
+
+[`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
 ### exportAccountFile()
 
 > **exportAccountFile**(`account_id`): `Promise`\<`any`\>
