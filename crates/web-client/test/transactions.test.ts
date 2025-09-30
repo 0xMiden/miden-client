@@ -257,7 +257,7 @@ test.describe("compile_tx_script tests", () => {
     const script = "fakeScript";
 
     await expect(compileTxScript(page, script)).rejects.toThrow(
-      /failed to compile transaction script:/
+      /failed to compile note script:/
     );
   });
 });
