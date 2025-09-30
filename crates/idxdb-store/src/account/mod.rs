@@ -23,7 +23,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
-use crate::account::models::AccountIdAddressIdxdbObject;
+use crate::account::models::AddressIdxdbObject;
 use crate::account::utils::{insert_account_address, parse_account_address_idxdb_object};
 
 mod js_bindings;
@@ -159,12 +159,12 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to fetch account addresses: {js_error:?}",))
         })?;
 
-        let account_addresses_idxdb: Vec<AccountIdAddressIdxdbObject> = from_value(js_value)
+        let account_addresses_idxdb: Vec<AddressIdxdbObject> = from_value(js_value)
             .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
 
         account_addresses_idxdb
             .into_iter()
-            .map(|obj| parse_account_address_idxdb_object(obj).map(|(addr, _)| addr))
+            .map(|obj| parse_account_address_idxdb_object(&obj).map(|(addr, _)| addr))
             .collect::<Result<Vec<Address>, StoreError>>()
     }
 

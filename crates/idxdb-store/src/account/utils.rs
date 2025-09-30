@@ -6,7 +6,6 @@ use miden_client::account::{
     AccountCode,
     AccountHeader,
     AccountId,
-    AccountIdAddress,
     AccountStorage,
     Address,
     StorageSlot,
@@ -29,7 +28,7 @@ use super::js_bindings::{
     idxdb_upsert_vault_assets,
 };
 use crate::account::js_bindings::idxdb_insert_account_address;
-use crate::account::models::{AccountIdAddressIdxdbObject, AccountRecordIdxdbObject};
+use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
 
 pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -100,13 +99,7 @@ pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
 
 pub async fn insert_account_address(account: &Account, address: Address) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
-    let serialized_address = match address {
-        Address::AccountId(addr) => {
-            let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = addr.into();
-            serialized.to_vec()
-        },
-        _ => vec![], // Should never get here
-    };
+    let serialized_address = address.to_bytes();
     let promise = idxdb_insert_account_address(account_id_str, serialized_address);
     JsFuture::from(promise).await?;
 
@@ -144,19 +137,13 @@ pub fn parse_account_record_idxdb_object(
 }
 
 pub fn parse_account_address_idxdb_object(
-    account_address_idxdb: AccountIdAddressIdxdbObject,
+    account_address_idxdb: &AddressIdxdbObject,
 ) -> Result<(Address, AccountId), StoreError> {
     let native_account_id: AccountId = AccountId::from_hex(&account_address_idxdb.id)?;
 
-    let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = account_address_idxdb
-        .address
-        .try_into()
-        .map_err(|_| StoreError::ParsingError("invalid address length".to_string()))?;
-    let native_address =
-        Address::AccountId(AccountIdAddress::try_from(address).map_err(|err| {
-            StoreError::ParsingError(format!("failed to parse address from bytes: {err}"))
-        })?);
-    Ok((native_address, native_account_id))
+    let address = Address::read_from_bytes(&account_address_idxdb.address)?;
+
+    Ok((address, native_account_id))
 }
 
 pub async fn update_account(new_account_state: &Account) -> Result<(), JsValue> {

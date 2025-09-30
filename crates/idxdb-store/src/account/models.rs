@@ -52,7 +52,7 @@ pub struct AccountRecordIdxdbObject {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountIdAddressIdxdbObject {
+pub struct AddressIdxdbObject {
     pub address: Vec<u8>,
     pub id: String,
 }

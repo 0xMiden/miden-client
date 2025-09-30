@@ -12,7 +12,6 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
-    AccountIdAddress,
     AccountIdPrefix,
     AccountStorage,
     Address,
@@ -814,14 +813,7 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<(), StoreError> {
         const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
-        let serialized_address = match address {
-            Address::AccountId(addr) => {
-                let serialized: [u8; AccountIdAddress::SERIALIZED_SIZE] = (*addr).into();
-                serialized.to_vec()
-            },
-            _ => vec![], // Should never get here
-        };
-
+        let serialized_address = address.to_bytes();
         tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
             .into_store_error()?;
 
@@ -1033,14 +1025,14 @@ fn query_account_addresses(
     conn.prepare(&query)
         .into_store_error()?
         .query_map([], |row| {
-            let address: [u8; AccountIdAddress::SERIALIZED_SIZE] = row.get(0)?;
+            let address: Vec<u8> = row.get(0)?;
             Ok(address)
         })
         .into_store_error()?
         .map(|result| {
             let serialized_address = result.into_store_error()?;
-            let address = AccountIdAddress::try_from(serialized_address)?;
-            Ok(Address::AccountId(address))
+            let address = Address::read_from_bytes(&serialized_address)?;
+            Ok(address)
         })
         .collect::<Result<Vec<Address>, StoreError>>()
 }

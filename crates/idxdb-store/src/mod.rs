@@ -258,7 +258,7 @@ impl Store for WebStore {
     async fn get_addresses_by_account_id(
         &self,
         account_id: AccountId,
-    ) -> Result<Vec<AccountIdAddress>, StoreError> {
+    ) -> Result<Vec<Address>, StoreError> {
         self.get_addresses_by_account_id(account_id).await
     }
 
