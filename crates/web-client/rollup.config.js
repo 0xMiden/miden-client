@@ -17,7 +17,7 @@ const baseCargoArgs = [
   "--features",
   "testing",
   "--config",
-  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296", "-Z", "unstable-options", "-C", "panic=immediate-abort"]`,
+  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296", "-C", "panic=abort"]`,
   "--no-default-features",
 ];
 
