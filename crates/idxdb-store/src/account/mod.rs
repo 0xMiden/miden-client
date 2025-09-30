@@ -20,9 +20,8 @@ use miden_client::{Felt, Word};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::promise::{await_js, await_js_value};
-
 use super::WebStore;
+use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
 pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
@@ -64,7 +63,8 @@ use utils::{
 impl WebStore {
     pub(super) async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
         let promise = idxdb_get_account_ids();
-        let account_ids_as_strings: Vec<String> = await_js(promise, "failed to fetch account ids").await?;
+        let account_ids_as_strings: Vec<String> =
+            await_js(promise, "failed to fetch account ids").await?;
 
         let native_account_ids: Vec<AccountId> = account_ids_as_strings
             .into_iter()
@@ -78,7 +78,8 @@ impl WebStore {
         &self,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
         let promise = idxdb_get_account_headers();
-        let account_headers_idxdb: Vec<AccountRecordIdxdbObject> = await_js(promise, "failed to fetch account headers").await?;
+        let account_headers_idxdb: Vec<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account headers").await?;
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
             .into_iter()
             .map(parse_account_record_idxdb_object)
@@ -93,7 +94,8 @@ impl WebStore {
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         let account_id_str = account_id.to_string();
         let promise = idxdb_get_account_header(account_id_str);
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> = await_js(promise, "failed to fetch account header").await?;
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header").await?;
 
         match account_header_idxdb {
             None => Ok(None),
@@ -113,7 +115,8 @@ impl WebStore {
         let account_commitment_str = account_commitment.to_string();
 
         let promise = idxdb_get_account_header_by_commitment(account_commitment_str);
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> = await_js(promise, "failed to fetch account header by commitment").await?;
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header by commitment").await?;
 
         let account_header: Result<Option<AccountHeader>, StoreError> = account_header_idxdb
             .map_or(Ok(None), |account_record| {
@@ -155,7 +158,8 @@ impl WebStore {
         let root_serialized = root.to_string();
 
         let promise = idxdb_get_account_code(root_serialized);
-        let account_code_idxdb: AccountCodeIdxdbObject = await_js(promise, "failed to fetch account code").await?;
+        let account_code_idxdb: AccountCodeIdxdbObject =
+            await_js(promise, "failed to fetch account code").await?;
 
         let code =
             AccountCode::from_bytes(&account_code_idxdb.code).map_err(StoreError::AccountError)?;
@@ -167,13 +171,14 @@ impl WebStore {
         let commitment_serialized = commitment.to_string();
 
         let promise = idxdb_get_account_storage(commitment_serialized);
-        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> = await_js(promise, "failed to fetch account storage").await?;
+        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
 
         let promise = idxdb_get_account_storage_maps(
             account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
         );
-        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> = await_js(promise, "failed to fetch account storage maps").await?;
-
+        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
+            await_js(promise, "failed to fetch account storage maps").await?;
 
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {

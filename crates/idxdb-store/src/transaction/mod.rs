@@ -13,11 +13,10 @@ use miden_client::transaction::{
 };
 use miden_client::utils::Deserializable;
 
-use crate::promise::await_js;
-
 use super::WebStore;
 use super::account::utils::update_account;
 use super::note::utils::apply_note_updates_tx;
+use crate::promise::await_js;
 
 mod js_bindings;
 use js_bindings::idxdb_get_transactions;
@@ -47,7 +46,8 @@ impl WebStore {
         };
 
         let promise = idxdb_get_transactions(filter_as_str.to_string());
-        let transactions_idxdb: Vec<TransactionIdxdbObject> = await_js(promise, "failed to get transactions").await?;
+        let transactions_idxdb: Vec<TransactionIdxdbObject> =
+            await_js(promise, "failed to get transactions").await?;
 
         let transaction_records: Result<Vec<TransactionRecord>, StoreError> = transactions_idxdb
             .into_iter()

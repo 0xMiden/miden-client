@@ -9,8 +9,6 @@ use miden_client::utils::{Deserializable, Serializable};
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::promise::{await_js, await_js_value};
-
 use super::WebStore;
 use super::chain_data::utils::{
     SerializedPartialBlockchainNodeData,
@@ -18,6 +16,7 @@ use super::chain_data::utils::{
 };
 use super::note::utils::{serialize_input_note, serialize_output_note};
 use super::transaction::utils::serialize_transaction_record;
+use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
 use js_bindings::{
@@ -39,7 +38,8 @@ use flattened_vec::flatten_nested_u8_vec;
 impl WebStore {
     pub(crate) async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
         let promise = idxdb_get_note_tags();
-        let tags_idxdb: Vec<NoteTagIdxdbObject> = await_js(promise, "failed to get note tags").await?;
+        let tags_idxdb: Vec<NoteTagIdxdbObject> =
+            await_js(promise, "failed to get note tags").await?;
 
         let tags = tags_idxdb
             .into_iter()
@@ -67,7 +67,8 @@ impl WebStore {
 
     pub(super) async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
         let promise = idxdb_get_sync_height();
-        let block_num_idxdb: SyncHeightIdxdbObject = await_js(promise, "failed to get sync height").await?;
+        let block_num_idxdb: SyncHeightIdxdbObject =
+            await_js(promise, "failed to get sync height").await?;
 
         let block_num_as_u32: u32 = block_num_idxdb.block_num.parse::<u32>().unwrap();
         Ok(block_num_as_u32.into())
