@@ -20,7 +20,16 @@
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
-* [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274))
+* [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
+* Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
+
+## 0.11.8 (2025-09-29)
+
+* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+
+## 0.11.7 (2025-09-26)
+
+* Fixed an issue where `AccountId` was being left as null-pointer ([#1340](https://github.com/0xMiden/miden-client/pull/1340)).
 
 ## 0.11.6 (2025-09-18)
 

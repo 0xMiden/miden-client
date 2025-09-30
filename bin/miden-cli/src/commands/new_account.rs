@@ -6,19 +6,18 @@ use std::vec;
 
 use clap::{Parser, ValueEnum};
 use miden_client::Client;
-use miden_client::account::component::COMPONENT_TEMPLATE_EXTENSION;
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthSecretKey, TransactionAuthenticator};
-use miden_client::crypto::rpo_falcon512::SecretKey;
-use miden_client::transaction::TransactionRequestBuilder;
-use miden_client::utils::Deserializable;
-use miden_lib::account::auth::AuthRpoFalcon512;
-use miden_objects::account::{
+use miden_client::account::component::{
     AccountComponent,
     AccountComponentTemplate,
+    COMPONENT_TEMPLATE_EXTENSION,
     InitStorageData,
     StorageValueName,
 };
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::crypto::rpo_falcon512::SecretKey;
+use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::utils::Deserializable;
 use rand::RngCore;
 use tracing::debug;
 

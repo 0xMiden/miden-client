@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use miden_objects::assembly::{
+use miden_client::assembly::{
     Assembler as NativeAssembler,
     DefaultSourceManager,
     LibraryPath,
