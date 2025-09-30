@@ -1,4 +1,4 @@
-use miden_objects::assembly::Library as NativeLibrary;
+use miden_client::assembly::Library as NativeLibrary;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

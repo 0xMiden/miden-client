@@ -253,6 +253,25 @@ impl Store for WebStore {
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id).await
     }
+
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
+    async fn set_setting(&self, _key: String, _value: Vec<u8>) -> Result<(), StoreError> {
+        unimplemented!()
+    }
+
+    async fn get_setting(&self, _key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        unimplemented!()
+    }
+
+    async fn remove_setting(&self, _key: String) -> Result<(), StoreError> {
+        unimplemented!()
+    }
+
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
+        unimplemented!()
+    }
 }
 
 // UTILS

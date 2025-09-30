@@ -180,7 +180,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 std::thread::sleep(Duration::from_secs(1));
             },
             TransactionStatus::Discarded(cause) => {
-                anyhow::bail!("transaction was discarded with cause: {:?}", cause);
+                anyhow::bail!("transaction was discarded with cause: {cause:?}");
             },
         }
 
