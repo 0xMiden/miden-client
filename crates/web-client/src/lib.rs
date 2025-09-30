@@ -1,17 +1,14 @@
 extern crate alloc;
 use alloc::sync::Arc;
 use core::fmt::Write;
+use models::script_builder::ScriptBuilder;
 
 use idxdb_store::WebStore;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{
-    Client,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
+    Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
 };
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -138,6 +135,16 @@ impl WebClient {
         self.keystore = Some(keystore);
 
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "createScriptBuilder")]
+    pub fn create_script_builder(&self) -> Result<ScriptBuilder, JsValue> {
+        let Some(client) = &self.inner else {
+            return Err("client was not initialized before instancing ScriptBuilder".into());
+        };
+        Ok(ScriptBuilder::from_source_manager(
+            client.script_builder().source_manager().clone(),
+        ))
     }
 }
 

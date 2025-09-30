@@ -151,7 +151,7 @@ declare global {
     Word: typeof Word;
     Address: typeof Address;
     ScriptBuilder: typeof ScriptBuilder;
-    ScriptBuilderMode: typeof ScriptBuilder;
+    ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace
