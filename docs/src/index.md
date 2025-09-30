@@ -3,7 +3,7 @@ title: Client
 sidebar_position: 1
 ---
 
-# Miden-client
+# Miden client
 
 The Miden client currently has three main components:
 
