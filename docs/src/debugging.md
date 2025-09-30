@@ -1,4 +1,4 @@
-## Debugging guide and transaction lifecycle
+## Debugging guide and transaction lifecycle (CLI)
 
 This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden client.
 
