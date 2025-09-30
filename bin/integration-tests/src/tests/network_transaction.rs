@@ -211,11 +211,10 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     consume_pipeline.prove_transaction(client.prover()).await?;
 
     // Submit both transactions
-    bump_pipeline.submit_proven_transaction().await?;
-    consume_pipeline.submit_proven_transaction().await?;
+    let _ = bump_pipeline.submit_proven_transaction().await?;
+    let consume_update = consume_pipeline.submit_proven_transaction().await?;
 
-    let tx_update = consume_pipeline.get_transaction_update().unwrap();
-    client.apply_transaction(tx_update).await?;
+    client.apply_transaction(consume_update).await?;
 
     wait_for_blocks(&mut client, 2).await;
 

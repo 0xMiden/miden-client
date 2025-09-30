@@ -548,9 +548,7 @@ where
 
         transaction_pipeline.prove_transaction(self.prover()).await?;
 
-        transaction_pipeline.submit_proven_transaction().await?;
-
-        let transaction_update = transaction_pipeline.get_transaction_update()?;
+        let transaction_update = transaction_pipeline.submit_proven_transaction().await?;
 
         self.apply_transaction(transaction_update).await?;
 

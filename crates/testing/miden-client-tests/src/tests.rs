@@ -1753,8 +1753,7 @@ async fn input_note_checks() {
     }
 
     transaction_pipeline.prove_transaction(client.prover()).await.unwrap();
-    transaction_pipeline.submit_proven_transaction().await.unwrap();
-    let tx_update = transaction_pipeline.get_transaction_update().unwrap();
+    let tx_update = transaction_pipeline.submit_proven_transaction().await.unwrap();
     Box::pin(client.apply_transaction(tx_update)).await.unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();

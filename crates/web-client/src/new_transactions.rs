@@ -11,7 +11,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
 use crate::models::note_type::NoteType;
+use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
+use crate::models::transaction_id::TransactionId;
+use crate::models::transaction_pipeline::TransactionPipeline;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::{WebClient, js_error_with_context};
@@ -25,22 +28,24 @@ impl WebClient {
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionStoreUpdate, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let transaction_pipeline =
+            let native_pipeline =
                 Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()))
                     .await
                     .map_err(|err| {
-                        js_error_with_context(err, "failed to create new transaction")
+                        js_error_with_context(err, "failed to execute transaction pipeline")
                     })?;
+
             let current_height = client
                 .get_sync_height()
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to get sync height"))?;
+                .map_err(|err| js_error_with_context(err, "failed to get sync height"))?
+                .as_u32();
 
-            let transaction_update = transaction_pipeline
+            let pipeline = TransactionPipeline::new(native_pipeline, Some(client.prover()));
+
+            pipeline
                 .get_transaction_update_with_height(current_height)
-                .map_err(|err| js_error_with_context(err, "failed to build transaction update"))?;
-
-            Ok(transaction_update.into())
+                .map_err(|err| js_error_with_context(err, "failed to build transaction update"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
@@ -69,6 +74,80 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to apply transaction"))?;
 
             Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "submitNewTransaction")]
+    pub async fn submit_new_transaction(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+        prover: Option<TransactionProver>,
+    ) -> Result<TransactionId, JsValue> {
+        let mut pipeline =
+            self.execute_transaction_pipeline(account_id, transaction_request).await?;
+
+        let tx_id = pipeline.id()?;
+
+        pipeline.prove_transaction(prover).await?;
+
+        let transaction_update = pipeline.submit_proven_transaction().await?;
+
+        self.apply_transaction(transaction_update).await?;
+
+        Ok(tx_id)
+    }
+
+    #[wasm_bindgen(js_name = "executeTransactionPipeline")]
+    pub async fn execute_transaction_pipeline(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionPipeline, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let pipeline =
+                Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()))
+                    .await
+                    .map_err(|err| {
+                        js_error_with_context(err, "failed to execute transaction pipeline")
+                    })?;
+
+            let default_prover = client.prover();
+
+            Ok(TransactionPipeline::new(pipeline, Some(default_prover)))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "newTransactionPipeline")]
+    pub fn new_transaction_pipeline(
+        &mut self,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionPipeline, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let pipeline = client.new_transaction_pipeline(transaction_request.into());
+            let default_prover = client.prover();
+            Ok(TransactionPipeline::new(pipeline, Some(default_prover)))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "submitProvenTransaction")]
+    pub async fn submit_proven_transaction(
+        &mut self,
+        proven_transaction: &ProvenTransaction,
+    ) -> Result<u32, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let native_proven = proven_transaction.clone().into();
+            client
+                .submit_proven_transaction(native_proven)
+                .await
+                .map(|block_number| block_number.as_u32())
+                .map_err(|err| js_error_with_context(err, "failed to submit proven transaction"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

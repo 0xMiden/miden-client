@@ -120,9 +120,8 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let transaction_id_2 = transaction_pipeline_2.id().unwrap();
     transaction_pipeline_2.prove_transaction(client.prover()).await.unwrap();
 
-    transaction_pipeline_1.submit_proven_transaction().await.unwrap();
-    transaction_pipeline_2.submit_proven_transaction().await.unwrap();
-    let tx_update = transaction_pipeline_2.get_transaction_update().unwrap();
+    let _ = transaction_pipeline_1.submit_proven_transaction().await.unwrap();
+    let tx_update = transaction_pipeline_2.submit_proven_transaction().await.unwrap();
     client.apply_transaction(tx_update).await.unwrap();
 
     client.sync_state().await.unwrap();
@@ -519,8 +518,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             std::thread::sleep(Duration::from_secs(3));
         }
         transaction_pipeline.prove_transaction(client.prover()).await.unwrap();
-        transaction_pipeline.submit_proven_transaction().await.unwrap();
-        let tx_update = transaction_pipeline.get_transaction_update().unwrap();
+        let tx_update = transaction_pipeline.submit_proven_transaction().await.unwrap();
 
         client.apply_transaction(tx_update).await.unwrap();
 
@@ -558,8 +556,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             std::thread::sleep(Duration::from_secs(3));
         }
         transaction_pipeline.prove_transaction(client.prover()).await.unwrap();
-        transaction_pipeline.submit_proven_transaction().await.unwrap();
-        let tx_update = transaction_pipeline.get_transaction_update().unwrap();
+        let tx_update = transaction_pipeline.submit_proven_transaction().await.unwrap();
 
         client.apply_transaction(tx_update).await.unwrap();
 
