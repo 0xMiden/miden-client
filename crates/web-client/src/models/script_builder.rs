@@ -2,7 +2,13 @@ use alloc::sync::Arc;
 
 use miden_client::ScriptBuilder as NativeScriptBuilder;
 use miden_client::assembly::{
-    Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind, PrintDiagnostic, Report,
+    Assembler,
+    Library as NativeLibrary,
+    LibraryPath,
+    Module,
+    ModuleKind,
+    PrintDiagnostic,
+    Report,
     SourceManagerSync,
 };
 use miden_client::transaction::TransactionKernel;
@@ -33,8 +39,8 @@ pub enum ScriptBuilderMode {
 
 #[wasm_bindgen]
 impl ScriptBuilder {
-    /// Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when initially instanced.
-    /// [Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
+    /// Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when
+    /// initially instanced. [Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
     #[wasm_bindgen(constructor)]
     pub fn new(mode: ScriptBuilderMode) -> Self {
         let in_debug_mode = mode.into();
@@ -54,7 +60,7 @@ impl ScriptBuilder {
     }
 
     #[wasm_bindgen(js_name = "linkModule")]
-    /// Given a module_path (something like 'my_lib::module') and source code, this will
+    /// Given a module path (something like `my_lib::module`) and source code, this will
     /// statically link it for use with scripts to be built with this builder.
     pub fn link_module(&mut self, module_path: &str, module_code: &str) -> Result<(), JsValue> {
         self.builder.link_module(module_path, module_code).map_err(|e| {
@@ -144,7 +150,7 @@ impl ScriptBuilder {
 
     #[wasm_bindgen(js_name = "buildLibrary")]
     /// Given a Library Path, and a source code, turn it into a Library.
-    /// E.g. A path library can be 'miden::my_contract'. When turned into a library,
+    /// E.g. A path library can be `miden::my_contract`. When turned into a library,
     /// this can be used from another script with an import statement, following the
     /// previous example: `use.miden::my_contract'.
     pub fn build_library(&self, library_path: &str, source_code: &str) -> Result<Library, JsValue> {
