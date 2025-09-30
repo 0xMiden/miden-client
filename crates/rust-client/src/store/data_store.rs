@@ -120,11 +120,9 @@ impl DataStore for ClientDataStore {
             });
         }
 
-        AssetWitness::new(vault.asset_tree().open(&vault_key)).map_err(|err| {
-            DataStoreError::Other {
-                error_msg: "Failed to open vault asset tree".into(),
-                source: Some(Box::new(err)),
-            }
+        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
+            error_msg: "Failed to open vault asset tree".into(),
+            source: Some(Box::new(err)),
         })
     }
 

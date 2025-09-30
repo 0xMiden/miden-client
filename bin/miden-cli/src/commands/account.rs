@@ -258,10 +258,7 @@ async fn print_summary_table<AUTH>(
         Cell::new("Code Commitment"),
         Cell::new(account.code().commitment().to_string()),
     ]);
-    table.add_row(vec![
-        Cell::new("Vault Root"),
-        Cell::new(account.vault().asset_tree().root().to_string()),
-    ]);
+    table.add_row(vec![Cell::new("Vault Root"), Cell::new(account.vault().root().to_string())]);
     table.add_row(vec![
         Cell::new("Storage Root"),
         Cell::new(account.storage().commitment().to_string()),
