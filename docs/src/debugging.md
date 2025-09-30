@@ -1,6 +1,6 @@
-## Debugging guide and transaction lifecycle (CLI)
+## Debugging guide and transaction lifecycle (CLI client)
 
-This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden client.
+This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden CLI client.
 
 ### TL;DR checklist
 
