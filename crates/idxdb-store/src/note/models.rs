@@ -1,46 +1,33 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use base64::Engine as _;
-use base64::engine::general_purpose;
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InputNoteIdxdbObject {
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub assets: Vec<u8>,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub serial_number: Vec<u8>,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub inputs: Vec<u8>,
     pub created_at: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub serialized_note_script: Vec<u8>,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub state: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputNoteIdxdbObject {
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub assets: Vec<u8>,
     pub recipient_digest: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub metadata: Vec<u8>,
     pub expected_height: u32,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    #[serde(deserialize_with = "crate::base64_to_vec_u8_required", default)]
     pub state: Vec<u8>,
-}
-
-fn base64_to_vec_u8_required<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let base64_str: String = Deserialize::deserialize(deserializer)?;
-    general_purpose::STANDARD
-        .decode(&base64_str)
-        .map_err(|e| Error::custom(format!("Base64 decode error: {e}")))
 }

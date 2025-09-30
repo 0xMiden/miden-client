@@ -12,8 +12,8 @@ use miden_client::transaction::{
     TransactionStoreUpdate,
 };
 use miden_client::utils::Deserializable;
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
+
+use crate::promise::await_js;
 
 use super::WebStore;
 use super::account::utils::update_account;
@@ -47,11 +47,7 @@ impl WebStore {
         };
 
         let promise = idxdb_get_transactions(filter_as_str.to_string());
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get transactions: {js_error:?}"))
-        })?;
-        let transactions_idxdb: Vec<TransactionIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let transactions_idxdb: Vec<TransactionIdxdbObject> = await_js(promise, "failed to get transactions").await?;
 
         let transaction_records: Result<Vec<TransactionRecord>, StoreError> = transactions_idxdb
             .into_iter()
