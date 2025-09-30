@@ -252,6 +252,8 @@ pub trait Store: Send + Sync {
     -> Result<Option<AccountRecord>, StoreError>;
 
     /// Inserts an [`Account`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the account. This address
+    /// will be tracked for incoming notes and its derived note tag will be monitored.
     ///
     /// # Errors
     ///

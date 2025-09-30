@@ -18,7 +18,7 @@ pub struct AccountRecord {
     account: Account,
     /// Status of the tracked account.
     status: AccountStatus,
-    /// Addresses that the account can be referred as.
+    /// Addresses by which this account can be referenced.
     addresses: Vec<Address>,
 }
 

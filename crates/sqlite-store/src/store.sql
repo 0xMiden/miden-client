@@ -178,10 +178,10 @@ CREATE TABLE partial_blockchain_nodes (
 
 -- Create addresses table
 CREATE TABLE addresses (
-    address BLOB NOT NULL UNIQUE,   -- the address
+    address BLOB NOT NULL,          -- the address
     id UNSIGNED BIG INT NOT NULL,   -- associated Account ID.
 
     PRIMARY KEY (address)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX idx_addresses_id ON addresses(id);
