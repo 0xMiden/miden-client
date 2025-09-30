@@ -24,6 +24,14 @@
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
 
+## 0.11.8 (2025-09-29)
+
+* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
+
+## 0.11.7 (2025-09-26)
+
+* Fixed an issue where `AccountId` was being left as null-pointer ([#1340](https://github.com/0xMiden/miden-client/pull/1340)).
+
 ## 0.11.6 (2025-09-18)
 
 * Added a way to retrieve a secret key in the client given a pub key ([#1293](https://github.com/0xMiden/miden-client/pull/1293)).

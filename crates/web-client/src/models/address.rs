@@ -25,11 +25,20 @@ pub enum AddressInterface {
 #[wasm_bindgen]
 impl Address {
     #[wasm_bindgen(js_name = "fromAccountId")]
-    pub fn from_account_id(
-        account_id: AccountId,
-        interface: AddressInterface,
-    ) -> Result<Self, JsValue> {
-        let interface: NativeAddressInterface = interface.try_into()?;
+    // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
+    // trait for enum types. But we can still leave its definition since it gets exported as a
+    // constant for the JS SDK.
+    pub fn from_account_id(account_id: &AccountId, interface: &str) -> Result<Self, JsValue> {
+        let interface: NativeAddressInterface = match interface {
+            "Unspecified" => NativeAddressInterface::Unspecified,
+            "BasicWallet" => NativeAddressInterface::BasicWallet,
+            _else => {
+                return Err(JsValue::from_str(&format!(
+                    "failed to build address from account id, wrong interface value given: {interface}"
+                )));
+            },
+        };
+
         let address = NativeAccountIdAddress::new(account_id.into(), interface);
 
         Ok(Address(NativeAddress::AccountId(address)))
