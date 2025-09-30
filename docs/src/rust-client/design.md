@@ -11,9 +11,10 @@ The Miden client has the following architectural components:
 - [Keystore](#keystore)
 - [Note screener](#note-screener)
 
-> [!Tip]
-> - The RPC client and the store are Rust traits.
-> - This allow developers and users to easily customize their implementations.
+:::tip
+- The RPC client and the store are Rust traits.
+- This allow developers and users to easily customize their implementations.
+:::
 
 ## Store
 
