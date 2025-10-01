@@ -812,7 +812,7 @@ impl SqliteStore {
         address: &Address,
         account_id: AccountId,
     ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(addresses { address, id } | REPLACE);
+        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
         let serialized_address = address.to_bytes();
         tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
             .into_store_error()?;
@@ -1021,7 +1021,7 @@ fn query_account_addresses(
 ) -> Result<Vec<Address>, StoreError> {
     const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
 
-    let query = format!("{ADDRESS_QUERY} WHERE ID = '{}'", account_id.to_hex());
+    let query = format!("{ADDRESS_QUERY} WHERE ACCOUNT_ID = '{}'", account_id.to_hex());
     conn.prepare(&query)
         .into_store_error()?
         .query_map([], |row| {
