@@ -2,6 +2,7 @@ use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
 use miden_client::transaction::{
     PaymentNoteDescription,
+    ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
@@ -42,9 +43,7 @@ impl WebClient {
 
             let pipeline = TransactionPipeline::new(native_pipeline, Some(client.prover()));
 
-            pipeline
-                .get_transaction_update_with_height(current_height)
-                .map_err(|err| js_error_with_context(err, "failed to build transaction update"))
+            pipeline.get_transaction_update_with_height(current_height)
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
@@ -141,7 +140,7 @@ impl WebClient {
         proven_transaction: &ProvenTransaction,
     ) -> Result<u32, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let native_proven = proven_transaction.clone().into();
+            let native_proven: NativeProvenTransaction = proven_transaction.clone().into();
             client
                 .submit_proven_transaction(native_proven)
                 .await

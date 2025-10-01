@@ -144,6 +144,26 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### executeTransactionPipeline()
+
+> **executeTransactionPipeline**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
+
+***
+
 ### exportAccountFile()
 
 > **exportAccountFile**(`account_id`): `Promise`\<`any`\>
@@ -642,6 +662,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### newTransactionPipeline()
+
+> **newTransactionPipeline**(`transaction_request`): [`TransactionPipeline`](TransactionPipeline.md)
+
+#### Parameters
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+[`TransactionPipeline`](TransactionPipeline.md)
+
+***
+
 ### newWallet()
 
 > **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
@@ -701,6 +737,46 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### submitNewTransaction()
+
+> **submitNewTransaction**(`account_id`, `transaction_request`, `prover?`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+##### prover?
+
+[`TransactionProver`](TransactionProver.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitProvenTransaction()
+
+> **submitProvenTransaction**(`proven_transaction`): `Promise`\<`number`\>
+
+#### Parameters
+
+##### proven\_transaction
+
+[`ProvenTransaction`](ProvenTransaction.md)
+
+#### Returns
+
+`Promise`\<`number`\>
 
 ***
 
