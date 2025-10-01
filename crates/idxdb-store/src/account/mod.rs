@@ -17,8 +17,6 @@ use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use crate::promise::{await_js, await_js_value};
@@ -245,8 +243,10 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         let account_id_str = new_account_state.id().to_string();
         let promise = idxdb_get_account_header(account_id_str);
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header").await?;
 
-        if JsFuture::from(promise).await.is_err() {
+        if account_header_idxdb.is_none() {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
@@ -303,18 +303,10 @@ impl WebStore {
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         let account_ids = account_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_get_foreign_account_code(account_ids);
-        let js_value = await_js_value(promise, "failed to fetch foreign account code").await?;
-
-        if js_value.is_null() || js_value.is_undefined() {
-            return Ok(BTreeMap::new());
-        }
-
-        let foreign_account_code_idxdb: Vec<ForeignAccountCodeIdxdbObject> = from_value(js_value)
-            .map_err(|err| {
-            StoreError::DatabaseError(format!("failed to deserialize {err:?}"))
-        })?;
+        let foreign_account_code_idxdb: Option<Vec<ForeignAccountCodeIdxdbObject>> = await_js(promise, "failed to fetch foreign account code").await?;
 
         let foreign_account_code: BTreeMap<AccountId, AccountCode> = foreign_account_code_idxdb
+            .unwrap_or_default()
             .into_iter()
             .map(|idxdb_object| {
                 let account_id = AccountId::from_hex(&idxdb_object.account_id)

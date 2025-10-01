@@ -6,8 +6,6 @@ use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use super::chain_data::utils::{
@@ -99,11 +97,7 @@ impl WebStore {
         };
 
         let promise = idxdb_remove_note_tag(tag.tag.to_bytes(), source_note_id, source_account_id);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to remove note tag: {js_error:?}"))
-        })?;
-        let removed_tags: usize = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let removed_tags: usize = await_js(promise, "failed to remove note tag").await?;
 
         Ok(removed_tags)
     }
@@ -211,9 +205,7 @@ impl WebStore {
             transaction_updates,
         };
         let promise = idxdb_apply_state_sync(state_update);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
-        })?;
+        await_js_value(promise, "failed to apply state sync").await?;
 
         Ok(())
     }
