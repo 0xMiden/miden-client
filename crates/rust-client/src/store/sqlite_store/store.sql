@@ -72,6 +72,8 @@ CREATE TABLE accounts (
 );
 
 CREATE UNIQUE INDEX idx_account_commitment ON accounts(account_commitment);
+CREATE INDEX idx_accounts_id ON accounts(id);
+CREATE INDEX idx_accounts_id_nonce ON accounts(id, nonce DESC);
 
 -- Create transactions table
 CREATE TABLE transactions (
@@ -108,6 +110,8 @@ CREATE TABLE input_notes (
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
 );
 
+CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
+
 -- Create output notes table
 CREATE TABLE output_notes (
     note_id TEXT NOT NULL,                                  -- the note id
@@ -123,6 +127,8 @@ CREATE TABLE output_notes (
 
     PRIMARY KEY (note_id)
 );
+
+CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
 
 -- Create note's scripts table, used for both input and output notes
 CREATE TABLE notes_scripts (
