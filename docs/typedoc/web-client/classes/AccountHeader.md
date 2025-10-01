@@ -1,0 +1,77 @@
+[**@demox-labs/miden-sdk**](../README.md)
+
+***
+
+[@demox-labs/miden-sdk](../README.md) / AccountHeader
+
+# Class: AccountHeader
+
+## Methods
+
+### codeCommitment()
+
+> **codeCommitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### commitment()
+
+> **commitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### free()
+
+> **free**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### id()
+
+> **id**(): [`AccountId`](AccountId.md)
+
+#### Returns
+
+[`AccountId`](AccountId.md)
+
+***
+
+### nonce()
+
+> **nonce**(): [`Felt`](Felt.md)
+
+#### Returns
+
+[`Felt`](Felt.md)
+
+***
+
+### storageCommitment()
+
+> **storageCommitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### vaultCommitment()
+
+> **vaultCommitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
