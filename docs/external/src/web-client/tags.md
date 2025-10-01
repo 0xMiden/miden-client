@@ -120,8 +120,8 @@ try {
 
 For more detailed information about tag functionality, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for tag operations
-- [NoteTag](../api/classes/NoteTag) - Class for working with note tags
-- [AccountId](../api/classes/AccountId) - Class for working with account IDs
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for tag operations
+- [NoteTag](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteTag.md) - Class for working with note tags
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Class for working with account IDs
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 

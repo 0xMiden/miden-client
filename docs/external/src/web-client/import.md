@@ -104,7 +104,7 @@ The `forceImportStore` method is a destructive operation that will completely ov
 
 For more detailed information about the import functionality, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network
-- [Account](../api/classes/Account) - Account class returned by importPublicAccountFromSeed
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
+- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class returned by importPublicAccountFromSeed
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 

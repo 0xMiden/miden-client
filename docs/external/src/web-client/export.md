@@ -88,6 +88,6 @@ The store export contains all the data managed by the client, which can be usefu
 
 For more detailed information about the export functionality, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index).
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

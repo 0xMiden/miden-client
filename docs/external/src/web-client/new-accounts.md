@@ -80,11 +80,11 @@ try {
 
 For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network
-- [Account](../api/classes/Account) - Account class and its properties
-- [AccountStorageMode](../api/classes/AccountStorageMode) - Storage mode options and methods
-- [AccountId](../api/classes/AccountId) - Account identifier class and utilities
-- [AccountCode](../api/classes/AccountCode) - Account code management
-- [AccountStorage](../api/classes/AccountStorage) - Account storage operations
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
+- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class and its properties
+- [AccountStorageMode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountStorageMode.md) - Storage mode options and methods
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class and utilities
+- [AccountCode](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountCode.md) - Account code management
+- [AccountStorage](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountStorage.md) - Account storage operations
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index).
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

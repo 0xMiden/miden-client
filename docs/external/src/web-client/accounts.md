@@ -74,8 +74,8 @@ try {
 
 For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network
-- [Account](../api/classes/Account) - Account class and its properties
-- [AccountId](../api/classes/AccountId) - Account identifier class and utilities
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
+- [Account](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Account.md) - Account class and its properties
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class and utilities
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index).
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

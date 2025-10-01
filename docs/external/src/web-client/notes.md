@@ -119,15 +119,15 @@ try {
 
 For more detailed information about note functionality, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for note operations
-- [NoteFilter](../api/classes/NoteFilter) - Class for filtering notes
-- [NoteFilterTypes](../api/enumerations/NoteFilterTypes) - Enumeration for note filter types
-- [AccountId](../api/classes/AccountId) - Class for working with account IDs
-- [InputNoteRecord](../api/classes/InputNoteRecord) - Class representing input notes
-- [ConsumableNoteRecord](../api/classes/ConsumableNoteRecord) - Class representing consumable notes
-- [NoteScript](../api/classes/NoteScript) - Class for working with note scripts
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for note operations
+- [NoteFilter](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteFilter.md) - Class for filtering notes
+- [NoteFilterTypes](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/enumerations/NoteFilterTypes.md) - Enumeration for note filter types
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Class for working with account IDs
+- [InputNoteRecord](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/InputNoteRecord.md) - Class representing input notes
+- [ConsumableNoteRecord](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/ConsumableNoteRecord.md) - Class representing consumable notes
+- [NoteScript](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteScript.md) - Class for working with note scripts
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index).
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
 
 ### Available Note Filter Types
 

@@ -141,12 +141,12 @@ You can check the status of a transaction using the following methods:
 
 For more detailed information about the classes and methods used in these examples, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for interacting with the Miden network
-- [TransactionRecord](../api/classes/TransactionRecord) - Historical transaction records and their properties
-- [TransactionFilter](../api/classes/TransactionFilter) - Transaction filtering options
-- [TransactionId](../api/classes/TransactionId) - Transaction identifier class
-- [AccountId](../api/classes/AccountId) - Account identifier class
-- [OutputNotes](../api/classes/OutputNotes) - Output notes associated with transactions
-- [TransactionStatus](../api/classes/TransactionStatus) - Transaction status information and methods
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for interacting with the Miden network
+- [TransactionRecord](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionRecord.md) - Historical transaction records and their properties
+- [TransactionFilter](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionFilter.md) - Transaction filtering options
+- [TransactionId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionId.md) - Transaction identifier class
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Account identifier class
+- [OutputNotes](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/OutputNotes.md) - Output notes associated with transactions
+- [TransactionStatus](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionStatus.md) - Transaction status information and methods
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 

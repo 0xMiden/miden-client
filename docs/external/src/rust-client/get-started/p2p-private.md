@@ -7,7 +7,7 @@ In this section, we show you how to make private transactions and send funds to 
 
 :::info Important: Prerequisite steps
 
-- You should have already followed the [prerequisite steps](prerequisites) and [get started](create-account-use-faucet) documents.
+- You should have already followed the [prerequisite steps](index.md#prerequisites) and [create account](create-account-use-faucet) documents.
 - You should _not_ have reset the state of your local client.
   :::
 

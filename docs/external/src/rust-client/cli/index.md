@@ -62,7 +62,7 @@ miden-client init --network 18.203.155.106 --store-path db/store.sqlite3
 miden-client init --remote-prover-endpoint <PROVER_URL>
 ```
 
-More information on the configuration file can be found in the [configuration section](./cli-config).
+More information on the configuration file can be found in the [configuration section](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md).
 
 ### `account`
 
@@ -248,7 +248,7 @@ Usage: `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED 
 
 #### Tips
 
-For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](./cli-config). If you omit the flag but have no default account defined in the config, you'll get an error instead.
+For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
 
 For every command which needs an account ID (either wallet or faucet), you can also provide a partial ID instead of the full ID for each account. So instead of
 

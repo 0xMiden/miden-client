@@ -6,7 +6,7 @@ sidebar_position: 2
 In this section, we show you how to execute transactions and send funds to another account using the Miden client and [public notes](https://0xMiden.github.io/miden-docs/miden-base/architecture/notes.html#note-storage-mode).
 
 :::info Important: Prerequisite steps
-- You should have already followed the [prerequisite steps](prerequisites) and [get started](create-account-use-faucet) documents.
+- You should have already followed the [prerequisite steps](index.md#prerequisites) and [create account](create-account-use-faucet) documents.
 - You should have *not* reset the state of your local client.
 :::
 

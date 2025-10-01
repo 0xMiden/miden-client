@@ -23,7 +23,7 @@ The Miden client also includes a command-line interface (CLI) that serves as a w
 
 The CLI provides commands for interacting with the Miden rollup, such as submitting transactions, syncing with the network, and managing account data.
 
-More information about the CLI can be found in the [CLI section](./cli-reference).
+More information about the CLI can be found in the [CLI section](./cli).
 
 ### Miden web client
 

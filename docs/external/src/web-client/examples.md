@@ -32,7 +32,7 @@ The examples in this section showcase various capabilities of the Miden SDK, inc
   - Import and export notes
   - Working with consumable notes
 
-For installation instructions, prerequisites, and setup details, please refer to the [SDK README](../../index).
+For installation instructions, prerequisites, and setup details, please refer to the [SDK README](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
 
 Each example is self-contained and includes:
 

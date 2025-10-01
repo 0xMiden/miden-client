@@ -45,10 +45,10 @@ The `SyncSummary` object returned by `syncState()` contains the following inform
 
 For more detailed information about sync functionality, refer to the following API documentation:
 
-- [WebClient](../api/classes/WebClient) - Main client class for sync operations
-- [SyncSummary](../api/classes/SyncSummary) - Class representing sync state
-- [NoteId](../api/classes/NoteId) - Class for working with note IDs
-- [AccountId](../api/classes/AccountId) - Class for working with account IDs
-- [TransactionId](../api/classes/TransactionId) - Class for working with transaction IDs
+- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for sync operations
+- [SyncSummary](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/SyncSummary.md) - Class representing sync state
+- [NoteId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteId.md) - Class for working with note IDs
+- [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Class for working with account IDs
+- [TransactionId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionId.md) - Class for working with transaction IDs
 
-For a complete list of available classes and utilities, see the [SDK API Reference](../api/index). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 
