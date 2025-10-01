@@ -22,10 +22,9 @@ use miden_client::store::{
 use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::promise::await_js_value;
-
 use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::promise::await_js_value;
 
 // TYPES
 // ================================================================================================

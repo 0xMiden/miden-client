@@ -303,7 +303,8 @@ impl WebStore {
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         let account_ids = account_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_get_foreign_account_code(account_ids);
-        let foreign_account_code_idxdb: Option<Vec<ForeignAccountCodeIdxdbObject>> = await_js(promise, "failed to fetch foreign account code").await?;
+        let foreign_account_code_idxdb: Option<Vec<ForeignAccountCodeIdxdbObject>> =
+            await_js(promise, "failed to fetch foreign account code").await?;
 
         let foreign_account_code: BTreeMap<AccountId, AccountCode> = foreign_account_code_idxdb
             .unwrap_or_default()
