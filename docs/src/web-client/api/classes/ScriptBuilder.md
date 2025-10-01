@@ -12,8 +12,8 @@
 
 > **new ScriptBuilder**(`mode`): `ScriptBuilder`
 
-Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when initially instanced.
-[Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
+Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when
+initially instanced. [Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
 
 #### Parameters
 
@@ -32,7 +32,7 @@ Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode 
 > **buildLibrary**(`library_path`, `source_code`): [`Library`](Library.md)
 
 Given a Library Path, and a source code, turn it into a Library.
-E.g. A path library can be 'miden::my_contract'. When turned into a library,
+E.g. A path library can be `miden::my_contract`. When turned into a library,
 this can be used from another script with an import statement, following the
 previous example: `use.miden::my_contract'.
 
@@ -127,7 +127,7 @@ Receives as argument the library to be linked.
 
 > **linkModule**(`module_path`, `module_code`): `void`
 
-Given a module_path (something like 'my_lib::module') and source code, this will
+Given a module path (something like `my_lib::module`) and source code, this will
 statically link it for use with scripts to be built with this builder.
 
 #### Parameters
