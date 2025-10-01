@@ -1270,6 +1270,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     await client.addAccountSecretKeyToWebStore(secretKey);
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
+    await client.syncState();
 
     let initialMapValue = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
