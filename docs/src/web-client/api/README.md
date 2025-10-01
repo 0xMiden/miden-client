@@ -12,7 +12,6 @@
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
-- [ScriptBuilderMode](enumerations/ScriptBuilderMode.md)
 
 ## Classes
 

@@ -6,25 +6,6 @@
 
 # Class: ScriptBuilder
 
-## Constructors
-
-### Constructor
-
-> **new ScriptBuilder**(`mode`): `ScriptBuilder`
-
-Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when
-initially instanced. [Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
-
-#### Parameters
-
-##### mode
-
-[`ScriptBuilderMode`](../enumerations/ScriptBuilderMode.md)
-
-#### Returns
-
-`ScriptBuilder`
-
 ## Methods
 
 ### buildLibrary()
