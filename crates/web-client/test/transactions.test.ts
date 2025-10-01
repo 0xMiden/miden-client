@@ -224,7 +224,7 @@ export const compileTxScript = async (
       true
     );
 
-    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
+    let builder = client.createScriptBuilder();
     const compiledScript = builder.compileNoteScript(_script);
 
     return {

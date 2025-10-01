@@ -75,7 +75,6 @@ export const test = base.extend<{ forEachTest: void }>({
             Rpo256,
             SecretKey,
             ScriptBuilder,
-            ScriptBuilderMode,
             Endpoint,
             RpcClient,
             NoteId,
@@ -179,7 +178,6 @@ export const test = base.extend<{ forEachTest: void }>({
           window.Word = Word;
           window.MockWebClient = MockWebClient;
           window.ScriptBuilder = ScriptBuilder;
-          window.ScriptBuilderMode = ScriptBuilderMode;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};

@@ -30,27 +30,8 @@ pub struct ScriptBuilder {
     assembler: Assembler,
 }
 
-#[derive(Clone, Debug)]
-#[wasm_bindgen]
-pub enum ScriptBuilderMode {
-    Debug,
-    Normal,
-}
-
 #[wasm_bindgen]
 impl ScriptBuilder {
-    /// Instance a `ScriptBuilder`. Will use debug mode (or not), depending on the mode passed when
-    /// initially instanced. [Relevant Miden VM reference](https://0xmiden.github.io/miden-vm/user_docs/assembly/debugging.html?highlight=debug#debugging)
-    #[wasm_bindgen(constructor)]
-    pub fn new(mode: ScriptBuilderMode) -> Self {
-        let in_debug_mode = mode.into();
-        let builder = NativeScriptBuilder::new(in_debug_mode);
-        let assembler =
-            TransactionKernel::assembler_with_source_manager(builder.source_manager().clone())
-                .with_debug_mode(in_debug_mode);
-        Self { builder, assembler }
-    }
-
     pub(crate) fn from_source_manager(source_manager: Arc<dyn SourceManagerSync>) -> Self {
         let builder = NativeScriptBuilder::with_source_manager(source_manager);
         let assembler = TransactionKernel::assembler_with_source_manager(builder.source_manager().clone())
@@ -192,15 +173,4 @@ fn format_assembler_error(err_report: &Report, extra_context: &str) -> String {
     let error = PrintDiagnostic::new(&err_report);
 
     format!("script builder error {extra_context}: {error} ")
-}
-
-// CONVERSIONS
-// ================================================================================================
-impl From<ScriptBuilderMode> for bool {
-    fn from(value: ScriptBuilderMode) -> Self {
-        match value {
-            ScriptBuilderMode::Debug => true,
-            ScriptBuilderMode::Normal => false,
-        }
-    }
 }

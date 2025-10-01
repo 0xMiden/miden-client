@@ -31,7 +31,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 swapw dropw
             end
         `;
-    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
+    let builder = client.createScriptBuilder();
     let getItemComponent = window.AccountComponent.compile(code, builder, [
       window.StorageSlot.map(storageMap),
     ]).withSupportsAllTypes();

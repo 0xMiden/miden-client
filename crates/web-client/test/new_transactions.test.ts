@@ -471,7 +471,7 @@ export const customTransaction = async (
             end
         `;
 
-      let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
+      let builder = client.createScriptBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.FeltArray([
@@ -787,7 +787,7 @@ export const customAccountComponent = async (
         end
       `;
     const client = window.client;
-    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
+    let builder = client.createScriptBuilder();
     let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
@@ -1092,7 +1092,7 @@ export const counterAccountComponent = async (
     // Create counter account
     let emptyStorageSlot = window.StorageSlot.emptyValue();
 
-    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Normal);
+    let builder = client.createScriptBuilder();
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,
@@ -1240,7 +1240,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                 end
         `;
 
-    let builder = new window.ScriptBuilder(window.ScriptBuilderMode.Debug);
+    let builder = client.createScriptBuilder();
     let bumpItemComponent = window.AccountComponent.compile(
       accountCode,
       builder,
