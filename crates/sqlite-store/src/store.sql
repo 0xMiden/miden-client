@@ -184,4 +184,4 @@ CREATE TABLE addresses (
     PRIMARY KEY (address)
 ) WITHOUT ROWID;
 
-CREATE INDEX idx_addresses_id ON addresses(id);
+CREATE INDEX idx_addresses_account_id ON addresses(account_id);
