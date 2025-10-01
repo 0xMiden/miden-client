@@ -24,8 +24,9 @@ impl AccountStorage {
         self.0.get_map_item(index, key.into()).ok().map(Into::into)
     }
 
-    /// Returns all entries from the storage map at the given index.
-    /// Returns None if the slot is not a map or if the index is out of bounds.
+    /// Get all key-value pairs from the map slot at `index`.
+    /// Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+    /// Returns `[]` if the map exists but is empty.
     #[wasm_bindgen(js_name = "getMapEntries")]
     pub fn get_map_entries(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
         let slots = self.0.slots();

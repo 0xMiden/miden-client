@@ -1275,7 +1275,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(0, MAP_KEY)
       ?.toHex();
 
     // Deploy counter account
@@ -1313,14 +1313,38 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(1, MAP_KEY)
+      .getMapItem(0, MAP_KEY)
       ?.toHex();
+
+    // Test getMapEntries() functionality
+    let accountStorage = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )?.storage();
+    let mapEntries = accountStorage?.getMapEntries(0);
+
+    // Verify we get the expected entries
+    let expectedKey = MAP_KEY.toHex();
+    let expectedValue = finalMapValue?.replace(/^0x/, "");
+
+    let mapEntriesData = {
+      entriesCount: mapEntries?.length || 0,
+      hasExpectedEntry: false,
+      expectedKey: expectedKey,
+      expectedValue: expectedValue,
+    };
+
+    if (mapEntries && mapEntries.length > 0) {
+      mapEntriesData.hasExpectedEntry = mapEntries.some(
+        (entry) => entry.key === expectedKey && entry.value === expectedValue
+      );
+    }
 
     return {
       initialMapValue: initialMapValue
         ?.replace(/^0x/, "")
         .replace(/^0+|0+$/g, ""),
       finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+      mapEntries: mapEntriesData,
     };
   });
 };
@@ -1328,8 +1352,15 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 test.describe("storage map test", () => {
   test.setTimeout(50000);
   test("storage map is updated correctly in transaction", async ({ page }) => {
-    let { initialMapValue, finalMapValue } = await testStorageMap(page);
+    let { initialMapValue, finalMapValue, mapEntries } =
+      await testStorageMap(page);
     expect(initialMapValue).toBe("1");
     expect(finalMapValue).toBe("2");
+
+    // Test getMapEntries() functionality
+    expect(mapEntries.entriesCount).toBeGreaterThan(0);
+    expect(mapEntries.hasExpectedEntry).toBe(true);
+    expect(mapEntries.expectedKey).toBeDefined();
+    expect(mapEntries.expectedValue).toBe("2");
   });
 });
