@@ -28,6 +28,8 @@ use super::{
     RpcError,
     StateSyncInfo,
 };
+use crate::rpc::domain::account_vault::AccountVaultInfo;
+use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
@@ -514,6 +516,65 @@ impl NodeRpcClient for TonicRpcClient {
         )?;
 
         Ok(note_script)
+    }
+
+    async fn sync_storage_maps(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError> {
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
+
+        let request = proto::rpc_store::SyncStorageMapsRequest {
+            block_range,
+            account_id: Some(account_id.into()),
+        };
+
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.sync_storage_maps(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncStorageMaps, status)
+        })?;
+
+        response.into_inner().try_into()
+    }
+
+    async fn sync_account_vault(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError> {
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
+
+        let request = proto::rpc_store::SyncAccountVaultRequest {
+            block_range,
+            account_id: Some(account_id.into()),
+        };
+
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.sync_account_vault(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncAccountVault, status)
+        })?;
+
+        response.into_inner().try_into()
+    }
+
+    async fn sync_transactions(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<(), RpcError> {
+        todo!()
     }
 }
 
