@@ -1,10 +1,5 @@
-use alloc::sync::Arc;
-
 use miden_client::BlockNumber;
-use miden_client::transaction::{
-    TransactionPipeline as NativeTransactionPipeline,
-    TransactionProver as NativeTransactionProver,
-};
+use miden_client::transaction::TransactionPipeline as NativeTransactionPipeline;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -21,7 +16,6 @@ use crate::models::transaction_store_update::TransactionStoreUpdate;
 #[wasm_bindgen]
 pub struct TransactionPipeline {
     pipeline: NativeTransactionPipeline,
-    default_prover: Option<Arc<dyn NativeTransactionProver + Send + Sync>>,
 }
 
 #[wasm_bindgen]
@@ -93,14 +87,10 @@ impl TransactionPipeline {
         &mut self,
         prover: Option<TransactionProver>,
     ) -> Result<ProvenTransaction, JsValue> {
-        let prover_arc = match prover {
-            Some(custom_prover) => custom_prover.get_prover(),
-            None => self.default_prover.clone().ok_or_else(|| {
-                JsValue::from_str(
-                    "No prover available: provide one or start the pipeline via WebClient",
-                )
-            })?,
-        };
+        let prover_arc =
+            prover.map(|custom_prover| custom_prover.get_prover()).ok_or_else(|| {
+                JsValue::from_str("Prover must be provided when proving a transaction")
+            })?;
 
         self.pipeline
             .prove_transaction(prover_arc)
@@ -121,10 +111,7 @@ impl TransactionPipeline {
 }
 
 impl TransactionPipeline {
-    pub(crate) fn new(
-        pipeline: NativeTransactionPipeline,
-        default_prover: Option<Arc<dyn NativeTransactionProver + Send + Sync>>,
-    ) -> Self {
-        Self { pipeline, default_prover }
+    pub(crate) fn new(pipeline: NativeTransactionPipeline) -> Self {
+        Self { pipeline }
     }
 }

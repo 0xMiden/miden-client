@@ -68,3 +68,9 @@ impl TransactionProver {
         self.prover.clone()
     }
 }
+
+impl From<Arc<dyn TransactionProverTrait + Send + Sync>> for TransactionProver {
+    fn from(prover: Arc<dyn TransactionProverTrait + Send + Sync>) -> Self {
+        TransactionProver { prover, endpoint: None }
+    }
+}

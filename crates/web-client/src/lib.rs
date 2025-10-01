@@ -16,6 +16,7 @@ use miden_client::{
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
+
 pub mod account;
 pub mod export;
 pub mod helpers;
@@ -150,7 +151,7 @@ where
     let mut error_string = context.to_string();
     let mut source = Some(&err as &dyn core::error::Error);
     while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeeds");
+        write!(error_string, ": {err}").expect("writing to string should always succeed");
         source = err.source();
     }
     JsValue::from(error_string)

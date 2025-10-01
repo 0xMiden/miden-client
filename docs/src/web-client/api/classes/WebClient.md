@@ -144,6 +144,16 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### defaultTransactionProver()
+
+> **defaultTransactionProver**(): [`TransactionProver`](TransactionProver.md)
+
+#### Returns
+
+[`TransactionProver`](TransactionProver.md)
+
+***
+
 ### executeTransactionPipeline()
 
 > **executeTransactionPipeline**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>

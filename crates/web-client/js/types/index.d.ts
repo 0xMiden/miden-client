@@ -93,6 +93,9 @@ export declare class WebClient extends WasmWebClient {
     seed?: string
   ): Promise<WebClient & WasmWebClient>;
 
+  /** Returns the default transaction prover configured on the client. */
+  defaultTransactionProver(): TransactionProver;
+
   /**
    * Terminates the underlying worker.
    */
