@@ -1,6 +1,6 @@
 ---
 title: Transactions
-sidebar_position: 10
+sidebar_position: 9
 ---
 
 # Retrieving Transaction History with the Miden SDK

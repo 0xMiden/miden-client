@@ -1,6 +1,6 @@
 ---
-title: index
-sidebar_position: 5
+title: Examples
+sidebar_position: 10
 ---
 
 # Miden SDK Examples
