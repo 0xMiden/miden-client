@@ -100,7 +100,7 @@ Return stringified version of self.
 
 ##### \_interface
 
-`string`
+[`AddressInterface`](../type-aliases/AddressInterface.md)
 
 #### Returns
 

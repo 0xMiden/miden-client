@@ -48,8 +48,9 @@
 
 > **getMapEntries**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
 
-Returns all entries from the storage map at the given index.
-Returns None if the slot is not a map or if the index is out of bounds.
+Get all key-value pairs from the map slot at `index`.
+Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+Returns `[]` if the map exists but is empty.
 
 #### Parameters
 
