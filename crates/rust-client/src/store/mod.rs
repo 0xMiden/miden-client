@@ -22,7 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -339,13 +339,27 @@ pub trait Store: Send + Sync {
     /// Gets the note transport cursor.
     ///
     /// This is used to reduce the number of fetched notes from the note transport network.
-    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError>;
+    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
+        let cursor_bytes = self
+            .get_setting("note_transport_cursor".to_string())
+            .await?
+            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+        let array: [u8; 8] = cursor_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|e: core::array::TryFromSliceError| StoreError::ParsingError(e.to_string()))?;
+        Ok(u64::from_be_bytes(array))
+    }
 
     /// Updates the note transport cursor.
     ///
     /// This is used to track the last cursor position when fetching notes from the note transport
     /// network.
-    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError>;
+    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+        let cursor_bytes = cursor.to_be_bytes().to_vec();
+        self.set_setting("note_transport_cursor".to_string(), cursor_bytes).await?;
+        Ok(())
+    }
 
     /// Applies a note transport update
     ///

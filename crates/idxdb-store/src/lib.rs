@@ -251,17 +251,6 @@ impl Store for WebStore {
         self.get_account_storage(account_id).await
     }
 
-    // TRANSPORT
-    // --------------------------------------------------------------------------------------------
-
-    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
-        self.get_note_transport_cursor().await
-    }
-
-    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
-        self.update_note_transport_cursor(cursor).await
-    }
-
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 

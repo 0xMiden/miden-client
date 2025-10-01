@@ -27,7 +27,6 @@ var Table;
     Table["OutputNotes"] = "outputNotes";
     Table["NotesScripts"] = "notesScripts";
     Table["StateSync"] = "stateSync";
-    Table["NoteTransportCursor"] = "noteTransportCursor";
     Table["BlockHeaders"] = "blockHeaders";
     Table["PartialBlockchainNodes"] = "partialBlockchainNodes";
     Table["Tags"] = "tags";
@@ -48,7 +47,6 @@ db.version(1).stores({
     [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
     [Table.NotesScripts]: indexes("scriptRoot"),
     [Table.StateSync]: indexes("id"),
-    [Table.NoteTransportCursor]: indexes("id"),
     [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
     [Table.PartialBlockchainNodes]: indexes("id"),
     [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
@@ -76,11 +74,10 @@ const inputNotes = db.table(Table.InputNotes);
 const outputNotes = db.table(Table.OutputNotes);
 const notesScripts = db.table(Table.NotesScripts);
 const stateSync = db.table(Table.StateSync);
-const noteTransportCursor = db.table(Table.NoteTransportCursor);
 const blockHeaders = db.table(Table.BlockHeaders);
 const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
 const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, noteTransportCursor, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
 //# sourceMappingURL=schema.js.map

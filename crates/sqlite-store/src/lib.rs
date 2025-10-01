@@ -60,7 +60,6 @@ mod note;
 mod sql_error;
 mod sync;
 mod transaction;
-mod transport;
 
 // SQLITE STORE
 // ================================================================================================
@@ -158,17 +157,6 @@ impl Store for SqliteStore {
     async fn remove_note_tag(&self, tag: NoteTagRecord) -> Result<usize, StoreError> {
         self.interact_with_connection(move |conn| SqliteStore::remove_note_tag(conn, tag))
             .await
-    }
-
-    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
-        self.interact_with_connection(SqliteStore::get_note_transport_cursor).await
-    }
-
-    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::update_note_transport_cursor(conn, cursor)
-        })
-        .await
     }
 
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {

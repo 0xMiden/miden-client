@@ -62,7 +62,7 @@ use core::cmp::max;
 
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
-use miden_objects::note::NoteId;
+use miden_objects::note::{NoteId, NoteTag};
 use miden_objects::transaction::{PartialBlockchain, TransactionId};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
@@ -142,7 +142,7 @@ where
             .map(|(acc_header, _)| acc_header)
             .collect();
 
-        let note_tags: BTreeSet<_> = self.store.get_unique_note_tags().await?;
+        let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
         let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;

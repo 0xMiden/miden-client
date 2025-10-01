@@ -176,14 +176,6 @@ CREATE TABLE partial_blockchain_nodes (
     PRIMARY KEY (id)
 );
 
--- Create note transport cursor table
-CREATE TABLE note_transport_cursor (
-    cursor UNSIGNED BIG INT -- note transport cursor for note fetch pagination
-);
-
--- Insert initial row into note_transport_cursor table
-INSERT OR IGNORE INTO note_transport_cursor (cursor)
-SELECT 0
-WHERE (
-    SELECT COUNT(*) FROM note_transport_cursor
-) = 0;
+-- Create an entry in the settings table for the Note Transport cursor
+INSERT INTO settings (name, value)
+VALUES ('note_transport_cursor', X'0000000000000000');
