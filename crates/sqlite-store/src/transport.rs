@@ -7,8 +7,8 @@ use super::SqliteStore;
 use crate::sql_error::SqlResultExt;
 
 impl SqliteStore {
-    pub(super) fn get_transport_layer_cursor(conn: &mut Connection) -> Result<u64, StoreError> {
-        const QUERY: &str = "SELECT cursor FROM transport_layer_cursor";
+    pub(super) fn get_note_transport_cursor(conn: &mut Connection) -> Result<u64, StoreError> {
+        const QUERY: &str = "SELECT cursor FROM note_transport_cursor";
 
         conn.prepare(QUERY)
             .into_store_error()?
@@ -16,12 +16,12 @@ impl SqliteStore {
             .into_store_error()
     }
 
-    pub(super) fn update_transport_layer_cursor(
+    pub(super) fn update_note_transport_cursor(
         conn: &mut Connection,
         cursor: u64,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
-        update_transport_layer_cursor(&tx, cursor)?;
+        update_note_transport_cursor(&tx, cursor)?;
 
         tx.commit().into_store_error()?;
 
@@ -29,11 +29,11 @@ impl SqliteStore {
     }
 }
 
-pub(super) fn update_transport_layer_cursor(
+pub(super) fn update_note_transport_cursor(
     tx: &Transaction<'_>,
     cursor: u64,
 ) -> Result<(), StoreError> {
-    const QUERY: &str = "UPDATE transport_layer_cursor SET cursor = ?";
+    const QUERY: &str = "UPDATE note_transport_cursor SET cursor = ?";
     tx.execute(QUERY, params![cursor]).into_store_error()?;
 
     Ok(())

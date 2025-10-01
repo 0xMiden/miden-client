@@ -60,8 +60,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
-    /// An optional custom transport layer client.
-    transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// An optional custom note transport client.
+    note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -75,7 +75,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
-            transport_api: None,
+            note_transport_api: None,
         }
     }
 }
@@ -167,10 +167,10 @@ where
         self
     }
 
-    /// Sets a custom transport layer client directly.
+    /// Sets a custom note transport client directly.
     #[must_use]
-    pub fn transport_layer(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
-        self.transport_api = Some(client);
+    pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
+        self.note_transport_api = Some(client);
         self
     }
 
@@ -237,7 +237,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
-            self.transport_api,
+            self.note_transport_api,
         )
         .await
     }

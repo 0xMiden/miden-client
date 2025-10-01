@@ -160,13 +160,13 @@ impl Store for SqliteStore {
             .await
     }
 
-    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError> {
-        self.interact_with_connection(SqliteStore::get_transport_layer_cursor).await
+    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
+        self.interact_with_connection(SqliteStore::get_note_transport_cursor).await
     }
 
-    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
         self.interact_with_connection(move |conn| {
-            SqliteStore::update_transport_layer_cursor(conn, cursor)
+            SqliteStore::update_note_transport_cursor(conn, cursor)
         })
         .await
     }

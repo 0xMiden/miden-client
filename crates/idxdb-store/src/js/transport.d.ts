@@ -1,2 +1,2 @@
-export declare function getTransportLayerCursor(): Promise<number>;
-export declare function updateTransportLayerCursor(cursor: number): Promise<void>;
+export declare function getNoteTransportCursor(): Promise<number>;
+export declare function updateNoteTransportCursor(cursor: number): Promise<void>;

@@ -7,13 +7,13 @@ impl super::WebStore {
     // TRANSPORT
     // --------------------------------------------------------------------------------------------
 
-    /// Gets the transport layer cursor from IndexedDB.
-    pub async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError> {
-        use js_bindings::idxdb_get_transport_layer_cursor;
+    /// Gets the note transport cursor from IndexedDB.
+    pub async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
+        use js_bindings::idxdb_get_note_transport_cursor;
 
-        let promise = idxdb_get_transport_layer_cursor();
+        let promise = idxdb_get_note_transport_cursor();
         let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get transport layer cursor: {js_error:?}"))
+            StoreError::DatabaseError(format!("failed to get note transport cursor: {js_error:?}"))
         })?;
 
         // Convert JS value to u64
@@ -24,13 +24,13 @@ impl super::WebStore {
         Ok(cursor)
     }
 
-    /// Updates the transport layer cursor in IndexedDB.
-    pub async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError> {
-        use js_bindings::idxdb_update_transport_layer_cursor;
+    /// Updates the note transport cursor in IndexedDB.
+    pub async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+        use js_bindings::idxdb_update_note_transport_cursor;
 
-        let promise = idxdb_update_transport_layer_cursor(cursor);
+        let promise = idxdb_update_note_transport_cursor(cursor);
         JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to update transport layer cursor: {js_error:?}"))
+            StoreError::DatabaseError(format!("failed to update note transport cursor: {js_error:?}"))
         })?;
 
         Ok(())

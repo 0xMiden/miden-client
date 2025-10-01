@@ -69,7 +69,7 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use crate::note::NoteScreener;
 use crate::store::{NoteFilter, TransactionFilter};
-use crate::transport::TransportLayer;
+use crate::transport::NoteTransport;
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -130,10 +130,8 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
-        let transport_layer = self
-            .transport_api
-            .as_ref()
-            .map(|transport_api| TransportLayer::new(transport_api.clone()));
+        let note_transport =
+            self.note_transport_api.as_ref().map(|api| NoteTransport::new(api.clone()));
 
         // Get current state of the client
         let accounts = self
@@ -182,11 +180,11 @@ where
             )
             .await?;
 
-        // Transport layer update
+        // Note Transport update
         // TODO We can run both sync_state, fetch_notes futures in parallel
-        let transport_layer_update = if let Some(mut transport_layer) = transport_layer {
-            let cursor = self.store.get_transport_layer_cursor().await?;
-            let update = transport_layer.fetch_notes(cursor, note_tags).await?;
+        let note_transport_update = if let Some(mut note_transport) = note_transport {
+            let cursor = self.store.get_note_transport_cursor().await?;
+            let update = note_transport.fetch_notes(cursor, note_tags).await?;
             Some(update)
         } else {
             None
@@ -200,9 +198,9 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        if let Some(transport_layer_update) = transport_layer_update {
+        if let Some(note_transport_update) = note_transport_update {
             self.store
-                .apply_transport_layer_update(transport_layer_update)
+                .apply_note_transport_update(note_transport_update)
                 .await
                 .map_err(ClientError::StoreError)?;
         }

@@ -28,7 +28,7 @@ enum Table {
   OutputNotes = "outputNotes",
   NotesScripts = "notesScripts",
   StateSync = "stateSync",
-  TransportLayerCursor = "transportLayerCursor",
+  NoteTransportCursor = "noteTransportCursor",
   BlockHeaders = "blockHeaders",
   PartialBlockchainNodes = "partialBlockchainNodes",
   Tags = "tags",
@@ -125,7 +125,7 @@ export interface IStateSync {
   blockNum: string;
 }
 
-export interface ITransportLayerCursor {
+export interface INoteTransportCursor {
   id: number;
   cursor: number;
 }
@@ -172,7 +172,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
   stateSync: Dexie.Table<IStateSync, number>;
-  transportLayerCursor: Dexie.Table<ITransportLayerCursor, number>;
+  noteTransportCursor: Dexie.Table<INoteTransportCursor, number>;
   blockHeaders: Dexie.Table<IBlockHeader, string>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
@@ -204,7 +204,7 @@ db.version(1).stores({
   ),
   [Table.NotesScripts]: indexes("scriptRoot"),
   [Table.StateSync]: indexes("id"),
-  [Table.TransportLayerCursor]: indexes("id"),
+  [Table.NoteTransportCursor]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
   [Table.PartialBlockchainNodes]: indexes("id"),
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
@@ -239,8 +239,8 @@ const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
 const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
 const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
 const stateSync = db.table<IStateSync, number>(Table.StateSync);
-const transportLayerCursor = db.table<ITransportLayerCursor, number>(
-  Table.TransportLayerCursor
+const noteTransportCursor = db.table<INoteTransportCursor, number>(
+  Table.NoteTransportCursor
 );
 const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
 const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
@@ -266,7 +266,7 @@ export {
   outputNotes,
   notesScripts,
   stateSync,
-  transportLayerCursor,
+  noteTransportCursor,
   blockHeaders,
   partialBlockchainNodes,
   tags,

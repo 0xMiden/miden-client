@@ -16,13 +16,13 @@ pub use self::errors::NoteTransportError;
 use crate::store::InputNoteRecord;
 use crate::{Client, ClientError};
 
-pub const TRANSPORT_LAYER_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
+pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
 
-/// Client transport layer methods.
+/// Client note transport methods.
 impl<AUTH> Client<AUTH> {
-    /// Check if the transport layer is configured
-    pub fn is_transport_layer_enabled(&self) -> bool {
-        self.transport_api.is_some()
+    /// Check if note transport is configured
+    pub fn is_note_transport_enabled(&self) -> bool {
+        self.note_transport_api.is_some()
     }
 
     /// Send a note
@@ -31,7 +31,7 @@ impl<AUTH> Client<AUTH> {
         note: Note,
         _address: &Address,
     ) -> Result<(), ClientError> {
-        let api = self.get_transport_api()?;
+        let api = self.get_note_transport_api()?;
 
         let header = *note.header();
         let details = NoteDetails::from(note);
@@ -47,69 +47,69 @@ impl<AUTH> Client<AUTH> {
     ///
     /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        let api = self.get_transport_api()?;
+        let api = self.get_note_transport_api()?;
 
         // Unique tags
         let note_tags = self.store.get_unique_note_tags().await?;
         // Get global cursor
-        let cursor = self.store.get_transport_layer_cursor().await?;
+        let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = TransportLayer::new(api).fetch_notes(cursor, note_tags).await?;
+        let update = NoteTransport::new(api).fetch_notes(cursor, note_tags).await?;
 
-        self.store.apply_transport_layer_update(update).await?;
+        self.store.apply_note_transport_update(update).await?;
 
         Ok(())
     }
 
     /// Fetches all notes for tracked note tags
     ///
-    /// All notes stored in the transport layer will be fetched.
+    /// All notes stored in the note transport network will be fetched.
     pub async fn fetch_all_private_notes<I>(&mut self) -> Result<(), ClientError> {
-        let api = self.get_transport_api()?;
+        let api = self.get_note_transport_api()?;
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = TransportLayer::new(api.clone()).fetch_notes(0, note_tags).await?;
+        let update = NoteTransport::new(api.clone()).fetch_notes(0, note_tags).await?;
 
-        self.store.apply_transport_layer_update(update).await?;
+        self.store.apply_note_transport_update(update).await?;
 
         Ok(())
     }
 
-    /// Returns the Transport layer client, if configured
-    pub(crate) fn get_transport_api(
+    /// Returns the Note Transport client, if configured
+    pub(crate) fn get_note_transport_api(
         &self,
     ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
-        self.transport_api.clone().ok_or(NoteTransportError::Disabled)
+        self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
     }
 }
 
-/// Transport layer methods
-pub struct TransportLayer {
+/// Note Transport methods
+pub struct NoteTransport {
     api: Arc<dyn NoteTransportClient>,
 }
 
-/// Transport layer update
-pub struct TransportLayerUpdate {
+/// Note Transport update
+pub struct NoteTransportUpdate {
     /// Pagination cursor for next fetch
     pub cursor: u64,
     /// Fetched notes
     pub note_updates: Vec<InputNoteRecord>,
 }
 
-impl TransportLayer {
+impl NoteTransport {
     pub fn new(api: Arc<dyn NoteTransportClient>) -> Self {
         Self { api }
     }
 
     /// Fetch notes for provided note tags with pagination
     ///
-    /// Only notes after the pairing cursor are requested.
+    /// Only notes after the provided cursor are requested.
     pub(crate) async fn fetch_notes<I>(
         &mut self,
         cursor: u64,
         tags: I,
-    ) -> Result<TransportLayerUpdate, ClientError>
+    ) -> Result<NoteTransportUpdate, ClientError>
     where
         I: IntoIterator<Item = NoteTag>,
     {
@@ -126,7 +126,7 @@ impl TransportLayer {
             note_updates.push(input_note);
         }
 
-        let update = TransportLayerUpdate { note_updates, cursor: rcursor };
+        let update = NoteTransportUpdate { note_updates, cursor: rcursor };
 
         Ok(update)
     }

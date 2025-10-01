@@ -176,14 +176,14 @@ CREATE TABLE partial_blockchain_nodes (
     PRIMARY KEY (id)
 );
 
--- Create transport layer cursor table
-CREATE TABLE transport_layer_cursor (
-    cursor UNSIGNED BIG INT -- transport layer tag cursor for note fetch pagination
+-- Create note transport cursor table
+CREATE TABLE note_transport_cursor (
+    cursor UNSIGNED BIG INT -- note transport cursor for note fetch pagination
 );
 
--- Insert initial row into transport_layer_cursor table
-INSERT OR IGNORE INTO transport_layer_cursor (cursor)
+-- Insert initial row into note_transport_cursor table
+INSERT OR IGNORE INTO note_transport_cursor (cursor)
 SELECT 0
 WHERE (
-    SELECT COUNT(*) FROM transport_layer_cursor
+    SELECT COUNT(*) FROM note_transport_cursor
 ) = 0;

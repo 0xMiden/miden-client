@@ -33,13 +33,14 @@ type Service = Channel;
 type Service = tonic_web_wasm_client::Client;
 
 /// gRPC client
-pub struct CanonicalNoteTransportClient {
+pub struct GrpcNoteTransportClient {
     client: RwLock<MidenPrivateTransportClient<Service>>,
     health_client: RwLock<HealthClient<Service>>,
 }
 
-impl CanonicalNoteTransportClient {
+impl GrpcNoteTransportClient {
     /// gRPC client constructor
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let endpoint = tonic::transport::Endpoint::try_from(endpoint)
             .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
@@ -62,7 +63,7 @@ impl CanonicalNoteTransportClient {
 
     /// gRPC client (WASM) constructor
     #[cfg(target_arch = "wasm32")]
-    pub async fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, NoteTransportError> {
+    pub fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenPrivateTransportClient::new(wasm_client);
@@ -85,7 +86,7 @@ impl CanonicalNoteTransportClient {
 
     /// Send a note
     ///
-    /// Pushes a note to the transport layer.
+    /// Pushes a note to the note transport network.
     /// While the note header goes in plaintext, the provided note details can be encrypted.
     pub async fn send_note(
         &self,
@@ -99,7 +100,7 @@ impl CanonicalNoteTransportClient {
         self.api()
             .send_note(Request::new(request))
             .await
-            .map_err(|e| NoteTransportError::TransportLayer(format!("Send note failed: {e:?}")))?;
+            .map_err(|e| NoteTransportError::Network(format!("Send note failed: {e:?}")))?;
 
         Ok(())
     }
@@ -116,9 +117,11 @@ impl CanonicalNoteTransportClient {
         let tags_int = tags.iter().map(NoteTag::as_u32).collect();
         let request = FetchNotesRequest { tags: tags_int, cursor };
 
-        let response = self.api().fetch_notes(Request::new(request)).await.map_err(|e| {
-            NoteTransportError::TransportLayer(format!("Fetch notes failed: {e:?}"))
-        })?;
+        let response = self
+            .api()
+            .fetch_notes(Request::new(request))
+            .await
+            .map_err(|e| NoteTransportError::Network(format!("Fetch notes failed: {e:?}")))?;
 
         let response = response.into_inner();
 
@@ -145,9 +148,11 @@ impl CanonicalNoteTransportClient {
     ) -> Result<NoteStreamAdapter, NoteTransportError> {
         let request = StreamNotesRequest { tag: tag.as_u32(), cursor };
 
-        let response = self.api().stream_notes(request).await.map_err(|e| {
-            NoteTransportError::TransportLayer(format!("Stream notes failed: {e:?}"))
-        })?;
+        let response = self
+            .api()
+            .stream_notes(request)
+            .await
+            .map_err(|e| NoteTransportError::Network(format!("Stream notes failed: {e:?}")))?;
         Ok(NoteStreamAdapter::new(response.into_inner()))
     }
 
@@ -161,7 +166,7 @@ impl CanonicalNoteTransportClient {
             .health_api()
             .check(request)
             .await
-            .map_err(|e| NoteTransportError::TransportLayer(format!("Health check failed: {e}")))?
+            .map_err(|e| NoteTransportError::Network(format!("Health check failed: {e}")))?
             .into_inner();
 
         let serving = matches!(
@@ -171,13 +176,13 @@ impl CanonicalNoteTransportClient {
 
         serving
             .then_some(())
-            .ok_or_else(|| NoteTransportError::TransportLayer("Service is not serving".into()))
+            .ok_or_else(|| NoteTransportError::Network("Service is not serving".into()))
     }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-impl super::NoteTransportClient for CanonicalNoteTransportClient {
+impl super::NoteTransportClient for GrpcNoteTransportClient {
     async fn send_note(
         &self,
         header: NoteHeader,
@@ -231,9 +236,9 @@ impl Stream for NoteStreamAdapter {
                 }
                 Poll::Ready(Some(Ok(notes)))
             },
-            Poll::Ready(Some(Err(status))) => Poll::Ready(Some(Err(
-                NoteTransportError::TransportLayer(format!("tonic status: {status}")),
-            ))),
+            Poll::Ready(Some(Err(status))) => Poll::Ready(Some(Err(NoteTransportError::Network(
+                format!("tonic status: {status}"),
+            )))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }

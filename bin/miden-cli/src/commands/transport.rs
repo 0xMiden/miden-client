@@ -7,21 +7,21 @@ use crate::Parser;
 use crate::errors::CliError;
 
 #[derive(Debug, Parser, Clone)]
-#[command(about = "Exchange privates notes using the Transport Layer")]
-pub enum TransportLayerCmd {
+#[command(about = "Exchange privates notes using the Note Transport network")]
+pub enum NoteTransportCmd {
     Send { note_id: String, address: String },
     Fetch,
 }
 
-impl TransportLayerCmd {
+impl NoteTransportCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        if !client.is_transport_layer_enabled() {
+        if !client.is_note_transport_enabled() {
             return Err(CliError::Config(
                 "Missing configuration".to_string().into(),
-                "Please provide a [transport-layer] configuration to use the transport layer"
+                "Please provide a [note_transport] configuration to use the note transport network"
                     .to_string(),
             ));
         }

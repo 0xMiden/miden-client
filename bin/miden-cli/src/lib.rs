@@ -10,7 +10,7 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::transport::grpc::CanonicalNoteTransportClient;
+use miden_client::transport::grpc::GrpcNoteTransportClient;
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::SqliteStore;
 use rand::rngs::StdRng;
@@ -26,7 +26,7 @@ use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
-use commands::transport_layer::TransportLayerCmd;
+use commands::transport::NoteTransportCmd;
 
 use self::utils::load_config_file;
 
@@ -146,7 +146,7 @@ pub enum Command {
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
     #[command(subcommand)]
-    TransportLayer(TransportLayerCmd),
+    NoteTransport(NoteTransportCmd),
 }
 
 /// CLI entry point.
@@ -194,14 +194,14 @@ impl Cli {
             builder = builder.max_block_number_delta(delta);
         }
 
-        if let Some(tl_config) = cli_config.transport_layer {
-            let client = CanonicalNoteTransportClient::connect(
+        if let Some(tl_config) = cli_config.note_transport {
+            let client = GrpcNoteTransportClient::connect(
                 tl_config.endpoint.to_string(),
                 tl_config.timeout_ms,
             )
             .await
             .map_err(|e| CliError::Client(e.into()))?;
-            builder = builder.transport_layer(Arc::new(client));
+            builder = builder.note_transport(Arc::new(client));
         }
 
         let mut client = builder.build().await?;
@@ -228,8 +228,8 @@ impl Cli {
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
-            Command::TransportLayer(transport_layer) => {
-                Box::pin(transport_layer.execute(client)).await
+            Command::NoteTransport(note_transport) => {
+                Box::pin(note_transport.execute(client)).await
             },
         }
     }

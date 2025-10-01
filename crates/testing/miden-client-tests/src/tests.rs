@@ -2212,7 +2212,7 @@ pub async fn create_test_client_transport(
 ) -> (MockClient<FilesystemKeyStore<StdRng>>, FilesystemKeyStore<StdRng>) {
     let (builder, _, keystore) = create_test_client_builder().await;
     let transport_client = MockNoteTransportApi::new(mock_ntnode);
-    let builder_w_transport = builder.transport_layer(Arc::new(transport_client));
+    let builder_w_transport = builder.note_transport(Arc::new(transport_client));
 
     let mut client = builder_w_transport.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();

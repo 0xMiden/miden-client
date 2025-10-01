@@ -14,7 +14,7 @@ use crate::transport::{NoteInfo, NoteStream, NoteTransportClient, NoteTransportE
 
 /// Mock Note Transport Node
 ///
-/// Simulates the functionality of the transport layer node.
+/// Simulates the functionality of the note transport node.
 #[derive(Clone)]
 pub struct MockNoteTransportNode {
     notes: BTreeMap<NoteTag, Vec<(NoteInfo, u64)>>,
@@ -64,7 +64,7 @@ impl Default for MockNoteTransportNode {
 
 /// Mock Note Transport API
 ///
-/// Simulates communications with the transport layer node.
+/// Simulates communications with the note transport node.
 pub struct MockNoteTransportApi {
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
 }

@@ -254,12 +254,12 @@ impl Store for WebStore {
     // TRANSPORT
     // --------------------------------------------------------------------------------------------
 
-    async fn get_transport_layer_cursor(&self) -> Result<u64, StoreError> {
-        self.get_transport_layer_cursor().await
+    async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
+        self.get_note_transport_cursor().await
     }
 
-    async fn update_transport_layer_cursor(&self, cursor: u64) -> Result<(), StoreError> {
-        self.update_transport_layer_cursor(cursor).await
+    async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
+        self.update_note_transport_cursor(cursor).await
     }
 
     // SETTINGS
