@@ -39,7 +39,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
     let sqlite_store = SqliteStore::new(store_config).await?;
 
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
-        .tonic_rpc_client(&endpoint, Some(10_000))
+        .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .store(Arc::new(sqlite_store))
         .in_debug_mode(miden_client::DebugMode::Enabled)

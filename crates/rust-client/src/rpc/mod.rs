@@ -16,13 +16,13 @@
 //! ## Example
 //!
 //! ```no_run
-//! # use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
+//! # use miden_client::rpc::{Endpoint, NodeRpcClient, GrpcClient};
 //! # use miden_objects::block::BlockNumber;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a Tonic RPC client instance (assumes default endpoint configuration).
+//! // Create a gRPC client instance (assumes default endpoint configuration).
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let mut rpc_client = TonicRpcClient::new(&endpoint, 1000);
+//! let mut rpc_client = GrpcClient::new(&endpoint, 1000);
 //!
 //! // Fetch the latest block header (by passing None).
 //! let (block_header, mmr_proof) = rpc_client.get_block_header_by_number(None, true).await?;
@@ -75,7 +75,7 @@ pub mod generated;
 #[cfg(feature = "tonic")]
 mod tonic_client;
 #[cfg(feature = "tonic")]
-pub use tonic_client::TonicRpcClient;
+pub use tonic_client::GrpcClient;
 
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;

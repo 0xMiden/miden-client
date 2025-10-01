@@ -14,7 +14,7 @@ miden-client = { version = "0.12" }
 
 | Features  | Description |
 | --------- | ----------- |
-| `tonic`   | Includes `TonicRpcClient`, a Tonic client to communicate with a Miden node. Uses `tonic` transport with TLS on native targets and `tonic-web-wasm-client` on `wasm32`. **Disabled by default.** |
+| `tonic`   | Includes `GrpcClient`, a gRPC client to communicate with a Miden node. Uses `tonic` transport with TLS on native targets and `tonic-web-wasm-client` on `wasm32`. **Disabled by default.** |
 | `std`     | Enables `std` support and concurrent execution in `miden-tx`. Enabled by default for native targets. |
 | `testing` | Enables functions meant for testing environments. **Disabled by default.** |
 
