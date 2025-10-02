@@ -42,7 +42,7 @@ To better trace these errors, a build with debug symbols can be generated. This 
 ## Using the debug symbols
 
 Once you have both the debug WASM and the Chrome extension, we need to link
-the dependency to the JS app we're debugging .
+the dependency to the JS app we're debugging.
 
 1. Link the package, cd to: `miden-client/crates/web-client` and run:
 ```
