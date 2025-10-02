@@ -1,11 +1,7 @@
 use alloc::sync::Arc;
 
 use miden_client::assembly::{
-    Assembler as NativeAssembler,
-    DefaultSourceManager,
-    LibraryPath,
-    Module,
-    ModuleKind,
+    Assembler as NativeAssembler, DefaultSourceManager, LibraryPath, Module, ModuleKind,
 };
 use wasm_bindgen::prelude::*;
 

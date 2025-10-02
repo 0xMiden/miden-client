@@ -1,6 +1,5 @@
 use miden_client::transaction::{
-    TransactionRecord as NativeTransactionRecord,
-    TransactionScript as NativeTransactionScript,
+    TransactionRecord as NativeTransactionRecord, TransactionScript as NativeTransactionScript,
 };
 use wasm_bindgen::prelude::*;
 

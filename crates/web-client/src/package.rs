@@ -1,6 +1,6 @@
-use wasm_bindgen::prelude::*;
-use miden_client::account::component::{AccountComponentTemplate, AccountComponent, Package};
+use miden_client::account::component::{AccountComponent, AccountComponentTemplate, Package};
 use miden_client::{Deserializable, Serializable};
+use wasm_bindgen::prelude::*;
 
 use crate::models::account_component::AccountComponent as WebAccountComponent;
 
@@ -17,7 +17,7 @@ impl WebPackage {
     pub fn new(bytes: &[u8]) -> Result<WebPackage, JsValue> {
         let package = Package::read_from_bytes(bytes)
             .map_err(|e| JsValue::from_str(&format!("Failed to deserialize package: {}", e)))?;
-        
+
         Ok(WebPackage { inner: package })
     }
 
@@ -30,7 +30,8 @@ impl WebPackage {
     /// Get the version of the package
     #[wasm_bindgen(js_name = "getVersion")]
     pub fn get_version(&self) -> String {
-        format!("{}.{}.{}", 
+        format!(
+            "{}.{}.{}",
             self.inner.version().major,
             self.inner.version().minor,
             self.inner.version().patch
@@ -53,29 +54,33 @@ impl WebPackage {
     #[wasm_bindgen(js_name = "getExportedProcedures")]
     pub fn get_exported_procedures(&self) -> Result<JsValue, JsValue> {
         let procedures = js_sys::Object::new();
-        
+
         for proc_info in self.inner.mast().procedures() {
             let name = proc_info.name.to_string();
-            let signature = format!("func({}) -> {}", 
+            let signature = format!(
+                "func({}) -> {}",
                 proc_info.num_locals,
                 if proc_info.num_outputs > 0 {
-                    format!("felt{}", if proc_info.num_outputs > 1 { 
-                        format!("[{}]", proc_info.num_outputs) 
-                    } else { 
-                        String::new() 
-                    })
+                    format!(
+                        "felt{}",
+                        if proc_info.num_outputs > 1 {
+                            format!("[{}]", proc_info.num_outputs)
+                        } else {
+                            String::new()
+                        }
+                    )
                 } else {
                     "()".to_string()
                 }
             );
-            
+
             js_sys::Reflect::set(
                 &procedures,
                 &JsValue::from_str(&name),
                 &JsValue::from_str(&signature),
             )?;
         }
-        
+
         Ok(procedures.into())
     }
 
@@ -91,8 +96,12 @@ impl WebPackage {
     /// This will fail if the package doesn't contain account component metadata
     #[wasm_bindgen(js_name = "toAccountComponentTemplate")]
     pub fn to_account_component_template(&self) -> Result<AccountComponentTemplate, JsValue> {
-        AccountComponentTemplate::try_from(self.inner.clone())
-            .map_err(|e| JsValue::from_str(&format!("Failed to convert package to AccountComponentTemplate: {}", e)))
+        AccountComponentTemplate::try_from(self.inner.clone()).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to convert package to AccountComponentTemplate: {}",
+                e
+            ))
+        })
     }
 
     /// Create an AccountComponent from the package
@@ -101,20 +110,23 @@ impl WebPackage {
     pub fn to_account_component(&self) -> Result<WebAccountComponent, JsValue> {
         // First convert to AccountComponentTemplate
         let template = self.to_account_component_template()?;
-        
+
         // Then create AccountComponent from the template
         // Note: This creates a component with empty storage slots
         // In a real implementation, you might want to pass storage data
-        let component = AccountComponent::from_template(&template, &Default::default())
-            .map_err(|e| JsValue::from_str(&format!("Failed to create AccountComponent from package: {}", e)))?;
-        
+        let component =
+            AccountComponent::from_template(&template, &Default::default()).map_err(|e| {
+                JsValue::from_str(&format!("Failed to create AccountComponent from package: {}", e))
+            })?;
+
         Ok(WebAccountComponent::from(component))
     }
 
     /// Serialize the package back to bytes
     #[wasm_bindgen(js_name = "toBytes")]
     pub fn to_bytes(&self) -> Result<Vec<u8>, JsValue> {
-        self.inner.to_bytes()
+        self.inner
+            .to_bytes()
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize package: {}", e)))
     }
 }
