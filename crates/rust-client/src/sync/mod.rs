@@ -68,8 +68,8 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use crate::note::NoteScreener;
+use crate::note_transport::NoteTransport;
 use crate::store::{NoteFilter, TransactionFilter};
-use crate::transport::NoteTransport;
 use crate::{Client, ClientError};
 mod block_header;
 

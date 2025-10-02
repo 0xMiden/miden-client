@@ -21,10 +21,10 @@ use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverErro
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
+use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
-use crate::transport::NoteTransportError;
 
 // CLIENT ERROR
 // ================================================================================================

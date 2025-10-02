@@ -9,8 +9,8 @@ use miden_client::account::AccountHeader;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::transport::grpc::GrpcNoteTransportClient;
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::SqliteStore;
 use rand::rngs::StdRng;
@@ -22,11 +22,11 @@ use commands::import::ImportCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::note_transport::NoteTransportCmd;
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
-use commands::transport::NoteTransportCmd;
 
 use self::utils::load_config_file;
 

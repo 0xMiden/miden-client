@@ -31,7 +31,7 @@ use miden_client::testing::common::{
     setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
-use miden_client::testing::transport::{MockNoteTransportApi, MockNoteTransportNode};
+use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,

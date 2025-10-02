@@ -43,9 +43,9 @@ use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
+use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportUpdate};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
-use crate::transport::NoteTransportUpdate;
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -341,7 +341,7 @@ pub trait Store: Send + Sync {
     /// This is used to reduce the number of fetched notes from the note transport network.
     async fn get_note_transport_cursor(&self) -> Result<u64, StoreError> {
         let cursor_bytes = self
-            .get_setting("note_transport_cursor".to_string())
+            .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
             .await?
             .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
         let array: [u8; 8] = cursor_bytes
@@ -357,7 +357,8 @@ pub trait Store: Send + Sync {
     /// network.
     async fn update_note_transport_cursor(&self, cursor: u64) -> Result<(), StoreError> {
         let cursor_bytes = cursor.to_be_bytes().to_vec();
-        self.set_setting("note_transport_cursor".to_string(), cursor_bytes).await?;
+        self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
+            .await?;
         Ok(())
     }
 

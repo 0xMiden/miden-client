@@ -175,7 +175,3 @@ CREATE TABLE partial_blockchain_nodes (
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
 );
-
--- Create an entry in the settings table for the Note Transport cursor
-INSERT INTO settings (name, value)
-VALUES ('note_transport_cursor', X'0000000000000000');

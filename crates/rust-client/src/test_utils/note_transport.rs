@@ -10,7 +10,7 @@ use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_tx::utils::sync::RwLock;
 
-use crate::transport::{NoteInfo, NoteStream, NoteTransportClient, NoteTransportError};
+use crate::note_transport::{NoteInfo, NoteStream, NoteTransportClient, NoteTransportError};
 
 /// Mock Note Transport Node
 ///

@@ -5,8 +5,8 @@ use std::str::FromStr;
 
 use figment::value::{Dict, Map};
 use figment::{Metadata, Profile, Provider};
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;
-use miden_client::transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;

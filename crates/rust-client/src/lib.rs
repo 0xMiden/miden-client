@@ -56,10 +56,10 @@
 //!
 //! use miden_client::crypto::RpoRandomCoin;
 //! use miden_client::keystore::FilesystemKeyStore;
+//! use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+//! use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 //! use miden_client::rpc::{Endpoint, TonicRpcClient};
 //! use miden_client::store::Store;
-//! use miden_client::transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
-//! use miden_client::transport::grpc::NoteTransportClient;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
@@ -89,7 +89,7 @@
 //!
 //! // Optionally, connect to the note transport network to exchange private notes.
 //! let note_transport_api =
-//!     CanonicalNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), 10_000)
+//!     GrpcNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), 10_000)
 //!         .await?;
 //!
 //! // Instantiate the client using a Tonic RPC client
@@ -132,12 +132,12 @@ extern crate std;
 pub mod account;
 pub mod keystore;
 pub mod note;
+pub mod note_transport;
 pub mod rpc;
 pub mod settings;
 pub mod store;
 pub mod sync;
 pub mod transaction;
-pub mod transport;
 pub mod utils;
 
 #[cfg(feature = "std")]
@@ -272,10 +272,10 @@ pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
+use note_transport::{NoteTransportClient, init_note_transport_cursor};
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
-use transport::NoteTransportClient;
 
 // MIDEN CLIENT
 // ================================================================================================
@@ -363,6 +363,11 @@ where
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             // Set the genesis commitment in the RPC API client for future requests.
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        if note_transport_api.is_some() {
+            // Initialize the note transport cursor
+            init_note_transport_cursor(store.clone()).await?;
         }
 
         let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());

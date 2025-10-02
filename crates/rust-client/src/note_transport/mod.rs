@@ -13,10 +13,11 @@ use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
 use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
-use crate::store::InputNoteRecord;
+use crate::store::{InputNoteRecord, Store};
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
+pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
 /// Client note transport methods.
 impl<AUTH> Client<AUTH> {
@@ -82,6 +83,16 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
         self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
     }
+}
+
+/// Populates the note transport cursor setting with 0, if it is not setup
+pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<(), ClientError> {
+    let setting = NOTE_TRANSPORT_CURSOR_STORE_SETTING;
+    if store.get_setting(setting.into()).await?.is_none() {
+        let initial_cursor = 0u64.to_be_bytes().to_vec();
+        store.set_setting(setting.into(), initial_cursor).await?;
+    }
+    Ok(())
 }
 
 /// Note Transport methods

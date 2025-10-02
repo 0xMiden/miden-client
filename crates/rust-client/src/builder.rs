@@ -9,9 +9,9 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
+use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::Store;
-use crate::transport::NoteTransportClient;
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
