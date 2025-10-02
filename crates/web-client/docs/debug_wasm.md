@@ -4,7 +4,7 @@ When debugging WASM, it can be tricky to trace the origin of an error since stac
 To better trace these errors, a build with debug symbols can be generated. This doc explains how to set it up.
 
 ## Requirements
-    - `yarn`
+    - yarn
     - Compatible Rust version
     - Chrome browser
     - [wasm-debugging-extension](https://goo.gle/wasm-debugging-extension).
@@ -27,6 +27,7 @@ make build-web-client-debug
   - [brew package manager](https://formulae.brew.sh/formula/wabt)
   - [nix packages](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
   - [source](https://github.com/WebAssembly/wabt).
+
  The WABT package provides an `wasm-obj` binary, which you can use like so:
  ```
  wasm-objdump --headers crates/web-client/dist/workers/assets/miden_client_web.wasm
@@ -59,10 +60,14 @@ make link-web-client-dep
 yarn link "@demox-labs/miden-sdk"
 ```
 Essentially,`yarn link` makes the project use the local modified version of the sdk instead of the NPM hosted one. Now, when you open the devtools with chrome, you will see an output like this:
+
+
 ![dev-tools-output](./devtools-output.png).
+
 
 You should also be able to see the rust source in the devtools source tab:
 ![source-example](./source-example.png)
+
 
 Also, you should see friendlier stack-traces:
 ![stack-trace-example](./stack-trace-example.png)
