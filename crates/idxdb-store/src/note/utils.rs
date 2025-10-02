@@ -21,10 +21,10 @@ use miden_client::store::{
 };
 use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::promise::await_js_value;
 
 // TYPES
 // ================================================================================================
@@ -117,9 +117,7 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
         serialized_data.state_discriminant,
         serialized_data.state,
     );
-    JsFuture::from(promise).await.map_err(|js_error| {
-        StoreError::DatabaseError(format!("failed to upsert input note: {js_error:?}"))
-    })?;
+    await_js_value(promise, "failed to upsert input note").await?;
 
     Ok(())
 }
@@ -150,7 +148,7 @@ pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutput
 pub async fn upsert_output_note_tx(note: &OutputNoteRecord) -> Result<(), StoreError> {
     let serialized_data = serialize_output_note(note);
 
-    let result = JsFuture::from(idxdb_upsert_output_note(
+    let promise = idxdb_upsert_output_note(
         serialized_data.note_id,
         serialized_data.note_assets,
         serialized_data.recipient_digest,
@@ -159,12 +157,9 @@ pub async fn upsert_output_note_tx(note: &OutputNoteRecord) -> Result<(), StoreE
         serialized_data.expected_height,
         serialized_data.state_discriminant,
         serialized_data.state,
-    ))
-    .await;
-    match result {
-        Ok(_) => Ok(()),
-        Err(_) => Err(StoreError::QueryError("Failed to insert output note".to_string())),
-    }
+    );
+    await_js_value(promise, "failed to upsert output note").await?;
+    Ok(())
 }
 
 pub fn parse_input_note_idxdb_object(

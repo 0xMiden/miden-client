@@ -393,7 +393,7 @@ pub trait Store: Send + Sync {
             return Ok(None);
         };
 
-        let witness = AssetWitness::new(vault.asset_tree().open(&asset.vault_key()))?;
+        let witness = AssetWitness::new(vault.open(asset.vault_key()).into())?;
 
         Ok(Some((asset, witness)))
     }
