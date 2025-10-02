@@ -7,7 +7,7 @@ To better trace these errors, a build with debug symbols can be generated. This 
     - `yarn`
     - Compatible Rust version
     - Chrome browser
-    - You will need to install this [extension](https://goo.gle/wasm-debugging-extension).
+    - [wasm-debugging-extension](https://goo.gle/wasm-debugging-extension).
       Despite the name, it will also work with WASM-generated Rust Files
     
 ## Building with debug symbols
