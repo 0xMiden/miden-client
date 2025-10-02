@@ -5,12 +5,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::Word;
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMapWitness,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMapWitness,
     StorageSlotType,
 };
 use miden_objects::block::{AccountWitness, BlockNumber};

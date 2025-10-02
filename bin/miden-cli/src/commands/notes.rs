@@ -3,11 +3,7 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use miden_client::asset::Asset;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
-    NoteConsumability,
-    NoteInputs,
-    NoteMetadata,
-    WellKnownNote,
-    get_input_note_with_id_prefix,
+    NoteConsumability, NoteInputs, NoteMetadata, WellKnownNote, get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};

@@ -6,8 +6,7 @@ use miden_lib::testing::mock_account::MockAccountExt;
 use miden_objects::account::{Account, AccountFile, AuthSecretKey};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
 };
 use miden_objects::{EMPTY_WORD, Word, ZERO};
 

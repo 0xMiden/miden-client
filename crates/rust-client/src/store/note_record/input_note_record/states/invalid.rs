@@ -6,10 +6,7 @@ use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note
 use miden_objects::transaction::TransactionId;
 
 use super::{
-    CommittedNoteState,
-    ConsumedExternalNoteState,
-    InputNoteState,
-    NoteStateHandler,
+    CommittedNoteState, ConsumedExternalNoteState, InputNoteState, NoteStateHandler,
     UnverifiedNoteState,
 };
 use crate::store::NoteRecordError;

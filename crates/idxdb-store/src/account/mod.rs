@@ -3,15 +3,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdError,
-    AccountStorage,
-    StorageMap,
-    StorageSlot,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdError, AccountStorage, StorageMap,
+    StorageSlot, StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
@@ -24,38 +17,22 @@ use crate::promise::{await_js, await_js_value};
 mod js_bindings;
 pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use js_bindings::{
-    idxdb_get_account_code,
-    idxdb_get_account_header,
-    idxdb_get_account_header_by_commitment,
-    idxdb_get_account_headers,
-    idxdb_get_account_ids,
-    idxdb_get_account_storage,
-    idxdb_get_account_storage_maps,
-    idxdb_get_account_vault_assets,
-    idxdb_get_foreign_account_code,
-    idxdb_lock_account,
-    idxdb_undo_account_states,
-    idxdb_upsert_foreign_account_code,
+    idxdb_get_account_code, idxdb_get_account_header, idxdb_get_account_header_by_commitment,
+    idxdb_get_account_headers, idxdb_get_account_ids, idxdb_get_account_storage,
+    idxdb_get_account_storage_maps, idxdb_get_account_vault_assets, idxdb_get_foreign_account_code,
+    idxdb_lock_account, idxdb_undo_account_states, idxdb_upsert_foreign_account_code,
 };
 
 mod models;
 use models::{
-    AccountAssetIdxdbObject,
-    AccountCodeIdxdbObject,
-    AccountRecordIdxdbObject,
-    AccountStorageIdxdbObject,
-    ForeignAccountCodeIdxdbObject,
-    StorageMapEntryIdxdbObject,
+    AccountAssetIdxdbObject, AccountCodeIdxdbObject, AccountRecordIdxdbObject,
+    AccountStorageIdxdbObject, ForeignAccountCodeIdxdbObject, StorageMapEntryIdxdbObject,
 };
 
 pub(crate) mod utils;
 use utils::{
-    parse_account_record_idxdb_object,
-    update_account,
-    upsert_account_asset_vault,
-    upsert_account_code,
-    upsert_account_record,
-    upsert_account_storage,
+    parse_account_record_idxdb_object, update_account, upsert_account_asset_vault,
+    upsert_account_code, upsert_account_record, upsert_account_storage,
 };
 
 impl WebStore {

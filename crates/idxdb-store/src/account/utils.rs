@@ -2,12 +2,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    StorageSlot,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorage, StorageSlot,
 };
 use miden_client::asset::AssetVault;
 use miden_client::store::{AccountStatus, StoreError};
@@ -17,13 +12,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 use super::js_bindings::{
-    JsStorageMapEntry,
-    JsStorageSlot,
-    JsVaultAsset,
-    idxdb_upsert_account_code,
-    idxdb_upsert_account_record,
-    idxdb_upsert_account_storage,
-    idxdb_upsert_storage_map_entries,
+    JsStorageMapEntry, JsStorageSlot, JsVaultAsset, idxdb_upsert_account_code,
+    idxdb_upsert_account_record, idxdb_upsert_account_storage, idxdb_upsert_storage_map_entries,
     idxdb_upsert_vault_assets,
 };
 use super::models::AccountRecordIdxdbObject;

@@ -2,12 +2,8 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use miden_client::account::component::{
-    AccountComponentMetadata,
-    AccountComponentTemplate,
-    COMPONENT_TEMPLATE_EXTENSION,
-    basic_fungible_faucet_library,
-    basic_wallet_library,
-    rpo_falcon_512_library,
+    AccountComponentMetadata, AccountComponentTemplate, COMPONENT_TEMPLATE_EXTENSION,
+    basic_fungible_faucet_library, basic_wallet_library, rpo_falcon_512_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;

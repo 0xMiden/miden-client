@@ -9,23 +9,14 @@ use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::crypto::merkle::{InnerNodeInfo, MerkleStore};
 use miden_objects::note::{
-    Note,
-    NoteDetails,
-    NoteId,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
-    PartialNote,
+    Note, NoteDetails, NoteId, NoteRecipient, NoteTag, NoteType, PartialNote,
 };
 use miden_objects::transaction::{OutputNote, TransactionScript};
 use miden_objects::vm::AdviceMap;
 use miden_objects::{Felt, FieldElement, NoteError, Word};
 
 use super::{
-    ForeignAccount,
-    NoteArgs,
-    TransactionRequest,
-    TransactionRequestError,
+    ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
     TransactionScriptTemplate,
 };
 use crate::ClientRng;

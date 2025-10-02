@@ -7,16 +7,8 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    StorageMap,
-    StorageSlot,
-    StorageSlotType,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
@@ -29,12 +21,8 @@ use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::merkle_store::{
-    get_asset_proof,
-    get_storage_map_item_proof,
-    insert_asset_nodes,
-    insert_storage_map_nodes,
-    update_asset_nodes,
-    update_storage_map_nodes,
+    get_asset_proof, get_storage_map_item_proof, insert_asset_nodes, insert_storage_map_nodes,
+    update_asset_nodes, update_storage_map_nodes,
 };
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
@@ -998,29 +986,17 @@ mod tests {
     use anyhow::Context;
     use miden_client::account::component::AccountComponent;
     use miden_client::account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountDelta,
-        AccountHeader,
-        AccountId,
-        AccountType,
-        StorageMap,
-        StorageSlot,
+        Account, AccountBuilder, AccountCode, AccountDelta, AccountHeader, AccountId, AccountType,
+        StorageMap, StorageSlot,
     };
     use miden_client::asset::{
-        AccountStorageDelta,
-        AccountVaultDelta,
-        Asset,
-        FungibleAsset,
-        NonFungibleAsset,
+        AccountStorageDelta, AccountVaultDelta, Asset, FungibleAsset, NonFungibleAsset,
         NonFungibleAssetDetails,
     };
     use miden_client::crypto::rpo_falcon512::PublicKey;
     use miden_client::store::Store;
     use miden_client::testing::account_id::{
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
     use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_client::transaction::TransactionKernel;

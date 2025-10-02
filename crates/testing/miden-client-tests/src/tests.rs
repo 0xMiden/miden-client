@@ -13,32 +13,15 @@ use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    create_test_store_path,
-    execute_failing_tx,
-    execute_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
+    consume_notes, create_test_store_path, execute_failing_tx, execute_tx, mint_and_consume,
+    mint_note, setup_two_wallets_and_faucet, setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionExecutorError,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
+    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::SqliteStore;
@@ -53,39 +36,20 @@ use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
 use miden_objects::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    AuthSecretKey,
-    StorageMap,
-    StorageSlot,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
+    AccountStorageMode, AccountType, AuthSecretKey, StorageMap, StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
+    NoteRecipient, NoteTag, NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };

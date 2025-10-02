@@ -6,21 +6,10 @@ use miden_client::account::component::AccountComponent;
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot};
 use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType,
 };
 use miden_client::testing::common::{
-    TestClient,
-    execute_tx_and_sync,
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_tx,
+    TestClient, execute_tx_and_sync, insert_new_wallet, wait_for_blocks, wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, ScriptBuilder, Word, ZERO};

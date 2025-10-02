@@ -10,12 +10,8 @@ use miden_client::crypto::MerkleStore;
 use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
-    TransactionDetails,
-    TransactionRecord,
-    TransactionScript,
-    TransactionStatus,
-    TransactionStatusVariant,
-    TransactionStoreUpdate,
+    TransactionDetails, TransactionRecord, TransactionScript, TransactionStatus,
+    TransactionStatusVariant, TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
 use rusqlite::types::Value;

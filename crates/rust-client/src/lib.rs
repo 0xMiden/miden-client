@@ -146,12 +146,7 @@ mod errors;
 pub mod assembly {
     pub use miden_objects::assembly::debuginfo::SourceManagerSync;
     pub use miden_objects::assembly::{
-        Assembler,
-        DefaultSourceManager,
-        Library,
-        LibraryPath,
-        Module,
-        ModuleKind,
+        Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind,
     };
 }
 
@@ -159,19 +154,11 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
-        AccountStorageDelta,
-        AccountVaultDelta,
-        FungibleAssetDelta,
-        NonFungibleAssetDelta,
+        AccountStorageDelta, AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
     pub use miden_objects::asset::{
-        Asset,
-        AssetVault,
-        AssetWitness,
-        FungibleAsset,
-        NonFungibleAsset,
-        NonFungibleAssetDetails,
+        Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -201,19 +188,8 @@ pub mod crypto {
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
-        Forest,
-        InOrderIndex,
-        LeafIndex,
-        MerklePath,
-        MerkleStore,
-        MerkleTree,
-        MmrDelta,
-        MmrPeaks,
-        MmrProof,
-        NodeIndex,
-        SMT_DEPTH,
-        SmtLeaf,
-        SmtProof,
+        Forest, InOrderIndex, LeafIndex, MerklePath, MerkleStore, MerkleTree, MmrDelta, MmrPeaks,
+        MmrProof, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
@@ -231,15 +207,8 @@ pub mod vm {
 pub use errors::*;
 use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_objects::{
-    EMPTY_WORD,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-    ONE,
-    PrettyPrint,
-    StarkField,
-    Word,
-    ZERO,
+    EMPTY_WORD, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, ONE, PrettyPrint,
+    StarkField, Word, ZERO,
 };
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;

@@ -94,12 +94,7 @@ use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    StoreError,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -111,36 +106,18 @@ mod request;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionArgs,
-    TransactionId,
-    TransactionScript,
-    TransactionSummary,
-    TransactionWitness,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionArgs, TransactionId, TransactionScript, TransactionSummary, TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError,
 };
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 // TRANSACTION RESULT

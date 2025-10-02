@@ -4,12 +4,7 @@ use alloc::vec::Vec;
 use miden_client::Word;
 use miden_client::note::Nullifier;
 use miden_client::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    OutputNoteState,
-    StoreError,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, StoreError,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::js_sys::{Array, Promise};
@@ -19,13 +14,9 @@ use crate::promise::await_js;
 
 mod js_bindings;
 use js_bindings::{
-    idxdb_get_input_notes,
-    idxdb_get_input_notes_from_ids,
-    idxdb_get_input_notes_from_nullifiers,
-    idxdb_get_output_notes,
-    idxdb_get_output_notes_from_ids,
-    idxdb_get_output_notes_from_nullifiers,
-    idxdb_get_unspent_input_note_nullifiers,
+    idxdb_get_input_notes, idxdb_get_input_notes_from_ids, idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_output_notes, idxdb_get_output_notes_from_ids,
+    idxdb_get_output_notes_from_nullifiers, idxdb_get_unspent_input_note_nullifiers,
 };
 
 mod models;
