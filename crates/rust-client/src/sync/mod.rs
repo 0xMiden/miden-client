@@ -80,7 +80,10 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
+    AccountUpdates,
+    BlockUpdates,
+    StateSyncUpdate,
+    TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.

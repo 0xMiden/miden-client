@@ -6,11 +6,23 @@ use std::vec::Vec;
 
 use miden_client::Word;
 use miden_client::note::{
-    BlockNumber, NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript,
-    NoteUpdateTracker, Nullifier,
+    BlockNumber,
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteUpdateTracker,
+    Nullifier,
 };
 use miden_client::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, OutputNoteState, StoreError,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::types::Value;

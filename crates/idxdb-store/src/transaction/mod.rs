@@ -5,7 +5,10 @@ use miden_client::Word;
 use miden_client::account::Account;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
-    TransactionDetails, TransactionRecord, TransactionScript, TransactionStatus,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionScript,
+    TransactionStatus,
     TransactionStoreUpdate,
 };
 use miden_client::utils::Deserializable;

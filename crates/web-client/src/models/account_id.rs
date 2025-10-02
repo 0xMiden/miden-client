@@ -3,7 +3,9 @@ use std::str::FromStr;
 use miden_client::Felt as NativeFelt;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
-    AccountIdAddress, Address, AddressInterface as NativeAccountInterface,
+    AccountIdAddress,
+    Address,
+    AddressInterface as NativeAccountInterface,
     NetworkId as NativeNetworkId,
 };
 use wasm_bindgen::prelude::*;

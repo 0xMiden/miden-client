@@ -11,7 +11,11 @@ use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
 use miden_objects::transaction::{
-    AccountInputs, InputNote, InputNotes, TransactionArgs, TransactionScript,
+    AccountInputs,
+    InputNote,
+    InputNotes,
+    TransactionArgs,
+    TransactionScript,
 };
 use miden_objects::vm::AdviceMap;
 use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
@@ -482,7 +486,8 @@ mod tests {
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_objects::transaction::OutputNote;

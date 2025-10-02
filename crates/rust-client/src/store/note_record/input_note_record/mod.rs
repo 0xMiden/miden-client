@@ -4,19 +4,34 @@ use miden_objects::Word;
 use miden_objects::account::AccountId;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{
-    Note, NoteAssets, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, Nullifier,
+    Note,
+    NoteAssets,
+    NoteDetails,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    Nullifier,
 };
 use miden_objects::transaction::{InputNote, TransactionId};
 use miden_objects::utils::{
-    ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable,
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
 };
 
 use super::NoteRecordError;
 
 mod states;
 pub use states::{
-    CommittedNoteState, ConsumedAuthenticatedLocalNoteState, ExpectedNoteState, InputNoteState,
-    InvalidNoteState, ProcessingAuthenticatedNoteState, ProcessingUnauthenticatedNoteState,
+    CommittedNoteState,
+    ConsumedAuthenticatedLocalNoteState,
+    ExpectedNoteState,
+    InputNoteState,
+    InvalidNoteState,
+    ProcessingAuthenticatedNoteState,
+    ProcessingUnauthenticatedNoteState,
     UnverifiedNoteState,
 };
 

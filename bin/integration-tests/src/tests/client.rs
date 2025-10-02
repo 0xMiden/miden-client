@@ -10,12 +10,22 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteState,
+    TransactionFilter,
 };
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, ProvenTransaction, TransactionProver,
-    TransactionProverError, TransactionRequestBuilder, TransactionStatus, TransactionWitness,
+    DiscardCause,
+    PaymentNoteDescription,
+    ProvenTransaction,
+    TransactionProver,
+    TransactionProverError,
+    TransactionRequestBuilder,
+    TransactionStatus,
+    TransactionWitness,
 };
 use miden_client_sqlite_store::SqliteStore;
 

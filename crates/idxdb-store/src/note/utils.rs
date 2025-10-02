@@ -4,10 +4,20 @@ use alloc::vec::Vec;
 use chrono::Utc;
 use miden_client::Word;
 use miden_client::note::{
-    NoteAssets, NoteDetails, NoteInputs, NoteMetadata, NoteRecipient, NoteScript, NoteUpdateTracker,
+    NoteAssets,
+    NoteDetails,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteUpdateTracker,
 };
 use miden_client::store::{
-    InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState, StoreError,
+    InputNoteRecord,
+    InputNoteState,
+    OutputNoteRecord,
+    OutputNoteState,
+    StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;

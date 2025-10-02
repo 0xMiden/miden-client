@@ -3,7 +3,14 @@ use alloc::vec::Vec;
 use miden_objects::block::BlockHeader;
 use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
-    Note, NoteDetails, NoteId, NoteInclusionProof, NoteMetadata, NoteScript, NoteTag, NoteType,
+    Note,
+    NoteDetails,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteScript,
+    NoteTag,
+    NoteType,
 };
 use miden_objects::{Felt, MastForest, MastNodeId, Word};
 use miden_tx::utils::Deserializable;

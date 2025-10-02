@@ -1,7 +1,8 @@
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
 use miden_client::transaction::{
-    PaymentNoteDescription, SwapTransactionData,
+    PaymentNoteDescription,
+    SwapTransactionData,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionResult as NativeTransactionResult,
 };
