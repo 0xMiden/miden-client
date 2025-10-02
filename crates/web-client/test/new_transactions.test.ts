@@ -1276,7 +1276,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(0, MAP_KEY)
+      .getMapItem(1, MAP_KEY)
       ?.toHex();
 
     // Deploy counter account
@@ -1314,14 +1314,14 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )
       ?.storage()
-      .getMapItem(0, MAP_KEY)
+      .getMapItem(1, MAP_KEY)
       ?.toHex();
 
     // Test getMapEntries() functionality
     let accountStorage = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
     )?.storage();
-    let mapEntries = accountStorage?.getMapEntries(0);
+    let mapEntries = accountStorage?.getMapEntries(1);
 
     // Verify we get the expected entries
     let expectedKey = MAP_KEY.toHex();
