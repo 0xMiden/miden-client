@@ -21,6 +21,7 @@
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
+* [BREAKING] Added connectivity to the Transport Layer, adding a new `Client` field and `Store` methods ([#1296](https://github.com/0xMiden/miden-client/pull/1296)).
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
 
 ## 0.11.8 (2025-09-29)

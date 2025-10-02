@@ -9,6 +9,7 @@ use miden_client::account::AccountHeader;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::SqliteStore;
@@ -21,6 +22,7 @@ use commands::import::ImportCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::note_transport::NoteTransportCmd;
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
@@ -143,6 +145,8 @@ pub enum Command {
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
+    #[command(subcommand)]
+    NoteTransport(NoteTransportCmd),
 }
 
 /// CLI entry point.
@@ -190,6 +194,16 @@ impl Cli {
             builder = builder.max_block_number_delta(delta);
         }
 
+        if let Some(tl_config) = cli_config.note_transport {
+            let client = GrpcNoteTransportClient::connect(
+                tl_config.endpoint.to_string(),
+                tl_config.timeout_ms,
+            )
+            .await
+            .map_err(|e| CliError::Client(e.into()))?;
+            builder = builder.note_transport(Arc::new(client));
+        }
+
         let mut client = builder.build().await?;
 
         client.ensure_genesis_in_place().await?;
@@ -214,6 +228,9 @@ impl Cli {
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
+            Command::NoteTransport(note_transport) => {
+                Box::pin(note_transport.execute(client)).await
+            },
         }
     }
 

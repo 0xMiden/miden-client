@@ -149,8 +149,8 @@ CREATE TABLE state_sync (
 
 -- Create tags table
 CREATE TABLE tags (
-    tag BLOB NOT NULL,                  -- the serialized tag
-    source BLOB NOT NULL                -- the serialized tag source
+    tag BLOB NOT NULL,    -- the serialized tag
+    source BLOB NOT NULL  -- the serialized tag source
 );
 
 -- insert initial row into state_sync table
@@ -174,4 +174,4 @@ CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
-)
+);
