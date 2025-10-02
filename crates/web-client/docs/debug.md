@@ -1,8 +1,7 @@
 # Debugging WASM
 
-When debugging WASM, it can be hard to trace the origin of an error since stack traces are not really useful.
-The typical situation is that you're running a frontend app from JS and get an unreadeable stacktrace.
-We can generate a debug build with symbols to help us trace these errors. This doc explains how to set it up.
+When debugging WASM, it can be tricky to trace the origin of an error since stack traces are not often noisy and difficult to read.
+To better trace these errors, a build with debug symbols can be generated. This doc explains how to set it up.
 
 ## Requirements
     - `yarn`
