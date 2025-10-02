@@ -86,6 +86,7 @@ pub mod component {
         AccountComponentTemplate,
         FeltRepresentation,
         InitStorageData,
+        Package,
         StorageEntry,
         StorageValueName,
         TemplateType,

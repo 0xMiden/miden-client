@@ -85,3 +85,9 @@ impl From<&AccountComponent> for NativeAccountComponent {
         account_component.0.clone()
     }
 }
+
+impl From<NativeAccountComponent> for AccountComponent {
+    fn from(native: NativeAccountComponent) -> Self {
+        AccountComponent(native)
+    }
+}
