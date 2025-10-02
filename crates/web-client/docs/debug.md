@@ -58,7 +58,7 @@ yarn link "@demox-labs/miden-sdk"
 You should also be able to see the rust source in the devtools source tab:
 ![source-example](./source-example.png)
 
-Also, you should seed friendlier stack-traces:
+Also, you should see friendlier stack traces:
 ![stack-trace-example](./stack-trace-example.png)
 
 
