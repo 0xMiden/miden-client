@@ -304,6 +304,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -395,6 +413,18 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+***
+
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
+
+#### Returns
+
+`Promise`\<`string`[]\>
 
 ***
 
@@ -638,6 +668,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+Deletes a setting key-value from the store.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -663,6 +711,28 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 
