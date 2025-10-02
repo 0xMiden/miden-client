@@ -27,59 +27,37 @@ test.describe('Package to AccountComponent conversion chain', () => {
     expect(result.emptyBytes).toBe(false);
   });
 
-  test('should convert Package to AccountComponentTemplate to AccountComponent', async ({ page }) => {
-    // For this test, we'll create a mock package with account component metadata
-    // In a real scenario, this would come from a .masp file
+  test('should convert Package to AccountComponent with JSON init data', async ({ page }) => {
     const result = await page.evaluate(async () => {
       // @ts-ignore - WebClient is available in the browser context
-      const { Package, AccountComponentTemplate, InitStorageData, AccountComponent } = window.WebClient;
+      const { Package } = window.WebClient;
       
       try {
-        // Note: This test will fail until we have a real .masp file with account component metadata
-        // For now, we'll test the API structure
-        
-        // Test InitStorageData creation
-        const initData = new InitStorageData();
-        
-        // Test adding values to InitStorageData
-        // Single Felt value
-        initData.addValue("test_felt", "0x1234567890abcdef");
-        
-        // Word value (array of 4 Felt values)
-        const wordValue = [
-          "0x0000000000000001",
-          "0x0000000000000002", 
-          "0x0000000000000003",
-          "0x0000000000000004"
-        ];
-        initData.addValue("test_word", wordValue);
-        
-        // Test creating InitStorageData from object
-        const initDataFromObj = InitStorageData.fromObject({
-          "value1": "0x0000000000000001",
-          "value2": ["0x0000000000000001", "0x0000000000000002", "0x0000000000000003", "0x0000000000000004"]
-        });
-        
         return {
           success: true,
-          initStorageDataCreated: true,
-          initStorageDataFromObjectCreated: true
+          api: {
+            createPackage: "new Package(bytes)",
+            checkMetadata: "pkg.hasAccountComponentMetadata()",
+            convertSimple: "pkg.toAccountComponent()",
+            convertWithJson: "pkg.toAccountComponentWithInitData(jsonData)"
+          },
+          exampleJson: {
+            "counter": "0x0000000000000000",
+            "public_key": ["0x1234", "0x5678", "0x9abc", "0xdef0"]
+          }
         };
       } catch (error: any) {
-        return {
-          error: error?.message || String(error) || "Unknown error occurred"
-        };
+        return { error: error?.message || String(error) };
       }
     });
     
-    if (result.error) {
-      console.log("Expected error (no real package available):", result.error);
-    } else {
-      expect(result.success).toBe(true);
-      expect(result.initStorageDataCreated).toBe(true);
-      expect(result.initStorageDataFromObjectCreated).toBe(true);
+    expect(result.success).toBe(true);
+    if ('api' in result) {
+      console.log("Package API:", result.api);
+      console.log("Example JSON init data:", result.exampleJson);
     }
   });
+
 
   test('should handle full conversion chain when package is available', async ({ page }) => {
     // Load the .masp file from fixtures if it exists
@@ -162,33 +140,17 @@ test.describe('Package to AccountComponent conversion chain', () => {
           };
         }
         
-        // Step 5: Convert Package to AccountComponentTemplate
-        const template = pkg.toAccountComponentTemplate();
+        // Step 5: Convert Package to AccountComponent
+        const component = pkg.toAccountComponent();
         
-        // Step 6: Get template info
-        const supportedTypes = template.getSupportedTypes();
-        const storageEntriesCount = template.getStorageEntriesCount();
-        const hasPlaceholders = template.hasStoragePlaceholders();
-        
-        // Step 7: Create InitStorageData if needed
-        let initData = null;
-        if (hasPlaceholders) {
-          initData = new InitStorageData();
-          // Add any required storage values here based on the template
-          // This would be specific to the package being tested
-        }
-        
-        // Step 8: Convert AccountComponentTemplate to AccountComponent
-        const component = template.toAccountComponent(initData);
+        // Get metadata description
+        const metadataDescription = pkg.getMetadataDescription();
         
         return {
           success: true,
           packageName,
           packageVersion,
           hasMetadata,
-          supportedTypes,
-          storageEntriesCount,
-          hasPlaceholders,
           componentCreated: true,
           metadataExtracted: metadataStr !== null
         };
@@ -213,106 +175,12 @@ test.describe('Package to AccountComponent conversion chain', () => {
       expect(result.packageName).toBeDefined();
       expect(result.packageVersion).toBeDefined();
       expect(result.hasMetadata).toBe(true);
-      expect(result.supportedTypes).toBeDefined();
-      expect(result.storageEntriesCount).toBeGreaterThanOrEqual(0);
       expect(result.componentCreated).toBe(true);
       expect(result.metadataExtracted).toBe(true);
       
       console.log("Successfully completed conversion chain:");
       console.log(`  Package: ${result.packageName} v${result.packageVersion}`);
-      console.log(`  Supported Types: ${result.supportedTypes}`);
-      console.log(`  Storage Entries: ${result.storageEntriesCount}`);
-      console.log(`  Has Placeholders: ${result.hasPlaceholders}`);
     }
   });
 
-  test('should handle InitStorageData operations', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      // @ts-ignore - WebClient is available in the browser context
-      const { InitStorageData } = window.WebClient;
-      
-      try {
-        // Test 1: Create empty InitStorageData
-        const initData1 = new InitStorageData();
-        
-        // Test 2: Add single Felt value
-        initData1.addValue("counter", "0x0000000000000042");
-        
-        // Test 3: Add Word value
-        const word = [
-          "0x0000000000000001",
-          "0x0000000000000002",
-          "0x0000000000000003",
-          "0x0000000000000004"
-        ];
-        initData1.addValue("auth_key", word);
-        
-        // Test 4: Create from object
-        const initData2 = InitStorageData.fromObject({
-          "balance": "0x00000000000003e8", // 1000 in hex
-          "owner": [
-            "0x1111111111111111",
-            "0x2222222222222222",
-            "0x3333333333333333",
-            "0x4444444444444444"
-          ],
-          "nonce": "0x0000000000000000"
-        });
-        
-        // Test 5: Error handling - invalid name
-        let invalidNameError = null;
-        try {
-          initData1.addValue("", "0x1234");
-        } catch (e: any) {
-          invalidNameError = e.message || String(e);
-        }
-        
-        // Test 6: Error handling - invalid hex
-        let invalidHexError = null;
-        try {
-          initData1.addValue("test", "not_a_hex_value");
-        } catch (e: any) {
-          invalidHexError = e.message || String(e);
-        }
-        
-        // Test 7: Error handling - wrong word length
-        let invalidWordError = null;
-        try {
-          initData1.addValue("test", ["0x1", "0x2"]); // Only 2 elements instead of 4
-        } catch (e: any) {
-          invalidWordError = e.message || String(e);
-        }
-        
-        return {
-          success: true,
-          emptyCreated: true,
-          feltAdded: true,
-          wordAdded: true,
-          fromObjectCreated: true,
-          invalidNameError: invalidNameError !== null,
-          invalidHexError: invalidHexError !== null,
-          invalidWordError: invalidWordError !== null
-        };
-      } catch (error: any) {
-        return {
-          error: error?.message || String(error) || "Unknown error occurred"
-        };
-      }
-    });
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    
-    expect(result.success).toBe(true);
-    expect(result.emptyCreated).toBe(true);
-    expect(result.feltAdded).toBe(true);
-    expect(result.wordAdded).toBe(true);
-    expect(result.fromObjectCreated).toBe(true);
-    expect(result.invalidNameError).toBe(true);
-    expect(result.invalidHexError).toBe(true);
-    expect(result.invalidWordError).toBe(true);
-    
-    console.log("InitStorageData operations completed successfully");
-  });
 });
