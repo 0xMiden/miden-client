@@ -295,6 +295,7 @@ where
         .map_err(|e| Error::custom(format!("Base64 decode error: {e}")))
 }
 
+/// Helper function to decode a base64 string to an `Option<Vec<u8>>`.
 pub(crate) fn base64_to_vec_u8_optional<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<u8>>, D::Error>
