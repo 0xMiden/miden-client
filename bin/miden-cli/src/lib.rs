@@ -178,10 +178,7 @@ impl Cli {
 
         let mut builder = ClientBuilder::new()
             .store(Arc::new(sqlite_store))
-            .tonic_rpc_client(
-                &cli_config.rpc.endpoint.clone().into(),
-                Some(cli_config.rpc.timeout_ms),
-            )
+            .grpc_client(&cli_config.rpc.endpoint.clone().into(), Some(cli_config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(in_debug_mode)
             .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));

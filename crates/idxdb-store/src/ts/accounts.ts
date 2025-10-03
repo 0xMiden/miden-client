@@ -4,6 +4,7 @@ import {
   accountAssets,
   accountAuths,
   accounts,
+  addresses,
   foreignAccountCode,
   IAccount,
   IAccountAsset,
@@ -283,6 +284,28 @@ export async function getAccountAuthByPubKey(pubKey: string) {
   return data;
 }
 
+export async function getAccountAddresses(accountId: string) {
+  try {
+    // Fetch all records matching the given accountId
+    const allMatchingRecords = await addresses
+      .where("id")
+      .equals(accountId)
+      .toArray();
+
+    if (allMatchingRecords.length === 0) {
+      console.log("No address records found for given account ID.");
+      return [];
+    }
+
+    return allMatchingRecords;
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error while fetching account addresses for id: ${accountId}`
+    );
+  }
+}
+
 // INSERT FUNCTIONS
 
 export async function upsertAccountCode(codeRoot: string, code: Uint8Array) {
@@ -392,6 +415,27 @@ export async function insertAccountAuth(pubKey: string, secretKey: string) {
     logWebStoreError(
       error,
       `Error inserting account auth for pubKey: ${pubKey}`
+    );
+  }
+}
+
+export async function insertAccountAddress(
+  address: Uint8Array,
+  accountId: string
+) {
+  try {
+    // Prepare the data object to insert
+    const data = {
+      address,
+      id: accountId,
+    };
+
+    // Perform the insert using Dexie
+    await addresses.put(data);
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error inserting address with value: ${String(address)} for the account ID ${accountId}`
     );
   }
 }
