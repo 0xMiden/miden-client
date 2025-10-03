@@ -22,6 +22,7 @@ enum Table {
   StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
   Accounts = "accounts",
+  Addresses = "addresses",
   Transactions = "transactions",
   TransactionScripts = "transactionScripts",
   InputNotes = "inputNotes",
@@ -75,6 +76,11 @@ export interface IAccount {
   accountSeed?: Uint8Array;
   accountCommitment: string;
   locked: boolean;
+}
+
+export interface IAddress {
+  address: Uint8Array;
+  id: string;
 }
 
 export interface ITransaction {
@@ -160,6 +166,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accounts: Dexie.Table<IAccount, string>;
+  addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
   inputNotes: Dexie.Table<IInputNote, string>;
@@ -186,6 +193,7 @@ db.version(1).stores({
     "storageRoot",
     "vaultRoot"
   ),
+  [Table.Addresses]: indexes("id"),
   [Table.Transactions]: indexes("id"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
@@ -223,6 +231,7 @@ const storageMapEntries = db.table<IStorageMapEntry, string>(
 const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
 const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
 const accounts = db.table<IAccount, string>(Table.Accounts);
+const addresses = db.table<IAddress, string>(Table.Addresses);
 const transactions = db.table<ITransaction, string>(Table.Transactions);
 const transactionScripts = db.table<ITransactionScript, string>(
   Table.TransactionScripts
@@ -249,6 +258,7 @@ export {
   accountAssets,
   accountAuths,
   accounts,
+  addresses,
   transactions,
   transactionScripts,
   inputNotes,

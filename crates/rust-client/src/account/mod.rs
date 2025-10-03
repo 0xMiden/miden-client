@@ -68,6 +68,7 @@ use super::Client;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
+use crate::sync::NoteTagRecord;
 
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
@@ -151,11 +152,22 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
+                let default_address = Address::AccountId(AccountIdAddress::new(
+                    account.id(),
+                    AddressInterface::Unspecified,
+                ));
+
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.into()).await?;
+                let default_address_note_tag = default_address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                self.store.add_note_tag(note_tag_record).await?;
 
-                self.store.insert_account(account).await.map_err(ClientError::StoreError)
+                self.store
+                    .insert_account(account, default_address)
+                    .await
+                    .map_err(ClientError::StoreError)
             },
             Some(tracked_account) => {
                 if !overwrite {

@@ -9,6 +9,7 @@ use miden_client::account::{
     AccountId,
     AccountIdError,
     AccountStorage,
+    Address,
     StorageMap,
     StorageSlot,
     StorageSlotType,
@@ -19,6 +20,9 @@ use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
 
 use super::WebStore;
+use crate::account::js_bindings::idxdb_get_account_addresses;
+use crate::account::models::AddressIdxdbObject;
+use crate::account::utils::{insert_account_address, parse_account_address_idxdb_object};
 use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
@@ -126,6 +130,23 @@ impl WebStore {
         account_header
     }
 
+    pub(crate) async fn get_account_addresses(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError> {
+        let account_id_str = account_id.to_string();
+
+        let promise = idxdb_get_account_addresses(account_id_str);
+
+        let account_addresses_idxdb: Vec<AddressIdxdbObject> =
+            await_js(promise, "failed to fetch account addresses").await?;
+
+        account_addresses_idxdb
+            .into_iter()
+            .map(|obj| parse_account_address_idxdb_object(&obj).map(|(addr, _)| addr))
+            .collect::<Result<Vec<Address>, StoreError>>()
+    }
+
     pub(crate) async fn get_account(
         &self,
         account_id: AccountId,
@@ -149,7 +170,9 @@ impl WebStore {
             status.seed().copied(),
         )?;
 
-        Ok(Some(AccountRecord::new(account, status)))
+        let addresses = self.get_account_addresses(account_id).await?;
+
+        Ok(Some(AccountRecord::new(account, status, addresses)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
@@ -217,7 +240,11 @@ impl WebStore {
         Ok(assets)
     }
 
-    pub(crate) async fn insert_account(&self, account: &Account) -> Result<(), StoreError> {
+    pub(crate) async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
         upsert_account_code(account.code()).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
         })?;
@@ -232,6 +259,10 @@ impl WebStore {
 
         upsert_account_record(account).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
+        })?;
+
+        insert_account_address(account, initial_address).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
         })?;
 
         Ok(())

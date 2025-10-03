@@ -21,6 +21,7 @@ var Table;
     Table["StorageMapEntries"] = "storageMapEntries";
     Table["AccountAuth"] = "accountAuth";
     Table["Accounts"] = "accounts";
+    Table["Addresses"] = "addresses";
     Table["Transactions"] = "transactions";
     Table["TransactionScripts"] = "transactionScripts";
     Table["InputNotes"] = "inputNotes";
@@ -41,6 +42,7 @@ db.version(1).stores({
     [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
     [Table.AccountAuth]: indexes("pubKey"),
     [Table.Accounts]: indexes("&accountCommitment", "id", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.Addresses]: indexes("id"),
     [Table.Transactions]: indexes("id"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
     [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
@@ -68,6 +70,7 @@ const storageMapEntries = db.table(Table.StorageMapEntries);
 const accountAssets = db.table(Table.AccountAssets);
 const accountAuths = db.table(Table.AccountAuth);
 const accounts = db.table(Table.Accounts);
+const addresses = db.table(Table.Addresses);
 const transactions = db.table(Table.Transactions);
 const transactionScripts = db.table(Table.TransactionScripts);
 const inputNotes = db.table(Table.InputNotes);
@@ -79,5 +82,5 @@ const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
 const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
 //# sourceMappingURL=schema.js.map
