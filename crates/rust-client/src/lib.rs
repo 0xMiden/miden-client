@@ -145,6 +145,8 @@ mod errors;
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
     pub use miden_objects::assembly::debuginfo::SourceManagerSync;
+    pub use miden_objects::assembly::diagnostics::Report;
+    pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_objects::assembly::{
         Assembler,
         DefaultSourceManager,

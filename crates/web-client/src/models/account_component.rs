@@ -5,7 +5,7 @@ use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
-use crate::models::assembler::Assembler;
+use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 
@@ -16,13 +16,13 @@ pub struct AccountComponent(NativeAccountComponent);
 impl AccountComponent {
     pub fn compile(
         account_code: &str,
-        assembler: &Assembler,
+        builder: &ScriptBuilder,
         storage_slots: Vec<StorageSlot>,
     ) -> Result<AccountComponent, JsValue> {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        NativeAccountComponent::compile(account_code, assembler.into(), native_slots)
+        NativeAccountComponent::compile(account_code, builder.clone_assembler(), native_slots)
             .map(AccountComponent)
             .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }

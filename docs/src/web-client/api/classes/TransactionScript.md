@@ -25,23 +25,3 @@
 #### Returns
 
 [`Word`](Word.md)
-
-***
-
-### compile()
-
-> `static` **compile**(`script_code`, `assembler`): `TransactionScript`
-
-#### Parameters
-
-##### script\_code
-
-`string`
-
-##### assembler
-
-[`Assembler`](Assembler.md)
-
-#### Returns
-
-`TransactionScript`
