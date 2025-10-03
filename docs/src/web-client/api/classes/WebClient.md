@@ -50,6 +50,22 @@
 
 ***
 
+### applyTransaction()
+
+> **applyTransaction**(`tx_update`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### tx\_update
+
+[`TransactionStoreUpdate`](TransactionStoreUpdate.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
@@ -103,6 +119,35 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 [`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
+### executeTransactionPipeline()
+
+> **executeTransactionPipeline**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
+
+Executes a transaction specified by the request against the specified account but does not
+submit it to the network nor update the local database. The returned [`TransactionPipeline`]
+retains all intermediate artifacts (request, execution results, proofs) needed to continue
+with the transaction lifecycle.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
 
 ***
 
@@ -614,15 +659,11 @@ Returns all the existing setting keys from the store.
 
 ***
 
-### newTransaction()
+### newTransactionPipeline()
 
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+> **newTransactionPipeline**(`transaction_request`): [`TransactionPipeline`](TransactionPipeline.md)
 
 #### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
 
 ##### transaction\_request
 
@@ -630,7 +671,7 @@ Returns all the existing setting keys from the store.
 
 #### Returns
 
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
+[`TransactionPipeline`](TransactionPipeline.md)
 
 ***
 
@@ -736,23 +777,46 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ***
 
-### submitTransaction()
+### submitNewTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
+> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account,
+proves it, submits it to the network, and updates the local database.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
 
 #### Parameters
 
-##### transaction\_result
+##### account\_id
 
-[`TransactionResult`](TransactionResult.md)
+[`AccountId`](AccountId.md)
 
-##### prover?
+##### transaction\_request
 
-[`TransactionProver`](TransactionProver.md)
+[`TransactionRequest`](TransactionRequest.md)
 
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitProvenTransaction()
+
+> **submitProvenTransaction**(`proven_transaction`): `Promise`\<`number`\>
+
+#### Parameters
+
+##### proven\_transaction
+
+[`ProvenTransaction`](ProvenTransaction.md)
+
+#### Returns
+
+`Promise`\<`number`\>
 
 ***
 
@@ -763,22 +827,6 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-***
-
-### testingApplyTransaction()
-
-> **testingApplyTransaction**(`tx_result`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### tx\_result
-
-[`TransactionResult`](TransactionResult.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 

@@ -2,9 +2,9 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / TransactionResult
+[@demox-labs/miden-sdk](../README.md) / TransactionStoreUpdate
 
-# Class: TransactionResult
+# Class: TransactionStoreUpdate
 
 ## Methods
 
@@ -15,26 +15,6 @@
 #### Returns
 
 [`AccountDelta`](AccountDelta.md)
-
-***
-
-### blockNum()
-
-> **blockNum**(): `number`
-
-#### Returns
-
-`number`
-
-***
-
-### consumedNotes()
-
-> **consumedNotes**(): [`InputNotes`](InputNotes.md)
-
-#### Returns
-
-[`InputNotes`](InputNotes.md)
 
 ***
 
@@ -78,19 +58,19 @@
 
 ***
 
-### transactionArguments()
+### submissionHeight()
 
-> **transactionArguments**(): [`TransactionArgs`](TransactionArgs.md)
+> **submissionHeight**(): `number`
 
 #### Returns
 
-[`TransactionArgs`](TransactionArgs.md)
+`number`
 
 ***
 
 ### deserialize()
 
-> `static` **deserialize**(`bytes`): `TransactionResult`
+> `static` **deserialize**(`bytes`): `TransactionStoreUpdate`
 
 #### Parameters
 
@@ -100,4 +80,4 @@
 
 #### Returns
 
-`TransactionResult`
+`TransactionStoreUpdate`

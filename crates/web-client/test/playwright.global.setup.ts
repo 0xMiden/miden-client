@@ -90,7 +90,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionKernel,
             TransactionProver,
             TransactionRequest,
-            TransactionResult,
+            TransactionStoreUpdate,
             TransactionRequestBuilder,
             TransactionScript,
             TransactionScriptInputPair,
@@ -168,7 +168,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionKernel = TransactionKernel;
           window.TransactionProver = TransactionProver;
           window.TransactionRequest = TransactionRequest;
-          window.TransactionResult = TransactionResult;
+          window.TransactionStoreUpdate = TransactionStoreUpdate;
           window.TransactionRequestBuilder = TransactionRequestBuilder;
           window.TransactionScript = TransactionScript;
           window.TransactionScriptInputPair = TransactionScriptInputPair;
@@ -213,6 +213,27 @@ export const test = base.extend<{ forEachTest: void }>({
               await new Promise((r) => setTimeout(r, delayInterval));
               timeWaited += delayInterval;
             }
+          };
+
+          window.helpers.executeAndApplyTransaction = async (
+            accountId,
+            transactionRequest,
+            prover
+          ) => {
+            const client = window.client;
+            const pipeline = await client.executeTransactionPipeline(
+              accountId,
+              transactionRequest
+            );
+
+            const proverToUse =
+              prover ?? window.TransactionProver.newLocalProver();
+
+            await pipeline.proveTransaction(proverToUse);
+            const submissionUpdate = await pipeline.submitProvenTransaction();
+            await client.applyTransaction(submissionUpdate);
+
+            return pipeline.getTransactionUpdate();
           };
 
           window.helpers.waitForBlocks = async (amountOfBlocks) => {
