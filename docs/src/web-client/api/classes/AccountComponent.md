@@ -46,7 +46,7 @@
 
 ### compile()
 
-> `static` **compile**(`account_code`, `assembler`, `storage_slots`): `AccountComponent`
+> `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
 
 #### Parameters
 
@@ -54,9 +54,9 @@
 
 `string`
 
-##### assembler
+##### builder
 
-[`Assembler`](Assembler.md)
+[`ScriptBuilder`](ScriptBuilder.md)
 
 ##### storage\_slots
 

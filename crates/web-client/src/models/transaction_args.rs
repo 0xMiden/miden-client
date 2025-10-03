@@ -1,4 +1,4 @@
-use miden_objects::transaction::TransactionArgs as NativeTransactionArgs;
+use miden_client::transaction::TransactionArgs as NativeTransactionArgs;
 use wasm_bindgen::prelude::*;
 
 use super::advice_inputs::AdviceInputs;

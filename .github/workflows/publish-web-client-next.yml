@@ -30,7 +30,7 @@ jobs:
       - name: Set up Rust and wasm target
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           profile: minimal
           override: true
           target: wasm32-unknown-unknown

@@ -90,6 +90,25 @@
 
 ***
 
+### fromHex()
+
+> `static` **fromHex**(`hex`): `Word`
+
+Creates a Word from a hex string.
+Fails if the provided string is not a valid hex representation of a Word.
+
+#### Parameters
+
+##### hex
+
+`string`
+
+#### Returns
+
+`Word`
+
+***
+
 ### newFromFelts()
 
 > `static` **newFromFelts**(`felt_vec`): `Word`

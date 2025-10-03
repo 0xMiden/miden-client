@@ -38,9 +38,9 @@
 
 ***
 
-### finalAccount()
+### finalAccountHeader()
 
-> **finalAccount**(): [`AccountHeader`](AccountHeader.md)
+> **finalAccountHeader**(): [`AccountHeader`](AccountHeader.md)
 
 #### Returns
 
@@ -68,13 +68,13 @@
 
 ***
 
-### initialAccount()
+### initialAccountHeader()
 
-> **initialAccount**(): [`Account`](Account.md)
+> **initialAccountHeader**(): [`AccountHeader`](AccountHeader.md)
 
 #### Returns
 
-[`Account`](Account.md)
+[`AccountHeader`](AccountHeader.md)
 
 ***
 

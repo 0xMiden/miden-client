@@ -1,5 +1,6 @@
+use miden_client::account::Account as NativeAccount;
+use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
 use miden_client::store::AccountRecord;
-use miden_objects::account::{Account as NativeAccount, AuthSecretKey as NativeAuthSecretKey};
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;

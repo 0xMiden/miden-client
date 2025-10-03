@@ -6,10 +6,10 @@ use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::rpc::{Endpoint, TonicRpcClient};
-use miden_client::store::sqlite_store::SqliteStore;
+use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{TestClient, TestClientKeyStore, create_test_store_path};
 use miden_client::{DebugMode, Felt};
+use miden_client_sqlite_store::SqliteStore;
 use rand::Rng;
 use uuid::Uuid;
 
@@ -59,24 +59,24 @@ impl ClientConfig {
     ) -> Result<(ClientBuilder<TestClientKeyStore>, TestClientKeyStore)> {
         let (rpc_endpoint, rpc_timeout, store_config, auth_path) = self.as_parts();
 
-        let store = {
-            let sqlite_store = SqliteStore::new(store_config)
-                .await
-                .with_context(|| "failed to create SQLite store")?;
-            std::sync::Arc::new(sqlite_store)
-        };
-
         let mut rng = rand::rng();
         let coin_seed: [u64; 4] = rng.random();
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+
+        let store = {
+            let sqlite_store = SqliteStore::new(store_config)
+                .await
+                .with_context(|| "failed to create SQLite store")?;
+            Arc::new(sqlite_store)
+        };
 
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
         })?;
 
         let builder = ClientBuilder::new()
-            .rpc(Arc::new(TonicRpcClient::new(&rpc_endpoint, rpc_timeout)))
+            .rpc(Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout)))
             .rng(Box::new(rng))
             .store(store)
             .filesystem_keystore(auth_path.to_str().with_context(|| {

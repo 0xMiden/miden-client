@@ -1,4 +1,4 @@
-use miden_objects::note::NoteId as NativeNoteId;
+use miden_client::note::NoteId as NativeNoteId;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;

@@ -1,4 +1,4 @@
-use miden_objects::crypto::merkle::MerklePath as NativeMerklePath;
+use miden_client::crypto::MerklePath as NativeMerklePath;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;

@@ -1,6 +1,6 @@
+use miden_client::account::AccountId as NativeAccountId;
 use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_client::transaction::TransactionResult as NativeTransactionResult;
-use miden_objects::account::AccountId as NativeAccountId;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;

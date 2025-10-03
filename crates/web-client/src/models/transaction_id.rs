@@ -1,4 +1,4 @@
-use miden_objects::transaction::TransactionId as NativeTransactionId;
+use miden_client::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

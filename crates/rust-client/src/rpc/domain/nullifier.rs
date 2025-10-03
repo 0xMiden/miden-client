@@ -29,18 +29,18 @@ impl TryFrom<proto::primitives::Digest> for Nullifier {
     }
 }
 
-impl TryFrom<&proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate>
-    for NullifierUpdate
-{
+impl TryFrom<&proto::rpc_store::sync_nullifiers_response::NullifierUpdate> for NullifierUpdate {
     type Error = RpcConversionError;
 
     fn try_from(
-        value: &proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate,
+        value: &proto::rpc_store::sync_nullifiers_response::NullifierUpdate,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             nullifier: value
                 .nullifier
-                .ok_or(proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate::missing_field(stringify!(nullifier)))?
+                .ok_or(proto::rpc_store::sync_nullifiers_response::NullifierUpdate::missing_field(
+                    stringify!(nullifier),
+                ))?
                 .try_into()?,
             block_num: value.block_num,
         })

@@ -1,5 +1,5 @@
-use miden_objects::account::{
-    AccountId as NativeAccountId,
+use miden_client::account::AccountId as NativeAccountId;
+use miden_client::asset::{
     AccountVaultDelta as NativeAccountVaultDelta,
     FungibleAssetDelta as NativeFungibleAssetDelta,
 };

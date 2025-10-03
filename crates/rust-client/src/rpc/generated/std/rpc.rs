@@ -150,35 +150,6 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "CheckNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
-        ///
-        /// Note that only 16-bit prefixes are supported at this time.
-        pub async fn check_nullifiers_by_prefix(
-            &mut self,
-            request: impl tonic::IntoRequest<
-                super::super::rpc_store::CheckNullifiersByPrefixRequest,
-            >,
-        ) -> std::result::Result<
-            tonic::Response<super::super::rpc_store::CheckNullifiersByPrefixResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/rpc.Api/CheckNullifiersByPrefix",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("rpc.Api", "CheckNullifiersByPrefix"));
-            self.inner.unary(req, path, codec).await
-        }
         /// Returns the latest state of an account with the specified ID.
         pub async fn get_account_details(
             &mut self,
@@ -203,14 +174,14 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountDetails"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns the latest state proofs of the specified accounts.
-        pub async fn get_account_proofs(
+        /// Returns the latest state proof of the specified account.
+        pub async fn get_account_proof(
             &mut self,
             request: impl tonic::IntoRequest<
-                super::super::rpc_store::AccountProofsRequest,
+                super::super::rpc_store::AccountProofRequest,
             >,
         ) -> std::result::Result<
-            tonic::Response<super::super::rpc_store::AccountProofs>,
+            tonic::Response<super::super::rpc_store::AccountProof>,
             tonic::Status,
         > {
             self.inner
@@ -222,9 +193,9 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProofs");
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProof");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProofs"));
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProof"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns raw block data for the specified block number.
@@ -299,6 +270,31 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetNotesById"));
             self.inner.unary(req, path, codec).await
         }
+        /// Returns the script for a note by its root.
+        pub async fn get_note_script_by_root(
+            &mut self,
+            request: impl tonic::IntoRequest<super::super::note::NoteRoot>,
+        ) -> std::result::Result<
+            tonic::Response<super::super::rpc_store::MaybeNoteScript>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/rpc.Api/GetNoteScriptByRoot",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("rpc.Api", "GetNoteScriptByRoot"));
+            self.inner.unary(req, path, codec).await
+        }
         /// Submits proven transaction to the Miden network.
         pub async fn submit_proven_transaction(
             &mut self,
@@ -361,6 +357,32 @@ pub mod api_client {
             );
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SubmitProvenBatch"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns a list of nullifiers that match the specified prefixes and are recorded in the node.
+        ///
+        /// Note that only 16-bit prefixes are supported at this time.
+        pub async fn sync_nullifiers(
+            &mut self,
+            request: impl tonic::IntoRequest<
+                super::super::rpc_store::SyncNullifiersRequest,
+            >,
+        ) -> std::result::Result<
+            tonic::Response<super::super::rpc_store::SyncNullifiersResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncNullifiers");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncNullifiers"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns account vault updates for specified account within a block range.

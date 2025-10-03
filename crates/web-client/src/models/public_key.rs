@@ -1,5 +1,5 @@
-use miden_objects::Word as NativeWord;
-use miden_objects::crypto::dsa::rpo_falcon512::PublicKey as NativePublicKey;
+use miden_client::Word as NativeWord;
+use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

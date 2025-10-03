@@ -50,38 +50,6 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
@@ -125,6 +93,16 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### createScriptBuilder()
+
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+
+#### Returns
+
+[`ScriptBuilder`](ScriptBuilder.md)
 
 ***
 
@@ -326,6 +304,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -420,6 +416,18 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
+
+#### Returns
+
+`Promise`\<`string`[]\>
+
+***
+
 ### listTags()
 
 > **listTags**(): `Promise`\<`any`\>
@@ -432,17 +440,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newAccount()
 
-> **newAccount**(`account`, `account_seed`, `overwrite`): `Promise`\<`void`\>
+> **newAccount**(`account`, `overwrite`): `Promise`\<`void`\>
 
 #### Parameters
 
 ##### account
 
 [`Account`](Account.md)
-
-##### account\_seed
-
-[`Word`](Word.md)
 
 ##### overwrite
 
@@ -664,6 +668,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+Deletes a setting key-value from the store.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -689,6 +711,28 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 

@@ -1,5 +1,5 @@
-use miden_objects::Word as NativeWord;
-use miden_objects::note::{
+use miden_client::Word as NativeWord;
+use miden_client::note::{
     NoteInputs as NativeNoteInputs,
     NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,

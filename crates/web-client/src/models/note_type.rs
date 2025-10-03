@@ -1,4 +1,4 @@
-use miden_objects::note::NoteType as NativeNoteType;
+use miden_client::note::NoteType as NativeNoteType;
 use wasm_bindgen::prelude::*;
 
 // Keep these masks in sync with `miden-lib/asm/miden/kernels/tx/tx.masm`

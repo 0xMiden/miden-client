@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
-use miden_lib::utils::{Deserializable, Serializable};
+use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 
 use crate::WebClient;

@@ -12,8 +12,6 @@
 
 > **commitment**(): [`Word`](Word.md)
 
-Returns a commitment to this storage.
-
 #### Returns
 
 [`Word`](Word.md)
@@ -34,7 +32,25 @@ Returns a commitment to this storage.
 
 > **getItem**(`index`): [`Word`](Word.md)
 
-Returns an item from the storage at the specified index.
+#### Parameters
+
+##### index
+
+`number`
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### getMapEntries()
+
+> **getMapEntries**(`index`): [`JsStorageMapEntry`](JsStorageMapEntry.md)[]
+
+Get all key-value pairs from the map slot at `index`.
+Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+Returns `[]` if the map exists but is empty.
 
 #### Parameters
 
@@ -42,18 +58,9 @@ Returns an item from the storage at the specified index.
 
 `number`
 
-The slot index in storage.
-
 #### Returns
 
-[`Word`](Word.md)
-
-The stored `Word`, or `undefined` if not found.
-
-#### Remarks
-
-Errors:
-- If the index is out of bounds
+[`JsStorageMapEntry`](JsStorageMapEntry.md)[]
 
 ***
 
@@ -61,30 +68,16 @@ Errors:
 
 > **getMapItem**(`index`, `key`): [`Word`](Word.md)
 
-Retrieves a map item from a map located in storage at the specified index.
-
 #### Parameters
 
 ##### index
 
 `number`
 
-The slot index in storage.
-
 ##### key
 
 [`Word`](Word.md)
 
-The key used to look up the map item.
-
 #### Returns
 
 [`Word`](Word.md)
-
-The stored `Word`, or `undefined` if not found.
-
-#### Remarks
-
-Errors:
-- If the index is out of bounds
-- If the indexed storage slot is not a map

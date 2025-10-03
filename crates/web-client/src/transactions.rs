@@ -1,12 +1,8 @@
-use miden_client::transaction::{
-    TransactionRecord as NativeTransactionRecord,
-    TransactionScript as NativeTransactionScript,
-};
+use miden_client::transaction::TransactionRecord as NativeTransactionRecord;
 use wasm_bindgen::prelude::*;
 
 use super::models::transaction_filter::TransactionFilter;
 use super::models::transaction_record::TransactionRecord;
-use super::models::transaction_script::TransactionScript;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -23,19 +19,6 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get transactions"))?;
 
             Ok(transaction_records.into_iter().map(Into::into).collect())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
-    }
-
-    #[wasm_bindgen(js_name = "compileTxScript")]
-    pub fn compile_tx_script(&mut self, script: &str) -> Result<TransactionScript, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let native_tx_script: NativeTransactionScript =
-                client.script_builder().compile_tx_script(script).map_err(|err| {
-                    js_error_with_context(err, "failed to compile transaction script")
-                })?;
-            Ok(native_tx_script.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
