@@ -25,9 +25,7 @@ impl TransactionRequest {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionRequest, JsValue> {
-        deserialize_from_uint8array::<NativeTransactionRequest>(bytes)
-            .map(TransactionRequest)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeTransactionRequest>(bytes).map(TransactionRequest)
     }
 
     #[wasm_bindgen(js_name = "expectedOutputOwnNotes")]

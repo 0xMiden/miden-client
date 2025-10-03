@@ -42,9 +42,7 @@ impl SyncSummary {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<SyncSummary, JsValue> {
-        deserialize_from_uint8array::<NativeSyncSummary>(bytes)
-            .map(SyncSummary)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeSyncSummary>(bytes).map(SyncSummary)
     }
 }
 

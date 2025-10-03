@@ -16,9 +16,7 @@ impl AccountStorageDelta {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<AccountStorageDelta, JsValue> {
-        deserialize_from_uint8array::<NativeAccountStorageDelta>(bytes)
-            .map(AccountStorageDelta)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeAccountStorageDelta>(bytes).map(AccountStorageDelta)
     }
 
     #[wasm_bindgen(js_name = "isEmpty")]

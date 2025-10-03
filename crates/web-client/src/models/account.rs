@@ -71,9 +71,7 @@ impl Account {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Account, JsValue> {
-        deserialize_from_uint8array::<NativeAccount>(bytes)
-            .map(Account)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeAccount>(bytes).map(Account)
     }
 
     #[wasm_bindgen(js_name = "getPublicKeys")]

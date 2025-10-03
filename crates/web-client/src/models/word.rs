@@ -62,8 +62,7 @@ impl Word {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Word, JsValue> {
-        let native_word =
-            deserialize_from_uint8array::<NativeWord>(bytes).map_err(Into::<JsValue>::into)?;
+        let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
         Ok(Word(native_word))
     }
 

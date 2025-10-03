@@ -15,8 +15,7 @@ impl Signature {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Signature, JsValue> {
-        let native_signature =
-            deserialize_from_uint8array::<NativeSignature>(bytes).map_err(Into::<JsValue>::into)?;
+        let native_signature = deserialize_from_uint8array::<NativeSignature>(bytes)?;
         Ok(Signature(native_signature))
     }
 }

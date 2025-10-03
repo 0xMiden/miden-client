@@ -21,9 +21,7 @@ impl AccountVaultDelta {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<AccountVaultDelta, JsValue> {
-        deserialize_from_uint8array::<NativeAccountVaultDelta>(bytes)
-            .map(AccountVaultDelta)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeAccountVaultDelta>(bytes).map(AccountVaultDelta)
     }
 
     #[wasm_bindgen(js_name = "isEmpty")]
@@ -96,9 +94,7 @@ impl FungibleAssetDelta {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<FungibleAssetDelta, JsValue> {
-        deserialize_from_uint8array::<NativeFungibleAssetDelta>(bytes)
-            .map(FungibleAssetDelta)
-            .map_err(Into::into)
+        deserialize_from_uint8array::<NativeFungibleAssetDelta>(bytes).map(FungibleAssetDelta)
     }
 
     #[wasm_bindgen(js_name = "isEmpty")]

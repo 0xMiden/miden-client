@@ -20,8 +20,7 @@ impl PublicKey {
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
-        let native_word =
-            deserialize_from_uint8array::<NativeWord>(bytes).map_err(Into::<JsValue>::into)?;
+        let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
         let native_public_key = NativePublicKey::new(native_word);
         Ok(PublicKey(native_public_key))
     }
