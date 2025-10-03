@@ -291,6 +291,20 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
+    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
+    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 

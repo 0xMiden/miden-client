@@ -348,6 +348,15 @@ export async function insertAccountAddress(address, accountId) {
         logWebStoreError(error, `Error inserting address with value: ${String(address)} for the account ID ${accountId}`);
     }
 }
+export async function removeAccountAddress(address) {
+    try {
+        // Perform the delete using Dexie
+        await addresses.where("address").equals(address).delete();
+    }
+    catch (error) {
+        logWebStoreError(error, `Error removing address with value: ${String(address)}`);
+    }
+}
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {
     try {
         await upsertAccountCode(codeRoot, code);

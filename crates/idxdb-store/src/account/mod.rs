@@ -22,7 +22,11 @@ use miden_client::{Felt, Word};
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
 use crate::account::models::AddressIdxdbObject;
-use crate::account::utils::{insert_account_address, parse_account_address_idxdb_object};
+use crate::account::utils::{
+    insert_account_address,
+    parse_account_address_idxdb_object,
+    remove_account_address,
+};
 use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
@@ -261,9 +265,13 @@ impl WebStore {
             StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
         })?;
 
-        insert_account_address(account, initial_address).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
-        })?;
+        insert_account_address(&account.id(), initial_address)
+            .await
+            .map_err(|js_error| {
+                StoreError::DatabaseError(format!(
+                    "failed to insert account addresses: {js_error:?}",
+                ))
+            })?;
 
         Ok(())
     }
@@ -386,5 +394,23 @@ impl WebStore {
         await_js_value(promise, "failed to lock account").await?;
 
         Ok(())
+    }
+
+    pub(crate) async fn insert_address(
+        &self,
+        address: Address,
+        account_id: &AccountId,
+    ) -> Result<(), StoreError> {
+        insert_account_address(account_id, address).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to insert account addresses: {js_error:?}",))
+        })?;
+
+        Ok(())
+    }
+
+    pub(crate) async fn remove_address(&self, address: Address) -> Result<(), StoreError> {
+        remove_account_address(address).await.map_err(|js_error| {
+            StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
+        })
     }
 }
