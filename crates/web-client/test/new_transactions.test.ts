@@ -1217,6 +1217,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const client = window.client;
     await client.syncState();
 
+    const normalizeHexWord = (hex) => {
+      if (!hex) return undefined;
+      const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      return normalized;
+    };
+
     // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
     // --------------------------------------------------------------------------
 
@@ -1227,6 +1233,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     let storageMap = new window.StorageMap();
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+    storageMap.insert(
+      new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
+      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+    );
 
     const accountCode = `export.bump_map_item
                     # map key
@@ -1240,12 +1250,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
                     exec.::miden::account::set_map_item
-                    dropw
-                    # => [OLD_VALUE]
-                    dupw
-                    push.0
-                    # Set a new item each time as the value keeps changing
-                    exec.::miden::account::set_map_item
+                    # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
@@ -1325,7 +1330,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     // Verify we get the expected entries
     let expectedKey = MAP_KEY.toHex();
-    let expectedValue = finalMapValue?.replace(/^0x/, "");
+    let expectedValue = normalizeHexWord(finalMapValue);
 
     let mapEntriesData = {
       entriesCount: mapEntries?.length || 0,
@@ -1334,17 +1339,17 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       expectedValue: expectedValue,
     };
 
-    if (mapEntries && mapEntries.length > 0) {
+    if (expectedValue && mapEntries && mapEntries.length > 0) {
       mapEntriesData.hasExpectedEntry = mapEntries.some(
-        (entry) => entry.key === expectedKey && entry.value === expectedValue
+        (entry) =>
+          entry.key === expectedKey &&
+          normalizeHexWord(entry.value) === expectedValue
       );
     }
 
     return {
-      initialMapValue: initialMapValue
-        ?.replace(/^0x/, "")
-        .replace(/^0+|0+$/g, ""),
-      finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+      initialMapValue: normalizeHexWord(initialMapValue),
+      finalMapValue: normalizeHexWord(finalMapValue),
       mapEntries: mapEntriesData,
     };
   });
@@ -1359,7 +1364,7 @@ test.describe("storage map test", () => {
     expect(finalMapValue).toBe("2");
 
     // Test getMapEntries() functionality
-    expect(mapEntries.entriesCount).toBeGreaterThan(0);
+    expect(mapEntries.entriesCount).toBeGreaterThan(1);
     expect(mapEntries.hasExpectedEntry).toBe(true);
     expect(mapEntries.expectedKey).toBeDefined();
     expect(mapEntries.expectedValue).toBe("2");
