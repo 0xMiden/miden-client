@@ -187,7 +187,7 @@
   dependencies:
     "@shikijs/types" "3.2.1"
 
-"@shikijs/types@^3.2.1", "@shikijs/types@3.2.1":
+"@shikijs/types@3.2.1", "@shikijs/types@^3.2.1":
   version "3.2.1"
   resolved "https://registry.npmjs.org/@shikijs/types/-/types-3.2.1.tgz"
   integrity sha512-/NTWAk4KE2M8uac0RhOsIhYQf4pdU0OywQuYDGIGAJ6Mjunxl2cGiuLkvu4HLCMn+OTTLRWkjZITp+aYJv60yA==
@@ -2262,7 +2262,7 @@ typedoc-plugin-markdown@^4.8.1:
   resolved "https://registry.npmjs.org/typedoc-plugin-markdown/-/typedoc-plugin-markdown-4.9.0.tgz"
   integrity sha512-9Uu4WR9L7ZBgAl60N/h+jqmPxxvnC9nQAlnnO/OujtG2ubjnKTVUFY1XDhcMY+pCqlX3N2HsQM2QTYZIU9tJuw==
 
-typedoc@^0.28.1, typedoc@0.28.x:
+typedoc@^0.28.1:
   version "0.28.1"
   resolved "https://registry.npmjs.org/typedoc/-/typedoc-0.28.1.tgz"
   integrity sha512-Mn2VPNMaxoe/hlBiLriG4U55oyAa3Xo+8HbtEwV7F5WEOPXqtxzGuMZhJYHaqFJpajeQ6ZDUC2c990NAtTbdgw==

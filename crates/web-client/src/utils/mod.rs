@@ -5,8 +5,6 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::js_error_with_context;
 
-pub mod assembler_utils;
-
 #[cfg(feature = "testing")]
 pub mod test_utils;
 
