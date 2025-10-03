@@ -4,35 +4,12 @@ use miden_objects::utils::{DeserializationError, SliceReader};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use crate::js_error_with_context;
+
 pub mod assembler_utils;
 
 #[cfg(feature = "testing")]
 pub mod test_utils;
-
-/// Error type for deserialization that includes type context.
-#[derive(Debug)]
-pub struct TypedDeserializationError {
-    pub type_name: &'static str,
-    pub source: DeserializationError,
-}
-
-impl std::fmt::Display for TypedDeserializationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "failed to deserialize {}: {}", self.type_name, self.source)
-    }
-}
-
-impl std::error::Error for TypedDeserializationError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.source)
-    }
-}
-
-impl From<TypedDeserializationError> for JsValue {
-    fn from(err: TypedDeserializationError) -> Self {
-        JsValue::from(err.to_string())
-    }
-}
 
 /// Serializes any value that implements `Serializable` into a `Uint8Array`.
 pub fn serialize_to_uint8array<T: Serializable>(value: &T) -> Uint8Array {
@@ -44,27 +21,21 @@ pub fn serialize_to_uint8array<T: Serializable>(value: &T) -> Uint8Array {
 
 /// Deserializes a `Uint8Array` into any type that implements `Deserializable`.
 /// Returns a `TypedDeserializationError` that includes the type name for better error context.
-pub fn deserialize_from_uint8array<T: Deserializable>(
-    bytes: &Uint8Array,
-) -> Result<T, TypedDeserializationError> {
+pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Result<T, JsValue> {
     let vec = bytes.to_vec();
     let mut reader = SliceReader::new(&vec);
-    T::read_from(&mut reader).map_err(|source| TypedDeserializationError {
-        type_name: std::any::type_name::<T>(),
-        source,
-    })
+    let context = alloc::format!("failed to deserialize {}", core::any::type_name::<T>());
+    T::read_from(&mut reader).map_err(|e| js_error_with_context(e, &context))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use miden_objects::utils::{ByteReader, ByteWriter};
 
     use super::*;
 
     // Mock types for testing
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Eq)]
     struct MockSuccessType {
         value: u32,
     }
@@ -163,43 +134,6 @@ mod tests {
         let error_string = error.to_string();
         assert!(error_string.contains("MockInsufficientDataType"));
         assert!(error_string.contains("failed to deserialize"));
-    }
-
-    #[test]
-    fn test_typed_deserialization_error_display() {
-        let source_error = DeserializationError::InvalidValue("test error message".to_string());
-        let typed_error = TypedDeserializationError {
-            type_name: "TestType",
-            source: source_error,
-        };
-
-        let display_string = typed_error.to_string();
-        assert_eq!(display_string, "failed to deserialize TestType: test error message");
-    }
-
-    #[test]
-    fn test_typed_deserialization_error_source() {
-        let source_error = DeserializationError::InvalidValue("test error".to_string());
-        let typed_error = TypedDeserializationError {
-            type_name: "TestType",
-            source: source_error,
-        };
-
-        // Verify that the source error is accessible
-        assert!(typed_error.source().is_some());
-    }
-
-    #[test]
-    fn test_typed_deserialization_error_to_js_value() {
-        let source_error = DeserializationError::InvalidValue("test error".to_string());
-        let typed_error = TypedDeserializationError {
-            type_name: "TestType",
-            source: source_error,
-        };
-
-        let js_value: JsValue = typed_error.into();
-        let js_string = js_value.as_string().unwrap();
-        assert_eq!(js_string, "failed to deserialize TestType: test error");
     }
 
     #[test]
