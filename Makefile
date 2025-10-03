@@ -211,3 +211,12 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"
+
+## --- Debug --------------------------------------------------------------------------------------
+.PHONY: build-web-client-debug
+build-web-client-debug: # build the web-client with debug symbols for the WASM-generated rust code
+	cd crates/web-client && yarn build-dev
+
+.PHONY: link-web-client-dep
+link-web-client-dep: # links the local web-client for debugging JS applications.
+	cd crates/web-client && yarn link
