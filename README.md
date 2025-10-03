@@ -51,12 +51,6 @@ The crate also comes with one feature flag that is used exclusively on tests:
 
 - `integration`: only used to run integration tests and separate them from unit tests.
 
-## Docs
-
-The documentation in the `docs/external` folder is built using Docusaurus and is automatically absorbed into the main [miden-docs](https://github.com/0xMiden/miden-docs) repository for the main documentation website. Changes to the `next` branch trigger an automated deployment workflow. The docs folder requires npm packages to be installed before building.
-
-The documentation inside of the `docs/typedoc` folder is auto generated using `typedoc` and is not integrated into the main Miden docs.
-
 ## Contributing
 
 Interested in contributing? Check [CONTRIBUTING.md](./CONTRIBUTING.md).
