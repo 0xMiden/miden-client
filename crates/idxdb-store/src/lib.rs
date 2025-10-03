@@ -12,6 +12,8 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
+use base64::Engine;
+use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
     Account,
@@ -39,6 +41,8 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys};
 
@@ -49,6 +53,7 @@ pub mod export;
 pub mod import;
 pub mod note;
 mod promise;
+pub mod settings;
 pub mod sync;
 pub mod transaction;
 
@@ -271,20 +276,20 @@ impl Store for WebStore {
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
-    async fn set_setting(&self, _key: String, _value: Vec<u8>) -> Result<(), StoreError> {
-        unimplemented!()
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
+        self.set_setting(key, value).await
     }
 
-    async fn get_setting(&self, _key: String) -> Result<Option<Vec<u8>>, StoreError> {
-        unimplemented!()
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
+        self.get_setting(key).await
     }
 
-    async fn remove_setting(&self, _key: String) -> Result<(), StoreError> {
-        unimplemented!()
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError> {
+        self.remove_setting(key).await
     }
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
-        unimplemented!()
+        self.list_setting_keys().await
     }
 }
 
@@ -295,4 +300,32 @@ impl Store for WebStore {
 pub(crate) fn current_timestamp_u64() -> u64 {
     let now = chrono::Utc::now();
     u64::try_from(now.timestamp()).expect("timestamp is always after epoch")
+}
+
+/// Helper function to decode a base64 string to a `Vec<u8>`.
+pub(crate) fn base64_to_vec_u8_required<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let base64_str: String = Deserialize::deserialize(deserializer)?;
+    general_purpose::STANDARD
+        .decode(&base64_str)
+        .map_err(|e| Error::custom(format!("Base64 decode error: {e}")))
+}
+
+/// Helper function to decode a base64 string to an `Option<Vec<u8>>`.
+pub(crate) fn base64_to_vec_u8_optional<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<u8>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let base64_str: Option<String> = Option::deserialize(deserializer)?;
+    match base64_str {
+        Some(str) => general_purpose::STANDARD
+            .decode(&str)
+            .map(Some)
+            .map_err(|e| Error::custom(format!("Base64 decode error: {e}"))),
+        None => Ok(None),
+    }
 }

@@ -33,6 +33,7 @@ enum Table {
   PartialBlockchainNodes = "partialBlockchainNodes",
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
+  Settings = "settings",
 }
 
 export interface IAccountCode {
@@ -153,6 +154,11 @@ export interface IForeignAccountCode {
   codeRoot: string;
 }
 
+export interface ISetting {
+  key: string;
+  value: Uint8Array;
+}
+
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -171,6 +177,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+  settings: Dexie.Table<ISetting, string>;
 };
 
 db.version(1).stores({
@@ -202,6 +209,7 @@ db.version(1).stores({
   [Table.PartialBlockchainNodes]: indexes("id"),
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
   [Table.ForeignAccountCode]: indexes("accountId"),
+  [Table.Settings]: indexes("key"),
 });
 
 function indexes(...items: string[]): string {
@@ -240,6 +248,7 @@ const tags = db.table<ITag, number>(Table.Tags);
 const foreignAccountCode = db.table<IForeignAccountCode, string>(
   Table.ForeignAccountCode
 );
+const settings = db.table<ISetting, string>(Table.Settings);
 
 export {
   db,
@@ -260,4 +269,5 @@ export {
   partialBlockchainNodes,
   tags,
   foreignAccountCode,
+  settings,
 };

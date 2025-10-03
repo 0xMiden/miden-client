@@ -32,6 +32,7 @@ var Table;
     Table["PartialBlockchainNodes"] = "partialBlockchainNodes";
     Table["Tags"] = "tags";
     Table["ForeignAccountCode"] = "foreignAccountCode";
+    Table["Settings"] = "settings";
 })(Table || (Table = {}));
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
@@ -52,6 +53,7 @@ db.version(1).stores({
     [Table.PartialBlockchainNodes]: indexes("id"),
     [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
     [Table.ForeignAccountCode]: indexes("accountId"),
+    [Table.Settings]: indexes("key"),
 });
 function indexes(...items) {
     return items.join(",");
@@ -79,5 +81,6 @@ const blockHeaders = db.table(Table.BlockHeaders);
 const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
 const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, };
+const settings = db.table(Table.Settings);
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
 //# sourceMappingURL=schema.js.map

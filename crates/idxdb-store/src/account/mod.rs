@@ -18,14 +18,12 @@ use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
 use crate::account::models::AddressIdxdbObject;
 use crate::account::utils::{insert_account_address, parse_account_address_idxdb_object};
-use crate::promise::await_js;
+use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
 pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
@@ -67,11 +65,8 @@ use utils::{
 impl WebStore {
     pub(super) async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
         let promise = idxdb_get_account_ids();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account ids: {js_error:?}",))
-        })?;
-        let account_ids_as_strings: Vec<String> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_ids_as_strings: Vec<String> =
+            await_js(promise, "failed to fetch account ids").await?;
 
         let native_account_ids: Vec<AccountId> = account_ids_as_strings
             .into_iter()
@@ -85,11 +80,8 @@ impl WebStore {
         &self,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
         let promise = idxdb_get_account_headers();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account headers: {js_error:?}",))
-        })?;
-        let account_headers_idxdb: Vec<AccountRecordIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_headers_idxdb: Vec<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account headers").await?;
         let account_headers: Vec<(AccountHeader, AccountStatus)> = account_headers_idxdb
             .into_iter()
             .map(parse_account_record_idxdb_object)
@@ -104,13 +96,8 @@ impl WebStore {
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         let account_id_str = account_id.to_string();
         let promise = idxdb_get_account_header(account_id_str);
-
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account header: {js_error:?}",))
-        })?;
-
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header").await?;
 
         match account_header_idxdb {
             None => Ok(None),
@@ -130,14 +117,8 @@ impl WebStore {
         let account_commitment_str = account_commitment.to_string();
 
         let promise = idxdb_get_account_header_by_commitment(account_commitment_str);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to fetch account header by commitment: {js_error:?}",
-            ))
-        })?;
-
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header by commitment").await?;
 
         let account_header: Result<Option<AccountHeader>, StoreError> = account_header_idxdb
             .map_or(Ok(None), |account_record| {
@@ -198,11 +179,8 @@ impl WebStore {
         let root_serialized = root.to_string();
 
         let promise = idxdb_get_account_code(root_serialized);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account code: {js_error:?}",))
-        })?;
-        let account_code_idxdb: AccountCodeIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_code_idxdb: AccountCodeIdxdbObject =
+            await_js(promise, "failed to fetch account code").await?;
 
         let code =
             AccountCode::from_bytes(&account_code_idxdb.code).map_err(StoreError::AccountError)?;
@@ -214,22 +192,14 @@ impl WebStore {
         let commitment_serialized = commitment.to_string();
 
         let promise = idxdb_get_account_storage(commitment_serialized);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
-        })?;
-
-        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
 
         let promise = idxdb_get_account_storage_maps(
             account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
         );
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch account storage: {js_error:?}",))
-        })?;
-
-        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
+            await_js(promise, "failed to fetch account storage maps").await?;
 
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
@@ -256,13 +226,8 @@ impl WebStore {
 
     pub(super) async fn get_vault_assets(&self, root: Word) -> Result<Vec<Asset>, StoreError> {
         let promise = idxdb_get_account_vault_assets(root.to_hex());
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to fetch vault assets: {js_error:?}",))
-        })?;
         let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
-            from_value(js_value).map_err(|err| {
-                StoreError::DatabaseError(format!("failed to deserialize DEBUG {err:?}"))
-            })?;
+            await_js(promise, "failed to fetch vault assets").await?;
 
         let assets = vault_assets_idxdb
             .into_iter()
@@ -309,8 +274,10 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         let account_id_str = new_account_state.id().to_string();
         let promise = idxdb_get_account_header(account_id_str);
+        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
+            await_js(promise, "failed to fetch account header").await?;
 
-        if JsFuture::from(promise).await.is_err() {
+        if account_header_idxdb.is_none() {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
@@ -356,11 +323,7 @@ impl WebStore {
         let account_id = account_id.to_string();
 
         let promise = idxdb_upsert_foreign_account_code(account_id, code, root);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!(
-                "failed to upsert foreign account code: {js_error:?}",
-            ))
-        })?;
+        await_js_value(promise, "failed to upsert foreign account code").await?;
 
         Ok(())
     }
@@ -371,22 +334,11 @@ impl WebStore {
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         let account_ids = account_ids.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_get_foreign_account_code(account_ids);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(
-                format!("failed to fetch foreign account code: {js_error:?}",),
-            )
-        })?;
-
-        if js_value.is_null() || js_value.is_undefined() {
-            return Ok(BTreeMap::new());
-        }
-
-        let foreign_account_code_idxdb: Vec<ForeignAccountCodeIdxdbObject> = from_value(js_value)
-            .map_err(|err| {
-            StoreError::DatabaseError(format!("failed to deserialize {err:?}"))
-        })?;
+        let foreign_account_code_idxdb: Option<Vec<ForeignAccountCodeIdxdbObject>> =
+            await_js(promise, "failed to fetch foreign account code").await?;
 
         let foreign_account_code: BTreeMap<AccountId, AccountCode> = foreign_account_code_idxdb
+            .unwrap_or_default()
             .into_iter()
             .map(|idxdb_object| {
                 let account_id = AccountId::from_hex(&idxdb_object.account_id)
@@ -408,9 +360,7 @@ impl WebStore {
         let account_commitments =
             account_states.iter().map(ToString::to_string).collect::<Vec<_>>();
         let promise = idxdb_undo_account_states(account_commitments);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to undo account states: {js_error:?}",))
-        })?;
+        await_js_value(promise, "failed to undo account states").await?;
 
         Ok(())
     }
@@ -433,9 +383,7 @@ impl WebStore {
 
         let account_id_str = account_id.to_string();
         let promise = idxdb_lock_account(account_id_str);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to lock account: {js_error:?}",))
-        })?;
+        await_js_value(promise, "failed to lock account").await?;
 
         Ok(())
     }
