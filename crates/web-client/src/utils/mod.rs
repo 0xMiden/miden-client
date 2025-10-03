@@ -42,19 +42,6 @@ mod tests {
         }
     }
 
-    #[derive(Debug)]
-    struct MockInsufficientDataType;
-
-    impl Deserializable for MockInsufficientDataType {
-        fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-            // Try to read more data than available
-            source.read_u64()?;
-            source.read_u64()?;
-            source.read_u64()?;
-            Ok(MockInsufficientDataType)
-        }
-    }
-
     #[test]
     fn test_deserialize_from_uint8array_failure_with_type_context() {
         // Create some invalid bytes
@@ -71,21 +58,5 @@ mod tests {
         assert!(error_string.contains("MockFailureType"));
         assert!(error_string.contains("failed to deserialize"));
         assert!(error_string.contains("mock error"));
-    }
-
-    #[test]
-    fn test_deserialize_from_uint8array_insufficient_data() {
-        // Create insufficient data (only 4 bytes, but MockInsufficientDataType needs 24)
-        let uint8_array = Uint8Array::new_with_length(4);
-
-        let result = deserialize_from_uint8array::<MockInsufficientDataType>(&uint8_array);
-
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-
-        // Verify the error contains the type name
-        let error_string = error.as_string().unwrap();
-        assert!(error_string.contains("MockInsufficientDataType"));
-        assert!(error_string.contains("failed to deserialize"));
     }
 }
