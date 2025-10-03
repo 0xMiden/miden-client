@@ -20,8 +20,10 @@ use crate::rpc::domain::account::{
     FetchedAccount,
     StateHeaders,
 };
+use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
@@ -175,6 +177,36 @@ impl MockRpcApi {
             transactions,
             notes,
         })
+    }
+
+    /// Retrieves account vault updates in a given block range.
+    fn get_sync_account_vault_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError> {
+        let response = AccountVaultInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates: vec![], // TODO: GET UPDATES
+        };
+        Ok(response)
+    }
+
+    /// Retrieves storage map updates in a given block range
+    fn get_sync_storage_maps_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError> {
+        let response = StorageMapInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates: vec![], // TODO: GET UPDATES
+        };
+        Ok(response)
     }
 
     /// Retrieves notes that are included in the specified block number.
@@ -481,6 +513,35 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(note.note().unwrap().script().clone())
+    }
+
+    async fn sync_storage_maps(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError> {
+        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id)?;
+        Ok(response)
+    }
+
+    async fn sync_account_vault(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError> {
+        let response = self.get_sync_account_vault_request(block_from, block_to, account_id)?;
+        Ok(response)
+    }
+
+    async fn sync_transactions(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<(), RpcError> {
+        todo!()
     }
 }
 
