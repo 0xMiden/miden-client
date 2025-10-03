@@ -22,7 +22,7 @@
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
-* Add more context to errors when deserializing objects ([#1338](https://github.com/0xMiden/miden-client/pull/1338))
+* Add more context to errors when deserializing objects ([#1336](https://github.com/0xMiden/miden-client/pull/1336))
 
 ## 0.11.8 (2025-09-29)
 
