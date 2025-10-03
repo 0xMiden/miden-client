@@ -1207,6 +1207,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const client = window.client;
     await client.syncState();
 
+    const normalizeHexWord = (hex) => {
+      if (!hex) return undefined;
+      const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      return normalized;
+    };
+
     // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
     // --------------------------------------------------------------------------
 
@@ -1217,6 +1223,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     let storageMap = new window.StorageMap();
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+    storageMap.insert(
+      new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
+      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+    );
 
     const accountCode = `export.bump_map_item
                     # map key
@@ -1230,12 +1240,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
                     exec.::miden::account::set_map_item
-                    dropw
-                    # => [OLD_VALUE]
-                    dupw
-                    push.0
-                    # Set a new item each time as the value keeps changing
-                    exec.::miden::account::set_map_item
+                    # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
@@ -1261,6 +1266,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     await client.addAccountSecretKeyToWebStore(secretKey);
     await client.newAccount(bumpItemAccountBuilderResult.account, false);
+    await client.syncState();
 
     let initialMapValue = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
@@ -1305,11 +1311,35 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .getMapItem(1, MAP_KEY)
       ?.toHex();
 
+    // Test getMapEntries() functionality
+    let accountStorage = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )?.storage();
+    let mapEntries = accountStorage?.getMapEntries(1);
+
+    // Verify we get the expected entries
+    let expectedKey = MAP_KEY.toHex();
+    let expectedValue = normalizeHexWord(finalMapValue);
+
+    let mapEntriesData = {
+      entriesCount: mapEntries?.length || 0,
+      hasExpectedEntry: false,
+      expectedKey: expectedKey,
+      expectedValue: expectedValue,
+    };
+
+    if (expectedValue && mapEntries && mapEntries.length > 0) {
+      mapEntriesData.hasExpectedEntry = mapEntries.some(
+        (entry) =>
+          entry.key === expectedKey &&
+          normalizeHexWord(entry.value) === expectedValue
+      );
+    }
+
     return {
-      initialMapValue: initialMapValue
-        ?.replace(/^0x/, "")
-        .replace(/^0+|0+$/g, ""),
-      finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+      initialMapValue: normalizeHexWord(initialMapValue),
+      finalMapValue: normalizeHexWord(finalMapValue),
+      mapEntries: mapEntriesData,
     };
   });
 };
@@ -1317,8 +1347,15 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 test.describe("storage map test", () => {
   test.setTimeout(50000);
   test("storage map is updated correctly in transaction", async ({ page }) => {
-    let { initialMapValue, finalMapValue } = await testStorageMap(page);
+    let { initialMapValue, finalMapValue, mapEntries } =
+      await testStorageMap(page);
     expect(initialMapValue).toBe("1");
     expect(finalMapValue).toBe("2");
+
+    // Test getMapEntries() functionality
+    expect(mapEntries.entriesCount).toBeGreaterThan(1);
+    expect(mapEntries.hasExpectedEntry).toBe(true);
+    expect(mapEntries.expectedKey).toBeDefined();
+    expect(mapEntries.expectedValue).toBe("2");
   });
 });
