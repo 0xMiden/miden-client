@@ -38,7 +38,7 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+use miden_objects::{crypto::dsa::rpo_falcon512::PublicKey, note::NoteTag};
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
@@ -234,7 +234,7 @@ impl<AUTH> Client<AUTH> {
             None => Err(ClientError::AccountDataNotFound(account_id)),
             Some(_tracked_account) => {
                 // Check that the Address is not already tracked
-                let derived_note_tag = address.to_note_tag();
+                let derived_note_tag: NoteTag = address.to_note_tag();
                 let note_tag_record =
                     NoteTagRecord::with_account_source(derived_note_tag, account_id);
                 if self.store.get_note_tags().await?.contains(&note_tag_record) {
