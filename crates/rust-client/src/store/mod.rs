@@ -36,6 +36,7 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
+use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
@@ -251,11 +252,17 @@ pub trait Store: Send + Sync {
     -> Result<Option<AccountRecord>, StoreError>;
 
     /// Inserts an [`Account`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the account. This address
+    /// will be tracked for incoming notes and its derived note tag will be monitored.
     ///
     /// # Errors
     ///
     /// - If the account is new and does not contain a seed
-    async fn insert_account(&self, account: &Account) -> Result<(), StoreError>;
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
     /// script roots and added to the `GetForeignAccountCode` request.
@@ -270,6 +277,12 @@ pub trait Store: Send + Sync {
         &self,
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
+
+    /// Retrieves all [`Address`] objects that correspond to the provided account ID.
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError>;
 
     /// Updates an existing [`Account`] with a new state.
     ///

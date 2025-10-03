@@ -36,6 +36,10 @@ export interface IAccount {
     accountCommitment: string;
     locked: boolean;
 }
+export interface IAddress {
+    address: Uint8Array;
+    id: string;
+}
 export interface ITransaction {
     id: string;
     details: Uint8Array;
@@ -108,6 +112,7 @@ declare const db: Dexie & {
     storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
     accountAuths: Dexie.Table<IAccountAuth, string>;
     accounts: Dexie.Table<IAccount, string>;
+    addresses: Dexie.Table<IAddress, string>;
     transactions: Dexie.Table<ITransaction, string>;
     transactionScripts: Dexie.Table<ITransactionScript, string>;
     inputNotes: Dexie.Table<IInputNote, string>;
@@ -126,6 +131,7 @@ declare const storageMapEntries: import("dexie").Table<IStorageMapEntry, string,
 declare const accountAssets: import("dexie").Table<IAccountAsset, string, IAccountAsset>;
 declare const accountAuths: import("dexie").Table<IAccountAuth, string, IAccountAuth>;
 declare const accounts: import("dexie").Table<IAccount, string, IAccount>;
+declare const addresses: import("dexie").Table<IAddress, string, IAddress>;
 declare const transactions: import("dexie").Table<ITransaction, string, ITransaction>;
 declare const transactionScripts: import("dexie").Table<ITransactionScript, string, ITransactionScript>;
 declare const inputNotes: import("dexie").Table<IInputNote, string, IInputNote>;
@@ -137,4 +143,4 @@ declare const partialBlockchainNodes: import("dexie").Table<IPartialBlockchainNo
 declare const tags: import("dexie").Table<ITag, number, ITag>;
 declare const foreignAccountCode: import("dexie").Table<IForeignAccountCode, string, IForeignAccountCode>;
 declare const settings: import("dexie").Table<ISetting, string, ISetting>;
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
