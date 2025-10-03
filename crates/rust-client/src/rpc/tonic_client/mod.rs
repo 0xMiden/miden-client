@@ -570,11 +570,12 @@ impl NodeRpcClient for TonicRpcClient {
 
     async fn sync_transactions(
         &self,
-        block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
-        account_ids: Vec<AccountId>,
+        _block_from: BlockNumber,
+        _block_to: Option<BlockNumber>,
+        _account_ids: Vec<AccountId>,
     ) -> Result<(), RpcError> {
-        todo!()
+        // TODO: depends on https://github.com/0xMiden/miden-node/issues/1272
+        unimplemented!()
     }
 }
 
