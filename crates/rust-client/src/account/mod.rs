@@ -38,7 +38,8 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::{crypto::dsa::rpo_falcon512::PublicKey, note::NoteTag};
+use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
