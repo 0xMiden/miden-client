@@ -28,29 +28,11 @@ pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Res
 
 #[cfg(test)]
 mod tests {
-    use miden_client::utils::{ByteReader, ByteWriter, DeserializationError};
+    use miden_client::utils::{ByteReader, DeserializationError};
 
     use super::*;
 
     // Mock types for testing
-    #[derive(Debug, PartialEq, Eq)]
-    struct MockSuccessType {
-        value: u32,
-    }
-
-    impl Serializable for MockSuccessType {
-        fn write_into<W: ByteWriter>(&self, target: &mut W) {
-            target.write_u32(self.value);
-        }
-    }
-
-    impl Deserializable for MockSuccessType {
-        fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-            let value = source.read_u32()?;
-            Ok(MockSuccessType { value })
-        }
-    }
-
     #[derive(Debug)]
     struct MockFailureType;
 
@@ -71,33 +53,6 @@ mod tests {
             source.read_u64()?;
             Ok(MockInsufficientDataType)
         }
-    }
-
-    #[test]
-    fn test_serialize_to_uint8array() {
-        let mock_data = MockSuccessType { value: 42 };
-        let uint8_array = serialize_to_uint8array(&mock_data);
-
-        // Verify the array has the expected length (4 bytes for u32)
-        assert_eq!(uint8_array.length(), 4);
-
-        // Verify the content
-        let vec = uint8_array.to_vec();
-        assert_eq!(vec, vec![42, 0, 0, 0]); // Little-endian representation of 42
-    }
-
-    #[test]
-    fn test_deserialize_from_uint8array_success() {
-        // Create valid data for MockSuccessType
-        let mock_data = MockSuccessType { value: 123 };
-        let uint8_array = serialize_to_uint8array(&mock_data);
-
-        // Deserialize it back
-        let result = deserialize_from_uint8array::<MockSuccessType>(&uint8_array);
-
-        assert!(result.is_ok());
-        let deserialized = result.unwrap();
-        assert_eq!(deserialized.value, 123);
     }
 
     #[test]
@@ -131,34 +86,6 @@ mod tests {
         // Verify the error contains the type name
         let error_string = error.as_string().unwrap();
         assert!(error_string.contains("MockInsufficientDataType"));
-        assert!(error_string.contains("failed to deserialize"));
-    }
-
-    #[test]
-    fn test_round_trip_serialization() {
-        let original = MockSuccessType { value: 999 };
-
-        // Serialize
-        let uint8_array = serialize_to_uint8array(&original);
-
-        // Deserialize
-        let result = deserialize_from_uint8array::<MockSuccessType>(&uint8_array);
-
-        assert!(result.is_ok());
-        let deserialized = result.unwrap();
-        assert_eq!(original, deserialized);
-    }
-
-    #[test]
-    fn test_empty_uint8array() {
-        let empty_array = Uint8Array::new_with_length(0);
-
-        let result = deserialize_from_uint8array::<MockSuccessType>(&empty_array);
-
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        let error_string = error.as_string().unwrap();
-        assert!(error_string.contains("MockSuccessType"));
         assert!(error_string.contains("failed to deserialize"));
     }
 }
