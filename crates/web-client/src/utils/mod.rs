@@ -1,6 +1,5 @@
 use miden_client::SliceReader;
 use miden_client::utils::{Deserializable, Serializable};
-use miden_objects::utils::{DeserializationError, SliceReader};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -20,7 +19,6 @@ pub fn serialize_to_uint8array<T: Serializable>(value: &T) -> Uint8Array {
 }
 
 /// Deserializes a `Uint8Array` into any type that implements `Deserializable`.
-/// Returns a `TypedDeserializationError` that includes the type name for better error context.
 pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Result<T, JsValue> {
     let vec = bytes.to_vec();
     let mut reader = SliceReader::new(&vec);
@@ -30,7 +28,7 @@ pub fn deserialize_from_uint8array<T: Deserializable>(bytes: &Uint8Array) -> Res
 
 #[cfg(test)]
 mod tests {
-    use miden_objects::utils::{ByteReader, ByteWriter};
+    use miden_client::utils::{ByteReader, ByteWriter, DeserializationError};
 
     use super::*;
 
@@ -114,7 +112,7 @@ mod tests {
         let error = result.unwrap_err();
 
         // Verify the error contains the type name
-        let error_string = error.to_string();
+        let error_string = error.as_string().unwrap();
         assert!(error_string.contains("MockFailureType"));
         assert!(error_string.contains("failed to deserialize"));
         assert!(error_string.contains("mock error"));
@@ -131,7 +129,7 @@ mod tests {
         let error = result.unwrap_err();
 
         // Verify the error contains the type name
-        let error_string = error.to_string();
+        let error_string = error.as_string().unwrap();
         assert!(error_string.contains("MockInsufficientDataType"));
         assert!(error_string.contains("failed to deserialize"));
     }
@@ -159,7 +157,7 @@ mod tests {
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        let error_string = error.to_string();
+        let error_string = error.as_string().unwrap();
         assert!(error_string.contains("MockSuccessType"));
         assert!(error_string.contains("failed to deserialize"));
     }
