@@ -25,10 +25,10 @@ let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 // Create a keystore to manage cryptographic keys.
 let keystore = FilesystemKeyStore::new(path.into())?;
 
-// Instantiate the client using a Tonic RPC client
+// Instantiate the client using a gRPC client
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 let client:Client = Client::new(
-    Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+    Arc::new(GrpcClient::new(&endpoint, 10_000)),
     rng,
     store,
     Some(Arc::new(keystore)), // Authenticator is optional - use None if no authentication is needed

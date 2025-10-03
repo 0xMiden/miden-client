@@ -4,7 +4,7 @@ use core::fmt::Write;
 
 use idxdb_store::WebStore;
 use miden_client::crypto::RpoRandomCoin;
-use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
+use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{
     Client,
@@ -13,6 +13,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
+use models::script_builder::ScriptBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -27,6 +28,7 @@ pub mod new_account;
 pub mod new_transactions;
 pub mod notes;
 pub mod rpc_client;
+pub mod settings;
 pub mod sync;
 pub mod tags;
 pub mod transactions;
@@ -53,6 +55,7 @@ impl Default for WebClient {
 impl WebClient {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
+        console_error_panic_hook::set_once();
         WebClient {
             inner: None,
             store: None,
@@ -77,7 +80,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
 
         self.setup_client(web_rpc_client, seed).await?;
 
@@ -138,6 +141,16 @@ impl WebClient {
         self.keystore = Some(keystore);
 
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "createScriptBuilder")]
+    pub fn create_script_builder(&self) -> Result<ScriptBuilder, JsValue> {
+        let Some(client) = &self.inner else {
+            return Err("client was not initialized before instancing ScriptBuilder".into());
+        };
+        Ok(ScriptBuilder::from_source_manager(
+            client.script_builder().source_manager().clone(),
+        ))
     }
 }
 

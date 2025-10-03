@@ -66,38 +66,6 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
@@ -144,19 +112,28 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### defaultTransactionProver()
+### createScriptBuilder()
 
-> **defaultTransactionProver**(): [`TransactionProver`](TransactionProver.md)
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
 
 #### Returns
 
-[`TransactionProver`](TransactionProver.md)
+[`ScriptBuilder`](ScriptBuilder.md)
 
 ***
 
 ### executeTransactionPipeline()
 
 > **executeTransactionPipeline**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
+
+Executes a transaction specified by the request against the specified account but does not
+submit it to the network nor update the local database. The returned [`TransactionPipeline`]
+retains all intermediate artifacts (request, execution results, proofs) needed to continue
+with the transaction lifecycle.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
 
 #### Parameters
 
@@ -372,6 +349,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -463,6 +458,18 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+***
+
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
+
+#### Returns
+
+`Promise`\<`string`[]\>
 
 ***
 
@@ -652,26 +659,6 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
-### newTransaction()
-
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### transaction\_request
-
-[`TransactionRequest`](TransactionRequest.md)
-
-#### Returns
-
-`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
-
-***
-
 ### newTransactionPipeline()
 
 > **newTransactionPipeline**(`transaction_request`): [`TransactionPipeline`](TransactionPipeline.md)
@@ -722,6 +709,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+Deletes a setting key-value from the store.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -750,9 +755,38 @@ Returns the inner serialized mock chain if it exists.
 
 ***
 
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### submitNewTransaction()
 
-> **submitNewTransaction**(`account_id`, `transaction_request`, `prover?`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account,
+proves it, submits it to the network, and updates the local database.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
 
 #### Parameters
 
@@ -763,10 +797,6 @@ Returns the inner serialized mock chain if it exists.
 ##### transaction\_request
 
 [`TransactionRequest`](TransactionRequest.md)
-
-##### prover?
-
-[`TransactionProver`](TransactionProver.md)
 
 #### Returns
 
@@ -787,26 +817,6 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Promise`\<`number`\>
-
-***
-
-### submitTransaction()
-
-> **submitTransaction**(`transaction_update`, `prover?`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### transaction\_update
-
-[`TransactionStoreUpdate`](TransactionStoreUpdate.md)
-
-##### prover?
-
-[`TransactionProver`](TransactionProver.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 

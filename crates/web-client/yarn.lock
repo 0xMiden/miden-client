@@ -2282,8 +2282,6 @@ typed-query-selector@^2.12.0:
 
 typedoc-plugin-markdown@^4.8.1:
   version "4.8.1"
-  resolved "https://registry.npmjs.org/typedoc-plugin-markdown/-/typedoc-plugin-markdown-4.8.1.tgz"
-  integrity sha512-ug7fc4j0SiJxSwBGLncpSo8tLvrT9VONvPUQqQDTKPxCoFQBADLli832RGPtj6sfSVJebNSrHZQRUdEryYH/7g==
 
 typedoc@^0.28.1, typedoc@0.28.x:
   version "0.28.13"
