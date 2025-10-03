@@ -256,12 +256,10 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
           .build();
 
-        let transactionUpdate = await client.newTransaction(
+        let transactionUpdate = await window.helpers.executeAndApplyTransaction(
           senderAccountId,
           transactionRequest
         );
-
-        await client.submitTransaction(transactionUpdate);
 
         await window.helpers.waitForTransaction(
           transactionUpdate.executedTransaction().id().toHex()
@@ -278,12 +276,11 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionUpdate = await client.newTransaction(
-          targetAccountId,
-          consumeTransactionRequest
-        );
-
-        await client.submitTransaction(consumeTransactionUpdate);
+        let consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccountId,
+            consumeTransactionRequest
+          );
 
         await window.helpers.waitForTransaction(
           consumeTransactionUpdate.executedTransaction().id().toHex()
@@ -360,12 +357,10 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
           .build();
 
-        let transactionUpdate = await client.newTransaction(
+        let transactionUpdate = await window.helpers.executeAndApplyTransaction(
           senderAccountId,
           transactionRequest
         );
-
-        await client.submitTransaction(transactionUpdate);
 
         await window.helpers.waitForTransaction(
           transactionUpdate.executedTransaction().id().toHex()
@@ -382,12 +377,11 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionUpdate = await client.newTransaction(
-          targetAccountId,
-          consumeTransactionRequest
-        );
-
-        await client.submitTransaction(consumeTransactionUpdate);
+        let consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccountId,
+            consumeTransactionRequest
+          );
 
         await window.helpers.waitForTransaction(
           consumeTransactionUpdate.executedTransaction().id().toHex()

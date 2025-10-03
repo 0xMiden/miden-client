@@ -215,6 +215,27 @@ export const test = base.extend<{ forEachTest: void }>({
             }
           };
 
+          window.helpers.executeAndApplyTransaction = async (
+            accountId,
+            transactionRequest,
+            prover
+          ) => {
+            const client = window.client;
+            const pipeline = await client.executeTransactionPipeline(
+              accountId,
+              transactionRequest
+            );
+
+            const proverToUse =
+              prover ?? window.TransactionProver.newLocalProver();
+
+            await pipeline.proveTransaction(proverToUse);
+            const submissionUpdate = await pipeline.submitProvenTransaction();
+            await client.applyTransaction(submissionUpdate);
+
+            return pipeline.getTransactionUpdate();
+          };
+
           window.helpers.waitForBlocks = async (amountOfBlocks) => {
             const client = window.client;
             let currentBlock = await client.getSyncHeight();

@@ -52,18 +52,17 @@ export const mintTransaction = async (
         _publicNote ? window.NoteType.Public : window.NoteType.Private,
         BigInt(1000)
       );
-      const mintTransactionResult = await client.newTransaction(
-        faucetAccountId,
-        mintTransactionRequest
-      );
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          mintTransactionResult,
-          window.remoteProverInstance
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+
+      const mintTransactionResult =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccountId,
+          mintTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(mintTransactionResult);
-      }
 
       if (_sync) {
         await window.helpers.waitForTransaction(
@@ -123,18 +122,16 @@ export const mintPublicTransaction = async (
         window.NoteType.Public,
         BigInt(1000)
       );
-      const mintTransactionUpdate = await client.newTransaction(
-        faucetAccountId,
-        mintTransactionRequest
-      );
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          mintTransactionUpdate,
-          window.remoteProverInstance
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+      const mintTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccountId,
+          mintTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(mintTransactionUpdate);
-      }
 
       if (_sync) {
         await window.helpers.waitForTransaction(
@@ -215,18 +212,17 @@ export const sendTransaction = async (
         BigInt(1000)
       );
 
-      let mintTransactionUpdate = await client.newTransaction(
-        faucetAccountId,
-        mintTransactionRequest
-      );
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          mintTransactionUpdate,
-          window.remoteProverInstance
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+
+      let mintTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccountId,
+          mintTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(mintTransactionUpdate);
-      }
 
       let createdNote = mintTransactionUpdate
         .executedTransaction()
@@ -245,19 +241,12 @@ export const sendTransaction = async (
         .withUnauthenticatedInputNotes(noteAndArgsArray)
         .build();
 
-      let consumeTransactionUpdate = await client.newTransaction(
-        senderAccountId,
-        txRequest
-      );
-
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          consumeTransactionUpdate,
-          window.remoteProverInstance
+      let consumeTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          senderAccountId,
+          txRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(consumeTransactionUpdate);
-      }
 
       let sendTransactionRequest = client.newSendTransactionRequest(
         senderAccountId,
@@ -268,18 +257,12 @@ export const sendTransaction = async (
         _recallHeight,
         null
       );
-      let sendTransactionUpdate = await client.newTransaction(
-        senderAccountId,
-        sendTransactionRequest
-      );
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          sendTransactionUpdate,
-          window.remoteProverInstance
+      let sendTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          senderAccountId,
+          sendTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(sendTransactionUpdate);
-      }
       let sendCreatedNotes = sendTransactionUpdate
         .executedTransaction()
         .outputNotes()
@@ -361,6 +344,11 @@ export const swapTransaction = async (
           ? window.NoteType.Public
           : window.NoteType.Private;
 
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+
       // Swap transaction
 
       let swapTransactionRequest = client.newSwapTransactionRequest(
@@ -378,19 +366,12 @@ export const swapTransaction = async (
         .expectedFutureNotes()
         .map((futureNote) => futureNote.noteDetails);
 
-      let swapTransactionUpdate = await client.newTransaction(
-        accountAId,
-        swapTransactionRequest
-      );
-
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          swapTransactionUpdate,
-          window.remoteProverInstance
+      let swapTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          accountAId,
+          swapTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(swapTransactionUpdate);
-      }
 
       await window.helpers.waitForTransaction(
         swapTransactionUpdate.executedTransaction().id().toHex()
@@ -402,19 +383,12 @@ export const swapTransaction = async (
         expectedOutputNotes[0].id().toString(),
       ]);
 
-      let consumeTransaction1Result = await client.newTransaction(
-        accountBId,
-        txRequest1
-      );
-
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          consumeTransaction1Result,
-          window.remoteProverInstance
+      let consumeTransaction1Result =
+        await window.helpers.executeAndApplyTransaction(
+          accountBId,
+          txRequest1,
+          prover
         );
-      } else {
-        await client.submitTransaction(consumeTransaction1Result);
-      }
 
       await window.helpers.waitForTransaction(
         consumeTransaction1Result.executedTransaction().id().toHex()
@@ -426,19 +400,12 @@ export const swapTransaction = async (
         expectedPaybackNoteDetails[0].id().toString(),
       ]);
 
-      let consumeTransaction2Result = await client.newTransaction(
-        accountAId,
-        txRequest2
-      );
-
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          consumeTransaction2Result,
-          window.remoteProverInstance
+      let consumeTransaction2Result =
+        await window.helpers.executeAndApplyTransaction(
+          accountAId,
+          txRequest2,
+          prover
         );
-      } else {
-        await client.submitTransaction(consumeTransaction2Result);
-      }
 
       await window.helpers.waitForTransaction(
         consumeTransaction2Result.executedTransaction().id().toHex()
@@ -686,18 +653,16 @@ export const consumeTransaction = async (
       const consumeTransactionRequest = client.newConsumeTransactionRequest([
         _noteId,
       ]);
-      const consumeTransactionUpdate = await client.newTransaction(
-        targetAccountId,
-        consumeTransactionRequest
-      );
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          consumeTransactionUpdate,
-          window.remoteProverInstance
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+      const consumeTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          targetAccountId,
+          consumeTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(consumeTransactionUpdate);
-      }
       await window.helpers.waitForTransaction(
         consumeTransactionUpdate.executedTransaction().id().toHex()
       );
@@ -766,19 +731,17 @@ export const mintAndConsumeTransaction = async (
         BigInt(1000)
       );
 
-      const mintTransactionUpdate = await client.newTransaction(
-        faucetAccountId,
-        mintTransactionRequest
-      );
+      const prover =
+        _withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
 
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          mintTransactionUpdate,
-          window.remoteProverInstance
+      const mintTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccountId,
+          mintTransactionRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(mintTransactionUpdate);
-      }
 
       let createdNote = mintTransactionUpdate
         .executedTransaction()
@@ -797,19 +760,12 @@ export const mintAndConsumeTransaction = async (
         .withUnauthenticatedInputNotes(noteAndArgsArray)
         .build();
 
-      let consumeTransactionUpdate = await client.newTransaction(
-        targetAccountId,
-        txRequest
-      );
-
-      if (_withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          consumeTransactionUpdate,
-          window.remoteProverInstance
+      let consumeTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          targetAccountId,
+          txRequest,
+          prover
         );
-      } else {
-        await client.submitTransaction(consumeTransactionUpdate);
-      }
 
       if (_sync) {
         await window.helpers.waitForTransaction(

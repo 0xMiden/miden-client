@@ -373,52 +373,32 @@ export class WebClient {
     }
   }
 
-  async newTransaction(accountId, transactionRequest) {
+  async submitNewTransaction(accountId, transactionRequest) {
     try {
-      if (!this.worker) {
-        return await this.wasmWebClient.newTransaction(
-          accountId,
-          transactionRequest
-        );
-      }
-      const serializedAccountId = accountId.toString();
-      const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedTransactionUpdateBytes = await this.callMethodWithWorker(
-        MethodName.NEW_TRANSACTION,
-        serializedAccountId,
-        serializedTransactionRequest
-      );
-      return wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(serializedTransactionUpdateBytes)
+      return await this.wasmWebClient.submitNewTransaction(
+        accountId,
+        transactionRequest
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in newTransaction:", error.toString());
+      console.error(
+        "INDEX.JS: Error in submitNewTransaction:",
+        error.toString()
+      );
       throw error;
     }
   }
 
-  async submitTransaction(transactionUpdate, prover = undefined) {
+  async executeTransactionPipeline(accountId, transactionRequest) {
     try {
-      if (!this.worker) {
-        return await this.wasmWebClient.submitTransaction(
-          transactionUpdate,
-          prover
-        );
-      }
-      const serializedTransactionUpdate = transactionUpdate.serialize();
-      const args = [serializedTransactionUpdate];
-
-      // If a prover is provided, serialize it and add it to the args.
-      if (prover) {
-        args.push(prover.serialize());
-      } else {
-        args.push(null);
-      }
-
-      // Always call the same worker method.
-      await this.callMethodWithWorker(MethodName.SUBMIT_TRANSACTION, ...args);
+      return await this.wasmWebClient.executeTransactionPipeline(
+        accountId,
+        transactionRequest
+      );
     } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error.toString());
+      console.error(
+        "INDEX.JS: Error in executeTransactionPipeline:",
+        error.toString()
+      );
       throw error;
     }
   }
@@ -518,42 +498,6 @@ export class MockWebClient extends WebClient {
       );
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error.toString());
-      throw error;
-    }
-  }
-
-  async submitTransaction(transactionUpdate, prover = undefined) {
-    try {
-      if (!this.worker) {
-        return await this.wasmWebClient.submitTransaction(
-          transactionUpdate,
-          prover
-        );
-      }
-      const serializedTransactionUpdate = transactionUpdate.serialize();
-      const args = [serializedTransactionUpdate];
-
-      // If a prover is provided, serialize it and add it to the args.
-      if (prover) {
-        args.push(prover.serialize());
-      } else {
-        args.push(null);
-      }
-
-      args.push(this.wasmWebClient.serializeMockChain().buffer);
-
-      // Always call the same worker method.
-      let serializedMockChain = await this.callMethodWithWorker(
-        MethodName.SUBMIT_TRANSACTION_MOCK,
-        ...args
-      );
-
-      serializedMockChain = new Uint8Array(serializedMockChain);
-
-      this.wasmWebClient = new WasmWebClient();
-      await this.wasmWebClient.createMockClient(this.seed, serializedMockChain);
-    } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
     }
   }

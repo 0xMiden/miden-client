@@ -6,13 +6,14 @@ This guide demonstrates how to create and submit different types of transactions
 
 All transactions follow a similar pattern:
 1. Create a transaction request
-2. Execute the transaction
-3. Submit the transaction to the network
+2. Execute the transaction pipeline to perform local validation and execution
+3. Prove the transaction (locally or by using a remote prover)
+4. Submit the proven transaction to the network and apply the resulting update
 
 Here's a basic example of how to execute and submit a mint transaction to mint tokens from a faucet:
 
 ```typescript
-import { NoteType, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 
 try {
     // Initialize the web client
@@ -25,20 +26,28 @@ try {
         1000 // number: The amount of tokens to mint
     );
 
-    // 2. Execute transaction
-    const transactionUpdate = await webClient.newTransaction(
+    // 2. Execute the transaction pipeline (performs request validation and execution)
+    const pipeline = await webClient.executeTransactionPipeline(
         accountId,
         transactionRequest
     );
 
-    // 3. Submit transaction
-    await webClient.submitTransaction(transactionUpdate);
-    
-    // Access transaction details
+    // Inspect execution results before proving
+    const executedTx = pipeline.executedTransaction();
+    console.log("Created notes:", executedTx.outputNotes());
+    console.log("Consumed notes:", executedTx.inputNotes());
+    console.log("Account delta:", executedTx.accountDelta());
+
+    // 3. Generate a proof and submit the transaction
+    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const transactionUpdate = await pipeline.submitProvenTransaction();
+    await webClient.applyTransaction(transactionUpdate);
+
     console.log("Block number:", transactionUpdate.blockNum());
-    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
-    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
-    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
+    console.log(
+        "Submitted transaction:",
+        transactionUpdate.executedTransaction().id().toHex()
+    );
 } catch (error) {
     console.error("Transaction failed:", error.message);
 }
@@ -52,34 +61,31 @@ For better performance, you can offload the work of proving the transaction to a
 import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 
 try {
-    // Initialize the web client
     const webClient = await WebClient.createClient();
 
-    // Create a remote prover with the endpoint
     const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com");
 
-    // 1. Create transaction request
     const transactionRequest = webClient.newMintTransactionRequest(
-        targetAccountId, // AccountId: The account that will receive the minted tokens
-        faucetId,// AccountId: The faucet account that will mint the tokens
-        NoteType.Private, // NoteType: The type of note to create (Private or Public)
-        1000 // number: The amount of tokens to mint
+        targetAccountId,
+        faucetId,
+        NoteType.Private,
+        1000
     );
 
-    // 2. Execute transaction
-    const transactionUpdate = await webClient.newTransaction(
+    const pipeline = await webClient.executeTransactionPipeline(
         accountId,
         transactionRequest
     );
 
-    // 3. Submit transaction with remote prover
-    await webClient.submitTransaction(transactionUpdate, remoteProver);
-    
-    // Access transaction details
+    await pipeline.proveTransaction(remoteProver);
+    const transactionUpdate = await pipeline.submitProvenTransaction();
+    await webClient.applyTransaction(transactionUpdate);
+
     console.log("Block number:", transactionUpdate.blockNum());
-    console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
-    console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
-    console.log("Account delta:", transactionUpdate.executedTransaction().accountDelta());
+    console.log(
+        "Submitted transaction:",
+        transactionUpdate.executedTransaction().id().toHex()
+    );
 } catch (error) {
     console.error("Transaction failed:", error.message);
 }
@@ -92,7 +98,7 @@ try {
 To send tokens between accounts:
 
 ```typescript
-import { NoteType, WebClient } from "@demox-labs/miden-sdk";
+import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 
 try {
     // Initialize the web client
@@ -108,14 +114,15 @@ try {
         90               // Optional timelock height
     );
 
-    const transactionUpdate = await webClient.newTransaction(
+    const pipeline = await webClient.executeTransactionPipeline(
         senderAccountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionUpdate);
-    
-    // Access transaction details
+    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const transactionUpdate = await pipeline.submitProvenTransaction();
+    await webClient.applyTransaction(transactionUpdate);
+
     console.log("Block number:", transactionUpdate.blockNum());
     console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
     console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
@@ -130,7 +137,7 @@ try {
 To consume (spend) notes:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 
 try {
     // Initialize the web client
@@ -140,14 +147,15 @@ try {
         [noteId1, noteId2]  // Array of note IDs to consume
     );
 
-    const transactionUpdate = await webClient.newTransaction(
+    const pipeline = await webClient.executeTransactionPipeline(
         accountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionUpdate);
-    
-    // Access transaction details
+    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const transactionUpdate = await pipeline.submitProvenTransaction();
+    await webClient.applyTransaction(transactionUpdate);
+
     console.log("Block number:", transactionUpdate.blockNum());
     console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
     console.log("Consumed notes:", transactionUpdate.executedTransaction().inputNotes());
@@ -175,7 +183,7 @@ import {
     Felt, 
     FeltArray,
     FungibleAsset,
-    NotesArray
+    NotesArray,
     NoteAssets,
     NoteExecutionHint,
     NoteExecutionMode,
@@ -183,6 +191,7 @@ import {
     NoteTag,
     NoteType, 
     OutputNotesArray,
+    TransactionProver,
     TransactionRequestBuilder,
     TransactionScript,
     WebClient
@@ -235,12 +244,14 @@ try {
         .build();
 
     // Create and submit the transaction
-    const transactionUpdate = await webClient.newTransaction(
+    const pipeline = await webClient.executeTransactionPipeline(
         accountId,
         transactionRequest
     );
 
-    await webClient.submitTransaction(transactionUpdate);
+    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const transactionUpdate = await pipeline.submitProvenTransaction();
+    await webClient.applyTransaction(transactionUpdate);
     
     // Access transaction details
     console.log("Block number:", transactionUpdate.blockNum());

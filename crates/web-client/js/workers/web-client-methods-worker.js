@@ -76,44 +76,6 @@ const methodHandlers = {
     const serializedFaucet = faucet.serialize();
     return serializedFaucet.buffer;
   },
-  [MethodName.NEW_TRANSACTION]: async (args) => {
-    const [accountIdStr, serializedTransactionRequest] = args;
-    const accountId = wasm.AccountId.fromHex(accountIdStr);
-    const transactionRequest = wasm.TransactionRequest.deserialize(
-      new Uint8Array(serializedTransactionRequest)
-    );
-
-    const transactionUpdate = await wasmWebClient.newTransaction(
-      accountId,
-      transactionRequest
-    );
-    const serializedTransactionUpdate = transactionUpdate.serialize();
-    return serializedTransactionUpdate.buffer;
-  },
-  [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    const [serializedTransactionUpdate, serializedProver] = args;
-    const transactionUpdate = wasm.TransactionStoreUpdate.deserialize(
-      new Uint8Array(serializedTransactionUpdate)
-    );
-
-    let prover = undefined;
-    if (serializedProver) {
-      if (serializedProver.startsWith("remote:")) {
-        // For a remote prover, extract the endpoint.
-        // For example, "remote:https://my-custom-endpoint.com" becomes "https://my-custom-endpoint.com"
-        const endpoint = serializedProver.split("remote:")[1];
-        prover = wasm.TransactionProver.deserialize("remote", endpoint);
-      } else if (serializedProver === "local") {
-        prover = wasm.TransactionProver.deserialize("local");
-      } else {
-        throw new Error("Invalid prover tag received in worker");
-      }
-    }
-
-    // Call the unified submit_transaction method with an optional prover.
-    await wasmWebClient.submitTransaction(transactionUpdate, prover);
-    return;
-  },
   [MethodName.SYNC_STATE]: async () => {
     const syncSummary = await wasmWebClient.syncState();
     const serializedSyncSummary = syncSummary.serialize();
@@ -128,17 +90,6 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
 
   return await methodHandlers[MethodName.SYNC_STATE]();
-};
-
-methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
-  let serializedMockChain = args.pop();
-  serializedMockChain = new Uint8Array(serializedMockChain);
-  wasmWebClient = new wasm.WebClient();
-  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
-
-  await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
-
-  return wasmWebClient.serializeMockChain().buffer;
 };
 
 /**
