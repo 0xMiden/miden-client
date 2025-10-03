@@ -4,7 +4,7 @@ use core::fmt::Write;
 
 use idxdb_store::WebStore;
 use miden_client::crypto::RpoRandomCoin;
-use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
+use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{
     Client,
@@ -26,6 +26,7 @@ pub mod new_account;
 pub mod new_transactions;
 pub mod notes;
 pub mod rpc_client;
+pub mod settings;
 pub mod sync;
 pub mod tags;
 pub mod transactions;
@@ -76,7 +77,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(TonicRpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
 
         self.setup_client(web_rpc_client, seed).await?;
 
