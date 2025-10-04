@@ -13,7 +13,7 @@ The `@demox-labs/miden-sdk` is a comprehensive software development toolkit (SDK
 Whether you're building a wallet, dApp, or other blockchain-integrated application, this SDK provides the core functionality to bridge your frontend with Miden's powerful ZK architecture.
 
 > **Note:** This README provides a high-level overview of the web client SDK.
-> For more detailed documentation, API references, and usage examples, see the documentation [here](../../docs/src/web-client) (TBD).
+> For more detailed documentation, API references, and usage examples, see the documentation [here](https://github.com/0xMiden/miden-client/blob/main/docs/src/web-client/index.md).
 
 ### SDK Structure and Build Process
 
