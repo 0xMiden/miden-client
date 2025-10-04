@@ -1,9 +1,11 @@
 use miden_client::auth::SigningInputs as NativeSigningInputs;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::felt::Felt;
 use crate::models::transaction_summary::TransactionSummary;
 use crate::models::word::Word;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 pub struct SigningInputs {
@@ -50,5 +52,41 @@ impl SigningInputs {
     #[wasm_bindgen(js_name = "toElements")]
     pub fn to_elements(&self) -> Vec<Felt> {
         self.inner.to_elements().into_iter().map(Into::into).collect()
+    }
+
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.inner)
+    }
+
+    pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
+        let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
+        Ok(native_signing_inputs.into())
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<NativeSigningInputs> for SigningInputs {
+    fn from(native_signing_inputs: NativeSigningInputs) -> Self {
+        SigningInputs { inner: native_signing_inputs }
+    }
+}
+
+impl From<&NativeSigningInputs> for SigningInputs {
+    fn from(native_signing_inputs: &NativeSigningInputs) -> Self {
+        SigningInputs { inner: native_signing_inputs.clone() }
+    }
+}
+
+impl From<SigningInputs> for NativeSigningInputs {
+    fn from(signing_inputs: SigningInputs) -> Self {
+        signing_inputs.inner
+    }
+}
+
+impl From<&SigningInputs> for NativeSigningInputs {
+    fn from(signing_inputs: &SigningInputs) -> Self {
+        signing_inputs.inner.clone()
     }
 }
