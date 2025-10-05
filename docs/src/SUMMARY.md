@@ -25,9 +25,9 @@
 
 ---
 
-# Debugging
+# Troubleshooting
 
-- [Debugging guide](./debugging.md)
+- [Troubleshooting guide](.troubleshooting/.md)
 
 ---
 
