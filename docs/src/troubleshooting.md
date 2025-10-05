@@ -1,4 +1,4 @@
-## Debugging guide and transaction lifecycle (CLI)
+## Troubleshooting and transaction lifecycle (CLI)
 
 This guide helps you troubleshoot common issues and understand the end-to-end lifecycle of transactions and notes in the Miden client.
 
@@ -38,13 +38,25 @@ If you see a gRPC error, it may include a status-derived kind (e.g. `Unavailable
 
 Below are representative errors you may encounter, their likely causes, and suggested fixes.
 
-#### `RpcError::GrpcError: Unavailable` / `DeadlineExceeded`
+#### `RpcError.GrpcError: Unavailable` / `DeadlineExceeded`
 - Cause: Node is down, unreachable, or behind a load balancer that blocked the request.
 - Fix: Check `rpc.endpoint` in `miden-client.toml`, verify the node is running/accessible, and retry.
 
 #### `RpcError.InvalidArgument` / `ExpectedDataMissing` / `InvalidResponse`
 - Cause: Malformed request parameters or unexpected server response.
 - Fix: Re-check command flags/inputs. If using partial IDs, ensure they map to a single entity. Update to the latest client if the server API has changed.
+
+#### Client/network compatibility mismatch
+- Cause: Client and network versions or the genesis header commitment are incompatible.
+- Symptoms: CLI may report messages like:
+
+  ```
+  accept header validation failed: server rejected request - please check your version and network settings
+  ```
+
+  or requests being rejected due to a mismatched genesis header commitment.
+- Details: These are validated by the node by verifying client headers on gRPC requests.
+- Fix: Ensure your client version matches the target network. Switch to the correct network or upgrade/downgrade the client accordingly. Verify the configured genesis header commitment matches the network, then retry.
 
 #### `ClientError.AccountDataNotFound(<account_id>)`
 - Cause: The account is not known to the local store yet.
@@ -81,8 +93,9 @@ For the full protocol-level lifecycle, see the Miden book: [Transaction lifecycl
 ```mermaid
 flowchart LR
     A[Build Request] --> B[Validate Request]
-    B -.->|optional| C[Collect/Insert Input Notes]
-    B -.->|optional| D[Load Foreign Accounts]
+    A -.->|optional| C[Collect/Insert Input Notes]
+    A -.->|optional| D[Load Foreign Accounts]
+    B -.->|optional| K[Insert Public Note Recipients]
     B --> E[Execute Transaction]
     E --> F[Prove Transaction]
     F --> G[Submit to Node]
@@ -113,6 +126,4 @@ Key states the CLI surfaces:
 - CLI debug flag and environment variable are documented in `CLI` and `Config` docs.
 - Common error enums originate from the client and RPC layers.
 - Protocol lifecycle: [Miden book — Transaction lifecycle](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html#transaction-lifecycle)
-
-
 
