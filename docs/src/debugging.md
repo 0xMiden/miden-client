@@ -38,7 +38,7 @@ If you see a gRPC error, it may include a status-derived kind (e.g. `Unavailable
 
 Below are representative errors you may encounter, their likely causes, and suggested fixes.
 
-#### `RpcError.GrpcError: Unavailable` / `DeadlineExceeded`
+#### `RpcError::GrpcError: Unavailable` / `DeadlineExceeded`
 - Cause: Node is down, unreachable, or behind a load balancer that blocked the request.
 - Fix: Check `rpc.endpoint` in `miden-client.toml`, verify the node is running/accessible, and retry.
 
