@@ -81,8 +81,8 @@ For the full protocol-level lifecycle, see the Miden book: [Transaction lifecycl
 ```mermaid
 flowchart LR
     A[Build Request] --> B[Validate Request]
-    B --> C[Collect/Insert Input Notes (optional)]
-    B --> D[Load Foreign Accounts (optional)]
+    B -.->|optional| C[Collect/Insert Input Notes]
+    B -.->|optional| D[Load Foreign Accounts]
     B --> E[Execute Transaction]
     E --> F[Prove Transaction]
     F --> G[Submit to Node]
