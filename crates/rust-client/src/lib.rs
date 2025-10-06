@@ -56,7 +56,7 @@
 //!
 //! use miden_client::crypto::RpoRandomCoin;
 //! use miden_client::keystore::FilesystemKeyStore;
-//! use miden_client::rpc::{Endpoint, TonicRpcClient};
+//! use miden_client::rpc::{Endpoint, GrpcClient};
 //! use miden_client::store::Store;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
@@ -85,10 +85,10 @@
 //! // 256 is simply an example value.
 //! let max_block_number_delta = Some(256);
 //!
-//! // Instantiate the client using a Tonic RPC client
+//! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
-//!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+//!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
 //!     Some(Arc::new(keystore)), // or None if no authenticator is needed
@@ -125,6 +125,7 @@ pub mod account;
 pub mod keystore;
 pub mod note;
 pub mod rpc;
+pub mod settings;
 pub mod store;
 pub mod sync;
 pub mod transaction;
@@ -143,6 +144,9 @@ mod errors;
 
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
+    pub use miden_objects::assembly::debuginfo::SourceManagerSync;
+    pub use miden_objects::assembly::diagnostics::Report;
+    pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_objects::assembly::{
         Assembler,
         DefaultSourceManager,
@@ -166,6 +170,7 @@ pub mod asset {
     pub use miden_objects::asset::{
         Asset,
         AssetVault,
+        AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,
@@ -177,9 +182,8 @@ pub mod asset {
 /// network.
 pub mod auth {
     pub use miden_lib::AuthScheme;
-    pub use miden_lib::account::auth::NoAuth;
-    pub use miden_objects::account::AuthSecretKey;
-    pub use miden_tx::auth::signatures::get_falcon_signature;
+    pub use miden_lib::account::auth::{AuthRpoFalcon512, NoAuth};
+    pub use miden_objects::account::{AuthSecretKey, Signature};
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
 
@@ -193,7 +197,7 @@ pub mod block {
 /// the `miden_objects` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+        pub use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey, Signature};
     }
 
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
@@ -216,8 +220,29 @@ pub mod crypto {
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
 
-pub use errors::{AccountError, AuthenticationError, ClientError, IdPrefixFetchError};
-pub use miden_objects::{EMPTY_WORD, Felt, ONE, StarkField, Word, ZERO};
+/// Provides types for working with addresses within the Miden network.
+pub mod address {
+    pub use miden_objects::address::{AccountIdAddress, Address, AddressInterface, NetworkId};
+}
+
+/// Provides types for working with the virtual machine within the Miden network.
+pub mod vm {
+    pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+}
+
+pub use errors::*;
+use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
+pub use miden_objects::{
+    EMPTY_WORD,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+    ONE,
+    PrettyPrint,
+    StarkField,
+    Word,
+    ZERO,
+};
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
@@ -235,8 +260,8 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
-pub use miden_lib::utils::ScriptBuilder;
-use miden_objects::block::BlockNumber;
+pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
+pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
@@ -269,6 +294,8 @@ pub struct Client<AUTH> {
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<AUTH>>,
+    /// Shared source manager used to retain MASM source information for assembled programs.
+    source_manager: Arc<dyn SourceManagerSync>,
     /// Options that control the transaction executor’s runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// The number of blocks that are considered old enough to discard pending transactions.
@@ -324,12 +351,15 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
+
         Ok(Self {
             store,
             rng: ClientRng::new(rng),
             rpc_api,
             tx_prover,
             authenticator,
+            source_manager,
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
@@ -343,7 +373,7 @@ where
 
     /// Returns an instance of the `ScriptBuilder`
     pub fn script_builder(&self) -> ScriptBuilder {
-        ScriptBuilder::new(self.in_debug_mode())
+        ScriptBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate

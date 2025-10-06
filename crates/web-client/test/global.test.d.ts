@@ -15,8 +15,6 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  Assembler,
-  AssemblerUtils,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -69,6 +67,8 @@ import {
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  ScriptBuilder,
+  ScriptBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -96,8 +96,6 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    Assembler: typeof Assembler;
-    AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -154,6 +152,8 @@ declare global {
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    ScriptBuilder: typeof ScriptBuilder;
+    ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

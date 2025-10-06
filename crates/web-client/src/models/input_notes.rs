@@ -1,4 +1,4 @@
-use miden_objects::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
+use miden_client::transaction::{InputNote as NativeInputNote, InputNotes as NativeInputNotes};
 use wasm_bindgen::prelude::*;
 
 use super::input_note::InputNote;

@@ -1,3 +1,4 @@
+use miden_client::account::{AccountFile, AccountId as NativeAccountId};
 use miden_client::auth::AuthSecretKey;
 use miden_objects::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_objects::note::NoteFile;
@@ -24,13 +25,15 @@ impl WebClient {
             let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
 
+            let AccountFile { account, auth_secret_keys } = account_data;
+
             client
-                .add_account(&account_data.account, account_data.account_seed, false)
+                .add_account(&account.clone(), false)
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to import account"))?;
 
             let keystore = keystore.expect("KeyStore should be initialized");
-            for key in account_data.auth_secret_keys {
+            for key in auth_secret_keys {
                 keystore.add_key(&key).await.map_err(|err| err.to_string())?;
             }
 
@@ -49,7 +52,7 @@ impl WebClient {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, _, key_pair) =
+        let (generated_acct, key_pair) =
             generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed)).await?;
 
         let native_id = generated_acct.id();

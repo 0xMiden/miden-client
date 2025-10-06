@@ -92,10 +92,10 @@ try {
 You can compile custom note scripts for advanced use cases:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { ScriptBuilder, ScriptBuilderMode } from "@demox-labs/miden-sdk";
 
 try {
-    // Initialize the web client
+    // Instance a script builder
     const webClient = await WebClient.createClient();
 
     const script = `
@@ -103,7 +103,11 @@ try {
         # This can include custom validation logic, asset transfers, etc.
     `;
 
-    const noteScript = webClient.compileNoteScript(script);
+    // Script builder can be instanced in either debug or normal mode using one of:
+    // - ScriptBuilderMode.Debug
+    // - ScriptBuilderMode.Normal
+    
+    const noteScript = new ScriptBuilder(ScriptBuilderMode.Debug);
     // Use the compiled script in your transaction
 } catch (error) {
     console.error("Failed to compile note script:", error.message);

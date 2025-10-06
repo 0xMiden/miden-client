@@ -43,8 +43,6 @@ export const test = base.extend<{ forEachTest: void }>({
             Address,
             AddressInterface,
             AdviceMap,
-            Assembler,
-            AssemblerUtils,
             AuthSecretKey,
             BasicFungibleFaucetComponent,
             ConsumableNoteRecord,
@@ -77,6 +75,7 @@ export const test = base.extend<{ forEachTest: void }>({
             PublicKey,
             Rpo256,
             SecretKey,
+            ScriptBuilder,
             Endpoint,
             RpcClient,
             NoteId,
@@ -124,8 +123,6 @@ export const test = base.extend<{ forEachTest: void }>({
           window.Address = Address;
           window.AddressInterface = AddressInterface;
           window.AdviceMap = AdviceMap;
-          window.Assembler = Assembler;
-          window.AssemblerUtils = AssemblerUtils;
           window.AuthSecretKey = AuthSecretKey;
           window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
           window.ConsumableNoteRecord = ConsumableNoteRecord;
@@ -182,6 +179,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
+          window.ScriptBuilder = ScriptBuilder;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};

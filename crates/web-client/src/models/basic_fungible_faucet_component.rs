@@ -1,5 +1,5 @@
-use miden_lib::account::faucets::BasicFungibleFaucet as NativeBasicFungibleFaucet;
-use miden_objects::account::Account as NativeAccount;
+use miden_client::account::Account as NativeAccount;
+use miden_client::account::component::BasicFungibleFaucet as NativeBasicFungibleFaucet;
 use wasm_bindgen::prelude::*;
 
 use super::account::Account;

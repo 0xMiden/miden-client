@@ -10,8 +10,7 @@ use miden_client::note::{
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError};
-use miden_objects::PrettyPrint;
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};

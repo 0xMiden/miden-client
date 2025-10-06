@@ -22,6 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -35,9 +36,10 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
-use miden_objects::asset::{Asset, AssetVault};
+use miden_objects::address::Address;
+use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
@@ -249,11 +251,17 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, account_id: AccountId)
     -> Result<Option<AccountRecord>, StoreError>;
 
-    /// Inserts an [`Account`] along with the seed used to create it.
+    /// Inserts an [`Account`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the account. This address
+    /// will be tracked for incoming notes and its derived note tag will be monitored.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is new and does not contain a seed
     async fn insert_account(
         &self,
         account: &Account,
-        account_seed: Option<Word>,
+        initial_address: Address,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -270,12 +278,33 @@ pub trait Store: Send + Sync {
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
 
+    /// Retrieves all [`Address`] objects that correspond to the provided account ID.
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError>;
+
     /// Updates an existing [`Account`] with a new state.
     ///
     /// # Errors
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
+    /// Adds a value to the `settings` table.
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError>;
+
+    /// Retrieves a value from the `settings` table.
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
+
+    /// Deletes a value from the `settings` table.
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError>;
+
+    /// Returns all the keys from the `settings` table.
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
@@ -364,22 +393,22 @@ pub trait Store: Send + Sync {
     /// Retrieves the asset vault for a specific account.
     async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
 
-    /// Retrieves a specific asset from the account's vault along with its Merkle proof.
+    /// Retrieves a specific asset from the account's vault along with its Merkle witness.
     ///
     /// The default implementation of this method uses [`Store::get_account_vault`].
     async fn get_account_asset(
         &self,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
-    ) -> Result<Option<(Asset, MerklePath)>, StoreError> {
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
         let vault = self.get_account_vault(account_id).await?;
         let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
             return Ok(None);
         };
 
-        let path = vault.asset_tree().open(&asset.vault_key()).into_parts().0;
+        let witness = AssetWitness::new(vault.open(asset.vault_key()).into())?;
 
-        Ok(Some((asset, path)))
+        Ok(Some((asset, witness)))
     }
 
     /// Retrieves the storage for a specific account.

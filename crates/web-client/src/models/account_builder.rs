@@ -1,5 +1,5 @@
+use miden_client::account::AccountBuilder as NativeAccountBuilder;
 use miden_client::auth::NoAuth;
-use miden_objects::account::AccountBuilder as NativeAccountBuilder;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -73,10 +73,11 @@ impl AccountBuilder {
     }
 
     pub fn build(self) -> Result<AccountBuilderResult, JsValue> {
-        let (account, seed) = self
+        let account = self
             .0
             .build()
             .map_err(|err| js_error_with_context(err, "Failed to build account"))?;
+        let seed = account.seed().expect("newly built account should always contain a seed");
         Ok(AccountBuilderResult {
             account: account.into(),
             seed: seed.into(),

@@ -36,7 +36,7 @@ use crate::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use crate::{Client, ClientError, Word};
+use crate::{Client, ClientError};
 
 pub type TestClientKeyStore = FilesystemKeyStore<StdRng>;
 pub type TestClient = Client<TestClientKeyStore>;
@@ -60,7 +60,7 @@ pub async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-) -> Result<(Account, Word, SecretKey), ClientError> {
+) -> Result<(Account, SecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -73,13 +73,13 @@ pub async fn insert_new_wallet_with_seed(
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
-) -> Result<(Account, Word, SecretKey), ClientError> {
+) -> Result<(Account, SecretKey), ClientError> {
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
     keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -87,9 +87,9 @@ pub async fn insert_new_wallet_with_seed(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(&account, false).await?;
 
-    Ok((account, seed, key_pair))
+    Ok((account, key_pair))
 }
 
 /// Inserts a new fungible faucet account into the client and into the keystore.
@@ -97,7 +97,7 @@ pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-) -> Result<(Account, Word, SecretKey), ClientError> {
+) -> Result<(Account, SecretKey), ClientError> {
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
@@ -111,7 +111,7 @@ pub async fn insert_new_fungible_faucet(
     let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
         .expect("u64 can be safely converted to a field element");
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(pub_key))
@@ -119,8 +119,8 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
-    Ok((account, seed, key_pair))
+    client.add_account(&account, false).await?;
+    Ok((account, key_pair))
 }
 
 /// Executes a transaction and asserts that it fails with the expected error.
@@ -197,7 +197,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
                 std::thread::sleep(Duration::from_secs(1));
             },
             TransactionStatus::Discarded(cause) => {
-                anyhow::bail!("transaction was discarded with cause: {:?}", cause);
+                anyhow::bail!("transaction was discarded with cause: {cause:?}");
             },
         }
 
@@ -299,7 +299,7 @@ pub async fn setup_two_wallets_and_faucet(
     anyhow::ensure!(input_notes.is_empty(), "Expected empty input notes for clean state");
 
     // Create faucet account
-    let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
+    let (faucet_account, _) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
         .with_context(|| "failed to insert new fungible faucet account")?;
 
@@ -326,7 +326,7 @@ pub async fn setup_wallet_and_faucet(
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
 ) -> Result<(Account, Account)> {
-    let (faucet_account, ..) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
+    let (faucet_account, _) = insert_new_fungible_faucet(client, accounts_storage_mode, keystore)
         .await
         .with_context(|| "failed to insert new fungible faucet account")?;
 

@@ -1,5 +1,5 @@
 use miden_client::crypto::MerklePath as NativeMerklePath;
-use miden_objects::note::NoteInclusionProof as NativeNoteInclusionProof;
+use miden_client::note::NoteInclusionProof as NativeNoteInclusionProof;
 use wasm_bindgen::prelude::*;
 
 use super::merkle_path::MerklePath;

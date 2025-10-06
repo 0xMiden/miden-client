@@ -7,9 +7,11 @@ use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
     AccountError,
     AccountIdError,
+    AddressError,
     AssetError,
     AssetVaultError,
     NoteError,
+    StorageMapError,
     TransactionScriptError,
     Word,
     WordError,
@@ -36,6 +38,8 @@ pub enum StoreError {
     AccountDataNotFound(AccountId),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("address error")]
+    AddressError(#[from] AddressError),
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
     #[error("account commitment {0} already exists")]
@@ -72,6 +76,8 @@ pub enum StoreError {
     QueryError(String),
     #[error("error with the SMT proof")]
     SmtProofError(#[from] SmtProofError),
+    #[error("error with a storage map")]
+    StorageMapError(#[from] StorageMapError),
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]

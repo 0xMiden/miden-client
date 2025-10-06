@@ -5,10 +5,10 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_client::note::NoteId as NativeNoteId;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
-use miden_client::rpc::{NodeRpcClient, TonicRpcClient};
-use miden_objects::note::NoteId as NativeNoteId;
-use miden_objects::transaction::InputNote as NativeInputNote;
+use miden_client::rpc::{GrpcClient, NodeRpcClient};
+use miden_client::transaction::InputNote as NativeInputNote;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -33,7 +33,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(TonicRpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
 
         Ok(RpcClient { inner: rpc_client })
     }

@@ -7,7 +7,7 @@ use std::string::ToString;
 use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
-use miden_objects::account::AuthSecretKey;
+use miden_objects::account::{AuthSecretKey, Signature};
 use miden_objects::{Felt, Word};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
@@ -139,7 +139,8 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
         let AuthSecretKey::RpoFalcon512(k) =
             secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
 
-        miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
+        let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
+        Ok(signature.to_prepared_signature())
     }
 }
 
