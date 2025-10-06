@@ -20,10 +20,10 @@ use crate::rpc::domain::account::{
     FetchedAccount,
     StateHeaders,
 };
-use crate::rpc::domain::account_vault::AccountVaultInfo;
+use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
-use crate::rpc::domain::storage_map::StorageMapInfo;
+use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
@@ -186,10 +186,46 @@ impl MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let vault_delta = account_delta.vault();
+
+                for asset in vault_delta.added_assets().into_iter() {
+                    let account_vault_update = AccountVaultUpdate {
+                        block_num: block_number,
+                        asset: Some(asset),
+                        vault_key: asset.vault_key(),
+                    };
+                    updates.push(account_vault_update);
+                }
+            }
+        }
+
         let response = AccountVaultInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_number: self.get_chain_tip_block_num(),
-            updates: vec![], // TODO: GET UPDATES
+            updates,
         };
         Ok(response)
     }
@@ -201,10 +237,50 @@ impl MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let storage_delta = account_delta.storage();
+
+                for (slot_index, map_delta) in storage_delta.maps() {
+                    let slot_index = *slot_index as u32;
+
+                    for (key, value) in map_delta.entries() {
+                        let storage_map_info = StorageMapUpdate {
+                            block_num: block_number,
+                            slot_index,
+                            key: key.clone().into(),
+                            value: value.clone(),
+                        };
+                        updates.push(storage_map_info);
+                    }
+                }
+            }
+        }
+
         let response = StorageMapInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_number: self.get_chain_tip_block_num(),
-            updates: vec![], // TODO: GET UPDATES
+            updates,
         };
         Ok(response)
     }
