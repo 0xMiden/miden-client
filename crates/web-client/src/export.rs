@@ -106,7 +106,7 @@ impl WebClient {
                 );
             }
 
-            let account_data = NativeAccountFile::new(account, account_seed, key_pairs);
+            let account_data = NativeAccountFile::new(account, key_pairs);
 
             Ok(AccountFile::from(account_data))
         } else {

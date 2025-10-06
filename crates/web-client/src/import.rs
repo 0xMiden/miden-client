@@ -1,8 +1,7 @@
-use miden_client::account::{AccountFile, AccountId as NativeAccountId};
+use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::auth::AuthSecretKey;
-use miden_objects::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
-use miden_objects::note::NoteFile;
-use miden_objects::utils::Deserializable;
+use miden_client::note::NoteFile;
+use miden_client::utils::Deserializable;
 use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
@@ -25,7 +24,7 @@ impl WebClient {
             let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
 
-            let AccountFile { account, auth_secret_keys } = account_data;
+            let NativeAccountFile { account, auth_secret_keys } = account_data;
 
             client
                 .add_account(&account.clone(), false)
