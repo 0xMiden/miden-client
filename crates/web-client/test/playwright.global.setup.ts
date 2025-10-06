@@ -226,8 +226,11 @@ export const test = base.extend<{ forEachTest: void }>({
               transactionRequest
             );
 
-            const proverToUse =
-              prover ?? window.TransactionProver.newLocalProver();
+            const useRemoteProver =
+              prover != null && window.remoteProverUrl != null;
+            const proverToUse = useRemoteProver
+              ? window.TransactionProver.newRemoteProver(window.remoteProverUrl)
+              : window.TransactionProver.newLocalProver();
 
             await pipeline.proveTransaction(proverToUse);
             const submissionUpdate = await pipeline.submitProvenTransaction();
