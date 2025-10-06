@@ -58,7 +58,7 @@
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 //! use miden_client::note_transport::grpc::GrpcNoteTransportClient;
-//! use miden_client::rpc::{Endpoint, TonicRpcClient};
+//! use miden_client::rpc::{Endpoint, GrpcClient};
 //! use miden_client::store::Store;
 //! use miden_client::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
@@ -92,10 +92,10 @@
 //!     GrpcNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), 10_000)
 //!         .await?;
 //!
-//! // Instantiate the client using a Tonic RPC client
+//! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
-//!     Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+//!     Arc::new(GrpcClient::new(&endpoint, 10_000)),
 //!     Box::new(rng),
 //!     store,
 //!     Some(Arc::new(keystore)), // or None if no authenticator is needed
@@ -154,6 +154,8 @@ mod errors;
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
     pub use miden_objects::assembly::debuginfo::SourceManagerSync;
+    pub use miden_objects::assembly::diagnostics::Report;
+    pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_objects::assembly::{
         Assembler,
         DefaultSourceManager,

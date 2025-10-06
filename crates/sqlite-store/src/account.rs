@@ -14,6 +14,7 @@ use miden_client::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    Address,
     StorageMap,
     StorageSlot,
     StorageSlotType,
@@ -137,13 +138,15 @@ impl SqliteStore {
             status.seed().copied(),
         );
 
-        Ok(Some(AccountRecord::new(account, status)))
+        let addresses = query_account_addresses(conn, header.id())?;
+        Ok(Some(AccountRecord::new(account, status, addresses)))
     }
 
     pub(crate) fn insert_account(
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account: &Account,
+        initial_address: &Address,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -157,6 +160,8 @@ impl SqliteStore {
 
         Self::insert_assets(&tx, account.vault().root(), account.vault().assets())?;
         Self::insert_account_header(&tx, &account.into(), account.seed())?;
+
+        Self::insert_address(&tx, initial_address, account.id())?;
 
         tx.commit().into_store_error()?;
 
@@ -347,6 +352,13 @@ impl SqliteStore {
         let witness = StorageMapWitness::new(proof, [key])?;
 
         Ok((item, witness))
+    }
+
+    pub(crate) fn get_account_addresses(
+        conn: &mut Connection,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError> {
+        query_account_addresses(conn, account_id)
     }
 
     // ACCOUNT DELTA HELPERS
@@ -794,6 +806,19 @@ impl SqliteStore {
 
         Ok(())
     }
+
+    fn insert_address(
+        tx: &Transaction<'_>,
+        address: &Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
+        let serialized_address = address.to_bytes();
+        tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
+            .into_store_error()?;
+
+        Ok(())
+    }
 }
 
 // HELPERS
@@ -990,6 +1015,28 @@ fn query_account_headers(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
+fn query_account_addresses(
+    conn: &Connection,
+    account_id: AccountId,
+) -> Result<Vec<Address>, StoreError> {
+    const ADDRESS_QUERY: &str = "SELECT address FROM addresses";
+
+    let query = format!("{ADDRESS_QUERY} WHERE ACCOUNT_ID = '{}'", account_id.to_hex());
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map([], |row| {
+            let address: Vec<u8> = row.get(0)?;
+            Ok(address)
+        })
+        .into_store_error()?
+        .map(|result| {
+            let serialized_address = result.into_store_error()?;
+            let address = Address::read_from_bytes(&serialized_address)?;
+            Ok(address)
+        })
+        .collect::<Result<Vec<Address>, StoreError>>()
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -1004,7 +1051,10 @@ mod tests {
         AccountDelta,
         AccountHeader,
         AccountId,
+        AccountIdAddress,
         AccountType,
+        Address,
+        AddressInterface,
         StorageMap,
         StorageSlot,
     };
@@ -1098,7 +1148,9 @@ mod tests {
             .with_component(dummy_component)
             .build()?;
 
-        store.insert_account(&account).await?;
+        let default_address =
+            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, [ZERO, ZERO, ZERO, ONE].into());
@@ -1186,7 +1238,9 @@ mod tests {
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
-        store.insert_account(&account).await?;
+        let default_address =
+            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
         storage_delta.set_item(1, EMPTY_WORD);

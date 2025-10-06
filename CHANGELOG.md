@@ -8,10 +8,12 @@
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 * Implemented functions for lazy loading on webstore [(#1184)](https://github.com/0xMiden/miden-client/pull/1184).
 * Separated `migrations` and `settings` tables [(#1287)](https://github.com/0xMiden/miden-client/pull/1287).
+* Added single default address on account creation ([#1308](https://github.com/0xMiden/miden-client/pull/1308)).
 * Added a `GetNoteScriptByRoot` call to the `RpcClient` ([#1311](https://github.com/0xMiden/miden-client/pull/1311)).
 * Implemented account lazy loading with more granular account data getters ([#1321](https://github.com/0xMiden/miden-client/pull/1321)).
 * Added `NoAuth` component to the web client ([#1330](https://github.com/0xMiden/miden-client/pull/1330)).
 * Implemented shared source manager for better error reporting ([#1275](https://github.com/0xMiden/miden-client/pull/1275)).
+* Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 
 ### Changes
 
@@ -23,6 +25,9 @@
 * [BREAKING] Updated Web Client account store functions from insert to upsert ([#1274](https://github.com/0xMiden/miden-client/pull/1274)).
 * [BREAKING] Added connectivity to the Transport Layer, adding a new `Client` field and `Store` methods ([#1296](https://github.com/0xMiden/miden-client/pull/1296)).
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
+* Add more context to errors when deserializing objects ([#1336](https://github.com/0xMiden/miden-client/pull/1336))
+* [BREAKING] Renamed `TonicRpcClient` to `GrpcClient` and `tonic_rpc_client()` method to `grpc_client()` ([#1360](https://github.com/0xMiden/miden-client/pull/1360)).
+* [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 
 ## 0.11.8 (2025-09-29)
 

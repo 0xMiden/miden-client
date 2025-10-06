@@ -12,8 +12,17 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
+use base64::Engine;
+use base64::engine::general_purpose;
 use miden_client::Word;
-use miden_client::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
+use miden_client::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
+};
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
@@ -32,6 +41,8 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, js_sys};
 
@@ -184,8 +195,12 @@ impl Store for WebStore {
     // ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    async fn insert_account(&self, account: &Account) -> Result<(), StoreError> {
-        self.insert_account(account).await
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
+        self.insert_account(account, initial_address).await
     }
 
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError> {
@@ -251,6 +266,13 @@ impl Store for WebStore {
         self.get_account_storage(account_id).await
     }
 
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError> {
+        self.get_account_addresses(account_id).await
+    }
+
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
@@ -278,4 +300,32 @@ impl Store for WebStore {
 pub(crate) fn current_timestamp_u64() -> u64 {
     let now = chrono::Utc::now();
     u64::try_from(now.timestamp()).expect("timestamp is always after epoch")
+}
+
+/// Helper function to decode a base64 string to a `Vec<u8>`.
+pub(crate) fn base64_to_vec_u8_required<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let base64_str: String = Deserialize::deserialize(deserializer)?;
+    general_purpose::STANDARD
+        .decode(&base64_str)
+        .map_err(|e| Error::custom(format!("Base64 decode error: {e}")))
+}
+
+/// Helper function to decode a base64 string to an `Option<Vec<u8>>`.
+pub(crate) fn base64_to_vec_u8_optional<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<u8>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let base64_str: Option<String> = Option::deserialize(deserializer)?;
+    match base64_str {
+        Some(str) => general_purpose::STANDARD
+            .decode(&str)
+            .map(Some)
+            .map_err(|e| Error::custom(format!("Base64 decode error: {e}"))),
+        None => Ok(None),
+    }
 }

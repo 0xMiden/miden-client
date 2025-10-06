@@ -104,18 +104,12 @@ where
         self
     }
 
-    /// Sets a tonic RPC client from the endpoint and optional timeout.
+    /// Sets a gRPC client from the endpoint and optional timeout.
     #[must_use]
     #[cfg(feature = "tonic")]
-    pub fn tonic_rpc_client(
-        mut self,
-        endpoint: &crate::rpc::Endpoint,
-        timeout_ms: Option<u64>,
-    ) -> Self {
-        self.rpc_api = Some(Arc::new(crate::rpc::TonicRpcClient::new(
-            endpoint,
-            timeout_ms.unwrap_or(10_000),
-        )));
+    pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
+        self.rpc_api =
+            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
         self
     }
 
