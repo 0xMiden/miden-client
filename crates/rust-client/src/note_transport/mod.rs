@@ -65,7 +65,7 @@ impl<AUTH> Client<AUTH> {
     /// Fetches all notes for tracked note tags
     ///
     /// All notes stored in the note transport network will be fetched.
-    pub async fn fetch_all_private_notes<I>(&mut self) -> Result<(), ClientError> {
+    pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
         let note_tags = self.store.get_unique_note_tags().await?;
