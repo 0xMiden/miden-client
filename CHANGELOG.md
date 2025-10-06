@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.9 (2025-10-06)
+
+* Implemented new note compatibility checker [(#1376)](https://github.com/0xMiden/miden-client/pull/1376).
+
 ## 0.11.8 (2025-09-29)
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
