@@ -462,14 +462,15 @@ export class MockWebClient extends WebClient {
    *
    * @param serializedMockChain - Serialized mock chain data (optional). Will use an empty chain if not provided.
    * @param seed - The seed for the account (optional).
+   * @param serializedMockNoteTransportNode - Serialized mock note transport node data (optional). Will use a new instance if not provided.
    * @returns A promise that resolves to a MockWebClient.
    */
-  static async createClient(serializedMockChain, seed) {
+  static async createClient(serializedMockChain, seed, serializedMockNoteTransportNode) {
     // Construct the instance (synchronously).
     const instance = new MockWebClient(seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createMockClient(seed, serializedMockChain);
+    await instance.wasmWebClient.createMockClient(seed, serializedMockChain, serializedMockNoteTransportNode);
 
     // Wait for the worker to be ready
     await instance.ready;

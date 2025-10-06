@@ -10,7 +10,7 @@ use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
-use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
+use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
 use crate::store::{InputNoteRecord, Store};
@@ -65,7 +65,7 @@ impl<AUTH> Client<AUTH> {
     /// Fetches all notes for tracked note tags
     ///
     /// All notes stored in the note transport network will be fetched.
-    pub async fn fetch_all_private_notes<I>(&mut self) -> Result<(), ClientError> {
+    pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
         let note_tags = self.store.get_unique_note_tags().await?;
@@ -185,6 +185,24 @@ pub struct NoteInfo {
     pub header: NoteHeader,
     /// Note details, can be encrypted
     pub details_bytes: Vec<u8>,
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for NoteInfo {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.header.write_into(target);
+        self.details_bytes.write_into(target);
+    }
+}
+
+impl Deserializable for NoteInfo {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let header = NoteHeader::read_from(source)?;
+        let details_bytes = Vec::<u8>::read_from(source)?;
+        Ok(NoteInfo { header, details_bytes })
+    }
 }
 
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
