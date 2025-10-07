@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.9 (2025-10-07)
+
+* Added indexes to improve sync process performance [(#1363)](https://github.com/0xMiden/miden-client/pull/1363).
+
 ## 0.11.8 (2025-09-29)
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).

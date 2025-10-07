@@ -14,7 +14,7 @@ use crate::transaction::{TransactionRecord, TransactionStatus};
 
 /// Represents the possible types of updates that can be applied to a note in a
 /// [`NoteUpdateTracker`].
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoteUpdateType {
     /// Indicates that the note was already tracked but it was not updated.
     None,

@@ -14,9 +14,7 @@ use miden_lib::AuthScheme;
 use miden_lib::account::faucets::create_basic_fungible_faucet;
 use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer,
-    DEFAULT_MAX_BATCHES_PER_BLOCK,
-    DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
@@ -373,10 +371,10 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     // Force the account nonce to 1.
     //
     // By convention, a nonce of zero indicates a freshly generated local account that has yet
-    // to be deployed. An account is deployed onchain along with its first transaction which
+    // to be deployed. An account is deployed onchain along withn  its first transaction which
     // results in a non-zero nonce onchain.
     //
-    // The genesis block is special in that accounts are "deplyed" without transactions and
+    // The genesis block is special in that accounts are "deployed" without transactions and
     // therefore we need bump the nonce manually to uphold this invariant.
     let (id, vault, storage, code, _) = account.into_parts();
     let updated_account = Account::from_parts(id, vault, storage, code, ONE);
