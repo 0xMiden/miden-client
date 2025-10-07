@@ -4,8 +4,11 @@ use core::fmt::Write;
 
 use idxdb_store::WebStore;
 use miden_client::crypto::RpoRandomCoin;
+use miden_client::note_transport::NoteTransportClient;
+use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
+use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
     Client,
     ExecutionOptions,
@@ -25,6 +28,7 @@ pub mod mock;
 pub mod models;
 pub mod new_account;
 pub mod new_transactions;
+pub mod note_transport;
 pub mod notes;
 pub mod rpc_client;
 pub mod settings;
@@ -42,6 +46,7 @@ pub struct WebClient {
     keystore: Option<WebKeyStore<RpoRandomCoin>>,
     inner: Option<Client<WebKeyStore<RpoRandomCoin>>>,
     mock_rpc_api: Option<Arc<MockRpcApi>>,
+    mock_note_transport_api: Option<Arc<MockNoteTransportApi>>,
 }
 
 impl Default for WebClient {
@@ -60,6 +65,7 @@ impl WebClient {
             store: None,
             keystore: None,
             mock_rpc_api: None,
+            mock_note_transport_api: None,
         }
     }
 
@@ -73,6 +79,7 @@ impl WebClient {
     pub async fn create_client(
         &mut self,
         node_url: Option<String>,
+        node_note_transport_url: Option<String>,
         seed: Option<Vec<u8>>,
     ) -> Result<JsValue, JsValue> {
         let endpoint = node_url.map_or(Ok(Endpoint::testnet()), |url| {
@@ -81,7 +88,10 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
 
-        self.setup_client(web_rpc_client, seed).await?;
+        let note_transport_client = node_note_transport_url
+            .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
+
+        self.setup_client(web_rpc_client, note_transport_client, seed).await?;
 
         Ok(JsValue::from_str("Client created successfully"))
     }
@@ -90,6 +100,7 @@ impl WebClient {
     async fn setup_client(
         &mut self,
         rpc_client: Arc<dyn NodeRpcClient>,
+        note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         seed: Option<Vec<u8>>,
     ) -> Result<(), JsValue> {
         let mut rng = match seed {
@@ -131,6 +142,7 @@ impl WebClient {
                 .expect("Default executor's options should always be valid"),
                 None,
                 None,
+                note_transport_client,
             )
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?,
