@@ -13,6 +13,7 @@
 * Implemented account lazy loading with more granular account data getters ([#1321](https://github.com/0xMiden/miden-client/pull/1321)).
 * Added `NoAuth` component to the web client ([#1330](https://github.com/0xMiden/miden-client/pull/1330)).
 * Implemented shared source manager for better error reporting ([#1275](https://github.com/0xMiden/miden-client/pull/1275)).
+* Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 * Added `Address` addition and removal for accounts ([#1367](https://github.com/0xMiden/miden-client/pull/1367)).
 
 ### Changes
@@ -26,6 +27,8 @@
 * Removed `miden-lib` and `miden-objects` dependencies from web client & cli ([#1333](https://github.com/0xMiden/miden-client/pull/1333)).
 * Add more context to errors when deserializing objects ([#1336](https://github.com/0xMiden/miden-client/pull/1336))
 * [BREAKING] Renamed `TonicRpcClient` to `GrpcClient` and `tonic_rpc_client()` method to `grpc_client()` ([#1360](https://github.com/0xMiden/miden-client/pull/1360)).
+* [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
+* [BREAKING] Implemented `AccountFile` in the WebClient ([#1258](https://github.com/0xMiden/miden-client/pull/1258)).
 
 ## 0.11.8 (2025-09-29)
 

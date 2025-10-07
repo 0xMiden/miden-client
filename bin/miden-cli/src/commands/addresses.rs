@@ -2,7 +2,6 @@ use miden_client::account::{AccountId, AccountIdAddress, AddressInterface};
 use miden_client::address::Address;
 use miden_client::note::NoteExecutionMode;
 use miden_client::{Client, Serializable};
-use tracing::info;
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;

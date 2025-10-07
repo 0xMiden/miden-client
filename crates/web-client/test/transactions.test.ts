@@ -224,7 +224,8 @@ export const compileTxScript = async (
       true
     );
 
-    const compiledScript = await client.compileTxScript(_script);
+    let builder = client.createScriptBuilder();
+    const compiledScript = builder.compileNoteScript(_script);
 
     return {
       scriptRoot: compiledScript.root().toHex(),
@@ -256,7 +257,7 @@ test.describe("compile_tx_script tests", () => {
     const script = "fakeScript";
 
     await expect(compileTxScript(page, script)).rejects.toThrow(
-      /failed to compile transaction script:/
+      /failed to compile note script:/
     );
   });
 });

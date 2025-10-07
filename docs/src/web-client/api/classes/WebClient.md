@@ -50,38 +50,6 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
@@ -128,9 +96,19 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### createScriptBuilder()
+
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+
+#### Returns
+
+[`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
 ### exportAccountFile()
 
-> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>
 
 #### Parameters
 
@@ -140,7 +118,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`AccountFile`](AccountFile.md)\>
 
 ***
 
@@ -388,13 +366,13 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importAccountFile()
 
-> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+> **importAccountFile**(`account_file`): `Promise`\<`any`\>
 
 #### Parameters
 
-##### account\_bytes
+##### account\_file
 
-`any`
+[`AccountFile`](AccountFile.md)
 
 #### Returns
 

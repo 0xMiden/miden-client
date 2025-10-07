@@ -1,4 +1,4 @@
-use miden_client::account::{AccountFile, AccountId as NativeAccountId};
+use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::auth::AuthSecretKey;
 use miden_client::note::NoteFile;
 use miden_client::utils::Deserializable;
@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
 use crate::models::account::Account;
+use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId as JsAccountId;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::{WebClient, js_error_with_context};
@@ -16,17 +17,14 @@ impl WebClient {
     #[wasm_bindgen(js_name = "importAccountFile")]
     pub async fn import_account_file(
         &mut self,
-        account_bytes: JsValue,
+        account_file: AccountFile,
     ) -> Result<JsValue, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let account_bytes_result: Vec<u8> =
-                from_value(account_bytes).map_err(|err| err.to_string())?;
-            let account_data = AccountFile::read_from_bytes(&account_bytes_result)
-                .map_err(|err| err.to_string())?;
+            let account_data: NativeAccountFile = account_file.into();
             let account_id = account_data.account.id().to_string();
 
-            let AccountFile { account, auth_secret_keys } = account_data;
+            let NativeAccountFile { account, auth_secret_keys } = account_data;
 
             client
                 .add_account(&account.clone(), false)
