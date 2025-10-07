@@ -2,10 +2,7 @@
   "name": "@demox-labs/miden-sdk",
   "version": "0.11.8",
   "description": "Miden Wasm SDK",
-  "collaborators": [
-    "Miden",
-    "Demox Labs <hi@demoxlabs.xyz>"
-  ],
+  "collaborators": ["Miden", "Demox Labs <hi@demoxlabs.xyz>"],
   "type": "module",
   "main": "./dist/index.js",
   "browser": "./dist/index.js",
@@ -13,10 +10,7 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "files": [
-    "dist",
-    "../LICENSE.md"
-  ],
+  "files": ["dist", "../LICENSE.md"],
   "scripts": {
     "build-rust-client-js": "cd ../rust-client/src/store/web_store && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
