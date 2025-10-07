@@ -52,6 +52,7 @@ use rusqlite::Connection;
 use rusqlite::types::Value;
 
 use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
+use crate::sql_error::SqlResultExt;
 
 mod account;
 mod chain_data;
@@ -428,6 +429,30 @@ impl Store for SqliteStore {
     ) -> Result<Vec<Address>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_addresses(conn, account_id)
+        })
+        .await
+    }
+
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            SqliteStore::insert_address(&tx, &address, account_id)?;
+            tx.commit().into_store_error()
+        })
+        .await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_address(conn, &address, account_id)
         })
         .await
     }

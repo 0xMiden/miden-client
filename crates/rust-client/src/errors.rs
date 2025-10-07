@@ -33,6 +33,8 @@ use crate::transaction::TransactionRequestError;
 pub enum ClientError {
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
+    #[error("address {0} is already being tracked")]
+    AddressAlreadyTracked(String),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("account with id {0} is locked")]

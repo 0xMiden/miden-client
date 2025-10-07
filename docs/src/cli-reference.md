@@ -175,18 +175,6 @@ miden-client notes --show 0x70b7ec
 
 Sync the client with the latest state of the Miden network. Shows a brief summary at the end.
 
-### `tags`
-
-View and add tags.
-
-#### Action Flags
-
-| Flag            | Description                                                 | Aliases |
-|-----------------|-------------------------------------------------------------|---------|
-| `--list`        | List all tags monitored by this client                      | `-l`    |
-| `--add <tag>`   | Add a new tag to the list of tags monitored by this client  | `-a`    |
-| `--remove <tag>`| Remove a tag from the list of tags monitored by this client | `-r`    |
-
 ### `tx`
 
 View transactions.
@@ -242,6 +230,38 @@ Usage: `miden-client send --sender <SENDER ACCOUNT ID> --target <TARGET ACCOUNT 
 The source account creates a `SWAP` note that offers some asset in exchange for some other asset. When another account consumes that note, it will receive the offered asset amount and the requested asset will removed from its vault (and put into a new note which the first account can then consume). Consuming the note will fail if the account doesn't have enough of the requested asset.
 
 Usage:  `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED AMOUNT>::<OFFERED FAUCET ID> --requested-asset <REQUESTED AMOUNT>::<REQUESTED FAUCET ID> --note-type <NOTE_TYPE>`
+
+### `addresses`
+
+View and manage addresses.
+
+#### Action Flags
+
+| Flags                      | Description                                                 | Short Flag |
+|----------------------------|-------------------------------------------------------------|------------|
+|`--list <ID>`               | List addresses for the specified account ID                 | `-l`       |
+|`--add <ID> <INTERFACE>`    | Bind an address for an interface for specified account ID   | `-a`       |
+|`--remove <ID> <INTERFACE>` | Remove an address for an interface for specified account ID | `-r`       |
+
+All commands require an account ID to be specified.
+
+The `--list` takes no arguments besides the account ID, and lists all addresses for that account:
+
+```sh
+miden-client addresses --list 0x17f13f4f83a8e8100c19d2961dfda2
+```
+
+The `--add` and `--remove` take and additional argument, which is the interface being added or removed, these values can be:
+- `unspecified`: The default interface.
+- `basic_wallet`: The basic wallet interface.
+
+```sh
+miden-client addresses 0x17f13f4f83a8e8100c19d2961dfda2 --remove basic_wallet
+```
+
+```sh
+miden-client addresses 0x17f13f4f83a8e8100c19d2961dfda2 --add basic_wallet
+```
 
 #### Tips
 For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](./cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
