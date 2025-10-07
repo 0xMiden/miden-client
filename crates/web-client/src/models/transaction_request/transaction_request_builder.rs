@@ -1,21 +1,19 @@
-use miden_client::transaction::{
-    ForeignAccount as NativeForeignAccount,
-    NoteArgs as NativeNoteArgs,
-    TransactionRequestBuilder as NativeTransactionRequestBuilder,
-};
-use miden_objects::Word as NativeWord;
-use miden_objects::note::{
+use miden_client::Word as NativeWord;
+use miden_client::note::{
     Note as NativeNote,
     NoteDetails as NativeNoteDetails,
     NoteId as NativeNoteId,
     NoteRecipient as NativeNoteRecipient,
     NoteTag as NativeNoteTag,
 };
-use miden_objects::transaction::{
+use miden_client::transaction::{
+    ForeignAccount as NativeForeignAccount,
+    NoteArgs as NativeNoteArgs,
     OutputNote as NativeOutputNote,
+    TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionScript as NativeTransactionScript,
 };
-use miden_objects::vm::AdviceMap as NativeAdviceMap;
+use miden_client::vm::AdviceMap as NativeAdviceMap;
 use wasm_bindgen::prelude::*;
 
 use crate::models::advice_map::AdviceMap;

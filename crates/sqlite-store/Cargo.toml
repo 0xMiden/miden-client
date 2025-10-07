@@ -1,0 +1,39 @@
+[package]
+authors.workspace      = true
+description            = "SQLite-backed Store implementation for miden-client"
+edition.workspace      = true
+license.workspace      = true
+name                   = "miden-client-sqlite-store"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+# Miden dependencies
+miden-client  = { path = "../rust-client", version = "0.12" }
+miden-objects = { workspace = true }
+
+# Workspace dependencies
+anyhow      = { workspace = true }
+async-trait = { workspace = true }
+chrono      = { workspace = true }
+hex         = { workspace = true }
+thiserror   = { workspace = true }
+
+# External dependencies
+deadpool           = { default-features = false, features = ["managed", "rt_tokio_1"], version = "0.12" }
+deadpool-sync      = { version = "0.1" }
+rusqlite           = { features = ["array", "bundled", "vtab"], version = "0.36" }
+rusqlite_migration = { version = "2.1" }
+tokio              = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+# Enable client testing utilities only for tests
+miden-client = { features = ["testing"], path = "../rust-client", version = "0.12" }
+miden-lib    = { features = ["testing"], workspace = true }

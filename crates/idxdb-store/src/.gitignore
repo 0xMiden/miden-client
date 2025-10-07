@@ -1,0 +1,5 @@
+# Ignore generated build files, eventually we should
+# add the whole js folder here.
+# TODO: see if we want to re-add the "js" entry
+#js
+/tsconfig.tsbuildinfo

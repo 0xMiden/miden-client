@@ -1,4 +1,4 @@
-use miden_lib::transaction::TransactionKernel as NativeTransactionKernel;
+use miden_client::transaction::TransactionKernel as NativeTransactionKernel;
 use wasm_bindgen::prelude::*;
 
 use crate::models::assembler::Assembler;

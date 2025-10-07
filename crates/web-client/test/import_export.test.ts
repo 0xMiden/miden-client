@@ -1,4 +1,4 @@
-// TODO: Rename this / figure out rebasing with the other featuer which has import tests
+// TODO: Rename this / figure out rebasing with the other feature which has import tests
 
 import test from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
@@ -44,16 +44,17 @@ const exportAccount = async (testingPage: Page, accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
-    const accountBytes = client.exportAccountFile(accountId);
-    return accountBytes;
+    const accountFile = await client.exportAccountFile(accountId);
+    return Array.from(accountFile.serialize());
   }, accountId);
 };
 
-const importAccount = async (testingPage: Page, accountBytes: any) => {
+const importAccount = async (testingPage: Page, accountBytes: number[]) => {
   return await testingPage.evaluate(async (_accountBytes) => {
     const client = window.client;
-    await client.importAccountFile(_accountBytes);
-    return;
+    const bytes = new Uint8Array(_accountBytes);
+    const accountFile = window.AccountFile.deserialize(bytes);
+    await client.importAccountFile(accountFile);
   }, accountBytes);
 };
 

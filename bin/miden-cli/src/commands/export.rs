@@ -88,7 +88,6 @@ async fn export_account<AUTH>(
         .get_account(account_id)
         .await?
         .ok_or(CliError::Export(format!("Account with ID {account_id} not found")))?;
-    let account_seed = account.seed().copied();
 
     let account: Account = account.into();
 
@@ -103,7 +102,7 @@ async fn export_account<AUTH>(
         );
     }
 
-    let account_data = AccountFile::new(account, account_seed, key_pairs);
+    let account_data = AccountFile::new(account, key_pairs);
 
     let file_path = if let Some(filename) = filename {
         filename

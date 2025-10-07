@@ -5,9 +5,8 @@ use miden_lib::account::interface::AccountInterfaceError;
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::MerkleError;
 use miden_objects::note::NoteId;
+pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_objects::{
-    AccountError,
-    AssetError,
     NoteError,
     PartialBlockchainError,
     TransactionInputError,

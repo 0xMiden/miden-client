@@ -8,9 +8,7 @@ module.exports = [
       "miden-node/**/*",
       "**/*.d.ts",
       "docs/book/**/*",
-      // TODO: Instead of ignoring the web_store, we should check if we're able to merge that
-      // eslint config file with this one.
-      "crates/rust-client/src/store/web_store/**",
+      "crates/idxdb-store/src/**",
     ],
   },
   {

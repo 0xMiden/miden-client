@@ -1,4 +1,4 @@
-use miden_objects::{Felt as NativeFelt, Word as NativeWord};
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -25,6 +25,16 @@ impl Word {
         let native_word: NativeWord = native_felt_vec.into();
 
         Word(native_word)
+    }
+
+    /// Creates a Word from a hex string.
+    /// Fails if the provided string is not a valid hex representation of a Word.
+    #[wasm_bindgen(js_name = "fromHex")]
+    pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
+        let native_word = NativeWord::try_from(hex).map_err(|err| {
+            JsValue::from_str(&format!("error instantiating Word from hex: {err}"))
+        })?;
+        Ok(Word(native_word))
     }
 
     #[wasm_bindgen(js_name = "newFromFelts")]

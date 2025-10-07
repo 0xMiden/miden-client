@@ -1,4 +1,4 @@
-use miden_objects::transaction::TransactionSummary as NativeTransactionSummary;
+use miden_client::transaction::TransactionSummary as NativeTransactionSummary;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

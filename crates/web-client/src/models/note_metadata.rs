@@ -1,4 +1,4 @@
-use miden_objects::note::NoteMetadata as NativeNoteMetadata;
+use miden_client::note::NoteMetadata as NativeNoteMetadata;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
@@ -26,7 +26,7 @@ impl NoteMetadata {
             note_type.into(),
             note_tag.into(),
             note_execution_hint.into(),
-            aux.map_or(miden_objects::Felt::default(), Into::into),
+            aux.map_or(miden_client::Felt::default(), Into::into),
         )
         .unwrap();
         NoteMetadata(native_note_metadata)

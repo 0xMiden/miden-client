@@ -5,6 +5,7 @@ export {
   AccountBuilder,
   AccountComponent,
   AccountDelta,
+  AccountFile,
   AccountHeader,
   AccountId,
   AccountInterface,

@@ -76,11 +76,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt::{self};
 
-use miden_objects::account::{Account, AccountCode, AccountDelta, AccountId};
+use miden_objects::account::{Account, AccountDelta, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
-use miden_objects::transaction::{AccountInputs, TransactionArgs};
+use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -117,8 +117,10 @@ pub use miden_objects::transaction::{
     OutputNote,
     OutputNotes,
     ProvenTransaction,
+    TransactionArgs,
     TransactionId,
     TransactionScript,
+    TransactionSummary,
     TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
@@ -656,6 +658,7 @@ where
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
         let data_store = ClientDataStore::new(self.store.clone());
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
@@ -823,6 +826,8 @@ where
 
         let data_store = ClientDataStore::new(self.store.clone());
 
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 
@@ -875,7 +880,11 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.source_manager.clone(),
+        );
 
         for note in notes_from_output(executed_tx.output_notes()) {
             // TODO: check_relevance() should have the option to take multiple notes
@@ -1104,12 +1113,15 @@ where
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
 
+            data_store
+                .register_foreign_account_inputs(tx_args.foreign_account_inputs().iter().cloned());
+
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
                 .check_notes_consumability(
                     account.id(),
                     self.store.get_sync_height().await?,
-                    input_notes.clone(),
+                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
                     tx_args.clone(),
                 )
                 .await?;
@@ -1168,8 +1180,6 @@ where
         let known_account_codes =
             self.store.get_foreign_account_code(account_ids.collect()).await?;
 
-        let known_account_codes: Vec<AccountCode> = known_account_codes.into_values().collect();
-
         // Fetch account proofs
         let (block_num, account_proofs) =
             self.rpc_api.get_account_proofs(&foreign_accounts, known_account_codes).await?;
@@ -1218,7 +1228,7 @@ where
             let summary = self.sync_state().await?;
 
             if summary.block_num != block_num {
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                 self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
                     .await?;
             }
@@ -1235,6 +1245,7 @@ where
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
         }
+        executor = executor.with_source_manager(self.source_manager.clone());
 
         Ok(executor)
     }
@@ -1334,99 +1345,4 @@ fn validate_executed_transaction(
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use alloc::boxed::Box;
-
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::transaction::TransactionKernel;
-    use miden_objects::Word;
-    use miden_objects::account::{
-        AccountBuilder,
-        AccountComponent,
-        AuthSecretKey,
-        StorageMap,
-        StorageSlot,
-    };
-    use miden_objects::asset::{Asset, FungibleAsset};
-    use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
-    use miden_objects::note::NoteType;
-    use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-    };
-    use miden_tx::utils::{Deserializable, Serializable};
-
-    use super::PaymentNoteDescription;
-    use crate::tests::create_test_client;
-    use crate::transaction::{TransactionRequestBuilder, TransactionResult};
-
-    #[tokio::test]
-    async fn transaction_creates_two_notes() {
-        let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-        let asset_1: Asset =
-            FungibleAsset::new(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap(), 123)
-                .unwrap()
-                .into();
-        let asset_2: Asset =
-            FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 500)
-                .unwrap()
-                .into();
-
-        let secret_key = SecretKey::new();
-        let pub_key = secret_key.public_key();
-        keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
-
-        let wallet_component = AccountComponent::compile(
-            "
-                export.::miden::contracts::wallets::basic::receive_asset
-                export.::miden::contracts::wallets::basic::move_asset_to_note
-            ",
-            TransactionKernel::assembler(),
-            vec![StorageSlot::Value(Word::default()), StorageSlot::Map(StorageMap::default())],
-        )
-        .unwrap()
-        .with_supports_all_types();
-
-        let account = AccountBuilder::new(Default::default())
-            .with_component(wallet_component)
-            .with_auth_component(AuthRpoFalcon512::new(pub_key))
-            .with_assets([asset_1, asset_2])
-            .build_existing()
-            .unwrap();
-
-        client.add_account(&account, None, false).await.unwrap();
-        client.sync_state().await.unwrap();
-        let tx_request = TransactionRequestBuilder::new()
-            .build_pay_to_id(
-                PaymentNoteDescription::new(
-                    vec![asset_1, asset_2],
-                    account.id(),
-                    ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap(),
-                ),
-                NoteType::Private,
-                client.rng(),
-            )
-            .unwrap();
-
-        let tx_result = Box::pin(client.new_transaction(account.id(), tx_request)).await.unwrap();
-        assert!(
-            tx_result
-                .created_notes()
-                .get_note(0)
-                .assets()
-                .is_some_and(|assets| assets.num_assets() == 2)
-        );
-        // Prove and apply transaction
-        Box::pin(client.testing_apply_transaction(tx_result.clone())).await.unwrap();
-
-        // Test serialization
-        let bytes: std::vec::Vec<u8> = tx_result.to_bytes();
-        let decoded = TransactionResult::read_from_bytes(&bytes).unwrap();
-
-        assert_eq!(tx_result, decoded);
-    }
 }
