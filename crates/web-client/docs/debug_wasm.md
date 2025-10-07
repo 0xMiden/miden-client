@@ -19,30 +19,10 @@ git clone git@github.com:0xMiden/miden-client.git
 ```bash
 make build-web-client-debug
 ```
-3. Once it finishes, the Rust build log should print this:
-  ```
+Once it finishes, the Rust build log should print this:
+```
     Finished `release` profile [optimized + debuginfo] target(s) in 38.33s
-  ```
-  4. (Optional) To double-check that debug symbols were generated, install the WebAssembly Binary Toolkit (WABT). Sources:
-  - [brew package manager](https://formulae.brew.sh/formula/wabt)
-  - [nix packages](https://github.com/NixOS/nixpkgs/blob/25e53aa156d47bad5082ff7618f5feb1f5e02d01/pkgs/by-name/wa/wabt/package.nix#L27)
-  - [source](https://github.com/WebAssembly/wabt).
-
- The WABT package provides an `wasm-obj` binary, which you can use like so:
- ```
- wasm-objdump --headers crates/web-client/dist/workers/assets/miden_client_web.wasm
- ```
- If the debug symbols are present, you should see a bunch of "debug" headers.
- An example of an output like this would be:
- ```
-   Custom start=0x00a85ee7 end=0x00a85f63 (size=0x0000007c) "producers"
-   Custom start=0x00a85f67 end=0x00bc6700 (size=0x00140799) ".debug_abbrev"
-   Custom start=0x00bc6705 end=0x03f1989b (size=0x03353196) ".debug_str"
-   Custom start=0x03f198a0 end=0x0480968b (size=0x008efdeb) ".debug_line"
-   Custom start=0x04809690 end=0x04c347ae (size=0x0042b11e) ".debug_ranges"
-   Custom start=0x04c347b3 end=0x059ae810 (size=0x00d7a05d) ".debug_loc"
-   Custom start=0x059ae815 end=0x09113060 (size=0x0376484b) ".debug_info"
- ```
+```
     
 ## Using the debug symbols
 
@@ -71,30 +51,3 @@ You should also be able to see the rust source in the devtools source tab:
 
 Also, you should see friendlier stack-traces:
 ![stack-trace-example](./stack-trace-example.png)
-
-
-## Relevant changes
-
-These changes are already reflected in the codebase, but the settings to make the release build have debug symbols are the following:
-
-1. In the `rollup.config.js` the relevant options for the Rust plugin are:
-```
-{
-   extraArgs: {
-     <other args>,
-     wasmBindgen: [ "--keep-debug"],
-   } 
-}
-```
-2. The rollup plugin also calls cargo internally, which needs these arguments to add debug symbols:
-   
-```javascript
-const cargoArgsUseDebugSymbols = [
-  // Generate debug symbols for the release cargo profile.
-  "--config",
-  "profile.release.debug='full'",
-  // Do not remove debug symbols from the final binary,
-  "--config",
-  "profile.release.strip='none'",
-];
-```

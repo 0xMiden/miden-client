@@ -71,6 +71,7 @@ export default [
         extraArgs: {
           cargo: [...baseCargoArgs],
           wasmOpt: wasmOptArgs,
+          // Keep debug symbols if in dev mode.
           wasmBindgen: devMode ? ["--keep-debug"] : [],
         },
         experimental: {
