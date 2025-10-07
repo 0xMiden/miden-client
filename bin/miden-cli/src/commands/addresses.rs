@@ -59,14 +59,17 @@ async fn list_addresses<AUTH>(client: Client<AUTH>, account_id: String) -> Resul
     let id = parse_account_id(&client, &account_id).await?;
     let addresses = match client.get_account(id).await? {
         Some(account) => account.addresses().clone(),
-        _ => vec![], // TODO: Maybe return error?
+        _ => {
+            return Err(CliError::Input(format!(
+                "The account with id `{account_id}` does not exist",
+            )));
+        },
     };
 
     println!("Addresses for AccountId {account_id}:");
     let mut table = create_dynamic_table(&["Address", "Interface"]);
     for address in addresses {
-        let serialized_address = hex::encode(address.to_bytes());
-        let address_hex = hex::encode(serialized_address);
+        let address_hex = hex::encode(address.to_bytes());
         let interface = match address.interface() {
             AddressInterface::Unspecified => "Unspecified".to_string(),
             AddressInterface::BasicWallet => "Basic Wallet".to_string(),
@@ -104,7 +107,7 @@ async fn add_address<AUTH>(
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
     };
-    info!(
+    println!(
         "adding address - Account Id {} - Execution mode: {}",
         account_id, execution_mode
     );
@@ -125,7 +128,7 @@ async fn remove_address<AUTH>(
         NoteExecutionMode::Network => "Network",
     };
 
-    info!(
+    println!(
         "removing address - Account Id {} - Execution mode: {}",
         account_id, execution_mode
     );
