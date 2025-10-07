@@ -34,6 +34,7 @@ export const test = base.extend<{ forEachTest: void }>({
             AccountStorageDelta,
             AccountVaultDelta,
             AccountHeader,
+            AccountFile,
             AccountId,
             AccountInterface,
             AccountStorageMode,
@@ -113,6 +114,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.AccountStorageDelta = AccountStorageDelta;
           window.AccountVaultDelta = AccountVaultDelta;
           window.AccountHeader = AccountHeader;
+          window.AccountFile = AccountFile;
           window.AccountId = AccountId;
           window.AccountInterface = AccountInterface;
           window.AccountStorageMode = AccountStorageMode;
