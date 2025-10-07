@@ -1,5 +1,9 @@
 # Changelog
 
+
+## 0.11.9 
+* Fixed a bug where StateSync failed when called multiple times while using Safari ([#1377](https://github.com/0xMiden/miden-client/pull/1377)).
+
 ## 0.11.8 (2025-09-29)
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
