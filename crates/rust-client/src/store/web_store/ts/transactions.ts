@@ -4,7 +4,6 @@ import {
   transactions,
   transactionScripts,
 } from "./schema.js";
-import { Dexie } from "dexie";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
