@@ -14,7 +14,9 @@ use miden_lib::AuthScheme;
 use miden_lib::account::faucets::create_basic_fungible_faucet;
 use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
