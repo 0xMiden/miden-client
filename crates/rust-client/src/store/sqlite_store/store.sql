@@ -22,7 +22,7 @@ CREATE TABLE account_storage (
     slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
     slot_type BLOB NOT NULL,                -- type of the slot, serialized
     PRIMARY KEY (commitment, slot_index)
-) WITHOUT ROWID;
+);
 
 CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
 
@@ -32,7 +32,7 @@ CREATE TABLE storage_map_entries (
     key TEXT NOT NULL,      -- key of the storage map entry
     value TEXT NOT NULL,    -- value of the storage map entry
     PRIMARY KEY (root, key)
-) WITHOUT ROWID;
+);
 
 CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
@@ -43,7 +43,7 @@ CREATE TABLE account_assets (
     faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
     asset TEXT NULL,                                -- value that represents the asset in the vault
     PRIMARY KEY (root, vault_key)
-) WITHOUT ROWID;
+);
 
 CREATE INDEX idx_account_assets_root ON account_assets(root);
 
@@ -58,7 +58,7 @@ CREATE TABLE foreign_account_code(
 -- Create accounts table
 CREATE TABLE accounts (
     id UNSIGNED BIG INT NOT NULL,               -- Account ID.
-    account_commitment TEXT NOT NULL,    -- Account state commitment
+    account_commitment TEXT NOT NULL UNIQUE,    -- Account state commitment
     code_commitment TEXT NOT NULL,              -- Commitment to the account code
     storage_commitment TEXT NOT NULL,           -- Commitment to the account storage
     vault_root TEXT NOT NULL,                   -- Root of the account_vault Merkle tree.
@@ -71,7 +71,7 @@ CREATE TABLE accounts (
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
 
-CREATE INDEX idx_accounts_id_nonce ON accounts(id, nonce DESC);
+CREATE UNIQUE INDEX idx_account_commitment ON accounts(account_commitment);
 
 -- Create transactions table
 CREATE TABLE transactions (
@@ -90,7 +90,7 @@ CREATE TABLE transaction_scripts (
     script BLOB,                                     -- serialized Transaction script
 
     PRIMARY KEY (script_root)
-) WITHOUT ROWID;
+);
 
 -- Create input notes table
 CREATE TABLE input_notes (
@@ -104,11 +104,9 @@ CREATE TABLE input_notes (
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
 
-    PRIMARY KEY (note_id),
+    PRIMARY KEY (note_id)
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
-) WITHOUT ROWID;
-
-CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
+);
 
 -- Create output notes table
 CREATE TABLE output_notes (
@@ -124,9 +122,7 @@ CREATE TABLE output_notes (
     state BLOB NOT NULL,                                    -- serialized note state
 
     PRIMARY KEY (note_id)
-) WITHOUT ROWID;
-
-CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
+);
 
 -- Create note's scripts table, used for both input and output notes
 CREATE TABLE notes_scripts (
@@ -157,16 +153,16 @@ WHERE (
 
 -- Create block headers table
 CREATE TABLE block_headers (
-    block_num UNSIGNED BIG INT NOT NULL,    -- block number
-    header BLOB NOT NULL,                   -- serialized block header
-    partial_blockchain_peaks BLOB NOT NULL, -- serialized peaks of the partial blockchain MMR at this block
-    has_client_notes BOOL NOT NULL,         -- whether the block has notes relevant to the client
+    block_num UNSIGNED BIG INT NOT NULL,  -- block number
+    header BLOB NOT NULL,                 -- serialized block header
+    partial_blockchain_peaks BLOB NOT NULL,        -- serialized peaks of the partial blockchain MMR at this block
+    has_client_notes BOOL NOT NULL,       -- whether the block has notes relevant to the client
     PRIMARY KEY (block_num)
-) WITHOUT ROWID;
+);
 
 -- Create partial blockchain nodes
 CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
-) WITHOUT ROWID;
+)
