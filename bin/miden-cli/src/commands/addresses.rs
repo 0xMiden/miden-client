@@ -106,10 +106,7 @@ async fn add_address<AUTH>(
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
     };
-    println!(
-        "adding address - Account Id {} - Execution mode: {}",
-        account_id, execution_mode
-    );
+    println!("adding address - Account Id {account_id} - Execution mode: {execution_mode}");
 
     client.add_address(address, account_id).await?;
     Ok(())
@@ -127,10 +124,7 @@ async fn remove_address<AUTH>(
         NoteExecutionMode::Network => "Network",
     };
 
-    println!(
-        "removing address - Account Id {} - Execution mode: {}",
-        account_id, execution_mode
-    );
+    println!("removing address - Account Id {account_id} - Execution mode: {execution_mode}");
 
     client.remove_address(address, account_id).await?;
     Ok(())
