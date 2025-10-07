@@ -58,13 +58,15 @@ When importing notes, there are three types of note files that can be used:
 To import a note that was previously exported:
 
 ```typescript
-import { WebClient } from "@demox-labs/miden-sdk";
+import { NoteFile, WebClient } from "@demox-labs/miden-sdk";
 
 try {
     // Initialize the web client
     const webClient = await WebClient.createClient();
 
-    // noteFile should be the result of a previous note export
+    // noteBytes should be the serialized output from a previous note export
+    const noteBytes = new Uint8Array(/* previously exported bytes */);
+    const noteFile = NoteFile.deserialize(noteBytes);
     const noteId = await webClient.importNoteFile(noteFile);
     console.log("Imported note ID:", noteId);
 } catch (error) {

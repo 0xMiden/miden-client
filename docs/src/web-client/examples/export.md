@@ -15,15 +15,18 @@ try {
 
     // Export a note with just its ID
     const noteIdExport = await webClient.exportNoteFile("0x1234...", "Id");
-    console.log("Note ID Export:", noteIdExport);
+    console.log("Note ID Export bytes:", Array.from(noteIdExport.serialize()));
 
     // Export a note with full details including inclusion proof
     const fullNoteExport = await webClient.exportNoteFile("0x1234...", "Full");
-    console.log("Full Note Export:", fullNoteExport);
+    console.log("Full Note Export bytes:", Array.from(fullNoteExport.serialize()));
 
-    // Export a note with partial details (default if type is not specified)
+    // Export a note with partial details
     const partialNoteExport = await webClient.exportNoteFile("0x1234...", "Partial");
-    console.log("Partial Note Export:", partialNoteExport);
+    console.log(
+        "Partial Note Export bytes:",
+        Array.from(partialNoteExport.serialize()),
+    );
 } catch (error) {
     console.error("Failed to export note:", error.message);
 }

@@ -36,6 +36,7 @@ import {
   NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
+  NoteFile,
   NoteInputs,
   NoteMetadata,
   NoteRecipient,
@@ -120,6 +121,7 @@ declare global {
     NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
+    NoteFile: typeof NoteFile;
     NoteInputs: typeof NoteInputs;
     NoteMetadata: typeof NoteMetadata;
     NoteRecipient: typeof NoteRecipient;

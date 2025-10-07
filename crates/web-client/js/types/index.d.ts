@@ -45,6 +45,7 @@ export {
   NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
+  NoteFile,
   NoteInputs,
   NoteMetadata,
   NoteRecipient,
