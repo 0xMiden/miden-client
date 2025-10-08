@@ -7,10 +7,15 @@ use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
 use miden_objects::note::{Note, NoteId};
-use miden_objects::transaction::{InputNote, InputNotes};
+use miden_objects::transaction::InputNote;
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{
+    NoteCheckerError,
+    NoteConsumptionChecker,
+    NoteConsumptionStatus,
+    TransactionExecutor,
+};
 use thiserror::Error;
 use tonic::async_trait;
 
@@ -69,10 +74,6 @@ where
     /// Returns a vector of tuples describing the relevance of the provided note to the
     /// accounts monitored by this screener.
     ///
-    /// Does a fast check for known scripts (P2ID, P2IDE, SWAP). We're currently
-    /// unable to execute notes that aren't committed so a slow check for other scripts is
-    /// currently not available.
-    ///
     /// If relevance can't be determined, the screener defaults to setting the note as consumable.
     pub async fn check_relevance(
         &self,
@@ -126,8 +127,6 @@ where
         )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
-        let input_notes = InputNotes::new(vec![InputNote::unauthenticated(note.clone())])
-            .expect("Single note should be valid");
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -138,19 +137,27 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
-        let note_execution_check = consumption_checker
-            .check_notes_consumability(
+        let note_consumption_check = consumption_checker
+            .can_consume(
                 account.id(),
                 self.store.get_sync_height().await?,
-                input_notes,
+                InputNote::unauthenticated(note.clone()),
                 tx_args,
             )
             .await?;
-        if !note_execution_check.successful.is_empty() {
-            return Ok(Some(NoteRelevance::Now));
-        }
 
-        Ok(None)
+        let result = match note_consumption_check {
+            NoteConsumptionStatus::ConsumableAfter(block_number) => {
+                Some(NoteRelevance::After(block_number.as_u32()))
+            },
+            NoteConsumptionStatus::Consumable
+            | NoteConsumptionStatus::UnconsumableWithoutAuthorization => Some(NoteRelevance::Now),
+            // NOTE: NoteConsumptionStatus::Unconsumable means that state-related context does not
+            // allow for consumption, so don't keep for now. In the next version, we should be more
+            // careful about this
+            NoteConsumptionStatus::Unconsumable | NoteConsumptionStatus::Incompatible => None,
+        };
+        Ok(result)
     }
 
     /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
