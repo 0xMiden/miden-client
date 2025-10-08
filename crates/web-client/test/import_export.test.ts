@@ -8,6 +8,7 @@ import {
   createNewWallet,
   fundAccountFromFaucet,
   getAccountBalance,
+  setupMintedNote,
   setupWalletAndFaucet,
   StorageMode,
 } from "./webClientTestUtils";
@@ -57,6 +58,43 @@ const importAccount = async (testingPage: Page, accountBytes: number[]) => {
     await client.importAccountFile(accountFile);
   }, accountBytes);
 };
+
+test.describe("export and import note", () => {
+  const exportTypes = [
+    ["Id", "NoteId"],
+    ["Full", "NoteWithProof"],
+    ["Details", "NoteDetails"],
+  ];
+
+  exportTypes.forEach(([exportType, expectedNoteType]) => {
+    test(`export note as note file -- export type: ${exportType}`, async ({
+      page,
+    }) => {
+      const { createdNoteId: noteId } = await setupMintedNote(page);
+
+      const exportNote = async (
+        testingPage: Page,
+        noteId: string,
+        exportType: string
+      ) => {
+        return await testingPage.evaluate(
+          async ({ noteId, exportType }) => {
+            const noteFile = await window.client.exportNoteFile(
+              noteId,
+              exportType
+            );
+            return noteFile.noteType();
+          },
+          { noteId, exportType }
+        );
+      };
+
+      await expect(exportNote(page, noteId, exportType)).resolves.toBe(
+        expectedNoteType
+      );
+    });
+  });
+});
 
 test.describe("export and import the db", () => {
   test("export db with an account, find the account when re-importing", async ({
