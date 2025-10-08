@@ -1186,7 +1186,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);
-    assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
+    assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note_script, retrieved_note_script);
 
     Ok(())

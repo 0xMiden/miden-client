@@ -317,7 +317,7 @@ pub fn build_wallet_id(
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(public_key))
+        .with_auth_component(AuthRpoFalcon512::new(public_key.into()))
         .with_component(BasicWallet)
         .build()?;
 

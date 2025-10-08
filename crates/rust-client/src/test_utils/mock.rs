@@ -18,14 +18,13 @@ use crate::rpc::domain::account::{
     AccountProofs,
     AccountUpdateSummary,
     FetchedAccount,
-    StateHeaders,
 };
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc_store::SyncStateResponse;
+use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{NodeRpcClient, RpcError};
 use crate::transaction::ForeignAccount;
@@ -98,7 +97,7 @@ impl MockRpcApi {
     /// Generates a sync state response based on the request block number.
     fn get_sync_state_request(
         &self,
-        request_block_num: BlockNumber,
+        request_block_range: BlockRange,
         note_tags: &BTreeSet<NoteTag>,
         account_ids: &[AccountId],
     ) -> Result<SyncStateResponse, RpcError> {
@@ -110,7 +109,10 @@ impl MockRpcApi {
             .values()
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
-                if note_tags.contains(&note.metadata().tag()) && block_num > request_block_num {
+                if note_tags.contains(&note.metadata().tag())
+                    && block_num.as_u32() >= request_block_range.block_from
+                    && Some(block_num.as_u32()) <= request_block_range.block_to
+                {
                     Some(block_num)
                 } else {
                     None
@@ -123,11 +125,12 @@ impl MockRpcApi {
         let next_block = self.get_block_by_num(next_block_num);
 
         // Prepare the MMR delta
-        let from_block_num = if request_block_num == self.get_chain_tip_block_num() {
-            next_block_num.as_usize()
-        } else {
-            request_block_num.as_usize() + 1
-        };
+        let from_block_num =
+            if request_block_range.block_from == self.get_chain_tip_block_num().as_u32() {
+                next_block_num.as_usize()
+            } else {
+                request_block_range.block_from as usize + 1
+            };
 
         let mmr_delta = self
             .get_mmr()
@@ -143,7 +146,7 @@ impl MockRpcApi {
             .proven_blocks()
             .iter()
             .filter(|block| {
-                block.header().block_num() > request_block_num
+                block.header().block_num().as_u32() > request_block_range.block_from
                     && block.header().block_num() <= next_block_num
             })
             .flat_map(|block| {
@@ -158,7 +161,7 @@ impl MockRpcApi {
         let mut accounts = vec![];
 
         for (block_num, updates) in self.account_commitment_updates.read().iter() {
-            if *block_num > request_block_num && *block_num <= next_block_num {
+            if block_num.as_u32() > request_block_range.block_from && *block_num <= next_block_num {
                 accounts.extend(updates.iter().map(|(account_id, commitment)| AccountSummary {
                     account_id: Some((*account_id).into()),
                     account_commitment: Some(commitment.into()),
@@ -251,9 +254,15 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags, &[])?;
+        let block_range = BlockRange {
+            block_from: block_num.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        };
+
+        let response = self.get_sync_state_request(block_range, note_tags, &[])?;
 
         let response = NoteSyncInfo {
             chain_tip: response.chain_tip,
@@ -283,7 +292,11 @@ impl NodeRpcClient for MockRpcApi {
         account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags, account_ids)?;
+        let block_range = BlockRange {
+            block_from: block_num.as_u32(),
+            block_to: None,
+        };
+        let response = self.get_sync_state_request(block_range, note_tags, account_ids)?;
 
         Ok(response.try_into().unwrap())
     }
@@ -402,12 +415,17 @@ impl NodeRpcClient for MockRpcApi {
                         }
                     }
 
-                    Some(StateHeaders {
-                        account_header: account.into(),
-                        storage_header: account.storage().to_header(),
-                        code: account.code().clone(),
-                        storage_slots,
-                    })
+                    // Some(AccountDetails {
+                    //     header: account.into(),
+                    //     storage_details: AccountDetails {
+                    //         header: account.storage().to_header(),
+                    //         storage_details: AccountStorageDetails
+                    //     },
+                    //     code: account.code().clone(),
+                    //     storage_slots,
+                    // })
+                    // TODO JM: FIX
+                    todo!()
                 },
                 ForeignAccount::Private(_) => None,
             };
