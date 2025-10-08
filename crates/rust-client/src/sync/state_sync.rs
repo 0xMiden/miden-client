@@ -133,7 +133,7 @@ impl StateSync {
         let block_num = u32::try_from(
             current_partial_mmr.forest().num_leaves().checked_sub(1).unwrap_or_default(),
         )
-        .expect("amount of leaves should fit within a u32")
+        .map_err(|_| ClientError::InvalidPartialMmrForest)?
         .into();
 
         let mut state_sync_update = StateSyncUpdate {
