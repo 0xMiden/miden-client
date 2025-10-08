@@ -5,7 +5,6 @@ pub mod import;
 pub mod init;
 pub mod new_account;
 pub mod new_transactions;
-pub mod note_transport;
 pub mod notes;
 pub mod sync;
 pub mod tags;

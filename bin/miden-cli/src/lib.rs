@@ -22,7 +22,6 @@ use commands::import::ImportCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
-use commands::note_transport::NoteTransportCmd;
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
@@ -145,8 +144,6 @@ pub enum Command {
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
-    #[command(subcommand)]
-    NoteTransport(NoteTransportCmd),
 }
 
 /// CLI entry point.
@@ -225,9 +222,6 @@ impl Cli {
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
-            Command::NoteTransport(note_transport) => {
-                Box::pin(note_transport.execute(client)).await
-            },
         }
     }
 
