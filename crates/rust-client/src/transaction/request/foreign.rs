@@ -3,7 +3,13 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::account::{AccountId, PartialAccount, PartialStorage};
+use miden_objects::account::{
+    AccountId,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+};
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;
@@ -131,16 +137,19 @@ impl TryFrom<AccountProof> for AccountInputs {
             header: account_header,
             code,
             storage_details,
-            vault_details,
+            vault_details: _,
         }) = account_details
         {
             // discard slot indices - not needed for execution
             let account_storage_map_details = storage_details.map_details;
-            let storage_map_proofs = Vec::with_capacity(account_storage_map_details.len());
+            let mut storage_map_proofs = Vec::with_capacity(account_storage_map_details.len());
             for account_storage_detail in account_storage_map_details {
-                // let storage_map = PartialStorageMap::from_witnesses(slots.into_iter())?;
-                // storage_map_proofs.push(storage_map);
-                // TODO JM: fix
+                let storage_entries_iter =
+                    account_storage_detail.entries.iter().map(|e| (e.key, e.value));
+                let partial_storage = StorageMap::with_entries(storage_entries_iter)
+                    .expect("Conversion from known good storage shouldn't fail")
+                    .into();
+                storage_map_proofs.push(partial_storage);
             }
 
             return Ok(AccountInputs::new(
