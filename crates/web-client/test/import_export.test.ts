@@ -1,4 +1,4 @@
-// TODO: Rename this / figure out rebasing with the other featuer which has import tests
+// TODO: Rename this / figure out rebasing with the other feature which has import tests
 
 import test from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
