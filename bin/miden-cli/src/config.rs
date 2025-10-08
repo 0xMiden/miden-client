@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use figment::value::{Dict, Map};
 use figment::{Metadata, Profile, Provider};
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,8 @@ pub struct CliConfig {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     pub max_block_number_delta: Option<u32>,
+    /// Describes settings related to the note transport endpoint.
+    pub note_transport: Option<NoteTransportConfig>,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -67,6 +70,7 @@ impl Default for CliConfig {
             remote_prover_endpoint: None,
             component_template_directory: Path::new(DEFAULT_COMPONENT_TEMPLATE_DIR).to_path_buf(),
             max_block_number_delta: None,
+            note_transport: None,
         }
     }
 }
@@ -87,6 +91,27 @@ impl Default for RpcConfig {
     fn default() -> Self {
         Self {
             endpoint: Endpoint::default().into(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+// NOTE TRANSPORT CONFIG
+// ================================================================================================
+
+/// Settings for the note transport client.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NoteTransportConfig {
+    /// Address of the Miden Note Transport node to connect to.
+    pub endpoint: String,
+    /// Timeout for the Note Transport RPC api requests, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for NoteTransportConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }
