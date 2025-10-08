@@ -187,9 +187,7 @@ impl Cli {
             builder = builder.max_block_number_delta(delta);
         }
 
-        let mut client = builder.build().await?;
-
-        client.ensure_genesis_in_place().await?;
+        let client = builder.build().await?;
 
         // Execute CLI command
         match &self.action {
