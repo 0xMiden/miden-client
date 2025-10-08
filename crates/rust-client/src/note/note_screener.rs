@@ -12,11 +12,7 @@ use miden_objects::note::{Note, NoteId};
 use miden_objects::transaction::InputNote;
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{
-    NoteCheckerError,
-    NoteConsumptionChecker,
-    TransactionExecutor,
-};
+use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 
 use crate::ClientError;
