@@ -19,6 +19,7 @@
 
 * [BREAKING] Incremented MSRV to 1.89.
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
+* [BREAKING] Added `TransactionPipeline` component that handles all transaction lifetime steps ([#1152](https://github.com/0xMiden/miden-client/pull/1152)).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).

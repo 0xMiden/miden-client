@@ -130,20 +130,18 @@ const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
   noteIdToConsume,
 ]);
 
-// Execute and prove the transaction client side
-const consumeTransactionResult = await webClient.newTransaction(
+// Execute, prove, submit, and apply the transaction in one step
+const transactionId = await webClient.submitNewTransaction(
   account,
   consumeTransactionRequest
 );
-
-// Submit the transaction to the node
-await webClient.submitTransaction(consumeTransactionResult);
 
 // Need to sync state again (in a loop) until the node verifies the transaction
 await syncState();
 
 // Check new account balance
-const accountBalance = account
+const updatedAccount = await webClient.getAccount(account);
+const accountBalance = updatedAccount
   .vault()
   .getBalance(/* id of remote faucet */)
   .toString();

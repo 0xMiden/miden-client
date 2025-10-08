@@ -2,69 +2,124 @@ use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
 use miden_client::transaction::{
     PaymentNoteDescription,
+    ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
-    TransactionResult as NativeTransactionResult,
+    TransactionStoreUpdate as NativeTransactionStoreUpdate,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
 use crate::models::note_type::NoteType;
+use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
+use crate::models::transaction_id::TransactionId;
+use crate::models::transaction_pipeline::TransactionPipeline;
 use crate::models::transaction_request::TransactionRequest;
-use crate::models::transaction_result::TransactionResult;
+use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = "newTransaction")]
-    pub async fn new_transaction(
+    /// Executes a transaction specified by the request against the specified account,
+    /// proves it, submits it to the network, and updates the local database.
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
+    /// have the required block header in the local database. In these scenarios, a sync to
+    /// the chain tip is performed, and the required block header is retrieved.
+    #[wasm_bindgen(js_name = "submitNewTransaction")]
+    pub async fn submit_new_transaction(
         &mut self,
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
-    ) -> Result<TransactionResult, JsValue> {
+    ) -> Result<TransactionId, JsValue> {
+        let mut pipeline = self.execute_transaction(account_id, transaction_request).await?;
+
+        let tx_id = pipeline.id()?;
+
+        let prover = self
+            .get_mut_inner()
+            .ok_or_else(|| JsValue::from_str("Client not initialized while proving transaction"))?
+            .prover();
+
+        pipeline.prove_transaction(Some(TransactionProver::from(prover))).await?;
+
+        let transaction_update = pipeline.submit_proven_transaction().await?;
+
+        self.apply_transaction(transaction_update).await?;
+
+        Ok(tx_id)
+    }
+
+    /// Executes a transaction specified by the request against the specified account but does not
+    /// submit it to the network nor update the local database. The returned [`TransactionPipeline`]
+    /// retains all intermediate artifacts (request, execution results, proofs) needed to continue
+    /// with the transaction lifecycle.
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
+    /// have the required block header in the local database. In these scenarios, a sync to
+    /// the chain tip is performed, and the required block header is retrieved.
+    #[wasm_bindgen(js_name = "executeTransaction")]
+    pub async fn execute_transaction(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionPipeline, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let native_transaction_execution_result: NativeTransactionResult =
-                Box::pin(client.new_transaction(account_id.into(), transaction_request.into()))
+            let pipeline =
+                Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()))
                     .await
                     .map_err(|err| {
-                        js_error_with_context(err, "failed to create new transaction")
+                        js_error_with_context(err, "failed to execute transaction pipeline")
                     })?;
 
-            Ok(native_transaction_execution_result.into())
+            Ok(TransactionPipeline::new(pipeline))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
 
-    #[wasm_bindgen(js_name = "submitTransaction")]
-    pub async fn submit_transaction(
+    #[wasm_bindgen(js_name = "newTransactionPipeline")]
+    pub fn new_transaction_pipeline(
         &mut self,
-        transaction_result: &TransactionResult,
-        prover: Option<TransactionProver>,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionPipeline, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let pipeline = client.new_transaction_pipeline(transaction_request.into());
+            Ok(TransactionPipeline::new(pipeline))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "submitProvenTransaction")]
+    pub async fn submit_proven_transaction(
+        &mut self,
+        proven_transaction: &ProvenTransaction,
+    ) -> Result<u32, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let native_proven: NativeProvenTransaction = proven_transaction.clone().into();
+            client
+                .submit_proven_transaction(native_proven)
+                .await
+                .map(|block_number| block_number.as_u32())
+                .map_err(|err| js_error_with_context(err, "failed to submit proven transaction"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "applyTransaction")]
+    pub async fn apply_transaction(
+        &mut self,
+        tx_update: TransactionStoreUpdate,
     ) -> Result<(), JsValue> {
-        let native_transaction_result: NativeTransactionResult = transaction_result.into();
+        let native_transaction_result: NativeTransactionStoreUpdate = tx_update.into();
 
         if let Some(client) = self.get_mut_inner() {
-            match prover {
-                Some(p) => {
-                    Box::pin(
-                        client.submit_transaction_with_prover(
-                            native_transaction_result,
-                            p.get_prover(),
-                        ),
-                    )
-                    .await
-                    .map_err(|err| {
-                        js_error_with_context(err, "failed to submit transaction with prover")
-                    })?;
-                },
-                None => {
-                    Box::pin(client.submit_transaction(native_transaction_result)).await.map_err(
-                        |err| js_error_with_context(err, "failed to submit transaction"),
-                    )?;
-                },
-            }
+            Box::pin(client.apply_transaction(native_transaction_result))
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to apply transaction"))?;
             Ok(())
         } else {
             Err(JsValue::from_str("Client not initialized"))

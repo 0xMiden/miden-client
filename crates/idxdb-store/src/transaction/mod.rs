@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 
 use miden_client::Word;
 use miden_client::account::Account;
-use miden_client::store::{StoreError, TransactionFilter};
+use miden_client::note::NoteUpdateTracker;
+use miden_client::store::input_note_states::ExpectedNoteState;
+use miden_client::store::{InputNoteState, StoreError, TransactionFilter};
+use miden_client::sync::NoteTagRecord;
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,
@@ -80,6 +83,7 @@ impl WebStore {
     pub async fn apply_transaction(
         &self,
         tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
     ) -> Result<(), StoreError> {
         // Transaction Data
         insert_proven_transaction_data(
@@ -104,10 +108,22 @@ impl WebStore {
         })?;
 
         // Updates for notes
-        apply_note_updates_tx(tx_update.note_updates()).await?;
+        apply_note_updates_tx(&note_updates).await?;
 
-        for tag_record in tx_update.new_tags() {
-            self.add_note_tag(*tag_record).await?;
+        // Updates for tags
+        let note_tags = note_updates.updated_input_notes().filter_map(|note| {
+            let note = note.inner();
+
+            if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
+            {
+                Some(NoteTagRecord::with_note_source(*tag, note.id()))
+            } else {
+                None
+            }
+        });
+
+        for tag_record in note_tags {
+            self.add_note_tag(tag_record).await?;
         }
 
         Ok(())
