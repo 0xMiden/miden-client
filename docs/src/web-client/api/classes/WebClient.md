@@ -122,9 +122,9 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
-### executeTransactionPipeline()
+### executeTransaction()
 
-> **executeTransactionPipeline**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
+> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionPipeline`](TransactionPipeline.md)\>
 
 Executes a transaction specified by the request against the specified account but does not
 submit it to the network nor update the local database. The returned [`TransactionPipeline`]

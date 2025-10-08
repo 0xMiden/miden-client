@@ -27,7 +27,7 @@ try {
     );
 
     // 2. Execute the transaction pipeline (performs request validation and execution)
-    const pipeline = await webClient.executeTransactionPipeline(
+    const pipeline = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
@@ -72,7 +72,7 @@ try {
         1000
     );
 
-    const pipeline = await webClient.executeTransactionPipeline(
+    const pipeline = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
@@ -114,7 +114,7 @@ try {
         90               // Optional timelock height
     );
 
-    const pipeline = await webClient.executeTransactionPipeline(
+    const pipeline = await webClient.executeTransaction(
         senderAccountId,
         transactionRequest
     );
@@ -147,7 +147,7 @@ try {
         [noteId1, noteId2]  // Array of note IDs to consume
     );
 
-    const pipeline = await webClient.executeTransactionPipeline(
+    const pipeline = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
@@ -244,7 +244,7 @@ try {
         .build();
 
     // Create and submit the transaction
-    const pipeline = await webClient.executeTransactionPipeline(
+    const pipeline = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );

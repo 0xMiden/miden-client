@@ -969,7 +969,7 @@ export const discardedTransaction = async (
     }
 
     // Target tries consuming but the transaction will not be submitted
-    let targetPipeline = await client.executeTransactionPipeline(
+    let targetPipeline = await client.executeTransaction(
       targetAccount.id(),
       consumeTransactionRequest
     );

@@ -388,17 +388,14 @@ export class WebClient {
     }
   }
 
-  async executeTransactionPipeline(accountId, transactionRequest) {
+  async executeTransaction(accountId, transactionRequest) {
     try {
-      return await this.wasmWebClient.executeTransactionPipeline(
+      return await this.wasmWebClient.executeTransaction(
         accountId,
         transactionRequest
       );
     } catch (error) {
-      console.error(
-        "INDEX.JS: Error in executeTransactionPipeline:",
-        error.toString()
-      );
+      console.error("INDEX.JS: Error in executeTransaction:", error.toString());
       throw error;
     }
   }

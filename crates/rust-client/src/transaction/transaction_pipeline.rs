@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountId};
+use miden_objects::assembly::SourceManagerSync;
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::{
@@ -40,6 +41,9 @@ use crate::{ClientError, DebugMode, TransactionPipelineError};
 pub struct TransactionPipeline {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient + Send>,
+    /// Shared source manager retaining MASM source mappings for scripts assembled within this
+    /// pipeline.
+    source_manager: Arc<dyn SourceManagerSync>,
     /// Indicates whether scripts should be assembled in debug mode or not.
     debug_mode: DebugMode,
     /// Transaction request that describes the transaction to run through the pipeline.
@@ -58,11 +62,13 @@ impl TransactionPipeline {
     /// Creates a new [`TransactionPipeline`].
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient + Send>,
+        source_manager: Arc<dyn SourceManagerSync>,
         debug_mode: DebugMode,
         transaction_request: TransactionRequest,
     ) -> Self {
         Self {
             rpc_api,
+            source_manager,
             debug_mode,
             transaction_request,
             executed_transaction: None,
@@ -187,6 +193,11 @@ impl TransactionPipeline {
     /// Returns a reference to the [`TransactionRequest`] of this pipeline.
     pub fn request(&self) -> &TransactionRequest {
         &self.transaction_request
+    }
+
+    /// Returns the [`SourceManagerSync`] associated with this pipeline.
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
+        self.source_manager.clone()
     }
 
     /// Returns the [`TransactionId`] corresponding to the transaction, or an error if it has not

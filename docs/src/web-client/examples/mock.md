@@ -12,7 +12,7 @@ try {
     const mockWebClient = await MockWebClient.createClient();
 
     // Running a mint transaction (assuming the client was setup previously)
-    const pipeline = await mockWebClient.executeTransactionPipeline(
+    const pipeline = await mockWebClient.executeTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );

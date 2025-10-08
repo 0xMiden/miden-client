@@ -221,7 +221,7 @@ export const test = base.extend<{ forEachTest: void }>({
             prover
           ) => {
             const client = window.client;
-            const pipeline = await client.executeTransactionPipeline(
+            const pipeline = await client.executeTransaction(
               accountId,
               transactionRequest
             );

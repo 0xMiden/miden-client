@@ -33,8 +33,7 @@ impl WebClient {
         account_id: &AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<TransactionId, JsValue> {
-        let mut pipeline =
-            self.execute_transaction_pipeline(account_id, transaction_request).await?;
+        let mut pipeline = self.execute_transaction(account_id, transaction_request).await?;
 
         let tx_id = pipeline.id()?;
 
@@ -60,8 +59,8 @@ impl WebClient {
     /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
     /// have the required block header in the local database. In these scenarios, a sync to
     /// the chain tip is performed, and the required block header is retrieved.
-    #[wasm_bindgen(js_name = "executeTransactionPipeline")]
-    pub async fn execute_transaction_pipeline(
+    #[wasm_bindgen(js_name = "executeTransaction")]
+    pub async fn execute_transaction(
         &mut self,
         account_id: &AccountId,
         transaction_request: &TransactionRequest,

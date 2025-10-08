@@ -8,7 +8,7 @@ const mockChainTest = async (testingPage: Page) => {
     await client.syncState();
 
     const executeAndApply = async (accountId, transactionRequest) => {
-      const pipeline = await client.executeTransactionPipeline(
+      const pipeline = await client.executeTransaction(
         accountId,
         transactionRequest
       );

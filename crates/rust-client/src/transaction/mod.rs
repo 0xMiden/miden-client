@@ -527,6 +527,7 @@ where
     ) -> TransactionPipeline {
         TransactionPipeline::new(
             self.rpc_api.clone(),
+            self.source_manager.clone(),
             self.in_debug_mode().into(),
             transaction_request,
         )
