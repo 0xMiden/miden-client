@@ -153,7 +153,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 ### exportAccountFile()
 
-> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>
 
 #### Parameters
 
@@ -163,7 +163,7 @@ the chain tip is performed, and the required block header is retrieved.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`AccountFile`](AccountFile.md)\>
 
 ***
 
@@ -411,13 +411,13 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importAccountFile()
 
-> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+> **importAccountFile**(`account_file`): `Promise`\<`any`\>
 
 #### Parameters
 
-##### account\_bytes
+##### account\_file
 
-`any`
+[`AccountFile`](AccountFile.md)
 
 #### Returns
 
