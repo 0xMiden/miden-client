@@ -4,7 +4,6 @@ import {
   transactions,
   transactionScripts,
 } from "./schema.js";
-import { Dexie } from "dexie";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 
 interface ProcessedTransaction {
@@ -131,16 +130,6 @@ export async function insertTransactionScript(
   txScript: Uint8Array
 ) {
   try {
-    // check if script root already exists
-    const record = await transactionScripts
-      .where("scriptRoot")
-      .equals(scriptRoot)
-      .first();
-
-    if (record) {
-      return;
-    }
-
     const scriptRootArray = new Uint8Array(scriptRoot);
     const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
 
@@ -152,12 +141,9 @@ export async function insertTransactionScript(
       ),
     };
 
-    await transactionScripts.add(data);
+    await transactionScripts.put(data);
   } catch (error) {
-    // Check if the error is because the record already exists
-    if (!(error instanceof Dexie.ConstraintError)) {
-      logWebStoreError(error, "Failed to insert transaction script");
-    }
+    logWebStoreError(error, "Failed to insert transaction script");
   }
 }
 
