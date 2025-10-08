@@ -1,5 +1,4 @@
 import { transactions, transactionScripts, } from "./schema.js";
-import { Dexie } from "dexie";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 const IDS_FILTER_PREFIX = "Ids:";
 const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
@@ -92,27 +91,16 @@ export async function getTransactions(filter) {
 }
 export async function insertTransactionScript(scriptRoot, txScript) {
     try {
-        // check if script root already exists
-        const record = await transactionScripts
-            .where("scriptRoot")
-            .equals(scriptRoot)
-            .first();
-        if (record) {
-            return;
-        }
         const scriptRootArray = new Uint8Array(scriptRoot);
         const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
         const data = {
             scriptRoot: scriptRootBase64,
             txScript: mapOption(txScript, (txScript) => new Blob([new Uint8Array(txScript)])),
         };
-        await transactionScripts.add(data);
+        await transactionScripts.put(data);
     }
     catch (error) {
-        // Check if the error is because the record already exists
-        if (!(error instanceof Dexie.ConstraintError)) {
-            logWebStoreError(error, "Failed to insert transaction script");
-        }
+        logWebStoreError(error, "Failed to insert transaction script");
     }
 }
 export async function upsertTransactionRecord(transactionId, details, blockNum, statusVariant, status, scriptRoot) {
