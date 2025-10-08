@@ -91,14 +91,6 @@ export async function getTransactions(filter) {
 }
 export async function insertTransactionScript(scriptRoot, txScript) {
     try {
-        // check if script root already exists
-        // const record = await transactionScripts
-        //   .where("scriptRoot")
-        //   .equals(scriptRoot)
-        //   .first();
-        // if (record) {
-        //   return;
-        // }
         const scriptRootArray = new Uint8Array(scriptRoot);
         const scriptRootBase64 = uint8ArrayToBase64(scriptRootArray);
         const data = {
