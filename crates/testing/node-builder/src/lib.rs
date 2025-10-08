@@ -373,7 +373,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     // Force the account nonce to 1.
     //
     // By convention, a nonce of zero indicates a freshly generated local account that has yet
-    // to be deployed. An account is deployed onchain along with its first transaction which
+    // to be deployed. An account is deployed onchain along within its first transaction which
     // results in a non-zero nonce onchain.
     //
     // The genesis block is special in that accounts are "deployed" without transactions and

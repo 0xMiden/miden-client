@@ -29,6 +29,12 @@
 * [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 * [BREAKING] Implemented `AccountFile` in the WebClient ([#1258](https://github.com/0xMiden/miden-client/pull/1258)).
 
+## 0.11.9 (2025-10-08)
+
+* Fixed a bug where StateSync failed when called multiple times while using Safari ([#1377](https://github.com/0xMiden/miden-client/pull/1377)).
+* Implemented new note compatibility checker [(#1376)](https://github.com/0xMiden/miden-client/pull/1376).
+* Added indexes to improve sync process performance [(#1363)](https://github.com/0xMiden/miden-client/pull/1363).
+
 ## 0.11.8 (2025-09-29)
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
