@@ -25,7 +25,7 @@ use {
     tonic::transport::{Channel, ClientTlsConfig},
 };
 
-use super::{NoteInfo, NoteStream, NoteTransportError};
+use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
 
 #[cfg(not(target_arch = "wasm32"))]
 type Service = Channel;
@@ -84,9 +84,8 @@ impl GrpcNoteTransportClient {
         self.health_client.read().clone()
     }
 
-    /// Send a note
-    ///
     /// Pushes a note to the note transport network.
+    ///
     /// While the note header goes in plaintext, the provided note details can be encrypted.
     pub async fn send_note(
         &self,
@@ -105,17 +104,16 @@ impl GrpcNoteTransportClient {
         Ok(())
     }
 
-    /// Fetch notes
+    /// Downloads notes for given tags from the note transport network.
     ///
-    /// Downloads notes for given tags.
-    /// Returns notes labelled after the provided cursor (pagination), and an updated cursor.
+    /// Returns notes labeled after the provided cursor (pagination), and an updated cursor.
     pub async fn fetch_notes(
         &self,
         tags: &[NoteTag],
-        cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
+        cursor: NoteTransportCursor,
+    ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
         let tags_int = tags.iter().map(NoteTag::as_u32).collect();
-        let request = FetchNotesRequest { tags: tags_int, cursor };
+        let request = FetchNotesRequest { tags: tags_int, cursor: cursor.value() };
 
         let response = self
             .api()
@@ -134,19 +132,22 @@ impl GrpcNoteTransportClient {
             notes.push(NoteInfo { header, details_bytes: pnote.details });
         }
 
-        Ok((notes, response.cursor))
+        Ok((notes, response.cursor.into()))
     }
 
-    /// Stream notes
+    /// Stream notes from the note transport network.
     ///
     /// Subscribes to a given tag.
     /// New notes are received periodically.
     pub async fn stream_notes(
         &self,
         tag: NoteTag,
-        cursor: u64,
+        cursor: NoteTransportCursor,
     ) -> Result<NoteStreamAdapter, NoteTransportError> {
-        let request = StreamNotesRequest { tag: tag.as_u32(), cursor };
+        let request = StreamNotesRequest {
+            tag: tag.as_u32(),
+            cursor: cursor.value(),
+        };
 
         let response = self
             .api()
@@ -156,7 +157,10 @@ impl GrpcNoteTransportClient {
         Ok(NoteStreamAdapter::new(response.into_inner()))
     }
 
-    /// gRPC-standardized server health-check
+    /// gRPC-standardized server health-check.
+    ///
+    /// Checks if the note transport node and respective gRPC services are serving requests.
+    /// Currently the grPC server operates only one service labelled `MidenPrivateTransport`.
     pub async fn health_check(&mut self) -> Result<(), NoteTransportError> {
         let request = tonic::Request::new(HealthCheckRequest {
             service: String::new(), // empty string -> whole server
@@ -194,15 +198,15 @@ impl super::NoteTransportClient for GrpcNoteTransportClient {
     async fn fetch_notes(
         &self,
         tags: &[NoteTag],
-        cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
+        cursor: NoteTransportCursor,
+    ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
         self.fetch_notes(tags, cursor).await
     }
 
     async fn stream_notes(
         &self,
         tag: NoteTag,
-        cursor: u64,
+        cursor: NoteTransportCursor,
     ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
         let stream = self.stream_notes(tag, cursor).await?;
         Ok(Box::new(stream))

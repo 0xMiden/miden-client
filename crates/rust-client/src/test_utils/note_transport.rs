@@ -10,14 +10,20 @@ use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_tx::utils::sync::RwLock;
 
-use crate::note_transport::{NoteInfo, NoteStream, NoteTransportClient, NoteTransportError};
+use crate::note_transport::{
+    NoteInfo,
+    NoteStream,
+    NoteTransportClient,
+    NoteTransportCursor,
+    NoteTransportError,
+};
 
 /// Mock Note Transport Node
 ///
 /// Simulates the functionality of the note transport node.
 #[derive(Clone)]
 pub struct MockNoteTransportNode {
-    notes: BTreeMap<NoteTag, Vec<(NoteInfo, u64)>>,
+    notes: BTreeMap<NoteTag, Vec<(NoteInfo, NoteTransportCursor)>>,
 }
 
 impl MockNoteTransportNode {
@@ -27,13 +33,20 @@ impl MockNoteTransportNode {
 
     pub fn add_note(&mut self, header: NoteHeader, details_bytes: Vec<u8>) {
         let info = NoteInfo { header, details_bytes };
-        let cursor = Utc::now().timestamp_micros().try_into().unwrap();
-        self.notes.entry(header.metadata().tag()).or_default().push((info, cursor));
+        let cursor = u64::try_from(Utc::now().timestamp_micros()).unwrap();
+        self.notes
+            .entry(header.metadata().tag())
+            .or_default()
+            .push((info, cursor.into()));
     }
 
-    pub fn get_notes(&self, tags: &[NoteTag], cursor: u64) -> (Vec<NoteInfo>, u64) {
+    pub fn get_notes(
+        &self,
+        tags: &[NoteTag],
+        cursor: NoteTransportCursor,
+    ) -> (Vec<NoteInfo>, NoteTransportCursor) {
         let mut notes = vec![];
-        let mut rcursor = 0;
+        let mut rcursor = NoteTransportCursor::init();
         for tag in tags {
             // Assumes stored notes are ordered by cursor
             let tnotes = self
@@ -49,7 +62,13 @@ impl MockNoteTransportNode {
                 })
                 .map(Vec::from)
                 .unwrap_or_default();
-            rcursor = rcursor.max(tnotes.iter().map(|(_, cursor)| *cursor).max().unwrap_or(0));
+            rcursor = rcursor.max(
+                tnotes
+                    .iter()
+                    .map(|(_, cursor)| *cursor)
+                    .max()
+                    .unwrap_or(NoteTransportCursor::init()),
+            );
             notes.extend(tnotes.into_iter().map(|(note, _)| note).collect::<Vec<_>>());
         }
         (notes, rcursor)
@@ -80,7 +99,11 @@ impl MockNoteTransportApi {
         self.mock_node.write().add_note(header, details_bytes);
     }
 
-    pub fn fetch_notes(&self, tags: &[NoteTag], cursor: u64) -> (Vec<NoteInfo>, u64) {
+    pub fn fetch_notes(
+        &self,
+        tags: &[NoteTag],
+        cursor: NoteTransportCursor,
+    ) -> (Vec<NoteInfo>, NoteTransportCursor) {
         self.mock_node.read().get_notes(tags, cursor)
     }
 }
@@ -110,15 +133,15 @@ impl NoteTransportClient for MockNoteTransportApi {
     async fn fetch_notes(
         &self,
         tags: &[NoteTag],
-        cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError> {
+        cursor: NoteTransportCursor,
+    ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
         Ok(self.fetch_notes(tags, cursor))
     }
 
     async fn stream_notes(
         &self,
         _tag: NoteTag,
-        _cursor: u64,
+        _cursor: NoteTransportCursor,
     ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
         Ok(Box::new(DummyNoteStream {}))
     }

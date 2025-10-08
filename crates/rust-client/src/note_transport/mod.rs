@@ -21,12 +21,16 @@ pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
 /// Client note transport methods.
 impl<AUTH> Client<AUTH> {
-    /// Check if note transport is configured
+    /// Check if note transport connection is configured
     pub fn is_note_transport_enabled(&self) -> bool {
         self.note_transport_api.is_some()
     }
 
-    /// Send a note
+    /// Send a note through the note transport network.
+    ///
+    /// The note will be end-to-end encrypted (unimplemented, currently plaintext)
+    /// using the provided recipient's `address` details.
+    /// The recipient will be able to retrieve this note through the note's [`NoteTag`].
     pub async fn send_private_note(
         &mut self,
         note: Note,
@@ -44,9 +48,18 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Fetch notes for tracked note tags
+    /// Fetch notes for tracked note tags.
+    ///
+    /// The client will query the configured note transport node for all tracked note tags.
+    /// To list tracked tags please use [`Client::get_note_tags`]. To add a new note tag please use
+    /// [`Client::add_note_tag`].
+    /// Only notes directed at your addresses will be stored and readable given the use of
+    /// end-to-end encryption (unimplemented).
+    /// Fetched notes will be stored into the client's store.
     ///
     /// An internal pagination mechanism is employed to reduce the number of downloaded notes.
+    /// To fetch the full history of private notes for the tracked tags, use
+    /// [`Client::fetch_all_private_notes`].
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
@@ -62,15 +75,19 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Fetches all notes for tracked note tags
+    /// Fetches all notes for tracked note tags.
     ///
-    /// All notes stored in the note transport network will be fetched.
+    /// Similar to [`Client::fetch_private_notes`] however does not employ pagination,
+    /// fetching all notes stored in the note transport network for the tracked tags.
+    /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = NoteTransport::new(api.clone()).fetch_notes(0, note_tags).await?;
+        let update = NoteTransport::new(api)
+            .fetch_notes(NoteTransportCursor::init(), note_tags)
+            .await?;
 
         self.store.apply_note_transport_update(update).await?;
 
@@ -100,10 +117,17 @@ pub struct NoteTransport {
     api: Arc<dyn NoteTransportClient>,
 }
 
+/// Note transport cursor
+///
+/// Pagination integer used to reduce the number of fetched notes from the note transport network,
+/// avoiding duplicate downloads.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub struct NoteTransportCursor(u64);
+
 /// Note Transport update
 pub struct NoteTransportUpdate {
     /// Pagination cursor for next fetch
-    pub cursor: u64,
+    pub cursor: NoteTransportCursor,
     /// Fetched notes
     pub note_updates: Vec<InputNoteRecord>,
 }
@@ -118,7 +142,7 @@ impl NoteTransport {
     /// Only notes after the provided cursor are requested.
     pub(crate) async fn fetch_notes<I>(
         &mut self,
-        cursor: u64,
+        cursor: NoteTransportCursor,
         tags: I,
     ) -> Result<NoteTransportUpdate, ClientError>
     where
@@ -143,6 +167,26 @@ impl NoteTransport {
     }
 }
 
+impl NoteTransportCursor {
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn init() -> Self {
+        Self::new(0)
+    }
+
+    pub fn value(&self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for NoteTransportCursor {
+    fn from(value: u64) -> Self {
+        Self::new(value)
+    }
+}
+
 /// The main transport client trait for sending and receiving encrypted notes
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -161,14 +205,14 @@ pub trait NoteTransportClient: Send + Sync {
     async fn fetch_notes(
         &self,
         tag: &[NoteTag],
-        cursor: u64,
-    ) -> Result<(Vec<NoteInfo>, u64), NoteTransportError>;
+        cursor: NoteTransportCursor,
+    ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError>;
 
     /// Stream notes for a given tag
     async fn stream_notes(
         &self,
         tag: NoteTag,
-        cursor: u64,
+        cursor: NoteTransportCursor,
     ) -> Result<Box<dyn NoteStream>, NoteTransportError>;
 }
 

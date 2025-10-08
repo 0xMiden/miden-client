@@ -9,7 +9,14 @@ use crate::errors::CliError;
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Exchange privates notes using the Note Transport network")]
 pub enum NoteTransportCmd {
-    Send { note_id: String, address: String },
+    /// Send a private note through the Note Transport network.
+    Send {
+        /// Note ID of the sending note, as a hex string.
+        note_id: String,
+        /// Address of the recipient, as a Bech32 string.
+        address: String,
+    },
+    /// Fetch notes from the Note Transport network. Fetched notes will be added to the store.
     Fetch,
 }
 
