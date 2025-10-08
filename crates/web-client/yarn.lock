@@ -290,6 +290,8 @@
 
 "@wasm-tool/rollup-plugin-rust@^3.0.3":
   version "3.0.5"
+  resolved "https://registry.npmjs.org/@wasm-tool/rollup-plugin-rust/-/rollup-plugin-rust-3.0.5.tgz"
+  integrity sha512-L3TyDtmrmAY4XdlZAZKMomDManfrKHLQHjDeFNJKi4LjPQRwWUnPoS0yV44NWy+pKXVKlv7wbdkaTmhiFJRmLg==
   dependencies:
     "@iarna/toml" "^2.2.5"
     "@rollup/pluginutils" "^5.1.4"
@@ -2408,6 +2410,8 @@ yallist@^5.0.0:
 
 yaml@^2.8.1:
   version "2.8.1"
+  resolved "https://registry.npmjs.org/yaml/-/yaml-2.8.1.tgz"
+  integrity sha512-lcYcMxX2PO9XMGvAJkJ3OsNMw+/7FKes7/hgerGUYWIoWu5j/+YQqcZr5JnPZWzOsEBgMbSbiSTn/dv/69Mkpw==
 
 yargs-parser@^20.2.2, yargs-parser@^20.2.9:
   version "20.2.9"
