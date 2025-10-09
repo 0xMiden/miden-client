@@ -16,20 +16,32 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorage, Address,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
 };
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::crypto::MerklePath;
-use miden_objects::account::PartialAccount;
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MerklePath, MmrPeaks};
 use miden_client::note::{BlockNumber, Nullifier};
 use miden_client::store::{
-    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_objects::account::PartialAccount;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -317,10 +329,7 @@ impl Store for WebStore {
         &self,
         _partial_account_id: &str,
         _slot_indices: &[u8],
-    ) -> Result<
-        Vec<(u8, miden_client::account::StorageSlot, MerklePath)>,
-        StoreError,
-    > {
+    ) -> Result<Vec<(u8, miden_client::account::StorageSlot, MerklePath)>, StoreError> {
         Err(StoreError::DatabaseError(
             "PartialAccount storage items retrieval not yet implemented for WebStore".to_string(),
         ))
@@ -330,8 +339,7 @@ impl Store for WebStore {
         &self,
         _partial_account_id: &str,
         _vault_keys: &[Word],
-    ) -> Result<Vec<(Word, Asset, MerklePath)>, StoreError>
-    {
+    ) -> Result<Vec<(Word, Asset, MerklePath)>, StoreError> {
         Err(StoreError::DatabaseError(
             "PartialAccount vault items retrieval not yet implemented for WebStore".to_string(),
         ))

@@ -13,11 +13,21 @@ use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::{
-    apply_migrations, get_setting, list_setting_keys, remove_setting, set_setting,
+    apply_migrations,
+    get_setting,
+    list_setting_keys,
+    remove_setting,
+    set_setting,
 };
 use miden_client::Word;
 use miden_client::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, Address,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    Address,
     StorageSlot,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
@@ -25,13 +35,20 @@ use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
-    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
-    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
+    AccountRecord,
+    AccountStatus,
+    BlockRelevance,
+    InputNoteRecord,
+    NoteFilter,
+    OutputNoteRecord,
+    PartialBlockchainFilter,
+    Store,
+    StoreError,
+    TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
-use miden_objects::account::PartialAccount;
-use miden_objects::account::StorageMapWitness;
+use miden_objects::account::{PartialAccount, StorageMapWitness};
 use rusqlite::Connection;
 use rusqlite::types::Value;
 

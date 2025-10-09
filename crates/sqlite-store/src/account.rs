@@ -7,32 +7,46 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
-    Address, StorageMap, StorageSlot, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    Address,
+    StorageMap,
+    StorageSlot,
+    StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerklePath, MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::StorageMapWitness;
 use miden_objects::account::{
-    AccountStorageHeader, PartialAccount, PartialStorage, PartialStorageMap,
+    AccountStorageHeader,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMapWitness,
 };
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Params, Transaction, named_params, params};
 
-use crate::current_timestamp_u64;
-
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
 use crate::merkle_store::{
-    get_asset_proof, get_storage_map_item_proof, insert_asset_nodes, insert_storage_map_nodes,
-    update_asset_nodes, update_storage_map_nodes,
+    get_asset_proof,
+    get_storage_map_item_proof,
+    insert_asset_nodes,
+    insert_storage_map_nodes,
+    update_asset_nodes,
+    update_storage_map_nodes,
 };
 use crate::sql_error::SqlResultExt;
-use crate::{insert_sql, subst};
+use crate::{current_timestamp_u64, insert_sql, subst};
 
 // TYPES
 // ================================================================================================
@@ -1221,7 +1235,8 @@ impl SqliteStore {
                     )
                 })?;
 
-                // Reconstruct StorageSlot based on whether it has a key (map entry) or not (simple value)
+                // Reconstruct StorageSlot based on whether it has a key (map entry) or not (simple
+                // value)
                 let storage_slot = if let Some(key) = item_key {
                     // This is a map entry - we need to create a PartialStorageMap
                     let mut map = StorageMap::new();
@@ -1532,17 +1547,32 @@ mod tests {
     use anyhow::Context;
     use miden_client::account::component::AccountComponent;
     use miden_client::account::{
-        Account, AccountBuilder, AccountCode, AccountDelta, AccountHeader, AccountId,
-        AccountIdAddress, AccountType, Address, AddressInterface, StorageMap, StorageSlot,
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountDelta,
+        AccountHeader,
+        AccountId,
+        AccountIdAddress,
+        AccountType,
+        Address,
+        AddressInterface,
+        StorageMap,
+        StorageSlot,
     };
     use miden_client::asset::{
-        AccountStorageDelta, AccountVaultDelta, Asset, FungibleAsset, NonFungibleAsset,
+        AccountStorageDelta,
+        AccountVaultDelta,
+        Asset,
+        FungibleAsset,
+        NonFungibleAsset,
         NonFungibleAssetDetails,
     };
     use miden_client::crypto::rpo_falcon512::PublicKey;
     use miden_client::store::Store;
     use miden_client::testing::account_id::{
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     };
     use miden_client::testing::constants::NON_FUNGIBLE_ASSET_DATA;
     use miden_client::transaction::TransactionKernel;
@@ -1785,8 +1815,8 @@ mod tests {
 
     #[test]
     fn test_partial_account_types_compile() -> anyhow::Result<()> {
-        // This test just verifies that the PartialAccount types can be imported and basic types work
-        // without requiring a full database setup
+        // This test just verifies that the PartialAccount types can be imported and basic types
+        // work without requiring a full database setup
 
         let account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?;
         let storage_header = AccountStorageHeader::new(vec![(
@@ -1796,11 +1826,12 @@ mod tests {
         let partial_storage = PartialStorage::new(storage_header, vec![])?;
         let partial_vault = PartialVault::new(PartialSmt::new())?;
 
-        // Test that we can create the basic types (this tests the imports and types compile correctly)
+        // Test that we can create the basic types (this tests the imports and types compile
+        // correctly)
         assert_eq!(account_id, AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?);
 
-        // Test that PartialStorage and PartialVault can be created (this verifies the types compile)
-        // If we get here, the types compiled successfully
+        // Test that PartialStorage and PartialVault can be created (this verifies the types
+        // compile) If we get here, the types compiled successfully
         let _ = partial_storage;
         let _ = partial_vault;
 
