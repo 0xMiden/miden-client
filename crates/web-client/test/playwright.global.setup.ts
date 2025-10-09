@@ -67,6 +67,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteId,
             Signature,
             SigningInputs,
+            SigningInputsKind,
             SlotAndKeys,
             SlotAndKeysArray,
             StorageMap,
@@ -82,6 +83,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
+            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -147,6 +149,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.SecretKey = SecretKey;
           window.Signature = Signature;
           window.SigningInputs = SigningInputs;
+          window.SigningInputsKind = SigningInputsKind;
           window.SlotAndKeys = SlotAndKeys;
           window.SlotAndKeysArray = SlotAndKeysArray;
           window.StorageMap = StorageMap;
@@ -163,6 +166,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
+          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;

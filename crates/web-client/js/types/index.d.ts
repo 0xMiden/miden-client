@@ -59,6 +59,7 @@ export {
   SerializedAccountHeader,
   Signature,
   SigningInputs,
+  SigningInputsKind,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -74,6 +75,7 @@ export {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
 } from "./crates/miden_client_web";
 

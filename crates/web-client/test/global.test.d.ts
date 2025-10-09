@@ -50,6 +50,7 @@ import {
   SecretKey,
   Signature,
   SigningInputs,
+  SigningInputsKind,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -65,6 +66,7 @@ import {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
@@ -133,6 +135,7 @@ declare global {
     SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
+    SigningInputsKind: typeof SigningInputsKind;
     SlotAndKeys: typeof SlotAndKeys;
     SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
@@ -148,6 +151,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
