@@ -270,7 +270,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()));
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().into()));
 
     // Process component templates and add them to the account builder.
     let account_components = process_component_templates(&component_templates, &init_storage_data)?;

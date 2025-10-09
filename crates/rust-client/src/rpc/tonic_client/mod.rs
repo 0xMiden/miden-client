@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
 
-use miden_objects::Word;
+use miden_objects::{Word, EMPTY_WORD};
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
@@ -29,8 +29,10 @@ use super::{
     StateSyncInfo,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys;
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
+use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -290,8 +292,8 @@ impl NodeRpcClient for GrpcClient {
         account_requests: &BTreeSet<ForeignAccount>,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
+        let (header, _) = self.get_block_header_by_number(None, false).await?;
         if account_requests.is_empty() {
-            let (header, _) = self.get_block_header_by_number(None, false).await?;
             return Ok((header.block_num(), Vec::new()));
         }
 
@@ -300,7 +302,7 @@ impl NodeRpcClient for GrpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let mut block_num: Option<BlockNumber> = None;
+        let block_num = header.block_num();
         let mut account_proofs = Vec::with_capacity(account_requests.len());
 
         // Request proofs one-by-one using the singular API
@@ -308,15 +310,24 @@ impl NodeRpcClient for GrpcClient {
             let account_id = foreign_account.account_id();
             let storage_requirements = foreign_account.storage_slot_requirements();
 
+            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements
+                .inner()
+                .iter()
+                .map(|(index, data)| proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
+                    slot_index: *index as u32,
+                    slot_data: Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(MapKeys {
+                        map_keys: data.iter().map(|word| word.into()).collect(),
+                    })),
+                })
+                .collect();
+
             // Only request details for public accounts; include known code commitment for this
             // account when available
             let account_details = if account_id.is_public() {
-                let code_commitment = known_account_codes
-                    .get(&account_id)
-                    .map(|code| proto::primitives::Digest::from(code.commitment()));
-                Some(proto::rpc_store::account_proof_request::AccountDetailsRequest {
-                    code_commitment,
-                    storage_requests: storage_requirements.clone().into(),
+                Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
+                    code_commitment: Some(EMPTY_WORD.into()),
+                    asset_vault_commitment: None,
+                    storage_maps,
                 })
             } else {
                 None
@@ -324,7 +335,8 @@ impl NodeRpcClient for GrpcClient {
 
             let request = proto::rpc_store::AccountProofRequest {
                 account_id: Some(account_id.into()),
-                account_details,
+                block_num: block_num.as_u32(),
+                details: account_details,
             };
 
             let response = rpc_api
@@ -334,11 +346,6 @@ impl NodeRpcClient for GrpcClient {
                     RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
                 })?
                 .into_inner();
-
-            let this_block_num: BlockNumber = response.block_num.into();
-            if block_num.is_none() {
-                block_num = Some(this_block_num);
-            }
 
             let account_witness: AccountWitness = response
                 .witness
@@ -362,7 +369,7 @@ impl NodeRpcClient for GrpcClient {
             account_proofs.push(proof);
         }
 
-        Ok((block_num.expect("at least one request present"), account_proofs))
+        Ok((block_num, account_proofs))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
@@ -370,12 +377,17 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request =
-            proto::rpc_store::SyncNotesRequest { block_num: block_num.as_u32(), note_tags };
+        let block_range = Some(BlockRange {
+            block_from: block_num.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
+
+        let request = proto::rpc_store::SyncNotesRequest { block_range, note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 

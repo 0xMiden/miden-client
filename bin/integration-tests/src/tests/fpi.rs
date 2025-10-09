@@ -61,11 +61,11 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
         end
         ",
@@ -171,11 +171,11 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{outer_proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
         end
@@ -263,11 +263,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
         end
@@ -358,7 +358,7 @@ fn foreign_account_with_code(
     .with_supports_all_types();
 
     let secret_key = SecretKey::new();
-    let auth_component = AuthRpoFalcon512::new(secret_key.public_key());
+    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment().into());
 
     let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())

@@ -480,9 +480,8 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
-    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
+    use miden_objects::account::{AccountBuilder, AccountId, AccountType, PublicKeyCommitment};
     use miden_objects::asset::FungibleAsset;
-    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
     use miden_objects::testing::account_id::{
@@ -527,7 +526,7 @@ mod tests {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()

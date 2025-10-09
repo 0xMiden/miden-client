@@ -60,7 +60,7 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(wallet_component)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();

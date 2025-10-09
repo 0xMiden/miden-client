@@ -108,7 +108,10 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc_store::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let chain_tip = value.chain_tip;
+        let chain_tip = value
+            .pagination_info
+            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
+            .chain_tip;
 
         // Validate and convert block header
         let block_header = value

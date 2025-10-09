@@ -59,8 +59,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     await client.addAccountSecretKeyToWebStore(secretKey);
     await client.newAccount(
       getItemAccountBuilderResult.account,
-      getItemAccountBuilderResult.seed,
-      false
+      false,
     );
     await client.syncState();
 

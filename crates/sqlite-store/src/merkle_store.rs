@@ -11,7 +11,10 @@ pub fn get_asset_proof(
     vault_root: Word,
     asset: &Asset,
 ) -> Result<SmtProof, StoreError> {
-    let path = merkle_store.get_path(vault_root, get_node_index(asset.vault_key())?)?.path;
+    let path = merkle_store
+        .get_path(vault_root, get_node_index(asset.vault_key())?)?
+        .path
+        .try_into()?;
     let leaf = SmtLeaf::new_single(asset.vault_key(), (*asset).into());
 
     Ok(SmtProof::new(path, leaf)?)

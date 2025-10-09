@@ -170,7 +170,7 @@ pub mod api_client {
                 super::super::rpc_store::AccountProofRequest,
             >,
         ) -> core::result::Result<
-            tonic::Response<super::super::rpc_store::AccountProof>,
+            tonic::Response<super::super::rpc_store::AccountProofResponse>,
             tonic::Status,
         > {
             self.inner
@@ -486,6 +486,30 @@ pub mod api_client {
             let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncStorageMaps");
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncStorageMaps"));
+            self.inner.unary(req, path, codec).await
+        }
+        /// Returns transactions records for specific accounts within a block range.
+        pub async fn sync_transactions(
+            &mut self,
+            request: impl tonic::IntoRequest<
+                super::super::rpc_store::SyncTransactionsRequest,
+            >,
+        ) -> core::result::Result<
+            tonic::Response<super::super::rpc_store::SyncTransactionsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/SyncTransactions");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "SyncTransactions"));
             self.inner.unary(req, path, codec).await
         }
     }

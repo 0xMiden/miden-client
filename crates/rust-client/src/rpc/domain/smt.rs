@@ -101,7 +101,7 @@ impl From<&SmtProof> for proto::primitives::SmtOpening {
     fn from(value: &SmtProof) -> Self {
         proto::primitives::SmtOpening {
             leaf: Some(value.leaf().into()),
-            path: Some(value.path().into()),
+            path: Some(value.path().clone().into()),
         }
     }
 }
@@ -115,7 +115,7 @@ impl TryFrom<&proto::primitives::SmtOpening> for SmtProof {
             None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(leaf))),
         };
 
-        let path = match &value.path {
+        let path = match value.path.clone() {
             Some(path) => path.try_into()?,
             None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(path))),
         };

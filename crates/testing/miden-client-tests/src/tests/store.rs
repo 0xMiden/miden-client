@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::testing::mock_account::MockAccountExt;
-use miden_objects::account::{Account, AccountFile, AuthSecretKey};
-use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+use miden_objects::account::{Account, AccountFile, AuthSecretKey, PublicKeyCommitment};
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -14,7 +14,8 @@ use miden_objects::{EMPTY_WORD, Word, ZERO};
 use crate::tests::create_test_client;
 
 fn create_account_data(account_id: u128) -> AccountFile {
-    let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
+    let account =
+        Account::mock(account_id, AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)));
 
     AccountFile::new(account.clone(), vec![AuthSecretKey::RpoFalcon512(SecretKey::new())])
 }
@@ -37,7 +38,7 @@ pub async fn try_add_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.

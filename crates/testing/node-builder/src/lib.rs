@@ -367,7 +367,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         12,
         Felt::from(1_000_000u32),
         miden_objects::account::AccountStorageMode::Public,
-        AuthScheme::RpoFalcon512 { pub_key: secret.public_key() },
+        AuthScheme::RpoFalcon512 { pub_key: secret.public_key().into() },
     )?;
 
     // Force the account nonce to 1.

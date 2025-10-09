@@ -5,10 +5,9 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
-use std::vec::Vec;
 
-use miden_objects::account::{AuthSecretKey, Signature};
-use miden_objects::{Felt, Word};
+use miden_objects::Word;
+use miden_objects::account::{AuthSecretKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::{Deserializable, Serializable};
@@ -47,7 +46,7 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     /// Adds a secret key to the keystore.
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match key {
-            AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()),
+            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment(),
         };
 
         let filename = hash_pub_key(pub_key);
@@ -125,22 +124,22 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// returned.
     async fn get_signature(
         &self,
-        pub_key: Word,
+        pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
+    ) -> Result<Signature, AuthenticationError> {
         let mut rng = self.rng.write().expect("poisoned lock");
 
         let message = signing_info.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key)
+            .get_key(pub_key.into())
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) =
-            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
+        let AuthSecretKey::RpoFalcon512(k) = secret_key
+            .ok_or(AuthenticationError::UnknownPublicKey(Into::<Word>::into(pub_key).to_hex()))?;
 
         let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
-        Ok(signature.to_prepared_signature())
+        Ok(signature)
     }
 }
 
