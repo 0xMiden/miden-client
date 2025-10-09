@@ -32,6 +32,7 @@ import {
   NoteExecutionHint,
   NoteExecutionMode,
   NoteFilter,
+  NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
@@ -116,6 +117,7 @@ declare global {
     NoteExecutionHint: typeof NoteExecutionHint;
     NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
+    NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
     NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;

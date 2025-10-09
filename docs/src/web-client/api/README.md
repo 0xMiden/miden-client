@@ -71,6 +71,7 @@
 - [NoteDetailsArray](classes/NoteDetailsArray.md)
 - [NoteExecutionHint](classes/NoteExecutionHint.md)
 - [NoteExecutionMode](classes/NoteExecutionMode.md)
+- [NoteFile](classes/NoteFile.md)
 - [NoteFilter](classes/NoteFilter.md)
 - [NoteHeader](classes/NoteHeader.md)
 - [NoteId](classes/NoteId.md)

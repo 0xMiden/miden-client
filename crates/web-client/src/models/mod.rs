@@ -63,6 +63,7 @@ pub mod note_assets;
 pub mod note_details;
 pub mod note_execution_hint;
 pub mod note_execution_mode;
+pub mod note_file;
 pub mod note_filter;
 pub mod note_header;
 pub mod note_id;

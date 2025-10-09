@@ -124,7 +124,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ### exportNoteFile()
 
-> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<`any`\>
+> **exportNoteFile**(`note_id`, `export_type`): `Promise`\<[`NoteFile`](NoteFile.md)\>
 
 #### Parameters
 
@@ -138,7 +138,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`NoteFile`](NoteFile.md)\>
 
 ***
 
@@ -382,13 +382,13 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importNoteFile()
 
-> **importNoteFile**(`note_bytes`): `Promise`\<`any`\>
+> **importNoteFile**(`note_file`): `Promise`\<`any`\>
 
 #### Parameters
 
-##### note\_bytes
+##### note\_file
 
-`any`
+[`NoteFile`](NoteFile.md)
 
 #### Returns
 
