@@ -3,21 +3,26 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
 use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
+use miden_objects::{EMPTY_WORD, Word};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
+    AccountDetails,
     AccountProof,
     AccountProofs,
+    AccountStorageDetails,
+    AccountStorageMapDetails,
     AccountUpdateSummary,
+    AccountVaultDetails,
     FetchedAccount,
+    StorageMapEntry,
 };
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
@@ -400,32 +405,49 @@ impl NodeRpcClient for MockRpcApi {
                 ForeignAccount::Public(account_id, account_storage_requirements) => {
                     let account = mock_chain.committed_account(*account_id).unwrap();
 
-                    let mut storage_slots = BTreeMap::new();
-                    for (index, storage_keys) in account_storage_requirements.inner() {
+                    let mut map_details = vec![];
+                    for (index, _) in account_storage_requirements.inner() {
                         if let Some(StorageSlot::Map(storage_map)) =
                             account.storage().slots().get(*index as usize)
                         {
-                            let proofs = storage_keys
-                                .iter()
-                                .map(|map_key| storage_map.open(map_key))
-                                .collect::<Vec<_>>();
-                            storage_slots.insert(*index, proofs);
+                            let entries = storage_map
+                                .entries()
+                                .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                                .collect::<Vec<StorageMapEntry>>();
+
+                            let too_many_entries = entries.len() > 1000;
+                            let account_storage_map_detail = AccountStorageMapDetails {
+                                slot_index: *index as u32,
+                                too_many_entries,
+                                entries,
+                            };
+
+                            map_details.push(account_storage_map_detail);
                         } else {
                             panic!("Storage slot at index {} is not a map", index);
                         }
                     }
 
-                    // Some(AccountDetails {
-                    //     header: account.into(),
-                    //     storage_details: AccountDetails {
-                    //         header: account.storage().to_header(),
-                    //         storage_details: AccountStorageDetails
-                    //     },
-                    //     code: account.code().clone(),
-                    //     storage_slots,
-                    // })
-                    // TODO JM: FIX
-                    todo!()
+                    let storage_details = AccountStorageDetails {
+                        header: account.storage().to_header(),
+                        map_details,
+                    };
+
+                    let mut assets = vec![];
+                    for asset in account.vault().assets() {
+                        assets.push(asset);
+                    }
+                    let vault_details = AccountVaultDetails {
+                        too_many_assets: assets.len() > 1000,
+                        assets,
+                    };
+
+                    Some(AccountDetails {
+                        header: account.into(),
+                        storage_details,
+                        code: account.code().clone(),
+                        vault_details,
+                    })
                 },
                 ForeignAccount::Private(_) => None,
             };
