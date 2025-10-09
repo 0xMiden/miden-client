@@ -3,12 +3,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_objects::Word;
 use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
-use miden_objects::{EMPTY_WORD, Word};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -115,8 +115,7 @@ impl MockRpcApi {
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
                 if note_tags.contains(&note.metadata().tag())
-                    && block_num.as_u32() >= request_block_range.block_from
-                    && Some(block_num.as_u32()) <= request_block_range.block_to
+                    && block_num.as_u32() > request_block_range.block_from
                 {
                     Some(block_num)
                 } else {

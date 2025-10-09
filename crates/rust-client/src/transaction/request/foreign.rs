@@ -3,13 +3,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::account::{
-    AccountId,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-};
+use miden_objects::account::{AccountId, PartialAccount, PartialStorage, StorageMap};
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;

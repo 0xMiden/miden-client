@@ -1923,7 +1923,8 @@ async fn storage_and_vault_proofs() {
     // can be updated.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into());
+        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .unwrap();
 
     let bump_item_component = AccountComponent::compile(
         BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
