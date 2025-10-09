@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
 
-use miden_objects::Word;
+use miden_objects::{Word, EMPTY_WORD};
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
@@ -29,6 +29,7 @@ use super::{
     StateSyncInfo,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys;
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
 use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
@@ -312,21 +313,19 @@ impl NodeRpcClient for GrpcClient {
             let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements
                 .inner()
                 .iter()
-                .map(|(index, _data)| proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
+                .map(|(index, data)| proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
                     slot_index: *index as u32,
-                    slot_data: Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::AllEntries(true)),
+                    slot_data: Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(MapKeys {
+                        map_keys: data.iter().map(|word| word.into()).collect(),
+                    })),
                 })
                 .collect();
 
             // Only request details for public accounts; include known code commitment for this
             // account when available
             let account_details = if account_id.is_public() {
-                let code_commitment = known_account_codes
-                    .get(&account_id)
-                    .map(|code| proto::primitives::Digest::from(code.commitment()));
-
                 Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
-                    code_commitment,
+                    code_commitment: Some(EMPTY_WORD.into()),
                     asset_vault_commitment: None,
                     storage_maps,
                 })
