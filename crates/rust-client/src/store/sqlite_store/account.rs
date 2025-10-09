@@ -60,7 +60,7 @@ impl SqliteStore {
     pub(super) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        const QUERY: &str = r#"
+        const QUERY: &str = "
             SELECT
                 a.id,
                 a.nonce,
@@ -78,7 +78,7 @@ impl SqliteStore {
             ON a.id = latest.id
             AND a.nonce = latest.nonce
             ORDER BY a.id;
-            "#;;
+            ";
 
         conn.prepare(QUERY)?
             .query_map(params![], |row| {
