@@ -45,7 +45,7 @@ impl SqliteStore {
     // --------------------------------------------------------------------------------------------
 
     pub(super) fn get_account_ids(conn: &mut Connection) -> Result<Vec<AccountId>, StoreError> {
-        const QUERY: &str = "SELECT DISTINCT id FROM accounts";
+        const QUERY: &str = "SELECT id FROM tracked_accounts";
 
         conn.prepare(QUERY)?
             .query_map([], |row| row.get(0))
@@ -60,11 +60,48 @@ impl SqliteStore {
     pub(super) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        query_account_headers(
-            conn,
-            "nonce = (SELECT MAX(max.nonce) FROM accounts max WHERE max.id = accounts.id)",
-            params![],
-        )
+        const QUERY: &str = r#"
+            SELECT
+                a.id,
+                a.nonce,
+                a.vault_root,
+                a.storage_commitment,
+                a.code_commitment,
+                a.account_seed,
+                a.locked
+            FROM accounts AS a
+            JOIN (
+                SELECT id, MAX(nonce) AS nonce
+                FROM accounts
+                GROUP BY id
+            ) AS latest
+            ON a.id = latest.id
+            AND a.nonce = latest.nonce
+            ORDER BY a.id;
+            "#;;
+
+        conn.prepare(QUERY)?
+            .query_map(params![], |row| {
+                let id: String = row.get(0)?;
+                let nonce: u64 = column_value_as_u64(row, 1)?;
+                let vault_root: String = row.get(2)?;
+                let storage_commitment: String = row.get(3)?;
+                let code_commitment: String = row.get(4)?;
+                let account_seed: Option<Vec<u8>> = row.get(5)?;
+                let locked: bool = row.get(6)?;
+
+                Ok(SerializedHeaderData {
+                    id,
+                    nonce,
+                    vault_root,
+                    storage_commitment,
+                    code_commitment,
+                    account_seed,
+                    locked,
+                })
+            })?
+            .map(|result| parse_accounts(result?))
+            .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
     }
 
     pub(crate) fn get_account_header(
@@ -563,6 +600,7 @@ impl SqliteStore {
                 false,
             ],
         )?;
+        Self::insert_tracked_account_id_tx(tx, account.id())?;
         Ok(())
     }
 
@@ -573,6 +611,15 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
         tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])?;
+        Ok(())
+    }
+
+    fn insert_tracked_account_id_tx(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(tracked_accounts { id } | IGNORE);
+        tx.execute(QUERY, params![account_id.to_hex()])?;
         Ok(())
     }
 

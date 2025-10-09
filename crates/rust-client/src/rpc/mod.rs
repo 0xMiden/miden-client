@@ -221,19 +221,25 @@ pub trait NodeRpcClient: Send + Sync {
         note_ids: &[NoteId],
         current_timestamp: Option<u64>,
     ) -> Result<Vec<InputNoteRecord>, RpcError> {
-        let note_details = self.get_notes_by_id(note_ids).await?;
+        if note_ids.is_empty() {
+            return Ok(vec![]);
+        }
 
-        let mut public_notes = vec![];
-        for detail in note_details {
-            if let FetchedNote::Public(note, inclusion_proof) = detail {
-                let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
-                    inclusion_proof,
+        let mut public_notes = Vec::with_capacity(note_ids.len());
+        for chunk in note_ids.chunks(1_000) {
+            let note_details = self.get_notes_by_id(chunk).await?;
+
+            for detail in note_details {
+                if let FetchedNote::Public(note, inclusion_proof) = detail {
+                    let state = UnverifiedNoteState {
+                        metadata: *note.metadata(),
+                        inclusion_proof,
+                    }
+                    .into();
+                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                    public_notes.push(note);
                 }
-                .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                public_notes.push(note);
             }
         }
 

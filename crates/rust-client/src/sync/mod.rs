@@ -137,7 +137,7 @@ where
         let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
+        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Expected).await?;
 
         let uncommitted_transactions =
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
@@ -169,6 +169,16 @@ where
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
+    }
+
+    /// Applies the state sync update to the store.
+    ///
+    /// See [`crate::Store::apply_state_sync()`] for what the update implies.
+    pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
+        self.store.apply_state_sync(update).await.map_err(ClientError::StoreError)?;
+
+        // Remove irrelevant block headers
+        self.store.prune_irrelevant_blocks().await.map_err(ClientError::StoreError)
     }
 }
 
