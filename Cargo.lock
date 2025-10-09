@@ -2349,6 +2349,7 @@ dependencies = [
  "base64",
  "chrono",
  "miden-client",
+ "miden-objects",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

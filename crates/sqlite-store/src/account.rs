@@ -1500,9 +1500,7 @@ fn query_account_code_and_nonce(
         .optional()
         .into_store_error()?
         .ok_or_else(|| {
-            StoreError::AccountError(AccountError::other(format!(
-                "Account {account_id} not found"
-            )))
+            StoreError::AccountError(AccountError::other(format!("Account {account_id} not found")))
         })?;
 
     // Get the actual account code
@@ -1515,9 +1513,7 @@ fn query_account_code_and_nonce(
         .optional()
         .into_store_error()?
         .ok_or_else(|| {
-            StoreError::AccountError(AccountError::other(format!(
-                "Account {account_id} not found"
-            )))
+            StoreError::AccountError(AccountError::other(format!("Account {account_id} not found")))
         })?;
 
     let account_code = AccountCode::read_from_bytes(&code_bytes)
