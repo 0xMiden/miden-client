@@ -1,7 +1,5 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::auth::AuthSecretKey;
-use miden_client::utils::Deserializable;
-use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;

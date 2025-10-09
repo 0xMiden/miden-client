@@ -59,43 +59,6 @@ const importAccount = async (testingPage: Page, accountBytes: number[]) => {
   }, accountBytes);
 };
 
-test.describe("export and import note", () => {
-  const exportTypes = [
-    ["Id", "NoteId"],
-    ["Full", "NoteWithProof"],
-    ["Details", "NoteDetails"],
-  ];
-
-  exportTypes.forEach(([exportType, expectedNoteType]) => {
-    test(`export note as note file -- export type: ${exportType}`, async ({
-      page,
-    }) => {
-      const { createdNoteId: noteId } = await setupMintedNote(page);
-
-      const exportNote = async (
-        testingPage: Page,
-        noteId: string,
-        exportType: string
-      ) => {
-        return await testingPage.evaluate(
-          async ({ noteId, exportType }) => {
-            const noteFile = await window.client.exportNoteFile(
-              noteId,
-              exportType
-            );
-            return noteFile.noteType();
-          },
-          { noteId, exportType }
-        );
-      };
-
-      await expect(exportNote(page, noteId, exportType)).resolves.toBe(
-        expectedNoteType
-      );
-    });
-  });
-});
-
 test.describe("export and import the db", () => {
   test("export db with an account, find the account when re-importing", async ({
     page,
@@ -153,5 +116,97 @@ test.describe("export and import account", () => {
 
     expect(restoredCommitment).toEqual(initialCommitment);
     expect(restoredBalance.toString()).toEqual(initialBalance);
+  });
+});
+
+test.describe("export and import note", () => {
+  const exportTypes = [
+    ["Id", "NoteId"],
+    ["Full", "NoteWithProof"],
+    ["Details", "NoteDetails"],
+  ];
+
+  const exportNote = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        return noteFile.noteType();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const exportNoteSerialized = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        return noteFile.serialize();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const importSerializedNote = async (
+    testingPage: Page,
+    serializedNote: Uint8Array
+  ) => {
+    return await testingPage.evaluate(
+      async ({ serializedNote }) => {
+        const noteFile = window.NoteFile.deserialize(serializedNote);
+        const importedNoteId = window.client.importNoteFile(noteFile);
+        return importedNoteId;
+      },
+      { serializedNote }
+    );
+  };
+
+  exportTypes.forEach(([exportType, expectedNoteType]) => {
+    test(`export note as note file -- export type: ${exportType}`, async ({
+      page,
+    }) => {
+      const { createdNoteId: noteId } = await setupMintedNote(page);
+
+      await expect(exportNote(page, noteId, exportType)).resolves.toBe(
+        expectedNoteType
+      );
+    });
+  });
+
+  test(`exporting non-existing note fails`, async ({ page }) => {
+    // Random note id taken from testnet
+    const noteId =
+      "0x60b06dbb6c7435ab1d439df972e483bca43bc21654dce2611de98ec3896beaed";
+    await expect(exportNote(page, noteId, "Full")).rejects.toThrowError(
+      "No output note found"
+    );
+  });
+
+  test(`exporting and then importing note`, async ({ page }) => {
+    const { createdNoteId: noteId } = await setupMintedNote(page);
+
+    const serializedNoteFile = await exportNoteSerialized(page, noteId, "Full");
+
+    // Clear store and assert that the output note cannot be found
+    await clearStore(page);
+    await expect(async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          return await window.client.getOutputNote(noteId);
+        },
+        { noteId }
+      );
+    }).rejects.toThrow("Note not found");
+
+    await expect(importSerializedNote(page, serializedNoteFile)).resolves.toBe(
+      noteId
+    );
   });
 });
