@@ -50,6 +50,7 @@ import {
   SecretKey,
   Signature,
   SigningInputs,
+  SigningInputsKind,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -133,6 +134,7 @@ declare global {
     SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
+    SigningInputsKind: typeof SigningInputsKind;
     SlotAndKeys: typeof SlotAndKeys;
     SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
