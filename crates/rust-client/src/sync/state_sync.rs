@@ -17,6 +17,7 @@ use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
+use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
@@ -144,18 +145,80 @@ impl StateSync {
         };
 
         let note_tags = Arc::new(note_tags);
+        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
+        let mut state_sync_steps = Vec::new();
         loop {
-            if !self
-                .sync_state_step(
-                    &mut state_sync_update,
-                    &mut current_partial_mmr,
-                    &accounts,
-                    note_tags.clone(),
-                )
-                .await?
-            {
+            let step = self
+                .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
+                .await?;
+            let Some(step) = step else {
                 break;
+            };
+            state_sync_update.block_num = step.block_header.block_num();
+            state_sync_steps.push(step);
+        }
+
+        // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
+        // (this would be a breaking change so it should be done separately)
+        let public_note_ids: Vec<NoteId> = state_sync_steps
+            .iter()
+            .flat_map(|s| s.note_inclusions.iter())
+            .filter(|n| !n.metadata().is_private())
+            .map(|n| *n.note_id())
+            .collect();
+
+        let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
+
+        // Apply local changes. These involve updating the MMR and applying state transitions
+        // to notes based on the received information.
+        for sync_step in state_sync_steps {
+            let StateSyncInfo {
+                chain_tip,
+                block_header,
+                mmr_delta,
+                account_commitment_updates,
+                note_inclusions,
+                transactions,
+            } = sync_step;
+
+            self.account_state_sync(
+                &mut state_sync_update.account_updates,
+                &accounts,
+                &account_commitment_updates,
+            )
+            .await?;
+
+            self.transaction_state_sync(
+                &mut state_sync_update.transaction_updates,
+                &block_header,
+                &transactions,
+            );
+
+            let found_relevant_note = self
+                .note_state_sync(
+                    &mut state_sync_update.note_updates,
+                    note_inclusions,
+                    &block_header,
+                    &public_note_records,
+                )
+                .await?;
+
+            let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
+                &block_header,
+                found_relevant_note,
+                &mut current_partial_mmr,
+                mmr_delta,
+            )?;
+
+            let include_block = found_relevant_note || chain_tip == block_header.block_num();
+            let mut new_blocks = Vec::new();
+            if include_block {
+                new_blocks.push((block_header, found_relevant_note, new_mmr_peaks));
             }
+
+            state_sync_update
+                .block_updates
+                .extend(BlockUpdates::new(new_blocks, new_authentication_nodes));
         }
 
         self.sync_nullifiers(&mut state_sync_update, block_num).await?;
@@ -163,83 +226,29 @@ impl StateSync {
         Ok(state_sync_update)
     }
 
-    /// Executes a single step of the state sync process, returning `true` if the client should
-    /// continue syncing and `false` if the client has reached the chain tip.
+    /// Executes a single sync request and returns the node response if the chain advanced.
     ///
-    /// A step in this context means a single request to the node to get the next relevant block and
-    /// the changes that happened in it. This block may not be the last one in the chain and
-    /// the client may need to call this method multiple times until it reaches the chain tip.
-    ///
-    /// The `sync_state_update` field of the struct will be updated with the new changes from this
-    /// step.
-    ///
-    /// This function returns whether the state sync process must continue, depending on whether
-    /// the chain tip was reached already.
+    /// This method issues a `/SyncState` call starting from `current_block_num`. If the node
+    /// reports the same block number, `None` is returned, signalling that the client is already at
+    /// the requested height. Otherwise the full [`StateSyncInfo`] is returned for deferred
+    /// processing by the caller.
     async fn sync_state_step(
         &self,
-        state_sync_update: &mut StateSyncUpdate,
-        current_partial_mmr: &mut PartialMmr,
-        accounts: &[AccountHeader],
+        current_block_num: BlockNumber,
+        account_ids: &[AccountId],
         note_tags: Arc<BTreeSet<NoteTag>>,
-    ) -> Result<bool, ClientError> {
-        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-
+    ) -> Result<Option<StateSyncInfo>, ClientError> {
         let response = self
             .rpc_api
-            .sync_state(state_sync_update.block_num, &account_ids, note_tags.as_ref())
+            .sync_state(current_block_num, account_ids, note_tags.as_ref())
             .await?;
 
         // We don't need to continue if the chain has not advanced, there are no new changes
-        if response.block_header.block_num() == state_sync_update.block_num {
-            return Ok(false);
+        if response.block_header.block_num() == current_block_num {
+            return Ok(None);
         }
 
-        let new_block_num = response.block_header.block_num();
-        state_sync_update.block_num = new_block_num;
-
-        self.account_state_sync(
-            &mut state_sync_update.account_updates,
-            accounts,
-            &response.account_commitment_updates,
-        )
-        .await?;
-
-        self.transaction_state_sync(
-            &mut state_sync_update.transaction_updates,
-            &response.block_header,
-            &response.transactions,
-        );
-
-        let found_relevant_note = self
-            .note_state_sync(
-                &mut state_sync_update.note_updates,
-                response.note_inclusions,
-                &response.block_header,
-            )
-            .await?;
-
-        let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
-            &response.block_header,
-            found_relevant_note,
-            current_partial_mmr,
-            response.mmr_delta,
-        )?;
-
-        let mut new_blocks = vec![];
-        if found_relevant_note || response.chain_tip == new_block_num {
-            // Only track relevant blocks or the chain tip
-            new_blocks.push((response.block_header, found_relevant_note, new_mmr_peaks));
-        }
-
-        state_sync_update
-            .block_updates
-            .extend(BlockUpdates::new(new_blocks, new_authentication_nodes));
-
-        if response.chain_tip == new_block_num {
-            Ok(false)
-        } else {
-            Ok(true)
-        }
+        Ok(Some(response))
     }
 
     // HELPERS
@@ -320,29 +329,28 @@ impl StateSync {
     /// * Tracked expected notes that were committed in the block.
     /// * Tracked notes that were being processed by a transaction that got committed.
     /// * Tracked notes that were nullified by an external transaction.
+    ///
+    /// The `public_notes` parameter provides cached public note details for the current sync
+    /// iteration so the node is only queried once per batch.
     async fn note_state_sync(
         &self,
         note_updates: &mut NoteUpdateTracker,
         note_inclusions: Vec<CommittedNote>,
         block_header: &BlockHeader,
+        public_notes: &BTreeMap<NoteId, InputNoteRecord>,
     ) -> Result<bool, ClientError> {
-        let public_note_ids: Vec<NoteId> = note_inclusions
-            .iter()
-            .filter_map(|note| (!note.metadata().is_private()).then_some(*note.note_id()))
-            .collect();
-
+        // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
 
-        // Process note inclusions
-        let new_public_notes = self.fetch_public_note_details(&public_note_ids).await?;
         for committed_note in note_inclusions {
-            let public_note = new_public_notes.get(committed_note.note_id()).cloned();
+            let public_note = (!committed_note.metadata().is_private())
+                .then(|| public_notes.get(committed_note.note_id()))
+                .flatten()
+                .cloned();
 
             match self.note_screener.on_note_received(committed_note, public_note).await? {
                 NoteUpdateAction::Commit(committed_note) => {
-                    found_relevant_note = true;
-
-                    note_updates
+                    found_relevant_note = note_updates
                         .apply_committed_note_state_transitions(&committed_note, block_header)?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
@@ -368,6 +376,7 @@ impl StateSync {
         if query_notes.is_empty() {
             return Ok(BTreeMap::new());
         }
+
         info!("Getting note details for notes that are not being tracked.");
 
         let return_notes = self.rpc_api.get_public_note_records(query_notes, None).await?;

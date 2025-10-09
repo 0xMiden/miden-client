@@ -45,7 +45,7 @@ impl<AUTH> Client<AUTH> {
     /// Builds the current view of the chain's [`PartialMmr`]. Because we want to add all new
     /// authentication nodes that could come from applying the MMR updates, we need to track all
     /// known leaves thus far.
-    pub(crate) async fn build_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
+    pub async fn build_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         let current_block_num = self.store.get_sync_height().await?;
 
         let tracked_nodes =

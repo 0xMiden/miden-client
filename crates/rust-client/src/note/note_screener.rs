@@ -123,7 +123,7 @@ where
 
         let tx_script = transaction_request.build_transaction_script(
             &AccountInterface::from(account),
-            crate::DebugMode::Enabled,
+            crate::DebugMode::Disabled,
         )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
