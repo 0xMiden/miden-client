@@ -13,40 +13,24 @@ use std::vec::Vec;
 
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::{
-    apply_migrations,
-    get_setting,
-    list_setting_keys,
-    remove_setting,
-    set_setting,
+    apply_migrations, get_setting, list_setting_keys, remove_setting, set_setting,
 };
 use miden_client::Word;
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    Address,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage, Address,
+    StorageSlot,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MerklePath, MerkleStore, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
-    AccountRecord,
-    AccountStatus,
-    BlockRelevance,
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    PartialBlockchainFilter,
-    Store,
-    StoreError,
-    TransactionFilter,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_objects::account::PartialAccount;
 use miden_objects::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
@@ -428,6 +412,85 @@ impl Store for SqliteStore {
     ) -> Result<Vec<Address>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_addresses(conn, account_id)
+        })
+        .await
+    }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    async fn store_partial_account(
+        &self,
+        partial_account_id: &str,
+        partial_account: &PartialAccount,
+        storage_items: Vec<(u8, Option<Word>, Word, MerklePath)>,
+        vault_items: Vec<(Word, Asset, MerklePath)>,
+    ) -> Result<(), StoreError> {
+        let partial_account_id = partial_account_id.to_string();
+        let partial_account = partial_account.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::store_partial_account(
+                conn,
+                &partial_account_id,
+                &partial_account,
+                storage_items,
+                vault_items,
+            )
+        })
+        .await
+    }
+
+    async fn get_partial_account(
+        &self,
+        partial_account_id: &str,
+    ) -> Result<Option<PartialAccount>, StoreError> {
+        let partial_account_id = partial_account_id.to_string();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_partial_account(conn, &partial_account_id)
+        })
+        .await
+    }
+
+    async fn get_partial_storage_items(
+        &self,
+        partial_account_id: &str,
+        slot_indices: &[u8],
+    ) -> Result<Vec<(u8, StorageSlot, MerklePath)>, StoreError> {
+        let partial_account_id = partial_account_id.to_string();
+        let slot_indices = slot_indices.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_partial_storage_items(conn, &partial_account_id, &slot_indices)
+        })
+        .await
+    }
+
+    async fn get_partial_vault_items(
+        &self,
+        partial_account_id: &str,
+        vault_keys: &[Word],
+    ) -> Result<Vec<(Word, Asset, MerklePath)>, StoreError> {
+        let partial_account_id = partial_account_id.to_string();
+        let vault_keys = vault_keys.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_partial_vault_items(conn, &partial_account_id, &vault_keys)
+        })
+        .await
+    }
+
+    async fn list_partial_accounts(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<String>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::list_partial_accounts(conn, account_id)
+        })
+        .await
+    }
+
+    async fn remove_partial_account(&self, partial_account_id: &str) -> Result<(), StoreError> {
+        let partial_account_id = partial_account_id.to_string();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_partial_account(conn, &partial_account_id)
         })
         .await
     }

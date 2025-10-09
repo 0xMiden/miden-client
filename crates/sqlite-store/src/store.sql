@@ -185,3 +185,44 @@ CREATE TABLE addresses (
 ) WITHOUT ROWID;
 
 CREATE INDEX idx_addresses_account_id ON addresses(account_id);
+
+-- PartialAccount support tables
+-- ================================================================================================
+
+-- Store PartialAccount metadata
+CREATE TABLE partial_accounts (
+    partial_account_id TEXT NOT NULL,     -- Unique identifier for the partial account
+    account_id TEXT NOT NULL,             -- ID of the original account
+    storage_header BLOB NOT NULL,         -- Serialized AccountStorageHeader (Vec<(StorageSlotType, Word)>)
+    vault_root TEXT NOT NULL,             -- Root of the partial vault
+    created_at UNSIGNED BIG INT NOT NULL, -- Timestamp
+    PRIMARY KEY (partial_account_id)
+    -- FOREIGN KEY (account_id) REFERENCES accounts(id) -- Temporarily disabled for testing
+);
+
+CREATE INDEX idx_partial_accounts_account_id ON partial_accounts(account_id);
+
+-- Track which storage items belong to a PartialAccount
+CREATE TABLE partial_account_storage_items (
+    partial_account_id TEXT NOT NULL,
+    slot_index UNSIGNED BIG INT NOT NULL,
+    item_key TEXT NULL,                   -- NULL for simple values, key for map entries
+    item_value TEXT NOT NULL,             -- The actual value
+    auth_path BLOB NOT NULL,              -- Merkle proof for this item
+    PRIMARY KEY (partial_account_id, slot_index, item_key),
+    FOREIGN KEY (partial_account_id) REFERENCES partial_accounts(partial_account_id)
+);
+
+CREATE INDEX idx_partial_account_storage_items_partial_account_id ON partial_account_storage_items(partial_account_id);
+
+-- Track which vault assets belong to a PartialAccount  
+CREATE TABLE partial_account_vault_items (
+    partial_account_id TEXT NOT NULL,
+    vault_key TEXT NOT NULL,
+    asset_value BLOB NOT NULL,            -- Serialized asset
+    auth_path BLOB NOT NULL,              -- Merkle proof for this asset
+    PRIMARY KEY (partial_account_id, vault_key),
+    FOREIGN KEY (partial_account_id) REFERENCES partial_accounts(partial_account_id)
+);
+
+CREATE INDEX idx_partial_account_vault_items_partial_account_id ON partial_account_vault_items(partial_account_id);

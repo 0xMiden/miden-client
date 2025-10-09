@@ -27,19 +27,13 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    StorageMapWitness,
-    StorageSlot,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    PartialAccount, StorageMapWitness, StorageSlot,
 };
 use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
@@ -62,13 +56,8 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteExportType,
-    NoteRecordError,
-    OutputNoteRecord,
-    OutputNoteState,
-    input_note_states,
+    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
+    OutputNoteState, input_note_states,
 };
 
 // STORE TRAIT
@@ -436,6 +425,59 @@ pub trait Store: Send + Sync {
 
         Ok((value, witness))
     }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Stores a `PartialAccount` with its specific vault/storage items and authentication paths.
+    ///
+    /// This method stores the metadata for a `PartialAccount` along with the specific storage items
+    /// and vault assets that belong to it. Each item includes its authentication path for
+    /// verification purposes.
+    async fn store_partial_account(
+        &self,
+        partial_account_id: &str,
+        partial_account: &PartialAccount,
+        storage_items: Vec<(u8, Option<Word>, Word, MerklePath)>,
+        vault_items: Vec<(Word, Asset, MerklePath)>,
+    ) -> Result<(), StoreError>;
+
+    /// Retrieves a `PartialAccount` by its ID.
+    ///
+    /// Returns the `PartialAccount` if found, or None if it doesn't exist.
+    async fn get_partial_account(
+        &self,
+        partial_account_id: &str,
+    ) -> Result<Option<PartialAccount>, StoreError>;
+
+    /// Retrieves specific storage items for a `PartialAccount`.
+    ///
+    /// Returns the storage items along with their authentication paths for the specified slot indices.
+    async fn get_partial_storage_items(
+        &self,
+        partial_account_id: &str,
+        slot_indices: &[u8],
+    ) -> Result<Vec<(u8, StorageSlot, MerklePath)>, StoreError>;
+
+    /// Retrieves specific vault items for a `PartialAccount`.
+    ///
+    /// Returns the vault assets along with their authentication paths for the specified vault keys.
+    async fn get_partial_vault_items(
+        &self,
+        partial_account_id: &str,
+        vault_keys: &[Word],
+    ) -> Result<Vec<(Word, Asset, MerklePath)>, StoreError>;
+
+    /// Lists all `PartialAccount` IDs for a given account.
+    ///
+    /// Returns a list of `PartialAccount` IDs that belong to the specified account.
+    async fn list_partial_accounts(&self, account_id: AccountId)
+    -> Result<Vec<String>, StoreError>;
+
+    /// Removes a `PartialAccount` and all its associated data.
+    ///
+    /// This is a cascading delete that removes the `PartialAccount` and all its storage/vault items.
+    async fn remove_partial_account(&self, partial_account_id: &str) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
