@@ -2,8 +2,6 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
-use std::borrow::ToOwned;
-use std::string::ToString;
 
 use miden_objects::Word;
 use miden_objects::account::{
@@ -20,6 +18,8 @@ use miden_objects::crypto::merkle::SparseMerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
+use crate::alloc::borrow::ToOwned;
+use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
