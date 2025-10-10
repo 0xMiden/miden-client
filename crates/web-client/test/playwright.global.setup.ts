@@ -83,6 +83,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
+            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -165,6 +166,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
+          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;

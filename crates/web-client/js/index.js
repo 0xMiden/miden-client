@@ -75,6 +75,7 @@ const {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   WebClient: WasmWebClient, // Alias the WASM-exported WebClient
 } = wasm;
@@ -152,6 +153,7 @@ export {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
 };
 
