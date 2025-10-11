@@ -2152,7 +2152,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2359,7 +2359,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "miden-assembly",
  "miden-objects",
@@ -2427,7 +2427,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2455,7 +2455,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2475,7 +2475,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2497,7 +2497,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "fs-err",
  "miette",
@@ -2509,7 +2509,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "futures",
@@ -2536,7 +2536,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2567,7 +2567,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2594,11 +2594,12 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
  "miden-assembly",
+ "miden-assembly-syntax",
  "miden-core",
  "miden-crypto",
  "miden-mast-package",
@@ -2647,7 +2648,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2692,7 +2693,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#56d311a5a0e7b1ebef072a450784f7229a64ab82"
+source = "git+https://github.com/lambdaclass/miden-node?branch=fabrizioorsi%2Fvm-re-export-miden-objects#96dcf8018bc3b183bbccd28e94bb0dbae1ec7de2"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2726,7 +2727,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2746,7 +2747,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2761,7 +2762,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#62feca75399d54f0d840f3aa3d5d345fe2f87e85"
+source = "git+https://github.com/lambdaclass/miden-base?branch=re-export-vm#33214b12cecc27c52d06926f17369b483692e5dd"
 dependencies = [
  "miden-objects",
  "miden-tx",
