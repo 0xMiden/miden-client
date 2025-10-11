@@ -331,13 +331,26 @@ impl NodeRpcClient for MockRpcApi {
         Ok(return_notes)
     }
 
-    /// Simulates the submission of a proven transaction to the node. This will create a new block
-    /// just for the new transaction and return the block number of the newly created block.
+    /// Simulates the submission of a proven transaction to the node.
+    ///
+    /// This enqueues the transaction to be included in a future block (created via `prove_block`).
+    /// Returns the current chain tip block number at the moment of submission.
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
     ) -> Result<BlockNumber, RpcError> {
-        // TODO: add some basic validations to test error cases
+        // Basic validation(s) to exercise error paths in tests
+        //  - Ensure the target account exists in the mock chain
+        if self
+            .mock_chain
+            .read()
+            .committed_account(proven_transaction.account_id())
+            .is_err()
+        {
+            return Err(RpcError::InvalidResponse(String::from(
+                "unknown account for proven transaction",
+            )));
+        }
 
         {
             let mut mock_chain = self.mock_chain.write();
