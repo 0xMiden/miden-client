@@ -25,6 +25,12 @@
 
 ---
 
+# Troubleshooting
+
+- [Troubleshooting guide](.troubleshooting/.md)
+
+---
+
 # CLI
 
 - [CLI](./cli-reference.md)
