@@ -23,9 +23,9 @@ use miden_client::account::{
     AccountStorage,
     Address,
 };
-use miden_client::asset::AssetVault;
+use miden_client::asset::{Asset, AssetVault};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MerklePath, MmrPeaks};
 use miden_client::note::{BlockNumber, Nullifier};
 use miden_client::store::{
     AccountRecord,
@@ -41,6 +41,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_objects::account::PartialAccount;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -290,6 +291,73 @@ impl Store for WebStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.list_setting_keys().await
+    }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+    // NOTE: WebStore implementation for PartialAccounts is currently unimplemented.
+    //
+    // Questions for reviewers:
+    // 1. Should WebStore mirror the SQLite schema with equivalent IndexedDB tables?
+    // 2. What's the priority for WASM/browser support of PartialAccounts?
+    // 3. Should we follow the same pattern as other WebStore methods (JS bindings + Dexie)?
+    //
+    // The SQLite implementation is complete and can serve as a reference.
+
+    async fn store_partial_account(
+        &self,
+        _partial_account_id: &str,
+        _partial_account: &PartialAccount,
+        _storage_items: Vec<(u8, Option<Word>, Word, MerklePath)>,
+        _vault_items: Vec<(Word, Asset, MerklePath)>,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount storage not yet implemented for WebStore".to_string(),
+        ))
+    }
+
+    async fn get_partial_account(
+        &self,
+        _partial_account_id: &str,
+    ) -> Result<Option<PartialAccount>, StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount retrieval not yet implemented for WebStore".to_string(),
+        ))
+    }
+
+    async fn get_partial_storage_items(
+        &self,
+        _partial_account_id: &str,
+        _slot_indices: &[u8],
+    ) -> Result<Vec<(u8, miden_client::account::StorageSlot, MerklePath)>, StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount storage items retrieval not yet implemented for WebStore".to_string(),
+        ))
+    }
+
+    async fn get_partial_vault_items(
+        &self,
+        _partial_account_id: &str,
+        _vault_keys: &[Word],
+    ) -> Result<Vec<(Word, Asset, MerklePath)>, StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount vault items retrieval not yet implemented for WebStore".to_string(),
+        ))
+    }
+
+    async fn list_partial_accounts(
+        &self,
+        _account_id: AccountId,
+    ) -> Result<Vec<String>, StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount listing not yet implemented for WebStore".to_string(),
+        ))
+    }
+
+    async fn remove_partial_account(&self, _partial_account_id: &str) -> Result<(), StoreError> {
+        Err(StoreError::DatabaseError(
+            "PartialAccount removal not yet implemented for WebStore".to_string(),
+        ))
     }
 }
 
