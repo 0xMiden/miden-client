@@ -1,7 +1,10 @@
+use miden_client::note::NoteDetails as NativeNoteDetails;
 use miden_client::notes::NoteFile as NativeNoteFile;
 use miden_client::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 
+use super::input_note::InputNote;
+use super::output_note::OutputNote;
 use crate::js_error_with_context;
 
 #[wasm_bindgen(inspectable)]
@@ -37,7 +40,37 @@ impl NoteFile {
             .map_err(|err| js_error_with_context(err, "notefile deserialization failed"))?;
         Ok(Self { inner: deserialized })
     }
+
+    #[wasm_bindgen(js_name = fromInputNote)]
+    pub fn from_input_note(note: &InputNote) -> Self {
+        match note.proof() {
+            Some(inclusion_proof) => Self {
+                inner: NativeNoteFile::NoteWithProof(note.note().into(), inclusion_proof.into()),
+            },
+            None => {
+                let assets = note.note().assets();
+                let recipient = note.note().recipient();
+                let details = NativeNoteDetails::new(assets.into(), recipient.into());
+                Self { inner: details.into() }
+            },
+        }
+    }
+
+    #[wasm_bindgen(js_name = fromOutputNote)]
+    pub fn from_output_note(note: &OutputNote) -> Self {
+        let native_note = note.note();
+        match (native_note.assets(), native_note.recipient()) {
+            (Some(assets), Some(recipient)) => {
+                let details = NativeNoteDetails::new(assets.clone(), recipient.clone());
+                Self { inner: details.into() }
+            },
+            _ => Self { inner: native_note.id().into() },
+        }
+    }
 }
+
+// CONVERSIONS
+// ================================================================================================
 
 impl From<NativeNoteFile> for NoteFile {
     fn from(note_file: NativeNoteFile) -> Self {

@@ -1,7 +1,5 @@
 use miden_client::note::{
-    Note as NativeNote,
-    NoteHeader as NativeNoteHeader,
-    PartialNote as NativePartialNote,
+    Note as NativeNote, NoteHeader as NativeNoteHeader, PartialNote as NativePartialNote,
 };
 use miden_client::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
@@ -63,6 +61,10 @@ impl OutputNote {
             NativeOutputNote::Full(note) => Some(note.into()),
             _ => None,
         }
+    }
+
+    pub(crate) fn note(&self) -> &NativeOutputNote {
+        &self.0
     }
 }
 
