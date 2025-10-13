@@ -411,7 +411,7 @@ async function updateCommittedNoteTags(
       await tx.tags.where("source_note_id").equals(noteId).delete();
     }
   } catch (error) {
-    logWebStoreError(error, "Failed to pudate committed note tags");
+    logWebStoreError(error, "Failed to update committed note tags");
   }
 }
 
