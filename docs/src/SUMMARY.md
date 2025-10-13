@@ -25,13 +25,8 @@
 
 ---
 
-# Troubleshooting
-
-- [Troubleshooting guide](.troubleshooting/.md)
-
----
-
 # CLI
 
 - [CLI](./cli-reference.md)
   - [Config](./cli-config.md)
+  - [Troubleshooting](./cli-troubleshooting.md)
