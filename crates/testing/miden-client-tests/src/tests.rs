@@ -2080,7 +2080,8 @@ async fn account_addresses_non_basic_wallet() {
 pub async fn create_test_client()
 -> (MockClient<FilesystemKeyStore<StdRng>>, MockRpcApi, FilesystemKeyStore<StdRng>) {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let client = builder.build().await.unwrap();
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
 
     (client, rpc_api, keystore)
 }
