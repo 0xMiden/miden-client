@@ -116,6 +116,27 @@ impl BlockUpdates {
         Self { block_headers, new_authentication_nodes }
     }
 
+    /// Adds a new block header and its corresponding data to this [`BlockUpdates`].
+    ///
+    /// # Parameters
+    /// - `block_header`: The block header to add.
+    /// - `has_client_notes`: Whether this block contains input notes that the client could use.
+    /// - `peaks`: The MMR peaks after including `block_header`.
+    /// - `new_authentication_nodes`: Authentication (MMR) nodes produced while adding
+    ///   `block_header` to the client's MMR.
+    pub fn insert(
+        &mut self,
+        block_header: BlockHeader,
+        has_client_notes: bool,
+        peaks: MmrPeaks,
+        new_authentication_nodes: Vec<(InOrderIndex, Word)>,
+    ) {
+        self.block_headers.push((block_header, has_client_notes, peaks));
+
+        self.new_authentication_nodes.reserve(new_authentication_nodes.len());
+        self.new_authentication_nodes.extend(new_authentication_nodes);
+    }
+
     /// Returns the new block headers to be stored, along with a flag indicating whether the block
     /// contains notes that are relevant to the client and the MMR peaks for the block.
     pub fn block_headers(&self) -> &[(BlockHeader, bool, MmrPeaks)] {

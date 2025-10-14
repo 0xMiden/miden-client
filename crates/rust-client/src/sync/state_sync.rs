@@ -12,7 +12,7 @@ use tonic::async_trait;
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
-use super::{AccountUpdates, BlockUpdates, StateSyncUpdate};
+use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
@@ -211,14 +211,14 @@ impl StateSync {
             )?;
 
             let include_block = found_relevant_note || chain_tip == block_header.block_num();
-            let mut new_blocks = Vec::new();
             if include_block {
-                new_blocks.push((block_header, found_relevant_note, new_mmr_peaks));
+                state_sync_update.block_updates.insert(
+                    block_header,
+                    found_relevant_note,
+                    new_mmr_peaks,
+                    new_authentication_nodes,
+                );
             }
-
-            state_sync_update
-                .block_updates
-                .extend(BlockUpdates::new(new_blocks, new_authentication_nodes));
         }
 
         self.sync_nullifiers(&mut state_sync_update, block_num).await?;

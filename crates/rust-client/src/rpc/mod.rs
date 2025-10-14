@@ -226,6 +226,7 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let mut public_notes = Vec::with_capacity(note_ids.len());
+        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
         for chunk in note_ids.chunks(1_000) {
             let note_details = self.get_notes_by_id(chunk).await?;
 
