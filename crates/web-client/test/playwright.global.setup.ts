@@ -1,5 +1,5 @@
 //@ts-nocheck
-import { test as base } from "@playwright/test";
+import { test as base, BrowserContext, chromium } from "@playwright/test";
 import { MockWebClient } from "../js";
 
 const TEST_SERVER_PORT = 8080;
@@ -7,6 +7,23 @@ const MIDEN_NODE_PORT = 57291;
 const REMOTE_TX_PROVER_PORT = 50051;
 
 export const test = base.extend<{ forEachTest: void }>({
+  context: async ({}, use) => {
+    const pathToExtension = path.join(
+      __dirname,
+      "..",
+      "vendor",
+      "C-C-DevTools-Support-DWARF-Chrome-Web-Store"
+    );
+    const context = await chromium.launchPersistentContext("", {
+      channel: "chromium",
+      args: [
+        `--disable-extensions-except=${pathToExtension}`,
+        `--load-extension=${pathToExtension}`,
+      ],
+    });
+    await use(context);
+    await context.close();
+  },
   forEachTest: [
     async ({ page }, use) => {
       page.on("console", (msg) => {

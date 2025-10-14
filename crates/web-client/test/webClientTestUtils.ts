@@ -40,6 +40,7 @@ export const mintTransaction = async (
       _sync: boolean;
       _publicNote: boolean;
     }) => {
+      debugger;
       const client = window.client;
       await client.syncState();
 
