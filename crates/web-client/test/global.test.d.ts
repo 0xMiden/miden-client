@@ -2,6 +2,7 @@ import { Page } from "puppeteer";
 import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
+  AccountFile,
   AccountBuilder,
   AccountComponent,
   AccountDelta,
@@ -63,6 +64,7 @@ import {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
@@ -77,7 +79,9 @@ declare global {
     MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
+    rpcUrl?: string;
     Account: typeof Account;
+    AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
@@ -146,6 +150,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;

@@ -2,9 +2,9 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Signature
+[@demox-labs/miden-sdk](../README.md) / AccountFile
 
-# Class: Signature
+# Class: AccountFile
 
 ## Methods
 
@@ -22,25 +22,19 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the `AccountFile` into a byte array
+
 #### Returns
 
 `Uint8Array`
 
 ***
 
-### toPreparedSignature()
-
-> **toPreparedSignature**(): [`Felt`](Felt.md)[]
-
-#### Returns
-
-[`Felt`](Felt.md)[]
-
-***
-
 ### deserialize()
 
-> `static` **deserialize**(`bytes`): `Signature`
+> `static` **deserialize**(`bytes`): `AccountFile`
+
+Deserializes a byte array into an `AccountFile`
 
 #### Parameters
 
@@ -50,4 +44,4 @@
 
 #### Returns
 
-`Signature`
+`AccountFile`
