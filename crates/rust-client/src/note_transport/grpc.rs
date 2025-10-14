@@ -7,14 +7,6 @@ use core::task::{Context, Poll};
 use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_objects::utils::{Deserializable, Serializable};
-use miden_private_transport_proto::miden_private_transport::miden_private_transport_client::MidenPrivateTransportClient;
-use miden_private_transport_proto::miden_private_transport::{
-    FetchNotesRequest,
-    SendNoteRequest,
-    StreamNotesRequest,
-    StreamNotesUpdate,
-    TransportNote,
-};
 use miden_tx::utils::sync::RwLock;
 use tonic::{Request, Streaming};
 use tonic_health::pb::HealthCheckRequest;
@@ -26,6 +18,14 @@ use {
 };
 
 use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
+use crate::note_transport::generated::miden_private_transport::miden_private_transport_client::MidenPrivateTransportClient;
+use crate::note_transport::generated::miden_private_transport::{
+    FetchNotesRequest,
+    SendNoteRequest,
+    StreamNotesRequest,
+    StreamNotesUpdate,
+    TransportNote,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 type Service = Channel;

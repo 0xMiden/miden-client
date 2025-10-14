@@ -21,8 +21,8 @@ crate-type = ["lib"]
 [features]
 default = ["std"]
 std = [
+  "miden-note-transport-proto-build",
   "miden-objects/std",
-  "miden-private-transport-proto/transport",
   "miden-remote-prover-client/std",
   "miden-tx/concurrent",
   "tonic/tls-native-roots",
@@ -34,12 +34,12 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
-miden-lib                     = { workspace = true }
-miden-objects                 = { workspace = true }
-miden-private-transport-proto = { default-features = false, git = "https://github.com/0xMiden/miden-private-transport" }
-miden-remote-prover-client    = { default-features = false, features = ["tx-prover"], workspace = true }
-miden-testing                 = { optional = true, workspace = true }
-miden-tx                      = { workspace = true }
+miden-lib                        = { workspace = true }
+miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-private-transport", optional = true }
+miden-objects                    = { workspace = true }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], workspace = true }
+miden-testing                    = { optional = true, workspace = true }
+miden-tx                         = { workspace = true }
 
 # External dependencies
 anyhow       = { workspace = true }
@@ -48,6 +48,7 @@ chrono       = { optional = false, version = "0.4" }
 futures      = { version = "0.3" }
 hex          = { workspace = true }
 prost        = { default-features = false, features = ["derive"], version = "0.13" }
+prost-types  = { version = "0.13" }
 rand         = { workspace = true }
 thiserror    = { workspace = true }
 tonic        = { default-features = false, features = ["codegen", "prost"], version = "0.13" }
@@ -61,14 +62,15 @@ tonic-web-wasm-client = { default-features = false, version = "0.7" }
 web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [build-dependencies]
-miden-lib              = { workspace = true }
-miden-node-proto-build = { workspace = true }
-miden-objects          = { workspace = true }
-miette                 = { workspace = true }
-prost                  = { default-features = false, features = ["derive"], version = "0.13" }
-prost-build            = { default-features = false, version = "0.13" }
-protox                 = { version = "0.7" }
-tonic-build            = { version = "0.13" }
+miden-lib                        = { workspace = true }
+miden-node-proto-build           = { workspace = true }
+miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-private-transport", optional = true }
+miden-objects                    = { workspace = true }
+miette                           = { workspace = true }
+prost                            = { default-features = false, features = ["derive"], version = "0.13" }
+prost-build                      = { default-features = false, version = "0.13" }
+protox                           = { version = "0.7" }
+tonic-build                      = { version = "0.13" }
 
 [dev-dependencies]
 miden-client              = { features = ["std", "testing"], path = "." }
