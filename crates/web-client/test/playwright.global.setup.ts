@@ -1,6 +1,7 @@
 //@ts-nocheck
 import { test as base, BrowserContext, chromium } from "@playwright/test";
 import { MockWebClient } from "../js";
+import path from "node:path";
 
 const TEST_SERVER_PORT = 8080;
 const MIDEN_NODE_PORT = 57291;
@@ -9,7 +10,7 @@ const REMOTE_TX_PROVER_PORT = 50051;
 export const test = base.extend<{ forEachTest: void }>({
   context: async ({}, use) => {
     const pathToExtension = path.join(
-      __dirname,
+      import.meta.dirname,
       "..",
       "vendor",
       "C-C-DevTools-Support-DWARF-Chrome-Web-Store"
