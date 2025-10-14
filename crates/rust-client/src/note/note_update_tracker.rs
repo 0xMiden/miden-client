@@ -250,7 +250,7 @@ impl NoteUpdateTracker {
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
-    /// committed in a block and returns whether this the committed note is tracked as input note.
+    /// committed in a block and returns whether the committed note is tracked as input note.
     pub(crate) fn apply_committed_note_state_transitions(
         &mut self,
         committed_note: &CommittedNote,
@@ -261,14 +261,17 @@ impl NoteUpdateTracker {
             committed_note.note_index(),
             committed_note.inclusion_path().clone(),
         )?;
-        let mut is_tracked_as_input_note = false;
-        if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of input notes
-            input_note_record
-                .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
-            input_note_record.block_header_received(block_header)?;
-            is_tracked_as_input_note = true;
-        }
+        let is_tracked_as_input_note =
+            if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
+                // The note belongs to our locally tracked set of input notes
+                input_note_record
+                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                input_note_record.block_header_received(block_header)?;
+
+                true
+            } else {
+                false
+            };
 
         if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
             // The note belongs to our locally tracked set of output notes

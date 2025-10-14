@@ -350,7 +350,10 @@ impl StateSync {
 
             match self.note_screener.on_note_received(committed_note, public_note).await? {
                 NoteUpdateAction::Commit(committed_note) => {
-                    found_relevant_note = note_updates
+                    // Only mark the downloaded block header as relevant if we are talking about
+                    // an input note (output notes get marked as committed but we don't need the
+                    // block for anything there)
+                    found_relevant_note |= note_updates
                         .apply_committed_note_state_transitions(&committed_note, block_header)?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
