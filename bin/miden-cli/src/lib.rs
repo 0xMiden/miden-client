@@ -198,9 +198,7 @@ impl Cli {
             builder = builder.note_transport(Arc::new(client));
         }
 
-        let mut client = builder.build().await?;
-
-        client.ensure_genesis_in_place().await?;
+        let client = builder.build().await?;
 
         // Execute CLI command
         match &self.action {
