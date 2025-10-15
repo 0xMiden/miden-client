@@ -9,7 +9,7 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag};
 use tonic::async_trait;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};
@@ -147,9 +147,10 @@ impl StateSync {
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
-        info!("Performing sync state.");
 
         loop {
+            info!("Performing sync state step.");
+
             let step = self
                 .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
                 .await?;

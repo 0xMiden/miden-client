@@ -218,16 +218,24 @@ impl SqliteStore {
     /// block.
     pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
         let tx = conn.transaction()?;
+        let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
-        let query = format!(
-            "\
+        let sync_block: Option<u32> = tx
+            .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
+            .optional()?;
+
+        if let Some(sync_height) = sync_block {
+            tx.execute(
+                r#"
             DELETE FROM block_headers
-            WHERE has_client_notes = FALSE
-            AND block_num != {}
-            AND block_num NOT IN (SELECT block_num FROM state_sync)",
-            BlockNumber::GENESIS.as_u32()
-        );
-        tx.execute(query.as_str(), params![])?;
+            WHERE has_client_notes = 0
+              AND block_num > ?1
+              AND block_num < ?2
+            "#,
+                rusqlite::params![genesis, sync_height],
+            )?;
+        }
+
         Ok(tx.commit().map(|_| ())?)
     }
 }
