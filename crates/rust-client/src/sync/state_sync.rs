@@ -147,6 +147,8 @@ impl StateSync {
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
+        info!("Performing sync state.");
+
         loop {
             let step = self
                 .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
@@ -171,6 +173,8 @@ impl StateSync {
 
         // Apply local changes. These involve updating the MMR and applying state transitions
         // to notes based on the received information.
+        info!("Applying state transitions locally.");
+
         for sync_step in state_sync_steps {
             let StateSyncInfo {
                 chain_tip,
@@ -220,6 +224,7 @@ impl StateSync {
                 );
             }
         }
+        info!("Syncing nullifiers.");
 
         self.sync_nullifiers(&mut state_sync_update, block_num).await?;
 

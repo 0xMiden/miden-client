@@ -59,6 +59,7 @@ use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
+use tracing::info;
 
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
@@ -80,10 +81,7 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
+    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
@@ -158,6 +156,7 @@ where
             .await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
+        info!("Applying changes to the store.");
 
         // Apply received and computed updates to the store
         self.store
@@ -165,6 +164,7 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
+        info!("Pruning block headers.");
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
 
