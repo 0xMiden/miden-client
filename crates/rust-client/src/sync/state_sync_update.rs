@@ -148,12 +148,6 @@ impl BlockUpdates {
     pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {
         &self.new_authentication_nodes
     }
-
-    /// Extends the current [`BlockUpdates`] with the provided one.
-    pub(crate) fn extend(&mut self, other: BlockUpdates) {
-        self.block_headers.extend(other.block_headers);
-        self.new_authentication_nodes.extend(other.new_authentication_nodes);
-    }
 }
 
 /// Contains transaction changes to apply to the store.
