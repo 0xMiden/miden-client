@@ -84,7 +84,9 @@ impl<R: Rng> WebKeyStore<R> {
             return Ok(());
         }
         let pub_key = match &key {
-            AuthSecretKey::RpoFalcon512(k) => NativeWord::from(k.public_key()).to_hex(),
+            AuthSecretKey::RpoFalcon512(k) => {
+                NativeWord::from(k.public_key().to_commitment()).to_hex()
+            },
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
@@ -127,12 +129,13 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     /// returned.
     async fn get_signature(
         &self,
-        pub_key: NativeWord,
+        pub_key: PublicKeyCommitment,
         signing_inputs: &SigningInputs,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
+    ) -> Result<Signature, AuthenticationError> {
         // If a JavaScript signing callback is provided, use it directly.
         if let Some(sign_cb) = &self.callbacks.as_ref().sign {
-            return sign_cb.sign(pub_key, signing_inputs).await;
+            let prepared_signature = sign_cb.sign(pub_key.into(), signing_inputs).await?;
+            todo!("can't create Signature from preparated Signature")
         }
         let message = signing_inputs.to_commitment();
 
@@ -143,8 +146,9 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
 
         let mut rng = self.rng.write();
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Into::<Word>::into(pub_key).to_hex()))?;
+        let AuthSecretKey::RpoFalcon512(k) = secret_key.ok_or(
+            AuthenticationError::UnknownPublicKey(Into::<NativeWord>::into(pub_key).to_hex()),
+        )?;
 
         let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
         Ok(signature)

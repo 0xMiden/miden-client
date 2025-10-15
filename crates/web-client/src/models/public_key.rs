@@ -73,6 +73,8 @@ impl From<&PublicKey> for NativePublicKey {
 
 impl From<NativeWord> for PublicKey {
     fn from(word: NativeWord) -> Self {
-        PublicKey(NativePublicKey::new(word))
+        let word: Word = word.into();
+        let felts = word.to_felts();
+        PublicKey(NativePublicKey::from(felts))
     }
 }

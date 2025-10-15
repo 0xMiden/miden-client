@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::borrow::ToOwned;
 use core::error::Error;
-use std::borrow::ToOwned;
 
 use miden_objects::{Word, EMPTY_WORD};
 use miden_objects::account::{Account, AccountCode, AccountId};
