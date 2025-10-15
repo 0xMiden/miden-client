@@ -1217,7 +1217,7 @@ mod tests {
         let store = create_test_store().await;
 
         let mut dummy_map = StorageMap::new();
-        dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into());
+        dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into())?;
 
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),

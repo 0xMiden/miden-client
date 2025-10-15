@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::borrow::ToOwned;
 use core::error::Error;
 
 use miden_objects::{Word, EMPTY_WORD};
@@ -477,8 +478,12 @@ impl NodeRpcClient for GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
         })?;
 
-        let response = response.into_inner();
-        let proofs = response.proofs.iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
+        let mut response = response.into_inner();
+        let proofs = response
+            .proofs
+            .iter_mut()
+            .map(|r| r.to_owned().try_into())
+            .collect::<Result<_, _>>()?;
 
         Ok(proofs)
     }

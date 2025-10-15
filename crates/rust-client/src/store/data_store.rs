@@ -138,26 +138,20 @@ impl DataStore for ClientDataStore {
 
         // TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
-        std::println!("retrieved storage: {:?}", account_storage);
 
         // If the retrieved storage is empty, assume its a foreign account
         if account_storage.num_slots() == 0 {
-            std::println!("retrieving storage for foreign account");
             let cache = self.foreign_account_inputs.read();
 
             let inputs = cache.get(&account_id).cloned().unwrap(); // TODO: remove unwrap
 
             for map in inputs.storage().maps() {
                 if map.root() == map_root {
-                    std::println!("found matching root for storage needed");
-                    std::println!("{:?}", map);
                     match map.open(&map_key) {
                         Ok(witness) => {
-                            std::println!("retrieved witness");
                             return Ok(witness);
                         },
                         Err(e) => {
-                            std::println!("failed to retrieve witness: {:?}", e);
                             return Err(DataStoreError::AccountNotFound(account_id));
                         },
                     }
@@ -186,10 +180,6 @@ impl DataStore for ClientDataStore {
         foreign_account_id: AccountId,
         _ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
-        std::println!(
-            "get_foreign_account_inputs called on account id: {}",
-            foreign_account_id.to_hex()
-        );
         let cache = self.foreign_account_inputs.read();
 
         let inputs = cache
@@ -204,7 +194,6 @@ impl DataStore for ClientDataStore {
         &self,
         script_root: Word,
     ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
-        std::println!("get_node_script");
         let store = self.store.clone();
 
         async move {
