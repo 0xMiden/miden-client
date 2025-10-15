@@ -226,12 +226,12 @@ impl SqliteStore {
 
         if let Some(sync_height) = sync_block {
             tx.execute(
-                r#"
+                r"
             DELETE FROM block_headers
             WHERE has_client_notes = 0
               AND block_num > ?1
               AND block_num < ?2
-            "#,
+            ",
                 rusqlite::params![genesis, sync_height],
             )?;
         }

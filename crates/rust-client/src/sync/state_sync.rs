@@ -9,7 +9,7 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag};
 use tonic::async_trait;
-use tracing::{debug, info};
+use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};

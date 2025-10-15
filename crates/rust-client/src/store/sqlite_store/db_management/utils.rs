@@ -96,11 +96,11 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
 
     let version_after = MIGRATIONS.current_version(conn)?;
 
-    if version_before != version_after {
-        if let SchemaVersion::Inside(new_ver) = version_after {
-            let new_hash = hex::encode(&*MIGRATION_HASHES[new_ver.get() - 1]);
-            set_settings_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
-        }
+    if version_before != version_after
+        && let SchemaVersion::Inside(new_ver) = version_after
+    {
+        let new_hash = hex::encode(&*MIGRATION_HASHES[new_ver.get() - 1]);
+        set_settings_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
     }
 
     Ok(())
