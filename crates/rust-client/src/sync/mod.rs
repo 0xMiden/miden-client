@@ -59,7 +59,6 @@ use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
-use tracing::info;
 
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
@@ -67,6 +66,7 @@ use miden_objects::note::{NoteId, NoteTag};
 use miden_objects::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use tracing::info;
 
 use crate::note::NoteScreener;
 use crate::store::{NoteFilter, TransactionFilter};
@@ -81,7 +81,10 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
+    AccountUpdates,
+    BlockUpdates,
+    StateSyncUpdate,
+    TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
