@@ -5,47 +5,46 @@ use miden_client::{Client, Serializable};
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
-use crate::{Parser, create_dynamic_table};
+use crate::{Parser, Subcommand, create_dynamic_table};
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum AddressSubCommand {
+    /// List all addresses an account can be referenced by
+    List { account_id: String },
+    /// Add a new address,
+    Add {
+        /// Interface number for add/remove operations
+        interface: String,
+        /// Account to Add
+        account_id: String,
+    },
+    /// Remove the given address.
+    Remove {
+        /// Interface number for add/remove operations
+        interface: String,
+        /// Account to Remove
+        account_id: String,
+    },
+}
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Manage account addresses")]
 pub struct AddressesCmd {
-    /// List all addresses an account can be referenced by.
-    #[arg(short, long, group = "action")]
-    list: bool,
-
-    /// Add a new address.
-    #[arg(short, long, group = "action")]
-    add: bool,
-
-    /// Remove an existing address.
-    #[arg(short, long, group = "action")]
-    remove: bool,
-
-    /// Hex representation of [`AccountId`]
-    #[arg(required = true)]
-    account_id: String,
-
-    /// Interface number for add/remove operations
-    #[arg(required_if_eq_any([("add", "true"), ("remove", "true")]))]
-    interface: Option<String>,
+    #[clap(subcommand)]
+    command: AddressSubCommand,
 }
 
 impl AddressesCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
-        match (self.add, self.remove, self.list) {
-            (true, ..) => {
-                // We can safely unwrap interface because it's required when add is true
-                add_address(client, self.account_id.clone(), self.interface.clone().unwrap())
-                    .await?;
+        match &self.command {
+            AddressSubCommand::List { account_id } => {
+                list_addresses(client, account_id.clone()).await?;
             },
-            (_, true, _) => {
-                // We can safely unwrap interface because it's required when remove is true
-                remove_address(client, self.account_id.clone(), self.interface.clone().unwrap())
-                    .await?;
+            AddressSubCommand::Add { interface, account_id } => {
+                add_address(client, account_id.clone(), interface.clone()).await?;
             },
-            _ => {
-                list_addresses(client, self.account_id.clone()).await?;
+            AddressSubCommand::Remove { interface, account_id } => {
+                remove_address(client, account_id.clone(), interface.clone()).await?;
             },
         }
         Ok(())

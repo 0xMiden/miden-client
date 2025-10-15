@@ -235,20 +235,20 @@ Usage:  `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED
 
 View and manage addresses.
 
-#### Action Flags
+#### Action Subcommands
 
-| Flags                      | Description                                                 | Short Flag |
-|----------------------------|-------------------------------------------------------------|------------|
-|`--list <ID>`               | List addresses for the specified account ID                 | `-l`       |
-|`--add <ID> <INTERFACE>`    | Bind an address for an interface for specified account ID   | `-a`       |
-|`--remove <ID> <INTERFACE>` | Remove an address for an interface for specified account ID | `-r`       |
+| Subcommand               | Description                                                   |
+|--------------------------|---------------------------------------------------------------|
+|`list <ID>`               | List addresses for the specified account ID                   |
+|`add <INTERFACE> <ID>`    | Bind an address for an interface for specified account ID     |
+|`remove <INTERFACE> <ID>` | Remove an address for an interface for specified account ID   |
 
 All commands require an account ID to be specified.
 
-The `--list` takes no arguments besides the account ID, and lists all addresses for that account:
+The `list` takes no arguments besides the account ID, and lists all addresses for that account:
 
 ```sh
-miden-client addresses --list 0x17f13f4f83a8e8100c19d2961dfda2
+miden-client addresses list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
 The `--add` and `--remove` take and additional argument, which is the interface being added or removed, these values can be:
@@ -256,11 +256,11 @@ The `--add` and `--remove` take and additional argument, which is the interface 
 - `basic_wallet`: The basic wallet interface.
 
 ```sh
-miden-client addresses 0x17f13f4f83a8e8100c19d2961dfda2 --remove basic_wallet
+miden-client addresses remove basic_wallet 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
 ```sh
-miden-client addresses 0x17f13f4f83a8e8100c19d2961dfda2 --add basic_wallet
+miden-client addresses add basic_wallet 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
 #### Tips
