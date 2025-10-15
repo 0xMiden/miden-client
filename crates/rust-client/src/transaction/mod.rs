@@ -663,7 +663,7 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
-        let tx_args = transaction_request.into_transaction_args(tx_script, foreign_account_inputs);
+        let tx_args = transaction_request.into_transaction_args(tx_script);
 
         let block_num = if let Some(block_num) = fpi_block_num {
             block_num

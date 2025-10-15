@@ -1,6 +1,5 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::auth::{
@@ -12,7 +11,7 @@ use miden_client::auth::{
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Felt, Word as NativeWord};
+use miden_client::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -84,9 +83,7 @@ impl<R: Rng> WebKeyStore<R> {
             return Ok(());
         }
         let pub_key = match &key {
-            AuthSecretKey::RpoFalcon512(k) => {
-                NativeWord::from(k.public_key().to_commitment()).to_hex()
-            },
+            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
@@ -134,7 +131,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     ) -> Result<Signature, AuthenticationError> {
         // If a JavaScript signing callback is provided, use it directly.
         if let Some(sign_cb) = &self.callbacks.as_ref().sign {
-            let prepared_signature = sign_cb.sign(pub_key.into(), signing_inputs).await?;
+            let _prepared_signature = sign_cb.sign(pub_key.into(), signing_inputs).await?;
             todo!("can't create Signature from preparated Signature")
         }
         let message = signing_inputs.to_commitment();

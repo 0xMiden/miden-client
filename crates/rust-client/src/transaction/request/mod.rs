@@ -10,13 +10,7 @@ use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
-use miden_objects::transaction::{
-    AccountInputs,
-    InputNote,
-    InputNotes,
-    TransactionArgs,
-    TransactionScript,
-};
+use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_objects::vm::AdviceMap;
 use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
@@ -281,11 +275,7 @@ impl TransactionRequest {
 
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(crate) fn into_transaction_args(
-        self,
-        tx_script: TransactionScript,
-        foreign_account_inputs: Vec<AccountInputs>,
-    ) -> TransactionArgs {
+    pub(crate) fn into_transaction_args(self, tx_script: TransactionScript) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
             expected_output_recipients,

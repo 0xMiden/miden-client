@@ -134,8 +134,6 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
-        std::println!("get_storage_map_witness called on account id: {}", account_id.to_hex());
-
         // TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
 
@@ -146,17 +144,18 @@ impl DataStore for ClientDataStore {
             let inputs = cache.get(&account_id).cloned().unwrap(); // TODO: remove unwrap
 
             for map in inputs.storage().maps() {
-                if map.root() == map_root {
-                    match map.open(&map_key) {
-                        Ok(witness) => {
-                            return Ok(witness);
-                        },
-                        Err(e) => {
-                            return Err(DataStoreError::AccountNotFound(account_id));
-                        },
-                    }
+                if map.root() == map_root
+                    && let Ok(witness) = map.open(&map_key)
+                {
+                    return Ok(witness);
                 }
             }
+
+            return Err(DataStoreError::Other {
+                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                    .into(),
+                source: None,
+            });
         }
 
         for slot in account_storage.slots() {

@@ -1,17 +1,17 @@
+use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::borrow::ToOwned;
 use core::error::Error;
 
-use miden_objects::{Word, EMPTY_WORD};
 use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_objects::utils::Deserializable;
+use miden_objects::{EMPTY_WORD, Word};
 use miden_tx::utils::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
@@ -30,7 +30,6 @@ use super::{
     StateSyncInfo,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys;
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
 use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;

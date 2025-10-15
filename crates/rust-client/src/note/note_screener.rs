@@ -131,7 +131,7 @@ where
             crate::DebugMode::Enabled,
         )?;
 
-        let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
+        let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);

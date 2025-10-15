@@ -615,19 +615,17 @@ impl From<AccountStorageRequirements>
                 Some(storage_map_detail_request::SlotData::AllEntries(true))
             } else {
                 let map_keys = storage_map_detail_request::MapKeys {
-                        map_keys: map_keys
-                            .into_iter()
-                            .map(crate::rpc::generated::primitives::Digest::from)
-                            .collect()
-                    };
+                    map_keys: map_keys
+                        .into_iter()
+                        .map(crate::rpc::generated::primitives::Digest::from)
+                        .collect(),
+                };
                 Some(storage_map_detail_request::SlotData::MapKeys(map_keys))
             };
-            requests.push(
-                account_detail_request::StorageMapDetailRequest {
-                    slot_index: u32::from(slot_index),
-                    slot_data,
-                },
-            );
+            requests.push(account_detail_request::StorageMapDetailRequest {
+                slot_index: u32::from(slot_index),
+                slot_data,
+            });
         }
         requests
     }

@@ -8,7 +8,7 @@ use crate::js_error_with_context;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::utils::serialize_to_uint8array;
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -72,9 +72,7 @@ impl From<&PublicKey> for NativePublicKey {
 }
 
 impl From<NativeWord> for PublicKey {
-    fn from(word: NativeWord) -> Self {
-        let word: Word = word.into();
-        let felts = word.to_felts();
-        PublicKey(NativePublicKey::from(felts))
+    fn from(_word: NativeWord) -> Self {
+        todo!("Implement conversion from NativeWord to PublicKey")
     }
 }
