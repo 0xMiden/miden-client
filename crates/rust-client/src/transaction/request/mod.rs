@@ -294,8 +294,7 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args =
-            TransactionArgs::new(advice_map, foreign_account_inputs).with_note_args(note_args);
+        let mut tx_args = TransactionArgs::new(advice_map).with_note_args(note_args);
 
         tx_args = if let Some(argument) = self.script_arg {
             tx_args.with_tx_script_and_args(tx_script, argument)

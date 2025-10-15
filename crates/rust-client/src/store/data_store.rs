@@ -7,7 +7,9 @@ use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
 use miden_objects::asset::AssetWitness;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
+use miden_objects::note::NoteScript;
 use miden_objects::transaction::{AccountInputs, PartialBlockchain};
+use miden_objects::vm::FutureMaybeSend;
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
@@ -132,8 +134,36 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
+        std::println!("get_storage_map_witness called on account id: {}", account_id.to_hex());
+
         //TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
+        std::println!("retrieved storage: {:?}", account_storage);
+
+        // If the retrieved storage is empty, assume its a foreign account
+        if account_storage.num_slots() == 0 {
+            std::println!("retrieving storage for foreign account");
+            let cache = self.foreign_account_inputs.read();
+
+            let inputs = cache.get(&account_id).cloned().unwrap(); // TODO: remove unwrap
+
+            for map in inputs.storage().maps() {
+                if map.root() == map_root {
+                    std::println!("found matching root for storage needed");
+                    match map.open(&map_key) {
+                        Ok(witness) => {
+                            std::println!("retrieved witness");
+                            return Ok(witness);
+                        },
+                        Err(e) => {
+                            std::println!("failed to retrieve witness: {:?}", e);
+                            return Err(DataStoreError::AccountNotFound(account_id));
+                        },
+                    }
+                }
+            }
+        }
+
         for slot in account_storage.slots() {
             if let StorageSlot::Map(map) = slot
                 && map.root() == map_root
@@ -155,12 +185,42 @@ impl DataStore for ClientDataStore {
         foreign_account_id: AccountId,
         _ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
+        std::println!(
+            "get_foreign_account_inputs called on account id: {}",
+            foreign_account_id.to_hex()
+        );
         let cache = self.foreign_account_inputs.read();
 
-        cache
+        let inputs = cache
             .get(&foreign_account_id)
             .cloned()
-            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))
+            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))?;
+
+        Ok(inputs)
+    }
+
+    fn get_note_script(
+        &self,
+        script_root: Word,
+    ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
+        std::println!("get_node_script");
+        let store = self.store.clone();
+
+        async move {
+            let notes = store.get_input_notes(super::NoteFilter::All).await.map_err(|err| {
+                DataStoreError::other_with_source("Failed to retrieve input notes", err)
+            })?;
+
+            for note_record in notes {
+                let recipient = note_record.details().recipient();
+                if recipient.script().root() == script_root {
+                    return Ok(recipient.script().clone());
+                }
+            }
+
+            // If no matching note found, return an error
+            Err(DataStoreError::other(format!("Note script with root {script_root} not found",)))
+        }
     }
 }
 

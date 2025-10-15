@@ -119,9 +119,9 @@ pub use miden_objects::transaction::{
     ProvenTransaction,
     TransactionArgs,
     TransactionId,
+    TransactionInputs,
     TransactionScript,
     TransactionSummary,
-    TransactionWitness,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
@@ -151,7 +151,7 @@ pub use request::{
 pub trait TransactionProver {
     async fn prove(
         &self,
-        tx_result: TransactionWitness,
+        tx_result: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError>;
 }
 
@@ -160,9 +160,9 @@ pub trait TransactionProver {
 impl TransactionProver for LocalTransactionProver {
     async fn prove(
         &self,
-        witness: TransactionWitness,
+        inputs: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
-        LocalTransactionProver::prove(self, witness)
+        LocalTransactionProver::prove(self, inputs)
     }
 }
 
@@ -171,9 +171,9 @@ impl TransactionProver for LocalTransactionProver {
 impl TransactionProver for RemoteTransactionProver {
     async fn prove(
         &self,
-        witness: TransactionWitness,
+        inputs: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
-        let fut = RemoteTransactionProver::prove(self, witness);
+        let fut = RemoteTransactionProver::prove(self, inputs);
         fut.await
     }
 }
@@ -828,6 +828,7 @@ where
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
+        // todo!()
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 
@@ -837,13 +838,7 @@ where
 
         Ok(self
             .build_executor(&data_store)?
-            .execute_tx_view_script(
-                account_id,
-                block_ref,
-                tx_script,
-                advice_inputs,
-                foreign_account_inputs,
-            )
+            .execute_tx_view_script(account_id, block_ref, tx_script, advice_inputs)
             .await?)
     }
 
@@ -1112,9 +1107,6 @@ where
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
             let data_store = ClientDataStore::new(self.store.clone());
-
-            data_store
-                .register_foreign_account_inputs(tx_args.foreign_account_inputs().iter().cloned());
 
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)

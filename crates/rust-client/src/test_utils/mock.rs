@@ -405,7 +405,7 @@ impl NodeRpcClient for MockRpcApi {
                     let account = mock_chain.committed_account(*account_id).unwrap();
 
                     let mut map_details = vec![];
-                    for (index, _) in account_storage_requirements.inner() {
+                    for index in account_storage_requirements.inner().keys() {
                         if let Some(StorageSlot::Map(storage_map)) =
                             account.storage().slots().get(*index as usize)
                         {
@@ -416,7 +416,7 @@ impl NodeRpcClient for MockRpcApi {
 
                             let too_many_entries = entries.len() > 1000;
                             let account_storage_map_detail = AccountStorageMapDetails {
-                                slot_index: *index as u32,
+                                slot_index: u32::from(*index),
                                 too_many_entries,
                                 entries,
                             };

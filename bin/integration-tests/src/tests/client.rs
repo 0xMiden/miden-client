@@ -21,11 +21,11 @@ use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
     ProvenTransaction,
+    TransactionInputs,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
     TransactionStatus,
-    TransactionWitness,
 };
 use miden_client_sqlite_store::SqliteStore;
 
@@ -981,7 +981,7 @@ impl AlwaysFailingProver {
 impl TransactionProver for AlwaysFailingProver {
     async fn prove(
         &self,
-        _tx_witness: TransactionWitness,
+        _inputs: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
         return Err(TransactionProverError::other("This prover always fails"));
     }

@@ -3,7 +3,13 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::account::{AccountId, PartialAccount, PartialStorage, StorageMap};
+use miden_objects::account::{
+    AccountId,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+};
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;
@@ -140,9 +146,10 @@ impl TryFrom<AccountProof> for AccountInputs {
             for account_storage_detail in account_storage_map_details {
                 let storage_entries_iter =
                     account_storage_detail.entries.iter().map(|e| (e.key, e.value));
-                let partial_storage = StorageMap::with_entries(storage_entries_iter)
-                    .expect("Conversion from known good storage shouldn't fail")
-                    .into();
+                let partial_storage = PartialStorageMap::new_minimal(
+                    &StorageMap::with_entries(storage_entries_iter)
+                        .map_err(|_| TransactionRequestError::ForeignAccountDataMissing)?, /* TODO JM: CORRECT ERROR */
+                );
                 storage_map_proofs.push(partial_storage);
             }
 

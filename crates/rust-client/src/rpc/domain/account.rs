@@ -311,7 +311,7 @@ pub struct AccountDetails {
 // ACCOUNT STORAGE DETAILS
 // ================================================================================================
 
-/// Account storage details for AccountProofResponse
+/// Account storage details for `AccountProofResponse`
 #[derive(Clone, Debug)]
 pub struct AccountStorageDetails {
     /// Account storage header (storage slot info for up to 256 slots)
@@ -420,7 +420,7 @@ pub struct AccountVaultDetails {
     /// to the user that `SyncAccountVault` endpoint should be used to retrieve the
     /// account's assets
     pub too_many_assets: bool,
-    /// When too_many_assets == false, this will contain the list of assets in the
+    /// When `too_many_assets` == false, this will contain the list of assets in the
     /// account's vault
     pub assets: Vec<Asset>,
 }
@@ -608,24 +608,22 @@ impl From<AccountStorageRequirements>
     {
         let mut requests = Vec::with_capacity(value.0.len());
         for (slot_index, map_keys) in value.0 {
-            let slot_data = match map_keys.len() <= 1000 {
-                true => Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::AllEntries(true)),
-                false => {
-                    let map_keys = proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys {
+            let slot_data = if map_keys.len() <= 1000 {
+                Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::AllEntries(true))
+            } else {
+                let map_keys = proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys {
                         map_keys: map_keys
                             .into_iter()
                             .map(crate::rpc::generated::primitives::Digest::from)
                             .collect()
                     };
-                    Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(map_keys))
-                }
+                Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(map_keys))
             };
             requests.push(
                 proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
                     slot_index: u32::from(slot_index),
                     slot_data,
                 },
-
             );
         }
         requests

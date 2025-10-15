@@ -314,9 +314,9 @@ impl NodeRpcClient for GrpcClient {
                 .inner()
                 .iter()
                 .map(|(index, data)| proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
-                    slot_index: *index as u32,
+                    slot_index: u32::from(*index),
                     slot_data: Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(MapKeys {
-                        map_keys: data.iter().map(|word| word.into()).collect(),
+                        map_keys: data.iter().map(core::convert::Into::into).collect(),
                     })),
                 })
                 .collect();
