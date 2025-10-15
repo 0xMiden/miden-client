@@ -14,6 +14,7 @@
         * [Library](./library.md)
         * [CLI](./cli-reference.md)
             + [Config](./cli-config.md)
+            + [Troubleshooting](./cli-troubleshooting.md)
         * [Examples](./examples.md)
         * [API](./api-docs.md)
     - [Typescript](./web-client/index.md)

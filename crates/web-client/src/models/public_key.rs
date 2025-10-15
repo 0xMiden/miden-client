@@ -1,5 +1,6 @@
-use miden_client::Deserializable;
+use miden_client::auth::Signature as NativeSignature;
 use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
+use miden_client::{Deserializable, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -34,8 +35,12 @@ impl PublicKey {
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
         let native_signature = signature.into();
-        let native_word = signing_inputs.to_commitment().into();
-        native_public_key.verify(native_word, &native_signature)
+        match native_signature {
+            NativeSignature::RpoFalcon512(falcon_signature) => {
+                let message = signing_inputs.to_commitment().into();
+                native_public_key.verify(message, &falcon_signature)
+            },
+        }
     }
 }
 
@@ -63,5 +68,11 @@ impl From<PublicKey> for NativePublicKey {
 impl From<&PublicKey> for NativePublicKey {
     fn from(public_key: &PublicKey) -> Self {
         public_key.0.clone()
+    }
+}
+
+impl From<NativeWord> for PublicKey {
+    fn from(word: NativeWord) -> Self {
+        PublicKey(NativePublicKey::new(word))
     }
 }

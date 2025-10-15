@@ -30,11 +30,13 @@ pub mod account_proof_request {
     /// Request the details for a public account.
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct AccountDetailRequest {
-        /// Last known code commitment to the client. The response will include account code
-        /// only if its commitment is different from this value or if the value is not present.
+        /// Last known code commitment to the requester. The response will include account code
+        /// only if its commitment is different from this value.
+        ///
+        /// If the field is ommiteed, the response will not include the account code.
         #[prost(message, optional, tag = "1")]
         pub code_commitment: ::core::option::Option<super::super::primitives::Digest>,
-        /// Last known asset vault commitment to the client. The response will include asset vault data
+        /// Last known asset vault commitment to the requester. The response will include asset vault data
         /// only if its commitment is different from this value. If the value is not present in the
         /// request, the response will not contain one either.
         /// If the number of to-be-returned asset entries exceed a threshold, they have to be requested
@@ -107,7 +109,8 @@ pub mod account_proof_response {
         /// Account code; empty if code commitments matched or none was requested
         #[prost(bytes = "vec", optional, tag = "3")]
         pub code: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-        /// Account asset vault data; empty if vault commitments matched
+        /// Account asset vault data; empty if vault commitments matched or the requester
+        /// omitted it in the request.
         #[prost(message, optional, tag = "4")]
         pub vault_details: ::core::option::Option<super::AccountVaultDetails>,
     }
@@ -231,12 +234,12 @@ pub mod sync_nullifiers_response {
 }
 /// State synchronization request.
 ///
-/// Specifies state updates the client is interested in. The server will return the first block which
+/// Specifies state updates the requester is interested in. The server will return the first block which
 /// contains a note matching `note_tags` or the chain tip. And the corresponding updates to
 /// `account_ids` for that block range.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncStateRequest {
-    /// Last block known by the client. The response will contain data starting from the next block,
+    /// Last block known by the requester. The response will contain data starting from the next block,
     /// until the first block which contains a note of matching the requested tag, or the chain tip
     /// if there are no notes.
     #[prost(fixed32, tag = "1")]
@@ -248,7 +251,7 @@ pub struct SyncStateRequest {
     /// it won't be included in the response.
     #[prost(message, repeated, tag = "2")]
     pub account_ids: ::prost::alloc::vec::Vec<super::account::AccountId>,
-    /// Specifies the tags which the client is interested in.
+    /// Specifies the tags which the requester is interested in.
     #[prost(fixed32, repeated, tag = "3")]
     pub note_tags: ::prost::alloc::vec::Vec<u32>,
 }
@@ -277,7 +280,7 @@ pub struct SyncStateResponse {
 }
 /// Account vault synchronization request.
 ///
-/// Allows clients to sync asset values for specific public accounts within a block range.
+/// Allows requesters to sync asset values for specific public accounts within a block range.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncAccountVaultRequest {
     /// Block range from which to start synchronizing.
@@ -317,14 +320,14 @@ pub struct AccountVaultUpdate {
 }
 /// Note synchronization request.
 ///
-/// Specifies note tags that client is interested in. The server will return the first block which
+/// Specifies note tags that requester is interested in. The server will return the first block which
 /// contains a note matching `note_tags` or the chain tip.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncNotesRequest {
     /// Block range from which to start synchronizing.
     #[prost(message, optional, tag = "1")]
     pub block_range: ::core::option::Option<BlockRange>,
-    /// Specifies the tags which the client is interested in.
+    /// Specifies the tags which the requester is interested in.
     #[prost(fixed32, repeated, tag = "2")]
     pub note_tags: ::prost::alloc::vec::Vec<u32>,
 }
@@ -349,7 +352,7 @@ pub struct SyncNotesResponse {
 }
 /// Storage map synchronization request.
 ///
-/// Allows clients to sync storage map values for specific public accounts within a block range,
+/// Allows requesters to sync storage map values for specific public accounts within a block range,
 /// with support for cursor-based pagination to handle large storage maps.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncStorageMapsRequest {
@@ -410,11 +413,11 @@ pub struct BlockRange {
 }
 /// Represents pagination information for chunked responses.
 ///
-/// Pagination is done using block numbers as the axis, allowing clients to request
+/// Pagination is done using block numbers as the axis, allowing requesters to request
 /// data in chunks by specifying block ranges and continuing from where the previous
 /// response left off.
 ///
-/// To request the next chunk, the client should use `block_num + 1` from the previous response
+/// To request the next chunk, the requester should use `block_num + 1` from the previous response
 /// as the `block_from` for the next request.
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct PaginationInfo {
@@ -431,7 +434,7 @@ pub struct PaginationInfo {
 }
 /// Transactions synchronization request.
 ///
-/// Allows clients to sync transactions for specific accounts within a block range.
+/// Allows requesters to sync transactions for specific accounts within a block range.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SyncTransactionsRequest {
     /// Block range from which to start synchronizing.
@@ -768,9 +771,9 @@ pub mod rpc_client {
                 .insert(GrpcMethod::new("rpc_store.Rpc", "SyncNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns info which can be used by the client to sync up to the tip of chain for the notes they are interested in.
+        /// Returns info which can be used by the requester to sync up to the tip of chain for the notes they are interested in.
         ///
-        /// Client specifies the `note_tags` they are interested in, and the block height from which to search for new for
+        /// requester specifies the `note_tags` they are interested in, and the block height from which to search for new for
         /// matching notes for. The request will then return the next block containing any note matching the provided tags.
         ///
         /// The response includes each note's metadata and inclusion proof.
@@ -798,20 +801,20 @@ pub mod rpc_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc_store.Rpc", "SyncNotes"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns info which can be used by the client to sync up to the latest state of the chain
-        /// for the objects (accounts, notes, nullifiers) the client is interested in.
+        /// Returns info which can be used by the requester to sync up to the latest state of the chain
+        /// for the objects (accounts, notes, nullifiers) the requester is interested in.
         ///
         /// This request returns the next block containing requested data. It also returns `chain_tip`
-        /// which is the latest block number in the chain. Client is expected to repeat these requests
+        /// which is the latest block number in the chain. requester is expected to repeat these requests
         /// in a loop until `response.block_header.block_num == response.chain_tip`, at which point
-        /// the client is fully synchronized with the chain.
+        /// the requester is fully synchronized with the chain.
         ///
         /// Each request also returns info about new notes, nullifiers etc. created. It also returns
         /// Chain MMR delta that can be used to update the state of Chain MMR. This includes both chain
         /// MMR peaks and chain MMR nodes.
         ///
         /// For preserving some degree of privacy, note tags and nullifiers filters contain only high
-        /// part of hashes. Thus, returned data contains excessive notes and nullifiers, client can make
+        /// part of hashes. Thus, returned data contains excessive notes and nullifiers, requester can make
         /// additional filtering of that data on its side.
         pub async fn sync_state(
             &mut self,

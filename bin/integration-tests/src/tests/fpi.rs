@@ -348,7 +348,7 @@ fn foreign_account_with_code(
 ) -> Result<(Account, Word, SecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
+    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
 
     let get_item_component = AccountComponent::compile(
         code,
