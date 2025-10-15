@@ -310,22 +310,14 @@ impl NodeRpcClient for GrpcClient {
             let account_id = foreign_account.account_id();
             let storage_requirements = foreign_account.storage_slot_requirements();
 
-            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements
-                .inner()
-                .iter()
-                .map(|(index, data)| proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
-                    slot_index: u32::from(*index),
-                    slot_data: Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(MapKeys {
-                        map_keys: data.iter().map(core::convert::Into::into).collect(),
-                    })),
-                })
-                .collect();
+            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
             // Only request details for public accounts; include known code commitment for this
             // account when available
             let account_details = if account_id.is_public() {
                 Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
                     code_commitment: Some(EMPTY_WORD.into()),
+                    // TODO: implement a way to request asset vaults
                     asset_vault_commitment: None,
                     storage_maps,
                 })
@@ -358,7 +350,7 @@ impl NodeRpcClient for GrpcClient {
                     response
                         .details
                         .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(&known_codes_by_commitment, &storage_requirements)?,
+                        .into_domain(&known_codes_by_commitment)?,
                 )
             } else {
                 None

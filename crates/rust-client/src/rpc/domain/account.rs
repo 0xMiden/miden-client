@@ -237,7 +237,6 @@ impl proto::rpc_store::account_proof_response::AccountDetails {
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
-        storage_requirements: &AccountStorageRequirements,
     ) -> Result<AccountDetails, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
@@ -363,6 +362,7 @@ impl TryFrom<proto::rpc_store::account_storage_details::AccountStorageMapDetails
     ) -> Result<Self, Self::Error> {
         let slot_index = value.slot_index;
         let too_many_entries = value.too_many_entries;
+
         let entries = value
             .entries
             .ok_or(
@@ -606,21 +606,24 @@ impl From<AccountStorageRequirements>
         value: AccountStorageRequirements,
     ) -> Vec<proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest>
     {
-        let mut requests = Vec::with_capacity(value.0.len());
-        for (slot_index, map_keys) in value.0 {
+        use proto::rpc_store::account_proof_request::account_detail_request;
+        use proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request;
+        let request_map = value.0;
+        let mut requests = Vec::with_capacity(request_map.len());
+        for (slot_index, map_keys) in request_map {
             let slot_data = if map_keys.len() <= 1000 {
-                Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::AllEntries(true))
+                Some(storage_map_detail_request::SlotData::AllEntries(true))
             } else {
-                let map_keys = proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::MapKeys {
+                let map_keys = storage_map_detail_request::MapKeys {
                         map_keys: map_keys
                             .into_iter()
                             .map(crate::rpc::generated::primitives::Digest::from)
                             .collect()
                     };
-                Some(proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request::SlotData::MapKeys(map_keys))
+                Some(storage_map_detail_request::SlotData::MapKeys(map_keys))
             };
             requests.push(
-                proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest {
+                account_detail_request::StorageMapDetailRequest {
                     slot_index: u32::from(slot_index),
                     slot_data,
                 },

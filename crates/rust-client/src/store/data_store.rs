@@ -136,7 +136,7 @@ impl DataStore for ClientDataStore {
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
         std::println!("get_storage_map_witness called on account id: {}", account_id.to_hex());
 
-        //TODO: Refactor the store call to be able to retrieve by map root.
+        // TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
         std::println!("retrieved storage: {:?}", account_storage);
 
@@ -150,6 +150,7 @@ impl DataStore for ClientDataStore {
             for map in inputs.storage().maps() {
                 if map.root() == map_root {
                     std::println!("found matching root for storage needed");
+                    std::println!("{:?}", map);
                     match map.open(&map_key) {
                         Ok(witness) => {
                             std::println!("retrieved witness");

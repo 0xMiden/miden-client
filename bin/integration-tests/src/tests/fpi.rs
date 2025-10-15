@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::account::{Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap, StorageSlot};
 use miden_client::auth::AuthSecretKey;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
@@ -305,7 +305,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .await?
             .context("failed to find foreign account after deploiyng")?
             .into();
-        ForeignAccount::private(&foreign_account)
+        
+        // TODO: do into_parts
+        let acc = PartialAccount::new(foreign_account.id(),foreign_account.nonce(),foreign_account.code().clone(),PartialStorage::new_full(foreign_account.storage().clone()),Default::default(), None)?;
+
+        ForeignAccount::private(acc)
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
@@ -348,7 +352,7 @@ fn foreign_account_with_code(
 ) -> Result<(Account, Word, SecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
+    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
 
     let get_item_component = AccountComponent::compile(
         code,
