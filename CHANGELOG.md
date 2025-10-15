@@ -37,6 +37,10 @@
 * [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
 * Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
 
+## 0.11.10 (2025-10-15)
+
+* Optimized sync-related lookups and RPC requests ([#1387](https://github.com/0xMiden/miden-client/pull/1387)).
+
 ## 0.11.9 (2025-10-08)
 
 * Fixed a bug where StateSync failed when called multiple times while using Safari ([#1377](https://github.com/0xMiden/miden-client/pull/1377)).

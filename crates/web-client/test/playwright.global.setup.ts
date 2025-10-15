@@ -82,6 +82,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteId,
             Signature,
             SigningInputs,
+            SigningInputsType,
             SlotAndKeys,
             SlotAndKeysArray,
             StorageMap,
@@ -163,6 +164,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.SecretKey = SecretKey;
           window.Signature = Signature;
           window.SigningInputs = SigningInputs;
+          window.SigningInputsType = SigningInputsType;
           window.SlotAndKeys = SlotAndKeys;
           window.SlotAndKeysArray = SlotAndKeysArray;
           window.StorageMap = StorageMap;

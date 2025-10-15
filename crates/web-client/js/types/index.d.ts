@@ -62,6 +62,7 @@ export {
   SerializedAccountHeader,
   Signature,
   SigningInputs,
+  SigningInputsType,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,

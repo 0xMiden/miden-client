@@ -119,7 +119,7 @@ impl SqliteStore {
         if let PartialBlockchainFilter::List(ids) = &filter {
             let id_values = ids
                 .iter()
-                 // SAFETY: d.inner() is a usize casted to u64, should not fail.
+            // SAFETY: d.inner() is a usize casted to u64, should not fail.
                 .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
                 .collect::<Vec<_>>();
 
@@ -217,18 +217,27 @@ impl SqliteStore {
     /// block.
     pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
+        let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
-        let query = format!(
-            "\
+        let sync_block: Option<u32> = tx
+            .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
+            .optional()
+            .into_store_error()?;
+
+        if let Some(sync_height) = sync_block {
+            tx.execute(
+                r"
             DELETE FROM block_headers
-            WHERE has_client_notes = FALSE
-            AND block_num != {}
-            AND block_num NOT IN (SELECT block_num FROM state_sync)",
-            BlockNumber::GENESIS.as_u32()
-        );
-        tx.execute(query.as_str(), params![]).into_store_error()?;
-        tx.commit().into_store_error()?;
-        Ok(())
+            WHERE has_client_notes = 0
+              AND block_num > ?1
+              AND block_num < ?2
+            ",
+                rusqlite::params![genesis, sync_height],
+            )
+            .into_store_error()?;
+        }
+
+        tx.commit().into_store_error()
     }
 }
 
@@ -338,7 +347,7 @@ pub(crate) fn set_block_header_has_client_notes(
 ) -> Result<(), StoreError> {
     // Only update to change has_client_notes to true if it was false previously
     const QUERY: &str = "\
-    UPDATE block_headers
+        UPDATE block_headers
         SET has_client_notes=?
         WHERE block_num=? AND has_client_notes=FALSE;";
     tx.execute(QUERY, params![has_client_notes, block_num]).into_store_error()?;

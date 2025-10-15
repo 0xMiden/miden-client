@@ -12,7 +12,10 @@ use miden_objects::note::{Note, NoteId};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::{
-    NoteCheckerError, NoteConsumptionChecker, NoteConsumptionStatus, TransactionExecutor,
+    NoteCheckerError,
+    NoteConsumptionChecker,
+    NoteConsumptionStatus,
+    TransactionExecutor,
 };
 use thiserror::Error;
 
@@ -21,7 +24,7 @@ use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -126,7 +129,7 @@ where
 
         let tx_script = transaction_request.build_transaction_script(
             &AccountInterface::from(account),
-            crate::DebugMode::Enabled,
+            crate::DebugMode::Disabled,
         )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
@@ -156,7 +159,7 @@ where
                 Some(NoteRelevance::After(block_number.as_u32()))
             },
             NoteConsumptionStatus::Consumable
-            | NoteConsumptionStatus::UnconsumableWithoutAuthorization => Some(NoteRelevance::Now),
+            | NoteConsumptionStatus::ConsumableWithAuthorization => Some(NoteRelevance::Now),
             // NOTE: NoteConsumptionStatus::Unconsumable means that state-related context does not
             // allow for consumption, so don't keep for now. In the next version, we should be more
             // careful about this
