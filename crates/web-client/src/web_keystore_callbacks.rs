@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use miden_client::auth::{
     AuthSecretKey,
     Signature as NativeSignature,
@@ -8,12 +6,11 @@ use miden_client::auth::{
 use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::Deserializable;
-use miden_client::{AuthenticationError, Felt, Word as NativeWord};
+use miden_client::{AuthenticationError, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use wasm_bindgen_futures::js_sys::{Array, Function, Promise, Uint8Array};
+use wasm_bindgen_futures::js_sys::{Function, Promise, Uint8Array};
 
-use crate::models::public_key::PublicKey;
 use crate::models::secret_key::SecretKey;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
@@ -115,29 +112,14 @@ impl SignCallback {
             call_result
         };
 
-        let arr = Array::is_array(&resolved)
-            .then(|| Array::from(&resolved))
-            .ok_or_else(|| AuthenticationError::other("sign callback must return an array"))?;
+        let bytes = resolved
+            .dyn_ref::<Uint8Array>()
+            .ok_or_else(|| AuthenticationError::other("sign callback must return a Uint8Array"))?;
 
-        todo!()
-        // let mut result: Vec<Felt> = Vec::with_capacity(arr.length() as usize);
-        // for value in arr.iter() {
-        //     if let Some(s) = value.as_string() {
-        //         let n = s.parse::<u64>().map_err(|_| {
-        //             AuthenticationError::other("failed to parse signature element string as u64")
-        //         })?;
-        //         result.push(Felt::new(n));
-        //     } else if let Some(f) = value.as_f64() {
-        //         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        //         result.push(Felt::new(f as u64));
-        //     } else {
-        //         return Err(AuthenticationError::other(
-        //             "signature elements must be numbers or numeric strings",
-        //         ));
-        //     }
-        // }
-
-        // Ok(result)
+        let signature = Signature::deserialize(bytes).map_err(|err| {
+            AuthenticationError::other(format!("Failed to sign via callback: {err:?}"))
+        })?;
+        Ok(signature.into())
     }
 }
 
