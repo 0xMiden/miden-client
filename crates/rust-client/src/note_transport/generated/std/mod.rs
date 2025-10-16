@@ -4,4 +4,4 @@
     clippy::trivially_copy_pass_by_ref,
     clippy::large_enum_variant
 )]
-pub mod miden_private_transport;
+pub mod miden_note_transport;

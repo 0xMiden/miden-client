@@ -17,15 +17,15 @@ use {
     tonic::transport::{Channel, ClientTlsConfig},
 };
 
-use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
-use crate::note_transport::generated::miden_private_transport::miden_private_transport_client::MidenPrivateTransportClient;
-use crate::note_transport::generated::miden_private_transport::{
+use super::generated::miden_note_transport::miden_note_transport_client::MidenNoteTransportClient;
+use super::generated::miden_note_transport::{
     FetchNotesRequest,
     SendNoteRequest,
     StreamNotesRequest,
     StreamNotesUpdate,
     TransportNote,
 };
+use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
 
 #[cfg(not(target_arch = "wasm32"))]
 type Service = Channel;
@@ -34,7 +34,7 @@ type Service = tonic_web_wasm_client::Client;
 
 /// gRPC client
 pub struct GrpcNoteTransportClient {
-    client: RwLock<MidenPrivateTransportClient<Service>>,
+    client: RwLock<MidenNoteTransportClient<Service>>,
     health_client: RwLock<HealthClient<Service>>,
 }
 
@@ -53,7 +53,7 @@ impl GrpcNoteTransportClient {
             .await
             .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
         let health_client = HealthClient::new(channel.clone());
-        let client = MidenPrivateTransportClient::new(channel);
+        let client = MidenNoteTransportClient::new(channel);
 
         Ok(Self {
             client: RwLock::new(client),
@@ -66,7 +66,7 @@ impl GrpcNoteTransportClient {
     pub fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, NoteTransportError> {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
         let health_client = HealthClient::new(wasm_client.clone());
-        let client = MidenPrivateTransportClient::new(wasm_client);
+        let client = MidenNoteTransportClient::new(wasm_client);
 
         Ok(Self {
             client: RwLock::new(client),
@@ -75,7 +75,7 @@ impl GrpcNoteTransportClient {
     }
 
     /// Get a lock to the main client
-    fn api(&self) -> MidenPrivateTransportClient<Service> {
+    fn api(&self) -> MidenNoteTransportClient<Service> {
         self.client.read().clone()
     }
 
@@ -160,7 +160,7 @@ impl GrpcNoteTransportClient {
     /// gRPC-standardized server health-check.
     ///
     /// Checks if the note transport node and respective gRPC services are serving requests.
-    /// Currently the grPC server operates only one service labelled `MidenPrivateTransport`.
+    /// Currently the grPC server operates only one service labelled `MidenNoteTransport`.
     pub async fn health_check(&mut self) -> Result<(), NoteTransportError> {
         let request = tonic::Request::new(HealthCheckRequest {
             service: String::new(), // empty string -> whole server

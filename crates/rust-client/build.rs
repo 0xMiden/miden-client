@@ -26,7 +26,9 @@ fn main() -> miette::Result<()> {
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc.rs");
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc_store.rs");
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/block_producer.rs");
-    replace_no_std_types(NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR.to_string() + "/note_transport.rs");
+    replace_no_std_types(
+        NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR.to_string() + "/miden_note_transport.rs",
+    );
 
     Ok(())
 }
