@@ -112,6 +112,14 @@ stop-node: ## Stop the testing node server
 	-pkill -f "node-builder"
 	sleep 1
 
+.PHONY: start-transport-background
+start-transport-background: ## Start the note transport service in background
+	./scripts/start-note-transport-bg.sh
+
+.PHONY: stop-transport
+stop-transport: ## Stop the note transport service
+	./scripts/stop-note-transport.sh
+
 .PHONY: integration-test
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
