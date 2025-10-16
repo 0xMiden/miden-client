@@ -18,8 +18,6 @@
 
 > **decompose**(): [`SigningInputsTagged`](SigningInputsTagged.md)
 
-Borrowing/clone version
-
 #### Returns
 
 [`SigningInputsTagged`](SigningInputsTagged.md)
