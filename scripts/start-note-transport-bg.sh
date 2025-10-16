@@ -23,7 +23,7 @@ else
   # Reset to the default remote HEAD to avoid local drift on CI
   DEFAULT_REF=$(git -C "$TRANSPORT_DIR" symbolic-ref --quiet refs/remotes/origin/HEAD || true)
   if [ -n "${DEFAULT_REF:-}" ]; then
-    git -C "$TRANSPORT_DIR" reset --hard "$(basename "$DEFAULT_REF")"
+    git -C "$TRANSPORT_DIR" reset --hard "$DEFAULT_REF"
   else
     git -C "$TRANSPORT_DIR" reset --hard origin/HEAD || true
   fi
@@ -37,11 +37,24 @@ echo "Starting note transport service in background..."
 
 sleep 4
 
-if ! ps -p $(cat "$PID_FILE") > /dev/null 2>&1; then
+if [ ! -s "$PID_FILE" ]; then
+  echo "Failed to start note transport service: PID file missing or empty"
+  rm -f "$PID_FILE"
+  exit 1
+fi
+
+PID=$(cat "$PID_FILE")
+if ! [[ "$PID" =~ ^[0-9]+$ ]]; then
+  echo "Failed to start note transport service: PID file invalid"
+  rm -f "$PID_FILE"
+  exit 1
+fi
+
+if ! ps -p "$PID" > /dev/null 2>&1; then
   echo "Failed to start note transport service"
   rm -f "$PID_FILE"
   exit 1
 fi
 
-echo "Note transport service started (pid $(cat "$PID_FILE"))"
+echo "Note transport service started (pid $PID)"
 
