@@ -828,7 +828,6 @@ where
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
-        // todo!()
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 

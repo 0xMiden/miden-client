@@ -1,6 +1,11 @@
 use alloc::vec::Vec;
 
-use miden_client::auth::{AuthSecretKey, SigningInputs as NativeSigningInputs};
+use miden_client::auth::{
+    AuthSecretKey,
+    Signature as NativeSignature,
+    SigningInputs as NativeSigningInputs,
+};
+use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::Deserializable;
 use miden_client::{AuthenticationError, Felt, Word as NativeWord};
@@ -10,19 +15,20 @@ use wasm_bindgen_futures::js_sys::{Array, Function, Promise, Uint8Array};
 
 use crate::models::public_key::PublicKey;
 use crate::models::secret_key::SecretKey;
+use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 
 /// Wrapper for the JavaScript `getKey` callback.
-/// Expected JS signature: `(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> |
-/// Uint8Array | null | undefined`.
+/// Expected JS signature: `(pubKeyCommitment: Uint8Array) => Promise<Uint8Array | null | undefined>
+/// | Uint8Array | null | undefined`.
 pub(crate) struct GetKeyCallback(pub(crate) Function);
 
 impl GetKeyCallback {
     pub(crate) async fn get_secret_key(
         &self,
-        pub_key: NativeWord,
+        pub_key_commitment: NativeWord,
     ) -> Result<Option<AuthSecretKey>, KeyStoreError> {
-        let pub_key_array = PublicKey::from(pub_key).serialize();
+        let pub_key_array = pub_key_commitment.as_bytes().to_vec();
         let call_result = self
             .0
             .call1(&JsValue::NULL, &JsValue::from(pub_key_array))
@@ -52,17 +58,19 @@ impl GetKeyCallback {
 }
 
 /// Wrapper for the JavaScript `insertKey` callback.
-/// Expected JS signature: `(pubKey: Uint8Array, secretKey: Uint8Array) => Promise<void> | void`.
+/// Expected JS signature: `(pubKeyCommitment: Uint8Array, secretKey: Uint8Array) => Promise<void> |
+/// void`.
 pub(crate) struct InsertKeyCallback(pub(crate) Function);
 
 impl InsertKeyCallback {
     pub(crate) async fn insert_key(&self, secret_key: &SecretKey) -> Result<(), KeyStoreError> {
-        let pub_key = secret_key.public_key();
+        let pub_key: NativePublicKey = secret_key.public_key().into();
+        let pub_key_commitment = pub_key.to_commitment();
         let result = self
             .0
             .call2(
                 &JsValue::NULL,
-                &JsValue::from(pub_key.serialize()),
+                &JsValue::from(pub_key_commitment.as_bytes().to_vec()),
                 &JsValue::from(secret_key.serialize()),
             )
             .map_err(|err| KeyStoreError::StorageError(format!("JS insertKey threw: {err:?}")))?;
@@ -77,24 +85,24 @@ impl InsertKeyCallback {
 }
 
 /// Wrapper for the JavaScript `sign` callback.
-/// Expected JS signature: `(pubKey: Uint8Array, commitment: Uint8Array) => Promise<number[] |
-/// string[]> | number[] | string[]`.
+/// Expected JS signature: `(pubKeyCommitment: Uint8Array, commitment: Uint8Array) =>
+/// Promise<number[] | string[]> | number[] | string[]`.
 pub(crate) struct SignCallback(pub(crate) Function);
 
 impl SignCallback {
     pub(crate) async fn sign(
         &self,
-        pub_key: NativeWord,
+        pub_key_commitment: NativeWord,
         signing_inputs: &NativeSigningInputs,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
+    ) -> Result<NativeSignature, AuthenticationError> {
         let signing_inputs_array = SigningInputs::from(signing_inputs).serialize();
-        let pub_key_array = PublicKey::from(pub_key).serialize();
+        let pub_key_commitment_array = pub_key_commitment.as_bytes().to_vec();
 
         let call_result = self
             .0
             .call2(
                 &JsValue::NULL,
-                &JsValue::from(pub_key_array),
+                &JsValue::from(pub_key_commitment_array),
                 &JsValue::from(signing_inputs_array),
             )
             .map_err(|err| AuthenticationError::other(format!("JS sign threw: {err:?}")))?;
@@ -111,24 +119,25 @@ impl SignCallback {
             .then(|| Array::from(&resolved))
             .ok_or_else(|| AuthenticationError::other("sign callback must return an array"))?;
 
-        let mut result: Vec<Felt> = Vec::with_capacity(arr.length() as usize);
-        for value in arr.iter() {
-            if let Some(s) = value.as_string() {
-                let n = s.parse::<u64>().map_err(|_| {
-                    AuthenticationError::other("failed to parse signature element string as u64")
-                })?;
-                result.push(Felt::new(n));
-            } else if let Some(f) = value.as_f64() {
-                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                result.push(Felt::new(f as u64));
-            } else {
-                return Err(AuthenticationError::other(
-                    "signature elements must be numbers or numeric strings",
-                ));
-            }
-        }
+        todo!()
+        // let mut result: Vec<Felt> = Vec::with_capacity(arr.length() as usize);
+        // for value in arr.iter() {
+        //     if let Some(s) = value.as_string() {
+        //         let n = s.parse::<u64>().map_err(|_| {
+        //             AuthenticationError::other("failed to parse signature element string as u64")
+        //         })?;
+        //         result.push(Felt::new(n));
+        //     } else if let Some(f) = value.as_f64() {
+        //         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        //         result.push(Felt::new(f as u64));
+        //     } else {
+        //         return Err(AuthenticationError::other(
+        //             "signature elements must be numbers or numeric strings",
+        //         ));
+        //     }
+        // }
 
-        Ok(result)
+        // Ok(result)
     }
 }
 

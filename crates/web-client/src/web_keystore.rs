@@ -131,8 +131,7 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     ) -> Result<Signature, AuthenticationError> {
         // If a JavaScript signing callback is provided, use it directly.
         if let Some(sign_cb) = &self.callbacks.as_ref().sign {
-            let _prepared_signature = sign_cb.sign(pub_key.into(), signing_inputs).await?;
-            todo!("can't create Signature from preparated Signature")
+            return sign_cb.sign(pub_key.into(), signing_inputs).await;
         }
         let message = signing_inputs.to_commitment();
 

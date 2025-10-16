@@ -70,9 +70,3 @@ impl From<&PublicKey> for NativePublicKey {
         public_key.0.clone()
     }
 }
-
-impl From<NativeWord> for PublicKey {
-    fn from(_word: NativeWord) -> Self {
-        todo!("Implement conversion from NativeWord to PublicKey")
-    }
-}
