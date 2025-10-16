@@ -13,7 +13,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Fallback kill by process name
-pkill -f "miden-private-transport" || true
+pkill -f "miden-note-transport" || true
 sleep 1
 echo "Note transport service stopped"
 

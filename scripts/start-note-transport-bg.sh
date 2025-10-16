@@ -7,8 +7,8 @@
 
 set -euo pipefail
 
-TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-private-transport}
-REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-private-transport}
+TRANSPORT_DIR=${TRANSPORT_DIR:-.tmp/miden-note-transport}
+REPO_URL=${REPO_URL:-https://github.com/0xMiden/miden-note-transport}
 RUN_CMD=${TRANSPORT_RUN_CMD:-cargo run --release --locked}
 PID_FILE=.note-transport.pid
 
