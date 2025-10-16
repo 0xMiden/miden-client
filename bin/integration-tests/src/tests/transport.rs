@@ -1,20 +1,28 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use miden_client::Felt;
 use miden_client::account::{AccountIdAddress, AccountStorageMode, Address, AddressInterface};
+use miden_client::asset::FungibleAsset;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteType, create_p2id_note};
+use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::NoteFilter;
-use miden_client::testing::common::{TestClient, TestClientKeyStore, insert_new_wallet};
+use miden_client::testing::common::{
+    TestClient,
+    TestClientKeyStore,
+    execute_tx_and_sync,
+    insert_new_fungible_faucet,
+    insert_new_wallet,
+    wait_for_node,
+};
+use miden_client::transaction::TransactionRequestBuilder;
 
 use crate::tests::config::ClientConfig;
 
 pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()> {
     // Create distinct configs so each client gets its own temp store/keystore
-    let (rpc_endpoint, rpc_timeout, _, _) = client_config.as_parts();
+    let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
     let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
 
@@ -67,15 +75,20 @@ async fn run_flow(
     mut recipient: TestClient,
     recipient_keystore: &TestClientKeyStore,
 ) -> Result<()> {
+    // Ensure node is up
+    wait_for_node(&mut sender).await;
+
     // Create accounts
-    let (sender_account, _sk1) =
-        insert_new_wallet(&mut sender, AccountStorageMode::Private, sender_keystore)
-            .await
-            .context("failed to insert sender wallet")?;
     let (recipient_account, _sk2) =
         insert_new_wallet(&mut recipient, AccountStorageMode::Private, recipient_keystore)
             .await
             .context("failed to insert recipient wallet")?;
+
+    // Create a faucet in sender
+    let (faucet_account, _faucet_sk) =
+        insert_new_fungible_faucet(&mut sender, AccountStorageMode::Private, sender_keystore)
+            .await
+            .context("failed to insert faucet in sender")?;
 
     // Build recipient address
     let recipient_address = Address::AccountId(AccountIdAddress::new(
@@ -88,15 +101,26 @@ async fn run_flow(
     let notes = recipient.get_input_notes(NoteFilter::All).await?;
     anyhow::ensure!(notes.is_empty(), "recipient should start with 0 input notes");
 
-    // Create a private P2ID note addressed to recipient
-    let note = create_p2id_note(
-        sender_account.id(),
-        recipient_account.id(),
-        vec![],
-        NoteType::Private,
-        Felt::default(),
-        sender.rng(),
-    )?;
+    // Build private mint tx from faucet to recipient; capture expected note
+    let fungible_asset = FungibleAsset::new(faucet_account.id(), 10).context("asset")?;
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            fungible_asset,
+            recipient_account.id(),
+            NoteType::Private,
+            sender.rng(),
+        )
+        .context("build mint tx")?;
+    let note = tx_request
+        .expected_output_own_notes()
+        .last()
+        .cloned()
+        .context("expected output note missing")?;
+
+    // Execute mint and wait for commit
+    execute_tx_and_sync(&mut sender, faucet_account.id(), tx_request)
+        .await
+        .context("mint tx failed")?;
 
     // Send over transport
     sender
