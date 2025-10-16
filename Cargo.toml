@@ -23,6 +23,10 @@ repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.89"
 version      = "0.12.0"
 
+[profile.test-dev]
+inherits  = "dev"
+opt-level = 1
+
 [workspace.dependencies]
 # Miden base/protocol dependencies
 miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
