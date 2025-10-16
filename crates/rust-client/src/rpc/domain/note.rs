@@ -210,7 +210,7 @@ impl CommittedNote {
 // FETCHED NOTE
 // ================================================================================================
 
-/// Describes the possible responses from  the `GetNotesById` endpoint for a single note.
+/// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
     /// Details for a private note only include its [`NoteMetadata`] and [`NoteInclusionProof`].
