@@ -30,7 +30,6 @@ impl SigningInputsTagged {
         self.kind
     }
 
-    // Non-consuming getters (undefined if not that variant)
     #[wasm_bindgen(getter)]
     pub fn summary(&self) -> Option<TransactionSummary> {
         self.summary.clone()
@@ -100,10 +99,9 @@ impl SigningInputs {
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
         let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
-        Ok(SigningInputs{inner: native_signing_inputs})
+        Ok(SigningInputs { inner: native_signing_inputs })
     }
 
-    /// Borrowing/clone version
     #[wasm_bindgen(js_name = "decompose")]
     pub fn decompose(&self) -> SigningInputsTagged {
         match &self.inner {
@@ -116,7 +114,7 @@ impl SigningInputs {
             NativeSigningInputs::Arbitrary(felts) => SigningInputsTagged {
                 kind: SigningInputsKind::Arbitrary,
                 arbitrary: Some(
-                    felts.iter().cloned().map(Felt::from).collect::<Vec<_>>().into_boxed_slice()
+                    felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into_boxed_slice(),
                 ),
                 summary: None,
                 blind: None,
