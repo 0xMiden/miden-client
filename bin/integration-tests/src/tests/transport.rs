@@ -13,13 +13,18 @@ use miden_client::testing::common::{TestClient, TestClientKeyStore, insert_new_w
 use crate::tests::config::ClientConfig;
 
 pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()> {
+    // Create distinct configs so each client gets its own temp store/keystore
+    let (rpc_endpoint, rpc_timeout, _, _) = client_config.as_parts();
+    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
+    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
+
     // Build sender client with transport
-    let (sender_builder, sender_keystore) = builder_with_transport(client_config.clone())
+    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
         .await
         .context("failed to get sender builder")?;
     let sender = sender_builder.build().await.context("failed to build sender client")?;
     // Build recipient client with transport
-    let (recipient_builder, recipient_keystore) = builder_with_transport(client_config)
+    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
         .await
         .context("failed to get recipient builder")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
