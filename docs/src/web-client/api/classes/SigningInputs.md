@@ -24,6 +24,16 @@
 
 ***
 
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### toCommitment()
 
 > **toCommitment**(): [`Word`](Word.md)
@@ -41,6 +51,22 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `SigningInputs`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`SigningInputs`
 
 ***
 

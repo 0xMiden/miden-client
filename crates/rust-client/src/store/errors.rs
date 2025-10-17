@@ -70,6 +70,8 @@ pub enum StoreError {
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
+    #[error("note transport cursor not found")]
+    NoteTransportCursorNotFound,
     #[error("failed to parse data retrieved from the database: {0}")]
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]
