@@ -7,6 +7,7 @@ use super::input_note::InputNote;
 use super::output_note::OutputNote;
 use crate::js_error_with_context;
 
+/// A serialized representation of a note.
 #[wasm_bindgen(inspectable)]
 pub struct NoteFile {
     pub(crate) inner: NativeNoteFile,
@@ -43,16 +44,15 @@ impl NoteFile {
 
     #[wasm_bindgen(js_name = fromInputNote)]
     pub fn from_input_note(note: &InputNote) -> Self {
-        match note.proof() {
-            Some(inclusion_proof) => Self {
+        if let Some(inclusion_proof) = note.proof() {
+            Self {
                 inner: NativeNoteFile::NoteWithProof(note.note().into(), inclusion_proof.into()),
-            },
-            None => {
-                let assets = note.note().assets();
-                let recipient = note.note().recipient();
-                let details = NativeNoteDetails::new(assets.into(), recipient.into());
-                Self { inner: details.into() }
-            },
+            }
+        } else {
+            let assets = note.note().assets();
+            let recipient = note.note().recipient();
+            let details = NativeNoteDetails::new(assets.into(), recipient.into());
+            Self { inner: details.into() }
         }
     }
 

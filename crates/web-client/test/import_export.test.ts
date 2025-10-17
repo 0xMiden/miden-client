@@ -8,6 +8,8 @@ import {
   createNewWallet,
   fundAccountFromFaucet,
   getAccountBalance,
+  getInputNote,
+  setupConsumedNote,
   setupMintedNote,
   setupWalletAndFaucet,
   StorageMode,
@@ -208,5 +210,56 @@ test.describe("export and import note", () => {
     await expect(importSerializedNote(page, serializedNoteFile)).resolves.toBe(
       noteId
     );
+  });
+
+  test(`export input note`, async ({ page }) => {
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const inputNoteRecord = await client.getInputNote(noteId);
+          return window.NoteFile.fromInputNote(
+            inputNoteRecord.toInputNote()
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
+
+    await expect(exportInputNote()).resolves.toBe("NoteWithProof");
+  });
+
+  test(`export output note`, async ({ page }) => {
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const account1 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true
+          );
+          const account2 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true
+          );
+
+          const p2IdNote = window.Note.createP2IDNote(
+            account1.id(),
+            account2.id(),
+            new window.NoteAssets([]),
+            window.NoteType.Public,
+            new window.Felt(0n)
+          );
+          return window.NoteFile.fromOutputNote(
+            window.OutputNote.full(p2IdNote)
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
+
+    await expect(exportInputNote()).resolves.toBe("NoteDetails");
   });
 });
