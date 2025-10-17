@@ -39,3 +39,6 @@ web-sys = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true
+
+[build]
+target = "wasm32-unknown-unknown"
