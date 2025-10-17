@@ -1,0 +1,63 @@
+name: Publish Web Client SDK on Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Set up Rust and wasm target
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: wasm32-unknown-unknown
+          components: rust-src 
+
+      - name: Install & build web-client
+        run: |
+          cd crates/web-client
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Did version bump?
+        id: check_version
+        run: |
+          # Fetch two commits so we can diff
+          git fetch origin ${{ github.ref }} --depth=2
+
+          # Count if package.json changed
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
+            | grep -c '^crates/web-client/package.json$' || true)
+
+          echo "version_changed=$([ "$CHANGED" -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+      - name: Publish to npm
+        if: steps.check_version.outputs.version_changed == 'true'
+        continue-on-error: true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd crates/web-client
+          npm publish --tag next
+
+      - name: Done
+        run: echo "✅ Build complete; publish only attempted if package.json changed."
