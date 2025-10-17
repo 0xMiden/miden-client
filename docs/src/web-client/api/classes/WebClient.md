@@ -417,7 +417,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importNoteFile()
 
-> **importNoteFile**(`note_file`): `Promise`\<`any`\>
+> **importNoteFile**(`note_file`): `Promise`\<[`NoteId`](NoteId.md)\>
 
 #### Parameters
 
@@ -427,7 +427,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`NoteId`](NoteId.md)\>
 
 ***
 

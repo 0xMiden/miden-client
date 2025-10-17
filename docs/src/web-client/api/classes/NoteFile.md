@@ -6,6 +6,8 @@
 
 # Class: NoteFile
 
+A serialized representation of a note.
+
 ## Methods
 
 ### free()
@@ -78,6 +80,38 @@ return it as a struct.
 ##### bytes
 
 `Uint8Array`
+
+#### Returns
+
+`NoteFile`
+
+***
+
+### fromInputNote()
+
+> `static` **fromInputNote**(`note`): `NoteFile`
+
+#### Parameters
+
+##### note
+
+[`InputNote`](InputNote.md)
+
+#### Returns
+
+`NoteFile`
+
+***
+
+### fromOutputNote()
+
+> `static` **fromOutputNote**(`note`): `NoteFile`
+
+#### Parameters
+
+##### note
+
+[`OutputNote`](OutputNote.md)
 
 #### Returns
 

@@ -8,6 +8,7 @@ use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId as JsAccountId;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::note_file::NoteFile;
+use crate::models::note_id::NoteId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -86,14 +87,13 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "importNoteFile")]
-    pub async fn import_note_file(&mut self, note_file: NoteFile) -> Result<JsValue, JsValue> {
+    pub async fn import_note_file(&mut self, note_file: NoteFile) -> Result<NoteId, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let imported = client
+            Ok(client
                 .import_note(note_file.into())
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to import note"))?;
-
-            Ok(JsValue::from_str(&imported.to_string()))
+                .map_err(|err| js_error_with_context(err, "failed to import note"))?
+                .into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

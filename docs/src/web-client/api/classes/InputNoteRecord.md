@@ -115,3 +115,13 @@
 #### Returns
 
 [`InputNoteState`](../enumerations/InputNoteState.md)
+
+***
+
+### toInputNote()
+
+> **toInputNote**(): [`InputNote`](InputNote.md)
+
+#### Returns
+
+[`InputNote`](InputNote.md)
