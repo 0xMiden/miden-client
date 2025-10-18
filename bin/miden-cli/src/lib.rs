@@ -27,7 +27,7 @@ use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
-use self::utils::load_config_file;
+use self::utils::get_cli_config;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 
@@ -168,7 +168,7 @@ impl Cli {
         };
 
         // Create the client
-        let (cli_config, _config_path) = load_config_file()?;
+        let cli_config = get_cli_config()?;
 
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
