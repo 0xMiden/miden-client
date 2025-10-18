@@ -37,6 +37,10 @@
 * [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
 * Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
 
+## 0.11.11 (2025-10-16)
+
+* Added Missing Details to `SigningInputs` Object to Fetch Underlying Data Type ([#1389](https://github.com/0xMiden/miden-client/pull/1389)).
+
 ## 0.11.10 (2025-10-15)
 
 * Optimized sync-related lookups and RPC requests ([#1387](https://github.com/0xMiden/miden-client/pull/1387)).

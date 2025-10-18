@@ -2449,7 +2449,6 @@ dependencies = [
  "chrono",
  "deadpool",
  "deadpool-sync",
- "hex",
  "miden-client",
  "miden-lib",
  "miden-objects",

@@ -10,9 +10,29 @@
 
 ### variantType
 
-> `readonly` **variantType**: `string`
+> `readonly` **variantType**: [`SigningInputsType`](../enumerations/SigningInputsType.md)
 
 ## Methods
+
+### arbitraryPayload()
+
+> **arbitraryPayload**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
+### blindPayload()
+
+> **blindPayload**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
 
 ### free()
 
@@ -51,6 +71,16 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
+
+***
+
+### transactionSummaryPayload()
+
+> **transactionSummaryPayload**(): [`TransactionSummary`](TransactionSummary.md)
+
+#### Returns
+
+[`TransactionSummary`](TransactionSummary.md)
 
 ***
 
