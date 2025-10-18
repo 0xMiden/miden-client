@@ -12,7 +12,7 @@
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
-- [SigningInputsKind](enumerations/SigningInputsKind.md)
+- [SigningInputsVariant](enumerations/SigningInputsVariant.md)
 
 ## Classes
 
@@ -96,7 +96,6 @@
 - [SerializedTransactionData](classes/SerializedTransactionData.md)
 - [Signature](classes/Signature.md)
 - [SigningInputs](classes/SigningInputs.md)
-- [SigningInputsTagged](classes/SigningInputsTagged.md)
 - [SlotAndKeys](classes/SlotAndKeys.md)
 - [StorageMap](classes/StorageMap.md)
 - [StorageSlot](classes/StorageSlot.md)

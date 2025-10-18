@@ -10,17 +10,27 @@
 
 ### variantType
 
-> `readonly` **variantType**: `string`
+> `readonly` **variantType**: [`SigningInputsVariant`](../enumerations/SigningInputsVariant.md)
 
 ## Methods
 
-### decompose()
+### arbitraryPayload()
 
-> **decompose**(): [`SigningInputsTagged`](SigningInputsTagged.md)
+> **arbitraryPayload**(): [`Felt`](Felt.md)[]
 
 #### Returns
 
-[`SigningInputsTagged`](SigningInputsTagged.md)
+[`Felt`](Felt.md)[]
+
+***
+
+### blindPayload()
+
+> **blindPayload**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 
@@ -61,6 +71,16 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
+
+***
+
+### transactionSummaryPayload()
+
+> **transactionSummaryPayload**(): [`TransactionSummary`](TransactionSummary.md)
+
+#### Returns
+
+[`TransactionSummary`](TransactionSummary.md)
 
 ***
 

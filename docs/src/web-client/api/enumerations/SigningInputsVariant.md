@@ -2,9 +2,9 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / SigningInputsKind
+[@demox-labs/miden-sdk](../README.md) / SigningInputsVariant
 
-# Enumeration: SigningInputsKind
+# Enumeration: SigningInputsVariant
 
 ## Enumeration Members
 

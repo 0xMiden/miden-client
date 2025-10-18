@@ -9,41 +9,10 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SigningInputsKind {
+pub enum SigningInputsVariant {
     TransactionSummary,
     Arbitrary,
     Blind,
-}
-
-#[wasm_bindgen]
-pub struct SigningInputsTagged {
-    kind: SigningInputsKind,
-    summary: Option<TransactionSummary>,
-    arbitrary: Option<Box<[Felt]>>,
-    blind: Option<Word>,
-}
-
-#[wasm_bindgen]
-impl SigningInputsTagged {
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> SigningInputsKind {
-        self.kind
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn summary(&self) -> Option<TransactionSummary> {
-        self.summary.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn arbitrary(&self) -> Option<Box<[Felt]>> {
-        self.arbitrary.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn blind(&self) -> Option<Word> {
-        self.blind.clone()
-    }
 }
 
 #[wasm_bindgen]
@@ -74,12 +43,49 @@ impl SigningInputs {
         }
     }
 
-    #[wasm_bindgen(getter, js_name = "variantType")]
-    pub fn variant_type(&self) -> String {
+    #[wasm_bindgen(js_name = "transactionSummaryPayload")]
+    pub fn transaction_summary_payload(&self) -> Result<TransactionSummary, JsValue> {
         match &self.inner {
-            NativeSigningInputs::TransactionSummary(_) => "TransactionSummary".to_string(),
-            NativeSigningInputs::Arbitrary(_) => "Arbitrary".to_string(),
-            NativeSigningInputs::Blind(_) => "Blind".to_string(),
+            NativeSigningInputs::TransactionSummary(ts) => {
+                Ok(TransactionSummary::from((**ts).clone()))
+            },
+            _ => Err(JsValue::from_str(&format!(
+                "transactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "arbitraryPayload")]
+    pub fn arbitrary_payload(&self) -> Result<Box<[Felt]>, JsValue> {
+        match &self.inner {
+            NativeSigningInputs::Arbitrary(felts) => {
+                Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into_boxed_slice())
+            },
+            _ => Err(JsValue::from_str(&format!(
+                "arbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "blindPayload")]
+    pub fn blind_payload(&self) -> Result<Word, JsValue> {
+        match &self.inner {
+            NativeSigningInputs::Blind(word) => Ok(Word::from(*word)),
+            _ => Err(JsValue::from_str(&format!(
+                "blindPayload requires SigningInputs::Blind (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(getter, js_name = "variantType")]
+    pub fn variant_type(&self) -> SigningInputsVariant {
+        match &self.inner {
+            NativeSigningInputs::TransactionSummary(_) => SigningInputsVariant::TransactionSummary,
+            NativeSigningInputs::Arbitrary(_) => SigningInputsVariant::Arbitrary,
+            NativeSigningInputs::Blind(_) => SigningInputsVariant::Blind,
         }
     }
 
@@ -100,31 +106,5 @@ impl SigningInputs {
     pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
         let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
         Ok(SigningInputs { inner: native_signing_inputs })
-    }
-
-    #[wasm_bindgen(js_name = "decompose")]
-    pub fn decompose(&self) -> SigningInputsTagged {
-        match &self.inner {
-            NativeSigningInputs::TransactionSummary(ts) => SigningInputsTagged {
-                kind: SigningInputsKind::TransactionSummary,
-                summary: Some(TransactionSummary::from((**ts).clone())),
-                arbitrary: None,
-                blind: None,
-            },
-            NativeSigningInputs::Arbitrary(felts) => SigningInputsTagged {
-                kind: SigningInputsKind::Arbitrary,
-                arbitrary: Some(
-                    felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into_boxed_slice(),
-                ),
-                summary: None,
-                blind: None,
-            },
-            NativeSigningInputs::Blind(word) => SigningInputsTagged {
-                kind: SigningInputsKind::Blind,
-                blind: Some(Word::from(*word)),
-                summary: None,
-                arbitrary: None,
-            },
-        }
     }
 }
