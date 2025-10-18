@@ -28,8 +28,8 @@ use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
+    get_cli_config,
     get_input_acc_id_by_prefix_or_default,
-    load_config_file,
     load_faucet_details_map,
     parse_account_id,
 };
@@ -411,7 +411,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         .collect::<Vec<_>>();
 
     if delegated_proving {
-        let (cli_config, _) = load_config_file()?;
+        let cli_config = get_cli_config()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),
