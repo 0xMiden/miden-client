@@ -12,7 +12,7 @@
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
-- [SigningInputsVariant](enumerations/SigningInputsVariant.md)
+- [SigningInputsType](enumerations/SigningInputsType.md)
 
 ## Classes
 

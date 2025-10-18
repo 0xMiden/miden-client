@@ -9,7 +9,7 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SigningInputsVariant {
+pub enum SigningInputsType {
     TransactionSummary,
     Arbitrary,
     Blind,
@@ -81,11 +81,11 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(getter, js_name = "variantType")]
-    pub fn variant_type(&self) -> SigningInputsVariant {
+    pub fn variant_type(&self) -> SigningInputsType {
         match &self.inner {
-            NativeSigningInputs::TransactionSummary(_) => SigningInputsVariant::TransactionSummary,
-            NativeSigningInputs::Arbitrary(_) => SigningInputsVariant::Arbitrary,
-            NativeSigningInputs::Blind(_) => SigningInputsVariant::Blind,
+            NativeSigningInputs::TransactionSummary(_) => SigningInputsType::TransactionSummary,
+            NativeSigningInputs::Arbitrary(_) => SigningInputsType::Arbitrary,
+            NativeSigningInputs::Blind(_) => SigningInputsType::Blind,
         }
     }
 

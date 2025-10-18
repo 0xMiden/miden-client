@@ -10,7 +10,7 @@
 
 ### variantType
 
-> `readonly` **variantType**: [`SigningInputsVariant`](../enumerations/SigningInputsVariant.md)
+> `readonly` **variantType**: [`SigningInputsType`](../enumerations/SigningInputsType.md)
 
 ## Methods
 
