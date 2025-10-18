@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use figment::Figment;
 use figment::providers::{Format, Toml};
@@ -77,18 +78,26 @@ pub(crate) async fn parse_account_id<AUTH>(
     }
 }
 
-/// Loads config file from current directory and default filename and returns it alongside its path.
-///
-/// This function will look for the configuration file at the provided path. If the path is
-/// relative, searches in parent directories all the way to the root as well.
-pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
-    let mut current_dir = std::env::current_dir()?;
+// CACHED CONFIG
+// ================================================================================================
+
+static CLI_CONFIG: OnceLock<CliConfig> = OnceLock::new();
+
+/// Returns a reference to the global CLI configuration, loading it once on first access.
+pub fn get_cli_config() -> Result<&'static CliConfig, CliError> {
+    // Resolve config path relative to current working directory
+    let mut current_dir = std::env::current_dir().map_err(CliError::IO)?;
     current_dir.push(CLIENT_CONFIG_FILE_NAME);
-    let config_path = current_dir.as_path();
+    let config_path = current_dir;
 
-    let cli_config = load_config(config_path)?;
+    if let Some(cfg) = CLI_CONFIG.get() {
+        return Ok(cfg);
+    }
 
-    Ok((cli_config, config_path.into()))
+    let cfg = load_config(config_path.as_path())?;
+    // If another thread initialized first, ignore the error and return the stored one
+    let _ = CLI_CONFIG.set(cfg);
+    Ok(CLI_CONFIG.get().expect("CLI_CONFIG must be initialized"))
 }
 
 /// Loads the client configuration.
@@ -100,6 +109,6 @@ fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
 
 /// Returns the faucet details map using the config file.
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
-    let (config, _) = load_config_file()?;
-    FaucetDetailsMap::new(config.token_symbol_map_filepath)
+    let config = get_cli_config()?;
+    FaucetDetailsMap::new(config.token_symbol_map_filepath.clone())
 }
