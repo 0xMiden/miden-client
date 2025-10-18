@@ -23,7 +23,7 @@ use tracing::debug;
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name, load_config_file};
+use crate::{CliKeyStore, client_binary_name, get_cli_config};
 
 // CLI TYPES
 // ================================================================================================
@@ -200,7 +200,7 @@ impl NewAccountCmd {
 /// Reads component templates from the given file paths.
 // TODO: IO errors should have more context
 fn load_component_templates(paths: &[PathBuf]) -> Result<Vec<AccountComponentTemplate>, CliError> {
-    let (cli_config, _) = load_config_file()?;
+    let cli_config = get_cli_config()?;
     let components_base_dir = &cli_config.component_template_directory;
     let mut templates = Vec::new();
     for path in paths {
