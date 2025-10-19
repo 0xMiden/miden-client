@@ -1336,10 +1336,19 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       );
     }
 
+    // Test forEachMapEntry (iterator-based approach)
+    const forEachEntries = [];
+    (accountStorage as any).forEachMapEntry(1, (entry: any) => {
+      forEachEntries.push(entry);
+    });
+
     return {
       initialMapValue: normalizeHexWord(initialMapValue),
       finalMapValue: normalizeHexWord(finalMapValue),
       mapEntries: mapEntriesData,
+      forEachEntriesCount: forEachEntries.length,
+      forEachMatchesGetMapEntries:
+        forEachEntries.length === (mapEntries?.length || 0),
     };
   });
 };
@@ -1347,8 +1356,13 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 test.describe("storage map test", () => {
   test.setTimeout(50000);
   test("storage map is updated correctly in transaction", async ({ page }) => {
-    let { initialMapValue, finalMapValue, mapEntries } =
-      await testStorageMap(page);
+    let {
+      initialMapValue,
+      finalMapValue,
+      mapEntries,
+      forEachEntriesCount,
+      forEachMatchesGetMapEntries,
+    } = await testStorageMap(page);
     expect(initialMapValue).toBe("1");
     expect(finalMapValue).toBe("2");
 
@@ -1357,5 +1371,9 @@ test.describe("storage map test", () => {
     expect(mapEntries.hasExpectedEntry).toBe(true);
     expect(mapEntries.expectedKey).toBeDefined();
     expect(mapEntries.expectedValue).toBe("2");
+
+    // Test forEachMapEntry() functionality
+    expect(forEachEntriesCount).toBeGreaterThan(1);
+    expect(forEachMatchesGetMapEntries).toBe(true);
   });
 });
