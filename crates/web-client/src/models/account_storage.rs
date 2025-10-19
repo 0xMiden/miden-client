@@ -1,6 +1,7 @@
 use idxdb_store::account::JsStorageMapEntry;
 use miden_client::account::{AccountStorage as NativeAccountStorage, StorageSlot};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys;
 
 use crate::models::word::Word;
 
@@ -25,8 +26,8 @@ impl AccountStorage {
     }
 
     /// Get all key-value pairs from the map slot at `index`.
-    /// Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
-    /// Returns `[]` if the map exists but is empty.
+    /// WARNING: This method allocates the entire map into memory.
+    /// For large maps, use `forEachMapEntry` instead for better memory efficiency.
     #[wasm_bindgen(js_name = "getMapEntries")]
     pub fn get_map_entries(&self, index: u8) -> Option<Vec<JsStorageMapEntry>> {
         let slots = self.0.slots();
@@ -41,6 +42,34 @@ impl AccountStorage {
                     .collect(),
             ),
             _ => None,
+        }
+    }
+
+    /// Stream all key-value pairs from the map slot at `index` via a callback function.
+    /// Memory-efficient approach for large maps - processes entries one at a time.
+    #[wasm_bindgen(js_name = "forEachMapEntry")]
+    pub fn for_each_map_entry(
+        &self,
+        index: u8,
+        callback: &js_sys::Function,
+    ) -> Result<(), JsValue> {
+        let slots = self.0.slots();
+        match slots.get(index as usize) {
+            Some(StorageSlot::Map(map)) => {
+                for (key, value) in map.entries() {
+                    let entry = JsStorageMapEntry {
+                        root: map.root().to_hex(),
+                        key: key.to_hex(),
+                        value: value.to_hex(),
+                    };
+
+                    callback
+                        .call1(&JsValue::UNDEFINED, &JsValue::from(entry))
+                        .map_err(|e| JsValue::from_str(&format!("Callback failed: {e:?}")))?;
+                }
+                Ok(())
+            },
+            _ => Err(JsValue::from_str("Invalid map index or slot is not a map")),
         }
     }
 }
