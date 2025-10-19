@@ -26,6 +26,9 @@ impl AccountStorage {
     }
 
     /// Get all key-value pairs from the map slot at `index`.
+    /// Returns `undefined` if the slot isn't a map or `index` is out of bounds (0-255).
+    /// Returns `[]` if the map exists but is empty.
+    ///
     /// WARNING: This method allocates the entire map into memory.
     /// For large maps, use `forEachMapEntry` instead for better memory efficiency.
     #[wasm_bindgen(js_name = "getMapEntries")]
@@ -46,7 +49,15 @@ impl AccountStorage {
     }
 
     /// Stream all key-value pairs from the map slot at `index` via a callback function.
-    /// Memory-efficient approach for large maps - processes entries one at a time.
+    /// This is a memory-efficient alternative to `getMapEntries` for large maps.
+    ///
+    /// The callback receives a `JsStorageMapEntry` object with `root`, `key`, and `value` fields.
+    /// Entries are processed one at a time without allocating an intermediate vector.
+    ///
+    /// Returns an error if:
+    /// - The slot at `index` is not a map
+    /// - `index` is out of bounds (0-255)
+    /// - The callback throws an error during execution
     #[wasm_bindgen(js_name = "forEachMapEntry")]
     pub fn for_each_map_entry(
         &self,
