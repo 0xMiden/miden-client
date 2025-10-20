@@ -64,7 +64,7 @@ impl TransactionResult {
     }
 
     /// Returns the [`AccountDelta`] that describes the change of state for the executing
-    /// [`crate::account::Account``].
+    /// [`crate::account::Account`].
     pub fn account_delta(&self) -> &AccountDelta {
         self.transaction.account_delta()
     }
