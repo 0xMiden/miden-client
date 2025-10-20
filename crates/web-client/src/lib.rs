@@ -160,6 +160,7 @@ impl WebClient {
                 .expect("Default executor's options should always be valid"),
                 None,
                 None,
+                None,
             )
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?,

@@ -21,6 +21,7 @@ use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverErro
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
+use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
@@ -73,6 +74,8 @@ pub enum ClientError {
     NoteImportError(String),
     #[error("error while converting input note")]
     NoteRecordConversionError(#[from] NoteRecordError),
+    #[error("transport api error")]
+    NoteTransportError(#[from] NoteTransportError),
     #[error("no consumable note for account {0}")]
     NoConsumableNoteForAccount(AccountId),
     #[error("rpc api error")]

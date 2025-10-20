@@ -22,7 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -44,6 +44,11 @@ use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
+use crate::note_transport::{
+    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
+    NoteTransportCursor,
+    NoteTransportUpdate,
+};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
@@ -358,6 +363,53 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets the note transport cursor.
+    ///
+    /// This is used to reduce the number of fetched notes from the note transport network.
+    async fn get_note_transport_cursor(&self) -> Result<NoteTransportCursor, StoreError> {
+        let cursor_bytes = self
+            .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
+            .await?
+            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+        let array: [u8; 8] = cursor_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|e: core::array::TryFromSliceError| StoreError::ParsingError(e.to_string()))?;
+        let cursor = u64::from_be_bytes(array);
+        Ok(cursor.into())
+    }
+
+    /// Updates the note transport cursor.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the note transport
+    /// network.
+    async fn update_note_transport_cursor(
+        &self,
+        cursor: NoteTransportCursor,
+    ) -> Result<(), StoreError> {
+        let cursor_bytes = cursor.value().to_be_bytes().to_vec();
+        self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
+            .await?;
+        Ok(())
+    }
+
+    /// Applies a note transport update
+    ///
+    /// An update involves:
+    /// - Insert fetched notes;
+    /// - Update pagination cursor used in note fetching.
+    async fn apply_note_transport_update(
+        &self,
+        note_transport_update: NoteTransportUpdate,
+    ) -> Result<(), StoreError> {
+        self.update_note_transport_cursor(note_transport_update.cursor).await?;
+        self.upsert_input_notes(&note_transport_update.note_updates).await?;
+        Ok(())
+    }
 
     // PARTIAL MMR
     // --------------------------------------------------------------------------------------------

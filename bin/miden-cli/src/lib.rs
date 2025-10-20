@@ -9,6 +9,7 @@ use miden_client::account::AccountHeader;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::SqliteStore;
@@ -185,6 +186,16 @@ impl Cli {
 
         if let Some(delta) = cli_config.max_block_number_delta {
             builder = builder.max_block_number_delta(delta);
+        }
+
+        if let Some(tl_config) = cli_config.note_transport {
+            let client = GrpcNoteTransportClient::connect(
+                tl_config.endpoint.to_string(),
+                tl_config.timeout_ms,
+            )
+            .await
+            .map_err(|e| CliError::Client(e.into()))?;
+            builder = builder.note_transport(Arc::new(client));
         }
 
         let client = builder.build().await?;

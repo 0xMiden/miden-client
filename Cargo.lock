@@ -2166,12 +2166,14 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "futures",
  "getrandom 0.3.3",
  "hex",
  "miden-client",
  "miden-client-sqlite-store",
  "miden-lib",
  "miden-node-proto-build",
+ "miden-note-transport-proto-build",
  "miden-objects",
  "miden-remote-prover-client",
  "miden-testing",
@@ -2179,12 +2181,14 @@ dependencies = [
  "miette",
  "prost",
  "prost-build",
+ "prost-types",
  "protox 0.7.2",
  "rand 0.9.2",
  "thiserror 2.0.16",
  "tokio",
  "tonic",
  "tonic-build",
+ "tonic-health",
  "tonic-web-wasm-client",
  "tracing",
  "uuid",
@@ -2590,6 +2594,18 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "miden-note-transport-proto-build"
+version = "0.1.0"
+source = "git+https://github.com/0xMiden/miden-note-transport#4ee3956fd7bfd77f3d72e9e83dc3af5b7a52d86e"
+dependencies = [
+ "fs-err",
+ "miette",
+ "prost",
+ "protox 0.8.0",
+ "tonic-build",
 ]
 
 [[package]]
