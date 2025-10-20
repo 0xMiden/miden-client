@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountStorageRequirementsArray**(`elements`?): `AccountStorageRequirementsArray`
+> **new AccountStorageRequirementsArray**(`elements?`): `AccountStorageRequirementsArray`
 
 #### Parameters
 

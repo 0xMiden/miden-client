@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new EndpointArray**(`elements`?): `EndpointArray`
+> **new EndpointArray**(`elements?`): `EndpointArray`
 
 #### Parameters
 

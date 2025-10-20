@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new ExecutedTransactionArray**(`elements`?): `ExecutedTransactionArray`
+> **new ExecutedTransactionArray**(`elements?`): `ExecutedTransactionArray`
 
 #### Parameters
 

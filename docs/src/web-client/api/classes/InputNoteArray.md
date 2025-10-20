@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new InputNoteArray**(`elements`?): `InputNoteArray`
+> **new InputNoteArray**(`elements?`): `InputNoteArray`
 
 #### Parameters
 

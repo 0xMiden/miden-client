@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new WordArray**(`elements`?): `WordArray`
+> **new WordArray**(`elements?`): `WordArray`
 
 #### Parameters
 

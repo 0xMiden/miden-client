@@ -9,9 +9,8 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
+use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
-#[cfg(feature = "tonic")]
-use crate::rpc::{Endpoint, TonicRpcClient};
 use crate::store::Store;
 use crate::{Client, ClientError, DebugMode};
 
@@ -61,6 +60,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An optional custom note transport client.
+    note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -74,6 +75,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
+            note_transport_api: None,
         }
     }
 }
@@ -102,11 +104,12 @@ where
         self
     }
 
-    /// Sets the a tonic RPC client from the endpoint and optional timeout.
-    #[cfg(feature = "tonic")]
+    /// Sets a gRPC client from the endpoint and optional timeout.
     #[must_use]
-    pub fn tonic_rpc_client(mut self, endpoint: &Endpoint, timeout_ms: Option<u64>) -> Self {
-        self.rpc_api = Some(Arc::new(TonicRpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
+    #[cfg(feature = "tonic")]
+    pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
+        self.rpc_api =
+            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
         self
     }
 
@@ -158,6 +161,13 @@ where
         self
     }
 
+    /// Sets a custom note transport client directly.
+    #[must_use]
+    pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
+        self.note_transport_api = Some(client);
+        self
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
@@ -172,7 +182,7 @@ where
             client
         } else {
             return Err(ClientError::ClientInitializationError(
-                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)` if `tonic` is enabled."
+                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)`."
                     .into(),
             ));
         };
@@ -221,6 +231,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
+            self.note_transport_api,
         )
         .await
     }

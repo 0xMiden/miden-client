@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new TransactionScriptInputPairArray**(`elements`?): `TransactionScriptInputPairArray`
+> **new TransactionScriptInputPairArray**(`elements?`): `TransactionScriptInputPairArray`
 
 #### Parameters
 

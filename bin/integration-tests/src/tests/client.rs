@@ -7,7 +7,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteType};
+use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -39,7 +39,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
     let sqlite_store = SqliteStore::new(store_config).await?;
 
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
-        .tonic_rpc_client(&endpoint, Some(10_000))
+        .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
         .store(Arc::new(sqlite_store))
         .in_debug_mode(miden_client::DebugMode::Enabled)
@@ -159,7 +159,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
             .await?;
 
     let (mut client_2, authenticator_2) = client_config.into_client().await?;
-    let (client_2_account, _seed, _) =
+    let (client_2_account, _) =
         insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
 
     wait_for_node(&mut client_2).await;
@@ -259,7 +259,7 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    let (client_2_account, _seed, _) =
+    let (client_2_account, _) =
         insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator).await?;
 
     wait_for_node(&mut client_2).await;
@@ -691,7 +691,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    let (client_2_account, _seed, _) =
+    let (client_2_account, _) =
         insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
 
     wait_for_node(&mut client_2).await;
@@ -947,7 +947,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .into_iter()
         .find(|tx| tx.id == tx_id)
         .with_context(|| {
-            format!("Transaction with id {} not found in discarded transactions", tx_id)
+            format!("Transaction with id {tx_id} not found in discarded transactions")
         })?;
     assert!(matches!(
         tx_record.status,
@@ -1027,11 +1027,11 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
 pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
 
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
             .await?;
 
-    let (private_account, seed, _) =
+    let (private_account, _) =
         insert_new_wallet(&mut client_1, AccountStorageMode::Private, &authenticator).await?;
 
     let from_account_id = private_account.id();
@@ -1051,7 +1051,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
         .with_rpc_endpoint(client_config.rpc_endpoint())
         .into_client()
         .await?;
-    client_2.add_account(&private_account, seed.into(), false).await.unwrap();
+    client_2.add_account(&private_account, false).await.unwrap();
 
     wait_for_node(&mut client_2).await;
 
@@ -1074,7 +1074,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
     let updated_private_account =
         client_1.get_account(from_account_id).await.unwrap().unwrap().into();
-    client_2.add_account(&updated_private_account, None, true).await.unwrap();
+    client_2.add_account(&updated_private_account, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();
@@ -1085,7 +1085,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
 
 pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
-    let (faucet_account, ..) =
+    let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 
@@ -1161,7 +1161,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into())
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
         .await
         .unwrap()
         .pop()
@@ -1173,9 +1173,21 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap()
         .pop()
         .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
+    let retrieved_note_script = client
+        .test_rpc_api()
+        .get_note_script_by_root(note.script().root())
+        .await
+        .unwrap();
+
+    // Remove debug decorators from original note script, as they are not persisted on submission
+    // https://github.com/0xMiden/miden-base/issues/1812
+    let mut mast = (*note.script().mast()).clone();
+    mast.strip_decorators();
+    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
 
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().pop().unwrap().0, nullifier.as_word());
+    assert_eq!(note_script, retrieved_note_script);
 
     Ok(())
 }

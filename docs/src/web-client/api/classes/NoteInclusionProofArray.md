@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteInclusionProofArray**(`elements`?): `NoteInclusionProofArray`
+> **new NoteInclusionProofArray**(`elements?`): `NoteInclusionProofArray`
 
 #### Parameters
 

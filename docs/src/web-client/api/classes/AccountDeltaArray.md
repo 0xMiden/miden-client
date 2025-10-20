@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountDeltaArray**(`elements`?): `AccountDeltaArray`
+> **new AccountDeltaArray**(`elements?`): `AccountDeltaArray`
 
 #### Parameters
 

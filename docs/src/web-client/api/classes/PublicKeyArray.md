@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new PublicKeyArray**(`elements`?): `PublicKeyArray`
+> **new PublicKeyArray**(`elements?`): `PublicKeyArray`
 
 #### Parameters
 

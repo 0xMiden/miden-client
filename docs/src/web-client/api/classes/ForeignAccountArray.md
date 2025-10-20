@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new ForeignAccountArray**(`elements`?): `ForeignAccountArray`
+> **new ForeignAccountArray**(`elements?`): `ForeignAccountArray`
 
 #### Parameters
 

@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new TokenSymbolArray**(`elements`?): `TokenSymbolArray`
+> **new TokenSymbolArray**(`elements?`): `TokenSymbolArray`
 
 #### Parameters
 

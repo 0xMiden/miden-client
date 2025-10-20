@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new SignatureArray**(`elements`?): `SignatureArray`
+> **new SignatureArray**(`elements?`): `SignatureArray`
 
 #### Parameters
 

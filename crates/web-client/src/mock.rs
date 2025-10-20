@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
-use miden_lib::utils::{Deserializable, Serializable};
+use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 
 use crate::WebClient;
@@ -26,7 +26,7 @@ impl WebClient {
             None => Arc::new(MockRpcApi::default()),
         };
 
-        self.setup_client(mock_rpc_api.clone(), seed).await?;
+        self.setup_client(mock_rpc_api.clone(), seed, None, None, None).await?;
 
         self.mock_rpc_api = Some(mock_rpc_api);
 

@@ -18,9 +18,11 @@ export async function openDatabase(): Promise<boolean> {
 enum Table {
   AccountCode = "accountCode",
   AccountStorage = "accountStorage",
-  AccountVaults = "accountVaults",
+  AccountAssets = "accountAssets",
+  StorageMapEntries = "storageMapEntries",
   AccountAuth = "accountAuth",
   Accounts = "accounts",
+  Addresses = "addresses",
   Transactions = "transactions",
   TransactionScripts = "transactionScripts",
   InputNotes = "inputNotes",
@@ -31,6 +33,7 @@ enum Table {
   PartialBlockchainNodes = "partialBlockchainNodes",
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
+  Settings = "settings",
 }
 
 export interface IAccountCode {
@@ -39,13 +42,23 @@ export interface IAccountCode {
 }
 
 export interface IAccountStorage {
-  root: string;
-  slots: Uint8Array;
+  commitment: string;
+  slotIndex: number;
+  slotValue: string;
+  slotType: number;
 }
 
-export interface IAccountVault {
+export interface IStorageMapEntry {
   root: string;
-  assets: Uint8Array;
+  key: string;
+  value: string;
+}
+
+export interface IAccountAsset {
+  root: string;
+  vaultKey: string;
+  faucetIdPrefix: string;
+  asset: string;
 }
 
 export interface IAccountAuth {
@@ -63,6 +76,11 @@ export interface IAccount {
   accountSeed?: Uint8Array;
   accountCommitment: string;
   locked: boolean;
+}
+
+export interface IAddress {
+  address: Uint8Array;
+  id: string;
 }
 
 export interface ITransaction {
@@ -136,12 +154,19 @@ export interface IForeignAccountCode {
   codeRoot: string;
 }
 
+export interface ISetting {
+  key: string;
+  value: Uint8Array;
+}
+
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountVaults: Dexie.Table<IAccountVault, string>;
+  accountAssets: Dexie.Table<IAccountAsset, string>;
+  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accounts: Dexie.Table<IAccount, string>;
+  addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
   inputNotes: Dexie.Table<IInputNote, string>;
@@ -152,12 +177,14 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+  settings: Dexie.Table<ISetting, string>;
 };
 
 db.version(1).stores({
   [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("root"),
-  [Table.AccountVaults]: indexes("root"),
+  [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+  [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+  [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
   [Table.AccountAuth]: indexes("pubKey"),
   [Table.Accounts]: indexes(
     "&accountCommitment",
@@ -166,6 +193,7 @@ db.version(1).stores({
     "storageRoot",
     "vaultRoot"
   ),
+  [Table.Addresses]: indexes("id"),
   [Table.Transactions]: indexes("id"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
@@ -181,6 +209,7 @@ db.version(1).stores({
   [Table.PartialBlockchainNodes]: indexes("id"),
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
   [Table.ForeignAccountCode]: indexes("accountId"),
+  [Table.Settings]: indexes("key"),
 });
 
 function indexes(...items: string[]): string {
@@ -196,9 +225,13 @@ db.on("populate", () => {
 
 const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
 const accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
-const accountVaults = db.table<IAccountVault, string>(Table.AccountVaults);
+const storageMapEntries = db.table<IStorageMapEntry, string>(
+  Table.StorageMapEntries
+);
+const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
 const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
 const accounts = db.table<IAccount, string>(Table.Accounts);
+const addresses = db.table<IAddress, string>(Table.Addresses);
 const transactions = db.table<ITransaction, string>(Table.Transactions);
 const transactionScripts = db.table<ITransactionScript, string>(
   Table.TransactionScripts
@@ -215,14 +248,17 @@ const tags = db.table<ITag, number>(Table.Tags);
 const foreignAccountCode = db.table<IForeignAccountCode, string>(
   Table.ForeignAccountCode
 );
+const settings = db.table<ISetting, string>(Table.Settings);
 
 export {
   db,
   accountCodes,
   accountStorages,
-  accountVaults,
+  storageMapEntries,
+  accountAssets,
   accountAuths,
   accounts,
+  addresses,
   transactions,
   transactionScripts,
   inputNotes,
@@ -233,4 +269,5 @@ export {
   partialBlockchainNodes,
   tags,
   foreignAccountCode,
+  settings,
 };

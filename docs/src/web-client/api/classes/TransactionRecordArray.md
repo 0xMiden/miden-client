@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new TransactionRecordArray**(`elements`?): `TransactionRecordArray`
+> **new TransactionRecordArray**(`elements?`): `TransactionRecordArray`
 
 #### Parameters
 

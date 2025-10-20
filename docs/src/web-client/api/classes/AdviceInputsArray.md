@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AdviceInputsArray**(`elements`?): `AdviceInputsArray`
+> **new AdviceInputsArray**(`elements?`): `AdviceInputsArray`
 
 #### Parameters
 

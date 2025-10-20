@@ -20,7 +20,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::rpc::{Endpoint, TonicRpcClient};
+use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -31,10 +31,16 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
-use miden_client::{self, Client, ExecutionOptions, Felt};
+use miden_client::{
+    self,
+    Client,
+    ExecutionOptions,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+};
 use miden_client_cli::CliKeyStore;
 use miden_client_sqlite_store::SqliteStore;
-use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use predicates::str::contains;
 use rand::Rng;
 
@@ -746,7 +752,7 @@ async fn create_rust_client_with_store_path(
 
     Ok((
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+            Arc::new(GrpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             Some(std::sync::Arc::new(keystore.clone())),
@@ -756,6 +762,7 @@ async fn create_rust_client_with_store_path(
                 false,
                 true,
             )?,
+            None,
             None,
             None,
         )

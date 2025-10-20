@@ -1,4 +1,4 @@
-use miden_objects::account::AccountType as NativeAccountType;
+use miden_client::account::AccountType as NativeAccountType;
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]

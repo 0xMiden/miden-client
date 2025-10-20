@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountBuilderArray**(`elements`?): `AccountBuilderArray`
+> **new AccountBuilderArray**(`elements?`): `AccountBuilderArray`
 
 #### Parameters
 

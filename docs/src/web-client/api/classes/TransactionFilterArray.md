@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new TransactionFilterArray**(`elements`?): `TransactionFilterArray`
+> **new TransactionFilterArray**(`elements?`): `TransactionFilterArray`
 
 #### Parameters
 

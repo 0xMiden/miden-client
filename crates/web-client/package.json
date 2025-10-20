@@ -1,8 +1,11 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.12.0-next.7",
+  "version": "0.12.0-next.27",
   "description": "Miden Wasm SDK",
-  "collaborators": ["Miden", "Demox Labs <hi@demoxlabs.xyz>"],
+  "collaborators": [
+    "Miden",
+    "Demox Labs <hi@demoxlabs.xyz>"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "browser": "./dist/index.js",
@@ -10,7 +13,10 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "files": ["dist", "../LICENSE.md"],
+  "files": [
+    "dist",
+    "../LICENSE.md"
+  ],
   "scripts": {
     "build-rust-client-js": "cd ../idxdb-store/src/ && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
@@ -40,7 +46,7 @@
     "rollup-plugin-copy": "^3.5.0",
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.1",
-    "typedoc-plugin-markdown": "^4.6.0",
+    "typedoc-plugin-markdown": "^4.8.1",
     "typescript": "^5.5.4"
   },
   "dependencies": {

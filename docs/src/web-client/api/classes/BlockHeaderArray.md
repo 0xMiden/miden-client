@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new BlockHeaderArray**(`elements`?): `BlockHeaderArray`
+> **new BlockHeaderArray**(`elements?`): `BlockHeaderArray`
 
 #### Parameters
 

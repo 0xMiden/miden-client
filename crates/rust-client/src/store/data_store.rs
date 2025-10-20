@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -7,12 +7,13 @@ use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
 use miden_objects::asset::AssetWitness;
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
-use miden_objects::transaction::PartialBlockchain;
+use miden_objects::transaction::{AccountInputs, PartialBlockchain};
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
 use crate::store::StoreError;
+use crate::utils::RwLock;
 
 // DATA STORE
 // ================================================================================================
@@ -23,6 +24,8 @@ pub(crate) struct ClientDataStore {
     store: alloc::sync::Arc<dyn Store>,
     /// Store used to provide MAST nodes to the transaction executor.
     transaction_mast_store: Arc<TransactionMastStore>,
+    /// Cache of foreign account inputs that should be returned to the executor on demand.
+    foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
 }
 
 impl ClientDataStore {
@@ -30,11 +33,26 @@ impl ClientDataStore {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
+            foreign_account_inputs: RwLock::new(BTreeMap::new()),
         }
     }
 
     pub fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.transaction_mast_store.clone()
+    }
+
+    /// Stores the provided foreign account inputs so they can be served to the executor upon
+    /// request.
+    pub fn register_foreign_account_inputs(
+        &self,
+        foreign_accounts: impl IntoIterator<Item = AccountInputs>,
+    ) {
+        let mut cache = self.foreign_account_inputs.write();
+        cache.clear();
+
+        for account_inputs in foreign_accounts {
+            cache.insert(account_inputs.id(), account_inputs);
+        }
     }
 }
 
@@ -43,8 +61,7 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
-    ) -> Result<(PartialAccount, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError>
-    {
+    ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
@@ -56,8 +73,8 @@ impl DataStore for ClientDataStore {
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
 
-        let seed = account_record.seed().copied();
         let account: Account = account_record.into();
+        let partial_account = PartialAccount::from(&account);
 
         // Get header data
         let (block_header, _had_notes) = self
@@ -84,7 +101,7 @@ impl DataStore for ClientDataStore {
                     err,
                 )
             })?;
-        Ok((account.into(), seed, block_header, partial_blockchain))
+        Ok((partial_account, block_header, partial_blockchain))
     }
 
     async fn get_vault_asset_witness(
@@ -103,11 +120,9 @@ impl DataStore for ClientDataStore {
             });
         }
 
-        AssetWitness::new(vault.asset_tree().open(&vault_key)).map_err(|err| {
-            DataStoreError::Other {
-                error_msg: "Failed to open vault asset tree".into(),
-                source: Some(Box::new(err)),
-            }
+        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
+            error_msg: "Failed to open vault asset tree".into(),
+            source: Some(Box::new(err)),
         })
     }
 
@@ -133,6 +148,19 @@ impl DataStore for ClientDataStore {
                 .into(),
             source: None,
         })
+    }
+
+    async fn get_foreign_account_inputs(
+        &self,
+        foreign_account_id: AccountId,
+        _ref_block: BlockNumber,
+    ) -> Result<AccountInputs, DataStoreError> {
+        let cache = self.foreign_account_inputs.read();
+
+        cache
+            .get(&foreign_account_id)
+            .cloned()
+            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))
     }
 }
 

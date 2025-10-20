@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new SigningInputsArray**(`elements`?): `SigningInputsArray`
+> **new SigningInputsArray**(`elements?`): `SigningInputsArray`
 
 #### Parameters
 

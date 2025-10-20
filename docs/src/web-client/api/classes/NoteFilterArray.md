@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteFilterArray**(`elements`?): `NoteFilterArray`
+> **new NoteFilterArray**(`elements?`): `NoteFilterArray`
 
 #### Parameters
 

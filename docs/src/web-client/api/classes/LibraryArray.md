@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new LibraryArray**(`elements`?): `LibraryArray`
+> **new LibraryArray**(`elements?`): `LibraryArray`
 
 #### Parameters
 

@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AssetVaultArray**(`elements`?): `AssetVaultArray`
+> **new AssetVaultArray**(`elements?`): `AssetVaultArray`
 
 #### Parameters
 

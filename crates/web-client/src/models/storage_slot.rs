@@ -1,4 +1,4 @@
-use miden_objects::account::StorageSlot as NativeStorageSlot;
+use miden_client::account::StorageSlot as NativeStorageSlot;
 use wasm_bindgen::prelude::*;
 
 use crate::models::storage_map::StorageMap;

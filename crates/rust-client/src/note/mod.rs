@@ -75,7 +75,7 @@ mod note_update_tracker;
 
 pub use miden_lib::note::utils::{build_p2id_recipient, build_swap_tag};
 pub use miden_lib::note::well_known_note::WellKnownNote;
-pub use miden_lib::note::{create_p2id_note, create_swap_note};
+pub use miden_lib::note::{create_p2id_note, create_p2ide_note, create_swap_note};
 pub use miden_objects::NoteError;
 pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
@@ -85,15 +85,18 @@ pub use miden_objects::note::{
     NoteExecutionHint,
     NoteExecutionMode,
     NoteFile,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteInputs,
+    NoteLocation,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
     NoteTag,
     NoteType,
     Nullifier,
+    PartialNote,
 };
 pub use miden_objects::transaction::ToInputNoteCommitments;
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
@@ -137,7 +140,11 @@ where
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.source_manager.clone(),
+        );
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
@@ -167,7 +174,11 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::new(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.source_manager.clone(),
+        );
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await

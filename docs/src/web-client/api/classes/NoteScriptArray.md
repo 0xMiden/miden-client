@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteScriptArray**(`elements`?): `NoteScriptArray`
+> **new NoteScriptArray**(`elements?`): `NoteScriptArray`
 
 #### Parameters
 

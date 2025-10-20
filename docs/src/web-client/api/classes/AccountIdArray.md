@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountIdArray**(`elements`?): `AccountIdArray`
+> **new AccountIdArray**(`elements?`): `AccountIdArray`
 
 #### Parameters
 

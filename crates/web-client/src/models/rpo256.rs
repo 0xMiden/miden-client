@@ -1,5 +1,5 @@
-use miden_objects::Felt as NativeFelt;
-use miden_objects::crypto::hash::rpo::Rpo256 as NativeRpo256;
+use miden_client::Felt as NativeFelt;
+use miden_client::crypto::Rpo256 as NativeRpo256;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;

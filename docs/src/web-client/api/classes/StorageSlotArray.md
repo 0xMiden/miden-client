@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new StorageSlotArray**(`elements`?): `StorageSlotArray`
+> **new StorageSlotArray**(`elements?`): `StorageSlotArray`
 
 #### Parameters
 

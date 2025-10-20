@@ -1,7 +1,8 @@
-use miden_objects::crypto::dsa::rpo_falcon512::Signature as NativeSignature;
+use miden_client::auth::Signature as NativeSignature;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use crate::models::felt::Felt;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
@@ -17,6 +18,11 @@ impl Signature {
     pub fn deserialize(bytes: &Uint8Array) -> Result<Signature, JsValue> {
         let native_signature = deserialize_from_uint8array::<NativeSignature>(bytes)?;
         Ok(Signature(native_signature))
+    }
+
+    #[wasm_bindgen(js_name = "toPreparedSignature")]
+    pub fn to_prepared_signature(&self) -> Vec<Felt> {
+        self.0.to_prepared_signature().into_iter().map(Into::into).collect()
     }
 }
 

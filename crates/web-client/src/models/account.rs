@@ -1,4 +1,5 @@
-use miden_objects::account::{Account as NativeAccount, AccountType as NativeAccountType};
+use miden_client::account::{Account as NativeAccount, AccountType as NativeAccountType};
+use miden_client::utils::get_public_keys_from_account;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -71,6 +72,17 @@ impl Account {
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Account, JsValue> {
         deserialize_from_uint8array::<NativeAccount>(bytes).map(Account)
+    }
+
+    #[wasm_bindgen(js_name = "getPublicKeys")]
+    pub fn get_public_keys(&self) -> Vec<Word> {
+        let mut key_pairs = vec![];
+
+        for pub_key in get_public_keys_from_account(&self.0) {
+            key_pairs.push(pub_key.into());
+        }
+
+        key_pairs
     }
 }
 

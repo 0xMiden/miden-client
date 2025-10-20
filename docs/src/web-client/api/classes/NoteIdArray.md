@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteIdArray**(`elements`?): `NoteIdArray`
+> **new NoteIdArray**(`elements?`): `NoteIdArray`
 
 #### Parameters
 

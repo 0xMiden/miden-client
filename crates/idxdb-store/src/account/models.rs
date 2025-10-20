@@ -1,10 +1,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use base64::Engine as _;
-use base64::engine::general_purpose;
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
+
+use crate::{base64_to_vec_u8_optional, base64_to_vec_u8_required};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,18 +15,25 @@ pub struct AccountCodeIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_field_names)]
 pub struct AccountStorageIdxdbObject {
-    pub root: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub storage: Vec<u8>,
+    pub slot_index: u8,
+    pub slot_value: String,
+    pub slot_type: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AccountVaultIdxdbObject {
+pub struct StorageMapEntryIdxdbObject {
     pub root: String,
-    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
-    pub assets: Vec<u8>,
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountAssetIdxdbObject {
+    pub asset: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,34 +49,17 @@ pub struct AccountRecordIdxdbObject {
     pub locked: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AddressIdxdbObject {
+    pub address: Vec<u8>,
+    pub id: String,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForeignAccountCodeIdxdbObject {
     pub account_id: String,
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub code: Vec<u8>,
-}
-
-fn base64_to_vec_u8_required<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let base64_str: String = Deserialize::deserialize(deserializer)?;
-    general_purpose::STANDARD
-        .decode(&base64_str)
-        .map_err(|e| Error::custom(format!("Base64 decode error: {e}")))
-}
-
-fn base64_to_vec_u8_optional<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let base64_str: Option<String> = Option::deserialize(deserializer)?;
-    match base64_str {
-        Some(str) => general_purpose::STANDARD
-            .decode(&str)
-            .map(Some)
-            .map_err(|e| Error::custom(format!("Base64 decode error: {e}"))),
-        None => Ok(None),
-    }
 }

@@ -1,4 +1,4 @@
-use miden_objects::transaction::OutputNotes as NativeOutputNotes;
+use miden_client::transaction::OutputNotes as NativeOutputNotes;
 use wasm_bindgen::prelude::*;
 
 use super::output_note::OutputNote;

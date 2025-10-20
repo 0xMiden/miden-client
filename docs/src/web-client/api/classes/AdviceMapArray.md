@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AdviceMapArray**(`elements`?): `AdviceMapArray`
+> **new AdviceMapArray**(`elements?`): `AdviceMapArray`
 
 #### Parameters
 

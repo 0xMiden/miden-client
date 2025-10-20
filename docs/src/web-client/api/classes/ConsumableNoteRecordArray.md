@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new ConsumableNoteRecordArray**(`elements`?): `ConsumableNoteRecordArray`
+> **new ConsumableNoteRecordArray**(`elements?`): `ConsumableNoteRecordArray`
 
 #### Parameters
 

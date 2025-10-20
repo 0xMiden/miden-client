@@ -67,7 +67,7 @@ typos-check: ## Run typos to check for spelling mistakes
 
 .PHONY: rust-client-ts-lint
 rust-client-ts-lint:
-	cd crates/idxdb-store/src/ && yarn && yarn lint
+	cd crates/idxdb-store/src && yarn && yarn lint
 
 # --- Documentation -------------------------------------------------------------------------------
 
@@ -164,6 +164,7 @@ install-tests: ## Install the tests binary
 build: ## Build the CLI binary, client library and tests binary in release mode
 	CODEGEN=1 cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --locked
 	cargo build --package testing-remote-prover --release --locked
+	cargo build --package miden-client-integration-tests --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
@@ -210,3 +211,12 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"
+
+## --- Debug --------------------------------------------------------------------------------------
+.PHONY: build-web-client-debug
+build-web-client-debug: # build the web-client with debug symbols for the WASM-generated rust code
+	cd crates/web-client && yarn build-dev
+
+.PHONY: link-web-client-dep
+link-web-client-dep: # links the local web-client for debugging JS applications.
+	cd crates/web-client && yarn link

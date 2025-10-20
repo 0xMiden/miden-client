@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AddressArray**(`elements`?): `AddressArray`
+> **new AddressArray**(`elements?`): `AddressArray`
 
 #### Parameters
 

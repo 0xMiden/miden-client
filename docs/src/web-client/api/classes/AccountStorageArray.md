@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountStorageArray**(`elements`?): `AccountStorageArray`
+> **new AccountStorageArray**(`elements?`): `AccountStorageArray`
 
 #### Parameters
 

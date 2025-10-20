@@ -5,16 +5,18 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_client::note::NoteId as NativeNoteId;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
-use miden_client::rpc::{NodeRpcClient, TonicRpcClient};
-use miden_objects::note::NoteId as NativeNoteId;
-use miden_objects::transaction::InputNote as NativeInputNote;
+use miden_client::rpc::{GrpcClient, NodeRpcClient};
+use miden_client::transaction::InputNote as NativeInputNote;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::endpoint::Endpoint;
 use crate::models::note_id::NoteId;
+use crate::models::note_script::NoteScript;
+use crate::models::word::Word;
 
 mod note;
 
@@ -31,7 +33,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(TonicRpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
 
         Ok(RpcClient { inner: rpc_client })
     }
@@ -82,5 +84,22 @@ impl RpcClient {
             .collect();
 
         Ok(web_notes)
+    }
+
+    /// Fetches a note script by its root hash from the connected Miden node.
+    ///
+    /// @param `script_root` - The root hash of the note script to fetch
+    /// @returns Promise that resolves to the `NoteScript`
+    #[wasm_bindgen(js_name = "getNoteScriptByRoot")]
+    pub async fn get_note_script_by_root(&self, script_root: Word) -> Result<NoteScript, JsValue> {
+        let native_script_root = script_root.into();
+
+        let note_script = self
+            .inner
+            .get_note_script_by_root(native_script_root)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get note script by root"))?;
+
+        Ok(note_script.into())
     }
 }

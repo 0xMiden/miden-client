@@ -1,5 +1,5 @@
+use miden_client::note::Note as NativeNote;
 use miden_client::transaction::NoteArgs as NativeNoteArgs;
-use miden_objects::note::Note as NativeNote;
 use wasm_bindgen::prelude::*;
 
 use crate::models::miden_arrays::NoteAndArgsArray;

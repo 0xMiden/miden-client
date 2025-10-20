@@ -16,8 +16,8 @@ pub enum SqliteStoreError {
     MigrationError(String),
     #[error("Schema version mismatch")]
     SchemaVersionMismatch,
-    #[error("No settings table in the database")]
-    MissingSettingsTable,
+    #[error("No migrations table in the database")]
+    MissingMigrationsTable,
     #[error("Migration hashes mismatch")]
     MigrationHashMismatch,
     #[error("Failed to decode hex string: {0}")]

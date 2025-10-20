@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new StorageMapArray**(`elements`?): `StorageMapArray`
+> **new StorageMapArray**(`elements?`): `StorageMapArray`
 
 #### Parameters
 

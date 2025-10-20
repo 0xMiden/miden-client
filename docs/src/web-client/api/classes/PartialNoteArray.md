@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new PartialNoteArray**(`elements`?): `PartialNoteArray`
+> **new PartialNoteArray**(`elements?`): `PartialNoteArray`
 
 #### Parameters
 

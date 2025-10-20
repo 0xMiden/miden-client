@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use figment::value::{Dict, Map};
 use figment::{Metadata, Profile, Provider};
+use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 
@@ -24,8 +25,6 @@ pub struct CliConfig {
     pub store_filepath: PathBuf,
     /// Path to the directory that contains the secret key files.
     pub secret_keys_directory: PathBuf,
-    /// Default address to be used when executing transaction in case none is provided.
-    pub default_account_id: Option<String>,
     /// Path to the file containing the token symbol map.
     pub token_symbol_map_filepath: PathBuf,
     /// RPC endpoint for the remote prover. If this isn't present, a local prover will be used.
@@ -35,6 +34,8 @@ pub struct CliConfig {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     pub max_block_number_delta: Option<u32>,
+    /// Describes settings related to the note transport endpoint.
+    pub note_transport: Option<NoteTransportConfig>,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -65,11 +66,11 @@ impl Default for CliConfig {
             rpc: RpcConfig::default(),
             store_filepath: exec_dir.join(STORE_FILENAME),
             secret_keys_directory: exec_dir.join(KEYSTORE_DIRECTORY),
-            default_account_id: None,
             token_symbol_map_filepath: Path::new(TOKEN_SYMBOL_MAP_FILEPATH).to_path_buf(),
             remote_prover_endpoint: None,
             component_template_directory: Path::new(DEFAULT_COMPONENT_TEMPLATE_DIR).to_path_buf(),
             max_block_number_delta: None,
+            note_transport: None,
         }
     }
 }
@@ -90,6 +91,27 @@ impl Default for RpcConfig {
     fn default() -> Self {
         Self {
             endpoint: Endpoint::default().into(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+// NOTE TRANSPORT CONFIG
+// ================================================================================================
+
+/// Settings for the note transport client.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NoteTransportConfig {
+    /// Address of the Miden Note Transport node to connect to.
+    pub endpoint: String,
+    /// Timeout for the Note Transport RPC api requests, in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for NoteTransportConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }

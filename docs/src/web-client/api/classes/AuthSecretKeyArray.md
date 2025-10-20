@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AuthSecretKeyArray**(`elements`?): `AuthSecretKeyArray`
+> **new AuthSecretKeyArray**(`elements?`): `AuthSecretKeyArray`
 
 #### Parameters
 

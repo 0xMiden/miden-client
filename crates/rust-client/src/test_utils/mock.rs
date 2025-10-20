@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -6,7 +7,7 @@ use miden_objects::Word;
 use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::ProvenTransaction;
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -211,13 +212,32 @@ impl MockRpcApi {
         self.mock_chain.read().committed_notes().values().cloned().collect()
     }
 
+    pub fn get_public_available_notes(&self) -> Vec<MockChainNote> {
+        self.mock_chain
+            .read()
+            .committed_notes()
+            .values()
+            .filter(|n| matches!(n, MockChainNote::Public(_, _)))
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_private_available_notes(&self) -> Vec<MockChainNote> {
+        self.mock_chain
+            .read()
+            .committed_notes()
+            .values()
+            .filter(|n| matches!(n, MockChainNote::Private(_, _, _)))
+            .cloned()
+            .collect()
+    }
+
     pub fn advance_blocks(&self, num_blocks: u32) {
         let current_height = self.get_chain_tip_block_num();
         let mut mock_chain = self.mock_chain.write();
         mock_chain.prove_until_block(current_height + num_blocks).unwrap();
     }
 }
-use alloc::boxed::Box;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
@@ -345,9 +365,9 @@ impl NodeRpcClient for MockRpcApi {
             .unwrap();
 
         if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            Ok(FetchedAccount::Public(account.clone(), summary))
+            Ok(FetchedAccount::new_public(account.clone(), summary))
         } else {
-            Ok(FetchedAccount::Private(account_id, summary))
+            Ok(FetchedAccount::new_private(account_id, summary))
         }
     }
 
@@ -406,6 +426,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         from_block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -413,7 +434,13 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                if prefixes.contains(&nullifier.prefix()) && block_num >= from_block_num {
+                let within_range = if let Some(to_block) = block_to {
+                    block_num >= from_block_num && block_num <= to_block
+                } else {
+                    block_num >= from_block_num
+                };
+
+                if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num: block_num.as_u32() })
                 } else {
                     None
@@ -443,6 +470,17 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(block)
+    }
+
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+        let note = self
+            .get_available_notes()
+            .iter()
+            .find(|note| note.note().is_some_and(|n| n.script().root() == root))
+            .unwrap()
+            .clone();
+
+        Ok(note.note().unwrap().script().clone())
     }
 }
 

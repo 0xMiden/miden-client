@@ -1,4 +1,4 @@
-use miden_objects::block::BlockHeader as NativeBlockHeader;
+use miden_client::block::BlockHeader as NativeBlockHeader;
 use wasm_bindgen::prelude::*;
 
 use super::word::Word;

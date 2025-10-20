@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new FungibleAssetArray**(`elements`?): `FungibleAssetArray`
+> **new FungibleAssetArray**(`elements?`): `FungibleAssetArray`
 
 #### Parameters
 

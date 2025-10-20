@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new OutputNotesArray**(`elements`?): `OutputNotesArray`
+> **new OutputNotesArray**(`elements?`): `OutputNotesArray`
 
 #### Parameters
 

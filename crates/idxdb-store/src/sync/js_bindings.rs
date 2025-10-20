@@ -2,12 +2,13 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::Account;
+use miden_client::account::{Account, StorageSlot};
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
 use super::flattened_vec::FlattenedU8Vec;
+use crate::account::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use crate::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
 use crate::transaction::utils::SerializedTransactionData;
 
@@ -15,7 +16,7 @@ use crate::transaction::utils::SerializedTransactionData;
 #[wasm_bindgen(module = "/src/js/sync.js")]
 extern "C" {
     // GETS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = getSyncHeight)]
     pub fn idxdb_get_sync_height() -> js_sys::Promise;
@@ -24,7 +25,7 @@ extern "C" {
     pub fn idxdb_get_note_tags() -> js_sys::Promise;
 
     // INSERTS
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
 
     #[wasm_bindgen(js_name = addNoteTag)]
     pub fn idxdb_add_note_tag(
@@ -37,7 +38,7 @@ extern "C" {
     pub fn idxdb_apply_state_sync(state_update: JsStateSyncUpdate) -> js_sys::Promise;
 
     // DELETES
-    // ================================================================================================
+    // --------------------------------------------------------------------------------------------
     #[wasm_bindgen(js_name = removeNoteTag)]
     pub fn idxdb_remove_note_tag(
         tag: Vec<u8>,
@@ -120,15 +121,19 @@ pub struct JsAccountUpdate {
 
     /// Serialized storage slot data for this account.
     #[wasm_bindgen(js_name = "storageSlots")]
-    pub storage_slots: Vec<u8>,
+    pub storage_slots: Vec<JsStorageSlot>,
+
+    /// Serialized storage map entries for this account.
+    #[wasm_bindgen(js_name = "storageMapEntries")]
+    pub storage_map_entries: Vec<JsStorageMapEntry>,
 
     /// The merkle root of the account's asset vault.
     #[wasm_bindgen(js_name = "assetVaultRoot")]
     pub asset_vault_root: String,
 
-    /// Serialized asset data for this account.
-    #[wasm_bindgen(js_name = "assetBytes")]
-    pub asset_bytes: Vec<u8>,
+    /// The account's asset vault.
+    #[wasm_bindgen(js_name = "assets")]
+    pub assets: Vec<JsVaultAsset>,
 
     /// ID for this account.
     #[wasm_bindgen(js_name = "accountId")]
@@ -160,9 +165,37 @@ impl JsAccountUpdate {
         let asset_vault = account.vault();
         Self {
             storage_root: account.storage().commitment().to_string(),
-            storage_slots: account.storage().to_bytes(),
+            storage_slots: account
+                .storage()
+                .slots()
+                .iter()
+                .enumerate()
+                .map(|(index, slot)| JsStorageSlot {
+                    commitment: account.storage().commitment().to_hex(),
+                    slot_index: u8::try_from(index)
+                        .expect("Indexes in account storage should be less than 256"),
+                    slot_value: slot.value().to_hex(),
+                    slot_type: slot.slot_type().to_bytes()[0],
+                })
+                .collect(),
+            storage_map_entries: account
+                .storage()
+                .slots()
+                .iter()
+                .filter_map(|slot| {
+                    if let StorageSlot::Map(map) = slot {
+                        Some(JsStorageMapEntry::from_map(map))
+                    } else {
+                        None
+                    }
+                })
+                .flatten()
+                .collect(),
             asset_vault_root: asset_vault.root().to_string(),
-            asset_bytes: asset_vault.assets().collect::<Vec<_>>().to_bytes(),
+            assets: asset_vault
+                .assets()
+                .map(|asset| JsVaultAsset::from_asset(&asset, asset_vault.root()))
+                .collect(),
             account_id: account.id().to_string(),
             code_root: account.code().commitment().to_string(),
             committed: account.is_public(),

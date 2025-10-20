@@ -6,7 +6,7 @@ use clap::Parser;
 use tracing::info;
 
 use crate::CLIENT_CONFIG_FILE_NAME;
-use crate::config::{CliConfig, CliEndpoint, Network};
+use crate::config::{CliConfig, CliEndpoint, Network, NoteTransportConfig};
 use crate::errors::CliError;
 
 /// Contains the account component template file generated on build.rs, corresponding to the basic
@@ -50,6 +50,13 @@ pub struct InitCmd {
     #[arg(long)]
     remote_prover_endpoint: Option<String>,
 
+    /// RPC endpoint for the note transport node. Required to use the note transport network to
+    /// exchange private notes.
+    /// The endpoint must be in the form of "{protocol}://{hostname}:{port}", being the protocol
+    /// and port optional.
+    #[arg(long)]
+    note_transport_endpoint: Option<String>,
+
     /// Maximum number of blocks the client can be behind the network.
     #[clap(long)]
     block_delta: Option<u32>,
@@ -79,6 +86,12 @@ impl InitCmd {
             Some(rpc) => CliEndpoint::try_from(rpc.as_str()).ok(),
             None => None,
         };
+
+        cli_config.note_transport =
+            self.note_transport_endpoint.as_ref().map(|rpc| NoteTransportConfig {
+                endpoint: rpc.to_string(),
+                ..Default::default()
+            });
 
         cli_config.max_block_number_delta = self.block_delta;
 

@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountStorageModeArray**(`elements`?): `AccountStorageModeArray`
+> **new AccountStorageModeArray**(`elements?`): `AccountStorageModeArray`
 
 #### Parameters
 

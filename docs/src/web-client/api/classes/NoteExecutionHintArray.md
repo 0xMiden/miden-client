@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteExecutionHintArray**(`elements`?): `NoteExecutionHintArray`
+> **new NoteExecutionHintArray**(`elements?`): `NoteExecutionHintArray`
 
 #### Parameters
 

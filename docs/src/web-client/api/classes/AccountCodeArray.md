@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new AccountCodeArray**(`elements`?): `AccountCodeArray`
+> **new AccountCodeArray**(`elements?`): `AccountCodeArray`
 
 #### Parameters
 

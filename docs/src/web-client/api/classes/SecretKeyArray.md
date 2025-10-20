@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new SecretKeyArray**(`elements`?): `SecretKeyArray`
+> **new SecretKeyArray**(`elements?`): `SecretKeyArray`
 
 #### Parameters
 

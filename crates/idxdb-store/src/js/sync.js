@@ -1,7 +1,7 @@
 import { db, stateSync, inputNotes, outputNotes, transactions, blockHeaders, partialBlockchainNodes, tags, } from "./schema.js";
 import { upsertTransactionRecord, insertTransactionScript, } from "./transactions.js";
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
-import { insertAccountStorage, insertAccountAssetVault, insertAccountRecord, } from "./accounts.js";
+import { upsertAccountStorage, upsertAccountRecord, upsertVaultAssets, upsertStorageMapEntries, } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getNoteTags() {
     try {
@@ -110,9 +110,10 @@ export async function applyStateSync(stateUpdate) {
     // Promises to insert each account update.
     let accountUpdatesWriteOp = Promise.all(accountUpdates.flatMap((accountUpdate) => {
         return [
-            insertAccountStorage(accountUpdate.storageRoot, accountUpdate.storageSlots),
-            insertAccountAssetVault(accountUpdate.assetVaultRoot, accountUpdate.assetBytes),
-            insertAccountRecord(accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.assetVaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
+            upsertAccountStorage(accountUpdate.storageSlots),
+            upsertStorageMapEntries(accountUpdate.storageMapEntries),
+            upsertVaultAssets(accountUpdate.assets),
+            upsertAccountRecord(accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.assetVaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
         ];
     }));
     const tablesToAccess = [

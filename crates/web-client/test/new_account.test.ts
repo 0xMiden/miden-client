@@ -187,3 +187,45 @@ test.describe("new_faucet tests", () => {
     );
   });
 });
+
+// AccountStorage.getMapEntries tests
+// =======================================================================================================
+
+test.describe("AccountStorage.getMapEntries tests", () => {
+  test("returns null for invalid indices and adds test for storage map", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      // Create a new wallet with private storage
+      const account = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true
+      );
+
+      // Get the account to access its storage
+      const accountRecord = await client.getAccount(account.id());
+      if (!accountRecord) {
+        throw new Error("Account not found");
+      }
+
+      const storage = accountRecord.storage();
+
+      // Test non-map storage slot (slot 0 should be empty for a new account)
+      const nonMapResult = storage.getMapEntries(0);
+
+      // Test out of bounds index
+      const outOfBoundsResult = storage.getMapEntries(255);
+
+      return {
+        nonMap: nonMapResult,
+        outOfBounds: outOfBoundsResult,
+      };
+    });
+
+    // For invalid cases, getMapEntries should return undefined
+    expect(result.nonMap).toBeUndefined();
+    expect(result.outOfBounds).toBeUndefined();
+  });
+});

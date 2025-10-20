@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteMetadataArray**(`elements`?): `NoteMetadataArray`
+> **new NoteMetadataArray**(`elements?`): `NoteMetadataArray`
 
 #### Parameters
 

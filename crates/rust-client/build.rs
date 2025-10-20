@@ -2,10 +2,13 @@ use std::fs;
 use std::io::Write;
 
 use miden_node_proto_build::rpc_api_descriptor;
+use miden_note_transport_proto_build::mnt_api_descriptor;
 use miette::IntoDiagnostic;
 
 const STD_PROTO_OUT_DIR: &str = "src/rpc/generated/std";
 const NO_STD_PROTO_OUT_DIR: &str = "src/rpc/generated/nostd";
+const NOTE_TRANSPORT_STD_PROTO_OUT_DIR: &str = "src/note_transport/generated/std";
+const NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR: &str = "src/note_transport/generated/nostd";
 
 /// Defines whether the build script should generate files in `/src`.
 /// The docs.rs build pipeline has a read-only filesystem, so we have to avoid writing to `src`,
@@ -19,12 +22,47 @@ fn main() -> miette::Result<()> {
     }
 
     compile_tonic_client_proto()?;
+    compile_tonic_note_transport_proto()?;
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc.rs");
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/rpc_store.rs");
     replace_no_std_types(NO_STD_PROTO_OUT_DIR.to_string() + "/block_producer.rs");
+    replace_no_std_types(
+        NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR.to_string() + "/miden_note_transport.rs",
+    );
 
     Ok(())
 }
+
+// NOTE TRANSPORT CLIENT PROTO CODEGEN
+// ===============================================================================================
+
+/// Generates the Rust protobuf bindings for the Note Transport client.
+fn compile_tonic_note_transport_proto() -> miette::Result<()> {
+    let file_descriptors = mnt_api_descriptor();
+
+    let mut prost_config = prost_build::Config::new();
+    prost_config.skip_debug(["AccountId", "Digest"]);
+
+    let mut web_tonic_prost_config = prost_build::Config::new();
+    web_tonic_prost_config.skip_debug(["AccountId", "Digest"]);
+
+    // Generate the header of the user facing server from its proto file
+    tonic_build::configure()
+        .build_transport(false)
+        .build_server(false)
+        .out_dir(NOTE_TRANSPORT_NO_STD_PROTO_OUT_DIR)
+        .compile_fds_with_config(web_tonic_prost_config, file_descriptors.clone())
+        .into_diagnostic()?;
+
+    tonic_build::configure()
+        .build_server(false)
+        .out_dir(NOTE_TRANSPORT_STD_PROTO_OUT_DIR)
+        .compile_fds_with_config(prost_config, file_descriptors)
+        .into_diagnostic()?;
+
+    Ok(())
+}
+
 // NODE RPC CLIENT PROTO CODEGEN
 // ===============================================================================================
 

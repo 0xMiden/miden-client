@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new NoteExecutionModeArray**(`elements`?): `NoteExecutionModeArray`
+> **new NoteExecutionModeArray**(`elements?`): `NoteExecutionModeArray`
 
 #### Parameters
 

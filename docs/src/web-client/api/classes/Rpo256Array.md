@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new Rpo256Array**(`elements`?): `Rpo256Array`
+> **new Rpo256Array**(`elements?`): `Rpo256Array`
 
 #### Parameters
 

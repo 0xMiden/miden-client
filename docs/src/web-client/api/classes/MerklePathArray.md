@@ -10,7 +10,7 @@
 
 ### Constructor
 
-> **new MerklePathArray**(`elements`?): `MerklePathArray`
+> **new MerklePathArray**(`elements?`): `MerklePathArray`
 
 #### Parameters
 

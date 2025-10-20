@@ -50,41 +50,9 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
-> **createClient**(`node_url`?, `seed`?): `Promise`\<`any`\>
+> **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
 
 Creates a new client with the given node URL and optional seed.
 If `node_url` is `None`, it defaults to the testnet endpoint.
@@ -105,9 +73,44 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ***
 
+### createClientWithExternalKeystore()
+
+> **createClientWithExternalKeystore**(`node_url?`, `seed?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
+
+Creates a new client with the given node URL, optional seed, and external keystore
+callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+
+#### Parameters
+
+##### node\_url?
+
+`string`
+
+##### seed?
+
+`Uint8Array`
+
+##### get\_key\_cb?
+
+`Function`
+
+##### insert\_key\_cb?
+
+`Function`
+
+##### sign\_cb?
+
+`Function`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### createMockClient()
 
-> **createMockClient**(`seed`?, `serialized_mock_chain`?): `Promise`\<`any`\>
+> **createMockClient**(`seed?`, `serialized_mock_chain?`): `Promise`\<`any`\>
 
 Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
 applications as it uses a mock chain that simulates the behavior of a real node.
@@ -128,9 +131,19 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### createScriptBuilder()
+
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+
+#### Returns
+
+[`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
 ### exportAccountFile()
 
-> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>
 
 #### Parameters
 
@@ -140,7 +153,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`AccountFile`](AccountFile.md)\>
 
 ***
 
@@ -220,6 +233,22 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getAccountAuthByPubKey()
+
+> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`SecretKey`](SecretKey.md)\>
+
+#### Parameters
+
+##### pub\_key
+
+[`Word`](Word.md)
+
+#### Returns
+
+`Promise`\<[`SecretKey`](SecretKey.md)\>
+
+***
+
 ### getAccounts()
 
 > **getAccounts**(): `Promise`\<[`AccountHeader`](AccountHeader.md)[]\>
@@ -232,7 +261,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### getConsumableNotes()
 
-> **getConsumableNotes**(`account_id`?): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
+> **getConsumableNotes**(`account_id?`): `Promise`\<[`ConsumableNoteRecord`](ConsumableNoteRecord.md)[]\>
 
 #### Parameters
 
@@ -310,6 +339,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -354,13 +401,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### importAccountFile()
 
-> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+> **importAccountFile**(`account_file`): `Promise`\<`any`\>
 
 #### Parameters
 
-##### account\_bytes
+##### account\_file
 
-`any`
+[`AccountFile`](AccountFile.md)
 
 #### Returns
 
@@ -404,6 +451,18 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
+
+#### Returns
+
+`Promise`\<`string`[]\>
+
+***
+
 ### listTags()
 
 > **listTags**(): `Promise`\<`any`\>
@@ -416,17 +475,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newAccount()
 
-> **newAccount**(`account`, `account_seed`, `overwrite`): `Promise`\<`void`\>
+> **newAccount**(`account`, `overwrite`): `Promise`\<`void`\>
 
 #### Parameters
 
 ##### account
 
 [`Account`](Account.md)
-
-##### account\_seed
-
-[`Word`](Word.md)
 
 ##### overwrite
 
@@ -516,7 +571,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newSendTransactionRequest()
 
-> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height`?, `timelock_height`?): [`TransactionRequest`](TransactionRequest.md)
+> **newSendTransactionRequest**(`sender_account_id`, `target_account_id`, `faucet_id`, `note_type`, `amount`, `recall_height?`, `timelock_height?`): [`TransactionRequest`](TransactionRequest.md)
 
 #### Parameters
 
@@ -616,7 +671,7 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed`?): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -648,6 +703,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+Deletes a setting key-value from the store.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -676,9 +749,31 @@ Returns the inner serialized mock chain if it exists.
 
 ***
 
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### submitTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover`?): `Promise`\<`void`\>
+> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
 
 #### Parameters
 

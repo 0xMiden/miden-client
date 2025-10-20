@@ -1,4 +1,4 @@
-use miden_objects::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
+use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
 use wasm_bindgen::prelude::*;
 
 use crate::models::miden_arrays::NoteDetailsAndTagArray;
