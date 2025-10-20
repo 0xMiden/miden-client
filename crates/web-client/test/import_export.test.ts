@@ -77,7 +77,9 @@ test.describe("export and import the db", () => {
 });
 
 test.describe("export and import account", () => {
-  test("should export and import a private account", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("should export and import a private account", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 

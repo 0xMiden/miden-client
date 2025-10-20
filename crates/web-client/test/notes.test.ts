@@ -58,7 +58,9 @@ test.describe("get_input_note", () => {
     expect(noteId).toBeUndefined();
   });
 
-  test("retrieve an input note that does exist", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("retrieve an input note that does exist", async ({ page }) => {
     const { consumedNoteId } = await setupConsumedNote(page);
 
     // Test both the existing client method and new RpcClient
@@ -89,7 +91,9 @@ test.describe("get_input_note", () => {
     expect(rpcResult[0].hasInputNote).toBe(false); // Private notes don't include input_note
   });
 
-  test("get note script by root", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("get note script by root", async ({ page }) => {
     await setupWalletAndFaucet(page);
 
     // First, we need to get a note script root from an existing note
@@ -137,7 +141,9 @@ test.describe("get_input_note", () => {
 });
 
 test.describe("get_input_notes", () => {
-  test("note exists, note filter all", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("note exists, note filter all", async ({ page }) => {
     const { consumedNoteId } = await setupConsumedNote(page);
     const { noteIds } = await getInputNotes(page);
     expect(noteIds.length).toBeGreaterThanOrEqual(1);
@@ -146,7 +152,9 @@ test.describe("get_input_notes", () => {
 });
 
 test.describe("get_consumable_notes", () => {
-  test("filter by account", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("filter by account", async ({ page }) => {
     const { createdNoteId: noteId1, accountId: accountId1 } =
       await setupMintedNote(page);
 
@@ -160,7 +168,9 @@ test.describe("get_consumable_notes", () => {
     });
   });
 
-  test("no filter by account", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("no filter by account", async ({ page }) => {
     const { createdNoteId: noteId1, accountId: accountId1 } =
       await setupMintedNote(page);
     const { createdNoteId: noteId2, accountId: accountId2 } =
@@ -186,7 +196,9 @@ test.describe("get_consumable_notes", () => {
     });
   });
 
-  test("p2ide consume after block", async ({ page }) => {
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("p2ide consume after block", async ({ page }) => {
     const { accountId: senderAccountId, faucetId } =
       await setupWalletAndFaucet(page);
     const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
@@ -213,7 +225,9 @@ test.describe("get_consumable_notes", () => {
 });
 
 test.describe("createP2IDNote and createP2IDENote", () => {
-  test("should create a proper consumable p2id note from the createP2IDNote function", async ({
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("should create a proper consumable p2id note from the createP2IDNote function", async ({
     page,
   }) => {
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
@@ -313,7 +327,9 @@ test.describe("createP2IDNote and createP2IDENote", () => {
     expect(result.targetAccountBalance).toEqual("10");
   });
 
-  test("should create a proper consumable p2ide note from the createP2IDENote function", async ({
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("should create a proper consumable p2ide note from the createP2IDENote function", async ({
     page,
   }) => {
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);

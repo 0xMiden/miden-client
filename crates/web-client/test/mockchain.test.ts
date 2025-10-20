@@ -57,7 +57,9 @@ const mockChainTest = async (testingPage: Page) => {
 };
 
 test.describe("mock chain tests", () => {
-  test("send transaction with mock chain completes successfully", async ({
+  // Disabled due to out of bounds memory error:
+  // https://github.com/0xMiden/miden-vm/issues/2303
+  test.skip("send transaction with mock chain completes successfully", async ({
     page,
   }) => {
     let finalBalance = await mockChainTest(page);
