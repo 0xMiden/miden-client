@@ -42,7 +42,9 @@ miden-node-rpc = { branch = "jmunoz-update-miden-base", git = "https://github.co
 miden-node-store = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }
 miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-note-transport" }
-miden-remote-prover = { branch = "jmunoz-update-miden-base", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
+miden-remote-prover = { branch = "jmunoz-update-miden-base", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "jmunoz-update-miden-base", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node" }
