@@ -347,7 +347,6 @@ export const customTransaction = async (
 ): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
-      debugger;
       const client = window.client;
 
       const walletAccount = await client.newWallet(
@@ -410,58 +409,9 @@ export const customTransaction = async (
             # assets, otherwise it could have been boiled down to the assert.
 
             use.miden::account
-            use.miden::note
+            use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
-
-
-            proc.add_note_assets_to_account
-                push.0 exec.note::get_assets
-                # => [num_of_assets, 0 = ptr, ...]
-
-                # compute the pointer at which we should stop iterating
-                mul.4 dup.1 add
-                # => [end_ptr, ptr, ...]
-
-                # pad the stack and move the pointer to the top
-                padw movup.5
-                # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                # compute the loop latch
-                dup dup.6 neq
-                # => [latch, ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                while.true
-                    # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                    # save the pointer so that we can use it later
-                    dup movdn.5
-                    # => [ptr, 0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # load the asset
-                    mem_loadw
-                    # => [ASSET, ptr, end_ptr, ...]
-
-                    # pad the stack before call
-                    padw swapw padw padw swapdw
-                    # => [ASSET, pad(12), ptr, end_ptr, ...]
-
-                    # add asset to the account
-                    call.wallet::receive_asset
-                    # => [pad(16), ptr, end_ptr, ...]
-
-                    # clean the stack after call
-                    dropw dropw dropw
-                    # => [0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # increment the pointer and compare it to the end_ptr
-                    movup.4 add.4 dup dup.6 neq
-                    # => [latch, ptr+4, ASSET, end_ptr, ...]
-                end
-
-                # clear the stack
-                drop dropw drop
-            end
 
             begin
                 # push data from the advice map into the advice stack
@@ -478,7 +428,7 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-
+                
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
@@ -498,7 +448,7 @@ export const customTransaction = async (
                 # => []
 
                 # store the note inputs to memory starting at address 0
-                push.0 exec.note::get_inputs
+                push.0 exec.active_note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
                 # make sure the number of inputs is 2
@@ -516,12 +466,13 @@ export const customTransaction = async (
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.add_note_assets_to_account
+                exec.active_note::add_assets_to_account
                 # => [...]
             end
         `;
 
-      let compiledNoteScript = await client.compileNoteScript(noteScript);
+      let builder = client.createScriptBuilder();
+      let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
         new window.FeltArray([
           walletAccount.id().prefix(),
@@ -581,7 +532,7 @@ export const customTransaction = async (
 
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
-      let transactionScript = await client.compileTxScript(txScript);
+      let transactionScript = await builder.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
@@ -836,14 +787,14 @@ export const customAccountComponent = async (
         end
       `;
     const client = window.client;
-    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
+    let builder = client.createScriptBuilder();
     let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
 
     let mappingAccountComponent = window.AccountComponent.compile(
       accountCode,
-      assembler,
+      builder,
       [emptyStorageSlot, storageSlotMap]
     ).withSupportsAllTypes();
 
@@ -861,25 +812,18 @@ export const customAccountComponent = async (
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     await client.syncState();
 
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "miden_by_example::mapping_example_contract",
-        accountCode
-      );
-
-    let txScript = window.TransactionScript.compile(
-      scriptCode,
-      assembler.withLibrary(accountComponentLib)
+    let accountCodeLib = builder.buildLibrary(
+      "miden_by_example::mapping_example_contract",
+      accountCode
     );
+
+    builder.linkStaticLibrary(accountCodeLib);
+
+    let txScript = builder.compileTxScript(scriptCode);
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
       .withCustomScript(txScript)
@@ -1143,43 +1087,29 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
-    const incrNonceAuthCode = `use.miden::account
-        export.auth__basic
-          exec.account::incr_nonce
-          drop
-        end`;
     const client = window.client;
 
     // Create counter account
-    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
     let emptyStorageSlot = window.StorageSlot.emptyValue();
+
+    let builder = client.createScriptBuilder();
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,
-      assembler,
+      builder,
       [emptyStorageSlot]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let incrNonceAuth = window.AccountComponent.compile(
-      incrNonceAuthCode,
-      assembler,
-      []
-    ).withSupportsAllTypes();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .storageMode(window.AccountStorageMode.network())
-      .withAuthComponent(incrNonceAuth)
+      .withNoAuthComponent()
       .withComponent(counterAccountComponent)
       .build();
 
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
@@ -1189,17 +1119,12 @@ export const counterAccountComponent = async (
     await client.syncState();
 
     // Deploy counter account
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "external_contract::counter_contract",
-        accountCode
-      );
-
-    let txScript = window.TransactionScript.compile(
-      scriptCode,
-      assembler.withLibrary(accountComponentLib)
+    let accountComponentLib = builder.buildLibrary(
+      "external_contract::counter_contract",
+      accountCode
     );
+    builder.linkDynamicLibrary(accountComponentLib);
+    let txScript = builder.compileTxScript(scriptCode);
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
       .withCustomScript(txScript)
@@ -1215,11 +1140,7 @@ export const counterAccountComponent = async (
     );
 
     // Create transaction with network note
-    assembler = window.TransactionKernel.assembler()
-      .withDebugMode(true)
-      .withLibrary(accountComponentLib);
-
-    let compiledNoteScript = await assembler.compileNoteScript(scriptCode);
+    let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
     let noteInputs = new window.NoteInputs(new window.FeltArray([]));
 
@@ -1275,6 +1196,7 @@ test.describe("counter account component tests", () => {
   test("counter account component transaction completes successfully", async ({
     page,
   }) => {
+    page.on("console", (msg) => console.log(msg));
     let finalCounter = await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
   });
@@ -1284,6 +1206,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
   return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
+
+    const normalizeHexWord = (hex) => {
+      if (!hex) return undefined;
+      const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      return normalized;
+    };
 
     // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
     // --------------------------------------------------------------------------
@@ -1295,6 +1223,10 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     let storageMap = new window.StorageMap();
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+    storageMap.insert(
+      new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
+      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+    );
 
     const accountCode = `export.bump_map_item
                     # map key
@@ -1308,19 +1240,15 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
                     exec.::miden::account::set_map_item
-                    dropw
-                    # => [OLD_VALUE]
-                    dupw
-                    push.0
-                    # Set a new item each time as the value keeps changing
-                    exec.::miden::account::set_map_item
+                    # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end
         `;
 
+    let builder = client.createScriptBuilder();
     let bumpItemComponent = window.AccountComponent.compile(
       accountCode,
-      window.TransactionKernel.assembler(),
+      builder,
       [window.StorageSlot.map(storageMap)]
     ).withSupportsAllTypes();
 
@@ -1337,11 +1265,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      bumpItemAccountBuilderResult.account,
-      bumpItemAccountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(bumpItemAccountBuilderResult.account, false);
+    await client.syncState();
 
     let initialMapValue = (
       await client.getAccount(bumpItemAccountBuilderResult.account.id())
@@ -1351,21 +1276,19 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       ?.toHex();
 
     // Deploy counter account
-    let assembler = window.TransactionKernel.assembler();
 
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "external_contract::bump_item_contract",
-        accountCode
-      );
+    let accountComponentLib = builder.buildLibrary(
+      "external_contract::bump_item_contract",
+      accountCode
+    );
 
-    let txScript = window.TransactionScript.compile(
+    builder.linkDynamicLibrary(accountComponentLib);
+
+    let txScript = builder.compileTxScript(
       `use.external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
-      end`,
-      assembler.withLibrary(accountComponentLib)
+      end`
     );
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
@@ -1388,22 +1311,51 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .getMapItem(1, MAP_KEY)
       ?.toHex();
 
+    // Test getMapEntries() functionality
+    let accountStorage = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )?.storage();
+    let mapEntries = accountStorage?.getMapEntries(1);
+
+    // Verify we get the expected entries
+    let expectedKey = MAP_KEY.toHex();
+    let expectedValue = normalizeHexWord(finalMapValue);
+
+    let mapEntriesData = {
+      entriesCount: mapEntries?.length || 0,
+      hasExpectedEntry: false,
+      expectedKey: expectedKey,
+      expectedValue: expectedValue,
+    };
+
+    if (expectedValue && mapEntries && mapEntries.length > 0) {
+      mapEntriesData.hasExpectedEntry = mapEntries.some(
+        (entry) =>
+          entry.key === expectedKey &&
+          normalizeHexWord(entry.value) === expectedValue
+      );
+    }
+
     return {
-      initialMapValue: initialMapValue
-        ?.replace(/^0x/, "")
-        .replace(/^0+|0+$/g, ""),
-      finalMapValue: finalMapValue?.replace(/^0x/, "").replace(/^0+|0+$/g, ""),
+      initialMapValue: normalizeHexWord(initialMapValue),
+      finalMapValue: normalizeHexWord(finalMapValue),
+      mapEntries: mapEntriesData,
     };
   });
 };
 
-// TODO: re-enable after miden-base#1878
+test.describe("storage map test", () => {
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue, mapEntries } =
+      await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
 
-// test.describe("storage map test", () => {
-//   test.setTimeout(50000);
-//   test("storage map is updated correctly in transaction", async ({ page }) => {
-//     let { initialMapValue, finalMapValue } = await testStorageMap(page);
-//     expect(initialMapValue).toBe("1");
-//     expect(finalMapValue).toBe("2");
-//   });
-// });
+    // Test getMapEntries() functionality
+    expect(mapEntries.entriesCount).toBeGreaterThan(1);
+    expect(mapEntries.hasExpectedEntry).toBe(true);
+    expect(mapEntries.expectedKey).toBeDefined();
+    expect(mapEntries.expectedValue).toBe("2");
+  });
+});

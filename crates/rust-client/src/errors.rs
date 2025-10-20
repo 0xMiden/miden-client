@@ -2,12 +2,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_lib::account::interface::AccountInterfaceError;
-pub use miden_objects::AccountError;
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::MerkleError;
 use miden_objects::note::NoteId;
+pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_objects::{
-    AssetError,
     NoteError,
     PartialBlockchainError,
     TransactionInputError,
@@ -22,6 +21,7 @@ use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverErro
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
+use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
@@ -72,6 +72,8 @@ pub enum ClientError {
     NoteImportError(String),
     #[error("error while converting input note")]
     NoteRecordConversionError(#[from] NoteRecordError),
+    #[error("transport api error")]
+    NoteTransportError(#[from] NoteTransportError),
     #[error("no consumable note for account {0}")]
     NoConsumableNoteForAccount(AccountId),
     #[error("rpc api error")]

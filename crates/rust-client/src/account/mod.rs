@@ -20,15 +20,14 @@
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
-//! let (account, seed) = AccountBuilder::new(random_seed)
+//! let account = AccountBuilder::new(random_seed)
 //!     .account_type(AccountType::RegularAccountImmutableCode)
 //!     .storage_mode(AccountStorageMode::Private)
 //!     .with_component(BasicWallet)
 //!     .build()?;
 //!
-//! // Add the account to the client. The account seed and authentication key are required
-//! // for new accounts.
-//! client.add_account(&account, Some(seed), false).await?;
+//! // Add the account to the client. The account already embeds its seed information.
+//! client.add_account(&account, false).await?;
 //! #   Ok(())
 //! # }
 //! ```
@@ -39,7 +38,6 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
 // RE-EXPORTS
 // ================================================================================================
@@ -70,11 +68,17 @@ use super::Client;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
+use crate::sync::NoteTagRecord;
 
 pub mod component {
     pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
 
     pub use miden_lib::account::auth::*;
+    pub use miden_lib::account::components::{
+        basic_fungible_faucet_library,
+        basic_wallet_library,
+        rpo_falcon_512_library,
+    };
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
@@ -111,11 +115,12 @@ impl<AUTH> Client<AUTH> {
     /// Adds the provided [Account] in the store so it can start being tracked by the client.
     ///
     /// If the account is already being tracked and `overwrite` is set to `true`, the account will
-    /// be overwritten. The `account_seed` should be provided if the account is newly created.
+    /// be overwritten. Newly created accounts must embed their seed (`account.seed()` must return
+    /// `Some(_)`).
     ///
     /// # Errors
     ///
-    /// - If the account is new but no seed is provided.
+    /// - If the account is new but it does not contain the seed.
     /// - If the account is already tracked and `overwrite` is set to `false`.
     /// - If `overwrite` is set to `true` and the `account_data` nonce is lower than the one already
     ///   being tracked.
@@ -124,38 +129,43 @@ impl<AUTH> Client<AUTH> {
     pub async fn add_account(
         &mut self,
         account: &Account,
-        account_seed: Option<Word>,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        let account_seed = if account.is_new() {
-            if account_seed.is_none() {
+        if account.is_new() {
+            if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
             }
-            account_seed
         } else {
             // Ignore the seed since it's not a new account
 
             // TODO: The alternative approach to this is to store the seed anyway, but
             // ignore it at the point of executing against this transaction, but that
             // approach seems a little bit more incorrect
-            if account_seed.is_some() {
+            if account.seed().is_some() {
                 tracing::warn!(
                     "Added an existing account and still provided a seed when it is not needed. It's possible that the account's file was incorrectly generated. The seed will be ignored."
                 );
             }
-            None
-        };
+        }
 
         let tracked_account = self.store.get_account(account.id()).await?;
 
         match tracked_account {
             None => {
+                let default_address = Address::AccountId(AccountIdAddress::new(
+                    account.id(),
+                    AddressInterface::Unspecified,
+                ));
+
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.into()).await?;
+                let default_address_note_tag = default_address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                self.store.add_note_tag(note_tag_record).await?;
 
                 self.store
-                    .insert_account(account, account_seed)
+                    .insert_account(account, default_address)
                     .await
                     .map_err(ClientError::StoreError)
             },
@@ -202,10 +212,10 @@ impl<AUTH> Client<AUTH> {
             FetchedAccount::Private(..) => {
                 return Err(ClientError::AccountIsPrivate(account_id));
             },
-            FetchedAccount::Public(account, ..) => account,
+            FetchedAccount::Public(account, ..) => *account,
         };
 
-        self.add_account(&account, None, true).await
+        self.add_account(&account, true).await
     }
 
     // ACCOUNT DATA RETRIEVAL
@@ -304,7 +314,7 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let (account, _) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
         .with_auth_component(AuthRpoFalcon512::new(public_key))

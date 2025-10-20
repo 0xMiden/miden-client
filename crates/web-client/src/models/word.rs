@@ -1,4 +1,4 @@
-use miden_objects::{Felt as NativeFelt, Word as NativeWord};
+use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

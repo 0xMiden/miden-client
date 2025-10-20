@@ -2,6 +2,7 @@ import { Page } from "puppeteer";
 import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
+  AccountFile,
   AccountBuilder,
   AccountComponent,
   AccountDelta,
@@ -14,8 +15,6 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  Assembler,
-  AssemblerUtils,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -65,9 +64,12 @@ import {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  ScriptBuilder,
+  ScriptBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -77,7 +79,9 @@ declare global {
     MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
+    rpcUrl?: string;
     Account: typeof Account;
+    AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
@@ -94,8 +98,6 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    Assembler: typeof Assembler;
-    AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -148,10 +150,13 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    ScriptBuilder: typeof ScriptBuilder;
+    ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

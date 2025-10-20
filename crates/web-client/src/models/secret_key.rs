@@ -1,4 +1,5 @@
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::auth::Signature as NativeSignature;
+use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
@@ -45,7 +46,7 @@ impl SecretKey {
     pub fn sign_data(&self, signing_inputs: &SigningInputs) -> Signature {
         let mut rng = StdRng::from_os_rng();
         let native_word = signing_inputs.to_commitment().into();
-        self.0.sign_with_rng(native_word, &mut rng).into()
+        NativeSignature::from(self.0.sign_with_rng(native_word, &mut rng)).into()
     }
 
     pub fn serialize(&self) -> Uint8Array {

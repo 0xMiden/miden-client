@@ -30,10 +30,10 @@ let rng = RpoRandomCoin::new(coin_seed.map(Felt::new));
 // Create a keystore to manage cryptographic keys.
 let keystore = FilesystemKeyStore::new(path.into())?;
 
-// Instantiate the client using a Tonic RPC client
+// Instantiate the client using a gRPC client
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 let client:Client = Client::new(
-    Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+    Arc::new(GrpcClient::new(&endpoint, 10_000)),
     rng,
     store,
     Some(Arc::new(keystore)), // Authenticator is optional - use None if no authentication is needed
@@ -52,15 +52,14 @@ The `AccountBuilder` can be used to create a new account with the specified para
 ```rust
 let key_pair = SecretKey::with_rng(client.rng());
 
-let (new_account, seed) = AccountBuilder::new(init_seed) // Seed should be random for each account
+let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Private)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-
 keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
-client.add_account(&new_account, Some(seed), false).await?;
+client.add_account(&new_account, false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
 
@@ -70,16 +69,15 @@ To create an public account, you can specify `AccountStorageMode::Public` like s
 let key_pair = SecretKey::with_rng(client.rng());
 let anchor_block = client.get_latest_epoch_block().await.unwrap();
 
-let (new_account, seed) = AccountBuilder::new(init_seed) // Seed should be random for each account
+let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
     .anchor((&anchor_block).try_into().unwrap())
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Public)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
-
 keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).await?;
-client.add_account(&new_account, Some(seed), false).await?;
+client.add_account(&new_account, false).await?;
 ```
 
 The account's state is also tracked locally, but during sync the client updates the account state by querying the node for the most recent account data.

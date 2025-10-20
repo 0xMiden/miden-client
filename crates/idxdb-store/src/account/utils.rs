@@ -7,6 +7,7 @@ use miden_client::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
+    Address,
     StorageSlot,
 };
 use miden_client::asset::AssetVault;
@@ -26,7 +27,8 @@ use super::js_bindings::{
     idxdb_upsert_storage_map_entries,
     idxdb_upsert_vault_assets,
 };
-use super::models::AccountRecordIdxdbObject;
+use crate::account::js_bindings::idxdb_insert_account_address;
+use crate::account::models::{AccountRecordIdxdbObject, AddressIdxdbObject};
 
 pub async fn upsert_account_code(account_code: &AccountCode) -> Result<(), JsValue> {
     let root = account_code.commitment().to_string();
@@ -70,17 +72,14 @@ pub async fn upsert_account_asset_vault(asset_vault: &AssetVault) -> Result<(), 
     Ok(())
 }
 
-pub async fn upsert_account_record(
-    account: &Account,
-    account_seed: Option<Word>,
-) -> Result<(), JsValue> {
+pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     let account_id_str = account.id().to_string();
     let code_root = account.code().commitment().to_string();
     let storage_root = account.storage().commitment().to_string();
     let vault_root = account.vault().root().to_string();
     let committed = account.is_public();
     let nonce = account.nonce().to_string();
-    let account_seed = account_seed.map(|seed| seed.to_bytes());
+    let account_seed = account.seed().map(|seed| seed.to_bytes());
     let commitment = account.commitment().to_string();
 
     let promise = idxdb_upsert_account_record(
@@ -93,6 +92,15 @@ pub async fn upsert_account_record(
         commitment,
         account_seed,
     );
+    JsFuture::from(promise).await?;
+
+    Ok(())
+}
+
+pub async fn insert_account_address(account: &Account, address: Address) -> Result<(), JsValue> {
+    let account_id_str = account.id().to_string();
+    let serialized_address = address.to_bytes();
+    let promise = idxdb_insert_account_address(account_id_str, serialized_address);
     JsFuture::from(promise).await?;
 
     Ok(())
@@ -128,8 +136,18 @@ pub fn parse_account_record_idxdb_object(
     Ok((account_header, status))
 }
 
+pub fn parse_account_address_idxdb_object(
+    account_address_idxdb: &AddressIdxdbObject,
+) -> Result<(Address, AccountId), StoreError> {
+    let native_account_id: AccountId = AccountId::from_hex(&account_address_idxdb.id)?;
+
+    let address = Address::read_from_bytes(&account_address_idxdb.address)?;
+
+    Ok((address, native_account_id))
+}
+
 pub async fn update_account(new_account_state: &Account) -> Result<(), JsValue> {
     upsert_account_storage(new_account_state.storage()).await?;
     upsert_account_asset_vault(new_account_state.vault()).await?;
-    upsert_account_record(new_account_state, None).await
+    upsert_account_record(new_account_state).await
 }

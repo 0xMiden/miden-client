@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
@@ -32,10 +33,21 @@ pub enum FetchedAccount {
     Private(AccountId, AccountUpdateSummary),
     /// Public accounts are recorded on-chain. As such, its state is shared with the network and
     /// can always be retrieved through the appropriate RPC method.
-    Public(Account, AccountUpdateSummary),
+    Public(Box<Account>, AccountUpdateSummary),
 }
 
 impl FetchedAccount {
+    /// Creates a [`FetchedAccount`] corresponding to a private account tracked only by its ID and
+    /// update summary.
+    pub fn new_private(account_id: AccountId, summary: AccountUpdateSummary) -> Self {
+        Self::Private(account_id, summary)
+    }
+
+    /// Creates a [`FetchedAccount`] for a public account with its full [`Account`] state.
+    pub fn new_public(account: Account, summary: AccountUpdateSummary) -> Self {
+        Self::Public(Box::new(account), summary)
+    }
+
     /// Returns the account ID.
     pub fn account_id(&self) -> AccountId {
         match self {
@@ -55,7 +67,7 @@ impl FetchedAccount {
     pub fn account(&self) -> Option<&Account> {
         match self {
             Self::Private(..) => None,
-            Self::Public(account, _) => Some(account),
+            Self::Public(account, _) => Some(account.as_ref()),
         }
     }
 }
@@ -64,7 +76,7 @@ impl From<FetchedAccount> for Option<Account> {
     fn from(acc: FetchedAccount) -> Self {
         match acc {
             FetchedAccount::Private(..) => None,
-            FetchedAccount::Public(account, _) => Some(account),
+            FetchedAccount::Public(account, _) => Some(*account),
         }
     }
 }
@@ -132,8 +144,8 @@ impl TryInto<StorageSlotType> for SlotTypeProto {
 
     fn try_into(self) -> Result<StorageSlotType, Self::Error> {
         match self.0 {
-            0 => Ok(StorageSlotType::Value),
-            1 => Ok(StorageSlotType::Map),
+            0 => Ok(StorageSlotType::Map),
+            1 => Ok(StorageSlotType::Value),
             _ => Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
         }
     }
@@ -223,6 +235,7 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
+        storage_requirements: &AccountStorageRequirements,
     ) -> Result<StateHeaders, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
@@ -273,8 +286,16 @@ impl proto::rpc_store::account_proof::AccountDetailsResponse {
                     stringify!(smt_proof),
                 ))?;
             let proof = miden_objects::crypto::merkle::SmtProof::try_from(smt_opening)?;
-            let witness = StorageMapWitness::new(proof);
             let key: u8 = storage_slot.try_into().expect("there are no more than 256 slots");
+
+            let requested_keys = storage_requirements.inner().get(&key).ok_or(
+                crate::rpc::RpcError::InvalidResponse(format!(
+                    "missing storage requirements for slot {key}"
+                )),
+            )?;
+
+            let witness = StorageMapWitness::new(proof, requested_keys.iter().copied())
+                .map_err(|err| crate::rpc::RpcError::InvalidResponse(format!("{err}")))?;
 
             storage_slot_proofs.entry(key).or_default().push(witness);
         }

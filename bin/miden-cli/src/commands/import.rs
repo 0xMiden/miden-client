@@ -9,9 +9,8 @@ use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
 use tracing::info;
 
-use crate::commands::account::maybe_set_default_account;
+use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
-use crate::utils::load_config_file;
 use crate::{CliKeyStore, Parser};
 
 #[derive(Debug, Parser, Clone)]
@@ -32,7 +31,6 @@ impl ImportCmd {
         keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         validate_paths(&self.filenames)?;
-        let (mut current_config, _) = load_config_file()?;
         for filename in &self.filenames {
             let note_file = read_note_file(filename.clone());
 
@@ -57,7 +55,7 @@ impl ImportCmd {
                 println!("Successfully imported account {account_id}");
 
                 if account_id.is_regular_account() {
-                    maybe_set_default_account(&mut current_config, account_id)?;
+                    set_default_account_if_unset(&mut client, account_id).await?;
                 }
             }
         }
@@ -78,13 +76,13 @@ async fn import_account<AUTH>(
         .map_err(ClientError::DataDeserializationError)?;
     let account_id = account_data.account.id();
 
-    for key in account_data.auth_secret_keys {
+    let AccountFile { account, auth_secret_keys } = account_data;
+
+    for key in auth_secret_keys {
         keystore.add_key(&key).map_err(CliError::KeyStore)?;
     }
 
-    client
-        .add_account(&account_data.account, account_data.account_seed, overwrite)
-        .await?;
+    client.add_account(&account, overwrite).await?;
 
     Ok(account_id)
 }
