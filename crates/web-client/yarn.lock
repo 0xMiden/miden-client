@@ -33,12 +33,12 @@
     "@jridgewell/trace-mapping" "0.3.9"
 
 "@gerrit0/mini-shiki@^3.12.0":
-  version "3.12.2"
+  version "3.13.0"
   dependencies:
-    "@shikijs/engine-oniguruma" "^3.12.2"
-    "@shikijs/langs" "^3.12.2"
-    "@shikijs/themes" "^3.12.2"
-    "@shikijs/types" "^3.12.2"
+    "@shikijs/engine-oniguruma" "^3.13.0"
+    "@shikijs/langs" "^3.13.0"
+    "@shikijs/themes" "^3.13.0"
+    "@shikijs/types" "^3.13.0"
     "@shikijs/vscode-textmate" "^10.0.2"
 
 "@iarna/toml@^2.2.5":
@@ -163,24 +163,24 @@
     estree-walker "^2.0.2"
     picomatch "^4.0.2"
 
-"@shikijs/engine-oniguruma@^3.12.2":
-  version "3.12.2"
+"@shikijs/engine-oniguruma@^3.13.0":
+  version "3.13.0"
   dependencies:
-    "@shikijs/types" "3.12.2"
+    "@shikijs/types" "3.13.0"
     "@shikijs/vscode-textmate" "^10.0.2"
 
-"@shikijs/langs@^3.12.2":
-  version "3.12.2"
+"@shikijs/langs@^3.13.0":
+  version "3.13.0"
   dependencies:
-    "@shikijs/types" "3.12.2"
+    "@shikijs/types" "3.13.0"
 
-"@shikijs/themes@^3.12.2":
-  version "3.12.2"
+"@shikijs/themes@^3.13.0":
+  version "3.13.0"
   dependencies:
-    "@shikijs/types" "3.12.2"
+    "@shikijs/types" "3.13.0"
 
-"@shikijs/types@^3.12.2", "@shikijs/types@3.12.2":
-  version "3.12.2"
+"@shikijs/types@^3.13.0", "@shikijs/types@3.13.0":
+  version "3.13.0"
   dependencies:
     "@shikijs/vscode-textmate" "^10.0.2"
     "@types/hast" "^3.0.4"
@@ -2269,10 +2269,10 @@ typed-query-selector@^2.12.0:
   integrity sha512-SbklCd1F0EiZOyPiW192rrHZzZ5sBijB6xM+cpmrwDqObvdtunOHHIk9fCGsoK5JVIYXoyEp4iEdE3upFH3PAg==
 
 typedoc-plugin-markdown@^4.8.1:
-  version "4.8.1"
+  version "4.9.0"
 
 typedoc@^0.28.1, typedoc@0.28.x:
-  version "0.28.12"
+  version "0.28.13"
   dependencies:
     "@gerrit0/mini-shiki" "^3.12.0"
     lunr "^2.3.9"

@@ -87,6 +87,7 @@
 - [OutputNotes](classes/OutputNotes.md)
 - [OutputNotesArray](classes/OutputNotesArray.md)
 - [PartialNote](classes/PartialNote.md)
+- [ProvenTransaction](classes/ProvenTransaction.md)
 - [PublicKey](classes/PublicKey.md)
 - [RecipientArray](classes/RecipientArray.md)
 - [RpcClient](classes/RpcClient.md)

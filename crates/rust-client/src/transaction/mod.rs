@@ -69,21 +69,17 @@
 //! For more detailed information about each function and error type, refer to the specific API
 //! documentation.
 
-use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::fmt::{self};
 
-use miden_objects::account::{Account, AccountDelta, AccountId};
+use miden_objects::account::{Account, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
 use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
-use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
@@ -103,11 +99,25 @@ use crate::store::{
 };
 use crate::sync::NoteTagRecord;
 
+mod record;
 mod request;
+pub use record::{
+    DiscardCause,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
+    TransactionStatusVariant,
+};
 
+mod store_update;
+pub use store_update::TransactionStoreUpdate;
+
+mod result;
+pub use result::TransactionResult;
+
+mod prover;
 // RE-EXPORTS
 // ================================================================================================
-
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
@@ -132,6 +142,7 @@ pub use miden_tx::{
     TransactionExecutorError,
     TransactionProverError,
 };
+pub use prover::TransactionProver;
 pub use request::{
     ForeignAccount,
     NoteArgs,
@@ -142,439 +153,6 @@ pub use request::{
     TransactionRequestError,
     TransactionScriptTemplate,
 };
-
-// TRANSACTION RESULT
-// ================================================================================================
-
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait TransactionProver {
-    async fn prove(
-        &self,
-        tx_result: TransactionWitness,
-    ) -> Result<ProvenTransaction, TransactionProverError>;
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl TransactionProver for LocalTransactionProver {
-    async fn prove(
-        &self,
-        witness: TransactionWitness,
-    ) -> Result<ProvenTransaction, TransactionProverError> {
-        LocalTransactionProver::prove(self, witness)
-    }
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl TransactionProver for RemoteTransactionProver {
-    async fn prove(
-        &self,
-        witness: TransactionWitness,
-    ) -> Result<ProvenTransaction, TransactionProverError> {
-        let fut = RemoteTransactionProver::prove(self, witness);
-        fut.await
-    }
-}
-
-/// Represents the result of executing a transaction by the client.
-///
-/// It contains an [`ExecutedTransaction`], and a list of `future_notes` that we expect to receive
-/// in the future (you can check at swap notes for an example of this).
-#[derive(Clone, Debug, PartialEq)]
-pub struct TransactionResult {
-    transaction: ExecutedTransaction,
-    future_notes: Vec<(NoteDetails, NoteTag)>,
-}
-
-impl TransactionResult {
-    /// Screens the output notes to store and track the relevant ones, and instantiates a
-    /// [`TransactionResult`].
-    pub fn new(
-        transaction: ExecutedTransaction,
-        future_notes: Vec<(NoteDetails, NoteTag)>,
-    ) -> Result<Self, ClientError> {
-        Ok(Self { transaction, future_notes })
-    }
-
-    /// Returns the [`ExecutedTransaction`].
-    pub fn executed_transaction(&self) -> &ExecutedTransaction {
-        &self.transaction
-    }
-
-    /// Returns the output notes that were generated as a result of the transaction execution.
-    pub fn created_notes(&self) -> &OutputNotes {
-        self.transaction.output_notes()
-    }
-
-    /// Returns the list of notes that might be created in the future as a result of the
-    /// transaction execution.
-    pub fn future_notes(&self) -> &[(NoteDetails, NoteTag)] {
-        &self.future_notes
-    }
-
-    /// Returns the block against which the transaction was executed.
-    pub fn block_num(&self) -> BlockNumber {
-        self.transaction.block_header().block_num()
-    }
-
-    /// Returns transaction's [`TransactionArgs`].
-    pub fn transaction_arguments(&self) -> &TransactionArgs {
-        self.transaction.tx_args()
-    }
-
-    /// Returns the [`AccountDelta`] that describes the change of state for the executing [Account].
-    pub fn account_delta(&self) -> &AccountDelta {
-        self.transaction.account_delta()
-    }
-
-    /// Returns input notes that were consumed as part of the transaction.
-    pub fn consumed_notes(&self) -> &InputNotes<InputNote> {
-        self.transaction.tx_inputs().input_notes()
-    }
-}
-
-impl From<TransactionResult> for ExecutedTransaction {
-    fn from(tx_result: TransactionResult) -> ExecutedTransaction {
-        tx_result.transaction
-    }
-}
-
-impl Serializable for TransactionResult {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.transaction.write_into(target);
-        self.future_notes.write_into(target);
-    }
-}
-
-impl Deserializable for TransactionResult {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let transaction = ExecutedTransaction::read_from(source)?;
-        let future_notes = Vec::<(NoteDetails, NoteTag)>::read_from(source)?;
-
-        Ok(Self { transaction, future_notes })
-    }
-}
-
-// TRANSACTION RECORD
-// ================================================================================================
-
-/// Describes a transaction that has been executed and is being tracked on the Client.
-#[derive(Debug, Clone)]
-pub struct TransactionRecord {
-    /// Unique identifier for the transaction.
-    pub id: TransactionId,
-    /// Details associated with the transaction.
-    pub details: TransactionDetails,
-    /// Script associated with the transaction, if no script is provided, only note scripts are
-    /// executed.
-    pub script: Option<TransactionScript>,
-    /// Current status of the transaction.
-    pub status: TransactionStatus,
-}
-
-impl TransactionRecord {
-    /// Creates a new [`TransactionRecord`] instance.
-    pub fn new(
-        id: TransactionId,
-        details: TransactionDetails,
-        script: Option<TransactionScript>,
-        status: TransactionStatus,
-    ) -> TransactionRecord {
-        TransactionRecord { id, details, script, status }
-    }
-
-    /// Updates (if necessary) the transaction status to signify that the transaction was
-    /// committed. Will return true if the record was modified, false otherwise.
-    pub fn commit_transaction(
-        &mut self,
-        commit_height: BlockNumber,
-        commit_timestamp: u64,
-    ) -> bool {
-        match self.status {
-            TransactionStatus::Pending => {
-                self.status = TransactionStatus::Committed {
-                    block_number: commit_height,
-                    commit_timestamp,
-                };
-                true
-            },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
-        }
-    }
-
-    /// Updates (if necessary) the transaction status to signify that the transaction was
-    /// discarded. Will return true if the record was modified, false otherwise.
-    pub fn discard_transaction(&mut self, cause: DiscardCause) -> bool {
-        match self.status {
-            TransactionStatus::Pending => {
-                self.status = TransactionStatus::Discarded(cause);
-                true
-            },
-            TransactionStatus::Discarded(_) | TransactionStatus::Committed { .. } => false,
-        }
-    }
-}
-
-/// Describes the details associated with a transaction.
-#[derive(Debug, Clone)]
-pub struct TransactionDetails {
-    /// ID of the account that executed the transaction.
-    pub account_id: AccountId,
-    /// Initial state of the account before the transaction was executed.
-    pub init_account_state: Word,
-    /// Final state of the account after the transaction was executed.
-    pub final_account_state: Word,
-    /// Nullifiers of the input notes consumed in the transaction.
-    pub input_note_nullifiers: Vec<Word>,
-    /// Output notes generated as a result of the transaction.
-    pub output_notes: OutputNotes,
-    /// Block number for the block against which the transaction was executed.
-    pub block_num: BlockNumber,
-    /// Block number at which the transaction was submitted.
-    pub submission_height: BlockNumber,
-    /// Block number at which the transaction is set to expire.
-    pub expiration_block_num: BlockNumber,
-    /// Timestamp indicating when the transaction was created by the client.
-    pub creation_timestamp: u64,
-}
-
-impl Serializable for TransactionDetails {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.account_id.write_into(target);
-        self.init_account_state.write_into(target);
-        self.final_account_state.write_into(target);
-        self.input_note_nullifiers.write_into(target);
-        self.output_notes.write_into(target);
-        self.block_num.write_into(target);
-        self.submission_height.write_into(target);
-        self.expiration_block_num.write_into(target);
-        self.creation_timestamp.write_into(target);
-    }
-}
-
-impl Deserializable for TransactionDetails {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let account_id = AccountId::read_from(source)?;
-        let init_account_state = Word::read_from(source)?;
-        let final_account_state = Word::read_from(source)?;
-        let input_note_nullifiers = Vec::<Word>::read_from(source)?;
-        let output_notes = OutputNotes::read_from(source)?;
-        let block_num = BlockNumber::read_from(source)?;
-        let submission_height = BlockNumber::read_from(source)?;
-        let expiration_block_num = BlockNumber::read_from(source)?;
-        let creation_timestamp = source.read_u64()?;
-
-        Ok(Self {
-            account_id,
-            init_account_state,
-            final_account_state,
-            input_note_nullifiers,
-            output_notes,
-            block_num,
-            submission_height,
-            expiration_block_num,
-            creation_timestamp,
-        })
-    }
-}
-
-/// Represents the cause of the discarded transaction.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DiscardCause {
-    Expired,
-    InputConsumed,
-    DiscardedInitialState,
-    Stale,
-}
-
-impl DiscardCause {
-    pub fn from_string(cause: &str) -> Result<Self, DeserializationError> {
-        match cause {
-            "Expired" => Ok(DiscardCause::Expired),
-            "InputConsumed" => Ok(DiscardCause::InputConsumed),
-            "DiscardedInitialState" => Ok(DiscardCause::DiscardedInitialState),
-            "Stale" => Ok(DiscardCause::Stale),
-            _ => Err(DeserializationError::InvalidValue(format!("Invalid discard cause: {cause}"))),
-        }
-    }
-}
-
-impl fmt::Display for DiscardCause {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DiscardCause::Expired => write!(f, "Expired"),
-            DiscardCause::InputConsumed => write!(f, "InputConsumed"),
-            DiscardCause::DiscardedInitialState => write!(f, "DiscardedInitialState"),
-            DiscardCause::Stale => write!(f, "Stale"),
-        }
-    }
-}
-
-impl Serializable for DiscardCause {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        match self {
-            DiscardCause::Expired => target.write_u8(0),
-            DiscardCause::InputConsumed => target.write_u8(1),
-            DiscardCause::DiscardedInitialState => target.write_u8(2),
-            DiscardCause::Stale => target.write_u8(3),
-        }
-    }
-}
-
-impl Deserializable for DiscardCause {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        match source.read_u8()? {
-            0 => Ok(DiscardCause::Expired),
-            1 => Ok(DiscardCause::InputConsumed),
-            2 => Ok(DiscardCause::DiscardedInitialState),
-            3 => Ok(DiscardCause::Stale),
-            _ => Err(DeserializationError::InvalidValue("Invalid discard cause".to_string())),
-        }
-    }
-}
-
-/// Represents the status of a transaction.
-#[derive(Debug, Clone, PartialEq)]
-pub enum TransactionStatus {
-    /// Transaction has been submitted but not yet committed.
-    Pending,
-    /// Transaction has been committed and included at the specified block number.
-    Committed {
-        /// Block number at which the transaction was committed.
-        block_number: BlockNumber,
-        /// Timestamp indicating when the transaction was committed.
-        commit_timestamp: u64,
-    },
-    /// Transaction has been discarded and isn't included in the node.
-    Discarded(DiscardCause),
-}
-
-pub enum TransactionStatusVariant {
-    Pending = 0,
-    Committed = 1,
-    Discarded = 2,
-}
-
-impl TransactionStatus {
-    pub const fn variant(&self) -> TransactionStatusVariant {
-        match self {
-            TransactionStatus::Pending => TransactionStatusVariant::Pending,
-            TransactionStatus::Committed { .. } => TransactionStatusVariant::Committed,
-            TransactionStatus::Discarded(_) => TransactionStatusVariant::Discarded,
-        }
-    }
-}
-
-impl fmt::Display for TransactionStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TransactionStatus::Pending => write!(f, "Pending"),
-            TransactionStatus::Committed { block_number, .. } => {
-                write!(f, "Committed (Block: {block_number})")
-            },
-            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
-        }
-    }
-}
-
-impl Serializable for TransactionStatus {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        match self {
-            TransactionStatus::Pending => target.write_u8(self.variant() as u8),
-            TransactionStatus::Committed { block_number, commit_timestamp } => {
-                target.write_u8(self.variant() as u8);
-                block_number.write_into(target);
-                commit_timestamp.write_into(target);
-            },
-            TransactionStatus::Discarded(cause) => {
-                target.write_u8(self.variant() as u8);
-                cause.write_into(target);
-            },
-        }
-    }
-}
-
-impl Deserializable for TransactionStatus {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        match source.read_u8()? {
-            variant if variant == TransactionStatusVariant::Pending as u8 => {
-                Ok(TransactionStatus::Pending)
-            },
-            variant if variant == TransactionStatusVariant::Committed as u8 => {
-                let block_number = BlockNumber::read_from(source)?;
-                let commit_timestamp = source.read_u64()?;
-                Ok(TransactionStatus::Committed { block_number, commit_timestamp })
-            },
-            variant if variant == TransactionStatusVariant::Discarded as u8 => {
-                let cause = DiscardCause::read_from(source)?;
-                Ok(TransactionStatus::Discarded(cause))
-            },
-            _ => Err(DeserializationError::InvalidValue("Invalid transaction status".to_string())),
-        }
-    }
-}
-
-// TRANSACTION STORE UPDATE
-// ================================================================================================
-
-/// Represents the changes that need to be applied to the client store as a result of a
-/// transaction execution.
-pub struct TransactionStoreUpdate {
-    /// Details of the executed transaction to be inserted.
-    executed_transaction: ExecutedTransaction,
-    /// Block number at which the transaction was submitted.
-    submission_height: BlockNumber,
-    /// Information about note changes after the transaction execution.
-    note_updates: NoteUpdateTracker,
-    /// New note tags to be tracked.
-    new_tags: Vec<NoteTagRecord>,
-}
-
-impl TransactionStoreUpdate {
-    /// Creates a new [`TransactionStoreUpdate`] instance.
-    ///
-    /// # Arguments
-    /// - `executed_transaction`: The executed transaction details.
-    /// - `submission_height`: The block number at which the transaction was submitted.
-    /// - `note_updates`: The note updates that need to be applied to the store after the
-    ///   transaction execution.
-    /// - `new_tags`: New note tags that were need to be tracked because of created notes.
-    pub fn new(
-        executed_transaction: ExecutedTransaction,
-        submission_height: BlockNumber,
-        note_updates: NoteUpdateTracker,
-        new_tags: Vec<NoteTagRecord>,
-    ) -> Self {
-        Self {
-            executed_transaction,
-            submission_height,
-            note_updates,
-            new_tags,
-        }
-    }
-
-    /// Returns the executed transaction.
-    pub fn executed_transaction(&self) -> &ExecutedTransaction {
-        &self.executed_transaction
-    }
-
-    /// Returns the block number at which the transaction was submitted.
-    pub fn submission_height(&self) -> BlockNumber {
-        self.submission_height
-    }
-
-    /// Returns the note updates that need to be applied after the transaction execution.
-    pub fn note_updates(&self) -> &NoteUpdateTracker {
-        &self.note_updates
-    }
-
-    /// Returns the new tags that were created as part of the transaction.
-    pub fn new_tags(&self) -> &[NoteTagRecord] {
-        &self.new_tags
-    }
-}
 
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
