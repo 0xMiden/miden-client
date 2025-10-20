@@ -112,11 +112,11 @@ stop-node: ## Stop the testing node server
 	-pkill -f "node-builder"
 	sleep 1
 
-.PHONY: start-transport-background
-start-transport-background: ## Start the note transport service in background
+.PHONY: start-note-transport-background
+start-note-transport-background: ## Start the note transport service in background
 	./scripts/start-note-transport-bg.sh
 
-.PHONY: stop-transport
+.PHONY: stop-note-transport
 stop-transport: ## Stop the note transport service
 	./scripts/stop-note-transport.sh
 

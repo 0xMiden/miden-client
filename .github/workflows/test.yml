@@ -50,7 +50,7 @@ jobs:
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
-        run: make start-transport-background
+        run: make start-note-transport-background
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
@@ -60,7 +60,7 @@ jobs:
       - name: Stop note transport
         if: always()
         run: |
-          make stop-transport
+          make stop-note-transport
 
   build-web-client-dist-folder:
     name: Build Web Client
@@ -151,7 +151,7 @@ jobs:
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
-        run: make start-transport-background
+        run: make start-note-transport-background
       - name: Run web client tests
         run: |
           make integration-test-web-client
@@ -162,7 +162,7 @@ jobs:
         run: make stop-node
       - name: Stop note transport
         if: always()
-        run: make stop-transport
+        run: make stop-note-transport
 
   integration-tests-remote-prover-web-client:
     name: Run integration tests for remote prover on ubuntu-latest
@@ -192,7 +192,7 @@ jobs:
       - name: Start test node
         run: make start-node-background
       - name: Start note transport
-        run: make start-transport-background
+        run: make start-note-transport-background
       - name: Start prover
         run: make start-prover-background
       - name: Run remote prover tests
@@ -205,4 +205,4 @@ jobs:
         run: make stop-prover
       - name: Stop note transport
         if: always()
-        run: make stop-transport
+        run: make stop-note-transport
