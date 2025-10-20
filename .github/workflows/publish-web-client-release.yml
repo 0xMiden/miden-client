@@ -89,7 +89,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
           cd crates/web-client
-          npm publish --tag next
+          npm publish --tag latest
 
       - name: Done
         if: steps.check_version.outputs.should_publish == 'true'
