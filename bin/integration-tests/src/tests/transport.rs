@@ -160,7 +160,7 @@ async fn run_flow(
 
     // Send over transport
     sender
-        .send_private_note(note, &recipient_address)
+        .send_private_note(note.clone(), &recipient_address)
         .await
         .context("send_private_note failed")?;
 
@@ -169,6 +169,7 @@ async fn run_flow(
     let notes = recipient.get_input_notes(NoteFilter::All).await?;
     if recipient_should_receive {
         assert_eq!(notes.len(), 1, "recipient should have exactly 1 input note after fetch");
+        assert_eq!(notes[0].id(), note.id(), "received note id should match minted note id");
     } else {
         assert!(notes.is_empty(), "recipient should have 0 input notes without transport");
     }
@@ -182,6 +183,7 @@ async fn run_flow(
             1,
             "recipient should still have exactly 1 input note after re-sync"
         );
+        assert_eq!(notes[0].id(), note.id(), "re-synced note id should match minted note id");
     } else {
         assert!(notes.is_empty(), "recipient should still have 0 input notes");
     }
