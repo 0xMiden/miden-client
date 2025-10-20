@@ -103,6 +103,38 @@ return it as a struct.
 
 ***
 
+### fromNoteDetails()
+
+> `static` **fromNoteDetails**(`note_details`): `NoteFile`
+
+#### Parameters
+
+##### note\_details
+
+[`NoteDetails`](NoteDetails.md)
+
+#### Returns
+
+`NoteFile`
+
+***
+
+### fromNoteId()
+
+> `static` **fromNoteId**(`note_details`): `NoteFile`
+
+#### Parameters
+
+##### note\_details
+
+[`NoteId`](NoteId.md)
+
+#### Returns
+
+`NoteFile`
+
+***
+
 ### fromOutputNote()
 
 > `static` **fromOutputNote**(`note`): `NoteFile`
