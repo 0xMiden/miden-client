@@ -120,6 +120,10 @@ start-transport-background: ## Start the note transport service in background
 stop-transport: ## Stop the note transport service
 	./scripts/stop-note-transport.sh
 
+.PHONY: start-note-transport
+start-note-transport:
+	./scripts/start-note-transport.sh
+
 .PHONY: integration-test
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
