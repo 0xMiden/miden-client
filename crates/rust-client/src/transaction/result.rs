@@ -63,7 +63,8 @@ impl TransactionResult {
         self.transaction.tx_args()
     }
 
-    /// Returns the [`AccountDelta`] that describes the change of state for the executing [Account].
+    /// Returns the [`AccountDelta`] that describes the change of state for the executing
+    /// [`crate::account::Account``].
     pub fn account_delta(&self) -> &AccountDelta {
         self.transaction.account_delta()
     }
