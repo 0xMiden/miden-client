@@ -163,10 +163,8 @@ test.describe("export and import note", () => {
     return await testingPage.evaluate(
       async ({ serializedNote }) => {
         const noteFile = window.NoteFile.deserialize(serializedNote);
-        const importedNoteId = window.client
-          .importNoteFile(noteFile)
-          .toString();
-        return importedNoteId;
+        const importedNoteId = await window.client.importNoteFile(noteFile);
+        return importedNoteId.toString();
       },
       { serializedNote }
     );
