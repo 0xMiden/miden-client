@@ -11,14 +11,14 @@ use crate::{Parser, Subcommand, create_dynamic_table};
 pub enum AddressSubCommand {
     /// List all addresses an account can be referenced by
     List { account_id: String },
-    /// Add a new address,
+    /// Add a new address
     Add {
         /// Interface number for add/remove operations
         interface: String,
-        /// Account to Add
+        /// Account to add
         account_id: String,
     },
-    /// Remove the given address.
+    /// Remove the given address
     Remove {
         /// Interface number for add/remove operations
         interface: String,
@@ -105,9 +105,9 @@ async fn add_address<AUTH>(
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
     };
-    println!("adding address - Account Id {account_id} - Execution mode: {execution_mode}");
-
     client.add_address(address, account_id).await?;
+
+    println!("Address added: Account Id {account_id} - Execution mode: {execution_mode}");
     Ok(())
 }
 
