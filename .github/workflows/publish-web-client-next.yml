@@ -99,10 +99,18 @@ jobs:
 
       - name: Done
         if: steps.check_version.outputs.should_publish == 'true'
-        run: echo "✅ Build complete; published version ${{ steps.check_version.outputs.current_version }}."
+        env:
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+        run: echo "✅ Build complete; published version $CURRENT_VERSION."
 
       - name: Skipped publish
         if: steps.check_version.outputs.should_publish != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ steps.check_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
         run: |
-          echo "ℹ️ Publish skipped; should_publish=${{ steps.check_version.outputs.should_publish }}"
+          echo "ℹ️ Publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
 
