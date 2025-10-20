@@ -49,9 +49,7 @@ const importAccountById = async (page: Page, accountId: string) => {
 };
 
 test.describe("import from seed", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("should import same public account from seed", async ({ page }) => {
+  test("should import same public account from seed", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
@@ -106,9 +104,7 @@ test.describe("import from seed", () => {
 });
 
 test.describe("import public account by id", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("should import public account from id", async ({ page }) => {
+  test("should import public account from id", async ({ page }) => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 

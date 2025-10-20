@@ -44,9 +44,7 @@ const getAllTransactions = async (
 };
 
 test.describe("get_transactions tests", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("get_transactions retrieves all transactions successfully", async ({
+  test("get_transactions retrieves all transactions successfully", async ({
     page,
   }) => {
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
@@ -64,9 +62,7 @@ test.describe("get_transactions tests", () => {
     expect(result.uncommittedTransactionIds.length).toEqual(0);
   });
 
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("get_transactions retrieves uncommitted transactions successfully", async ({
+  test("get_transactions retrieves uncommitted transactions successfully", async ({
     page,
   }) => {
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
@@ -105,9 +101,7 @@ test.describe("get_transactions tests", () => {
     expect(result.uncommittedTransactionIds.length).toEqual(0);
   });
 
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("get_transactions filters by specific transaction IDs successfully", async ({
+  test("get_transactions filters by specific transaction IDs successfully", async ({
     page,
   }) => {
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
@@ -144,9 +138,7 @@ test.describe("get_transactions tests", () => {
     );
   });
 
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("get_transactions filters expired transactions successfully", async ({
+  test("get_transactions filters expired transactions successfully", async ({
     page,
   }) => {
     const { accountId, faucetId } = await setupWalletAndFaucet(page);

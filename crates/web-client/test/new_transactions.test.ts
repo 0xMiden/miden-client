@@ -141,9 +141,7 @@ test.describe("mint transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    // Disabled due to out of bounds memory error:
-    // https://github.com/0xMiden/miden-vm/issues/2303
-    test.skip(description, async ({ page }) => {
+    test(description, async ({ page }) => {
       // This test was added in #995 to reproduce an issue in the web wallet.
       // It is useful because most tests consume the note right on the latest client block,
       // but this test mints 3 notes and consumes them after the fact. This ensures the
@@ -174,9 +172,7 @@ test.describe("consume transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    // Disabled due to out of bounds memory error:
-    // https://github.com/0xMiden/miden-vm/issues/2303
-    test.skip(description, async ({ page }) => {
+    test(description, async ({ page }) => {
       const { faucetId, accountId } = await setupWalletAndFaucet(page);
       const { consumeResult: result } = await mintAndConsumeTransaction(
         page,
@@ -249,9 +245,7 @@ test.describe("send transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    // Disabled due to out of bounds memory error:
-    // https://github.com/0xMiden/miden-vm/issues/2303
-    test.skip(description, async ({ page }) => {
+    test(description, async ({ page }) => {
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
@@ -297,9 +291,7 @@ test.describe("swap transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    // Disabled due to out of bounds memory error:
-    // https://github.com/0xMiden/miden-vm/issues/2303
-    test.skip(description, async ({ page }) => {
+    test(description, async ({ page }) => {
       const { accountId: accountA, faucetId: faucetA } =
         await setupWalletAndFaucet(page);
       const { accountId: accountB, faucetId: faucetB } =
@@ -436,7 +428,7 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-
+                
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
@@ -676,21 +668,15 @@ const customTxWithMultipleNotes = async (
 };
 
 test.describe("custom transaction tests", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("custom transaction completes successfully", async ({ page }) => {
+  test("custom transaction completes successfully", async ({ page }) => {
     await expect(customTransaction(page, "0", false)).resolves.toBeUndefined();
   });
 
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("custom transaction fails", async ({ page }) => {
+  test("custom transaction fails", async ({ page }) => {
     await expect(customTransaction(page, "1", false)).rejects.toThrow();
   });
 
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("custom transaction with remote prover completes successfully", async ({
+  test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
@@ -710,9 +696,7 @@ test.describe("custom transaction with multiple output notes", () => {
   ];
 
   testCases.forEach(({ description, shouldFail }) => {
-    // Disabled due to out of bounds memory error:
-    // https://github.com/0xMiden/miden-vm/issues/2303
-    test.skip(description, async ({ page }) => {
+    test(description, async ({ page }) => {
       const { accountId, faucetId } = await setupConsumedNote(page);
       if (shouldFail) {
         await expect(
@@ -1050,9 +1034,7 @@ export const discardedTransaction = async (
 };
 
 test.describe("discarded_transaction tests", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("transaction gets discarded", async ({ page }) => {
+  test("transaction gets discarded", async ({ page }) => {
     const result = await discardedTransaction(page);
 
     expect(result.discardedTransactions.length).toEqual(1);
@@ -1211,9 +1193,7 @@ export const counterAccountComponent = async (
 };
 
 test.describe("counter account component tests", () => {
-  // Disabled due to out of bounds memory error:
-  // https://github.com/0xMiden/miden-vm/issues/2303
-  test.skip("counter account component transaction completes successfully", async ({
+  test("counter account component transaction completes successfully", async ({
     page,
   }) => {
     page.on("console", (msg) => console.log(msg));
