@@ -76,7 +76,7 @@ impl FaucetDetailsMap {
     /// Parses a string representing a [`FungibleAsset`]. There are two accepted formats for the
     /// string:
     /// - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units and `<FAUCET_ID>` is
-    ///   the faucet's account iD.
+    ///   the faucet's account ID.
     /// - `<AMOUNT>::<FAUCET_ADDRESS>` where `<AMOUNT>` is in the faucet base units and
     ///   `<FAUCET_ADDRESS>` is the faucet address.
     /// - `<AMOUNT>::<TOKEN_SYMBOL>` where `<AMOUNT>` is a decimal number representing the quantity

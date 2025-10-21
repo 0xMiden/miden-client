@@ -1,12 +1,17 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
-use miden_client::auth::{AuthSecretKey, Signature, SigningInputs, TransactionAuthenticator};
+use miden_client::auth::{
+    AuthSecretKey,
+    PublicKeyCommitment,
+    Signature,
+    SigningInputs,
+    TransactionAuthenticator,
+};
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Felt, Word as NativeWord};
+use miden_client::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -78,7 +83,7 @@ impl<R: Rng> WebKeyStore<R> {
             return Ok(());
         }
         let pub_key = match &key {
-            AuthSecretKey::RpoFalcon512(k) => NativeWord::from(k.public_key()).to_hex(),
+            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
@@ -121,26 +126,27 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
     /// returned.
     async fn get_signature(
         &self,
-        pub_key: NativeWord,
+        pub_key: PublicKeyCommitment,
         signing_inputs: &SigningInputs,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
+    ) -> Result<Signature, AuthenticationError> {
         // If a JavaScript signing callback is provided, use it directly.
         if let Some(sign_cb) = &self.callbacks.as_ref().sign {
-            return sign_cb.sign(pub_key, signing_inputs).await;
+            return sign_cb.sign(pub_key.into(), signing_inputs).await;
         }
         let message = signing_inputs.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key)
+            .get_key(pub_key.into())
             .await
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
         let mut rng = self.rng.write();
 
-        let AuthSecretKey::RpoFalcon512(k) =
-            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
+        let AuthSecretKey::RpoFalcon512(k) = secret_key.ok_or(
+            AuthenticationError::UnknownPublicKey(Into::<NativeWord>::into(pub_key).to_hex()),
+        )?;
 
         let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
-        Ok(signature.to_prepared_signature())
+        Ok(signature)
     }
 }

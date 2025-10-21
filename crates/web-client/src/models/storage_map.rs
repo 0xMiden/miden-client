@@ -15,7 +15,7 @@ impl StorageMap {
     }
 
     pub fn insert(&mut self, key: &Word, value: &Word) -> Word {
-        self.0.insert(key.into(), value.into()).into()
+        self.0.insert(key.into(), value.into()).unwrap_or_default().into()
     }
 }
 

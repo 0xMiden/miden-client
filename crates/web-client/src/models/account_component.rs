@@ -1,7 +1,8 @@
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
-use miden_client::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
+use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
 use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
@@ -66,8 +67,10 @@ impl AccountComponent {
     #[wasm_bindgen(js_name = "createAuthComponent")]
     pub fn create_auth_component(secret_key: &SecretKey) -> AccountComponent {
         let native_secret_key: NativeSecretKey = secret_key.into();
-        let native_auth_component: NativeAccountComponent =
-            NativeRpoFalcon512::new(native_secret_key.public_key()).into();
+        let native_auth_component: NativeAccountComponent = NativeRpoFalcon512::new(
+            PublicKeyCommitment::from(native_secret_key.public_key().to_commitment()),
+        )
+        .into();
         AccountComponent(native_auth_component)
     }
 }
