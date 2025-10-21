@@ -77,6 +77,7 @@ pub mod note_type;
 pub mod output_note;
 pub mod output_notes;
 pub mod partial_note;
+pub mod proven_transaction;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
@@ -97,6 +98,7 @@ pub mod transaction_result;
 pub mod transaction_script;
 pub mod transaction_script_inputs;
 pub mod transaction_status;
+pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
 
