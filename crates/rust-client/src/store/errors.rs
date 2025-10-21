@@ -7,6 +7,7 @@ use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
     AccountError,
     AccountIdError,
+    AddressError,
     AssetError,
     AssetVaultError,
     NoteError,
@@ -37,6 +38,8 @@ pub enum StoreError {
     AccountDataNotFound(AccountId),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("address error")]
+    AddressError(#[from] AddressError),
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
     #[error("account commitment {0} already exists")]
@@ -67,6 +70,8 @@ pub enum StoreError {
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
+    #[error("note transport cursor not found")]
+    NoteTransportCursorNotFound,
     #[error("failed to parse data retrieved from the database: {0}")]
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]

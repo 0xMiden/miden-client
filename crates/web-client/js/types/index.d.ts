@@ -5,6 +5,7 @@ export {
   AccountBuilder,
   AccountComponent,
   AccountDelta,
+  AccountFile,
   AccountHeader,
   AccountId,
   AccountInterface,
@@ -74,6 +75,7 @@ export {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
 } from "./crates/miden_client_web";
 

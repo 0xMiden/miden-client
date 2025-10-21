@@ -50,38 +50,6 @@
 
 ***
 
-### compileNoteScript()
-
-> **compileNoteScript**(`script`): [`NoteScript`](NoteScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`NoteScript`](NoteScript.md)
-
-***
-
-### compileTxScript()
-
-> **compileTxScript**(`script`): [`TransactionScript`](TransactionScript.md)
-
-#### Parameters
-
-##### script
-
-`string`
-
-#### Returns
-
-[`TransactionScript`](TransactionScript.md)
-
-***
-
 ### createClient()
 
 > **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
@@ -98,6 +66,41 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 ##### seed?
 
 `Uint8Array`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
+### createClientWithExternalKeystore()
+
+> **createClientWithExternalKeystore**(`node_url?`, `seed?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
+
+Creates a new client with the given node URL, optional seed, and external keystore
+callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
+
+#### Parameters
+
+##### node\_url?
+
+`string`
+
+##### seed?
+
+`Uint8Array`
+
+##### get\_key\_cb?
+
+`Function`
+
+##### insert\_key\_cb?
+
+`Function`
+
+##### sign\_cb?
+
+`Function`
 
 #### Returns
 
@@ -128,9 +131,19 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ***
 
+### createScriptBuilder()
+
+> **createScriptBuilder**(): [`ScriptBuilder`](ScriptBuilder.md)
+
+#### Returns
+
+[`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
 ### exportAccountFile()
 
-> **exportAccountFile**(`account_id`): `Promise`\<`any`\>
+> **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>
 
 #### Parameters
 
@@ -140,7 +153,7 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 #### Returns
 
-`Promise`\<`any`\>
+`Promise`\<[`AccountFile`](AccountFile.md)\>
 
 ***
 
@@ -326,6 +339,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### getSetting()
+
+> **getSetting**(`key`): `Promise`\<`any`\>
+
+Retrieves the setting value for `key`, or `None` if it hasn’t been set.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`any`\>
+
+***
+
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -370,13 +401,13 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ### importAccountFile()
 
-> **importAccountFile**(`account_bytes`): `Promise`\<`any`\>
+> **importAccountFile**(`account_file`): `Promise`\<`any`\>
 
 #### Parameters
 
-##### account\_bytes
+##### account\_file
 
-`any`
+[`AccountFile`](AccountFile.md)
 
 #### Returns
 
@@ -417,6 +448,18 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<[`Account`](Account.md)\>
+
+***
+
+### listSettingKeys()
+
+> **listSettingKeys**(): `Promise`\<`string`[]\>
+
+Returns all the existing setting keys from the store.
+
+#### Returns
+
+`Promise`\<`string`[]\>
 
 ***
 
@@ -660,6 +703,24 @@ Meant to be used in conjunction with the `force_import_store` method
 
 ***
 
+### removeSetting()
+
+> **removeSetting**(`key`): `Promise`\<`void`\>
+
+Deletes a setting key-value from the store.
+
+#### Parameters
+
+##### key
+
+`string`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeTag()
 
 > **removeTag**(`tag`): `Promise`\<`void`\>
@@ -685,6 +746,28 @@ Returns the inner serialized mock chain if it exists.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### setSetting()
+
+> **setSetting**(`key`, `value`): `Promise`\<`void`\>
+
+Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
+
+#### Parameters
+
+##### key
+
+`string`
+
+##### value
+
+`any`
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 

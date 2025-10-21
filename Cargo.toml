@@ -23,6 +23,10 @@ repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.89"
 version      = "0.12.0"
 
+[profile.test-dev]
+inherits  = "dev"
+opt-level = 1
+
 [workspace.dependencies]
 # Miden base/protocol dependencies
 miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
@@ -37,6 +41,7 @@ miden-node-proto-build = { branch = "next", default-features = false, git = "htt
 miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-note-transport" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",

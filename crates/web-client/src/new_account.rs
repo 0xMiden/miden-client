@@ -2,7 +2,7 @@ use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, PublicKeyCommitment};
 use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
@@ -72,7 +72,9 @@ impl WebClient {
             let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
-                .with_auth_component(AuthRpoFalcon512::new(pub_key))
+                .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(
+                    pub_key.to_commitment(),
+                )))
                 .with_component(
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,

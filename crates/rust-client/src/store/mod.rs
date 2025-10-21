@@ -22,7 +22,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
@@ -36,6 +36,7 @@ use miden_objects::account::{
     StorageMapWitness,
     StorageSlot,
 };
+use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
@@ -43,6 +44,11 @@ use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
+use crate::note_transport::{
+    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
+    NoteTransportCursor,
+    NoteTransportUpdate,
+};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
 
@@ -251,11 +257,17 @@ pub trait Store: Send + Sync {
     -> Result<Option<AccountRecord>, StoreError>;
 
     /// Inserts an [`Account`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the account. This address
+    /// will be tracked for incoming notes and its derived note tag will be monitored.
     ///
     /// # Errors
     ///
     /// - If the account is new and does not contain a seed
-    async fn insert_account(&self, account: &Account) -> Result<(), StoreError>;
+    async fn insert_account(
+        &self,
+        account: &Account,
+        initial_address: Address,
+    ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
     /// script roots and added to the `GetForeignAccountCode` request.
@@ -270,6 +282,12 @@ pub trait Store: Send + Sync {
         &self,
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
+
+    /// Retrieves all [`Address`] objects that correspond to the provided account ID.
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError>;
 
     /// Updates an existing [`Account`] with a new state.
     ///
@@ -331,6 +349,53 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets the note transport cursor.
+    ///
+    /// This is used to reduce the number of fetched notes from the note transport network.
+    async fn get_note_transport_cursor(&self) -> Result<NoteTransportCursor, StoreError> {
+        let cursor_bytes = self
+            .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
+            .await?
+            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+        let array: [u8; 8] = cursor_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|e: core::array::TryFromSliceError| StoreError::ParsingError(e.to_string()))?;
+        let cursor = u64::from_be_bytes(array);
+        Ok(cursor.into())
+    }
+
+    /// Updates the note transport cursor.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the note transport
+    /// network.
+    async fn update_note_transport_cursor(
+        &self,
+        cursor: NoteTransportCursor,
+    ) -> Result<(), StoreError> {
+        let cursor_bytes = cursor.value().to_be_bytes().to_vec();
+        self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
+            .await?;
+        Ok(())
+    }
+
+    /// Applies a note transport update
+    ///
+    /// An update involves:
+    /// - Insert fetched notes;
+    /// - Update pagination cursor used in note fetching.
+    async fn apply_note_transport_update(
+        &self,
+        note_transport_update: NoteTransportUpdate,
+    ) -> Result<(), StoreError> {
+        self.update_note_transport_cursor(note_transport_update.cursor).await?;
+        self.upsert_input_notes(&note_transport_update.note_updates).await?;
+        Ok(())
+    }
 
     // PARTIAL MMR
     // --------------------------------------------------------------------------------------------

@@ -6,8 +6,6 @@ use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen_futures::JsFuture;
 
 use super::WebStore;
 use super::chain_data::utils::{
@@ -16,6 +14,7 @@ use super::chain_data::utils::{
 };
 use super::note::utils::{serialize_input_note, serialize_output_note};
 use super::transaction::utils::serialize_transaction_record;
+use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
 use js_bindings::{
@@ -37,11 +36,8 @@ use flattened_vec::flatten_nested_u8_vec;
 impl WebStore {
     pub(crate) async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
         let promise = idxdb_get_note_tags();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get note tags: {js_error:?}"))
-        })?;
-        let tags_idxdb: Vec<NoteTagIdxdbObject> = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let tags_idxdb: Vec<NoteTagIdxdbObject> =
+            await_js(promise, "failed to get note tags").await?;
 
         let tags = tags_idxdb
             .into_iter()
@@ -69,11 +65,8 @@ impl WebStore {
 
     pub(super) async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
         let promise = idxdb_get_sync_height();
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to get sync height: {js_error:?}"))
-        })?;
-        let block_num_idxdb: SyncHeightIdxdbObject = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let block_num_idxdb: SyncHeightIdxdbObject =
+            await_js(promise, "failed to get sync height").await?;
 
         let block_num_as_u32: u32 = block_num_idxdb.block_num.parse::<u32>().unwrap();
         Ok(block_num_as_u32.into())
@@ -91,9 +84,7 @@ impl WebStore {
         };
 
         let promise = idxdb_add_note_tag(tag.tag.to_bytes(), source_note_id, source_account_id);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to add note tag: {js_error:?}"))
-        })?;
+        await_js_value(promise, "failed to add note tag").await?;
 
         Ok(true)
     }
@@ -106,11 +97,7 @@ impl WebStore {
         };
 
         let promise = idxdb_remove_note_tag(tag.tag.to_bytes(), source_note_id, source_account_id);
-        let js_value = JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to remove note tag: {js_error:?}"))
-        })?;
-        let removed_tags: usize = from_value(js_value)
-            .map_err(|err| StoreError::DatabaseError(format!("failed to deserialize {err:?}")))?;
+        let removed_tags: usize = await_js(promise, "failed to remove note tag").await?;
 
         Ok(removed_tags)
     }
@@ -218,9 +205,7 @@ impl WebStore {
             transaction_updates,
         };
         let promise = idxdb_apply_state_sync(state_update);
-        JsFuture::from(promise).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to apply state sync: {js_error:?}"))
-        })?;
+        await_js_value(promise, "failed to apply state sync").await?;
 
         Ok(())
     }

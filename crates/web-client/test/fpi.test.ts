@@ -31,12 +31,10 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 swapw dropw
             end
         `;
-
-    let getItemComponent = window.AccountComponent.compile(
-      code,
-      window.TransactionKernel.assembler(),
-      [window.StorageSlot.map(storageMap)]
-    ).withSupportsAllTypes();
+    let builder = client.createScriptBuilder();
+    let getItemComponent = window.AccountComponent.compile(code, builder, [
+      window.StorageSlot.map(storageMap),
+    ]).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
@@ -59,11 +57,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     let foreignAccountId = getItemAccountBuilderResult.account.id();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      getItemAccountBuilderResult.account,
-      getItemAccountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(getItemAccountBuilderResult.account, false);
     await client.syncState();
 
     let txRequest = new window.TransactionRequestBuilder().build();
@@ -107,10 +101,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
         foreignAccountId.prefix().asInt().toString()
       );
 
-    let compiledTxScript = window.TransactionScript.compile(
-      txScript,
-      window.TransactionKernel.assembler()
-    );
+    let compiledTxScript = builder.compileTxScript(txScript);
 
     await client.syncState();
 

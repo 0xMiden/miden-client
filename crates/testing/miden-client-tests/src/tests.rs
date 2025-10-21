@@ -5,6 +5,7 @@ use std::println;
 use std::string::ToString;
 use std::sync::Arc;
 
+use miden_client::account::{AccountIdAddress, Address, AddressInterface};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteRelevance};
@@ -12,6 +13,7 @@ use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::NoteTagSource;
+use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
     MINT_AMOUNT,
@@ -31,6 +33,7 @@ use miden_client::testing::common::{
     setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
+use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
@@ -40,14 +43,15 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
+use miden_client::utils::RwLock;
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::SqliteStore;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::utils;
 use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::note::{create_p2id_note, utils};
 use miden_lib::testing::mock_account::MockAccountExt;
 use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
@@ -62,12 +66,13 @@ use miden_objects::account::{
     AccountStorageMode,
     AccountType,
     AuthSecretKey,
+    PublicKeyCommitment,
     StorageMap,
     StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
     Note,
@@ -243,7 +248,7 @@ async fn insert_same_account_twice_fails() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     assert!(client.add_account(&account, false).await.is_ok());
@@ -257,7 +262,7 @@ async fn account_code() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     let account_code = account.code();
@@ -279,7 +284,7 @@ async fn get_account_by_id() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -1875,7 +1880,7 @@ async fn empty_storage_map() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_component(BasicWallet)
         .with_component(component)
         .build()
@@ -1920,7 +1925,8 @@ async fn storage_and_vault_proofs() {
     // can be updated.
     let mut storage_map = StorageMap::new();
     storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into());
+        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .unwrap();
 
     let bump_item_component = AccountComponent::compile(
         BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
@@ -1963,7 +1969,7 @@ async fn storage_and_vault_proofs() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -2028,6 +2034,48 @@ async fn storage_and_vault_proofs() {
         assert_eq!(value, map.get(&MAP_KEY.into()));
         assert_eq!(proof, map.open(&MAP_KEY.into()));
     }
+}
+
+#[tokio::test]
+async fn account_addresses_basic_wallet() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account = Account::mock(
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+    );
+
+    client.add_account(&account, false).await.unwrap();
+    let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
+
+    let unspecified_default_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
+
+    // Even when the account has a basic wallet, the address list should not contain it by default
+    let basic_wallet_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+    assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
+}
+
+#[tokio::test]
+async fn account_addresses_non_basic_wallet() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account = Account::mock_non_fungible_faucet(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET);
+
+    client.add_account(&account, false).await.unwrap();
+    let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
+
+    let unspecified_default_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
+
+    let basic_wallet_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+    assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
 // HELPERS
@@ -2164,7 +2212,7 @@ async fn insert_new_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2195,11 +2243,81 @@ async fn insert_new_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
+}
+
+pub async fn create_test_client_transport(
+    mock_ntnode: Arc<RwLock<MockNoteTransportNode>>,
+) -> (MockClient<FilesystemKeyStore<StdRng>>, FilesystemKeyStore<StdRng>) {
+    let (builder, _, keystore) = create_test_client_builder().await;
+    let transport_client = MockNoteTransportApi::new(mock_ntnode);
+    let builder_w_transport = builder.note_transport(Arc::new(transport_client));
+
+    let mut client = builder_w_transport.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    (client, keystore)
+}
+
+pub async fn create_test_user_transport(
+    mock_ntnode: Arc<RwLock<MockNoteTransportNode>>,
+) -> (MockClient<FilesystemKeyStore<StdRng>>, Account) {
+    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_ntnode.clone())).await;
+    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+    (client, account)
+}
+
+#[tokio::test]
+async fn transport_basic() {
+    // Setup entities
+    let mock_ntnode = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let (mut sender, sender_account) = create_test_user_transport(mock_ntnode.clone()).await;
+    let (mut recipient, recipient_account) = create_test_user_transport(mock_ntnode.clone()).await;
+    let recipient_address =
+        Address::from(AccountIdAddress::new(recipient_account.id(), AddressInterface::BasicWallet));
+    let (mut observer, _observer_account) = create_test_user_transport(mock_ntnode.clone()).await;
+
+    // Create note
+    let note = create_p2id_note(
+        sender_account.id(),
+        recipient_account.id(),
+        vec![],
+        NoteType::Private,
+        Felt::default(),
+        sender.rng(),
+    )
+    .unwrap();
+
+    // Sync-state / fetch notes
+    // No notes before sending
+    recipient.sync_state().await.unwrap();
+    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(notes.len(), 0);
+
+    // Send note
+    sender.send_private_note(note, &recipient_address).await.unwrap();
+
+    // Sync-state / fetch notes
+    // 1 note stored
+    recipient.sync_state().await.unwrap();
+    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(notes.len(), 1);
+
+    // Sync again, should be only 1 note stored
+    recipient.sync_state().await.unwrap();
+    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(notes.len(), 1);
+
+    // Third user shouldn't receive any note
+    observer.sync_state().await.unwrap();
+    let notes = observer.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(notes.len(), 0);
 }

@@ -34,6 +34,7 @@ export const test = base.extend<{ forEachTest: void }>({
             AccountStorageDelta,
             AccountVaultDelta,
             AccountHeader,
+            AccountFile,
             AccountId,
             AccountInterface,
             AccountStorageMode,
@@ -42,8 +43,6 @@ export const test = base.extend<{ forEachTest: void }>({
             Address,
             AddressInterface,
             AdviceMap,
-            Assembler,
-            AssemblerUtils,
             AuthSecretKey,
             BasicFungibleFaucetComponent,
             ConsumableNoteRecord,
@@ -76,6 +75,7 @@ export const test = base.extend<{ forEachTest: void }>({
             PublicKey,
             Rpo256,
             SecretKey,
+            ScriptBuilder,
             Endpoint,
             RpcClient,
             NoteId,
@@ -96,6 +96,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
+            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -114,6 +115,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.AccountStorageDelta = AccountStorageDelta;
           window.AccountVaultDelta = AccountVaultDelta;
           window.AccountHeader = AccountHeader;
+          window.AccountFile = AccountFile;
           window.AccountId = AccountId;
           window.AccountInterface = AccountInterface;
           window.AccountStorageMode = AccountStorageMode;
@@ -122,8 +124,6 @@ export const test = base.extend<{ forEachTest: void }>({
           window.Address = Address;
           window.AddressInterface = AddressInterface;
           window.AdviceMap = AdviceMap;
-          window.Assembler = Assembler;
-          window.AssemblerUtils = AssemblerUtils;
           window.AuthSecretKey = AuthSecretKey;
           window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
           window.ConsumableNoteRecord = ConsumableNoteRecord;
@@ -177,15 +177,18 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
+          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
+          window.ScriptBuilder = ScriptBuilder;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};
 
           // Add the remote prover url to window
           window.remoteProverUrl = proverUrl;
+          window.rpcUrl = rpcUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(window.remoteProverUrl);
