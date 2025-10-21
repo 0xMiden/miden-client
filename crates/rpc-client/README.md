@@ -2,6 +2,27 @@
 
 Minimal Miden RPC client.
 
+## Usage
+
+```rust
+use miden_rpc_client::MidenRpcClient;
+
+#[tokio::main]
+async fn main() -> Result<(), String> {
+    // Connect to Miden node
+    let mut client = MidenRpcClient::connect("https://node.example.com").await?;
+
+    // Get node status
+    let status = client.get_status().await?;
+    println!("Node version: {}", status.version);
+
+    // Get account details
+    let account_details = client.get_account_details(&account_id).await?;
+
+    Ok(())
+}
+```
+
 ## Available RPC Methods
 
 1. `get_status` - Node status information
