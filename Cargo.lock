@@ -2353,6 +2353,7 @@ dependencies = [
  "base64",
  "chrono",
  "miden-client",
+ "miette",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

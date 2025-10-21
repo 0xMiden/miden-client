@@ -32,3 +32,6 @@ web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [lints]
 workspace = true
+
+[build-dependencies]
+miette.workspace =  true
