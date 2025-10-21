@@ -141,7 +141,11 @@ impl DataStore for ClientDataStore {
         if account_storage.num_slots() == 0 {
             let cache = self.foreign_account_inputs.read();
 
-            let inputs = cache.get(&account_id).cloned().unwrap(); // TODO: remove unwrap
+            let inputs = cache.get(&account_id).cloned().ok_or(DataStoreError::Other {
+                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                    .into(),
+                source: None,
+            })?;
 
             for map in inputs.storage().maps() {
                 if map.root() == map_root
@@ -208,6 +212,8 @@ impl DataStore for ClientDataStore {
             }
 
             // If no matching note found, return an error
+            // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not found
+            // https://github.com/0xMiden/miden-client/issues/1410
             Err(DataStoreError::other(format!("Note script with root {script_root} not found",)))
         }
     }

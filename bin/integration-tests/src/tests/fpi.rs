@@ -314,14 +314,14 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .context("failed to find foreign account after deploiyng")?
             .into();
 
-        // TODO: do into_parts
+        let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
         let acc = PartialAccount::new(
-            foreign_account.id(),
-            foreign_account.nonce(),
-            foreign_account.code().clone(),
-            PartialStorage::new_full(foreign_account.storage().clone()),
+            id,
+            nonce,
+            code,
+            PartialStorage::new_full(storage),
             Default::default(),
-            None,
+            seed,
         )?;
 
         ForeignAccount::private(acc)

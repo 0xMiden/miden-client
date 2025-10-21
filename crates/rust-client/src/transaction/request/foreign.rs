@@ -148,7 +148,7 @@ impl TryFrom<AccountProof> for AccountInputs {
                     account_storage_detail.entries.iter().map(|e| (e.key, e.value));
                 let partial_storage = PartialStorageMap::new_full(
                     StorageMap::with_entries(storage_entries_iter)
-                        .map_err(|_| TransactionRequestError::ForeignAccountDataMissing)?, /* TODO JM: CORRECT ERROR */
+                        .map_err(TransactionRequestError::StorageMapError)?,
                 );
                 storage_map_proofs.push(partial_storage);
             }

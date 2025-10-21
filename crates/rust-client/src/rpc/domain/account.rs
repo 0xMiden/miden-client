@@ -611,17 +611,13 @@ impl From<AccountStorageRequirements>
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_index, map_keys) in request_map {
-            let slot_data = if map_keys.len() <= 1000 {
-                Some(storage_map_detail_request::SlotData::AllEntries(true))
-            } else {
-                let map_keys = storage_map_detail_request::MapKeys {
-                    map_keys: map_keys
-                        .into_iter()
-                        .map(crate::rpc::generated::primitives::Digest::from)
-                        .collect(),
-                };
-                Some(storage_map_detail_request::SlotData::MapKeys(map_keys))
+            let map_keys = storage_map_detail_request::MapKeys {
+                map_keys: map_keys
+                    .into_iter()
+                    .map(crate::rpc::generated::primitives::Digest::from)
+                    .collect(),
             };
+            let slot_data = Some(storage_map_detail_request::SlotData::MapKeys(map_keys));
             requests.push(account_detail_request::StorageMapDetailRequest {
                 slot_index: u32::from(slot_index),
                 slot_data,

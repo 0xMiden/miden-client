@@ -12,7 +12,14 @@ use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
 use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_objects::vm::AdviceMap;
-use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
+use miden_objects::{
+    AccountError,
+    NoteError,
+    StorageMapError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
+};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
 
@@ -457,6 +464,8 @@ pub enum TransactionRequestError {
     StorageSlotNotFound(u8, AccountId),
     #[error("error while building the input notes: {0}")]
     TransactionInputError(#[from] TransactionInputError),
+    #[error("storage map error")]
+    StorageMapError(#[from] StorageMapError),
 }
 
 // TESTS
