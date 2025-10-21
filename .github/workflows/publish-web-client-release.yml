@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
+          ref: refs/tags/${{ github.event.release.tag_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -39,15 +39,12 @@ jobs:
 
           SHOULD_PUBLISH=true
 
-          # Determine target branch commit for comparison
-          TARGET_BRANCH=main
+          RELEASE_SHA=$GITHUB_SHA
 
-          git fetch origin "$TARGET_BRANCH" --depth=2
-
-          BASE_SHA=$(git rev-list "origin/$TARGET_BRANCH" --max-count=1 --skip=1 || true)
+          BASE_SHA=$(git rev-parse "${RELEASE_SHA}^" 2>/dev/null || true)
 
           if [ -z "$BASE_SHA" ]; then
-            echo "Unable to determine prior commit on $TARGET_BRANCH for version comparison."
+            echo "Unable to determine parent commit for release tag $GITHUB_REF."
             SHOULD_PUBLISH=false
           fi
 
@@ -63,7 +60,7 @@ jobs:
             PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_package.json)
 
             if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
-              echo "Version $CURRENT_VERSION matches target branch (main); skipping publish."
+              echo "Version $CURRENT_VERSION matches prior tagged commit; skipping publish."
               SHOULD_PUBLISH=false
             fi
           fi
@@ -88,7 +85,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
           cd crates/web-client
-          npm publish --tag latest
+          npm publish --tag next
 
       - name: Done
         if: steps.check_version.outputs.should_publish == 'true'
