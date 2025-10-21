@@ -11,6 +11,7 @@ use crate::sync::NoteTagRecord;
 
 /// Represents the changes that need to be applied to the client store as a result of a
 /// transaction execution.
+#[derive(Clone, Debug)]
 pub struct TransactionStoreUpdate {
     /// Details of the executed transaction to be inserted.
     executed_transaction: ExecutedTransaction,

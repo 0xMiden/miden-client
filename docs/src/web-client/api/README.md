@@ -117,6 +117,7 @@
 - [TransactionScriptInputPair](classes/TransactionScriptInputPair.md)
 - [TransactionScriptInputPairArray](classes/TransactionScriptInputPairArray.md)
 - [TransactionStatus](classes/TransactionStatus.md)
+- [TransactionStoreUpdate](classes/TransactionStoreUpdate.md)
 - [TransactionSummary](classes/TransactionSummary.md)
 - [WebClient](classes/WebClient.md)
 - [Word](classes/Word.md)
