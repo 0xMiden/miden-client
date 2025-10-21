@@ -1180,12 +1180,17 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
     let sync_storage_maps = client
         .test_rpc_api()
-        .sync_storage_maps(block_header.block_num(), None, faucet_account.id())
+        .sync_storage_maps(0.into(), None, first_basic_account.id())
         .await
         .unwrap();
     let account_vault_info = client
         .test_rpc_api()
-        .sync_account_vault(block_header.block_num(), None, faucet_account.id())
+        .sync_account_vault(0.into(), None, first_basic_account.id())
+        .await
+        .unwrap();
+    let transactions_info = client
+        .test_rpc_api()
+        .sync_transactions(0.into(), None, vec![first_basic_account.id()])
         .await
         .unwrap();
 
@@ -1198,8 +1203,11 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note_script, retrieved_note_script);
-    assert!(!sync_storage_maps.updates.is_empty());
-    assert!(!account_vault_info.updates.is_empty());
+    assert!(sync_storage_maps.chain_tip >= first_block_num);
+    assert!(sync_storage_maps.updates.is_empty());
+    assert!(account_vault_info.chain_tip >= first_block_num);
+    assert!(account_vault_info.updates.is_empty());
+    assert!(!transactions_info.transaction_records.is_empty());
 
     Ok(())
 }
