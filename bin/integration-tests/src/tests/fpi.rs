@@ -61,8 +61,6 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     )
     .await?;
     let foreign_account_id = foreign_account.id();
-    println!("foreign account id {:?}", foreign_account_id.to_hex());
-
     let code = format!(
         "
         use.miden::tx

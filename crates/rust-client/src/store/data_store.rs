@@ -137,31 +137,6 @@ impl DataStore for ClientDataStore {
         // TODO: Refactor the store call to be able to retrieve by map root.
         let account_storage = self.store.get_account_storage(account_id).await?;
 
-        // If the retrieved storage is empty, assume its a foreign account
-        if account_storage.num_slots() == 0 {
-            let cache = self.foreign_account_inputs.read();
-
-            let inputs = cache.get(&account_id).cloned().ok_or(DataStoreError::Other {
-                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                    .into(),
-                source: None,
-            })?;
-
-            for map in inputs.storage().maps() {
-                if map.root() == map_root
-                    && let Ok(witness) = map.open(&map_key)
-                {
-                    return Ok(witness);
-                }
-            }
-
-            return Err(DataStoreError::Other {
-                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                    .into(),
-                source: None,
-            });
-        }
-
         for slot in account_storage.slots() {
             if let StorageSlot::Map(map) = slot
                 && map.root() == map_root

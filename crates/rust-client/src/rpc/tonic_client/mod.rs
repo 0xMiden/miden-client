@@ -318,6 +318,7 @@ impl NodeRpcClient for GrpcClient {
                 Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
                     code_commitment: Some(EMPTY_WORD.into()),
                     // TODO: implement a way to request asset vaults
+                    // https://github.com/0xMiden/miden-client/issues/1412
                     asset_vault_commitment: None,
                     storage_maps,
                 })
