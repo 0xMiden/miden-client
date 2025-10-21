@@ -29,6 +29,7 @@ use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
@@ -192,7 +193,7 @@ impl MockRpcApi {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_id: AccountId,
-    ) -> Result<AccountVaultInfo, RpcError> {
+    ) -> AccountVaultInfo {
         let block_to = match block_to {
             Some(block_to) => block_to,
             None => self.get_chain_tip_block_num(),
@@ -218,7 +219,7 @@ impl MockRpcApi {
 
                 let vault_delta = account_delta.vault();
 
-                for asset in vault_delta.added_assets().into_iter() {
+                for asset in vault_delta.added_assets() {
                     let account_vault_update = AccountVaultUpdate {
                         block_num: block_number,
                         asset: Some(asset),
@@ -229,12 +230,50 @@ impl MockRpcApi {
             }
         }
 
-        let response = AccountVaultInfo {
+        AccountVaultInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_number: self.get_chain_tip_block_num(),
             updates,
+        }
+    }
+
+    /// Retrieves transactions in a given block range that match the provided account IDs
+    fn get_sync_transactions_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: &[AccountId],
+    ) -> TransactionsInfo {
+        let chain_tip = self.get_chain_tip_block_num();
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => chain_tip,
         };
-        Ok(response)
+
+        let mut transaction_records = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for transaction_header in block.transactions().as_slice() {
+                if !account_ids.contains(&transaction_header.account_id()) {
+                    continue;
+                }
+
+                transaction_records.push(TransactionRecord {
+                    block_num: block_number.as_u32(),
+                    transaction_header: transaction_header.clone(),
+                });
+            }
+        }
+
+        TransactionsInfo {
+            chain_tip: chain_tip.as_u32(),
+            block_num: block_to.as_u32(),
+            transaction_records,
+        }
     }
 
     /// Retrieves storage map updates in a given block range
@@ -243,7 +282,7 @@ impl MockRpcApi {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_id: AccountId,
-    ) -> Result<StorageMapInfo, RpcError> {
+    ) -> StorageMapInfo {
         let block_to = match block_to {
             Some(block_to) => block_to,
             None => self.get_chain_tip_block_num(),
@@ -269,14 +308,14 @@ impl MockRpcApi {
                 let storage_delta = account_delta.storage();
 
                 for (slot_index, map_delta) in storage_delta.maps() {
-                    let slot_index = *slot_index as u32;
+                    let slot_index = u32::from(*slot_index);
 
                     for (key, value) in map_delta.entries() {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
                             slot_index,
-                            key: key.clone().into(),
-                            value: value.clone(),
+                            key: (*key).into(),
+                            value: *value,
                         };
                         updates.push(storage_map_info);
                     }
@@ -284,12 +323,11 @@ impl MockRpcApi {
             }
         }
 
-        let response = StorageMapInfo {
+        StorageMapInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_number: self.get_chain_tip_block_num(),
             updates,
-        };
-        Ok(response)
+        }
     }
 
     /// Retrieves notes that are included in the specified block number.
@@ -636,7 +674,7 @@ impl NodeRpcClient for MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id)?;
+        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id);
         Ok(response)
     }
 
@@ -646,7 +684,7 @@ impl NodeRpcClient for MockRpcApi {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let response = self.get_sync_account_vault_request(block_from, block_to, account_id)?;
+        let response = self.get_sync_account_vault_request(block_from, block_to, account_id);
         Ok(response)
     }
 
@@ -655,8 +693,9 @@ impl NodeRpcClient for MockRpcApi {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
-    ) -> Result<(), RpcError> {
-        todo!()
+    ) -> Result<TransactionsInfo, RpcError> {
+        let response = self.get_sync_transactions_request(block_from, block_to, &account_ids);
+        Ok(response)
     }
 }
 

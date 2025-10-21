@@ -31,6 +31,7 @@ use super::{
 };
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
+use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
@@ -579,12 +580,26 @@ impl NodeRpcClient for GrpcClient {
 
     async fn sync_transactions(
         &self,
-        _block_from: BlockNumber,
-        _block_to: Option<BlockNumber>,
-        _account_ids: Vec<AccountId>,
-    ) -> Result<(), RpcError> {
-        // TODO: depends on https://github.com/0xMiden/miden-node/issues/1272
-        unimplemented!()
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<TransactionsInfo, RpcError> {
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
+
+        let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
+
+        let request = proto::rpc_store::SyncTransactionsRequest { block_range, account_ids };
+
+        let mut rpc_api = self.ensure_connected().await?;
+
+        let response = rpc_api.sync_transactions(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::SyncTransactions, status)
+        })?;
+
+        response.into_inner().try_into()
     }
 }
 

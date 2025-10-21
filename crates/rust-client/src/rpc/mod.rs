@@ -79,6 +79,7 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
+use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
@@ -340,7 +341,7 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
-    ) -> Result<(), RpcError>;
+    ) -> Result<TransactionsInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -363,6 +364,7 @@ pub enum NodeRpcClientEndpoint {
     GetNoteScriptByRoot,
     SyncStorageMaps,
     SyncAccountVault,
+    SyncTransactions,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
@@ -386,6 +388,7 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
             NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
             NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
+            NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
         }
     }
 }

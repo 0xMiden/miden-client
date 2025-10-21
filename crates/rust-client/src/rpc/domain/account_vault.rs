@@ -79,7 +79,7 @@ impl TryFrom<proto::rpc_store::AccountVaultUpdate> for AccountVaultUpdate {
     fn try_from(value: proto::rpc_store::AccountVaultUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
 
-        let asset: Option<Asset> = value.asset.map(|asset| asset.try_into()).transpose()?;
+        let asset: Option<Asset> = value.asset.map(TryInto::try_into).transpose()?;
 
         let vault_key = value
             .vault_key

@@ -14,6 +14,7 @@
 * Added `NoAuth` component to the web client ([#1330](https://github.com/0xMiden/miden-client/pull/1330)).
 * Implemented shared source manager for better error reporting ([#1275](https://github.com/0xMiden/miden-client/pull/1275)).
 * Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
+* Implemented missing RPC endpoints ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
 
 ### Changes
 
