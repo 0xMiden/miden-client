@@ -17,7 +17,7 @@ impl AuthSecretKey {
         let public_key = match self.0 {
             NativeAuthSecretKey::RpoFalcon512(ref key) => key.public_key(),
         };
-        let public_key_as_native_word: NativeWord = public_key.into();
+        let public_key_as_native_word: NativeWord = public_key.to_commitment();
         public_key_as_native_word.into()
     }
 

@@ -159,6 +159,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError>;
 
