@@ -31,7 +31,7 @@ impl TransactionStoreUpdate {
     /// - `submission_height`: The block number at which the transaction was submitted.
     /// - `note_updates`: The note updates that need to be applied to the store after the
     ///   transaction execution.
-    /// - `new_tags`: New note tags that were need to be tracked because of created notes.
+    /// - `new_tags`: New note tags that need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
         submission_height: BlockNumber,
