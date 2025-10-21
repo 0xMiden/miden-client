@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use miden_objects::transaction::{ProvenTransaction, TransactionWitness};
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 use miden_tx::{LocalTransactionProver, TransactionProverError};
 
@@ -9,7 +9,7 @@ use miden_tx::{LocalTransactionProver, TransactionProverError};
 pub trait TransactionProver {
     async fn prove(
         &self,
-        tx_result: TransactionWitness,
+        tx_result: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError>;
 }
 
@@ -18,7 +18,7 @@ pub trait TransactionProver {
 impl TransactionProver for LocalTransactionProver {
     async fn prove(
         &self,
-        witness: TransactionWitness,
+        witness: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
         LocalTransactionProver::prove(self, witness)
     }
@@ -29,7 +29,7 @@ impl TransactionProver for LocalTransactionProver {
 impl TransactionProver for RemoteTransactionProver {
     async fn prove(
         &self,
-        witness: TransactionWitness,
+        witness: TransactionInputs,
     ) -> Result<ProvenTransaction, TransactionProverError> {
         let fut = RemoteTransactionProver::prove(self, witness);
         fut.await
