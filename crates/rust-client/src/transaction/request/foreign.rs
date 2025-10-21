@@ -3,14 +3,20 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::account::{AccountId, PartialAccount, PartialStorage, PartialStorageMap};
+use miden_objects::account::{
+    AccountId,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+};
 use miden_objects::asset::PartialVault;
 use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
-use crate::rpc::domain::account::{AccountProof, AccountStorageRequirements, StateHeaders};
+use crate::rpc::domain::account::{AccountDetails, AccountProof, AccountStorageRequirements};
 
 // FOREIGN ACCOUNT
 // ================================================================================================
@@ -125,20 +131,26 @@ impl TryFrom<AccountProof> for AccountInputs {
     type Error = TransactionRequestError;
 
     fn try_from(value: AccountProof) -> Result<Self, Self::Error> {
-        let (witness, state_headers) = value.into_parts();
+        let (witness, account_details) = value.into_parts();
 
-        if let Some(StateHeaders {
-            account_header,
-            storage_header,
+        if let Some(AccountDetails {
+            header: account_header,
             code,
-            storage_slots,
-        }) = state_headers
+            storage_details,
+            vault_details: _,
+        }) = account_details
         {
             // discard slot indices - not needed for execution
-            let mut storage_map_proofs = Vec::with_capacity(storage_slots.len());
-            for (_, slots) in storage_slots {
-                let storage_map = PartialStorageMap::from_witnesses(slots.into_iter())?;
-                storage_map_proofs.push(storage_map);
+            let account_storage_map_details = storage_details.map_details;
+            let mut storage_map_proofs = Vec::with_capacity(account_storage_map_details.len());
+            for account_storage_detail in account_storage_map_details {
+                let storage_entries_iter =
+                    account_storage_detail.entries.iter().map(|e| (e.key, e.value));
+                let partial_storage = PartialStorageMap::new_full(
+                    StorageMap::with_entries(storage_entries_iter)
+                        .map_err(TransactionRequestError::StorageMapError)?,
+                );
+                storage_map_proofs.push(partial_storage);
             }
 
             return Ok(AccountInputs::new(
@@ -146,7 +158,7 @@ impl TryFrom<AccountProof> for AccountInputs {
                     account_header.id(),
                     account_header.nonce(),
                     code,
-                    PartialStorage::new(storage_header, storage_map_proofs.into_iter())?,
+                    PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
                     // We don't use vault information so we leave it empty
                     PartialVault::new(PartialSmt::new())
                         .expect("Empty partial vault shouldn't fail"),

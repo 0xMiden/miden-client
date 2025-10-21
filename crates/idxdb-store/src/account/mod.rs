@@ -204,7 +204,7 @@ impl WebStore {
         let mut maps = BTreeMap::new();
         for entry in account_maps_idxdb {
             let map = maps.entry(entry.root).or_insert_with(StorageMap::new);
-            map.insert(Word::try_from(entry.key)?, Word::try_from(entry.value)?);
+            map.insert(Word::try_from(entry.key)?, Word::try_from(entry.value)?)?;
         }
 
         let slots: Vec<StorageSlot> = account_storage_idxdb

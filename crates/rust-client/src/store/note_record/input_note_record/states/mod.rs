@@ -42,7 +42,7 @@ use super::NoteRecordError;
 pub enum InputNoteState {
     /// Tracked by the client but without a network inclusion proof.
     Expected(ExpectedNoteState),
-    /// The store holds the note's inclusion proof, but  it was not yet verified.
+    /// The store holds the note's inclusion proof, but it was not yet verified.
     Unverified(UnverifiedNoteState),
     /// The store holds the note's inclusion proof, which was verified.
     Committed(CommittedNoteState),
