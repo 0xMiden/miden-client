@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::ClientError;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
@@ -27,6 +26,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
+use miden_client::ClientError;
 use miden_client_sqlite_store::SqliteStore;
 
 use crate::tests::config::ClientConfig;
@@ -1178,6 +1178,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .get_note_script_by_root(note.script().root())
         .await
         .unwrap();
+    let sync_storage_maps = client
+        .test_rpc_api()
+        .sync_storage_maps(block_header.block_num(), None, faucet_account.id())
+        .await
+        .unwrap();
+    let account_vault_info = client
+        .test_rpc_api()
+        .sync_account_vault(block_header.block_num(), None, faucet_account.id())
+        .await
+        .unwrap();
 
     // Remove debug decorators from original note script, as they are not persisted on submission
     // https://github.com/0xMiden/miden-base/issues/1812
@@ -1188,6 +1198,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note_script, retrieved_note_script);
+    assert!(!sync_storage_maps.updates.is_empty());
+    assert!(!account_vault_info.updates.is_empty());
 
     Ok(())
 }
