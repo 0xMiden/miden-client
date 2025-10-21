@@ -93,29 +93,25 @@ impl TryFrom<&proto::primitives::SmtLeaf> for SmtLeaf {
 
 impl From<SmtProof> for proto::primitives::SmtOpening {
     fn from(value: SmtProof) -> Self {
-        (&value).into()
-    }
-}
+        let (path, leaf) = value.into_parts();
 
-impl From<&SmtProof> for proto::primitives::SmtOpening {
-    fn from(value: &SmtProof) -> Self {
         proto::primitives::SmtOpening {
-            leaf: Some(value.leaf().into()),
-            path: Some(value.path().into()),
+            leaf: Some(leaf.into()),
+            path: Some(path.into()),
         }
     }
 }
 
-impl TryFrom<&proto::primitives::SmtOpening> for SmtProof {
+impl TryFrom<proto::primitives::SmtOpening> for SmtProof {
     type Error = RpcConversionError;
 
-    fn try_from(value: &proto::primitives::SmtOpening) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::primitives::SmtOpening) -> Result<Self, Self::Error> {
         let leaf = match &value.leaf {
             Some(leaf) => leaf.try_into()?,
             None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(leaf))),
         };
 
-        let path = match &value.path {
+        let path = match value.path {
             Some(path) => path.try_into()?,
             None => return Err(proto::primitives::SmtOpening::missing_field(stringify!(path))),
         };

@@ -5,11 +5,14 @@ import { expect } from "@playwright/test";
 test.describe("remote keystore", () => {
   test("should create a client with a remote keystore", async ({ page }) => {
     const client = await page.evaluate(async () => {
-      const insertKeyCb = async (_publicKey: string, _secretKey: string) => {};
-      const getKeyCb = async (_publicKey: string) => {
+      const insertKeyCb = async (
+        _publicKeyCommitment: string,
+        _secretKey: string
+      ) => {};
+      const getKeyCb = async (_publicKeyCommitment: string) => {
         return undefined;
       };
-      const signCb = async (_publicKey: string, _message: string) => {
+      const signCb = async (_publicKeyCommitment: string, _message: string) => {
         return undefined;
       };
       const client = await window.WebClient.createClientWithExternalKeystore(
@@ -27,14 +30,14 @@ test.describe("remote keystore", () => {
   test("should create a client with a remote keystore and insert a key", async ({
     page,
   }) => {
-    const { publicKey, secretKey } = await page.evaluate(async () => {
-      let publicKey: string | undefined;
+    const { publicKeyCommitment, secretKey } = await page.evaluate(async () => {
+      let publicKeyCommitment: string | undefined;
       let secretKey: string | undefined;
       const insertKeyCb = async (
-        publicKeyStr: string,
+        publicKeyCommitmentStr: string,
         secretKeyStr: string
       ) => {
-        publicKey = publicKeyStr;
+        publicKeyCommitment = publicKeyCommitmentStr;
         secretKey = secretKeyStr;
       };
       const client = await window.WebClient.createClientWithExternalKeystore(
@@ -51,12 +54,12 @@ test.describe("remote keystore", () => {
       );
 
       return {
-        publicKey,
+        publicKeyCommitment,
         secretKey,
       };
     });
 
-    expect(publicKey).toBeDefined();
+    expect(publicKeyCommitment).toBeDefined();
     expect(secretKey).toBeDefined();
   });
 
@@ -68,14 +71,14 @@ test.describe("remote keystore", () => {
       let getKeyPubKey: number[] | undefined;
 
       const insertKeyCb = async (
-        publicKey: Uint8Array,
+        publicKeyCommitment: Uint8Array,
         _secretKey: Uint8Array
       ) => {
-        insertedPubKey = Array.from(publicKey);
+        insertedPubKey = Array.from(publicKeyCommitment);
       };
 
-      const getKeyCb = async (publicKey: Uint8Array) => {
-        getKeyPubKey = Array.from(publicKey);
+      const getKeyCb = async (publicKeyCommitment: Uint8Array) => {
+        getKeyPubKey = Array.from(publicKeyCommitment);
         // Intentionally return undefined to cause export to fail after callback invocation
         return undefined;
       };
@@ -117,28 +120,27 @@ test.describe("remote keystore", () => {
       let signPubKey: number[] | undefined;
 
       const insertKeyCb = async (
-        publicKey: Uint8Array,
+        publicKeyCommitment: Uint8Array,
         secretKey: Uint8Array
       ) => {
         // Capture the faucet's public key (we will create the faucet first)
         if (!faucetPubKey) {
-          faucetPubKey = Array.from(publicKey);
+          faucetPubKey = Array.from(publicKeyCommitment);
           faucetSecretKey = secretKey;
         }
       };
 
       const signCb = async (
-        publicKey: Uint8Array,
+        publicKeyCommitment: Uint8Array,
         signingInputs: Uint8Array
       ) => {
-        signPubKey = Array.from(publicKey);
+        signPubKey = Array.from(publicKeyCommitment);
         const wasmSigningInputs =
           window.SigningInputs.deserialize(signingInputs);
         const wasmSecretKey = window.SecretKey.deserialize(faucetSecretKey!);
         const signature = wasmSecretKey.signData(wasmSigningInputs);
-        const preparedSignature = signature.toPreparedSignature();
-        const felts = preparedSignature.map((felt: any) => felt.toString());
-        return felts;
+        const serializedSig = signature.serialize();
+        return serializedSig;
       };
 
       const client = await window.WebClient.createClientWithExternalKeystore(
