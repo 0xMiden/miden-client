@@ -2085,7 +2085,7 @@ async fn account_add_address_after_creation() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
     );
 
     client.add_account(&account, false).await.unwrap();
