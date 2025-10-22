@@ -2,10 +2,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::ClientError;
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::component::{AccountComponent, BasicWallet};
+use miden_client::account::{
+    AccountBuilder,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageSlot,
+};
+use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
 use miden_client::builder::ClientBuilder;
+use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
@@ -22,12 +32,15 @@ use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
+    TransactionKernel,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
     TransactionStatus,
 };
+use miden_client::{ClientError, Felt, ScriptBuilder};
 use miden_client_sqlite_store::SqliteStore;
+use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
 
@@ -1155,7 +1168,98 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
 
+    // Define the account code for the custom library
+    let custom_code = "
+        use.miden::account
+
+        export.update_map
+            push.0.0.0.0
+            push.1.2.3.5
+            # => [VALUE]
+            # => [KEY, VALUE]
+            push.1
+            # => [index, KEY, VALUE]
+            exec.account::set_map_item
+            dropw dropw dropw dropw
+        end
+    ";
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(
+        [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into(),
+        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+    )?;
+
+    let assembler = TransactionKernel::assembler();
+    let custom_component = AccountComponent::compile(
+        custom_code,
+        assembler.clone(),
+        vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)],
+    )?
+    .with_supports_all_types();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let pub_key = key_pair.public_key();
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))?;
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.into()))
+        .with_component(BasicWallet)
+        .with_component(custom_component)
+        .build()?;
+
+    client.add_account(&account, false).await?;
+
     client.sync_state().await.unwrap();
+
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("custom_library::set_map_item_library")
+                .context("failed to create library path for custom library")?,
+            custom_code,
+            &source_manager,
+        )
+        .unwrap();
+    let custom_lib = assembler.assemble_library([module]).unwrap();
+
+    let tx_script = ScriptBuilder::new(true)
+        .with_statically_linked_library(&custom_lib)?
+        .compile_tx_script(
+            "
+        use.custom_library::set_map_item_library
+
+        begin
+             call.set_map_item_library::update_map
+        end
+        ",
+        )?;
+
+    let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+    execute_tx_and_sync(&mut client, account.id(), tx_request.clone()).await?;
+
+    // Mint a new fungible asset to check account vault changes
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await?
+        .0;
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT)?;
+    let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+        fungible_asset,
+        first_basic_account.id(),
+        NoteType::Public,
+        client.rng(),
+    )?;
+    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;
+
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id])?;
+    execute_tx_and_sync(&mut client, first_basic_account.id(), tx_request).await?;
 
     let nullifier = note.nullifier();
 
@@ -1180,7 +1284,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
     let sync_storage_maps = client
         .test_rpc_api()
-        .sync_storage_maps(0.into(), None, first_basic_account.id())
+        .sync_storage_maps(0.into(), None, account.id())
         .await
         .unwrap();
     let account_vault_info = client
@@ -1203,10 +1307,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note_script, retrieved_note_script);
-    assert!(sync_storage_maps.chain_tip >= first_block_num);
-    assert!(sync_storage_maps.updates.is_empty());
-    assert!(account_vault_info.chain_tip >= first_block_num);
-    assert!(account_vault_info.updates.is_empty());
+    assert!(!sync_storage_maps.updates.is_empty());
+    assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());
 
     Ok(())
