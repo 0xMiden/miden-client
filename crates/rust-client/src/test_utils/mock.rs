@@ -263,15 +263,15 @@ impl MockRpcApi {
                 }
 
                 transaction_records.push(TransactionRecord {
-                    block_num: block_number.as_u32(),
+                    block_num: block_number,
                     transaction_header: transaction_header.clone(),
                 });
             }
         }
 
         TransactionsInfo {
-            chain_tip: chain_tip.as_u32(),
-            block_num: block_to.as_u32(),
+            chain_tip,
+            block_num: block_to,
             transaction_records,
         }
     }

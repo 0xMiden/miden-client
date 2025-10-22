@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteHeader, Nullifier};
 use miden_objects::transaction::{InputNotes, TransactionHeader, TransactionId};
 
@@ -60,9 +61,9 @@ pub struct TransactionInclusion {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionsInfo {
     /// Current chain tip
-    pub chain_tip: u32,
+    pub chain_tip: BlockNumber,
     /// The block number of the last check included in this response.
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// List of transaction records.
     pub transaction_records: Vec<TransactionRecord>,
 }
@@ -78,8 +79,8 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
             },
         )?;
 
-        let chain_tip = pagination_info.chain_tip;
-        let block_num = pagination_info.block_num;
+        let chain_tip = pagination_info.chain_tip.into();
+        let block_num = pagination_info.block_num.into();
 
         let transaction_records = value
             .transaction_records
@@ -102,7 +103,7 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRecord {
     /// Block number in which the transaction was executed.
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// A transaction header.
     pub transaction_header: TransactionHeader,
 }
@@ -111,7 +112,7 @@ impl TryFrom<proto::rpc_store::TransactionRecord> for TransactionRecord {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc_store::TransactionRecord) -> Result<Self, Self::Error> {
-        let block_num = value.block_num;
+        let block_num = value.block_num.into();
         let transaction_header = value.transaction_header.ok_or(
             RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "TransactionRecord",

@@ -329,7 +329,6 @@ pub trait NodeRpcClient: Send + Sync {
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError>;
 
-    // TODO: update miden node version to implement this
     /// Fetches transactions records for specific accounts within a block range.
     /// Using the `/SyncTransactions` RPC endpoint.
     ///
