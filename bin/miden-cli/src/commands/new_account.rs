@@ -157,13 +157,6 @@ pub struct NewAccountCmd {
     /// account.
     #[arg(short, long)]
     pub packages: Vec<PathBuf>,
-    #[deprecated(
-        since = "0.12.0",
-        note = "Component templates were superseded my [miden_client::vm::Package].\
-                This field is only kept to inform users about said change."
-    )]
-    #[arg(short, long, hide(true))]
-    pub component_templates: Vec<PathBuf>,
     /// Optional file path to a TOML file containing a list of key/values used for initializing
     /// storage. Each of these keys should map to the templated storage values within the passed
     /// list of component templates. The user will be prompted to provide values for any keys not
@@ -182,20 +175,6 @@ impl NewAccountCmd {
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
     ) -> Result<(), CliError> {
-        // We allow #deprecated here in order to inform the user about the
-        // migration from account component templates to packages.
-        #[allow(deprecated)]
-        if !self.component_templates.is_empty() {
-            return Err(CliError::Input(format!(
-                "Detected use of -c/--component-templates flag.
-Account component templates have been replaced by the use of packages.
-To use packages, pass the -p flag instead, like so:
-{} new-account -p <package-name.masp>
-",
-                client_binary_name().display()
-            )));
-        }
-
         let new_account = create_client_account(
             &mut client,
             &keystore,
