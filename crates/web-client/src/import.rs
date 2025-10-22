@@ -1,8 +1,5 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
 use miden_client::auth::AuthSecretKey;
-use miden_client::note::NoteFile;
-use miden_client::utils::Deserializable;
-use serde_wasm_bindgen::from_value;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
@@ -10,6 +7,8 @@ use crate::models::account::Account;
 use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId as JsAccountId;
 use crate::models::account_storage_mode::AccountStorageMode;
+use crate::models::note_file::NoteFile;
+use crate::models::note_id::NoteId;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -88,20 +87,13 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "importNoteFile")]
-    pub async fn import_note_file(&mut self, note_bytes: JsValue) -> Result<JsValue, JsValue> {
+    pub async fn import_note_file(&mut self, note_file: NoteFile) -> Result<NoteId, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_bytes_result: Vec<u8> =
-                from_value(note_bytes).map_err(|err| err.to_string())?;
-
-            let note_file =
-                NoteFile::read_from_bytes(&note_bytes_result).map_err(|err| err.to_string())?;
-
-            let imported = client
-                .import_note(note_file)
+            Ok(client
+                .import_note(note_file.into())
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to import note"))?;
-
-            Ok(JsValue::from_str(&imported.to_string()))
+                .map_err(|err| js_error_with_context(err, "failed to import note"))?
+                .into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
