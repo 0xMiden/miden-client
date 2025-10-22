@@ -123,18 +123,33 @@ const methodHandlers = {
 
 // Add mock methods to the handler mapping.
 methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
-  let [serializedMockChain] = args;
+  let [serializedMockChain, serializedMockNoteTransportNode] = args;
   serializedMockChain = new Uint8Array(serializedMockChain);
-  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
+  serializedMockNoteTransportNode = serializedMockNoteTransportNode
+    ? new Uint8Array(serializedMockNoteTransportNode)
+    : null;
+  await wasmWebClient.createMockClient(
+    wasmSeed,
+    serializedMockChain,
+    serializedMockNoteTransportNode
+  );
 
   return await methodHandlers[MethodName.SYNC_STATE]();
 };
 
 methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
+  let serializedMockNoteTransportNode = args.pop();
   let serializedMockChain = args.pop();
   serializedMockChain = new Uint8Array(serializedMockChain);
+  serializedMockNoteTransportNode = serializedMockNoteTransportNode
+    ? new Uint8Array(serializedMockNoteTransportNode)
+    : null;
   wasmWebClient = new wasm.WebClient();
-  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
+  await wasmWebClient.createMockClient(
+    wasmSeed,
+    serializedMockChain,
+    serializedMockNoteTransportNode
+  );
 
   await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
 

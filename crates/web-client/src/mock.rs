@@ -69,7 +69,7 @@ impl WebClient {
 
     /// Returns the inner serialized mock note transport node if it exists.
     #[wasm_bindgen(js_name = "serializeMockNoteTransportNode")]
-    pub fn serialized_mock_note_transport_node(&mut self) -> Result<Vec<u8>, JsValue> {
+    pub fn serialize_mock_note_transport_node(&mut self) -> Result<Vec<u8>, JsValue> {
         self.mock_note_transport_api
             .as_ref()
             .map(|api| api.mock_node.read().to_bytes())
