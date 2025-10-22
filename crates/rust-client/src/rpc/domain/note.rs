@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
     Note,
@@ -90,7 +90,7 @@ impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
 #[derive(Debug)]
 pub struct NoteSyncInfo {
     /// Number of the latest block in the chain.
-    pub chain_tip: u32,
+    pub chain_tip: BlockNumber,
     /// Block header of the block with the first note matching the specified criteria.
     pub block_header: BlockHeader,
     /// Proof for block header's MMR with respect to the chain tip.
@@ -158,7 +158,7 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
             notes.push(committed_note);
         }
 
-        Ok(NoteSyncInfo { chain_tip, block_header, mmr_path, notes })
+        Ok(NoteSyncInfo { chain_tip: chain_tip.into(), block_header, mmr_path, notes })
     }
 }
 

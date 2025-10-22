@@ -210,7 +210,7 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(nullifiers
             .iter()
             .find(|update| update.nullifier == *nullifier)
-            .map(|update| update.block_num))
+            .map(|update| update.block_num.as_u32()))
     }
 
     /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
