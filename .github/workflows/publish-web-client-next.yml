@@ -45,7 +45,7 @@ jobs:
       - name: Verify version bump against next
         id: check_version
         run: |
-          set -eo pipefail
+          set -euo pipefail
 
           SHOULD_PUBLISH=true
 
