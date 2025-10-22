@@ -12,7 +12,7 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, DebugMode, IdPrefixFetchError};
-use miden_client_sqlite_store::SqliteStore;
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
@@ -173,12 +173,8 @@ impl Cli {
         let keystore = CliKeyStore::new(cli_config.secret_keys_directory.clone())
             .map_err(CliError::KeyStore)?;
 
-        let sqlite_store = SqliteStore::new(cli_config.store_filepath.clone())
-            .await
-            .map_err(|e| CliError::Internal(Box::new(e)))?;
-
         let mut builder = ClientBuilder::new()
-            .store(Arc::new(sqlite_store))
+            .sqlite_store(cli_config.store_filepath.clone())
             .grpc_client(&cli_config.rpc.endpoint.clone().into(), Some(cli_config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(in_debug_mode)
