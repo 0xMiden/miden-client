@@ -170,7 +170,7 @@ where
             )
             .await?
         {
-            if note_record.consumed_externally(note_record.nullifier(), block_height)? {
+            if note_record.consumed_externally(note_record.nullifier(), block_height.into())? {
                 return Ok(Some(note_record));
             }
 

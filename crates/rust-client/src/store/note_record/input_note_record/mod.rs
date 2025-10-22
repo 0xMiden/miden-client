@@ -204,7 +204,7 @@ impl InputNoteRecord {
     pub(crate) fn consumed_externally(
         &mut self,
         nullifier: Nullifier,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<bool, NoteRecordError> {
         if self.nullifier() != nullifier {
             return Err(NoteRecordError::StateTransitionError(
@@ -247,7 +247,7 @@ impl InputNoteRecord {
     pub(crate) fn transaction_committed(
         &mut self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<bool, NoteRecordError> {
         let new_state = self.state.transaction_committed(transaction_id, block_height)?;
         if let Some(new_state) = new_state {

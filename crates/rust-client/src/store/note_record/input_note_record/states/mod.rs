@@ -3,7 +3,7 @@ use core::fmt::{self, Display};
 
 use chrono::{Local, TimeZone};
 use miden_objects::account::AccountId;
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_objects::transaction::TransactionId;
 pub use miden_tx::utils::{
@@ -133,7 +133,7 @@ impl InputNoteState {
     /// If the note state doesn't change, `None` is returned.
     pub(crate) fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         self.inner().consumed_externally(nullifier_block_height)
     }
@@ -166,7 +166,7 @@ impl InputNoteState {
     pub(crate) fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         self.inner().transaction_committed(transaction_id, block_height)
     }
@@ -311,7 +311,7 @@ pub trait NoteStateHandler {
 
     fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 
     fn block_header_received(
@@ -330,7 +330,7 @@ pub trait NoteStateHandler {
     fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 }
 

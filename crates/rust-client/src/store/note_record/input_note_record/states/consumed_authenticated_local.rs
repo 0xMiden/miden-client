@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 
 use miden_objects::Word;
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_objects::transaction::TransactionId;
 
@@ -19,7 +19,7 @@ pub struct ConsumedAuthenticatedLocalNoteState {
     /// Root of the note tree inside the block that verifies the note inclusion proof.
     pub block_note_root: Word,
     /// Block height at which the note was nullified.
-    pub nullifier_block_height: u32,
+    pub nullifier_block_height: BlockNumber,
     /// Information about the submission of the note.
     pub submission_data: NoteSubmissionData,
 }
@@ -35,7 +35,7 @@ impl NoteStateHandler for ConsumedAuthenticatedLocalNoteState {
 
     fn consumed_externally(
         &self,
-        _nullifier_block_height: u32,
+        _nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(None)
     }
@@ -60,7 +60,7 @@ impl NoteStateHandler for ConsumedAuthenticatedLocalNoteState {
     fn transaction_committed(
         &self,
         _transaction_id: TransactionId,
-        _block_height: u32,
+        _block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::InvalidStateTransition(
             "Only processing notes can be committed in a local transaction".to_string(),
@@ -103,7 +103,7 @@ impl miden_tx::utils::Deserializable for ConsumedAuthenticatedLocalNoteState {
             metadata,
             inclusion_proof,
             block_note_root,
-            nullifier_block_height,
+            nullifier_block_height: nullifier_block_height.into(),
             submission_data,
         })
     }

@@ -290,24 +290,20 @@ impl NoteUpdateTracker {
                     consumer_transaction.status
                 {
                     input_note_record
-                        .transaction_committed(consumer_transaction.id, block_number.as_u32())?;
+                        .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
                 // The note was consumed by an external transaction
-                input_note_record.consumed_externally(
-                    nullifier_update.nullifier,
-                    nullifier_update.block_num.as_u32(),
-                )?;
+                input_note_record
+                    .consumed_externally(nullifier_update.nullifier, nullifier_update.block_num)?;
             }
         }
 
         if let Some(output_note_record) =
             self.get_output_note_by_nullifier(nullifier_update.nullifier)
         {
-            output_note_record.nullifier_received(
-                nullifier_update.nullifier,
-                nullifier_update.block_num.as_u32(),
-            )?;
+            output_note_record
+                .nullifier_received(nullifier_update.nullifier, nullifier_update.block_num)?;
         }
 
         Ok(())

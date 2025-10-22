@@ -138,7 +138,7 @@ impl OutputNoteRecord {
     pub(crate) fn nullifier_received(
         &mut self,
         nullifier: Nullifier,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<bool, NoteRecordError> {
         if let Some(note_nullifier) = self.nullifier()
             && note_nullifier != nullifier
@@ -307,7 +307,7 @@ pub enum OutputNoteState {
     /// Note has been nullified on chain.
     Consumed {
         /// Block height at which the note was consumed.
-        block_height: u32,
+        block_height: BlockNumber,
         /// Details needed to consume the note.
         recipient: NoteRecipient,
     },
@@ -380,7 +380,7 @@ impl OutputNoteState {
 
     pub fn nullifier_received(
         &self,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<OutputNoteState>, NoteRecordError> {
         match self {
             OutputNoteState::Consumed { .. } => Ok(None),
@@ -444,7 +444,10 @@ impl Deserializable for OutputNoteState {
             Self::STATE_CONSUMED => {
                 let block_height = source.read_u32()?;
                 let recipient = NoteRecipient::read_from(source)?;
-                Ok(OutputNoteState::Consumed { block_height, recipient })
+                Ok(OutputNoteState::Consumed {
+                    block_height: block_height.into(),
+                    recipient,
+                })
             },
             _ => Err(DeserializationError::InvalidValue("OutputNoteState".to_string())),
         }

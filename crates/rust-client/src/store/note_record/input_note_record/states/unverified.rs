@@ -36,7 +36,7 @@ impl NoteStateHandler for UnverifiedNoteState {
 
     fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
     }
@@ -103,7 +103,7 @@ impl NoteStateHandler for UnverifiedNoteState {
     fn transaction_committed(
         &self,
         _transaction_id: TransactionId,
-        _block_height: u32,
+        _block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::InvalidStateTransition(
             "Only processing notes can be committed in a local transaction".to_string(),

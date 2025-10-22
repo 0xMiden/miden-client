@@ -1,6 +1,6 @@
 use alloc::string::ToString;
 
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_objects::transaction::TransactionId;
 
@@ -11,7 +11,7 @@ use crate::store::NoteRecordError;
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConsumedExternalNoteState {
     /// Block height at which the note was nullified.
-    pub nullifier_block_height: u32,
+    pub nullifier_block_height: BlockNumber,
 }
 
 impl NoteStateHandler for ConsumedExternalNoteState {
@@ -25,7 +25,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
 
     fn consumed_externally(
         &self,
-        _nullifier_block_height: u32,
+        _nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(None)
     }
@@ -50,7 +50,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     fn transaction_committed(
         &self,
         _transaction_id: TransactionId,
-        _block_height: u32,
+        _block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::InvalidStateTransition(
             "Only processing notes can be committed in a local transaction".to_string(),
@@ -81,7 +81,9 @@ impl miden_tx::utils::Deserializable for ConsumedExternalNoteState {
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let nullifier_block_height = u32::read_from(source)?;
-        Ok(ConsumedExternalNoteState { nullifier_block_height })
+        Ok(ConsumedExternalNoteState {
+            nullifier_block_height: nullifier_block_height.into(),
+        })
     }
 }
 
