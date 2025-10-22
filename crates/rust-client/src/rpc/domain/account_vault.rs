@@ -1,8 +1,9 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::Word;
 use miden_objects::asset::Asset;
 use miden_objects::block::BlockNumber;
+use miden_objects::{AssetError, Word};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
@@ -27,7 +28,7 @@ impl TryFrom<proto::rpc_store::SyncAccountVaultResponse> for AccountVaultInfo {
 
     fn try_from(value: proto::rpc_store::SyncAccountVaultResponse) -> Result<Self, Self::Error> {
         let pagination_info = value.pagination_info.ok_or(
-            proto::rpc_store::SyncStorageMapsResponse::missing_field(stringify!(pagination_info)),
+            proto::rpc_store::SyncAccountVaultResponse::missing_field(stringify!(pagination_info)),
         )?;
         let chain_tip = pagination_info.chain_tip;
         let block_number = pagination_info.block_num;
@@ -69,7 +70,8 @@ impl TryFrom<proto::primitives::Asset> for Asset {
             .asset
             .ok_or(proto::rpc_store::SyncAccountVaultResponse::missing_field(stringify!(asset)))?
             .try_into()?;
-        Ok(word.try_into().unwrap())
+        word.try_into()
+            .map_err(|e: AssetError| RpcError::InvalidResponse(e.to_string()))
     }
 }
 

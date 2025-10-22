@@ -74,12 +74,12 @@ impl TryFrom<proto::rpc_store::StorageMapUpdate> for StorageMapUpdate {
 
         let key: Word = value
             .key
-            .ok_or(proto::rpc_store::SyncStorageMapsResponse::missing_field(stringify!(key)))?
+            .ok_or(proto::rpc_store::StorageMapUpdate::missing_field(stringify!(key)))?
             .try_into()?;
 
         let value: Word = value
             .value
-            .ok_or(proto::rpc_store::SyncStorageMapsResponse::missing_field(stringify!(value)))?
+            .ok_or(proto::rpc_store::StorageMapUpdate::missing_field(stringify!(value)))?
             .try_into()?;
 
         Ok(Self {
