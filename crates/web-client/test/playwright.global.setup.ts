@@ -106,6 +106,8 @@ export const test = base.extend<{ forEachTest: void }>({
             : undefined;
           const client = await WebClient.createClient(rpcUrl, undefined);
 
+          window.rpcUrl = rpcUrl;
+
           window.client = client;
           window.Account = Account;
           window.AccountBuilder = AccountBuilder;

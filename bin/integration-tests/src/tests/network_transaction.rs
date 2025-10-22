@@ -184,9 +184,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     client.sync_state().await?;
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
-
     let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
-
     let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?.0;
 
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
@@ -204,14 +202,12 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .build()?;
 
     let consume_result = client.execute_transaction(native_account.id(), tx_request).await?;
-
     let bump_proven = client.prove_transaction(&bump_result).await?;
     let consume_proven = client.prove_transaction(&consume_result).await?;
 
     // Submit both transactions
     let bump_submission_height = client.submit_proven_transaction(bump_proven).await?;
     let bump_update = bump_result.to_transaction_update(bump_submission_height);
-    client.apply_transaction(bump_update).await?;
 
     let consume_submission_height = client.submit_proven_transaction(consume_proven).await?;
     let consume_update = consume_result.to_transaction_update(consume_submission_height);
