@@ -12,7 +12,8 @@
     "moduleResolution": "Node",
     "outDir": "./js",
     "strict": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+    "skipLibCheck": true
   },
   "include": ["./ts/*.ts"],
   "exclude": ["./js/**/*"]

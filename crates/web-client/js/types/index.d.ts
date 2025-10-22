@@ -32,7 +32,6 @@ export {
   InputNoteState,
   Library,
   NetworkId,
-  NewSwapTransactionResult,
   Note,
   NoteAndArgs,
   NoteAndArgsArray,
@@ -57,6 +56,9 @@ export {
   Rpo256,
   RpcClient,
   SecretKey,
+  TransactionId,
+  TransactionResult,
+  ProvenTransaction,
   SerializedAccountHeader,
   Signature,
   SigningInputs,
@@ -70,12 +72,11 @@ export {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
-  TransactionSummary,
   Word,
 } from "./crates/miden_client_web";
 
@@ -92,6 +93,9 @@ export declare class WebClient extends WasmWebClient {
     rpcUrl?: string,
     seed?: string
   ): Promise<WebClient & WasmWebClient>;
+
+  /** Returns the default transaction prover configured on the client. */
+  defaultTransactionProver(): TransactionProver;
 
   /**
    * Terminates the underlying worker.

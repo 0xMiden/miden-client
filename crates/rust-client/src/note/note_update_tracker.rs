@@ -74,6 +74,11 @@ impl InputNoteUpdate {
     pub fn update_type(&self) -> &NoteUpdateType {
         &self.update_type
     }
+
+    /// Returns the identifier of the inner note.
+    pub fn id(&self) -> NoteId {
+        self.note.id()
+    }
 }
 
 /// Represents the possible states of an output note record in a [`NoteUpdateTracker`].
@@ -118,6 +123,11 @@ impl OutputNoteUpdate {
     /// Returns the type of the note update.
     pub fn update_type(&self) -> &NoteUpdateType {
         &self.update_type
+    }
+
+    /// Returns the identifier of the inner note.
+    pub fn id(&self) -> NoteId {
+        self.note.id()
     }
 }
 

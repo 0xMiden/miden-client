@@ -20,6 +20,8 @@
 
 * [BREAKING] Incremented MSRV to 1.89.
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
+* [BREAKING] Added `TransactionPipeline` component that handles all transaction lifetime steps ([#1152](https://github.com/0xMiden/miden-client/pull/1152)).
+* [BREAKING] Replaced `TransactionPipeline` with client-scoped lifecycle APIs and the new `TransactionResult` type (TBD).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
@@ -30,7 +32,8 @@
 * [BREAKING] Renamed `TonicRpcClient` to `GrpcClient` and `tonic_rpc_client()` method to `grpc_client()` ([#1360](https://github.com/0xMiden/miden-client/pull/1360)).
 * [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 * [BREAKING] Implemented `AccountFile` in the WebClient ([#1258](https://github.com/0xMiden/miden-client/pull/1258)).
-* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
+* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371)).
+* [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type (TBD).
 
 ## 0.11.8 (2025-09-29)
 

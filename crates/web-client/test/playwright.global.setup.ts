@@ -91,12 +91,11 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionKernel,
             TransactionProver,
             TransactionRequest,
-            TransactionResult,
+            TransactionStoreUpdate,
             TransactionRequestBuilder,
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
-            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -171,13 +170,12 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionKernel = TransactionKernel;
           window.TransactionProver = TransactionProver;
           window.TransactionRequest = TransactionRequest;
-          window.TransactionResult = TransactionResult;
+          window.TransactionStoreUpdate = TransactionStoreUpdate;
           window.TransactionRequestBuilder = TransactionRequestBuilder;
           window.TransactionScript = TransactionScript;
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
-          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
@@ -188,7 +186,6 @@ export const test = base.extend<{ forEachTest: void }>({
 
           // Add the remote prover url to window
           window.remoteProverUrl = proverUrl;
-          window.rpcUrl = rpcUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(window.remoteProverUrl);
@@ -218,6 +215,33 @@ export const test = base.extend<{ forEachTest: void }>({
               await new Promise((r) => setTimeout(r, delayInterval));
               timeWaited += delayInterval;
             }
+          };
+
+          window.helpers.executeAndApplyTransaction = async (
+            accountId,
+            transactionRequest,
+            prover
+          ) => {
+            const client = window.client;
+            const result = await client.executeTransaction(
+              accountId,
+              transactionRequest
+            );
+
+            const useRemoteProver =
+              prover != null && window.remoteProverUrl != null;
+            const proverToUse = useRemoteProver
+              ? window.TransactionProver.newRemoteProver(window.remoteProverUrl)
+              : window.TransactionProver.newLocalProver();
+
+            const proven = await client.proveTransaction(result, proverToUse);
+            const submissionHeight =
+              await client.submitProvenTransaction(proven);
+            const submissionUpdate =
+              result.transactionUpdateWithHeight(submissionHeight);
+            await client.applyTransaction(submissionUpdate);
+
+            return submissionUpdate;
           };
 
           window.helpers.waitForBlocks = async (amountOfBlocks) => {

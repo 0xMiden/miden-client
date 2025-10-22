@@ -18,7 +18,7 @@ try {
     // Access synchronization details
     console.log("Current block number:", syncSummary.blockNum());
     console.log("Committed notes:", syncSummary.committedNotes().map(id => id.toString()));
-    console.log("Consumed notes:", syncSummary.consumedNotes().map(id => id.toString()));
+    console.log("Consumed notes:", syncSummary.executedTransaction().inputNotes().map(id => id.toString()));
     console.log("Updated accounts:", syncSummary.updatedAccounts().map(id => id.toString()));
     console.log("Committed transactions:", syncSummary.committedTransactions().map(id => id.toString()));
 } catch (error) {

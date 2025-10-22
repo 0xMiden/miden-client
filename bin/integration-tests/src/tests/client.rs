@@ -99,28 +99,32 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     println!("Running P2ID tx...");
 
     // Create transactions
-    let transaction_execution_result_1 =
-        client.new_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
-    let tx_prove_1 =
-        client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_1).await.unwrap();
+    let transaction_result_1 =
+        client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
+    let transaction_id_1 = transaction_result_1.id();
+    let proven_transaction_1 = client.prove_transaction(&transaction_result_1).await.unwrap();
 
-    let transaction_execution_result_2 =
-        client.new_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
-    let tx_prove_2 =
-        client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_2).await.unwrap();
+    // NOTE: we manually construct a [`TransactionStoreUpdate`] because we want to submit both
+    // proofs at the same time, but we can't apply the transaction to the store before submitting
+    // it to the node (since we need the submission height).
+    let store_update = transaction_result_1.to_transaction_update(client.get_sync_height().await?);
+    client.apply_transaction(store_update).await?;
+
+    let transaction_result_2 =
+        client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
+    let transaction_id_2 = transaction_result_2.id();
+    let proven_transaction_2 = client.prove_transaction(&transaction_result_2).await.unwrap();
+
+    client.submit_proven_transaction(proven_transaction_1).await?;
+    let submission_height_2 = client.submit_proven_transaction(proven_transaction_2).await.unwrap();
+
+    let tx_update = transaction_result_2.to_transaction_update(submission_height_2);
+    client.apply_transaction(tx_update).await.unwrap();
 
     client.sync_state().await.unwrap();
 
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
-
-    // Submit the proven transactions
-    client.testing_submit_proven_transaction(tx_prove_1).await.unwrap();
-    client.testing_submit_proven_transaction(tx_prove_2).await.unwrap();
 
     // wait for 1 block
     wait_for_tx(&mut client, transaction_id_1).await?;
@@ -473,13 +477,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
-
-        println!("Sending transaction to node");
+        let transaction_id =
+            client.submit_new_transaction(faucet_account_id, tx_request.clone()).await?;
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-        client.submit_transaction(transaction_execution_result).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -498,9 +498,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -514,7 +514,10 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client.submit_proven_transaction(proven_transaction).await.unwrap();
+        let tx_update = transaction_result.to_transaction_update(submission_height);
+        client.apply_transaction(tx_update).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -533,9 +536,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -549,7 +552,10 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client.submit_proven_transaction(proven_transaction).await.unwrap();
+        let tx_update = transaction_result.to_transaction_update(submission_height);
+        client.apply_transaction(tx_update).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -643,8 +649,11 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
         .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build()?;
 
-    let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
-    let tx_id_2 = execute_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
+    let tx_id_1 = client.submit_new_transaction(to_account_ids[0], tx_request_1).await.unwrap();
+    let tx_id_2 = unauth_client
+        .submit_new_transaction(to_account_ids[1], tx_request_2)
+        .await
+        .unwrap();
 
     // Ensure notes are processed
     assert!(!client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
@@ -907,16 +916,18 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
-    let tx_result = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client_1.testing_prove_transaction(&tx_result).await.unwrap();
+    let transaction_result =
+        client_1.execute_transaction(from_account_id, tx_request.clone()).await.unwrap();
+    let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
     let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
     let account_hash_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
-    client_1.testing_apply_transaction(tx_result).await.unwrap();
+    let tx_update =
+        transaction_result.to_transaction_update(client_1.get_sync_height().await.unwrap());
+    client_1.apply_transaction(tx_update).await.unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
@@ -1004,14 +1015,11 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
         client.rng(),
     )?;
 
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
 
     let result = client
-        .submit_transaction_with_prover(
-            transaction_execution_result,
-            Arc::new(AlwaysFailingProver::new()),
-        )
+        .prove_transaction_with(&transaction_result, Arc::new(AlwaysFailingProver::new()))
         .await;
 
     assert!(matches!(
@@ -1112,14 +1120,21 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
         )?;
 
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request).await.unwrap();
 
     println!("Transaction executed successfully");
     wait_for_blocks(&mut client, (expiration_delta + 1).into()).await;
 
     println!("Sending transaction to node");
-    let submitted_tx_result = client.submit_transaction(transaction_execution_result).await;
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    let submitted_tx_result = match client.submit_proven_transaction(proven_transaction).await {
+        Ok(submission_height) => {
+            let tx_update = transaction_result.to_transaction_update(submission_height);
+            client.apply_transaction(tx_update).await
+        },
+        Err(err) => Err(err),
+    };
 
     assert!(submitted_tx_result.is_err());
     Ok(())

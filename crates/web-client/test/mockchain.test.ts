@@ -7,6 +7,23 @@ const mockChainTest = async (testingPage: Page) => {
     const client = await window.MockWebClient.createClient();
     await client.syncState();
 
+    const executeAndApply = async (accountId, transactionRequest) => {
+      const result = await client.executeTransaction(
+        accountId,
+        transactionRequest
+      );
+
+      const proven = await client.proveTransaction(
+        result,
+        window.TransactionProver.newLocalProver()
+      );
+      const submissionHeight = await client.submitProvenTransaction(proven);
+      const update = result.transactionUpdateWithHeight(submissionHeight);
+      await client.applyTransaction(update);
+
+      return update;
+    };
+
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true
@@ -26,24 +43,25 @@ const mockChainTest = async (testingPage: Page) => {
       BigInt(1000)
     );
 
-    const mintTransactionResult = await client.newTransaction(
+    const mintTransactionUpdate = await executeAndApply(
       faucetAccount.id(),
       mintTransactionRequest
     );
-
-    await client.submitTransaction(mintTransactionResult);
     await client.proveBlock();
     await client.syncState();
 
     const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintTransactionResult.createdNotes().notes()[0].id().toString(),
+      mintTransactionUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()[0]
+        .id()
+        .toString(),
     ]);
-    const consumeTransactionResult = await client.newTransaction(
+    const consumeTransactionUpdate = await executeAndApply(
       account.id(),
       consumeTransactionRequest
     );
-
-    await client.submitTransaction(consumeTransactionResult);
     await client.proveBlock();
     await client.syncState();
 

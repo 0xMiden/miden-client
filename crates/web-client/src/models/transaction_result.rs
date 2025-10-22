@@ -1,83 +1,64 @@
+use miden_client::BlockNumber;
 use miden_client::transaction::TransactionResult as NativeTransactionResult;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
-use crate::models::account_delta::AccountDelta;
 use crate::models::executed_transaction::ExecutedTransaction;
-use crate::models::input_notes::InputNotes;
-use crate::models::output_notes::OutputNotes;
-use crate::models::transaction_args::TransactionArgs;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::models::transaction_id::TransactionId;
+use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
+use crate::models::transaction_store_update::TransactionStoreUpdate;
 
+/// WASM wrapper around the native [`TransactionResult`].
+#[derive(Clone)]
 #[wasm_bindgen]
-pub struct TransactionResult(NativeTransactionResult);
+pub struct TransactionResult {
+    result: NativeTransactionResult,
+}
 
 #[wasm_bindgen]
 impl TransactionResult {
+    /// Returns the ID of the transaction.
+    pub fn id(&self) -> TransactionId {
+        self.result.id().into()
+    }
+
+    /// Returns the executed transaction.
     #[wasm_bindgen(js_name = "executedTransaction")]
     pub fn executed_transaction(&self) -> ExecutedTransaction {
-        self.0.executed_transaction().into()
+        self.result.executed_transaction().clone().into()
     }
 
-    #[wasm_bindgen(js_name = "createdNotes")]
-    pub fn created_notes(&self) -> OutputNotes {
-        self.0.created_notes().into()
+    /// Returns notes that are expected to be created as a result of follow-up executions.
+    #[wasm_bindgen(js_name = "futureNotes")]
+    pub fn future_notes(&self) -> Vec<NoteDetailsAndTag> {
+        self.result
+            .future_notes()
+            .iter()
+            .cloned()
+            .map(|(note_details, note_tag)| {
+                NoteDetailsAndTag::new(note_details.into(), note_tag.into())
+            })
+            .collect()
     }
 
-    // TODO: relevant_notes
-
-    #[wasm_bindgen(js_name = "blockNum")]
-    pub fn block_num(&self) -> u32 {
-        self.0.block_num().as_u32()
-    }
-
-    #[wasm_bindgen(js_name = "transactionArguments")]
-    pub fn transaction_arguments(&self) -> TransactionArgs {
-        self.0.transaction_arguments().into()
-    }
-
-    #[wasm_bindgen(js_name = "accountDelta")]
-    pub fn account_delta(&self) -> AccountDelta {
-        self.0.account_delta().into()
-    }
-
-    #[wasm_bindgen(js_name = "consumedNotes")]
-    pub fn consumed_notes(&self) -> InputNotes {
-        self.0.consumed_notes().into()
-    }
-
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
-    }
-
-    pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionResult, JsValue> {
-        deserialize_from_uint8array::<NativeTransactionResult>(bytes).map(TransactionResult)
+    /// Builds a store update using the provided submission height.
+    #[wasm_bindgen(js_name = "transactionUpdateWithHeight")]
+    pub fn transaction_update_with_height(&self, submission_height: u32) -> TransactionStoreUpdate {
+        self.result.to_transaction_update(BlockNumber::from(submission_height)).into()
     }
 }
 
-// CONVERSIONS
-// ================================================================================================
+impl TransactionResult {
+    pub(crate) fn new(result: NativeTransactionResult) -> Self {
+        Self { result }
+    }
+
+    pub(crate) fn native(&self) -> &NativeTransactionResult {
+        &self.result
+    }
+}
 
 impl From<NativeTransactionResult> for TransactionResult {
-    fn from(native_transaction_result: NativeTransactionResult) -> Self {
-        TransactionResult(native_transaction_result)
-    }
-}
-
-impl From<&NativeTransactionResult> for TransactionResult {
-    fn from(native_transaction_result: &NativeTransactionResult) -> Self {
-        TransactionResult(native_transaction_result.clone())
-    }
-}
-
-impl From<TransactionResult> for NativeTransactionResult {
-    fn from(transaction_result: TransactionResult) -> Self {
-        transaction_result.0
-    }
-}
-
-impl From<&TransactionResult> for NativeTransactionResult {
-    fn from(transaction_result: &TransactionResult) -> Self {
-        transaction_result.0.clone()
+    fn from(result: NativeTransactionResult) -> Self {
+        Self::new(result)
     }
 }

@@ -146,7 +146,7 @@ pub mod builder;
 #[cfg(feature = "testing")]
 mod test_utils;
 
-mod errors;
+pub mod errors;
 
 // RE-EXPORTS
 // ================================================================================================
@@ -275,10 +275,12 @@ pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
-use note_transport::{NoteTransportClient, init_note_transport_cursor};
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
+
+use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::transaction::TransactionProver;
 
 // MIDEN CLIENT
 // ================================================================================================
@@ -405,6 +407,10 @@ where
         &mut self.rng
     }
 
+    pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
+        self.tx_prover.clone()
+    }
+
     // TEST HELPERS
     // --------------------------------------------------------------------------------------------
 
@@ -461,6 +467,7 @@ impl FeltRng for ClientRng {
 }
 
 /// Indicates whether the client is operating in debug mode.
+#[derive(Debug, Clone, Copy)]
 pub enum DebugMode {
     Enabled,
     Disabled,

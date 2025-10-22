@@ -2826,7 +2826,7 @@ dependencies = [
 [[package]]
 name = "miden-note-transport-proto-build"
 version = "0.1.0"
-source = "git+https://github.com/0xMiden/miden-note-transport#4ee3956fd7bfd77f3d72e9e83dc3af5b7a52d86e"
+source = "git+https://github.com/0xMiden/miden-note-transport#bb1075155be757601d853deb0e1df8a95a51ff69"
 dependencies = [
  "fs-err",
  "miette",

@@ -9,9 +9,11 @@ use miden_objects::transaction::{
     InputNotes,
     OutputNotes,
     TransactionArgs,
+    TransactionId,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
+use super::store_update::TransactionStoreUpdate;
 use crate::ClientError;
 
 // TRANSACTION RESULT
@@ -35,6 +37,11 @@ impl TransactionResult {
         future_notes: Vec<(NoteDetails, NoteTag)>,
     ) -> Result<Self, ClientError> {
         Ok(Self { transaction, future_notes })
+    }
+
+    /// Returns a unique identifier of this transaction.
+    pub fn id(&self) -> TransactionId {
+        self.transaction.id()
     }
 
     /// Returns the [`ExecutedTransaction`].
@@ -63,8 +70,7 @@ impl TransactionResult {
         self.transaction.tx_args()
     }
 
-    /// Returns the [`AccountDelta`] that describes the change of state for the executing
-    /// [`crate::account::Account`].
+    /// Returns the [`AccountDelta`] that describes the change of state for the executing account.
     pub fn account_delta(&self) -> &AccountDelta {
         self.transaction.account_delta()
     }
@@ -72,6 +78,15 @@ impl TransactionResult {
     /// Returns input notes that were consumed as part of the transaction.
     pub fn consumed_notes(&self) -> &InputNotes<InputNote> {
         self.transaction.tx_inputs().input_notes()
+    }
+
+    /// Builds a [`TransactionStoreUpdate`] using the provided submission height.
+    pub fn to_transaction_update(&self, submission_height: BlockNumber) -> TransactionStoreUpdate {
+        TransactionStoreUpdate::new(
+            self.transaction.clone(),
+            submission_height,
+            self.future_notes.clone(),
+        )
     }
 }
 

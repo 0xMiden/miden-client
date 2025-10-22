@@ -6,51 +6,15 @@
 
 # Class: TransactionResult
 
+WASM wrapper around the native [`TransactionResult`].
+
 ## Methods
-
-### accountDelta()
-
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
-
-#### Returns
-
-[`AccountDelta`](AccountDelta.md)
-
-***
-
-### blockNum()
-
-> **blockNum**(): `number`
-
-#### Returns
-
-`number`
-
-***
-
-### consumedNotes()
-
-> **consumedNotes**(): [`InputNotes`](InputNotes.md)
-
-#### Returns
-
-[`InputNotes`](InputNotes.md)
-
-***
-
-### createdNotes()
-
-> **createdNotes**(): [`OutputNotes`](OutputNotes.md)
-
-#### Returns
-
-[`OutputNotes`](OutputNotes.md)
-
-***
 
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+
+Returns the executed transaction.
 
 #### Returns
 
@@ -68,36 +32,42 @@
 
 ***
 
-### serialize()
+### futureNotes()
 
-> **serialize**(): `Uint8Array`
+> **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
 
-#### Returns
-
-`Uint8Array`
-
-***
-
-### transactionArguments()
-
-> **transactionArguments**(): [`TransactionArgs`](TransactionArgs.md)
+Returns notes that are expected to be created as a result of follow-up executions.
 
 #### Returns
 
-[`TransactionArgs`](TransactionArgs.md)
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
 
 ***
 
-### deserialize()
+### id()
 
-> `static` **deserialize**(`bytes`): `TransactionResult`
+> **id**(): [`TransactionId`](TransactionId.md)
+
+Returns the ID of the transaction.
+
+#### Returns
+
+[`TransactionId`](TransactionId.md)
+
+***
+
+### transactionUpdateWithHeight()
+
+> **transactionUpdateWithHeight**(`submission_height`): [`TransactionStoreUpdate`](TransactionStoreUpdate.md)
+
+Builds a store update using the provided submission height.
 
 #### Parameters
 
-##### bytes
+##### submission\_height
 
-`Uint8Array`
+`number`
 
 #### Returns
 
-`TransactionResult`
+[`TransactionStoreUpdate`](TransactionStoreUpdate.md)

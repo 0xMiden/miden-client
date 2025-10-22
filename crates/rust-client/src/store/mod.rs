@@ -44,6 +44,7 @@ use miden_objects::note::{NoteId, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
+use crate::note::NoteUpdateTracker;
 use crate::note_transport::{
     NOTE_TRANSPORT_CURSOR_STORE_SETTING,
     NoteTransportCursor,
@@ -111,7 +112,7 @@ pub trait Store: Send + Sync {
     ) -> Result<Vec<TransactionRecord>, StoreError>;
 
     /// Applies a transaction, atomically updating the current state based on the
-    /// [`TransactionStoreUpdate`].
+    /// [`TransactionStoreUpdate`] and [`NoteUpdateTracker`].
     ///
     /// An update involves:
     /// - Updating the stored account which is being modified by the transaction.
@@ -120,7 +121,11 @@ pub trait Store: Send + Sync {
     /// - Updating the input notes that are being processed by the transaction.
     /// - Inserting the new tracked tags into the store.
     /// - Inserting the transaction into the store to track.
-    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError>;
+    async fn apply_transaction(
+        &self,
+        tx_update: TransactionStoreUpdate,
+        note_updates: NoteUpdateTracker,
+    ) -> Result<(), StoreError>;
 
     // NOTES
     // --------------------------------------------------------------------------------------------
@@ -360,7 +365,7 @@ pub trait Store: Send + Sync {
         let cursor_bytes = self
             .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
             .await?
-            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+            .ok_or(StoreError::NoteTransportCursorNotFound)?;
         let array: [u8; 8] = cursor_bytes
             .as_slice()
             .try_into()

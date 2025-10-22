@@ -5,19 +5,22 @@ The mock web client is useful for testing and development purposes, as it simula
 The mock web client mimics the normal `WebClient` interface to allow for seamless integration with existing code, the only difference is the addition of a `proveBlock` function. The simulated environment will not create blocks automatically, so `proveBlock` needs to be called manually each time a new block should be created.
 
 ```typescript
-import { MockWebClient } from "@demox-labs/miden-sdk";
+import { MockWebClient, TransactionProver } from "@demox-labs/miden-sdk";
 
 try {
     // Initialize the mock web client
     const mockWebClient = await MockWebClient.createClient();
 
     // Running a mint transaction (assuming the client was setup previously)
-    const mintTransactionResult = await mockWebClient.newTransaction(
+    const pipeline = await mockWebClient.executeTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
 
-    await mockWebClient.submitTransaction(mintTransactionResult);
+    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const mintTransactionUpdate = await pipeline.submitProvenTransaction();
+    await mockWebClient.applyTransaction(mintTransactionUpdate);
+
     await mockWebClient.proveBlock(); // Creates a new block that will include the submitted transaction
     await mockWebClient.syncState();
 

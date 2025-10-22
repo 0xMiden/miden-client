@@ -90,9 +90,7 @@ async fn deploy_counter_contract(
     let tx_increment_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
 
     // Execute the transaction locally
-    let tx_result = client.new_transaction(acc.id(), tx_increment_request).await?;
-    let tx_id = tx_result.executed_transaction().id();
-    client.submit_transaction(tx_result).await?;
+    let tx_id = client.submit_new_transaction(acc.id(), tx_increment_request).await?;
     wait_for_tx(client, tx_id).await?;
 
     Ok(acc)
@@ -197,23 +195,27 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .own_output_notes(vec![OutputNote::Full(network_note.clone())])
         .build()?;
 
-    let bump_transaction = client.new_transaction(wallet.id(), tx_request).await?;
-    client.testing_apply_transaction(bump_transaction.clone()).await?;
+    let bump_result = client.execute_transaction(wallet.id(), tx_request).await?;
+    let tx_update = bump_result.to_transaction_update(client.get_sync_height().await?);
+    client.apply_transaction(tx_update).await?;
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(vec![(network_note, None)])
         .build()?;
 
-    let consume_transaction = client.new_transaction(native_account.id(), tx_request).await?;
+    let consume_result = client.execute_transaction(native_account.id(), tx_request).await?;
 
-    let bump_proof = client.testing_prove_transaction(&bump_transaction).await?;
-    let consume_proof = client.testing_prove_transaction(&consume_transaction).await?;
+    let bump_proven = client.prove_transaction(&bump_result).await?;
+    let consume_proven = client.prove_transaction(&consume_result).await?;
 
     // Submit both transactions
-    client.testing_submit_proven_transaction(bump_proof).await?;
-    client.testing_submit_proven_transaction(consume_proof).await?;
+    let bump_submission_height = client.submit_proven_transaction(bump_proven).await?;
+    let bump_update = bump_result.to_transaction_update(bump_submission_height);
+    client.apply_transaction(bump_update).await?;
 
-    client.testing_apply_transaction(consume_transaction).await?;
+    let consume_submission_height = client.submit_proven_transaction(consume_proven).await?;
+    let consume_update = consume_result.to_transaction_update(consume_submission_height);
+    client.apply_transaction(consume_update).await?;
 
     wait_for_blocks(&mut client, 2).await;
 
