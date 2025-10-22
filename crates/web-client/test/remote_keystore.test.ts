@@ -178,7 +178,7 @@ test.describe("remote keystore", () => {
       );
 
       // This call should trigger the sign callback
-      await client.newTransaction(faucet.id(), txRequest);
+      await client.executeTransaction(faucet.id(), txRequest);
 
       return { faucetPubKey, signPubKey };
     });
