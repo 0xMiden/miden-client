@@ -29,7 +29,7 @@ pub struct CliConfig {
     pub token_symbol_map_filepath: PathBuf,
     /// RPC endpoint for the remote prover. If this isn't present, a local prover will be used.
     pub remote_prover_endpoint: Option<CliEndpoint>,
-    /// Path to the directory from where [[`miden_core::vm::Package`]]s will be loaded.
+    /// Path to the directory from where Packages will be loaded.
     pub package_directory: PathBuf,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
