@@ -1,6 +1,6 @@
 use miden_client::account::component::BasicWallet;
 use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::AuthRpoFalcon512;
+use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -45,7 +45,9 @@ pub(crate) async fn generate_wallet(
     let new_account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode.into())
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
+        .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(
+            key_pair.public_key().to_commitment(),
+        )))
         .with_component(BasicWallet)
         .build()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
