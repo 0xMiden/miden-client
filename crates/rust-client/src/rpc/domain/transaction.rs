@@ -99,7 +99,8 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
 // TRANSACTION RECORD
 // ================================================================================================
 
-/// Represents a transaction record.
+/// Contains information about a transaction that got included in the chain at a specific block
+/// number.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRecord {
     /// Block number in which the transaction was executed.

@@ -313,7 +313,7 @@ impl MockRpcApi {
                     for (key, value) in map_delta.entries() {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
-                            slot_index,
+                            slot_index: u8::try_from(slot_index).unwrap(),
                             key: (*key).into(),
                             value: *value,
                         };

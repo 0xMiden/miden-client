@@ -4,12 +4,14 @@ use miden_objects::Word;
 use miden_objects::block::BlockNumber;
 
 use crate::rpc::domain::MissingFieldHelper;
-use crate::rpc::{RpcError, generated as proto};
+use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
 // STORAGE MAP INFO
 // ================================================================================================
 
-/// Represents a `proto::rpc_store::SyncStorageMapsRequest`
+/// Represents a `proto::rpc_store::SyncStorageMapsResponse` with fields converted into domain
+/// types. Contains information of updated map slots in a given range of blocks specified on
+/// request. Also provides the current chain tip while processing the request.
 pub struct StorageMapInfo {
     /// Current chain tip
     pub chain_tip: BlockNumber,
@@ -54,7 +56,7 @@ pub struct StorageMapUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,
     /// Slot index ([0..255]).
-    pub slot_index: u32,
+    pub slot_index: u8,
     /// The storage map key
     pub key: Word,
     /// The storage map value.
@@ -65,7 +67,7 @@ pub struct StorageMapUpdate {
 // ================================================================================================
 
 impl TryFrom<proto::rpc_store::StorageMapUpdate> for StorageMapUpdate {
-    type Error = RpcError;
+    type Error = RpcConversionError;
 
     fn try_from(value: proto::rpc_store::StorageMapUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
@@ -84,7 +86,7 @@ impl TryFrom<proto::rpc_store::StorageMapUpdate> for StorageMapUpdate {
 
         Ok(Self {
             block_num: block_num.into(),
-            slot_index,
+            slot_index: u8::try_from(slot_index)?,
             key,
             value,
         })

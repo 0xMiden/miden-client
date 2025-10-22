@@ -11,6 +11,9 @@ use crate::rpc::{RpcError, generated as proto};
 // ACCOUNT VAULT INFO
 // ================================================================================================
 
+/// Represents a `proto::rpc_store::SyncAccountVaultResponse` with fields converted into domain
+/// types. Contains information of asset updates in a given range of blocks specified on request.
+/// Also provides the current chain tip while processing the request.
 pub struct AccountVaultInfo {
     /// Current chain tip
     pub chain_tip: BlockNumber,
@@ -50,6 +53,7 @@ impl TryFrom<proto::rpc_store::SyncAccountVaultResponse> for AccountVaultInfo {
 // ACCOUNT VAULT UPDATE
 // ================================================================================================
 
+/// Represents an update to an account vault, including the vault key and asset value involved.
 pub struct AccountVaultUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,
