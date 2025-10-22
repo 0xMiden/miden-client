@@ -158,7 +158,12 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
             notes.push(committed_note);
         }
 
-        Ok(NoteSyncInfo { chain_tip: chain_tip.into(), block_header, mmr_path, notes })
+        Ok(NoteSyncInfo {
+            chain_tip: chain_tip.into(),
+            block_header,
+            mmr_path,
+            notes,
+        })
     }
 }
 
