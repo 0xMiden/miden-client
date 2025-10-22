@@ -347,7 +347,7 @@ impl SqliteStore {
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
 
         // TODO: change the api of get_storage_map_item_proof
-        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1;
+        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1.try_into()?;
         let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
@@ -509,7 +509,7 @@ impl SqliteStore {
             )?;
 
             for (key, value) in map_delta.entries() {
-                map.insert((*key).into(), *value);
+                map.insert((*key).into(), *value)?;
             }
 
             updated_storage_slots.insert(*index, StorageSlot::Map(map));
@@ -969,7 +969,7 @@ fn query_storage_maps(
     let mut maps = BTreeMap::new();
     for (root, key, value) in map_entries {
         let map = maps.entry(root).or_insert_with(StorageMap::new);
-        map.insert(key, value);
+        map.insert(key, value)?;
     }
 
     Ok(maps)
@@ -1106,7 +1106,6 @@ mod tests {
         NonFungibleAsset,
         NonFungibleAssetDetails,
     };
-    use miden_client::crypto::rpo_falcon512::PublicKey;
     use miden_client::store::Store;
     use miden_client::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -1117,6 +1116,7 @@ mod tests {
     use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
+    use miden_objects::account::PublicKeyCommitment;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;
@@ -1136,7 +1136,10 @@ mod tests {
         )?
         .with_supports_all_types();
         let account_code = AccountCode::from_components(
-            &[AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)).into(), account_component],
+            &[
+                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into(),
+                account_component,
+            ],
             AccountType::RegularAccountUpdatableCode,
         )?;
 
@@ -1184,7 +1187,7 @@ mod tests {
         // Create and insert an account
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .with_component(dummy_component)
             .build()?;
 
@@ -1254,7 +1257,7 @@ mod tests {
         let store = create_test_store().await;
 
         let mut dummy_map = StorageMap::new();
-        dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into());
+        dummy_map.insert([ONE, ZERO, ZERO, ZERO].into(), [ONE, ONE, ONE, ONE].into())?;
 
         let dummy_component = AccountComponent::new(
             basic_wallet_library(),
@@ -1274,7 +1277,7 @@ mod tests {
         ];
         let account = AccountBuilder::new([0; 32])
             .account_type(AccountType::RegularAccountImmutableCode)
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
