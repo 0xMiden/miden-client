@@ -21,7 +21,12 @@ use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
+    Endpoint,
+    FetchedAccount,
+    NodeRpcClient,
+    NodeRpcClientEndpoint,
+    NoteSyncInfo,
+    RpcError,
     StateSyncInfo,
 };
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
