@@ -16,10 +16,12 @@
 * Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 * Added `Address` addition and removal for accounts ([#1367](https://github.com/0xMiden/miden-client/pull/1367)).
 * Refactored code into their own files and added `ProvenTransaction` and `TransactionStoreUpdate` bindings for the WebClient ([#1408](https://github.com/0xMiden/miden-client/pull/1408)).
+* Added `NoteFile` type, used for exporting and importing `Notes`([#1378](https://github.com/0xMiden/miden-client/pull/1383))
 
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
+* [BREAKING] Unified chain tip and block number types to use `BlockNumber` instead of `u32` ([#1415](https://github.com/0xMiden/miden-client/pull/1415)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).

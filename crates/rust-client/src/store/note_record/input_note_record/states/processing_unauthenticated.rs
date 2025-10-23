@@ -36,7 +36,7 @@ impl NoteStateHandler for ProcessingUnauthenticatedNoteState {
 
     fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
     }
@@ -61,7 +61,7 @@ impl NoteStateHandler for ProcessingUnauthenticatedNoteState {
     fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         if transaction_id != self.submission_data.consumer_transaction {
             return Err(NoteRecordError::StateTransitionError(

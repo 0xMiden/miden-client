@@ -1,5 +1,6 @@
 use miden_objects::Word;
 use miden_objects::account::AccountId;
+use miden_objects::block::BlockNumber;
 use miden_objects::transaction::TransactionId;
 
 use crate::rpc::errors::RpcConversionError;
@@ -46,7 +47,7 @@ pub struct TransactionInclusion {
     /// The transaction identifier.
     pub transaction_id: TransactionId,
     /// The number of the block in which the transaction was included.
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// The account that the transaction was executed against.
     pub account_id: AccountId,
 }
