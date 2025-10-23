@@ -211,8 +211,7 @@ where
             }
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)`."
-                    .into(),
+                "Store must be specified. Call `.store(...)`.".into(),
             ));
         };
 
