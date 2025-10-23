@@ -277,7 +277,7 @@ where
                 .sync_notes(request_block_num, None, &[tag].into_iter().collect())
                 .await?;
 
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip.into() {
+            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
                 return Ok(None);
             }
 

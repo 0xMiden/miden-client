@@ -49,7 +49,7 @@ pub struct TransactionInclusion {
     /// The transaction identifier.
     pub transaction_id: TransactionId,
     /// The number of the block in which the transaction was included.
-    pub block_num: u32,
+    pub block_num: BlockNumber,
     /// The account that the transaction was executed against.
     pub account_id: AccountId,
 }

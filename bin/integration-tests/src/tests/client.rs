@@ -1173,9 +1173,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         use.miden::account
 
         export.update_map
-            push.0.0.0.0
-            push.1.2.3.5
+            push.1.2.3.4
             # => [VALUE]
+            push.0.0.0.0
             # => [KEY, VALUE]
             push.1
             # => [index, KEY, VALUE]

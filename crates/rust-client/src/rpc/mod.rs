@@ -207,7 +207,7 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         nullifier: &Nullifier,
         block_num: BlockNumber,
-    ) -> Result<Option<u32>, RpcError> {
+    ) -> Result<Option<BlockNumber>, RpcError> {
         let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
 
         Ok(nullifiers

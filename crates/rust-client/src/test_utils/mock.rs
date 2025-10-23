@@ -415,7 +415,7 @@ impl NodeRpcClient for MockRpcApi {
         let response = self.get_sync_state_request(block_range, note_tags, &[])?;
 
         let response = NoteSyncInfo {
-            chain_tip: response.chain_tip,
+            chain_tip: response.chain_tip.into(),
             block_header: response.block_header.unwrap().try_into().unwrap(),
             mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
             notes: response
@@ -626,7 +626,7 @@ impl NodeRpcClient for MockRpcApi {
                 };
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
-                    Some(NullifierUpdate { nullifier, block_num: block_num.as_u32() })
+                    Some(NullifierUpdate { nullifier, block_num })
                 } else {
                     None
                 }
