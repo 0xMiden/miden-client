@@ -2,7 +2,7 @@ use alloc::string::ToString;
 
 use miden_objects::Word;
 use miden_objects::account::AccountId;
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_objects::transaction::TransactionId;
 
@@ -45,7 +45,7 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
 
     fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
     }
@@ -70,7 +70,7 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
     fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         if transaction_id != self.submission_data.consumer_transaction {
             return Err(NoteRecordError::StateTransitionError(
