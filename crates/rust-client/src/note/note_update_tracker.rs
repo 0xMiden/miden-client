@@ -290,7 +290,7 @@ impl NoteUpdateTracker {
                     consumer_transaction.status
                 {
                     input_note_record
-                        .transaction_committed(consumer_transaction.id, block_number.as_u32())?;
+                        .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
                 // The note was consumed by an external transaction
