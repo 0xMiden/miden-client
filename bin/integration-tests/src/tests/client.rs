@@ -2,20 +2,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::component::{AccountComponent, BasicWallet};
-use miden_client::account::{
-    AccountBuilder,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageSlot,
-};
+use miden_client::account::{AccountId, AccountStorageMode, StorageMap, StorageSlot};
 use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteScript, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
@@ -40,7 +30,6 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, Felt, ScriptBuilder};
 use miden_client_sqlite_store::SqliteStore;
-use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
 
@@ -1190,33 +1179,19 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 
-    let assembler = TransactionKernel::assembler();
-    let custom_component = AccountComponent::compile(
+    let storage_slots = vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)];
+    let (account_with_map_item, _) = insert_account_with_custom_component(
+        &mut client,
         custom_code,
-        assembler.clone(),
-        vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)],
-    )?
-    .with_supports_all_types();
-
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-
-    let key_pair = SecretKey::with_rng(client.rng());
-    let pub_key = key_pair.public_key();
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))?;
-
-    let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.into()))
-        .with_component(BasicWallet)
-        .with_component(custom_component)
-        .build()?;
-
-    client.add_account(&account, false).await?;
+        storage_slots,
+        AccountStorageMode::Public,
+        &keystore,
+    )
+    .await?;
 
     client.sync_state().await.unwrap();
 
+    let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
@@ -1241,7 +1216,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         )?;
 
     let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
-    execute_tx_and_sync(&mut client, account.id(), tx_request.clone()).await?;
+    execute_tx_and_sync(&mut client, account_with_map_item.id(), tx_request.clone()).await?;
 
     // Mint a new fungible asset to check account vault changes
     let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
@@ -1284,7 +1259,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
     let sync_storage_maps = client
         .test_rpc_api()
-        .sync_storage_maps(0.into(), None, account.id())
+        .sync_storage_maps(0.into(), None, account_with_map_item.id())
         .await
         .unwrap();
     let account_vault_info = client
