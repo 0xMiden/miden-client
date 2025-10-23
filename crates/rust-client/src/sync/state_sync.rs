@@ -403,7 +403,7 @@ impl StateSync {
 
         // Discard nullifiers that are newer than the current block (this might happen if the block
         // changes between the sync_state and the check_nullifier calls)
-        new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num.as_u32());
+        new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
