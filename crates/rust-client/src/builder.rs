@@ -129,7 +129,7 @@ where
         self
     }
 
-    /// Optionally provide a store directly.
+    /// Provide a store to be used by the client.
     #[must_use]
     pub fn store(mut self, store: Arc<dyn Store>) -> Self {
         self.store = Some(StoreBuilder::Store(store));
@@ -211,7 +211,7 @@ where
             }
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path."
+                "Store must be specified. Call `.store(...)`."
                     .into(),
             ));
         };
