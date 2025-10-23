@@ -64,6 +64,10 @@ impl OutputNote {
             _ => None,
         }
     }
+
+    pub(crate) fn note(&self) -> &NativeOutputNote {
+        &self.0
+    }
 }
 
 // CONVERSIONS

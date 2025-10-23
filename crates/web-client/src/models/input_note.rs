@@ -8,7 +8,7 @@ use super::note_location::NoteLocation;
 
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct InputNote(NativeInputNote);
+pub struct InputNote(pub(crate) NativeInputNote);
 
 #[wasm_bindgen]
 impl InputNote {

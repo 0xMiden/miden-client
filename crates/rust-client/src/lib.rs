@@ -151,6 +151,10 @@ pub mod errors;
 // RE-EXPORTS
 // ================================================================================================
 
+pub mod notes {
+    pub use miden_objects::note::NoteFile;
+}
+
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
     pub use miden_objects::assembly::debuginfo::SourceManagerSync;

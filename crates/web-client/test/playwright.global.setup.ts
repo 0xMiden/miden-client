@@ -61,6 +61,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteExecutionHint,
             NoteExecutionMode,
             NoteFilter,
+            NoteFile,
             NoteFilterTypes,
             NoteIdAndArgs,
             NoteIdAndArgsArray,
@@ -144,6 +145,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.NoteExecutionHint = NoteExecutionHint;
           window.NoteExecutionMode = NoteExecutionMode;
           window.NoteFilter = NoteFilter;
+          window.NoteFile = NoteFile;
           window.NoteFilterTypes = NoteFilterTypes;
           window.NoteIdAndArgs = NoteIdAndArgs;
           window.NoteIdAndArgsArray = NoteIdAndArgsArray;
