@@ -103,9 +103,16 @@ Notice how the amount specified when using the token symbol takes into account t
 The `remote_prover_endpoint` field is used to configure the usage of a remote prover. You can set a remote prover when calling the `miden-client prover` command with the `--remote-prover-endpoint` flag. The prover will be used for all transactions that are executed with the `miden` command. By default, no remote prover is used and all transactions are executed locally.
 
 ### Package directory
-The `package_directory` field is used to configure the path to the directory where the account component are stored in package (`.masp`) form. The default value is `./packages`.
+`Packages` are Miden's native packaging format.
+This structure encompasses a Mast Forest (containing either a `Library` or a `Program`) with all of its corresponding metadata. Specifically to the miden-client, a `Package` will contain the MASM code for an `Account Component` in the form of a `Library`.
+
+The `package_directory` field is used to configure the path to the directory where the account components are stored in package (`.masp`) form. The default value is `./packages`.
 
 In this directory you can place the packages used to create the account components. These define the interface of the account that will be created.
+
+For more information on miden packages, see:
+- [The mast-package crate](https://github.com/0xMiden/miden-vm/blob/next/crates/mast-package/README.md)
+- [The Miden package's status article on the Miden compiler](https://0xmiden.github.io/compiler/appendix/known-limitations.html#packaging)
 
 ### Block Delta
 
