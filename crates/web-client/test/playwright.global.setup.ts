@@ -132,7 +132,6 @@ export const test = base.extend<{ forEachTest: void }>({
           window.ConsumableNoteRecord = ConsumableNoteRecord;
           window.Endpoint = Endpoint;
           window.Felt = Felt;
-          window.FeltArray = FeltArray;
           window.ForeignAccount = ForeignAccount;
           window.FungibleAsset = FungibleAsset;
           window.FungibleAssetDelta = FungibleAssetDelta;

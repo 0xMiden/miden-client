@@ -378,7 +378,7 @@ export const customTransaction = async (
       let felt8 = new window.Felt(BigInt(9));
 
       let noteArgs = [felt1, felt2, felt3, felt4, felt5, felt6, felt7, felt8];
-      let feltArray = new window.FeltArray();
+      let feltArray = new window.MidenArrays.FeltArray();
 
       noteArgs.forEach((felt) => {
         feltArray.push(felt);
@@ -478,7 +478,7 @@ export const customTransaction = async (
       let builder = client.createScriptBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
+        new window.MidenArrays.FeltArray([
           walletAccount.id().prefix(),
           walletAccount.id().suffix(),
         ])
@@ -629,7 +629,7 @@ const customTxWithMultipleNotes = async (
 
       const p2idScript = window.NoteScript.p2id();
 
-      const inputNotes = new window.FeltArray([
+      const inputNotes = new window.MidenArrays.FeltArray([
         targetAccount.id().suffix(),
         targetAccount.id().prefix(),
       ]);
@@ -1155,7 +1155,9 @@ export const counterAccountComponent = async (
     // Create transaction with network note
     let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let noteInputs = new window.NoteInputs(new window.FeltArray([]));
+    let noteInputs = new window.NoteInputs(
+      new window.MidenArrays.FeltArray([])
+    );
 
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
