@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn main() -> miette::Result<(), String> {
-    println!("cargo::rerun-if-changed=.");
+    println!("cargo::rerun-if-changed=src");
 
     // Install dependencies for the TS project files with yarn
     let status = Command::new("yarn").current_dir("src").status().map_err(|err| {
