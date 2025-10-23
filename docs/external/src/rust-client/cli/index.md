@@ -177,6 +177,18 @@ miden-client notes --show 0x70b7ec
 
 Sync the client with the latest state of the Miden network. Shows a brief summary at the end.
 
+### `tags`
+
+View and add tags.
+
+#### Action Flags
+
+| Flag             | Description                                                 | Aliases |
+| ---------------- | ----------------------------------------------------------- | ------- |
+| `--list`         | List all tags monitored by this client                      | `-l`    |
+| `--add <tag>`    | Add a new tag to the list of tags monitored by this client  | `-a`    |
+| `--remove <tag>` | Remove a tag from the list of tags monitored by this client | `-r`    |
+
 ### `tx`
 
 View transactions.
@@ -240,30 +252,28 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand               | Description                                                   |
-|--------------------------|---------------------------------------------------------------|
-|`list <ID>`               | List addresses for the specified account ID                   |
-|`add <INTERFACE> <ID>`    | Bind an address for an interface for specified account ID     |
-|`remove <INTERFACE> <ID>` | Remove an address for an interface for specified account ID   |
+| Subcommand                       | Description                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `list <ID>`                      | List all addresses or only for the specified account ID                               |
+| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for specified account ID with optional tag length    |
+| `remove <ID> <INTERFACE>`        | Remove an address for an interface for specified account ID                           |
 
-All commands require an account ID to be specified.
-
-The `list` takes no arguments besides the account ID, and lists all addresses for that account:
+The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
 ```sh
 miden-client addresses list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-The `--add` and `--remove` take and additional argument, which is the interface being added or removed, these values can be:
-- `unspecified`: The default interface.
-- `basic_wallet`: The basic wallet interface.
+`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, these values can be:
+- `Unspecified`: The default interface.
+- `BasicWallet`: The basic wallet interface.
 
 ```sh
-miden-client addresses remove basic_wallet 0x17f13f4f83a8e8100c19d2961dfda2
+miden-client addresses add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
 ```
 
 ```sh
-miden-client addresses add basic_wallet 0x17f13f4f83a8e8100c19d2961dfda2
+miden-client addresses remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
 ```
 
 #### Tips

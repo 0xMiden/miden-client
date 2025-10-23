@@ -24,6 +24,7 @@ use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
+use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
 use self::utils::load_config_file;
@@ -136,6 +137,7 @@ pub enum Command {
     Sync(SyncCmd),
     /// View a summary of the current client state.
     Info,
+    Tags(TagsCmd),
     Addresses(AddressesCmd),
     #[command(name = "tx")]
     Transaction(TransactionCmd),
@@ -212,6 +214,7 @@ impl Cli {
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
+            Command::Tags(tags) => tags.execute(client).await,
             Command::Addresses(addresses) => addresses.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
             Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,

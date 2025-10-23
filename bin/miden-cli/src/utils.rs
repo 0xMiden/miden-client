@@ -4,7 +4,7 @@ use figment::Figment;
 use figment::providers::{Format, Toml};
 use miden_client::Client;
 use miden_client::account::AccountId;
-use miden_client::address::Address;
+use miden_client::address::{Address, AddressInterface};
 
 use super::config::CliConfig;
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
@@ -74,6 +74,18 @@ pub(crate) async fn parse_account_id<AUTH>(
                 "Input account ID {address:?} is not an ID based address"
             ))),
         }
+    }
+}
+
+pub(crate) fn parse_address_interface(
+    address_interface: &str,
+) -> Result<AddressInterface, CliError> {
+    match address_interface {
+        "BasicWallet" => Ok(AddressInterface::BasicWallet),
+        "Unspecified" => Ok(AddressInterface::Unspecified),
+        _ => Err(CliError::Input(format!(
+            "Input address interface {address_interface:?} is not a valid address interface"
+        ))),
     }
 }
 

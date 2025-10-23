@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use core::error::Error;
 
 use miden_objects::account::{Account, AccountCode, AccountId};
+use miden_objects::address::NetworkId;
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
@@ -523,6 +524,12 @@ impl NodeRpcClient for GrpcClient {
         )?;
 
         Ok(note_script)
+    }
+
+    async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
+        let endpoint_str: &str = &self.endpoint.to_string();
+        let endpoint: Endpoint = Endpoint::try_from(endpoint_str).unwrap();
+        Ok(endpoint.to_network_id())
     }
 }
 

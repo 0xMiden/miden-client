@@ -67,7 +67,6 @@ pub use miden_objects::{
     },
     address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
 };
-use miden_tx::utils::Serializable;
 
 use super::Client;
 use crate::errors::ClientError;
@@ -242,8 +241,9 @@ impl<AUTH> Client<AUTH> {
                 let note_tag_record =
                     NoteTagRecord::with_account_source(derived_note_tag, account_id);
                 if self.store.get_note_tags().await?.contains(&note_tag_record) {
-                    let hex_address = hex::encode(address.to_bytes());
-                    return Err(ClientError::AddressAlreadyTracked(hex_address));
+                    let network_id = self.rpc_api.get_network_id().await?;
+                    let address_bench32 = address.to_bech32(network_id);
+                    return Err(ClientError::AddressAlreadyTracked(address_bench32));
                 }
 
                 self.store.insert_address(address, account_id).await?;

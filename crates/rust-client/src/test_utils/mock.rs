@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::{AccountCode, AccountId, StorageSlot};
+use miden_objects::address::NetworkId;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
@@ -520,6 +521,10 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(note.note().unwrap().script().clone())
+    }
+
+    async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
+        Ok(NetworkId::Testnet)
     }
 }
 

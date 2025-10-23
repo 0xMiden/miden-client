@@ -52,6 +52,7 @@ use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::address::NetworkId;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
@@ -299,6 +300,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
+
+    async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
 }
 
 // RPC API ENDPOINT

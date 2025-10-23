@@ -1,29 +1,31 @@
-use miden_client::account::{AccountId, AccountIdAddress, AddressInterface};
-use miden_client::address::Address;
+use miden_client::Client;
+use miden_client::account::AccountIdAddress;
+use miden_client::address::{Address, NetworkId};
 use miden_client::note::NoteExecutionMode;
-use miden_client::{Client, Serializable};
 
 use crate::errors::CliError;
-use crate::utils::parse_account_id;
-use crate::{Parser, Subcommand, create_dynamic_table};
+use crate::utils::{parse_account_id, parse_address_interface};
+use crate::{Parser, Subcommand, create_dynamic_table, load_config_file};
 
 #[derive(Debug, Subcommand, Clone)]
 pub enum AddressSubCommand {
     /// List all addresses an account can be referenced by
-    List { account_id: String },
+    List { account_id: Option<String> },
     /// Add a new address
     Add {
-        /// Interface number for add/remove operations
-        interface: String,
         /// Account to add
         account_id: String,
+        /// Interface number for add/remove operations
+        interface: String,
+        /// Optional tag length
+        tag_len: Option<u8>,
     },
     /// Remove the given address
     Remove {
-        /// Interface number for add/remove operations
-        interface: String,
-        /// Account to Remove
+        /// Account that owns the address to remove
         account_id: String,
+        /// Address to remove
+        address: String,
     },
 }
 
@@ -38,13 +40,19 @@ impl AddressesCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match &self.command {
             AddressSubCommand::List { account_id } => {
-                list_addresses(client, account_id.clone()).await?;
+                let (cli_config, _) = load_config_file()?;
+                let network_id = cli_config.rpc.endpoint.0.to_network_id();
+                if let Some(account_id) = account_id {
+                    list_account_addresses(client, account_id, network_id).await?;
+                } else {
+                    list_all_addresses(client, network_id).await?;
+                }
             },
-            AddressSubCommand::Add { interface, account_id } => {
-                add_address(client, account_id.clone(), interface.clone()).await?;
+            AddressSubCommand::Add { interface, account_id, tag_len } => {
+                add_address(client, account_id.clone(), interface.clone(), *tag_len).await?;
             },
-            AddressSubCommand::Remove { interface, account_id } => {
-                remove_address(client, account_id.clone(), interface.clone()).await?;
+            AddressSubCommand::Remove { account_id, address } => {
+                remove_address(client, account_id.clone(), address.clone()).await?;
             },
         }
         Ok(())
@@ -53,8 +61,43 @@ impl AddressesCmd {
 
 // HELPERS
 // ================================================================================================
-async fn list_addresses<AUTH>(client: Client<AUTH>, account_id: String) -> Result<(), CliError> {
-    let id = parse_account_id(&client, &account_id).await?;
+
+fn print_account_addresses(account_id: &String, addresses: &Vec<Address>, network_id: &NetworkId) {
+    println!("Addresses for AccountId {account_id}:");
+    let mut table = create_dynamic_table(&["Address", "Interface"]);
+    for address in addresses {
+        let address_bech32 = address.to_bech32(network_id.clone());
+        let interface = address.interface().to_string();
+        table.add_row(vec![address_bech32, interface]);
+    }
+
+    println!("{table}");
+}
+
+async fn list_all_addresses<AUTH>(
+    client: Client<AUTH>,
+    network_id: NetworkId,
+) -> Result<(), CliError> {
+    println!("Listing addresses for all accounts:\n");
+    let accounts = client.get_account_headers().await?;
+    for (acc_header, _) in accounts {
+        let account_record = client
+            .get_account(acc_header.id())
+            .await?
+            .expect("account is expected to exist if retrieved");
+        let addresses = account_record.addresses();
+        print_account_addresses(&acc_header.id().to_string(), addresses, &network_id);
+        println!();
+    }
+    Ok(())
+}
+
+async fn list_account_addresses<AUTH>(
+    client: Client<AUTH>,
+    account_id: &String,
+    network_id: NetworkId,
+) -> Result<(), CliError> {
+    let id = parse_account_id(&client, account_id).await?;
     let addresses = match client.get_account(id).await? {
         Some(account) => account.addresses().clone(),
         _ => {
@@ -64,48 +107,31 @@ async fn list_addresses<AUTH>(client: Client<AUTH>, account_id: String) -> Resul
         },
     };
 
-    println!("Addresses for AccountId {account_id}:");
-    let mut table = create_dynamic_table(&["Address", "Interface"]);
-    for address in addresses {
-        let address_hex = hex::encode(address.to_bytes());
-        let interface = match address.interface() {
-            AddressInterface::Unspecified => "Unspecified".to_string(),
-            AddressInterface::BasicWallet => "Basic Wallet".to_string(),
-            _ => "Unknown Address Interface".to_string(),
-        };
-
-        table.add_row(vec![address_hex, interface]);
-    }
-
-    println!("{table}");
-
+    print_account_addresses(account_id, &addresses, &network_id);
     Ok(())
-}
-
-fn build_address_from_cli_args(
-    account_id: AccountId,
-    interface: &str,
-) -> Result<Address, CliError> {
-    let interface = match interface {
-        "unspecified" => AddressInterface::Unspecified,
-        "basic_wallet" => AddressInterface::BasicWallet,
-        _ => return Err(CliError::Input("Invalid interface input value".to_string())),
-    };
-    Ok(Address::AccountId(AccountIdAddress::new(account_id, interface)))
 }
 
 async fn add_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
     interface: String,
+    tag_len: Option<u8>,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let address = build_address_from_cli_args(account_id, &interface)?;
-    let execution_mode = match address.to_note_tag().execution_mode() {
+    let interface = parse_address_interface(&interface)?;
+    let account_id_address = match tag_len {
+        Some(tag_len) => AccountIdAddress::new(account_id, interface)
+            .with_tag_len(tag_len)
+            .map_err(|e| CliError::Address(e, String::new()))?,
+        None => AccountIdAddress::new(account_id, interface),
+    };
+
+    // AccountIdAddress::with_tag_len(self, tag_len)
+    let execution_mode = match account_id_address.to_note_tag().execution_mode() {
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
     };
-    client.add_address(address, account_id).await?;
+    client.add_address(account_id_address.into(), account_id).await?;
 
     println!("Address added: Account Id {account_id} - Execution mode: {execution_mode}");
     Ok(())
@@ -114,10 +140,10 @@ async fn add_address<AUTH>(
 async fn remove_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
-    interface: String,
+    address: String,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let address = build_address_from_cli_args(account_id, &interface)?;
+    let (_, address) = Address::from_bech32(&address).map_err(|e| CliError::Address(e, address))?;
     let execution_mode = match address.to_note_tag().execution_mode() {
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
