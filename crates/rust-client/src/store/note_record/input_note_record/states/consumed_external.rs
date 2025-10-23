@@ -80,10 +80,8 @@ impl miden_tx::utils::Deserializable for ConsumedExternalNoteState {
     fn read_from<R: miden_tx::utils::ByteReader>(
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
-        let nullifier_block_height = u32::read_from(source)?;
-        Ok(ConsumedExternalNoteState {
-            nullifier_block_height: nullifier_block_height.into(),
-        })
+        let nullifier_block_height = BlockNumber::read_from(source)?;
+        Ok(ConsumedExternalNoteState { nullifier_block_height })
     }
 }
 

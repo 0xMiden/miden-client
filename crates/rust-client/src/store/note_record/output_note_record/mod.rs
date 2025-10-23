@@ -442,12 +442,9 @@ impl Deserializable for OutputNoteState {
                 Ok(OutputNoteState::CommittedFull { recipient, inclusion_proof })
             },
             Self::STATE_CONSUMED => {
-                let block_height = source.read_u32()?;
+                let block_height = BlockNumber::read_from(source)?;
                 let recipient = NoteRecipient::read_from(source)?;
-                Ok(OutputNoteState::Consumed {
-                    block_height: block_height.into(),
-                    recipient,
-                })
+                Ok(OutputNoteState::Consumed { block_height, recipient })
             },
             _ => Err(DeserializationError::InvalidValue("OutputNoteState".to_string())),
         }

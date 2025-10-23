@@ -97,13 +97,13 @@ impl miden_tx::utils::Deserializable for ConsumedAuthenticatedLocalNoteState {
         let metadata = NoteMetadata::read_from(source)?;
         let inclusion_proof = NoteInclusionProof::read_from(source)?;
         let block_note_root = Word::read_from(source)?;
-        let nullifier_block_height = u32::read_from(source)?;
+        let nullifier_block_height = BlockNumber::read_from(source)?;
         let submission_data = NoteSubmissionData::read_from(source)?;
         Ok(ConsumedAuthenticatedLocalNoteState {
             metadata,
             inclusion_proof,
             block_note_root,
-            nullifier_block_height: nullifier_block_height.into(),
+            nullifier_block_height,
             submission_data,
         })
     }

@@ -88,11 +88,11 @@ impl miden_tx::utils::Deserializable for ConsumedUnauthenticatedLocalNoteState {
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
-        let nullifier_block_height = u32::read_from(source)?;
+        let nullifier_block_height = BlockNumber::read_from(source)?;
         let submission_data = NoteSubmissionData::read_from(source)?;
         Ok(ConsumedUnauthenticatedLocalNoteState {
             metadata,
-            nullifier_block_height: nullifier_block_height.into(),
+            nullifier_block_height,
             submission_data,
         })
     }
