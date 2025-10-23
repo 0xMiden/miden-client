@@ -8,21 +8,14 @@ use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
-    AccountDetails,
-    AccountProof,
-    AccountProofs,
-    AccountStorageDetails,
-    AccountStorageMapDetails,
-    AccountUpdateSummary,
-    AccountVaultDetails,
-    FetchedAccount,
-    StorageMapEntry,
+    AccountDetails, AccountProof, AccountProofs, AccountStorageDetails, AccountStorageMapDetails,
+    AccountUpdateSummary, AccountVaultDetails, FetchedAccount, StorageMapEntry,
 };
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
@@ -353,6 +346,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        _tx_inputs: Option<TransactionInputs>, // TODO: use this?
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 

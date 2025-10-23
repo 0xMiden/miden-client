@@ -90,12 +90,7 @@ use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    StoreError,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -104,10 +99,7 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause,
-    TransactionDetails,
-    TransactionRecord,
-    TransactionStatus,
+    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -122,36 +114,18 @@ mod store_update;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionArgs,
-    TransactionId,
-    TransactionInputs,
-    TransactionScript,
-    TransactionSummary,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionArgs, TransactionId, TransactionInputs, TransactionScript, TransactionSummary,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError,
 };
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 pub use store_update::TransactionStoreUpdate;
 
@@ -292,7 +266,12 @@ where
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<(), ClientError> {
         let proven_transaction = self.prove_transaction(&tx_result, tx_prover).await?;
-        let block_num = self.submit_proven_transaction(proven_transaction).await?;
+        let block_num = self
+            .submit_proven_transaction(
+                proven_transaction,
+                Some(tx_result.executed_transaction().tx_inputs().clone()),
+            )
+            .await?;
         self.apply_transaction(block_num, tx_result).await
     }
 
@@ -315,9 +294,13 @@ where
     async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
+        transaction_inputs: Option<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
-        let block_num = self.rpc_api.submit_proven_transaction(proven_transaction).await?;
+        let block_num = self
+            .rpc_api
+            .submit_proven_transaction(proven_transaction, transaction_inputs)
+            .await?;
         info!("Transaction submitted.");
 
         Ok(block_num)
@@ -836,8 +819,9 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     pub async fn testing_submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
+        tx_inputs: Option<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
-        self.submit_proven_transaction(proven_transaction).await
+        self.submit_proven_transaction(proven_transaction, tx_inputs).await
     }
 
     pub async fn testing_apply_transaction(
