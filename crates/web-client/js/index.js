@@ -84,7 +84,7 @@ const {
 // Take each exported array type and organize them under a single object.
 // Then, export it under the name "MidenArrays". So, the array types will effectively
 // be "name-spaced" under "MidenArrays" when the library is imported in another project.
-const buildTypedErraysExport = async (exportObject) => {
+const buildTypedArraysExport = async (exportObject) => {
   return Object.entries(exportObject).reduce(
     (exports, [exportName, _export]) => {
       if (exportName.endsWith("Array")) {
@@ -96,7 +96,7 @@ const buildTypedErraysExport = async (exportObject) => {
   );
 };
 
-const MidenArrays = await buildTypedErraysExport(wasm);
+const MidenArrays = await buildTypedArraysExport(wasm);
 
 export {
   Account,
