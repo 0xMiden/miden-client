@@ -57,4 +57,4 @@ jobs:
 
       - name: Verify Documentation is Up-to-date
         if: github.event_name == 'push' || steps.bypass.outputs.skip != 'true'
-        run: git diff --exit-code docs/src/web-client/api
+        run: git diff --exit-code docs/typedoc/web-client

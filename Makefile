@@ -77,9 +77,9 @@ doc: ## Generate & check rust documentation. You'll need `jq` in order for this 
 	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
 
-.PHONY: book
-book: ## Builds the book & serves documentation site
-	mdbook serve --open docs
+.PHONY: serve-docs
+serve-docs: ## Serves the docs
+	cd docs/external && npm run start:dev
 
 .PHONY: typedoc
 typedoc: rust-client-ts-build ## Generate web client package documentation.

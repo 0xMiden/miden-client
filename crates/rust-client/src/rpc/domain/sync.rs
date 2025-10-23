@@ -128,7 +128,7 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
 
                 Ok(TransactionInclusion {
                     transaction_id,
-                    block_num: transaction_block_num,
+                    block_num: transaction_block_num.into(),
                     account_id: transaction_account_id,
                 })
             })

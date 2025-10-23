@@ -187,7 +187,7 @@ impl TransactionUpdateTracker {
     ) {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
-            transaction.commit_transaction(transaction_inclusion.block_num.into(), timestamp);
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }
 
