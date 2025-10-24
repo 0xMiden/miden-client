@@ -213,13 +213,13 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     client
         .testing_submit_proven_transaction(
             bump_proof,
-            Some(bump_transaction.executed_transaction().tx_inputs().clone()),
+            bump_transaction.executed_transaction().tx_inputs().clone(),
         )
         .await?;
     client
         .testing_submit_proven_transaction(
             consume_proof,
-            Some(consume_transaction.executed_transaction().tx_inputs().clone()),
+            consume_transaction.executed_transaction().tx_inputs().clone(),
         )
         .await?;
 

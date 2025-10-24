@@ -123,11 +123,11 @@ impl NodeRpcClient for GrpcClient {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: Option<TransactionInputs>,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError> {
         let request = proto::transaction::ProvenTransaction {
             transaction: proven_transaction.to_bytes(),
-            transaction_inputs: transaction_inputs.map(|inputs| inputs.to_bytes()),
+            transaction_inputs: Some(transaction_inputs.to_bytes()),
         };
 
         let mut rpc_api = self.ensure_connected().await?;

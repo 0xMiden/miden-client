@@ -295,7 +295,7 @@ where
         let block_num = self
             .submit_proven_transaction(
                 proven_transaction,
-                Some(tx_result.executed_transaction().tx_inputs().clone()),
+                tx_result.executed_transaction().tx_inputs().clone(),
             )
             .await?;
         self.apply_transaction(block_num, tx_result).await
@@ -320,7 +320,7 @@ where
     async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: Option<TransactionInputs>,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
         let block_num = self
@@ -845,7 +845,7 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     pub async fn testing_submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        tx_inputs: Option<TransactionInputs>,
+        tx_inputs: TransactionInputs,
     ) -> Result<BlockNumber, ClientError> {
         self.submit_proven_transaction(proven_transaction, tx_inputs).await
     }

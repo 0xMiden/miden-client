@@ -353,7 +353,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-        _tx_inputs: Option<TransactionInputs>, // TODO: use this?
+        _tx_inputs: TransactionInputs, // Unnecessary for testing client itself.
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 

@@ -128,14 +128,14 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     client
         .testing_submit_proven_transaction(
             tx_prove_1,
-            Some(transaction_execution_result_1.executed_transaction().tx_inputs().clone()),
+            transaction_execution_result_1.executed_transaction().tx_inputs().clone(),
         )
         .await
         .unwrap();
     client
         .testing_submit_proven_transaction(
             tx_prove_2,
-            Some(transaction_execution_result_2.executed_transaction().tx_inputs().clone()),
+            transaction_execution_result_2.executed_transaction().tx_inputs().clone(),
         )
         .await
         .unwrap();
