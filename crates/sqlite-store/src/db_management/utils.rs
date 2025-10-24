@@ -1,4 +1,4 @@
-use std::string::{String, ToString};
+use std::string::String;
 use std::sync::LazyLock;
 use std::vec::Vec;
 
@@ -79,10 +79,11 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
         }
 
         let expected_hash = &*MIGRATION_HASHES[ver.get() - 1];
-        let actual_hash = get_migrations_value::<Vec<u8>>(conn, DB_MIGRATION_HASH_FIELD)?
-            .ok_or_else(|| {
-                SqliteStoreError::DatabaseError("Migration hash not found".to_string())
-            })?;
+
+        let Ok(Some(actual_hash)) = get_migrations_value::<Vec<u8>>(conn, DB_MIGRATION_HASH_FIELD)
+        else {
+            return Err(SqliteStoreError::DatabaseError("Migration hash not found".to_owned()));
+        };
 
         if &actual_hash[..] != expected_hash {
             return Err(SqliteStoreError::MigrationHashMismatch);
@@ -95,7 +96,7 @@ pub fn apply_migrations(conn: &mut Connection) -> Result<(), SqliteStoreError> {
 
     if version_before != version_after {
         let new_hash = &*MIGRATION_HASHES[MIGRATION_HASHES.len() - 1];
-        set_setting(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
+        set_migrations_value(conn, DB_MIGRATION_HASH_FIELD, &new_hash)?;
     }
 
     Ok(())
@@ -131,6 +132,15 @@ pub fn get_migrations_value<T: FromSql>(conn: &mut Connection, name: &str) -> Re
     conn.transaction()?
         .query_row("SELECT value FROM migrations WHERE name = $1", params![name], |row| row.get(0))
         .optional()
+}
+
+pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) -> Result<()> {
+    let count =
+        conn.execute(insert_sql!(migrations { name, value } | REPLACE), params![name, value])?;
+
+    debug_assert_eq!(count, 1);
+
+    Ok(())
 }
 
 pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
