@@ -246,7 +246,7 @@ The source account creates a `SWAP` note that offers some asset in exchange for 
 
 Usage: `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED AMOUNT>::<OFFERED FAUCET ID> --requested-asset <REQUESTED AMOUNT>::<REQUESTED FAUCET ID> --note-type <NOTE_TYPE>`
 
-### `addresses`
+### `address`
 
 View and manage addresses.
 
@@ -261,7 +261,7 @@ View and manage addresses.
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
 ```sh
-miden-client addresses list 0x17f13f4f83a8e8100c19d2961dfda2
+miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
 `add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, these values can be:
@@ -269,11 +269,11 @@ miden-client addresses list 0x17f13f4f83a8e8100c19d2961dfda2
 - `BasicWallet`: The basic wallet interface.
 
 ```sh
-miden-client addresses add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
 ```
 
 ```sh
-miden-client addresses remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
+miden-client address remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
 ```
 
 #### Tips

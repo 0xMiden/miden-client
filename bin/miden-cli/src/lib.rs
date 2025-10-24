@@ -28,7 +28,7 @@ use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
 use self::utils::load_config_file;
-use crate::commands::addresses::AddressesCmd;
+use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 
@@ -138,7 +138,7 @@ pub enum Command {
     /// View a summary of the current client state.
     Info,
     Tags(TagsCmd),
-    Addresses(AddressesCmd),
+    Address(AddressCmd),
     #[command(name = "tx")]
     Transaction(TransactionCmd),
     Mint(MintCmd),
@@ -215,7 +215,7 @@ impl Cli {
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
-            Command::Addresses(addresses) => addresses.execute(client).await,
+            Command::Address(addresses) => addresses.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
             Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,

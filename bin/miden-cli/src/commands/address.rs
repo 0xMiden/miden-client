@@ -31,12 +31,12 @@ pub enum AddressSubCommand {
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Manage account addresses")]
-pub struct AddressesCmd {
+pub struct AddressCmd {
     #[clap(subcommand)]
     command: Option<AddressSubCommand>,
 }
 
-impl AddressesCmd {
+impl AddressCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
