@@ -6,7 +6,7 @@ use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransp
 use miden_client::utils::{Deserializable, RwLock, Serializable};
 use wasm_bindgen::prelude::*;
 
-use crate::WebClient;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
@@ -22,7 +22,7 @@ impl WebClient {
         let mock_rpc_api = match serialized_mock_chain {
             Some(chain) => {
                 Arc::new(MockRpcApi::new(MockChain::read_from_bytes(&chain).map_err(|err| {
-                    JsValue::from_str(&format!("Failed to deserialize mock chain: {err}"))
+                    js_error_with_context(err, "failed to deserialize mock chain")
                 })?))
             },
             None => Arc::new(MockRpcApi::default()),
@@ -31,9 +31,7 @@ impl WebClient {
         let mock_note_transport_api = match serialized_mock_note_transport_node {
             Some(node_bytes) => {
                 let node = MockNoteTransportNode::read_from_bytes(&node_bytes).map_err(|err| {
-                    JsValue::from_str(&format!(
-                        "Failed to deserialize mock note transport node: {err}"
-                    ))
+                    js_error_with_context(err, "failed to deserialize mock note transport node")
                 })?;
                 Arc::new(MockNoteTransportApi::new(Arc::new(RwLock::new(node))))
             },

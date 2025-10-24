@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use crate::WebClient;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {
@@ -18,7 +18,7 @@ impl WebClient {
         client
             .send_private_note(note.into(), &address.into())
             .await
-            .map_err(|e| JsValue::from_str(&format!("Failed sending private note: {e}")))?;
+            .map_err(|e| js_error_with_context(e, "failed sending private note"))?;
 
         Ok(())
     }
@@ -35,7 +35,7 @@ impl WebClient {
         client
             .fetch_all_private_notes()
             .await
-            .map_err(|e| JsValue::from_str(&format!("Failed fetching private notes: {e}")))?;
+            .map_err(|e| js_error_with_context(e, "failed fetching private notes"))?;
 
         Ok(())
     }
@@ -54,7 +54,7 @@ impl WebClient {
         client
             .fetch_all_private_notes()
             .await
-            .map_err(|e| JsValue::from_str(&format!("Failed fetching all private notes: {e}")))?;
+            .map_err(|e| js_error_with_context(e, "failed fetching all private notes"))?;
 
         Ok(())
     }

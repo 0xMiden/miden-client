@@ -223,7 +223,7 @@ pub trait NoteStream:
 {
 }
 
-/// Information about a note in API responses
+/// Information about a note fetched from the note transport network
 #[derive(Debug, Clone)]
 pub struct NoteInfo {
     /// Note header
