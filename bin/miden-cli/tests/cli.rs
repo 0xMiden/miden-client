@@ -95,6 +95,62 @@ fn init_with_params() {
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
+#[test]
+fn silent_initialization_uses_default_values() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Run any command to trigger silent initialization
+    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Read and verify the config file contents
+    let config_path = temp_dir.join("miden-client.toml");
+    let config_content = std::fs::read_to_string(&config_path).unwrap();
+
+    // Verify default values are used
+    assert!(config_content.contains("testnet"), "Should use testnet as default network");
+    assert!(config_content.contains("store.sqlite3"), "Should use default store path");
+    assert!(config_content.contains("keystore"), "Should use default keystore directory");
+}
+
+#[test]
+fn silent_initialization_does_not_override_existing_config() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Manual configuration file
+    let config_path = temp_dir.join("miden-client.toml");
+    let custom_config = r#"
+    [rpc]
+    endpoint = "https://custom-endpoint.com"
+    timeout_ms = 5000
+
+    store_filepath = "custom-store.sqlite3"
+    secret_keys_directory = "custom-keystore"
+    token_symbol_map_filepath = "custom-tokens.toml"
+    component_template_directory = "custom-templates"
+    "#;
+    std::fs::write(&config_path, custom_config).unwrap();
+
+    // Run command without explicitly initializing
+    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify original config remains unchanged
+    let config_content = std::fs::read_to_string(&config_path).unwrap();
+    assert!(
+        config_content.contains("custom-endpoint.com"),
+        "Config should not be overwritten"
+    );
+    assert!(
+        config_content.contains("custom-store.sqlite3"),
+        "Config should not be overwritten"
+    );
+}
+
 // TX TESTS
 // ================================================================================================
 

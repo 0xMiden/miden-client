@@ -160,6 +160,12 @@ impl Cli {
             return Ok(());
         }
 
+        // Check if Client is not yet initialized => silently initialize the client
+        if !current_dir.exists() {
+            let init_cmd = InitCmd::new_default();
+            init_cmd.execute(&current_dir)?;
+        }
+
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {

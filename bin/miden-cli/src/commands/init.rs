@@ -63,6 +63,17 @@ pub struct InitCmd {
 }
 
 impl InitCmd {
+    // Create a new InitCmd with default values for silent initialization
+    pub fn new_default() -> Self {
+        Self {
+            network: Network::Testnet,
+            store_path: None,
+            remote_prover_endpoint: None,
+            note_transport_endpoint: None,
+            block_delta: None,
+        }
+    }
+
     pub fn execute(&self, config_file_path: &PathBuf) -> Result<(), CliError> {
         if config_file_path.exists() {
             return Err(CliError::Config(
