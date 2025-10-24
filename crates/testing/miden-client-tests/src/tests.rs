@@ -45,7 +45,7 @@ use miden_client::transaction::{
 };
 use miden_client::utils::RwLock;
 use miden_client::{ClientError, DebugMode};
-use miden_client_sqlite_store::SqliteStore;
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
@@ -2103,11 +2103,10 @@ pub async fn create_test_client_builder()
     let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
-    let sqlite_store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let builder = ClientBuilder::new()
         .rpc(arc_rpc_api)
         .rng(Box::new(rng))
-        .store(Arc::new(sqlite_store))
+        .sqlite_store(create_test_store_path())
         .filesystem_keystore(keystore_path.to_str().unwrap())
         .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);

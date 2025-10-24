@@ -51,3 +51,6 @@ crates/web-client/playwright-report
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# JS Artifacts for indexdb
+crates/idxdb-store/src/js
