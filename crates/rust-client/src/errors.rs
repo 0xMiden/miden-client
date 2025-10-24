@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::MerkleError;
-use miden_objects::note::NoteId;
+use miden_objects::note::{NoteId, NoteTag};
 pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_objects::{
     NoteError,
@@ -34,8 +34,8 @@ use crate::transaction::TransactionRequestError;
 pub enum ClientError {
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
-    #[error("address {0} is already being tracked")]
-    AddressAlreadyTracked(String),
+    #[error("note tag {0} derived from address {1} is already being tracked")]
+    NoteTagDerivedAddressAlreadyTracked(NoteTag, String),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("account with id {0} is locked")]

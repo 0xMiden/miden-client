@@ -254,7 +254,7 @@ View and manage addresses.
 
 | Subcommand                       | Description                                                                           |
 | -------------------------------- | ------------------------------------------------------------------------------------- |
-| `list <ID>`                      | List all addresses or only for the specified account ID                               |
+| `list <ID>`                      | List all addresses or only for the specified account ID (default command)             |
 | `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for specified account ID with optional tag length    |
 | `remove <ID> <INTERFACE>`        | Remove an address for an interface for specified account ID                           |
 

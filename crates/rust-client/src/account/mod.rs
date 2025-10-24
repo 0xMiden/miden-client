@@ -243,7 +243,10 @@ impl<AUTH> Client<AUTH> {
                 if self.store.get_note_tags().await?.contains(&note_tag_record) {
                     let network_id = self.rpc_api.get_network_id().await?;
                     let address_bench32 = address.to_bech32(network_id);
-                    return Err(ClientError::AddressAlreadyTracked(address_bench32));
+                    return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
+                        derived_note_tag,
+                        address_bench32,
+                    ));
                 }
 
                 self.store.insert_address(address, account_id).await?;

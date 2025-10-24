@@ -33,26 +33,28 @@ pub enum AddressSubCommand {
 #[command(about = "Manage account addresses")]
 pub struct AddressesCmd {
     #[clap(subcommand)]
-    command: AddressSubCommand,
+    command: Option<AddressSubCommand>,
 }
 
 impl AddressesCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match &self.command {
-            AddressSubCommand::List { account_id } => {
+            Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
                 let (cli_config, _) = load_config_file()?;
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
-                if let Some(account_id) = account_id {
-                    list_account_addresses(client, account_id, network_id).await?;
-                } else {
-                    list_all_addresses(client, network_id).await?;
-                }
+                list_account_addresses(client, account_id, network_id).await?;
             },
-            AddressSubCommand::Add { interface, account_id, tag_len } => {
+            Some(AddressSubCommand::Add { interface, account_id, tag_len }) => {
                 add_address(client, account_id.clone(), interface.clone(), *tag_len).await?;
             },
-            AddressSubCommand::Remove { account_id, address } => {
+            Some(AddressSubCommand::Remove { account_id, address }) => {
                 remove_address(client, account_id.clone(), address.clone()).await?;
+            },
+            _ => {
+                // List all addresses as default
+                let (cli_config, _) = load_config_file()?;
+                let network_id = cli_config.rpc.endpoint.0.to_network_id();
+                list_all_addresses(client, network_id).await?;
             },
         }
         Ok(())
@@ -126,7 +128,6 @@ async fn add_address<AUTH>(
         None => AccountIdAddress::new(account_id, interface),
     };
 
-    // AccountIdAddress::with_tag_len(self, tag_len)
     let execution_mode = match account_id_address.to_note_tag().execution_mode() {
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
