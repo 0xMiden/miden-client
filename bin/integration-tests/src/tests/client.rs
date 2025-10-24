@@ -29,7 +29,7 @@ use miden_client::transaction::{
     TransactionStatus,
 };
 use miden_client::{ClientError, Felt, ScriptBuilder};
-use miden_client_sqlite_store::{ClientBuilderSqliteExt, SqliteStore};
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
 

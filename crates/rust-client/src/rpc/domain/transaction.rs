@@ -103,7 +103,7 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
 /// number.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRecord {
-    /// Block number in which the transaction was executed.
+    /// Block number in which the transaction was included.
     pub block_num: BlockNumber,
     /// A transaction header.
     pub transaction_header: TransactionHeader,
