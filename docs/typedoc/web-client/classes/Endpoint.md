@@ -61,16 +61,6 @@ Returns the protocol of the endpoint.
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### free()
 
 > **free**(): `void`

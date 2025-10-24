@@ -18,16 +18,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### build()
 
 > **build**(): [`TransactionRequest`](TransactionRequest.md)

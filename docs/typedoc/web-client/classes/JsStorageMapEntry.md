@@ -34,16 +34,6 @@ The value of the storage map entry.
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### free()
 
 > **free**(): `void`
