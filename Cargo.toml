@@ -37,7 +37,7 @@ miden-tx      = { branch = "next", default-features = false, git = "https://gith
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "sergerad-guardrails", default-features = false, git = "https://github.com/0xMiden/miden-node" }
+miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
 miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
