@@ -126,6 +126,7 @@ where
             self.store.clone(),
             self.authenticator.clone(),
             self.source_manager.clone(),
+            self.rpc_api.clone(),
         );
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);

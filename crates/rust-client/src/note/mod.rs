@@ -144,6 +144,7 @@ where
             self.store.clone(),
             self.authenticator.clone(),
             self.source_manager.clone(),
+            self.rpc_api.clone(),
         );
 
         let mut relevant_notes = Vec::new();
@@ -178,6 +179,7 @@ where
             self.store.clone(),
             self.authenticator.clone(),
             self.source_manager.clone(),
+            self.rpc_api.clone(),
         );
         note_screener
             .check_relevance(&note.clone().try_into()?)

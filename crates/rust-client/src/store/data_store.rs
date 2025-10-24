@@ -14,6 +14,7 @@ use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
+use crate::rpc::NodeRpcClient;
 use crate::store::StoreError;
 use crate::utils::RwLock;
 
@@ -28,14 +29,20 @@ pub(crate) struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
+    /// RPC client for fetching data from the node when not available locally.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl ClientDataStore {
-    pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
+    pub fn new(
+        store: alloc::sync::Arc<dyn Store>,
+        rpc_api: alloc::sync::Arc<dyn NodeRpcClient>,
+    ) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            rpc_api,
         }
     }
 
@@ -186,10 +193,10 @@ impl DataStore for ClientDataStore {
                 }
             }
 
-            // If no matching note found, return an error
-            // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not found
-            // https://github.com/0xMiden/miden-client/issues/1410
-            Err(DataStoreError::other(format!("Note script with root {script_root} not found",)))
+            // If no matching note found, attempt to retrieve from RPC API
+            self.rpc_api.get_note_script_by_root(script_root).await.map_err(|_| {
+                DataStoreError::other("Note script not found on data store nor rpc server")
+            })
         }
     }
 }
