@@ -33,7 +33,7 @@ impl WebClient {
         })?;
 
         client
-            .fetch_all_private_notes()
+            .fetch_private_notes()
             .await
             .map_err(|e| js_error_with_context(e, "failed fetching private notes"))?;
 
