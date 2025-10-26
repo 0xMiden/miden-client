@@ -8,16 +8,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### adviceInputs()
 
 > **adviceInputs**(): [`AdviceInputs`](AdviceInputs.md)

@@ -8,16 +8,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### amount()
 
 > **amount**(`faucet_id`): `bigint`

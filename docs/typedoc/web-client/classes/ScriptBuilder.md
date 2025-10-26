@@ -8,16 +8,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### buildLibrary()
 
 > **buildLibrary**(`library_path`, `source_code`): [`Library`](Library.md)

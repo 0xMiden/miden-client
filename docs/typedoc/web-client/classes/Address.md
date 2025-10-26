@@ -8,16 +8,6 @@
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### accountId()
 
 > **accountId**(): [`AccountId`](AccountId.md)

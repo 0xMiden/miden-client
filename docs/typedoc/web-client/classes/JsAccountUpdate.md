@@ -120,16 +120,6 @@ Optional seed data for the account.
 
 ## Methods
 
-### \[dispose\]()
-
-> **\[dispose\]**(): `void`
-
-#### Returns
-
-`void`
-
-***
-
 ### free()
 
 > **free**(): `void`
