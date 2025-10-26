@@ -55,7 +55,7 @@ use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -105,6 +105,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
