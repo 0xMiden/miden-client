@@ -9,7 +9,7 @@ use miden_objects::account::{Account, AccountCode, AccountId};
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_objects::utils::Deserializable;
 use miden_objects::{EMPTY_WORD, Word};
 use miden_tx::utils::Serializable;
@@ -126,9 +126,11 @@ impl NodeRpcClient for GrpcClient {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError> {
         let request = proto::transaction::ProvenTransaction {
             transaction: proven_transaction.to_bytes(),
+            transaction_inputs: Some(transaction_inputs.to_bytes()),
         };
 
         let mut rpc_api = self.ensure_connected().await?;
