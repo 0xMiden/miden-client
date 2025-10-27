@@ -9,7 +9,6 @@ use miden_objects::account::{Account, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag};
-use miden_objects::transaction::PartialBlockchain;
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -124,15 +123,17 @@ impl StateSync {
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
         self,
-        current_partial_blockchain: PartialBlockchain,
+        mut current_partial_mmr: PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
         unspent_input_notes: Vec<InputNoteRecord>,
         unspent_output_notes: Vec<OutputNoteRecord>,
         uncommitted_transactions: Vec<TransactionRecord>,
     ) -> Result<StateSyncUpdate, ClientError> {
-        let block_num =
-            current_partial_blockchain.chain_length().checked_sub(1).unwrap_or_default();
+        let block_num = BlockNumber::from(
+            u32::try_from(current_partial_mmr.forest().num_leaves())
+                .expect("partial MMR should never contain more than u32::MAX leaves"),
+        );
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
@@ -141,13 +142,12 @@ impl StateSync {
             ..Default::default()
         };
 
-        let mut partial_mmr = current_partial_blockchain.mmr().clone();
         let note_tags = Arc::new(note_tags);
         loop {
             if !self
                 .sync_state_step(
                     &mut state_sync_update,
-                    &mut partial_mmr,
+                    &mut current_partial_mmr,
                     &accounts,
                     note_tags.clone(),
                 )
