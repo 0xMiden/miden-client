@@ -73,9 +73,9 @@ The component also exposes a specific customizable callback which can be used to
 ## Note transport
 
 Access to the note transport network to exchange private notes is also provided.
-The provided client uses gRPC methods to communicate with the note transport network, working bothin `std` and `wasm` environments.
+The provided client uses gRPC methods to communicate with the note transport network, working both in `std` and `wasm` environments.
 
-Targetting privacy, notes are primarly exchanged using their tags as identifiers. By default, when notes are created the tag is derived from the recipient account ID, however the tag can also be random.
+Targeting privacy, notes are primarily exchanged using their tags as identifiers. By default, when notes are created the tag is derived from the recipient account ID, however the tag can also be random.
 
 The system is also prepared for end-to-end encryption (to be implemented).
 

@@ -81,7 +81,7 @@ In this section, we show you how to make private transactions and send funds to 
 
 Wanna do more? [Sending public notes](p2p-public.md)
 
-## Using the node transport network
+## Using the note transport network
 
 The steps above assume that the client owns both accounts. To exchange notes with other users, the note transport network can be used.
 For this the sender (account A) will need the address (bech32 string) of the recipient (account B). By using the address, the sender will securely encrypt the private note, being only decryptable by the receiver.
