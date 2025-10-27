@@ -9,6 +9,7 @@ use chrono::Utc;
 use futures::Stream;
 use miden_objects::note::{NoteHeader, NoteTag};
 use miden_tx::utils::sync::RwLock;
+use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use crate::note_transport::{
     NoteInfo,
@@ -84,8 +85,9 @@ impl Default for MockNoteTransportNode {
 /// Mock Note Transport API
 ///
 /// Simulates communications with the note transport node.
+#[derive(Clone, Default)]
 pub struct MockNoteTransportApi {
-    mock_node: Arc<RwLock<MockNoteTransportNode>>,
+    pub mock_node: Arc<RwLock<MockNoteTransportNode>>,
 }
 
 impl MockNoteTransportApi {
@@ -144,5 +146,22 @@ impl NoteTransportClient for MockNoteTransportApi {
         _cursor: NoteTransportCursor,
     ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
         Ok(Box::new(DummyNoteStream {}))
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for MockNoteTransportNode {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.notes.write_into(target);
+    }
+}
+
+impl Deserializable for MockNoteTransportNode {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let notes = BTreeMap::<NoteTag, Vec<(NoteInfo, NoteTransportCursor)>>::read_from(source)?;
+
+        Ok(Self { notes })
     }
 }

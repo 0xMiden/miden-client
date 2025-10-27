@@ -19,8 +19,13 @@ use rand::RngCore;
 use rand::rngs::StdRng;
 use uuid::Uuid;
 
-use crate::account::component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet};
-use crate::account::{AccountBuilder, AccountType};
+use crate::account::component::{
+    AccountComponent,
+    AuthRpoFalcon512,
+    BasicFungibleFaucet,
+    BasicWallet,
+};
+use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSecretKey;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
@@ -31,6 +36,7 @@ use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
     NoteArgs,
+    TransactionKernel,
     TransactionRequest,
     TransactionRequestBuilder,
     TransactionRequestError,
@@ -489,4 +495,38 @@ pub async fn mint_and_consume(
         basic_account_id,
     ))
     .await
+}
+
+/// Creates and inserts an account with custom code as a component into the client.
+pub async fn insert_account_with_custom_component(
+    client: &mut TestClient,
+    custom_code: &str,
+    storage_slots: Vec<StorageSlot>,
+    storage_mode: AccountStorageMode,
+    keystore: &TestClientKeyStore,
+) -> Result<(Account, SecretKey), ClientError> {
+    let assembler = TransactionKernel::assembler();
+    let custom_component = AccountComponent::compile(custom_code, assembler.clone(), storage_slots)
+        .map_err(ClientError::AccountError)?
+        .with_supports_all_types();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let pub_key = key_pair.public_key();
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.into()))
+        .with_component(BasicWallet)
+        .with_component(custom_component)
+        .build()
+        .map_err(ClientError::AccountError)?;
+
+    client.add_account(&account, false).await?;
+
+    Ok((account, key_pair))
 }

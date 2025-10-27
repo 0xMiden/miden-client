@@ -2356,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2578,7 +2578,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "Inflector",
  "fs-err",
@@ -2650,7 +2650,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2678,7 +2678,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "quote",
  "syn 2.0.106",
@@ -2687,7 +2687,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2707,7 +2707,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2730,7 +2730,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "fs-err",
  "miette",
@@ -2742,7 +2742,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2769,7 +2769,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2800,7 +2800,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2827,7 +2827,7 @@ dependencies = [
 [[package]]
 name = "miden-note-transport-proto-build"
 version = "0.1.0"
-source = "git+https://github.com/0xMiden/miden-note-transport#4ee3956fd7bfd77f3d72e9e83dc3af5b7a52d86e"
+source = "git+https://github.com/0xMiden/miden-note-transport#bb1075155be757601d853deb0e1df8a95a51ff69"
 dependencies = [
  "fs-err",
  "miette",
@@ -2839,7 +2839,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2894,7 +2894,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2939,7 +2939,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2975,7 +2975,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2994,7 +2994,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -3009,7 +3009,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f23bf31ffff5973969375cd5c379cb9815aa27ab"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
 dependencies = [
  "miden-objects",
  "miden-tx",

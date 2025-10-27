@@ -54,6 +54,7 @@ use rusqlite::types::Value;
 use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 
 mod account;
+mod builder;
 mod chain_data;
 mod db_management;
 mod merkle_store;
@@ -61,6 +62,8 @@ mod note;
 mod sql_error;
 mod sync;
 mod transaction;
+
+pub use builder::ClientBuilderSqliteExt;
 
 // SQLITE STORE
 // ================================================================================================
@@ -80,7 +83,7 @@ impl SqliteStore {
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
-        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath.clone());
+        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath);
         let pool = Pool::builder(sqlite_pool_manager)
             .build()
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
