@@ -63,15 +63,15 @@ impl GrpcNoteTransportClient {
 
     /// gRPC client (WASM) constructor
     #[cfg(target_arch = "wasm32")]
-    pub fn connect(endpoint: String, _timeout_ms: u64) -> Result<Self, NoteTransportError> {
+    pub fn new(endpoint: String) -> Self {
         let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
         let health_client = HealthClient::new(wasm_client.clone());
         let client = MidenNoteTransportClient::new(wasm_client);
 
-        Ok(Self {
+        Self {
             client: RwLock::new(client),
             health_client: RwLock::new(health_client),
-        })
+        }
     }
 
     /// Get a lock to the main client

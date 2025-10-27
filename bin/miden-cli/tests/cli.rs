@@ -547,7 +547,7 @@ async fn list_addresses_add() -> Result<()> {
     sync_cli(&temp_dir);
 
     let mut list_addresses_cmd = Command::cargo_bin("miden-client").unwrap();
-    list_addresses_cmd.args(["addresses", "list", &basic_account_id]);
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
 
     let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
@@ -560,7 +560,7 @@ async fn list_addresses_add() -> Result<()> {
     let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
     let custom_note_tag_len = "10";
     add_address_cmd.args([
-        "addresses",
+        "address",
         "add",
         &basic_account_id,
         &AddressInterface::BasicWallet.to_string(),
@@ -582,7 +582,7 @@ async fn list_addresses_add() -> Result<()> {
     let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
     let custom_note_tag_len = "5";
     add_address_cmd.args([
-        "addresses",
+        "address",
         "add",
         &basic_account_id,
         &AddressInterface::BasicWallet.to_string(),
@@ -614,7 +614,7 @@ async fn list_addresses_remove() -> Result<()> {
 
     // List of addresses for created account should contain an Unspecified address
     let mut list_addresses_cmd = Command::cargo_bin("miden-client").unwrap();
-    list_addresses_cmd.args(["addresses", "list", &basic_account_id]);
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
     let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
@@ -628,7 +628,7 @@ async fn list_addresses_remove() -> Result<()> {
         .find(&formatted_output)
         .unwrap()
         .as_str();
-    remove_address_cmd.args(["addresses", "remove", &basic_account_id, unspecified_wallet_address]);
+    remove_address_cmd.args(["address", "remove", &basic_account_id, unspecified_wallet_address]);
     let output = remove_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 

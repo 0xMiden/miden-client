@@ -2651,7 +2651,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2679,7 +2679,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "quote",
  "syn 2.0.106",
@@ -2688,7 +2688,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2708,7 +2708,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2731,7 +2731,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "fs-err",
  "miette",
@@ -2743,7 +2743,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "futures",
@@ -2770,7 +2770,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2801,7 +2801,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2828,7 +2828,7 @@ dependencies = [
 [[package]]
 name = "miden-note-transport-proto-build"
 version = "0.1.0"
-source = "git+https://github.com/0xMiden/miden-note-transport#4ee3956fd7bfd77f3d72e9e83dc3af5b7a52d86e"
+source = "git+https://github.com/0xMiden/miden-note-transport#bb1075155be757601d853deb0e1df8a95a51ff69"
 dependencies = [
  "fs-err",
  "miette",
@@ -2895,7 +2895,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2940,7 +2940,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#5c41a2916ae501d274d55180181696ee37eb1e94"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
