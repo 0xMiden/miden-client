@@ -8,24 +8,31 @@ use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
 use crate::Client;
 use crate::rpc::domain::account::{
+    AccountDetails,
     AccountProof,
     AccountProofs,
+    AccountStorageDetails,
+    AccountStorageMapDetails,
     AccountUpdateSummary,
+    AccountVaultDetails,
     FetchedAccount,
-    StateHeaders,
+    StorageMapEntry,
 };
+use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc_store::SyncStateResponse;
+use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{NodeRpcClient, RpcError};
 use crate::transaction::ForeignAccount;
@@ -98,7 +105,7 @@ impl MockRpcApi {
     /// Generates a sync state response based on the request block number.
     fn get_sync_state_request(
         &self,
-        request_block_num: BlockNumber,
+        request_block_range: BlockRange,
         note_tags: &BTreeSet<NoteTag>,
         account_ids: &[AccountId],
     ) -> Result<SyncStateResponse, RpcError> {
@@ -110,7 +117,9 @@ impl MockRpcApi {
             .values()
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
-                if note_tags.contains(&note.metadata().tag()) && block_num > request_block_num {
+                if note_tags.contains(&note.metadata().tag())
+                    && block_num.as_u32() > request_block_range.block_from
+                {
                     Some(block_num)
                 } else {
                     None
@@ -123,11 +132,12 @@ impl MockRpcApi {
         let next_block = self.get_block_by_num(next_block_num);
 
         // Prepare the MMR delta
-        let from_block_num = if request_block_num == self.get_chain_tip_block_num() {
-            next_block_num.as_usize()
-        } else {
-            request_block_num.as_usize() + 1
-        };
+        let from_block_num =
+            if request_block_range.block_from == self.get_chain_tip_block_num().as_u32() {
+                next_block_num.as_usize()
+            } else {
+                request_block_range.block_from as usize + 1
+            };
 
         let mmr_delta = self
             .get_mmr()
@@ -143,7 +153,7 @@ impl MockRpcApi {
             .proven_blocks()
             .iter()
             .filter(|block| {
-                block.header().block_num() > request_block_num
+                block.header().block_num().as_u32() > request_block_range.block_from
                     && block.header().block_num() <= next_block_num
             })
             .flat_map(|block| {
@@ -158,7 +168,7 @@ impl MockRpcApi {
         let mut accounts = vec![];
 
         for (block_num, updates) in self.account_commitment_updates.read().iter() {
-            if *block_num > request_block_num && *block_num <= next_block_num {
+            if block_num.as_u32() > request_block_range.block_from && *block_num <= next_block_num {
                 accounts.extend(updates.iter().map(|(account_id, commitment)| AccountSummary {
                     account_id: Some((*account_id).into()),
                     account_commitment: Some(commitment.into()),
@@ -175,6 +185,149 @@ impl MockRpcApi {
             transactions,
             notes,
         })
+    }
+
+    /// Retrieves account vault updates in a given block range.
+    fn get_sync_account_vault_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> AccountVaultInfo {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let vault_delta = account_delta.vault();
+
+                for asset in vault_delta.added_assets() {
+                    let account_vault_update = AccountVaultUpdate {
+                        block_num: block_number,
+                        asset: Some(asset),
+                        vault_key: asset.vault_key(),
+                    };
+                    updates.push(account_vault_update);
+                }
+            }
+        }
+
+        AccountVaultInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates,
+        }
+    }
+
+    /// Retrieves transactions in a given block range that match the provided account IDs
+    fn get_sync_transactions_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: &[AccountId],
+    ) -> TransactionsInfo {
+        let chain_tip = self.get_chain_tip_block_num();
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => chain_tip,
+        };
+
+        let mut transaction_records = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for transaction_header in block.transactions().as_slice() {
+                if !account_ids.contains(&transaction_header.account_id()) {
+                    continue;
+                }
+
+                transaction_records.push(TransactionRecord {
+                    block_num: block_number,
+                    transaction_header: transaction_header.clone(),
+                });
+            }
+        }
+
+        TransactionsInfo {
+            chain_tip,
+            block_num: block_to,
+            transaction_records,
+        }
+    }
+
+    /// Retrieves storage map updates in a given block range
+    fn get_sync_storage_maps_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> StorageMapInfo {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let storage_delta = account_delta.storage();
+
+                for (slot_index, map_delta) in storage_delta.maps() {
+                    let slot_index = u32::from(*slot_index);
+
+                    for (key, value) in map_delta.entries() {
+                        let storage_map_info = StorageMapUpdate {
+                            block_num: block_number,
+                            slot_index: u8::try_from(slot_index).unwrap(),
+                            key: (*key).into(),
+                            value: *value,
+                        };
+                        updates.push(storage_map_info);
+                    }
+                }
+            }
+        }
+
+        StorageMapInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates,
+        }
     }
 
     /// Retrieves notes that are included in the specified block number.
@@ -251,12 +404,18 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags, &[])?;
+        let block_range = BlockRange {
+            block_from: block_num.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        };
+
+        let response = self.get_sync_state_request(block_range, note_tags, &[])?;
 
         let response = NoteSyncInfo {
-            chain_tip: response.chain_tip,
+            chain_tip: response.chain_tip.into(),
             block_header: response.block_header.unwrap().try_into().unwrap(),
             mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
             notes: response
@@ -283,7 +442,11 @@ impl NodeRpcClient for MockRpcApi {
         account_ids: &[AccountId],
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<StateSyncInfo, RpcError> {
-        let response = self.get_sync_state_request(block_num, note_tags, account_ids)?;
+        let block_range = BlockRange {
+            block_from: block_num.as_u32(),
+            block_to: None,
+        };
+        let response = self.get_sync_state_request(block_range, note_tags, account_ids)?;
 
         Ok(response.try_into().unwrap())
     }
@@ -336,6 +499,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        _tx_inputs: TransactionInputs, // Unnecessary for testing client itself.
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 
@@ -387,26 +551,48 @@ impl NodeRpcClient for MockRpcApi {
                 ForeignAccount::Public(account_id, account_storage_requirements) => {
                     let account = mock_chain.committed_account(*account_id).unwrap();
 
-                    let mut storage_slots = BTreeMap::new();
-                    for (index, storage_keys) in account_storage_requirements.inner() {
+                    let mut map_details = vec![];
+                    for index in account_storage_requirements.inner().keys() {
                         if let Some(StorageSlot::Map(storage_map)) =
                             account.storage().slots().get(*index as usize)
                         {
-                            let proofs = storage_keys
-                                .iter()
-                                .map(|map_key| storage_map.open(map_key))
-                                .collect::<Vec<_>>();
-                            storage_slots.insert(*index, proofs);
+                            let entries = storage_map
+                                .entries()
+                                .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                                .collect::<Vec<StorageMapEntry>>();
+
+                            let too_many_entries = entries.len() > 1000;
+                            let account_storage_map_detail = AccountStorageMapDetails {
+                                slot_index: u32::from(*index),
+                                too_many_entries,
+                                entries,
+                            };
+
+                            map_details.push(account_storage_map_detail);
                         } else {
                             panic!("Storage slot at index {} is not a map", index);
                         }
                     }
 
-                    Some(StateHeaders {
-                        account_header: account.into(),
-                        storage_header: account.storage().to_header(),
+                    let storage_details = AccountStorageDetails {
+                        header: account.storage().to_header(),
+                        map_details,
+                    };
+
+                    let mut assets = vec![];
+                    for asset in account.vault().assets() {
+                        assets.push(asset);
+                    }
+                    let vault_details = AccountVaultDetails {
+                        too_many_assets: assets.len() > 1000,
+                        assets,
+                    };
+
+                    Some(AccountDetails {
+                        header: account.into(),
+                        storage_details,
                         code: account.code().clone(),
-                        storage_slots,
+                        vault_details,
                     })
                 },
                 ForeignAccount::Private(_) => None,
@@ -441,7 +627,7 @@ impl NodeRpcClient for MockRpcApi {
                 };
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
-                    Some(NullifierUpdate { nullifier, block_num: block_num.as_u32() })
+                    Some(NullifierUpdate { nullifier, block_num })
                 } else {
                     None
                 }
@@ -481,6 +667,36 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(note.note().unwrap().script().clone())
+    }
+
+    async fn sync_storage_maps(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError> {
+        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id);
+        Ok(response)
+    }
+
+    async fn sync_account_vault(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError> {
+        let response = self.get_sync_account_vault_request(block_from, block_to, account_id);
+        Ok(response)
+    }
+
+    async fn sync_transactions(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<TransactionsInfo, RpcError> {
+        let response = self.get_sync_transactions_request(block_from, block_to, &account_ids);
+        Ok(response)
     }
 }
 

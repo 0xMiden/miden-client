@@ -9,8 +9,9 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
+use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
-use crate::store::Store;
+use crate::store::{Store, StoreError};
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -34,6 +35,23 @@ enum AuthenticatorConfig<AUTH> {
     Instance(Arc<AUTH>),
 }
 
+// STORE BUILDER
+// ================================================================================================
+
+/// Allows the [`ClientBuilder`] to accept either an already built store instance or a factory for
+/// deferring the store instantiation.
+pub enum StoreBuilder {
+    Store(Arc<dyn Store>),
+    Factory(Box<dyn StoreFactory>),
+}
+
+/// Trait for building a store instance.
+#[async_trait::async_trait]
+pub trait StoreFactory {
+    /// Returns a new store instance.
+    async fn build(&self) -> Result<Arc<dyn Store>, StoreError>;
+}
+
 // CLIENT BUILDER
 // ================================================================================================
 
@@ -46,7 +64,7 @@ pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
     rpc_api: Option<Arc<dyn NodeRpcClient>>,
     /// An optional store provided by the user.
-    store: Option<Arc<dyn Store>>,
+    pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
     /// The keystore configuration provided by the user.
@@ -59,6 +77,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An optional custom note transport client.
+    note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -67,11 +87,11 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             rpc_api: None,
             store: None,
             rng: None,
-
             keystore: None,
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
+            note_transport_api: None,
         }
     }
 }
@@ -109,10 +129,10 @@ where
         self
     }
 
-    /// Optionally provide a store directly.
+    /// Provide a store to be used by the client.
     #[must_use]
     pub fn store(mut self, store: Arc<dyn Store>) -> Self {
-        self.store = Some(store);
+        self.store = Some(StoreBuilder::Store(store));
         self
     }
 
@@ -157,6 +177,13 @@ where
         self
     }
 
+    /// Sets a custom note transport client directly.
+    #[must_use]
+    pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
+        self.note_transport_api = Some(client);
+        self
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
@@ -177,12 +204,14 @@ where
         };
 
         // Ensure a store was provided.
-        let store: Arc<dyn Store> = if let Some(store) = self.store {
-            store
+        let store = if let Some(store_builder) = self.store {
+            match store_builder {
+                StoreBuilder::Store(store) => store,
+                StoreBuilder::Factory(factory) => factory.build().await?,
+            }
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path if `sqlite` is enabled."
-                    .into(),
+                "Store must be specified. Call `.store(...)`.".into(),
             ));
         };
 
@@ -220,6 +249,7 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
+            self.note_transport_api,
         )
         .await
     }

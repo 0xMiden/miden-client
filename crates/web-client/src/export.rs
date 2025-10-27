@@ -1,10 +1,12 @@
 use miden_client::Word;
-use miden_client::account::AccountFile;
+use miden_client::account::AccountFile as NativeAccountFile;
 use miden_client::store::NoteExportType;
-use miden_client::utils::{Serializable, get_public_keys_from_account};
+use miden_client::utils::get_public_keys_from_account;
 use wasm_bindgen::prelude::*;
 
+use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId;
+use crate::models::note_file::NoteFile;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -14,16 +16,26 @@ impl WebClient {
         &mut self,
         note_id: String,
         export_type: String,
-    ) -> Result<JsValue, JsValue> {
+    ) -> Result<NoteFile, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let note_id = Word::try_from(note_id)
-                .map_err(|err| js_error_with_context(err, "failed to parse input note id"))?
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        "error exporting note file: failed to parse input note id",
+                    )
+                })?
                 .into();
 
             let output_note = client
                 .get_output_note(note_id)
                 .await
-                .map_err(|err| js_error_with_context(err, "failed to get output notes"))?
+                .map_err(|err| {
+                    js_error_with_context(
+                        err,
+                        "error exporting note file: failed to get output notes",
+                    )
+                })?
                 .ok_or(JsValue::from_str("No output note found"))?;
 
             let export_type = match export_type.as_str() {
@@ -43,12 +55,7 @@ impl WebClient {
                 js_error_with_context(err, "failed to convert output note to note file")
             })?;
 
-            let input_note_bytes = note_file.to_bytes();
-
-            let serialized_input_note_bytes = serde_wasm_bindgen::to_value(&input_note_bytes)
-                .map_err(|_| JsValue::from_str("Serialization error"))?;
-
-            Ok(serialized_input_note_bytes)
+            Ok(note_file.into())
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
@@ -69,7 +76,10 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "exportAccountFile")]
-    pub async fn export_account_file(&mut self, account_id: AccountId) -> Result<JsValue, JsValue> {
+    pub async fn export_account_file(
+        &mut self,
+        account_id: AccountId,
+    ) -> Result<AccountFile, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let account = client
                 .get_account(account_id.into())
@@ -102,13 +112,9 @@ impl WebClient {
                 );
             }
 
-            let account_data = AccountFile::new(account, key_pairs);
+            let account_data = NativeAccountFile::new(account, key_pairs);
 
-            let serialized_input_note_bytes =
-                serde_wasm_bindgen::to_value(&account_data.to_bytes())
-                    .map_err(|_| JsValue::from_str("Serialization error"))?;
-
-            Ok(serialized_input_note_bytes)
+            Ok(AccountFile::from(account_data))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

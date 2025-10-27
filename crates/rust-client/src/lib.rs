@@ -56,6 +56,8 @@
 //!
 //! use miden_client::crypto::RpoRandomCoin;
 //! use miden_client::keystore::FilesystemKeyStore;
+//! use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+//! use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 //! use miden_client::rpc::{Endpoint, GrpcClient};
 //! use miden_client::store::Store;
 //! use miden_client::{Client, ExecutionOptions, Felt};
@@ -85,6 +87,11 @@
 //! // 256 is simply an example value.
 //! let max_block_number_delta = Some(256);
 //!
+//! // Optionally, connect to the note transport network to exchange private notes.
+//! let note_transport_api =
+//!     GrpcNoteTransportClient::connect(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(), 10_000)
+//!         .await?;
+//!
 //! // Instantiate the client using a gRPC client
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
 //! let client: Client<FilesystemKeyStore<StdRng>> = Client::new(
@@ -101,6 +108,7 @@
 //!     .unwrap(),
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
+//!     Some(Arc::new(note_transport_api)),
 //! )
 //! .await
 //! .unwrap();
@@ -124,6 +132,7 @@ extern crate std;
 pub mod account;
 pub mod keystore;
 pub mod note;
+pub mod note_transport;
 pub mod rpc;
 pub mod settings;
 pub mod store;
@@ -141,6 +150,10 @@ mod errors;
 
 // RE-EXPORTS
 // ================================================================================================
+
+pub mod notes {
+    pub use miden_objects::note::NoteFile;
+}
 
 /// Provides types and utilities for working with Miden Assembly.
 pub mod assembly {
@@ -183,6 +196,7 @@ pub mod asset {
 pub mod auth {
     pub use miden_lib::AuthScheme;
     pub use miden_lib::account::auth::{AuthRpoFalcon512, NoAuth};
+    pub use miden_objects::account::auth::PublicKeyCommitment;
     pub use miden_objects::account::{AuthSecretKey, Signature};
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
@@ -265,6 +279,7 @@ pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
 use miden_tx::auth::TransactionAuthenticator;
+use note_transport::{NoteTransportClient, init_note_transport_cursor};
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
@@ -303,6 +318,9 @@ pub struct Client<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
+    /// the Miden Note Transport network.
+    note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 /// Construction and access methods.
@@ -317,8 +335,8 @@ where
     ///
     /// ## Arguments
     ///
-    /// - `api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect to
-    ///   the Miden node.
+    /// - `rpc_api`: An instance of [`NodeRpcClient`] which provides a way for the client to connect
+    ///   to the Miden node.
     /// - `rng`: An instance of [`FeltRng`] which provides randomness tools for generating new keys,
     ///   serial numbers, etc. This can be any RNG that implements the [`FeltRng`] trait.
     /// - `store`: An instance of [`Store`], which provides a way to write and read entities to
@@ -331,6 +349,8 @@ where
     ///   pending transactions.
     /// - `max_block_number_delta`: Determines the maximum number of blocks that the client can be
     ///   behind the network for transactions and account proofs to be considered valid.
+    /// - `note_transport_api`: An instance of [`NoteTransportClient`] which provides a way for the
+    ///   client to connect to the Miden Note Transport network.
     ///
     /// # Errors
     ///
@@ -343,12 +363,18 @@ where
         exec_options: ExecutionOptions,
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
+        note_transport_api: Option<Arc<dyn NoteTransportClient>>,
     ) -> Result<Self, ClientError> {
         let tx_prover = Arc::new(LocalTransactionProver::default());
 
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             // Set the genesis commitment in the RPC API client for future requests.
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        }
+
+        if note_transport_api.is_some() {
+            // Initialize the note transport cursor
+            init_note_transport_cursor(store.clone()).await?;
         }
 
         let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
@@ -363,6 +389,7 @@ where
             exec_options,
             tx_graceful_blocks,
             max_block_number_delta,
+            note_transport_api,
         })
     }
 

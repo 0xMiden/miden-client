@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
     Note,
@@ -90,7 +90,7 @@ impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
 #[derive(Debug)]
 pub struct NoteSyncInfo {
     /// Number of the latest block in the chain.
-    pub chain_tip: u32,
+    pub chain_tip: BlockNumber,
     /// Block header of the block with the first note matching the specified criteria.
     pub block_header: BlockHeader,
     /// Proof for block header's MMR with respect to the chain tip.
@@ -108,7 +108,10 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc_store::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let chain_tip = value.chain_tip;
+        let chain_tip = value
+            .pagination_info
+            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
+            .chain_tip;
 
         // Validate and convert block header
         let block_header = value
@@ -155,7 +158,12 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
             notes.push(committed_note);
         }
 
-        Ok(NoteSyncInfo { chain_tip, block_header, mmr_path, notes })
+        Ok(NoteSyncInfo {
+            chain_tip: chain_tip.into(),
+            block_header,
+            mmr_path,
+            notes,
+        })
     }
 }
 
@@ -210,7 +218,7 @@ impl CommittedNote {
 // FETCHED NOTE
 // ================================================================================================
 
-/// Describes the possible responses from  the `GetNotesById` endpoint for a single note.
+/// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
     /// Details for a private note only include its [`NoteMetadata`] and [`NoteInclusionProof`].

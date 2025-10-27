@@ -91,7 +91,7 @@ This runs a suite of integration tests to verify the SDK’s functionality in a 
 
 ## Usage
 
-The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/src/web-client/api).
+The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
 
 ### Create a New Wallet
 

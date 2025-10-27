@@ -34,6 +34,7 @@ export const test = base.extend<{ forEachTest: void }>({
             AccountStorageDelta,
             AccountVaultDelta,
             AccountHeader,
+            AccountFile,
             AccountId,
             AccountInterface,
             AccountStorageMode,
@@ -60,6 +61,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteExecutionHint,
             NoteExecutionMode,
             NoteFilter,
+            NoteFile,
             NoteFilterTypes,
             NoteIdAndArgs,
             NoteIdAndArgsArray,
@@ -95,6 +97,7 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
+            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -103,7 +106,11 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await WebClient.createClient(rpcUrl, undefined);
+          const client = await WebClient.createClient(
+            rpcUrl,
+            undefined,
+            undefined
+          );
 
           window.client = client;
           window.Account = Account;
@@ -113,6 +120,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.AccountStorageDelta = AccountStorageDelta;
           window.AccountVaultDelta = AccountVaultDelta;
           window.AccountHeader = AccountHeader;
+          window.AccountFile = AccountFile;
           window.AccountId = AccountId;
           window.AccountInterface = AccountInterface;
           window.AccountStorageMode = AccountStorageMode;
@@ -140,6 +148,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.NoteExecutionHint = NoteExecutionHint;
           window.NoteExecutionMode = NoteExecutionMode;
           window.NoteFilter = NoteFilter;
+          window.NoteFile = NoteFile;
           window.NoteFilterTypes = NoteFilterTypes;
           window.NoteIdAndArgs = NoteIdAndArgs;
           window.NoteIdAndArgsArray = NoteIdAndArgsArray;
@@ -174,6 +183,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
+          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
@@ -184,6 +194,7 @@ export const test = base.extend<{ forEachTest: void }>({
 
           // Add the remote prover url to window
           window.remoteProverUrl = proverUrl;
+          window.rpcUrl = rpcUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(window.remoteProverUrl);
@@ -235,7 +246,11 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(rpcUrl, initSeed);
+            const client = await WebClient.createClient(
+              rpcUrl,
+              undefined,
+              initSeed
+            );
             window.client = client;
             await window.client.syncState();
           };

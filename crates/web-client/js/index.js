@@ -7,6 +7,7 @@ const {
   AccountBuilder,
   AccountComponent,
   AccountDelta,
+  AccountFile,
   AccountHeader,
   AccountId,
   AccountInterface,
@@ -35,9 +36,11 @@ const {
   NoteAndArgsArray,
   NoteAssets,
   NoteConsumability,
+  NoteDetails,
   NoteExecutionHint,
   NoteExecutionMode,
   NoteFilter,
+  NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
@@ -73,6 +76,7 @@ const {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
   WebClient: WasmWebClient, // Alias the WASM-exported WebClient
 } = wasm;
@@ -82,6 +86,7 @@ export {
   AccountBuilder,
   AccountComponent,
   AccountDelta,
+  AccountFile,
   AccountVaultDelta,
   AccountHeader,
   AccountId,
@@ -112,9 +117,11 @@ export {
   NoteAndArgsArray,
   NoteAssets,
   NoteConsumability,
+  NoteDetails,
   NoteExecutionHint,
   NoteExecutionMode,
   NoteFilter,
+  NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
@@ -148,6 +155,7 @@ export {
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
+  TransactionSummary,
   Word,
 };
 
@@ -177,12 +185,41 @@ export {
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
 export class WebClient {
-  constructor(rpcUrl, seed) {
+  /**
+   * Create a WebClient wrapper.
+   *
+   * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
+   * @param {Uint8Array | undefined} seed - Optional seed for account initialization.
+   * @param {(pubKey: Uint8Array) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined} [getKeyCb]
+   *   - Callback to retrieve the secret key bytes for a given public key. The `pubKey`
+   *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
+   *   corresponding secret key as a `Uint8Array`, or `null`/`undefined` if not found. The
+   *   return value may be provided synchronously or via a `Promise`.
+   * @param {(pubKey: Uint8Array, secretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
+   *   - Callback to persist a secret key. `pubKey` is the serialized public key, and
+   *   `secretKey` is the serialized secret key (from `SecretKey.serialize()`). May return
+   *   `void` or a `Promise<void>`.
+   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Array<number | string>> | Array<number | string>} [signCb]
+   *   - Callback to produce signature elements for the provided inputs. `pubKey` is the
+   *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
+   *   `SigningInputs.serialize()`. Must return an array of numeric values (numbers or numeric
+   *   strings) representing the signature elements, either directly or wrapped in a `Promise`.
+   */
+  constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
     this.rpcUrl = rpcUrl;
+    this.noteTransportUrl = noteTransportUrl;
     this.seed = seed;
+    this.getKeyCb = getKeyCb;
+    this.insertKeyCb = insertKeyCb;
+    this.signCb = signCb;
 
     // Check if Web Workers are available.
-    if (typeof Worker !== "undefined") {
+    if (
+      typeof Worker !== "undefined" &&
+      !this.getKeyCb &&
+      !this.insertKeyCb &&
+      !this.signCb
+    ) {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
@@ -240,7 +277,14 @@ export class WebClient {
       this.loaded.then(() => {
         this.worker.postMessage({
           action: WorkerAction.INIT,
-          args: [this.rpcUrl, this.seed],
+          args: [
+            this.rpcUrl,
+            this.noteTransportUrl,
+            this.seed,
+            this.getKeyCb,
+            this.insertKeyCb,
+            this.signCb,
+          ],
         });
       });
     } else {
@@ -261,19 +305,78 @@ export class WebClient {
    * This method is async so you can await the asynchronous call to createClient().
    *
    * @param {string} rpcUrl - The RPC URL.
+   * @param {string} noteTransportUrl - The note transport URL (optional).
    * @param {string} seed - The seed for the account.
    * @returns {Promise<WebClient>} The fully initialized WebClient.
    */
-  static async createClient(rpcUrl, seed) {
+  static async createClient(rpcUrl, noteTransportUrl, seed) {
     // Construct the instance (synchronously).
-    const instance = new WebClient(rpcUrl, seed);
+    const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createClient(rpcUrl, seed);
+    await instance.wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the worker to be ready
     await instance.ready;
 
+    // Return a proxy that forwards missing properties to wasmWebClient.
+    return new Proxy(instance, {
+      get(target, prop, receiver) {
+        // If the property exists on the wrapper, return it.
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
+        }
+        // Otherwise, if the wasmWebClient has it, return that.
+        if (target.wasmWebClient && prop in target.wasmWebClient) {
+          const value = target.wasmWebClient[prop];
+          if (typeof value === "function") {
+            return value.bind(target.wasmWebClient);
+          }
+          return value;
+        }
+        return undefined;
+      },
+    });
+  }
+
+  /**
+   * Factory method to create and initialize a WebClient instance with a remote keystore.
+   * This method is async so you can await the asynchronous call to createClientWithExternalKeystore().
+   *
+   * @param {string} rpcUrl - The RPC URL.
+   * @param {string | undefined} noteTransportUrl - The note transport URL (optional).
+   * @param {string | undefined} seed - The seed for the account.
+   * @param {Function | undefined} getKeyCb - The get key callback.
+   * @param {Function | undefined} insertKeyCb - The insert key callback.
+   * @param {Function | undefined} signCb - The sign callback.
+   * @returns {Promise<WebClient>} The fully initialized WebClient.
+   */
+  static async createClientWithExternalKeystore(
+    rpcUrl,
+    noteTransportUrl,
+    seed,
+    getKeyCb,
+    insertKeyCb,
+    signCb
+  ) {
+    // Construct the instance (synchronously).
+    const instance = new WebClient(
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      getKeyCb,
+      insertKeyCb,
+      signCb
+    );
+    await instance.wasmWebClient.createClientWithExternalKeystore(
+      rpcUrl,
+      noteTransportUrl,
+      seed,
+      getKeyCb,
+      insertKeyCb,
+      signCb
+    );
+    await instance.ready;
     // Return a proxy that forwards missing properties to wasmWebClient.
     return new Proxy(instance, {
       get(target, prop, receiver) {
@@ -461,15 +564,24 @@ export class MockWebClient extends WebClient {
    * Factory method to create a WebClient with a mock chain for testing purposes.
    *
    * @param serializedMockChain - Serialized mock chain data (optional). Will use an empty chain if not provided.
+   * @param serializedMockNoteTransportNode - Serialized mock note transport node data (optional). Will use a new instance if not provided.
    * @param seed - The seed for the account (optional).
    * @returns A promise that resolves to a MockWebClient.
    */
-  static async createClient(serializedMockChain, seed) {
+  static async createClient(
+    serializedMockChain,
+    serializedMockNoteTransportNode,
+    seed
+  ) {
     // Construct the instance (synchronously).
     const instance = new MockWebClient(seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createMockClient(seed, serializedMockChain);
+    await instance.wasmWebClient.createMockClient(
+      seed,
+      serializedMockChain,
+      serializedMockNoteTransportNode
+    );
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -501,10 +613,13 @@ export class MockWebClient extends WebClient {
       }
 
       let serializedMockChain = this.wasmWebClient.serializeMockChain().buffer;
+      let serializedMockNoteTransportNode =
+        this.wasmWebClient.serializeMockNoteTransportNode().buffer;
 
       const serializedSyncSummaryBytes = await this.callMethodWithWorker(
         MethodName.SYNC_STATE_MOCK,
-        serializedMockChain
+        serializedMockChain,
+        serializedMockNoteTransportNode
       );
 
       return wasm.SyncSummary.deserialize(
@@ -535,17 +650,25 @@ export class MockWebClient extends WebClient {
       }
 
       args.push(this.wasmWebClient.serializeMockChain().buffer);
+      args.push(this.wasmWebClient.serializeMockNoteTransportNode().buffer);
 
       // Always call the same worker method.
-      let serializedMockChain = await this.callMethodWithWorker(
+      let result = await this.callMethodWithWorker(
         MethodName.SUBMIT_TRANSACTION_MOCK,
         ...args
       );
 
-      serializedMockChain = new Uint8Array(serializedMockChain);
+      const serializedMockChain = new Uint8Array(result.serializedMockChain);
+      const serializedMockNoteTransportNode = new Uint8Array(
+        result.serializedMockNoteTransportNode
+      );
 
       this.wasmWebClient = new WasmWebClient();
-      await this.wasmWebClient.createMockClient(this.seed, serializedMockChain);
+      await this.wasmWebClient.createMockClient(
+        this.seed,
+        serializedMockChain,
+        serializedMockNoteTransportNode
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;

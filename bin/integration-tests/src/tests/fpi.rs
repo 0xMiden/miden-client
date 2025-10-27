@@ -1,6 +1,14 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountStorageMode,
+    PartialAccount,
+    PartialStorage,
+    StorageMap,
+    StorageSlot,
+};
 use miden_client::auth::AuthSecretKey;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
@@ -53,7 +61,6 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     )
     .await?;
     let foreign_account_id = foreign_account.id();
-
     let code = format!(
         "
         use.miden::tx
@@ -61,11 +68,11 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
         end
         ",
@@ -171,11 +178,11 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{outer_proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
         end
@@ -263,11 +270,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
         end
@@ -304,7 +311,18 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .await?
             .context("failed to find foreign account after deploiyng")?
             .into();
-        ForeignAccount::private(&foreign_account)
+
+        let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
+        let acc = PartialAccount::new(
+            id,
+            nonce,
+            code,
+            PartialStorage::new_full(storage),
+            Default::default(),
+            seed,
+        )?;
+
+        ForeignAccount::private(acc)
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
@@ -347,7 +365,7 @@ fn foreign_account_with_code(
 ) -> Result<(Account, Word, SecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
+    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
 
     let get_item_component = AccountComponent::compile(
         code,
@@ -358,7 +376,7 @@ fn foreign_account_with_code(
     .with_supports_all_types();
 
     let secret_key = SecretKey::new();
-    let auth_component = AuthRpoFalcon512::new(secret_key.public_key());
+    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment().into());
 
     let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())

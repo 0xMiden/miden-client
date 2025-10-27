@@ -6,6 +6,10 @@ pub struct ProvenTransaction {
     /// \[miden_objects::transaction::proven_tx::ProvenTransaction\].
     #[prost(bytes = "vec", tag = "1")]
     pub transaction: ::prost::alloc::vec::Vec<u8>,
+    /// Transaction inputs encoded using \[winter_utils::Serializable\] implementation for
+    /// \[miden_objects::transaction::TransactionInputs\].
+    #[prost(bytes = "vec", optional, tag = "2")]
+    pub transaction_inputs: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProvenTransactionBatch {
@@ -33,4 +37,23 @@ pub struct TransactionSummary {
     /// The ID of the account affected by the transaction.
     #[prost(message, optional, tag = "3")]
     pub account_id: ::core::option::Option<super::account::AccountId>,
+}
+/// Represents a transaction header.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransactionHeader {
+    /// ID of the account against which the transaction was executed.
+    #[prost(message, optional, tag = "1")]
+    pub account_id: ::core::option::Option<super::account::AccountId>,
+    /// State commitment of the account before the transaction was executed.
+    #[prost(message, optional, tag = "2")]
+    pub initial_state_commitment: ::core::option::Option<super::primitives::Digest>,
+    /// State commitment of the account after the transaction was executed.
+    #[prost(message, optional, tag = "3")]
+    pub final_state_commitment: ::core::option::Option<super::primitives::Digest>,
+    /// Nullifiers of the input notes of the transaction.
+    #[prost(message, repeated, tag = "4")]
+    pub input_notes: ::prost::alloc::vec::Vec<super::primitives::Digest>,
+    /// Output notes of the transaction.
+    #[prost(message, repeated, tag = "5")]
+    pub output_notes: ::prost::alloc::vec::Vec<super::note::NoteSyncRecord>,
 }

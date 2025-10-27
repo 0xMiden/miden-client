@@ -77,9 +77,9 @@ doc: ## Generate & check rust documentation. You'll need `jq` in order for this 
 	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
 
-.PHONY: book
-book: ## Builds the book & serves documentation site
-	mdbook serve --open docs
+.PHONY: serve-docs
+serve-docs: ## Serves the docs
+	cd docs/external && npm run start:dev
 
 .PHONY: typedoc
 typedoc: rust-client-ts-build ## Generate web client package documentation.
@@ -211,3 +211,12 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"
+
+## --- Debug --------------------------------------------------------------------------------------
+.PHONY: build-web-client-debug
+build-web-client-debug: # build the web-client with debug symbols for the WASM-generated rust code
+	cd crates/web-client && yarn build-dev
+
+.PHONY: link-web-client-dep
+link-web-client-dep: # links the local web-client for debugging JS applications.
+	cd crates/web-client && yarn link
