@@ -20,6 +20,7 @@ use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -82,6 +83,12 @@ struct SerializedOutputNoteParts {
     pub recipient_digest: String,
     pub expected_height: u32,
     pub state: Vec<u8>,
+}
+
+/// Represents the pars retrieved form the database to build a `NoteScript`
+struct SerializedNoteScriptPars {
+    pub script_root: String,
+    pub script: Vec<u8>,
 }
 
 // NOTES STORE METHODS
@@ -163,6 +170,35 @@ impl SqliteStore {
                     .and_then(|v: String| Ok(Word::try_from(v).map(Nullifier::from)?))
             })
             .collect::<Result<Vec<Nullifier>, _>>()
+    }
+
+    pub(crate) fn upsert_note_scripts(
+        conn: &mut Connection,
+        note_scripts: &[NoteScriptRecord],
+    ) -> Result<(), StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+
+        for note_script in note_scripts {
+            upsert_note_script_tx(&tx, note_script)?;
+        }
+
+        tx.commit().into_store_error()
+    }
+
+    /// Retrieves the note scripts from the database.
+    pub(crate) fn get_note_scripts(
+        conn: &mut Connection,
+    ) -> Result<Vec<NoteScriptRecord>, StoreError> {
+        let query = "SELECT * FROM notes_scripts";
+        let note_scripts = conn
+            .prepare(query)
+            .into_store_error()?
+            .query_map([], parse_note_scripts_columns)
+            .expect("no binding parameters used in query")
+            .map(|result| Ok(result.into_store_error()?).and_then(parse_note_script))
+            .collect::<Result<Vec<NoteScriptRecord>, _>>()?;
+
+        Ok(note_scripts)
     }
 }
 
@@ -434,4 +470,39 @@ pub(crate) fn apply_note_updates_tx(
     }
 
     Ok(())
+}
+
+/// Inserts the provided note script into the database, if the script already exists, it will be
+/// replaced.
+pub(super) fn upsert_note_script_tx(
+    tx: &Transaction<'_>,
+    note_script_record: &NoteScriptRecord,
+) -> Result<(), StoreError> {
+    let script = note_script_record.script().to_bytes();
+    let script_root = note_script_record.script_root();
+
+    const QUERY: &str =
+        insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
+    tx.execute(QUERY, params![script_root, script,]).into_store_error()?;
+
+    Ok(())
+}
+
+/// Parse note script columns from the provided row into native types.
+fn parse_note_scripts_columns(
+    row: &rusqlite::Row<'_>,
+) -> Result<SerializedNoteScriptPars, rusqlite::Error> {
+    let script_root = row.get(0)?;
+    let script = row.get(1)?;
+
+    Ok(SerializedNoteScriptPars { script_root, script })
+}
+
+/// Parse a note script from the provided parts.
+fn parse_note_script(
+    serialized_note_script_parts: SerializedNoteScriptPars,
+) -> Result<NoteScriptRecord, StoreError> {
+    let script_root = serialized_note_script_parts.script_root;
+    let script = NoteScript::from_bytes(&serialized_note_script_parts.script)?;
+    Ok(NoteScriptRecord::new(script_root, script))
 }

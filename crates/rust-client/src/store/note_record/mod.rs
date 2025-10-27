@@ -24,9 +24,11 @@ use miden_objects::NoteError;
 use thiserror::Error;
 
 mod input_note_record;
+mod note_script_record;
 mod output_note_record;
 
 pub use input_note_record::{InputNoteRecord, InputNoteState};
+pub use note_script_record::NoteScriptRecord;
 pub use output_note_record::{NoteExportType, OutputNoteRecord, OutputNoteState};
 
 /// Contains structures that model all states in which an input note can be.

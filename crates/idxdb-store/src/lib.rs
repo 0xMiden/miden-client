@@ -33,6 +33,7 @@ use miden_client::store::{
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
+    NoteScriptRecord,
     OutputNoteRecord,
     PartialBlockchainFilter,
     Store,
@@ -141,6 +142,17 @@ impl Store for WebStore {
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
+    }
+
+    async fn get_note_scripts(&self) -> Result<Vec<NoteScriptRecord>, StoreError> {
+        unimplemented!()
+    }
+
+    async fn upsert_note_scripts(
+        &self,
+        note_scripts: &[NoteScriptRecord],
+    ) -> Result<(), StoreError> {
+        unimplemented!()
     }
 
     // CHAIN DATA

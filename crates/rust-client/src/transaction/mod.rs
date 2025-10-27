@@ -93,6 +93,7 @@ use crate::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteScriptRecord,
     OutputNoteRecord,
     StoreError,
     TransactionFilter,
@@ -263,6 +264,13 @@ where
             // Remove invalid notes
             notes = self.get_valid_input_notes(account, notes, tx_args.clone()).await?;
         }
+
+        let note_scripts: Vec<NoteScriptRecord> = notes
+            .clone()
+            .into_iter()
+            .map(|n| n.into_note().script().clone().into())
+            .collect();
+        self.store.upsert_note_scripts(&note_scripts).await?;
 
         // Execute the transaction and get the witness
         let executed_transaction = self

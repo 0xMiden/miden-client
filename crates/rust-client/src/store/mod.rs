@@ -71,6 +71,7 @@ pub use note_record::{
     InputNoteState,
     NoteExportType,
     NoteRecordError,
+    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     input_note_states,
@@ -149,6 +150,14 @@ pub trait Store: Send + Sync {
     /// Inserts the provided input notes into the database. If a note with the same ID already
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
+
+    /// Returns the note scripts stored in the database.
+    async fn get_note_scripts(&self) -> Result<Vec<NoteScriptRecord>, StoreError>;
+
+    /// Inserts the provided note scripts into the database. If a script with the same root already
+    /// exists, it will be replaced.
+    async fn upsert_note_scripts(&self, note_script: &[NoteScriptRecord])
+    -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------

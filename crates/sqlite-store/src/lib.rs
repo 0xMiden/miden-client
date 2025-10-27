@@ -39,6 +39,7 @@ use miden_client::store::{
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
+    NoteScriptRecord,
     OutputNoteRecord,
     PartialBlockchainFilter,
     Store,
@@ -213,6 +214,21 @@ impl Store for SqliteStore {
         let notes = notes.to_vec();
         self.interact_with_connection(move |conn| SqliteStore::upsert_input_notes(conn, &notes))
             .await
+    }
+
+    async fn get_note_scripts(&self) -> Result<Vec<NoteScriptRecord>, StoreError> {
+        self.interact_with_connection(SqliteStore::get_note_scripts).await
+    }
+
+    async fn upsert_note_scripts(
+        &self,
+        note_scripts: &[NoteScriptRecord],
+    ) -> Result<(), StoreError> {
+        let note_scripts = note_scripts.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::upsert_note_scripts(conn, &note_scripts)
+        })
+        .await
     }
 
     async fn insert_block_header(
