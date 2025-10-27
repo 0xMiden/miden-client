@@ -55,7 +55,7 @@ use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_objects::transaction::ProvenTransaction;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -105,7 +105,6 @@ pub trait NodeRpcClient: Send + Sync {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
@@ -227,19 +226,26 @@ pub trait NodeRpcClient: Send + Sync {
         note_ids: &[NoteId],
         current_timestamp: Option<u64>,
     ) -> Result<Vec<InputNoteRecord>, RpcError> {
-        let note_details = self.get_notes_by_id(note_ids).await?;
+        if note_ids.is_empty() {
+            return Ok(vec![]);
+        }
 
-        let mut public_notes = vec![];
-        for detail in note_details {
-            if let FetchedNote::Public(note, inclusion_proof) = detail {
-                let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
-                    inclusion_proof,
+        let mut public_notes = Vec::with_capacity(note_ids.len());
+        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
+        for chunk in note_ids.chunks(1_000) {
+            let note_details = self.get_notes_by_id(chunk).await?;
+
+            for detail in note_details {
+                if let FetchedNote::Public(note, inclusion_proof) = detail {
+                    let state = UnverifiedNoteState {
+                        metadata: *note.metadata(),
+                        inclusion_proof,
+                    }
+                    .into();
+                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                    public_notes.push(note);
                 }
-                .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                public_notes.push(note);
             }
         }
 

@@ -210,18 +210,8 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let consume_proof = client.testing_prove_transaction(&consume_transaction).await?;
 
     // Submit both transactions
-    client
-        .testing_submit_proven_transaction(
-            bump_proof,
-            bump_transaction.executed_transaction().tx_inputs().clone(),
-        )
-        .await?;
-    client
-        .testing_submit_proven_transaction(
-            consume_proof,
-            consume_transaction.executed_transaction().tx_inputs().clone(),
-        )
-        .await?;
+    client.testing_submit_proven_transaction(bump_proof).await?;
+    client.testing_submit_proven_transaction(consume_proof).await?;
 
     client.testing_apply_transaction(consume_transaction).await?;
 

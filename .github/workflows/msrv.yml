@@ -26,8 +26,6 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Ensure stable toolchain is installed
-        run: rustup toolchain install stable --profile minimal
       - name: Install cargo-msrv
         run: cargo install cargo-msrv
       - name: Check MSRV for each workspace member

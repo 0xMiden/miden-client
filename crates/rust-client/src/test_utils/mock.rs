@@ -8,7 +8,7 @@ use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
+use miden_objects::transaction::ProvenTransaction;
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -499,7 +499,6 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
-        _tx_inputs: TransactionInputs, // Unnecessary for testing client itself.
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 

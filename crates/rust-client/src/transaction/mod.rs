@@ -292,12 +292,7 @@ where
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<(), ClientError> {
         let proven_transaction = self.prove_transaction(&tx_result, tx_prover).await?;
-        let block_num = self
-            .submit_proven_transaction(
-                proven_transaction,
-                tx_result.executed_transaction().tx_inputs().clone(),
-            )
-            .await?;
+        let block_num = self.submit_proven_transaction(proven_transaction).await?;
         self.apply_transaction(block_num, tx_result).await
     }
 
@@ -320,13 +315,9 @@ where
     async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
-        let block_num = self
-            .rpc_api
-            .submit_proven_transaction(proven_transaction, transaction_inputs)
-            .await?;
+        let block_num = self.rpc_api.submit_proven_transaction(proven_transaction).await?;
         info!("Transaction submitted.");
 
         Ok(block_num)
@@ -845,9 +836,8 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     pub async fn testing_submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        tx_inputs: TransactionInputs,
     ) -> Result<BlockNumber, ClientError> {
-        self.submit_proven_transaction(proven_transaction, tx_inputs).await
+        self.submit_proven_transaction(proven_transaction).await
     }
 
     pub async fn testing_apply_transaction(

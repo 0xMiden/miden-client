@@ -123,41 +123,22 @@ const methodHandlers = {
 
 // Add mock methods to the handler mapping.
 methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
-  let [serializedMockChain, serializedMockNoteTransportNode] = args;
+  let [serializedMockChain] = args;
   serializedMockChain = new Uint8Array(serializedMockChain);
-  serializedMockNoteTransportNode = serializedMockNoteTransportNode
-    ? new Uint8Array(serializedMockNoteTransportNode)
-    : null;
-  await wasmWebClient.createMockClient(
-    wasmSeed,
-    serializedMockChain,
-    serializedMockNoteTransportNode
-  );
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
 
   return await methodHandlers[MethodName.SYNC_STATE]();
 };
 
 methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
-  let serializedMockNoteTransportNode = args.pop();
   let serializedMockChain = args.pop();
   serializedMockChain = new Uint8Array(serializedMockChain);
-  serializedMockNoteTransportNode = serializedMockNoteTransportNode
-    ? new Uint8Array(serializedMockNoteTransportNode)
-    : null;
   wasmWebClient = new wasm.WebClient();
-  await wasmWebClient.createMockClient(
-    wasmSeed,
-    serializedMockChain,
-    serializedMockNoteTransportNode
-  );
+  await wasmWebClient.createMockClient(wasmSeed, serializedMockChain);
 
   await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
 
-  return {
-    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-    serializedMockNoteTransportNode:
-      wasmWebClient.serializeMockNoteTransportNode().buffer,
-  };
+  return wasmWebClient.serializeMockChain().buffer;
 };
 
 /**
@@ -167,10 +148,10 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-      const [rpcUrl, noteTransportUrl, seed] = args;
+      const [rpcUrl, seed] = args;
       // Initialize the WASM WebClient.
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+      await wasmWebClient.createClient(rpcUrl, seed);
 
       wasmSeed = seed;
       ready = true;

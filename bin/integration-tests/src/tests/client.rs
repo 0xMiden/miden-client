@@ -104,20 +104,14 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
     let tx_prove_1 =
         client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
-    client
-        .testing_apply_transaction(transaction_execution_result_1.clone())
-        .await
-        .unwrap();
+    client.testing_apply_transaction(transaction_execution_result_1).await.unwrap();
 
     let transaction_execution_result_2 =
         client.new_transaction(from_account_id, tx_request_2).await.unwrap();
     let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
     let tx_prove_2 =
         client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
-    client
-        .testing_apply_transaction(transaction_execution_result_2.clone())
-        .await
-        .unwrap();
+    client.testing_apply_transaction(transaction_execution_result_2).await.unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -125,20 +119,8 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     wait_for_blocks(&mut client, 1).await;
 
     // Submit the proven transactions
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_1,
-            transaction_execution_result_1.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_2,
-            transaction_execution_result_2.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
+    client.testing_submit_proven_transaction(tx_prove_1).await.unwrap();
+    client.testing_submit_proven_transaction(tx_prove_2).await.unwrap();
 
     // wait for 1 block
     wait_for_tx(&mut client, transaction_id_1).await?;

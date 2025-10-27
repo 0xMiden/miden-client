@@ -11,7 +11,7 @@ use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
+use miden_tx::utils::{Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
 use crate::store::{InputNoteRecord, Store};
@@ -223,44 +223,13 @@ pub trait NoteStream:
 {
 }
 
-/// Information about a note fetched from the note transport network
+/// Information about a note in API responses
 #[derive(Debug, Clone)]
 pub struct NoteInfo {
     /// Note header
     pub header: NoteHeader,
     /// Note details, can be encrypted
     pub details_bytes: Vec<u8>,
-}
-
-// SERIALIZATION
-// ================================================================================================
-
-impl Serializable for NoteInfo {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.header.write_into(target);
-        self.details_bytes.write_into(target);
-    }
-}
-
-impl Deserializable for NoteInfo {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let header = NoteHeader::read_from(source)?;
-        let details_bytes = Vec::<u8>::read_from(source)?;
-        Ok(NoteInfo { header, details_bytes })
-    }
-}
-
-impl Serializable for NoteTransportCursor {
-    fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        self.0.write_into(target);
-    }
-}
-
-impl Deserializable for NoteTransportCursor {
-    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let value = u64::read_from(source)?;
-        Ok(Self::new(value))
-    }
 }
 
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
