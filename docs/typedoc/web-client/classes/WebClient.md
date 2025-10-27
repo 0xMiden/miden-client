@@ -52,7 +52,7 @@
 
 ### createClient()
 
-> **createClient**(`node_url?`, `seed?`): `Promise`\<`any`\>
+> **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`): `Promise`\<`any`\>
 
 Creates a new client with the given node URL and optional seed.
 If `node_url` is `None`, it defaults to the testnet endpoint.
@@ -60,6 +60,10 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 #### Parameters
 
 ##### node\_url?
+
+`string`
+
+##### node\_note\_transport\_url?
 
 `string`
 
@@ -75,7 +79,7 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ### createClientWithExternalKeystore()
 
-> **createClientWithExternalKeystore**(`node_url?`, `seed?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
+> **createClientWithExternalKeystore**(`node_url?`, `node_note_transport_url?`, `seed?`, `get_key_cb?`, `insert_key_cb?`, `sign_cb?`): `Promise`\<`any`\>
 
 Creates a new client with the given node URL, optional seed, and external keystore
 callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
@@ -83,6 +87,10 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 #### Parameters
 
 ##### node\_url?
+
+`string`
+
+##### node\_note\_transport\_url?
 
 `string`
 
@@ -110,7 +118,7 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ### createMockClient()
 
-> **createMockClient**(`seed?`, `serialized_mock_chain?`): `Promise`\<`any`\>
+> **createMockClient**(`seed?`, `serialized_mock_chain?`, `serialized_mock_note_transport_node?`): `Promise`\<`any`\>
 
 Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
 applications as it uses a mock chain that simulates the behavior of a real node.
@@ -122,6 +130,10 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 `Uint8Array`
 
 ##### serialized\_mock\_chain?
+
+`Uint8Array`
+
+##### serialized\_mock\_note\_transport\_node?
 
 `Uint8Array`
 
@@ -188,6 +200,36 @@ Meant to be used in conjunction with the `force_import_store` method
 #### Returns
 
 `Promise`\<`any`\>
+
+***
+
+### fetchAllPrivateNotes()
+
+> **fetchAllPrivateNotes**(): `Promise`\<`void`\>
+
+Fetch all private notes from the note transport layer
+
+Fetches all notes stored in the transport layer, with no pagination.
+Prefer using [`WebClient::fetch_private_notes`] for a more efficient, on-going,
+fetching mechanism.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
+### fetchPrivateNotes()
+
+> **fetchPrivateNotes**(): `Promise`\<`void`\>
+
+Fetch private notes from the note transport layer
+
+Uses an internal pagination mechanism to avoid fetching duplicate notes.
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 
@@ -737,11 +779,45 @@ Deletes a setting key-value from the store.
 
 ***
 
+### sendPrivateNote()
+
+> **sendPrivateNote**(`note`, `address`): `Promise`\<`void`\>
+
+Send a private note via the note transport layer
+
+#### Parameters
+
+##### note
+
+[`Note`](Note.md)
+
+##### address
+
+[`Address`](Address.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### serializeMockChain()
 
 > **serializeMockChain**(): `Uint8Array`
 
 Returns the inner serialized mock chain if it exists.
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### serializeMockNoteTransportNode()
+
+> **serializeMockNoteTransportNode**(): `Uint8Array`
+
+Returns the inner serialized mock note transport node if it exists.
 
 #### Returns
 
