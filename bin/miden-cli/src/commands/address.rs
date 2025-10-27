@@ -1,11 +1,42 @@
+use std::str::FromStr;
+
 use miden_client::Client;
 use miden_client::account::AccountIdAddress;
-use miden_client::address::{Address, NetworkId};
+use miden_client::address::{Address, AddressInterface, NetworkId};
 use miden_client::note::NoteExecutionMode;
 
 use crate::errors::CliError;
-use crate::utils::{parse_account_id, parse_address_interface};
+use crate::utils::parse_account_id;
 use crate::{Parser, Subcommand, create_dynamic_table, load_config_file};
+
+#[derive(Debug, Clone)]
+pub enum CliAddressInterface {
+    BasicWallet,
+    Unspecified,
+}
+
+impl FromStr for CliAddressInterface {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "BasicWallet" => Ok(CliAddressInterface::BasicWallet),
+            "Unspecified" => Ok(CliAddressInterface::Unspecified),
+            other => Err(format!(
+                "Invalid interface: {other}. Valid values are: BasicWallet, Unspecified",
+            )),
+        }
+    }
+}
+
+impl From<CliAddressInterface> for AddressInterface {
+    fn from(value: CliAddressInterface) -> Self {
+        match value {
+            CliAddressInterface::BasicWallet => AddressInterface::BasicWallet,
+            CliAddressInterface::Unspecified => AddressInterface::Unspecified,
+        }
+    }
+}
 
 #[derive(Debug, Subcommand, Clone)]
 pub enum AddressSubCommand {
@@ -16,7 +47,7 @@ pub enum AddressSubCommand {
         /// Account to add
         account_id: String,
         /// Interface number for add/remove operations
-        interface: String,
+        interface: CliAddressInterface,
         /// Optional tag length
         tag_len: Option<u8>,
     },
@@ -116,11 +147,11 @@ async fn list_account_addresses<AUTH>(
 async fn add_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
-    interface: String,
+    interface: CliAddressInterface,
     tag_len: Option<u8>,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let interface = parse_address_interface(&interface)?;
+    let interface = interface.into();
     let account_id_address = match tag_len {
         Some(tag_len) => AccountIdAddress::new(account_id, interface)
             .with_tag_len(tag_len)
