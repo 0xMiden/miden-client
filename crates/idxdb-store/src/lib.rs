@@ -90,23 +90,23 @@ impl Store for WebStore {
     // SYNC
     // --------------------------------------------------------------------------------------------
     async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
-        self.get_note_tags().await
+        WebStore::get_note_tags(self).await
     }
 
     async fn add_note_tag(&self, tag: NoteTagRecord) -> Result<bool, StoreError> {
-        self.add_note_tag(tag).await
+        WebStore::add_note_tag(self, tag).await
     }
 
     async fn remove_note_tag(&self, tag: NoteTagRecord) -> Result<usize, StoreError> {
-        self.remove_note_tag(tag).await
+        WebStore::remove_note_tag(self, tag).await
     }
 
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
-        self.get_sync_height().await
+        WebStore::get_sync_height(self).await
     }
 
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
-        self.apply_state_sync(state_sync_update).await
+        WebStore::apply_state_sync(self, state_sync_update).await
     }
 
     // TRANSACTIONS
@@ -116,11 +116,11 @@ impl Store for WebStore {
         &self,
         transaction_filter: TransactionFilter,
     ) -> Result<Vec<TransactionRecord>, StoreError> {
-        self.get_transactions(transaction_filter).await
+        WebStore::get_transactions(self, transaction_filter).await
     }
 
     async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
-        self.apply_transaction(tx_update).await
+        WebStore::apply_transaction(self, tx_update).await
     }
 
     // NOTES
@@ -129,18 +129,18 @@ impl Store for WebStore {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<InputNoteRecord>, StoreError> {
-        self.get_input_notes(filter).await
+        WebStore::get_input_notes(self, filter).await
     }
 
     async fn get_output_notes(
         &self,
         note_filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError> {
-        self.get_output_notes(note_filter).await
+        WebStore::get_output_notes(self, note_filter).await
     }
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
-        self.upsert_input_notes(notes).await
+        WebStore::upsert_input_notes(self, notes).await
     }
 
     // CHAIN DATA
@@ -152,7 +152,7 @@ impl Store for WebStore {
         partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        self.insert_block_header(block_header, partial_blockchain_peaks, has_client_notes)
+        WebStore::insert_block_header(self, block_header, partial_blockchain_peaks, has_client_notes)
             .await
     }
 
@@ -160,36 +160,36 @@ impl Store for WebStore {
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
     ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
-        self.get_block_headers(block_numbers).await
+        WebStore::get_block_headers(self, block_numbers).await
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
-        self.get_tracked_block_headers().await
+        WebStore::get_tracked_block_headers(self).await
     }
 
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
-        self.get_partial_blockchain_nodes(filter).await
+        WebStore::get_partial_blockchain_nodes(self, filter).await
     }
 
     async fn insert_partial_blockchain_nodes(
         &self,
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
-        self.insert_partial_blockchain_nodes(nodes).await
+        WebStore::insert_partial_blockchain_nodes(self, nodes).await
     }
 
     async fn get_partial_blockchain_peaks_by_block_num(
         &self,
         block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
-        self.get_partial_blockchain_peaks_by_block_num(block_num).await
+        WebStore::get_partial_blockchain_peaks_by_block_num(self, block_num).await
     }
 
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        self.prune_irrelevant_blocks().await
+        WebStore::prune_irrelevant_blocks(self).await
     }
 
     // ACCOUNTS
@@ -200,40 +200,40 @@ impl Store for WebStore {
         account: &Account,
         initial_address: Address,
     ) -> Result<(), StoreError> {
-        self.insert_account(account, initial_address).await
+        WebStore::insert_account(self, account, initial_address).await
     }
 
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError> {
-        self.update_account(new_account_state).await
+        WebStore::update_account(self, new_account_state).await
     }
 
     async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
-        self.get_account_ids().await
+        WebStore::get_account_ids(self).await
     }
 
     async fn get_account_headers(&self) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        self.get_account_headers().await
+        WebStore::get_account_headers(self).await
     }
 
     async fn get_account_header(
         &self,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
-        self.get_account_header(account_id).await
+        WebStore::get_account_header(self, account_id).await
     }
 
     async fn get_account_header_by_commitment(
         &self,
         account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
-        self.get_account_header_by_commitment(account_commitment).await
+        WebStore::get_account_header_by_commitment(self, account_commitment).await
     }
 
     async fn get_account(
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        self.get_account(account_id).await
+        WebStore::get_account(self, account_id).await
     }
 
     async fn upsert_foreign_account_code(
@@ -241,55 +241,55 @@ impl Store for WebStore {
         account_id: AccountId,
         code: AccountCode,
     ) -> Result<(), StoreError> {
-        self.upsert_foreign_account_code(account_id, code).await
+        WebStore::upsert_foreign_account_code(self, account_id, code).await
     }
 
     async fn get_foreign_account_code(
         &self,
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
-        self.get_foreign_account_code(account_ids).await
+        WebStore::get_foreign_account_code(self, account_ids).await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
-        self.get_unspent_input_note_nullifiers().await
+        WebStore::get_unspent_input_note_nullifiers(self).await
     }
 
     async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError> {
-        self.get_account_vault(account_id).await
+        WebStore::get_account_vault(self, account_id).await
     }
 
     async fn get_account_storage(
         &self,
         account_id: AccountId,
     ) -> Result<AccountStorage, StoreError> {
-        self.get_account_storage(account_id).await
+        WebStore::get_account_storage(self, account_id).await
     }
 
     async fn get_addresses_by_account_id(
         &self,
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
-        self.get_account_addresses(account_id).await
+        WebStore::get_account_addresses(self, account_id).await
     }
 
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
     async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.set_setting(key, value).await
+        WebStore::set_setting(self, key, value).await
     }
 
     async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
-        self.get_setting(key).await
+        WebStore::get_setting(self, key).await
     }
 
     async fn remove_setting(&self, key: String) -> Result<(), StoreError> {
-        self.remove_setting(key).await
+        WebStore::remove_setting(self, key).await
     }
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
-        self.list_setting_keys().await
+        WebStore::list_setting_keys(self).await
     }
 }
 
