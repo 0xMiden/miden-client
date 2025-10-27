@@ -81,3 +81,23 @@
 #### Returns
 
 `AccountComponent`
+
+***
+
+### fromPackage()
+
+> `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
+
+#### Parameters
+
+##### \_package
+
+[`Package`](Package.md)
+
+##### storage\_slots
+
+[`StorageSlot`](StorageSlot.md)[]
+
+#### Returns
+
+`AccountComponent`

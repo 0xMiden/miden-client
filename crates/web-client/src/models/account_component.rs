@@ -2,10 +2,12 @@ use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
 use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
@@ -72,6 +74,23 @@ impl AccountComponent {
         )
         .into();
         AccountComponent(native_auth_component)
+    }
+
+    #[wasm_bindgen(js_name = "fromPackage")]
+    pub fn from_package(
+        package: &Package,
+        storage_slots: Vec<StorageSlot>,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_package: NativePackage = package.into();
+        let native_library = native_package.unwrap_library().as_ref().clone();
+        let native_slots: Vec<NativeStorageSlot> =
+            storage_slots.into_iter().map(Into::into).collect();
+
+        NativeAccountComponent::new(native_library, native_slots)
+            .map(AccountComponent)
+            .map_err(|e| {
+                js_error_with_context(e, "Failed to create account component from package")
+            })
     }
 }
 

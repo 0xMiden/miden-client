@@ -1,6 +1,16 @@
+use alloc::sync::Arc;
+
+use miden_client::Serializable;
 use miden_client::account::AccountId as NativeAccountId;
+use miden_client::assembly::Assembler as NativeAssembler;
 use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
+use miden_client::vm::{
+    MastArtifact as NativeMastArtifact,
+    Package as NativePackage,
+    PackageManifest as NativePackageManifest,
+};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_id::AccountId;
 
@@ -14,5 +24,33 @@ impl TestUtils {
         let native_account_id: NativeAccountId =
             ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE.try_into().unwrap();
         native_account_id.into()
+    }
+
+    #[wasm_bindgen(js_name = "createMockSerializedPackage")]
+    pub fn create_mock_serialized_package() -> Uint8Array {
+        pub const CODE: &str = "
+            export.foo
+                push.1.2 mul
+            end
+
+            export.bar
+                push.1.2 add
+            end
+        ";
+
+        let library = NativeAssembler::default().assemble_library([CODE]).unwrap();
+
+        let package_without_metadata = NativePackage {
+            name: "test_package_no_metadata".to_string(),
+            mast: NativeMastArtifact::Library(Arc::new(library)),
+            manifest: NativePackageManifest::new(None),
+            sections: vec![], // No metadata section
+            version: Default::default(),
+            description: None,
+        };
+
+        let bytes: Vec<u8> = package_without_metadata.to_bytes();
+
+        Uint8Array::from(bytes.as_slice())
     }
 }
