@@ -1,11 +1,10 @@
 import { expect, Page } from "@playwright/test";
-import test from "./playwright.global.setup";
+import { test as base } from "./playwright.global.setup";
 import {
   AddressInterface,
   AccountId,
   Address,
   NetworkId,
-  AccountIdArray,
   MidenArrays,
 } from "../js";
 
@@ -26,27 +25,33 @@ const collectArrayTypes = async ({
   }, {});
 };
 
-const instanceEmptyArrays = async ({ page }: { page: typeof Page }) => {
-  return await page.evaluate(async ({}) => {
-    for (const [arrayName, arrayBuilder] of Object.entries(
-      window.MidenArrays
-    )) {
+const instanceEmptyArray = async ({
+  page,
+  arrayTypeToInstance,
+}: {
+  page: typeof Page;
+  arrayTypeToInstance: string;
+}) => {
+  return await page.evaluate(
+    async ({ arrayTypeToInstance: toInstance }) => {
       try {
-        const array = new window.MidenArrays[arrayName]();
+        console.log(toInstance);
+        const array = new window.MidenArrays[toInstance]();
         console.log(array);
         if (array.length() != 0) {
           throw new Error(
-            `Newly created array of type ${arrayName} should be zero`
+            `Newly created array of type ${toInstance} should be zero`
           );
         }
       } catch (err) {
         throw new Error(
-          `Failed to build and/or access miden array of type ${arrayName}: ${err}`
+          `Failed to build and/or access miden array of type ${toInstance}: ${err}`
         );
       }
-    }
-    return true;
-  }, {});
+      return true;
+    },
+    { arrayTypeToInstance }
+  );
 };
 
 const instanceMixedArray = async ({
@@ -85,58 +90,24 @@ const instanceAccountArrayFromAccounts = async ({
   }, {});
 };
 
-const mutateArrayAtIndex = async ({ page }: { page: typeof Page }) => {
-  return await page.evaluate(async ({}) => {
-    const accountToSet = await window.client.newWallet(
-      window.AccountStorageMode.private(),
-      true
-    );
-    const accounts = await Promise.all(
-      Array.from({ length: 10 }, () =>
-        window.client.newWallet(window.AccountStorageMode.private(), true)
-      )
-    );
-    const accountIds = accounts.map((account) => account.id());
-    const array = new window.MidenArrays.AccountIdArray(accountIds);
-    array.replaceAt(5, accountToSet.id());
-    return array.get(5).toString() == accountToSet.id().toString();
-  }, {});
-};
-
-const outOfBoundsArrayAccess = async ({
-  page,
-  index,
-}: {
-  page: typeof Page;
-  index: number;
-}) => {
+const mutateAccountIdArray = async ({ page, index }: { page: typeof Page }) => {
   return await page.evaluate(
-    async ({ index }) => {
-      const array = new window.MidenArrays.AccountIdArray([]);
-      return array.get(index);
-    },
-    { index }
-  );
-};
-
-const outOfBoundsReplace = async ({
-  page,
-  index,
-}: {
-  page: typeof Page;
-  index: number;
-}) => {
-  return await page.evaluate(
-    async ({ index }) => {
-      const wallet = await window.client.newWallet(
+    async ({ _index }) => {
+      const accountToSet = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true
       );
-      const accountId = wallet.id();
-      const array = new window.MidenArrays.AccountIdArray([]);
-      return array.replaceAt(index, accountId);
+      const accounts = await Promise.all(
+        Array.from({ length: 10 }, () =>
+          window.client.newWallet(window.AccountStorageMode.private(), true)
+        )
+      );
+      const accountIds = accounts.map((account) => account.id());
+      const array = new window.MidenArrays.AccountIdArray(accountIds);
+      array.replaceAt(_index, accountToSet.id());
+      return array.get(_index).toString() == accountToSet.id().toString();
     },
-    { index }
+    { _index: index }
   );
 };
 
@@ -184,66 +155,14 @@ const arrayWithSingleAccount = async ({ page }: { page: typeof Page }) => {
   }, {});
 };
 
-test.describe("Instance array", () => {
-  test("Instance empty arrays", async ({ page }) => {
-    await expect(
-      instanceEmptyArrays({
-        page,
-      })
-    ).resolves.toBe(true);
-  });
+const test = base.extend<{ exposedMidenArrayTypes: string[] }>({
+  exposedMidenArrayTypes: async ({ page }, use) => {
+    let exposedMidenArrayTypes = await collectArrayTypes({ page });
+    await use(exposedMidenArrayTypes);
+  },
+});
 
-  test("Building array of mixed types fails", async ({ page }) => {
-    const arrayTypes = await collectArrayTypes({ page });
-    await Promise.all(
-      arrayTypes.map((arrayTypeName) => {
-        expect(
-          instanceMixedArray({ page, arrayTypeName }),
-          `Should not be able to build array of type ${arrayTypeName} with mixed types`
-        ).rejects.toThrow();
-      })
-    );
-  });
-
-  test("Instance array with 10 account ids ", async ({ page }) => {
-    await expect(
-      instanceAccountArrayFromAccounts({
-        page,
-      })
-    ).resolves.toBe(10);
-  });
-
-  test("Mutate array at index", async ({ page }) => {
-    await expect(
-      mutateArrayAtIndex({
-        page,
-      })
-    ).resolves.toBe(true);
-  });
-
-  test("OOB index throws", async ({ page }) => {
-    const index = Math.random() * (1 << 30);
-    const params = { page, index };
-    await Promise.all([
-      expect(outOfBoundsArrayAccess(params)).rejects.toThrowError(
-        /out of bounds access/
-      ),
-      expect(outOfBoundsArrayAccess(params)).rejects.toThrowError(
-        /tried to access at index/
-      ),
-      expect(outOfBoundsArrayAccess(params)).rejects.toThrowError("0"),
-      expect(outOfBoundsArrayAccess(params)).rejects.toThrowError("AccountId"),
-      expect(outOfBoundsReplace(params)).rejects.toThrowError(
-        /out of bounds access/
-      ),
-      expect(outOfBoundsReplace(params)).rejects.toThrowError(
-        /tried to access at index/
-      ),
-      expect(outOfBoundsReplace(params)).rejects.toThrowError("0"),
-      expect(outOfBoundsReplace(params)).rejects.toThrowError("AccountId"),
-    ]);
-  });
-
+test.describe("Specific array tests (using AccountIdArray)", () => {
   test("Cannot modify array through aliasing", async ({ page }) => {
     const params = {
       page,
@@ -256,5 +175,66 @@ test.describe("Instance array", () => {
     page,
   }) => {
     await expect(arrayWithSingleAccount({ page })).resolves.toBeTruthy();
+  });
+
+  test("Instance array with 10 account ids ", async ({ page }) => {
+    await expect(
+      instanceAccountArrayFromAccounts({
+        page,
+      })
+    ).resolves.toBe(10);
+  });
+
+  test("Mutate array at index", async ({ page }) => {
+    await expect(
+      mutateAccountIdArray({
+        page,
+        index: 5,
+      })
+    ).resolves.toBe(true);
+  });
+
+  test("OOB array mutate throws", async ({ page }) => {
+    const index = Math.ceil(Math.random() * (1 << 30)) + 1;
+    const params = { page, index };
+    await Promise.all([
+      expect(mutateAccountIdArray(params)).rejects.toThrowError(
+        /out of bounds access/
+      ),
+      expect(mutateAccountIdArray(params)).rejects.toThrowError(
+        /tried to access at index/
+      ),
+      expect(mutateAccountIdArray(params)).rejects.toThrowError("0"),
+      expect(mutateAccountIdArray(params)).rejects.toThrowError("AccountId"),
+    ]);
+  });
+});
+
+test.describe("Generic array tests (using each exposed array type)", () => {
+  test("Instance empty arrays", async ({ page, exposedMidenArrayTypes }) => {
+    exposedMidenArrayTypes.forEach(async (arrayTypeToInstance) => {
+      test.step(`Empty array ${arrayTypeToInstance}`, async () => {
+        await expect(
+          instanceEmptyArray({
+            page,
+            arrayTypeToInstance,
+          })
+        ).resolves.toBe(true);
+      });
+    });
+  });
+
+  test("Building array of mixed types fails", async ({
+    page,
+    exposedMidenArrayTypes,
+  }) => {
+    exposedMidenArrayTypes.forEach(async (arrayTypeToInstance) => {
+      test.step(`Mixed typed array of ${arrayTypeToInstance} fails`, async () => {
+        await expect(
+          instanceMixedArray({ page, arrayTypeToInstance }),
+          `Should not be able to build array of type ${arrayTypeToInstance} with mixed types`
+        ).rejects.toThrow();
+      });
+    });
   });
 });

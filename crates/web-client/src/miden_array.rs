@@ -18,7 +18,6 @@ macro_rules! declare_js_miden_arrays {
             #[derive(Clone)]
             pub struct $miden_type_array_name {
                 pub (crate) __inner: Vec<$miden_type_name>,
-                length: usize,
             }
 
             #[wasm_bindgen]
@@ -26,8 +25,7 @@ macro_rules! declare_js_miden_arrays {
                 #[wasm_bindgen(constructor)]
                 pub fn new(elements: Option<Vec<$miden_type_name>>) -> Self {
                     let elements = elements.unwrap_or_else(|| vec![]);
-                    let length = elements.len();
-                    Self { __inner: elements, length }
+                    Self { __inner: elements }
                 }
 
                 /// Get element at index, will always return a clone to avoid aliasing issues.
@@ -37,7 +35,7 @@ macro_rules! declare_js_miden_arrays {
                         None => {
                             let err = crate::miden_array::ArrayError::OutOfBounds {
                                 index,
-                                length: self.length,
+                                length: self.__inner.len(),
                             };
                             Err(js_error_with_context(
                                 err,
@@ -58,7 +56,7 @@ macro_rules! declare_js_miden_arrays {
                         Ok(())
                     } else {
                         let err =
-                            crate::miden_array::ArrayError::OutOfBounds { index, length: self.length };
+                            crate::miden_array::ArrayError::OutOfBounds { index, length: self.__inner.len() };
                         Err(js_error_with_context(
                             err,
                             &format!("array type is: {}", stringify!($miden_type_name)),
@@ -70,8 +68,8 @@ macro_rules! declare_js_miden_arrays {
                     self.__inner.push(element.clone());
                 }
 
-                pub fn length(&self) -> usize {
-                    self.__inner.len()
+                pub fn length(&self) -> u32 {
+                    u32::try_from(self.__inner.len()).expect("fatal: usize in wasm should be u32")
                 }
             }
 
