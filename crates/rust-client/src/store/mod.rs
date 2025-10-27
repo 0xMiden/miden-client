@@ -151,8 +151,8 @@ pub trait Store: Send + Sync {
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
 
-    /// Returns the note scripts stored in the database.
-    async fn get_note_scripts(&self) -> Result<Vec<NoteScriptRecord>, StoreError>;
+    /// Returns the note script associated with the given root.
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScriptRecord, StoreError>;
 
     /// Inserts the provided note scripts into the database. If a script with the same root already
     /// exists, it will be replaced.

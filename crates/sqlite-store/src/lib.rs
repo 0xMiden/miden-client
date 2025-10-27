@@ -216,8 +216,9 @@ impl Store for SqliteStore {
             .await
     }
 
-    async fn get_note_scripts(&self) -> Result<Vec<NoteScriptRecord>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_note_scripts).await
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScriptRecord, StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::get_note_script(conn, script_root))
+            .await
     }
 
     async fn upsert_note_scripts(

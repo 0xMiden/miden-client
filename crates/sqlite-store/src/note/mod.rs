@@ -186,19 +186,24 @@ impl SqliteStore {
     }
 
     /// Retrieves the note scripts from the database.
-    pub(crate) fn get_note_scripts(
+    pub(crate) fn get_note_script(
         conn: &mut Connection,
-    ) -> Result<Vec<NoteScriptRecord>, StoreError> {
-        let query = "SELECT * FROM notes_scripts";
-        let note_scripts = conn
+        script_root: Word,
+    ) -> Result<NoteScriptRecord, StoreError> {
+        let script_root = script_root.to_hex();
+        let query = "SELECT * FROM notes_scripts WHERE script_root = ?";
+        let note_script = conn
             .prepare(query)
             .into_store_error()?
-            .query_map([], parse_note_scripts_columns)
+            .query_map([script_root.clone()], parse_note_scripts_columns)
             .expect("no binding parameters used in query")
             .map(|result| Ok(result.into_store_error()?).and_then(parse_note_script))
-            .collect::<Result<Vec<NoteScriptRecord>, _>>()?;
+            .collect::<Result<Vec<NoteScriptRecord>, _>>()?
+            .first()
+            .cloned()
+            .ok_or(StoreError::NoteScriptNotFound(script_root))?;
 
-        Ok(note_scripts)
+        Ok(note_script)
     }
 }
 

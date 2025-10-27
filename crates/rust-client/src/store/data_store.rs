@@ -182,21 +182,24 @@ impl DataStore for ClientDataStore {
         let store = self.store.clone();
 
         async move {
-            let notes = store.get_input_notes(super::NoteFilter::All).await.map_err(|err| {
-                DataStoreError::other_with_source("Failed to retrieve input notes", err)
-            })?;
-
-            for note_record in notes {
-                let recipient = note_record.details().recipient();
-                if recipient.script().root() == script_root {
-                    return Ok(recipient.script().clone());
-                }
+            match store.get_note_script(script_root).await.map_err(|err| {
+                DataStoreError::other_with_source("Failed to retrieved note script", err)
+            }) {
+                Ok(note_script) => Ok(note_script.into()),
+                Err(err) => match err {
+                    DataStoreError::NoteScriptNotFound(script_root) => {
+                        self.rpc_api.get_note_script_by_root(script_root).await.map_err(|_| {
+                            DataStoreError::other(
+                                "Note script not found on data store nor rpc server",
+                            )
+                        })
+                    },
+                    _ => Err(DataStoreError::other_with_source(
+                        "Failed to retrieved note script",
+                        err,
+                    )),
+                },
             }
-
-            // If no matching note found, attempt to retrieve from RPC API
-            self.rpc_api.get_note_script_by_root(script_root).await.map_err(|_| {
-                DataStoreError::other("Note script not found on data store nor rpc server")
-            })
         }
     }
 }
