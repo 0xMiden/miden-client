@@ -88,7 +88,6 @@ pub mod component {
     pub use miden_objects::account::{
         AccountComponent,
         AccountComponentMetadata,
-        AccountComponentTemplate,
         FeltRepresentation,
         InitStorageData,
         StorageEntry,
