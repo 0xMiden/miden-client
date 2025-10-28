@@ -923,13 +923,17 @@ the chain tip is performed, and the required block header is retrieved.
 
 ### submitProvenTransaction()
 
-> **submitProvenTransaction**(`proven_transaction`): `Promise`\<`number`\>
+> **submitProvenTransaction**(`proven_transaction`, `transaction_result`): `Promise`\<`number`\>
 
 #### Parameters
 
 ##### proven\_transaction
 
 [`ProvenTransaction`](ProvenTransaction.md)
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
 
 #### Returns
 
