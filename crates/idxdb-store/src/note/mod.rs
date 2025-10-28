@@ -7,6 +7,7 @@ use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -15,6 +16,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::js_sys::{Array, Promise};
 
 use super::WebStore;
+use crate::note::utils::upsert_note_script_tx;
 use crate::promise::await_js;
 
 mod js_bindings;
@@ -80,6 +82,17 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         for note in notes {
             upsert_input_note_tx(note).await?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn upsert_note_scripts(
+        &self,
+        note_scripts: &[NoteScriptRecord],
+    ) -> Result<(), StoreError> {
+        for note_script in note_scripts {
+            upsert_note_script_tx(note_script).await?;
         }
 
         Ok(())

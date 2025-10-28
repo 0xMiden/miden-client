@@ -214,3 +214,21 @@ async function processOutputNotes(notes: IOutputNote[]) {
     })
   );
 }
+
+export async function upsertNoteScript(
+  scriptRoot: string,
+  serializedNoteScript: Uint8Array
+) {
+  return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+    try {
+      const noteScriptData = {
+        scriptRoot,
+        serializedNoteScript,
+      };
+
+      await tx.notesScripts.put(noteScriptData);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
+    }
+  });
+}

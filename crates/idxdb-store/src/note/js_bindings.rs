@@ -60,4 +60,10 @@ extern "C" {
         state_discriminant: u8,
         state: Vec<u8>,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = upsertNoteScript)]
+    pub fn idxdb_upsert_note_script(
+        note_script_root: String,
+        serialized_note_script: Vec<u8>,
+    ) -> js_sys::Promise;
 }

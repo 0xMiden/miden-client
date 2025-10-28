@@ -152,7 +152,7 @@ impl Store for WebStore {
         &self,
         note_scripts: &[NoteScriptRecord],
     ) -> Result<(), StoreError> {
-        unimplemented!()
+        self.upsert_note_scripts(note_scripts).await
     }
 
     // CHAIN DATA

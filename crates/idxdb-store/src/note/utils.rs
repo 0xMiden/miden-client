@@ -15,6 +15,7 @@ use miden_client::note::{
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
+    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -22,7 +23,11 @@ use miden_client::store::{
 use miden_client::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};
+use super::js_bindings::{
+    idxdb_upsert_input_note,
+    idxdb_upsert_note_script,
+    idxdb_upsert_output_note,
+};
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
 use crate::promise::await_js_value;
 
@@ -118,6 +123,16 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
         serialized_data.state,
     );
     await_js_value(promise, "failed to upsert input note").await?;
+
+    Ok(())
+}
+
+pub async fn upsert_note_script_tx(note_script: &NoteScriptRecord) -> Result<(), StoreError> {
+    let note_script_bytes = note_script.script().to_bytes();
+    let note_script_root = note_script.script_root().into();
+
+    let promise = idxdb_upsert_note_script(note_script_root, note_script_bytes);
+    await_js_value(promise, "failed to upsert note script").await?;
 
     Ok(())
 }
