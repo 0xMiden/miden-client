@@ -53,7 +53,7 @@ const NOTE_ARGS: [Felt; 8] = [
     Felt::new(9),
 ];
 
-pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()> {
+pub async fn transaction_request(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -143,7 +143,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     Ok(())
 }
 
-pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
+pub async fn merkle_store(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -226,7 +226,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
+pub async fn onchain_notes_sync_with_tag(client_config: ClientConfig) -> Result<()> {
     // Client 1 has an private faucet which will mint an onchain note for client 2
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     // Client 2 will be used to sync and check that by adding the tag we can still fetch notes
