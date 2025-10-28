@@ -8,24 +8,56 @@ The mock web client mimics the normal `WebClient` interface to allow for seamles
 import { MockWebClient, TransactionProver } from "@demox-labs/miden-sdk";
 
 try {
-    // Initialize the mock web client
-    const mockWebClient = await MockWebClient.createClient();
+  // Initialize the mock web client
+  const mockWebClient = await MockWebClient.createClient();
 
-    // Running a mint transaction (assuming the client was setup previously)
-    const pipeline = await mockWebClient.executeTransaction(
-      faucetAccount.id(),
-      mintTransactionRequest
-    );
+  // Running a mint transaction (assuming the client was setup previously)
+  const mintTransactionId = await mockWebClient.submitNewTransaction(
+    faucetAccount.id(),
+    mintTransactionRequest
+  );
 
-    await pipeline.proveTransaction(TransactionProver.newLocalProver());
-    const mintTransactionUpdate = await pipeline.submitProvenTransaction();
-    await mockWebClient.applyTransaction(mintTransactionUpdate);
+  console.log("Mint transaction submitted:", mintTransactionId.toString());
 
-    await mockWebClient.proveBlock(); // Creates a new block that will include the submitted transaction
-    await mockWebClient.syncState();
+  // Advance the mock chain and refresh local state
+  await mockWebClient.proveBlock();
+  await mockWebClient.syncState();
 
+  const consumableNotes = await mockWebClient.getConsumableNotes(
+    userAccount.id()
+  );
+  const noteIdToConsume = consumableNotes[0]
+    .inputNoteRecord()
+    .id()
+    .toString();
+
+  const consumeRequest = mockWebClient.newConsumeTransactionRequest([
+    noteIdToConsume,
+  ]);
+
+  const consumePipeline = await mockWebClient.executeTransaction(
+    userAccount.id(),
+    consumeRequest
+  );
+  const consumeProven = await mockWebClient.proveTransaction(
+    consumePipeline,
+    TransactionProver.newLocalProver()
+  );
+  const consumeHeight = await mockWebClient.submitProvenTransaction(
+    consumeProven
+  );
+  const consumeUpdate = consumePipeline.transactionUpdateWithHeight(
+    consumeHeight
+  );
+  await mockWebClient.applyTransaction(consumeUpdate);
+
+  await mockWebClient.proveBlock();
+  await mockWebClient.syncState();
 } catch (error) {
-    console.error("An error occurred while using the mock web client:", error.message);
+  console.error(
+    "An error occurred while using the mock web client:",
+    error.message
+  );
 }
 ```
 

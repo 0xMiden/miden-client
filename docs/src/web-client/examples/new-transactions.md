@@ -6,40 +6,71 @@ This guide demonstrates how to create and submit different types of transactions
 
 All transactions follow a similar pattern:
 1. Create a transaction request
-2. Execute the transaction pipeline to perform local validation and execution
+2. Execute the transaction to perform local validation and execution
 3. Prove the transaction (locally or by using a remote prover)
 4. Submit the proven transaction to the network and apply the resulting update
 
-Here's a basic example of how to execute and submit a mint transaction to mint tokens from a faucet:
+If you don't need to inspect the transaction intermediate structures manually, the SDK offers `submitNewTransaction` to run steps 2-4 for you:
+
+```typescript
+import { NoteType, WebClient } from "@demox-labs/miden-sdk";
+
+try {
+    const webClient = await WebClient.createClient();
+    // 1. Create a transaction request
+    const transactionRequest = webClient.newMintTransactionRequest(
+        recipientAccountId, // Account that will receive the minted tokens
+        faucetAccountId,    // Faucet account that mints the tokens
+        NoteType.Private,
+        1000
+    );
+    // 2-4. Execute transaction, prove and submit to the network
+    const transactionId = await webClient.submitNewTransaction(
+        faucetAccountId,
+        transactionRequest
+    );
+
+    console.log("Submitted transaction:", transactionId.toString());
+
+    await webClient.syncState();
+    const consumableNotes = await webClient.getConsumableNotes(recipientAccountId);
+    console.log("Minted note ID:", consumableNotes[0].inputNoteRecord().id().toString());
+} catch (error) {
+    console.error("Mint transaction failed:", error.message);
+}
+```
+
+When you need to inspect execution results before proving, fall back to the manual pipeline:
 
 ```typescript
 import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 
 try {
-    // Initialize the web client
     const webClient = await WebClient.createClient();
 
+    // 1. Create a transaction request
     const transactionRequest = webClient.newMintTransactionRequest(
-        targetAccountId, // AccountId: The account that will receive the minted tokens
-        faucetId,// AccountId: The faucet account that will mint the tokens
-        NoteType.Private, // NoteType: The type of note to create (Private or Public)
-        1000 // number: The amount of tokens to mint
+        recipientAccountId,
+        faucetAccountId,
+        NoteType.Private,
+        1000
     );
 
-    // 2. Execute the transaction pipeline (performs request validation and execution)
+    // 2. Execute the transaction to perform local validation and execution
     const pipeline = await webClient.executeTransaction(
-        accountId,
+        faucetAccountId,
         transactionRequest
     );
 
-    // Inspect execution results before proving
     const executedTx = pipeline.executedTransaction();
     console.log("Created notes:", executedTx.outputNotes());
     console.log("Consumed notes:", executedTx.inputNotes());
     console.log("Account delta:", executedTx.accountDelta());
 
-    // 3. Generate a proof and submit the transaction
+    // 3. Prove the transaction (locally or by using a remote prover)
     await pipeline.proveTransaction(TransactionProver.newLocalProver());
+
+    // 4. Submit the proven transaction to the network and apply the resulting update
     const transactionUpdate = await pipeline.submitProvenTransaction();
     await webClient.applyTransaction(transactionUpdate);
 
