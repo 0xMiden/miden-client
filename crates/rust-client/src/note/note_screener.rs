@@ -211,7 +211,7 @@ where
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
-            return Ok((NoteUpdateAction::Commit(committed_note), true));
+            return Ok((NoteUpdateAction::Commit(committed_note), input_note_present));
         }
 
         let action = match public_note {
