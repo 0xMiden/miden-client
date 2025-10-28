@@ -2078,6 +2078,76 @@ async fn account_addresses_non_basic_wallet() {
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
+#[tokio::test]
+async fn consume_note_with_custom_script() {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    let (sender_account, receiver_account, faucet_account) =
+        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
+
+    let sender_id = sender_account.id();
+    let receiver_id = receiver_account.id();
+    let faucet_id = faucet_account.id();
+
+    mint_and_consume(&mut client, sender_id, faucet_id, NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let custom_note_script = "
+        begin
+            # Simple validation: ensure two values are equal
+            push.1 push.1
+            assert_eq
+        end
+    ";
+    let note_script = client.script_builder().compile_note_script(custom_note_script).unwrap();
+
+    let asset = FungibleAsset::new(faucet_id, TRANSFER_AMOUNT).unwrap();
+    let note_inputs = NoteInputs::new(vec![]).unwrap();
+    let serial_num = client.rng().draw_word();
+    let note_metadata = NoteMetadata::new(
+        sender_id,
+        NoteType::Private,
+        NoteTag::from_account_id(receiver_id),
+        NoteExecutionHint::None,
+        Felt::default(),
+    )
+    .unwrap();
+    let note_assets = NoteAssets::new(vec![Asset::Fungible(asset)]).unwrap();
+    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
+    let custom_note = Note::new(note_assets, note_metadata, note_recipient);
+
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(custom_note.clone())])
+        .build()
+        .unwrap();
+    let transaction = Box::pin(client.new_transaction(sender_id, tx_request)).await.unwrap();
+
+    Box::pin(client.submit_transaction(transaction)).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // At this point, the note script should be stored locally
+    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    assert_eq!(stored_script.script_root(), note_script.root().to_hex());
+
+    // Consume note
+    let transaction_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![custom_note.id()])
+        .unwrap();
+
+    let transaction = Box::pin(client.new_transaction(receiver_id, transaction_request))
+        .await
+        .unwrap();
+
+    // The transaction should be submitted successfully
+    Box::pin(client.submit_transaction(transaction)).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+}
+
 // HELPERS
 // ================================================================================================
 

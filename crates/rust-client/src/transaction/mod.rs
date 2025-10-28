@@ -243,6 +243,13 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
+        let output_note_scripts: Vec<NoteScriptRecord> = transaction_request
+            .expected_output_own_notes()
+            .iter()
+            .map(|n| n.script().clone().into())
+            .collect();
+        self.store.upsert_note_scripts(&output_note_scripts).await?;
+
         let tx_args = transaction_request.into_transaction_args(tx_script);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -264,13 +271,6 @@ where
             // Remove invalid notes
             notes = self.get_valid_input_notes(account, notes, tx_args.clone()).await?;
         }
-
-        let note_scripts: Vec<NoteScriptRecord> = notes
-            .clone()
-            .into_iter()
-            .map(|n| n.into_note().script().clone().into())
-            .collect();
-        self.store.upsert_note_scripts(&note_scripts).await?;
 
         // Execute the transaction and get the witness
         let executed_transaction = self
