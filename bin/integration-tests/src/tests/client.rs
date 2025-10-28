@@ -998,7 +998,9 @@ impl TransactionProver for AlwaysFailingProver {
     }
 }
 
-pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
+pub async fn test_custom_transaction_prover_error_caught(
+    client_config: ClientConfig,
+) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
@@ -1022,13 +1024,13 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
         .prove_transaction_with(&transaction_result, Arc::new(AlwaysFailingProver::new()))
         .await;
 
-    assert!(matches!(
-        result,
-        Err(ClientError::TransactionProvingError(TransactionProverError::Other {
-            error_msg: _,
-            source: _
-        }))
-    ));
+    let Err(ClientError::TransactionProvingError(TransactionProverError::Other {
+        error_msg, ..
+    })) = result
+    else {
+        panic!("expected different prover error");
+    };
+    assert_eq!(error_msg.as_ref(), "This prover always fails");
     Ok(())
 }
 

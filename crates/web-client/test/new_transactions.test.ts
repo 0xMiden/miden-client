@@ -541,14 +541,14 @@ export const customTransaction = async (
         .build();
 
       // Execute and Submit Transaction
-      let TransactionUpdate2 = await window.helpers.executeAndApplyTransaction(
+      let transactionUpdate2 = await window.helpers.executeAndApplyTransaction(
         walletAccount.id(),
         transactionRequest2,
         prover
       );
 
       await window.helpers.waitForTransaction(
-        TransactionUpdate2.executedTransaction().id().toHex()
+        transactionUpdate2.executedTransaction().id().toHex()
       );
     },
     {

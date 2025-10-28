@@ -103,7 +103,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     // This fails because of {asserted_value} having the incorrect number passed in
     assert!(
         client
-            .submit_new_transaction(regular_account.id(), transaction_request)
+            .execute_transaction(regular_account.id(), transaction_request)
             .await
             .is_err()
     );

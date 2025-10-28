@@ -32,6 +32,7 @@ use miden_client::testing::common::{
     setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
+use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
@@ -41,14 +42,15 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
+use miden_client::utils::RwLock;
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::SqliteStore;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::utils;
 use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::note::{create_p2id_note, utils};
 use miden_lib::testing::mock_account::MockAccountExt;
 use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
@@ -100,6 +102,7 @@ use rand::{Rng, RngCore};
 
 pub mod store;
 mod transaction;
+mod transport;
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
@@ -672,7 +675,7 @@ async fn note_without_asset() {
         .unwrap();
 
     let transaction =
-        Box::pin(client.submit_new_transaction(wallet.id(), transaction_request.clone())).await;
+        Box::pin(client.execute_transaction(wallet.id(), transaction_request.clone())).await;
 
     assert!(transaction.is_ok());
 
@@ -1192,7 +1195,7 @@ async fn p2ide_transfer_consumed_by_sender() {
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
     let transaction_execution_result =
-        Box::pin(client.submit_new_transaction(from_account_id, tx_request)).await;
+        Box::pin(client.execute_transaction(from_account_id, tx_request)).await;
     assert!(transaction_execution_result.is_err_and(|err| {
         matches!(
             err,
@@ -1283,8 +1286,8 @@ async fn p2ide_timelocked() {
     // Check that it's still too early to consume by both accounts
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
     let results = [
-        Box::pin(client.submit_new_transaction(from_account_id, tx_request.clone())).await,
-        Box::pin(client.submit_new_transaction(to_account_id, tx_request)).await,
+        Box::pin(client.execute_transaction(from_account_id, tx_request.clone())).await,
+        Box::pin(client.execute_transaction(to_account_id, tx_request)).await,
     ];
     assert!(results.iter().all(|result| {
         result.as_ref().is_err_and(|err| {

@@ -287,7 +287,7 @@ where
         TransactionResult::new(executed_transaction, future_notes)
     }
 
-    /// Proves the specified transaction using the client's default prover.
+    /// Proves the specified transaction using the prover configured for this client.
     pub async fn prove_transaction(
         &mut self,
         tx_result: &TransactionResult,
@@ -311,8 +311,8 @@ where
         Ok(proven_transaction)
     }
 
-    /// Submits a previously proven transaction to the RPC endpoint and
-    /// returns the block number where it was included.
+    /// Submits a previously proven transaction to the RPC endpoint and returns the node’s chain tip
+    /// upon mempool admission.
     pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
@@ -809,38 +809,6 @@ where
         executor = executor.with_source_manager(self.source_manager.clone());
 
         Ok(executor)
-    }
-}
-
-// TESTING HELPERS
-// ================================================================================================
-
-#[cfg(feature = "testing")]
-impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
-    /// Proves a transaction result using the client's default prover.
-    pub async fn testing_prove_transaction(
-        &mut self,
-        tx_result: &TransactionResult,
-    ) -> Result<ProvenTransaction, ClientError> {
-        self.prove_transaction(tx_result).await
-    }
-
-    /// Submits an already proven transaction within test helpers.
-    pub async fn testing_submit_proven_transaction(
-        &mut self,
-        proven_transaction: ProvenTransaction,
-    ) -> Result<BlockNumber, ClientError> {
-        self.submit_proven_transaction(proven_transaction).await
-    }
-
-    /// Applies a transaction result at the current sync height inside tests.
-    pub async fn testing_apply_transaction(
-        &self,
-        tx_result: TransactionResult,
-    ) -> Result<(), ClientError> {
-        let submission_height = self.get_sync_height().await.unwrap();
-        let tx_update = tx_result.to_transaction_update(submission_height);
-        self.apply_transaction(tx_update).await
     }
 }
 

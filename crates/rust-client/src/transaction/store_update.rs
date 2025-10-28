@@ -66,16 +66,6 @@ impl TransactionStoreUpdate {
         }
     }
 
-    /// Attaches note updates and new tags to the [`TransactionStoreUpdate`].
-    pub fn set_note_updates(
-        &mut self,
-        note_updates: NoteUpdateTracker,
-        new_tags: Vec<NoteTagRecord>,
-    ) {
-        self.note_updates = note_updates;
-        self.new_tags = new_tags;
-    }
-
     /// Returns the executed transaction.
     pub fn executed_transaction(&self) -> &ExecutedTransaction {
         &self.executed_transaction
