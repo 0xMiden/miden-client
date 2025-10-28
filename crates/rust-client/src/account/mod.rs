@@ -1,4 +1,3 @@
-
 //! The `account` module provides types and client APIs for managing accounts within the Miden
 //! network.
 //!
