@@ -35,3 +35,8 @@ impl From<&NativeNoteInclusionProof> for NoteInclusionProof {
         NoteInclusionProof(native_proof.clone())
     }
 }
+impl From<NoteInclusionProof> for NativeNoteInclusionProof {
+    fn from(proof: NoteInclusionProof) -> Self {
+        proof.0
+    }
+}
