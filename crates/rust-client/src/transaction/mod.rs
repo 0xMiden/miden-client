@@ -174,7 +174,8 @@ where
         let tx_id = tx_result.executed_transaction().id();
 
         let proven_transaction = self.prove_transaction(&tx_result).await?;
-        let submission_height = self.submit_proven_transaction(proven_transaction).await?;
+        let submission_height =
+            self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
         let future_notes = tx_result.future_notes().to_vec();
         let executed_transaction = tx_result.into();
@@ -316,12 +317,12 @@ where
     pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: TransactionInputs,
+        transaction_inputs: impl Into<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
         let block_num = self
             .rpc_api
-            .submit_proven_transaction(proven_transaction, transaction_inputs)
+            .submit_proven_transaction(proven_transaction, transaction_inputs.into())
             .await?;
         info!("Transaction submitted.");
 

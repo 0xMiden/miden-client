@@ -428,7 +428,9 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     println!("Submitting transaction to node...");
 
-    let submission_height = client.submit_proven_transaction(proven_transaction).await?;
+    let submission_height = client
+        .submit_proven_transaction(proven_transaction, &transaction_result)
+        .await?;
     let tx_update = transaction_result.to_transaction_update(submission_height);
 
     println!("Applying transaction to store...");

@@ -99,8 +99,6 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   return await methodHandlers[MethodName.SYNC_STATE]();
 };
 
-<<<<<<< HEAD
-=======
 methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
   let serializedMockNoteTransportNode = args.pop();
   let serializedMockChain = args.pop();
@@ -124,7 +122,6 @@ methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
   };
 };
 
->>>>>>> e0f2737d9bc3f83dd100e2068f8266e395904441
 /**
  * Process a single message event.
  */

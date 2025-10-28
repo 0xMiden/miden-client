@@ -10,6 +10,7 @@ use miden_objects::transaction::{
     OutputNotes,
     TransactionArgs,
     TransactionId,
+    TransactionInputs,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -70,6 +71,11 @@ impl TransactionResult {
         self.transaction.tx_args()
     }
 
+    /// Returns a reference to the [`TransactionInputs`].
+    pub fn tx_inputs(&self) -> &TransactionInputs {
+        self.transaction.tx_inputs()
+    }
+
     /// Returns the [`AccountDelta`] that describes the change of state for the executing account.
     pub fn account_delta(&self) -> &AccountDelta {
         self.transaction.account_delta()
@@ -87,6 +93,19 @@ impl TransactionResult {
             submission_height,
             self.future_notes.clone(),
         )
+    }
+}
+
+impl Into<TransactionInputs> for &TransactionResult {
+    fn into(self) -> TransactionInputs {
+        self.executed_transaction().tx_inputs().clone()
+    }
+}
+
+impl Into<TransactionInputs> for TransactionResult {
+    fn into(self) -> TransactionInputs {
+        let (inputs, ..) = self.transaction.into_parts();
+        inputs
     }
 }
 

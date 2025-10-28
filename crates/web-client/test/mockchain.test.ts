@@ -17,7 +17,10 @@ const mockChainTest = async (testingPage: Page) => {
         result,
         window.TransactionProver.newLocalProver()
       );
-      const submissionHeight = await client.submitProvenTransaction(proven);
+      const submissionHeight = await client.submitProvenTransaction(
+        proven,
+        result
+      );
       const update = result.transactionUpdateWithHeight(submissionHeight);
       await client.applyTransaction(update);
 

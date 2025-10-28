@@ -206,10 +206,12 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let consume_proven = client.prove_transaction(&consume_result).await?;
 
     // Submit both transactions
-    let bump_submission_height = client.submit_proven_transaction(bump_proven).await?;
+    let bump_submission_height =
+        client.submit_proven_transaction(bump_proven, &bump_result).await?;
     let _bump_update = bump_result.to_transaction_update(bump_submission_height);
 
-    let consume_submission_height = client.submit_proven_transaction(consume_proven).await?;
+    let consume_submission_height =
+        client.submit_proven_transaction(consume_proven, &consume_result).await?;
     let consume_update = consume_result.to_transaction_update(consume_submission_height);
     client.apply_transaction(consume_update).await?;
 

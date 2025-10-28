@@ -99,7 +99,6 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     println!("Running P2ID tx...");
 
     // Create transactions
-<<<<<<< HEAD
     let transaction_result_1 =
         client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
     let transaction_id_1 = transaction_result_1.id();
@@ -116,57 +115,22 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let transaction_id_2 = transaction_result_2.id();
     let proven_transaction_2 = client.prove_transaction(&transaction_result_2).await.unwrap();
 
-    client.submit_proven_transaction(proven_transaction_1).await?;
-    let submission_height_2 = client.submit_proven_transaction(proven_transaction_2).await.unwrap();
+    client
+        .submit_proven_transaction(proven_transaction_1, &transaction_result_1)
+        .await?;
+    let submission_height_2 = client
+        .submit_proven_transaction(proven_transaction_2, &transaction_result_2)
+        .await
+        .unwrap();
 
     let tx_update = transaction_result_2.to_transaction_update(submission_height_2);
     client.apply_transaction(tx_update).await.unwrap();
-=======
-    let transaction_execution_result_1 =
-        client.new_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
-    let tx_prove_1 =
-        client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
-    client
-        .testing_apply_transaction(transaction_execution_result_1.clone())
-        .await
-        .unwrap();
-
-    let transaction_execution_result_2 =
-        client.new_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
-    let tx_prove_2 =
-        client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
-    client
-        .testing_apply_transaction(transaction_execution_result_2.clone())
-        .await
-        .unwrap();
->>>>>>> e0f2737d9bc3f83dd100e2068f8266e395904441
 
     client.sync_state().await.unwrap();
 
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-<<<<<<< HEAD
-=======
-    // Submit the proven transactions
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_1,
-            transaction_execution_result_1.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
-    client
-        .testing_submit_proven_transaction(
-            tx_prove_2,
-            transaction_execution_result_2.executed_transaction().tx_inputs().clone(),
-        )
-        .await
-        .unwrap();
-
->>>>>>> e0f2737d9bc3f83dd100e2068f8266e395904441
     // wait for 1 block
     wait_for_tx(&mut client, transaction_id_1).await?;
 
@@ -556,7 +520,10 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             std::thread::sleep(Duration::from_secs(3));
         }
         let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
-        let submission_height = client.submit_proven_transaction(proven_transaction).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
         let tx_update = transaction_result.to_transaction_update(submission_height);
         client.apply_transaction(tx_update).await.unwrap();
 
@@ -594,7 +561,10 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             std::thread::sleep(Duration::from_secs(3));
         }
         let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
-        let submission_height = client.submit_proven_transaction(proven_transaction).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
         let tx_update = transaction_result.to_transaction_update(submission_height);
         client.apply_transaction(tx_update).await.unwrap();
 
@@ -1171,13 +1141,14 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
 
     println!("Sending transaction to node");
     let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
-    let submitted_tx_result = match client.submit_proven_transaction(proven_transaction).await {
-        Ok(submission_height) => {
-            let tx_update = transaction_result.to_transaction_update(submission_height);
-            client.apply_transaction(tx_update).await
-        },
-        Err(err) => Err(err),
-    };
+    let submitted_tx_result =
+        match client.submit_proven_transaction(proven_transaction, &transaction_result).await {
+            Ok(submission_height) => {
+                let tx_update = transaction_result.to_transaction_update(submission_height);
+                client.apply_transaction(tx_update).await
+            },
+            Err(err) => Err(err),
+        };
 
     assert!(submitted_tx_result.is_err());
     Ok(())

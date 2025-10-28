@@ -39,7 +39,8 @@ impl WebClient {
 
         let proven_transaction = self.prove_transaction(&transaction_result, None).await?;
 
-        let submission_height = self.submit_proven_transaction(&proven_transaction).await?;
+        let submission_height =
+            self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
         let transaction_update =
             transaction_result.transaction_update_with_height(submission_height);
 
@@ -96,11 +97,12 @@ impl WebClient {
     pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: &ProvenTransaction,
+        transaction_result: &TransactionResult,
     ) -> Result<u32, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let native_proven: NativeProvenTransaction = proven_transaction.clone().into();
             client
-                .submit_proven_transaction(native_proven)
+                .submit_proven_transaction(native_proven, transaction_result.native())
                 .await
                 .map(|block_number| block_number.as_u32())
                 .map_err(|err| js_error_with_context(err, "failed to submit proven transaction"))

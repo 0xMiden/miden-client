@@ -62,21 +62,28 @@ try {
     );
 
     // 2. Execute the transaction to perform local validation and execution
-    const pipeline = await webClient.executeTransaction(
+    const result = await webClient.executeTransaction(
         faucetAccountId,
         transactionRequest
     );
 
-    const executedTx = pipeline.executedTransaction();
+    const executedTx = result.executedTransaction();
     console.log("Created notes:", executedTx.outputNotes());
     console.log("Consumed notes:", executedTx.inputNotes());
     console.log("Account delta:", executedTx.accountDelta());
 
     // 3. Prove the transaction (locally or by using a remote prover)
-    await pipeline.proveTransaction(TransactionProver.newLocalProver());
+    const proven = await webClient.proveTransaction(
+        result,
+        TransactionProver.newLocalProver()
+    );
 
     // 4. Submit the proven transaction to the network and apply the resulting update
-    const transactionUpdate = await pipeline.submitProvenTransaction();
+    const submissionHeight = await webClient.submitProvenTransaction(
+        proven,
+        result
+    );
+    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -108,13 +115,17 @@ try {
         1000
     );
 
-    const pipeline = await webClient.executeTransaction(
+    const result = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
 
-    await pipeline.proveTransaction(remoteProver);
-    const transactionUpdate = await pipeline.submitProvenTransaction();
+    const proven = await webClient.proveTransaction(result, remoteProver);
+    const submissionHeight = await webClient.submitProvenTransaction(
+        proven,
+        result
+    );
+    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -152,13 +163,20 @@ try {
         90               // Optional timelock height
     );
 
-    const pipeline = await webClient.executeTransaction(
+    const result = await webClient.executeTransaction(
         senderAccountId,
         transactionRequest
     );
 
-    await pipeline.proveTransaction(TransactionProver.newLocalProver());
-    const transactionUpdate = await pipeline.submitProvenTransaction();
+    const proven = await webClient.proveTransaction(
+        result,
+        TransactionProver.newLocalProver()
+    );
+    const submissionHeight = await webClient.submitProvenTransaction(
+        proven,
+        result
+    );
+    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -185,13 +203,20 @@ try {
         [noteId1, noteId2]  // Array of note IDs to consume
     );
 
-    const pipeline = await webClient.executeTransaction(
+    const result = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
 
-    await pipeline.proveTransaction(TransactionProver.newLocalProver());
-    const transactionUpdate = await pipeline.submitProvenTransaction();
+    const proven = await webClient.proveTransaction(
+        result,
+        TransactionProver.newLocalProver()
+    );
+    const submissionHeight = await webClient.submitProvenTransaction(
+        proven,
+        result
+    );
+    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -284,13 +309,20 @@ try {
         .build();
 
     // Create and submit the transaction
-    const pipeline = await webClient.executeTransaction(
+    const result = await webClient.executeTransaction(
         accountId,
         transactionRequest
     );
 
-    await pipeline.proveTransaction(TransactionProver.newLocalProver());
-    const transactionUpdate = await pipeline.submitProvenTransaction();
+    const proven = await webClient.proveTransaction(
+        result,
+        TransactionProver.newLocalProver()
+    );
+    const submissionHeight = await webClient.submitProvenTransaction(
+        proven,
+        result
+    );
+    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
     await webClient.applyTransaction(transactionUpdate);
     
     // Access transaction details
