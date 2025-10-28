@@ -197,6 +197,9 @@ where
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in
     /// the sync response it may be a new public note, in that case we use the [`NoteScreener`]
     /// to check its relevance.
+    ///
+    /// Returns a tuple containing the action to be taken for the received note update and a boolean
+    /// indicating whether the block header should be tracked.
     async fn on_note_received(
         &self,
         committed_note: CommittedNote,
@@ -245,9 +248,9 @@ where
                 NoteUpdateAction::Discard
             },
         };
-        let is_relevant =
+        let track_block =
             matches!(action, NoteUpdateAction::Insert(_) | NoteUpdateAction::Commit(_));
-        Ok((action, is_relevant))
+        Ok((action, track_block))
     }
 }
 
