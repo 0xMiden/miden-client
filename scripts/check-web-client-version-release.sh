@@ -30,7 +30,7 @@ if [ -z "$BASE_SHA" ]; then
 fi
 
 # Short-circuit: Check if package.json changed at all
-if ! git diff --name-only "$BASE_SHA" HEAD -- crates/web-client/package.json | grep -q .; then
+if ! git diff --name-only "$BASE_SHA" "$RELEASE_SHA" -- crates/web-client/package.json | grep -q .; then
   echo "No changes to crates/web-client/package.json; skipping publish."
   write_skip_and_exit
 fi
