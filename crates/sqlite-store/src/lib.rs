@@ -50,10 +50,12 @@ use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
+use sql_error::SqlResultExt;
 
 use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 
 mod account;
+mod builder;
 mod chain_data;
 mod db_management;
 mod merkle_store;
@@ -61,6 +63,8 @@ mod note;
 mod sql_error;
 mod sync;
 mod transaction;
+
+pub use builder::ClientBuilderSqliteExt;
 
 // SQLITE STORE
 // ================================================================================================
@@ -80,7 +84,7 @@ impl SqliteStore {
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
-        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath.clone());
+        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath);
         let pool = Pool::builder(sqlite_pool_manager)
             .build()
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
@@ -365,7 +369,10 @@ impl Store for SqliteStore {
     }
 
     async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| set_setting(conn, &key, &value)).await
+        self.interact_with_connection(move |conn| {
+            set_setting(conn, &key, &value).into_store_error()
+        })
+        .await
     }
 
     async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {

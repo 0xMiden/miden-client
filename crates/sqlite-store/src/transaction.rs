@@ -16,7 +16,6 @@ use miden_client::transaction::{
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
-    TransactionStatusVariant,
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
@@ -42,33 +41,6 @@ pub(crate) const UPSERT_TRANSACTION_QUERY: &str = insert_sql!(
 
 pub(crate) const INSERT_TRANSACTION_SCRIPT_QUERY: &str =
     insert_sql!(transaction_scripts { script_root, script } | IGNORE);
-
-// TRANSACTIONS FILTER HELPERS
-// ================================================================================================
-
-fn transaction_filter_to_query(filter: &TransactionFilter) -> String {
-    const QUERY: &str = "SELECT tx.id, script.script, tx.details, tx.status \
-        FROM transactions AS tx LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
-    match filter {
-        TransactionFilter::All => QUERY.to_string(),
-        TransactionFilter::Uncommitted => format!(
-            "{QUERY} WHERE tx.status_variant != {}",
-            TransactionStatusVariant::Committed as u8
-        ),
-        TransactionFilter::Ids(_) => {
-            // Use SQLite's array parameter binding
-            format!("{QUERY} WHERE tx.id IN rarray(?)")
-        },
-        TransactionFilter::ExpiredBefore(block_num) => {
-            format!(
-                "{QUERY} WHERE tx.block_num < {} AND tx.status_variant != {} AND tx.status_variant != {}",
-                block_num.as_u32(),
-                TransactionStatusVariant::Discarded as u8,
-                TransactionStatusVariant::Committed as u8
-            )
-        },
-    }
-}
 
 // TRANSACTIONS
 // ================================================================================================
@@ -114,7 +86,7 @@ impl SqliteStore {
                     ids.iter().map(|id| Value::Text(id.to_string())).collect::<Vec<_>>();
 
                 // Create a prepared statement and bind the array parameter
-                conn.prepare(&transaction_filter_to_query(filter))
+                conn.prepare(filter.to_query().as_ref())
                     .into_store_error()?
                     .query_map(params![Rc::new(id_strings)], parse_transaction_columns)
                     .into_store_error()?
@@ -123,7 +95,7 @@ impl SqliteStore {
             },
             _ => {
                 // For other filters, no parameters are needed
-                conn.prepare(&transaction_filter_to_query(filter))
+                conn.prepare(filter.to_query().as_ref())
                     .into_store_error()?
                     .query_map([], parse_transaction_columns)
                     .into_store_error()?

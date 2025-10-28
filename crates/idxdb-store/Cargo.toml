@@ -1,5 +1,6 @@
 [package]
 authors.workspace      = true
+build                  = "build.rs"
 description            = "IndexedDB-backed Store implementation for miden-client (WASM)"
 edition.workspace      = true
 license.workspace      = true
@@ -31,3 +32,6 @@ web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [lints]
 workspace = true
+
+[build-dependencies]
+miette.workspace = true

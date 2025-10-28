@@ -8,7 +8,7 @@ use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
 
@@ -24,9 +24,12 @@ use crate::rpc::domain::account::{
     FetchedAccount,
     StorageMapEntry,
 };
+use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
@@ -184,6 +187,149 @@ impl MockRpcApi {
         })
     }
 
+    /// Retrieves account vault updates in a given block range.
+    fn get_sync_account_vault_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> AccountVaultInfo {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let vault_delta = account_delta.vault();
+
+                for asset in vault_delta.added_assets() {
+                    let account_vault_update = AccountVaultUpdate {
+                        block_num: block_number,
+                        asset: Some(asset),
+                        vault_key: asset.vault_key(),
+                    };
+                    updates.push(account_vault_update);
+                }
+            }
+        }
+
+        AccountVaultInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates,
+        }
+    }
+
+    /// Retrieves transactions in a given block range that match the provided account IDs
+    fn get_sync_transactions_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: &[AccountId],
+    ) -> TransactionsInfo {
+        let chain_tip = self.get_chain_tip_block_num();
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => chain_tip,
+        };
+
+        let mut transaction_records = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for transaction_header in block.transactions().as_slice() {
+                if !account_ids.contains(&transaction_header.account_id()) {
+                    continue;
+                }
+
+                transaction_records.push(TransactionRecord {
+                    block_num: block_number,
+                    transaction_header: transaction_header.clone(),
+                });
+            }
+        }
+
+        TransactionsInfo {
+            chain_tip,
+            block_num: block_to,
+            transaction_records,
+        }
+    }
+
+    /// Retrieves storage map updates in a given block range
+    fn get_sync_storage_maps_request(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> StorageMapInfo {
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.get_chain_tip_block_num(),
+        };
+        let mut updates = vec![];
+        for block in self.mock_chain.read().proven_blocks() {
+            let block_number = block.header().block_num();
+            if block_number <= block_from || block_number > block_to {
+                continue;
+            }
+
+            for update in block
+                .updated_accounts()
+                .iter()
+                .filter(|block_acc_update| block_acc_update.account_id() == account_id)
+            {
+                let miden_objects::account::delta::AccountUpdateDetails::Delta(account_delta) =
+                    update.details().clone()
+                else {
+                    continue;
+                };
+
+                let storage_delta = account_delta.storage();
+
+                for (slot_index, map_delta) in storage_delta.maps() {
+                    let slot_index = u32::from(*slot_index);
+
+                    for (key, value) in map_delta.entries() {
+                        let storage_map_info = StorageMapUpdate {
+                            block_num: block_number,
+                            slot_index: u8::try_from(slot_index).unwrap(),
+                            key: (*key).into(),
+                            value: *value,
+                        };
+                        updates.push(storage_map_info);
+                    }
+                }
+            }
+        }
+
+        StorageMapInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_number: self.get_chain_tip_block_num(),
+            updates,
+        }
+    }
+
     /// Retrieves notes that are included in the specified block number.
     fn get_notes_in_block(
         &self,
@@ -269,7 +415,7 @@ impl NodeRpcClient for MockRpcApi {
         let response = self.get_sync_state_request(block_range, note_tags, &[])?;
 
         let response = NoteSyncInfo {
-            chain_tip: response.chain_tip,
+            chain_tip: response.chain_tip.into(),
             block_header: response.block_header.unwrap().try_into().unwrap(),
             mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
             notes: response
@@ -353,6 +499,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        _tx_inputs: TransactionInputs, // Unnecessary for testing client itself.
     ) -> Result<BlockNumber, RpcError> {
         // TODO: add some basic validations to test error cases
 
@@ -480,7 +627,7 @@ impl NodeRpcClient for MockRpcApi {
                 };
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
-                    Some(NullifierUpdate { nullifier, block_num: block_num.as_u32() })
+                    Some(NullifierUpdate { nullifier, block_num })
                 } else {
                     None
                 }
@@ -520,6 +667,36 @@ impl NodeRpcClient for MockRpcApi {
             .clone();
 
         Ok(note.note().unwrap().script().clone())
+    }
+
+    async fn sync_storage_maps(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError> {
+        let response = self.get_sync_storage_maps_request(block_from, block_to, account_id);
+        Ok(response)
+    }
+
+    async fn sync_account_vault(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError> {
+        let response = self.get_sync_account_vault_request(block_from, block_to, account_id);
+        Ok(response)
+    }
+
+    async fn sync_transactions(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<TransactionsInfo, RpcError> {
+        let response = self.get_sync_transactions_request(block_from, block_to, &account_ids);
+        Ok(response)
     }
 }
 

@@ -56,6 +56,8 @@ pub enum ClientError {
     NoteNotFoundOnChain(NoteId),
     #[error("error parsing hex")]
     HexParseError(#[from] HexParseError),
+    #[error("partial MMR has a forest that does not fit within a u32")]
+    InvalidPartialMmrForest,
     #[error("can't add new account without seed")]
     AddNewAccountWithoutSeed,
     #[error("error with merkle path")]

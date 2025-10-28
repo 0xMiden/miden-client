@@ -82,6 +82,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteId,
             Signature,
             SigningInputs,
+            SigningInputsType,
             SlotAndKeys,
             SlotAndKeysArray,
             StorageMap,
@@ -105,7 +106,11 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await WebClient.createClient(rpcUrl, undefined);
+          const client = await WebClient.createClient(
+            rpcUrl,
+            undefined,
+            undefined
+          );
 
           window.rpcUrl = rpcUrl;
 
@@ -164,6 +169,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.SecretKey = SecretKey;
           window.Signature = Signature;
           window.SigningInputs = SigningInputs;
+          window.SigningInputsType = SigningInputsType;
           window.SlotAndKeys = SlotAndKeys;
           window.SlotAndKeysArray = SlotAndKeysArray;
           window.StorageMap = StorageMap;
@@ -268,7 +274,11 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(rpcUrl, initSeed);
+            const client = await WebClient.createClient(
+              rpcUrl,
+              undefined,
+              initSeed
+            );
             window.client = client;
             await window.client.syncState();
           };

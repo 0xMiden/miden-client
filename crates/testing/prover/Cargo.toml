@@ -5,7 +5,7 @@ license.workspace      = true
 name                   = "testing-remote-prover"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.1.0"
+version.workspace      = true
 
 [dependencies]
 # Miden dependencies

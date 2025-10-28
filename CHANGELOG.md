@@ -15,11 +15,16 @@
 * Implemented shared source manager for better error reporting ([#1275](https://github.com/0xMiden/miden-client/pull/1275)).
 * Added `getMapEntries` method to `AccountStorage` in web client for iterating storage map entries ([#1323](https://github.com/0xMiden/miden-client/pull/1323)).
 * Refactored code into their own files and added `ProvenTransaction` and `TransactionStoreUpdate` bindings for the WebClient ([#1408](https://github.com/0xMiden/miden-client/pull/1408)).
-* Added `NoteFile` type, used for exporting and importing `Notes`([#1378](https://github.com/0xMiden/miden-client/pull/1383))
+* Added `NoteFile` type, used for exporting and importing `Notes` ([#1378](https://github.com/0xMiden/miden-client/pull/1383)).
+* Build `IndexedDB` code from a `build.rs` instead of pushing artifacts to the repo ([#1409](https://github.com/0xMiden/miden-client/pull/1409)).
+* Implemented missing RPC endpoints: `/SyncStorageMaps`, `/SyncAccountVault` & `/SyncTransactions` ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
+* Updated `submit_proven_transaction()` to include `TransactionInputs` for validator ([#1421](https://github.com/0xMiden/miden-client/pull/1421)).
+* [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 
 ### Changes
 
 * [BREAKING] Incremented MSRV to 1.89.
+* [BREAKING] Unified chain tip and block number types to use `BlockNumber` instead of `u32` ([#1415](https://github.com/0xMiden/miden-client/pull/1415)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 * [BREAKING] Added `TransactionPipeline` component that handles all transaction lifetime steps ([#1152](https://github.com/0xMiden/miden-client/pull/1152)).
 * [BREAKING] Replaced `TransactionPipeline` with client-scoped lifecycle APIs and the new `TransactionResult` type (TBD).
@@ -33,8 +38,23 @@
 * [BREAKING] Renamed `TonicRpcClient` to `GrpcClient` and `tonic_rpc_client()` method to `grpc_client()` ([#1360](https://github.com/0xMiden/miden-client/pull/1360)).
 * [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 * [BREAKING] Implemented `AccountFile` in the WebClient ([#1258](https://github.com/0xMiden/miden-client/pull/1258)).
-* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371)).
-* [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type (TBD).
+* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
+* Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
+* [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374))
+
+## 0.11.11 (2025-10-16)
+
+* Added Missing Details to `SigningInputs` Object to Fetch Underlying Data Type ([#1389](https://github.com/0xMiden/miden-client/pull/1389)).
+
+## 0.11.10 (2025-10-15)
+
+* Optimized sync-related lookups and RPC requests ([#1387](https://github.com/0xMiden/miden-client/pull/1387)).
+
+## 0.11.9 (2025-10-08)
+
+* Fixed a bug where StateSync failed when called multiple times while using Safari ([#1377](https://github.com/0xMiden/miden-client/pull/1377)).
+* Implemented new note compatibility checker [(#1376)](https://github.com/0xMiden/miden-client/pull/1376).
+* Added indexes to improve sync process performance [(#1363)](https://github.com/0xMiden/miden-client/pull/1363).
 
 ## 0.11.8 (2025-09-29)
 

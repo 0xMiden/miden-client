@@ -14,7 +14,7 @@ use crate::transaction::{TransactionRecord, TransactionStatus};
 
 /// Represents the possible types of updates that can be applied to a note in a
 /// [`NoteUpdateTracker`].
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NoteUpdateType {
     /// Indicates that the note was already tracked but it was not updated.
     None,
@@ -104,6 +104,14 @@ impl OutputNoteUpdate {
         }
     }
 
+    /// Creates a new [`OutputNoteUpdate`] with the provided note with an `Update` update type.
+    fn new_update(note: OutputNoteRecord) -> Self {
+        Self {
+            note,
+            update_type: NoteUpdateType::Update,
+        }
+    }
+
     /// Returns a reference the inner note record.
     pub fn inner(&self) -> &OutputNoteRecord {
         &self.note
@@ -145,6 +153,10 @@ pub struct NoteUpdateTracker {
     input_notes: BTreeMap<NoteId, InputNoteUpdate>,
     /// A map of updated output note records to be upserted in the store.
     output_notes: BTreeMap<NoteId, OutputNoteUpdate>,
+    /// Fast lookup map from nullifier to input note id.
+    input_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
+    /// Fast lookup map from nullifier to output note id.
+    output_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
 }
 
 impl NoteUpdateTracker {
@@ -153,16 +165,15 @@ impl NoteUpdateTracker {
         input_notes: impl IntoIterator<Item = InputNoteRecord>,
         output_notes: impl IntoIterator<Item = OutputNoteRecord>,
     ) -> Self {
-        Self {
-            input_notes: input_notes
-                .into_iter()
-                .map(|note| (note.id(), InputNoteUpdate::new_none(note)))
-                .collect(),
-            output_notes: output_notes
-                .into_iter()
-                .map(|note| (note.id(), OutputNoteUpdate::new_none(note)))
-                .collect(),
+        let mut tracker = Self::default();
+        for note in input_notes {
+            tracker.insert_input_note(note, NoteUpdateType::None);
         }
+        for note in output_notes {
+            tracker.insert_output_note(note, NoteUpdateType::None);
+        }
+
+        tracker
     }
 
     /// Creates a [`NoteUpdateTracker`] for updates related to transactions.
@@ -177,21 +188,21 @@ impl NoteUpdateTracker {
         updated_input_notes: impl IntoIterator<Item = InputNoteRecord>,
         new_output_notes: impl IntoIterator<Item = OutputNoteRecord>,
     ) -> Self {
-        Self {
-            input_notes: new_input_notes
-                .into_iter()
-                .map(|note| (note.id(), InputNoteUpdate::new_insert(note)))
-                .chain(
-                    updated_input_notes
-                        .into_iter()
-                        .map(|note| (note.id(), InputNoteUpdate::new_update(note))),
-                )
-                .collect(),
-            output_notes: new_output_notes
-                .into_iter()
-                .map(|note| (note.id(), OutputNoteUpdate::new_insert(note)))
-                .collect(),
+        let mut tracker = Self::default();
+
+        for note in new_input_notes {
+            tracker.insert_input_note(note, NoteUpdateType::Insert);
         }
+
+        for note in updated_input_notes {
+            tracker.insert_input_note(note, NoteUpdateType::Update);
+        }
+
+        for note in new_output_notes {
+            tracker.insert_output_note(note, NoteUpdateType::Insert);
+        }
+
+        tracker
     }
 
     // GETTERS
@@ -243,38 +254,41 @@ impl NoteUpdateTracker {
         block_header: &BlockHeader,
     ) -> Result<(), ClientError> {
         public_note_data.block_header_received(block_header)?;
-        self.input_notes
-            .insert(public_note_data.id(), InputNoteUpdate::new_insert(public_note_data));
+        self.insert_input_note(public_note_data, NoteUpdateType::Insert);
 
         Ok(())
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
-    /// committed in a block.
+    /// committed in a block and returns whether the committed note is tracked as input note.
     pub(crate) fn apply_committed_note_state_transitions(
         &mut self,
         committed_note: &CommittedNote,
         block_header: &BlockHeader,
-    ) -> Result<(), ClientError> {
+    ) -> Result<bool, ClientError> {
         let inclusion_proof = NoteInclusionProof::new(
             block_header.block_num(),
             committed_note.note_index(),
             committed_note.inclusion_path().clone(),
         )?;
+        let is_tracked_as_input_note =
+            if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
+                // The note belongs to our locally tracked set of input notes
+                input_note_record
+                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                input_note_record.block_header_received(block_header)?;
 
-        if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of input notes
-            input_note_record
-                .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
-            input_note_record.block_header_received(block_header)?;
-        }
+                true
+            } else {
+                false
+            };
 
         if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
             // The note belongs to our locally tracked set of output notes
             output_note_record.inclusion_proof_received(inclusion_proof.clone())?;
         }
 
-        Ok(())
+        Ok(is_tracked_as_input_note)
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
@@ -300,7 +314,7 @@ impl NoteUpdateTracker {
                     consumer_transaction.status
                 {
                     input_note_record
-                        .transaction_committed(consumer_transaction.id, block_number.as_u32())?;
+                        .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
                 // The note was consumed by an external transaction
@@ -338,10 +352,8 @@ impl NoteUpdateTracker {
         &mut self,
         nullifier: Nullifier,
     ) -> Option<&mut InputNoteRecord> {
-        self.input_notes
-            .values_mut()
-            .find(|note| note.inner().nullifier() == nullifier)
-            .map(InputNoteUpdate::inner_mut)
+        let note_id = self.input_notes_by_nullifier.get(&nullifier).copied()?;
+        self.input_notes.get_mut(&note_id).map(InputNoteUpdate::inner_mut)
     }
 
     /// Returns a mutable reference to the output note record with the provided nullifier if it
@@ -350,9 +362,34 @@ impl NoteUpdateTracker {
         &mut self,
         nullifier: Nullifier,
     ) -> Option<&mut OutputNoteRecord> {
-        self.output_notes
-            .values_mut()
-            .find(|note| note.inner().nullifier() == Some(nullifier))
-            .map(OutputNoteUpdate::inner_mut)
+        let note_id = self.output_notes_by_nullifier.get(&nullifier).copied()?;
+        self.output_notes.get_mut(&note_id).map(OutputNoteUpdate::inner_mut)
+    }
+
+    /// Insert an input note update
+    fn insert_input_note(&mut self, note: InputNoteRecord, update_type: NoteUpdateType) {
+        let note_id = note.id();
+        let nullifier = note.nullifier();
+        self.input_notes_by_nullifier.insert(nullifier, note_id);
+        let update = match update_type {
+            NoteUpdateType::None => InputNoteUpdate::new_none(note),
+            NoteUpdateType::Insert => InputNoteUpdate::new_insert(note),
+            NoteUpdateType::Update => InputNoteUpdate::new_update(note),
+        };
+        self.input_notes.insert(note_id, update);
+    }
+
+    /// Insert an output note update
+    fn insert_output_note(&mut self, note: OutputNoteRecord, update_type: NoteUpdateType) {
+        let note_id = note.id();
+        if let Some(nullifier) = note.nullifier() {
+            self.output_notes_by_nullifier.insert(nullifier, note_id);
+        }
+        let update = match update_type {
+            NoteUpdateType::None => OutputNoteUpdate::new_none(note),
+            NoteUpdateType::Insert => OutputNoteUpdate::new_insert(note),
+            NoteUpdateType::Update => OutputNoteUpdate::new_update(note),
+        };
+        self.output_notes.insert(note_id, update);
     }
 }

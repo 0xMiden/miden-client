@@ -64,6 +64,7 @@ export {
   SerializedAccountHeader,
   Signature,
   SigningInputs,
+  SigningInputsType,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -88,11 +89,13 @@ export declare class WebClient extends WasmWebClient {
    * Factory method to create and initialize a new wrapped WebClient.
    *
    * @param rpcUrl - The RPC URL (optional).
+   * @param noteTransportUrl - The note transport URL (optional).
    * @param seed - The seed for the account (optional).
    * @returns A promise that resolves to a fully initialized WebClient.
    */
   static createClient(
     rpcUrl?: string,
+    noteTransportUrl?: string,
     seed?: string
   ): Promise<WebClient & WasmWebClient>;
 

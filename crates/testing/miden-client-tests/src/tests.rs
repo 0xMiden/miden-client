@@ -44,7 +44,7 @@ use miden_client::transaction::{
 };
 use miden_client::utils::RwLock;
 use miden_client::{ClientError, DebugMode};
-use miden_client_sqlite_store::SqliteStore;
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
@@ -1448,8 +1448,8 @@ async fn get_output_notes() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    //After consuming, the note is returned when using the [NoteFilter::Consumed] filter
-    assert!(!client.get_output_notes(NoteFilter::Consumed).await.unwrap().is_empty());
+    // After consuming, the note is returned when using the [NoteFilter::Consumed] filter
+    assert!(!client.get_input_notes(NoteFilter::Consumed).await.unwrap().is_empty());
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -2141,11 +2141,10 @@ pub async fn create_test_client_builder()
     let rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
-    let sqlite_store = SqliteStore::new(create_test_store_path()).await.unwrap();
     let builder = ClientBuilder::new()
         .rpc(arc_rpc_api)
         .rng(Box::new(rng))
-        .store(Arc::new(sqlite_store))
+        .sqlite_store(create_test_store_path())
         .filesystem_keystore(keystore_path.to_str().unwrap())
         .in_debug_mode(DebugMode::Enabled)
         .tx_graceful_blocks(None);

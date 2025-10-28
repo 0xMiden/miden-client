@@ -1,0 +1,4 @@
+label: Getting Started
+# Determines where this documentation section appears relative to other sections in the parent folder
+position: 3
+collapsed: true

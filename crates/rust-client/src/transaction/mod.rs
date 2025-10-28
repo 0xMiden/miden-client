@@ -316,9 +316,13 @@ where
     pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
-        let block_num = self.rpc_api.submit_proven_transaction(proven_transaction).await?;
+        let block_num = self
+            .rpc_api
+            .submit_proven_transaction(proven_transaction, transaction_inputs)
+            .await?;
         info!("Transaction submitted.");
 
         Ok(block_num)
