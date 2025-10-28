@@ -96,15 +96,15 @@ impl TransactionResult {
     }
 }
 
-impl Into<TransactionInputs> for &TransactionResult {
-    fn into(self) -> TransactionInputs {
-        self.executed_transaction().tx_inputs().clone()
+impl From<&TransactionResult> for TransactionInputs {
+    fn from(value: &TransactionResult) -> Self {
+        value.executed_transaction().tx_inputs().clone()
     }
 }
 
-impl Into<TransactionInputs> for TransactionResult {
-    fn into(self) -> TransactionInputs {
-        let (inputs, ..) = self.transaction.into_parts();
+impl From<TransactionResult> for TransactionInputs {
+    fn from(value: TransactionResult) -> Self {
+        let (inputs, ..) = value.transaction.into_parts();
         inputs
     }
 }
