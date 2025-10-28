@@ -1,3 +1,4 @@
+
 //! The `account` module provides types and client APIs for managing accounts within the Miden
 //! network.
 //!
@@ -232,6 +233,12 @@ impl<AUTH> Client<AUTH> {
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
+        let network_id = self.rpc_api.get_network_id().await?;
+        let address_bench32 = address.to_bech32(network_id);
+        if self.store.get_addresses_by_account_id(account_id).await?.contains(&address) {
+            return Err(ClientError::AddressAlreadyTracked(address_bench32));
+        }
+
         let tracked_account = self.store.get_account(account_id).await?;
         match tracked_account {
             None => Err(ClientError::AccountDataNotFound(account_id)),
@@ -241,11 +248,9 @@ impl<AUTH> Client<AUTH> {
                 let note_tag_record =
                     NoteTagRecord::with_account_source(derived_note_tag, account_id);
                 if self.store.get_note_tags().await?.contains(&note_tag_record) {
-                    let network_id = self.rpc_api.get_network_id().await?;
-                    let address_bench32 = address.to_bech32(network_id);
                     return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
-                        derived_note_tag,
                         address_bench32,
+                        derived_note_tag,
                     ));
                 }
 

@@ -140,7 +140,7 @@ async fn list_account_addresses<AUTH>(
         },
     };
 
-    print_account_addresses(account_id, &addresses, &network_id);
+    print_account_addresses(&id.to_hex(), &addresses, &network_id);
     Ok(())
 }
 
