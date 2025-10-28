@@ -208,6 +208,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
 	yarn --cwd crates/idxdb-store/src --silent
+	npm install --prefix docs/external --no-progress
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"

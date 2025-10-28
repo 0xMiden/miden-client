@@ -51,4 +51,4 @@ For more detailed information about sync functionality, refer to the following A
 - [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Class for working with account IDs
 - [TransactionId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionId.md) - Class for working with transaction IDs
 
-For a complete list of available classes and utilities, see the [SDK API Reference](docs/src/web-client/api/README.md). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
