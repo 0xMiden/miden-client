@@ -5,7 +5,8 @@ members = [
   "bin/integration-tests",
   "bin/miden-cli",
   "crates/idxdb-store",
-  "crates/rust-client",
+  "crates/miden-client-core",
+  "crates/miden-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
@@ -13,7 +14,7 @@ members = [
   "crates/web-client",
 ]
 
-default-members = ["bin/miden-cli", "crates/rust-client"]
+default-members = ["bin/miden-cli", "crates/miden-client"]
 
 [workspace.package]
 authors      = ["miden contributors"]

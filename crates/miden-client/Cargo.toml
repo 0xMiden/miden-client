@@ -1,0 +1,32 @@
+[package]
+authors.workspace      = true
+description            = "Std-aware client runtime for interacting with the Miden network"
+documentation          = "https://docs.rs/miden-client/0.12.0"
+edition.workspace      = true
+keywords               = ["client", "miden"]
+license.workspace      = true
+name                   = "miden-client"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = ["std"]
+std = ["dep:tokio", "miden-client-core/std"]
+tonic = ["miden-client-core/tonic"]
+testing = ["miden-client-core/testing"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+miden-client-core = { default-features = false, path = "../miden-client-core", version = "0.12" }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

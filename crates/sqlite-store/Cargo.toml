@@ -13,7 +13,7 @@ crate-type = ["lib"]
 
 [dependencies]
 # Miden dependencies
-miden-client  = { path = "../rust-client", version = "0.12" }
+miden-client  = { package = "miden-client-core", path = "../miden-client-core", version = "0.12" }
 miden-objects = { workspace = true }
 
 # Workspace dependencies
@@ -35,5 +35,5 @@ workspace = true
 
 [dev-dependencies]
 # Enable client testing utilities only for tests
-miden-client = { features = ["testing"], path = "../rust-client", version = "0.12" }
+miden-client = { features = ["testing"], package = "miden-client-core", path = "../miden-client-core", version = "0.12" }
 miden-lib    = { features = ["testing"], workspace = true }

@@ -1,0 +1,32 @@
+# Miden Client Core
+
+Foundational Rust library that can be embedded in both native and WASM environments to interact with the Miden rollup.
+
+## Adding `miden-client-core` as a dependency
+
+Add the core crate to your project's `Cargo.toml` when you need a `no_std` friendly dependency:
+
+````toml
+miden-client-core = { version = "0.12" }
+````
+
+For std-aware runtimes you can depend on [`miden-client`](../miden-client/README.md), which re-exports the same API and adds orchestration utilities.
+
+## Crate Features
+
+| Features  | Description |
+| --------- | ----------- |
+| `tonic`   | Includes `GrpcClient`, a gRPC client to communicate with a Miden node. Uses `tonic` transport with TLS on native targets and `tonic-web-wasm-client` on `wasm32`. **Disabled by default.** |
+| `std`     | Enables `std` support and concurrent execution in `miden-tx`. Enabled by default for native targets. |
+| `testing` | Enables functions meant for testing environments. **Disabled by default.** |
+
+### Store and RpcClient implementations
+
+The library user can provide their own implementations of `Store` and `RpcClient` traits, which can be used as components of `Client`, though it is not necessary. The `Store` trait is used to persist the state of the client, while the `RpcClient` trait is used to communicate via [gRPC](https://grpc.io/) with the Miden node.
+
+Storage backends are provided as separate crates:
+- SQLite: `miden-client-sqlite-store`, based on SQLite. For `std`-compatible environments.
+- Web (WASM): `idxdb-store`, based on IndexedDB. For browser environments.
+
+## License
+This project is [MIT licensed](../../LICENSE).

@@ -7,10 +7,7 @@ use std::vec;
 use clap::{Parser, ValueEnum};
 use miden_client::Client;
 use miden_client::account::component::{
-    AccountComponent,
-    AccountComponentTemplate,
-    COMPONENT_TEMPLATE_EXTENSION,
-    InitStorageData,
+    AccountComponent, AccountComponentTemplate, COMPONENT_TEMPLATE_EXTENSION, InitStorageData,
     StorageValueName,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};

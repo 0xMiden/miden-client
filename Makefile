@@ -16,7 +16,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
-RUST_CLIENT_DIR=crates/rust-client
+RUST_CLIENT_DIR=crates/miden-client
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
 
@@ -73,7 +73,7 @@ rust-client-ts-lint:
 
 .PHONY: doc
 doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
-	@cd crates/rust-client && \
+	@cd crates/miden-client && \
 	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
 

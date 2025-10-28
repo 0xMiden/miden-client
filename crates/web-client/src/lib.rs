@@ -7,11 +7,7 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::{
-    Client,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
+    Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
 };
 use models::script_builder::ScriptBuilder;
 use rand::rngs::StdRng;
