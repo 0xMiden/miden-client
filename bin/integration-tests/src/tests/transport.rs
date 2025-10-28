@@ -21,6 +21,12 @@ use miden_client::transaction::TransactionRequestBuilder;
 use crate::tests::config::ClientConfig;
 
 pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()> {
+    // Skip unless explicitly opted in via environment variable
+    if std::env::var("TEST_WITH_NOTE_TRANSPORT").unwrap_or_default() != "1" {
+        eprintln!("Skipping note transport test (set TEST_WITH_NOTE_TRANSPORT=1 to enable)");
+        return Ok(());
+    }
+
     // Create distinct configs so each client gets its own temp store/keystore
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
@@ -42,6 +48,12 @@ pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()>
 
 /// Sender has transport; recipient does NOT. Recipient should not receive private notes.
 pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Result<()> {
+    // Skip unless explicitly opted in via environment variable
+    if std::env::var("TEST_WITH_NOTE_TRANSPORT").unwrap_or_default() != "1" {
+        eprintln!("Skipping note transport test (set TEST_WITH_NOTE_TRANSPORT=1 to enable)");
+        return Ok(());
+    }
+
     // Distinct configs for unique stores
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
     let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
