@@ -1185,7 +1185,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_additions() -> anyhow::Result<()> {
+    async fn apply_account_delta_additions() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let dummy_component = AccountComponent::new(
@@ -1263,7 +1263,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_removals() -> anyhow::Result<()> {
+    async fn apply_account_delta_removals() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let mut dummy_map = StorageMap::new();
