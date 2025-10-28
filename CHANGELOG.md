@@ -40,6 +40,20 @@
 * Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
 * [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374))
 
+## 0.11.11 (2025-10-16)
+
+* Added Missing Details to `SigningInputs` Object to Fetch Underlying Data Type ([#1389](https://github.com/0xMiden/miden-client/pull/1389)).
+
+## 0.11.10 (2025-10-15)
+
+* Optimized sync-related lookups and RPC requests ([#1387](https://github.com/0xMiden/miden-client/pull/1387)).
+
+## 0.11.9 (2025-10-08)
+
+* Fixed a bug where StateSync failed when called multiple times while using Safari ([#1377](https://github.com/0xMiden/miden-client/pull/1377)).
+* Implemented new note compatibility checker [(#1376)](https://github.com/0xMiden/miden-client/pull/1376).
+* Added indexes to improve sync process performance [(#1363)](https://github.com/0xMiden/miden-client/pull/1363).
+
 ## 0.11.8 (2025-09-29)
 
 * Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).

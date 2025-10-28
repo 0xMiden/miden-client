@@ -1430,8 +1430,8 @@ async fn get_output_notes() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    //After consuming, the note is returned when using the [NoteFilter::Consumed] filter
-    assert!(!client.get_output_notes(NoteFilter::Consumed).await.unwrap().is_empty());
+    // After consuming, the note is returned when using the [NoteFilter::Consumed] filter
+    assert!(!client.get_input_notes(NoteFilter::Consumed).await.unwrap().is_empty());
 
     // Do a transfer from first account to second account
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
