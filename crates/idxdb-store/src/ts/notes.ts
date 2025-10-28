@@ -92,6 +92,18 @@ export async function getUnspentInputNoteNullifiers() {
   }
 }
 
+export async function getNoteScript(scriptRoot: string) {
+  try {
+    const noteScript = await notesScripts
+      .where("scriptRoot")
+      .equals(scriptRoot)
+      .first();
+    return noteScript;
+  } catch (err) {
+    logWebStoreError(err, "Failed to get note script from root");
+  }
+}
+
 export async function upsertInputNote(
   noteId: string,
   assets: Uint8Array,

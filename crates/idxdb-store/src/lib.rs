@@ -145,7 +145,7 @@ impl Store for WebStore {
     }
 
     async fn get_note_script(&self, script_root: Word) -> Result<NoteScriptRecord, StoreError> {
-        unimplemented!()
+        self.get_note_script(script_root).await
     }
 
     async fn upsert_note_scripts(

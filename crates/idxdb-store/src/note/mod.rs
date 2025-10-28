@@ -24,6 +24,7 @@ use js_bindings::{
     idxdb_get_input_notes,
     idxdb_get_input_notes_from_ids,
     idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_note_script,
     idxdb_get_output_notes,
     idxdb_get_output_notes_from_ids,
     idxdb_get_output_notes_from_nullifiers,
@@ -31,10 +32,15 @@ use js_bindings::{
 };
 
 mod models;
-use models::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use models::{InputNoteIdxdbObject, NoteScriptIdxdbObject, OutputNoteIdxdbObject};
 
 pub(crate) mod utils;
-use utils::{parse_input_note_idxdb_object, parse_output_note_idxdb_object, upsert_input_note_tx};
+use utils::{
+    parse_input_note_idxdb_object,
+    parse_note_script_idxdb_object,
+    parse_output_note_idxdb_object,
+    upsert_input_note_tx,
+};
 
 impl WebStore {
     pub(crate) async fn get_input_notes(
@@ -61,6 +67,18 @@ impl WebStore {
             .into_iter()
             .map(parse_output_note_idxdb_object) // Simplified closure
             .collect::<Result<Vec<_>, _>>() // Collect results into a single Result
+    }
+
+    pub(crate) async fn get_note_script(
+        &self,
+        script_root: Word,
+    ) -> Result<NoteScriptRecord, StoreError> {
+        let script_root = script_root.to_hex();
+        let promise = idxdb_get_note_script(script_root);
+        let script_idxdb: NoteScriptIdxdbObject =
+            await_js(promise, "failed to get note script").await?;
+
+        parse_note_script_idxdb_object(script_idxdb)
     }
 
     pub(crate) async fn get_unspent_input_note_nullifiers(

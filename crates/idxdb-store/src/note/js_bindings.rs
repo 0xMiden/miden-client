@@ -32,6 +32,9 @@ extern "C" {
     #[wasm_bindgen(js_name = getUnspentInputNoteNullifiers)]
     pub fn idxdb_get_unspent_input_note_nullifiers() -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = getNoteScript)]
+    pub fn idxdb_get_note_script(script_root: String) -> js_sys::Promise;
+
     // INSERTS
     // ================================================================================================
 

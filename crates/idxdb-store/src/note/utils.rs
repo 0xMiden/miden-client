@@ -29,6 +29,7 @@ use super::js_bindings::{
     idxdb_upsert_output_note,
 };
 use super::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use crate::note::models::NoteScriptIdxdbObject;
 use crate::promise::await_js_value;
 
 // TYPES
@@ -222,6 +223,16 @@ pub fn parse_output_note_idxdb_object(
         state,
         note_idxdb.expected_height.into(),
     ))
+}
+
+pub fn parse_note_script_idxdb_object(
+    note_script_idxdb: NoteScriptIdxdbObject,
+) -> Result<NoteScriptRecord, StoreError> {
+    let NoteScriptIdxdbObject { note_script_root, serialized_note_script } = note_script_idxdb;
+
+    let note_script = NoteScript::read_from_bytes(&serialized_note_script)?;
+
+    Ok(NoteScriptRecord::new(note_script_root, note_script))
 }
 
 pub(crate) async fn apply_note_updates_tx(
