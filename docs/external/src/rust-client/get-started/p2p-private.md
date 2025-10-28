@@ -94,7 +94,7 @@ Wanna do more? [Sending public notes](p2p-public)
 ## Using the note transport network
 
 The steps above assume that the client owns both accounts. To exchange notes with other users, the note transport network can be used.
-For this the sender (account A) will need the address (bech32 string) of the recipient (account B). By using the address, the sender will securely encrypt the private note, being only decryptable by the receiver.
+For this the sender (account A) will need the address (bech32 string) of the recipient (account B).
 After creating the note (step 1 above), get the created note ID with `miden-client notes --list`. Then send that note through the note transport network,
 ```sh
 miden-client notes --send <note-id> <address-B>
