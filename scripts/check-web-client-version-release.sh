@@ -11,44 +11,54 @@ set -euo pipefail
 
 RELEASE_SHA="$1"
 
-SHOULD_PUBLISH=true
+# Helper function to write should_publish=false and exit
+write_skip_and_exit() {
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "should_publish=false" >> "$GITHUB_OUTPUT"
+  else
+    echo "should_publish=false"
+  fi
+  exit 0
+}
 
+# Try to determine parent commit
 BASE_SHA=$(git rev-parse "${RELEASE_SHA}^" 2>/dev/null || true)
 
 if [ -z "$BASE_SHA" ]; then
   echo "Unable to determine parent commit for release tag."
-  SHOULD_PUBLISH=false
+  write_skip_and_exit
 fi
 
-if [ "$SHOULD_PUBLISH" = "true" ]; then
-  if ! git show "$BASE_SHA:crates/web-client/package.json" > /tmp/base_package.json; then
-    echo "Unable to read crates/web-client/package.json from $BASE_SHA."
-    SHOULD_PUBLISH=false
-  fi
+# Short-circuit: Check if package.json changed at all
+if ! git diff --name-only "$BASE_SHA" HEAD -- crates/web-client/package.json | grep -q .; then
+  echo "No changes to crates/web-client/package.json; skipping publish."
+  write_skip_and_exit
 fi
 
-if [ "$SHOULD_PUBLISH" = "true" ]; then
-  CURRENT_VERSION=$(jq -r '.version' crates/web-client/package.json)
-  PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_package.json)
-
-  if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
-    echo "Version $CURRENT_VERSION matches prior tagged commit; skipping publish."
-    SHOULD_PUBLISH=false
-  fi
+# Try to read package.json from parent commit
+if ! git show "$BASE_SHA:crates/web-client/package.json" > /tmp/base_package.json; then
+  echo "Unable to read crates/web-client/package.json from $BASE_SHA."
+  write_skip_and_exit
 fi
 
-# Write outputs to $GITHUB_OUTPUT if running in GitHub Actions, otherwise print to stdout
+# Compare versions
+CURRENT_VERSION=$(jq -r '.version' crates/web-client/package.json)
+PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_package.json)
+
+if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
+  echo "Version $CURRENT_VERSION matches prior tagged commit; skipping publish."
+  write_skip_and_exit
+fi
+
+# All checks passed - publish is needed
+echo "Version bumped from $PREVIOUS_VERSION to $CURRENT_VERSION; will publish."
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
-  if [ "$SHOULD_PUBLISH" = "true" ]; then
-    echo "previous_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
-    echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-  fi
+  echo "should_publish=true" >> "$GITHUB_OUTPUT"
+  echo "previous_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
+  echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 else
-  echo "should_publish=$SHOULD_PUBLISH"
-  if [ "$SHOULD_PUBLISH" = "true" ]; then
-    echo "previous_version=$PREVIOUS_VERSION"
-    echo "current_version=$CURRENT_VERSION"
-  fi
+  echo "should_publish=true"
+  echo "previous_version=$PREVIOUS_VERSION"
+  echo "current_version=$CURRENT_VERSION"
 fi
 
