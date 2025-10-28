@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Script to publish all miden-node crates to crates.io. 
+# This should only be invoked manually in case the automated publishing CI workflows fail.
 # Usage: ./publish-crates.sh [args] 
 # 
 # E.G: ./publish-crates.sh
