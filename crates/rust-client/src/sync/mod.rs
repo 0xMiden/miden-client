@@ -120,15 +120,22 @@ where
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
-        _ = self.ensure_genesis_in_place().await?;
-
-        let note_screener = NoteScreener::new(
+        let note_screener = Arc::new(NoteScreener::new(
             self.store.clone(),
             self.authenticator.clone(),
             self.source_manager.clone(),
-        );
+        ));
+        self.sync_state_custom(note_screener).await
+    }
+
+    pub async fn sync_state_custom(
+        &mut self,
+        note_screener: Arc<dyn OnNoteReceived>,
+    ) -> Result<SyncSummary, ClientError> {
+        _ = self.ensure_genesis_in_place().await?;
+
         let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
+            StateSync::new(self.rpc_api.clone(), note_screener, self.tx_graceful_blocks);
 
         let note_transport =
             self.note_transport_api.as_ref().map(|api| NoteTransport::new(api.clone()));

@@ -53,7 +53,7 @@ pub trait OnNoteReceived {
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError>;
+    ) -> Result<(NoteUpdateAction, bool), ClientError>;
 }
 
 // STATE SYNC
@@ -337,16 +337,15 @@ impl StateSync {
         for committed_note in note_inclusions {
             let public_note = new_public_notes.get(committed_note.note_id()).cloned();
 
-            match self.note_screener.on_note_received(committed_note, public_note).await? {
+            let (update_action, is_relevant) =
+                self.note_screener.on_note_received(committed_note, public_note).await?;
+            found_relevant_note |= is_relevant;
+            match update_action {
                 NoteUpdateAction::Commit(committed_note) => {
-                    found_relevant_note = true;
-
                     note_updates
                         .apply_committed_note_state_transitions(&committed_note, block_header)?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
-                    found_relevant_note = true;
-
                     note_updates.apply_new_public_note(public_note, block_header)?;
                 },
                 NoteUpdateAction::Discard => {},

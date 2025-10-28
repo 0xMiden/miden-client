@@ -201,7 +201,7 @@ where
         &self,
         committed_note: CommittedNote,
         public_note: Option<InputNoteRecord>,
-    ) -> Result<NoteUpdateAction, ClientError> {
+    ) -> Result<(NoteUpdateAction, bool), ClientError> {
         let note_id = *committed_note.note_id();
 
         let input_note_present =
@@ -211,40 +211,43 @@ where
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant
-            return Ok(NoteUpdateAction::Commit(committed_note));
+            return Ok((NoteUpdateAction::Commit(committed_note), true));
         }
 
-        match public_note {
+        let action = match public_note {
             Some(public_note) => {
                 // If tracked by the user, keep note regardless of inputs and extra checks
                 if let Some(metadata) = public_note.metadata()
                     && self.store.get_unique_note_tags().await?.contains(&metadata.tag())
                 {
-                    return Ok(NoteUpdateAction::Insert(public_note));
-                }
-
-                // The note is not being tracked by the client and is public so we can screen it
-                let new_note_relevance = self
-                    .check_relevance(
-                        &public_note
-                            .clone()
-                            .try_into()
-                            .map_err(ClientError::NoteRecordConversionError)?,
-                    )
-                    .await?;
-                let is_relevant = !new_note_relevance.is_empty();
-                if is_relevant {
-                    Ok(NoteUpdateAction::Insert(public_note))
+                    NoteUpdateAction::Insert(public_note)
                 } else {
-                    Ok(NoteUpdateAction::Discard)
+                    // The note is not being tracked by the client and is public so we can screen it
+                    let new_note_relevance = self
+                        .check_relevance(
+                            &public_note
+                                .clone()
+                                .try_into()
+                                .map_err(ClientError::NoteRecordConversionError)?,
+                        )
+                        .await?;
+                    let is_relevant = !new_note_relevance.is_empty();
+                    if is_relevant {
+                        NoteUpdateAction::Insert(public_note)
+                    } else {
+                        NoteUpdateAction::Discard
+                    }
                 }
             },
             None => {
                 // The note is not being tracked by the client and is private so we can't determine
                 // if it is relevant
-                Ok(NoteUpdateAction::Discard)
+                NoteUpdateAction::Discard
             },
-        }
+        };
+        let is_relevant =
+            matches!(action, NoteUpdateAction::Insert(_) | NoteUpdateAction::Commit(_));
+        Ok((action, is_relevant))
     }
 }
 
