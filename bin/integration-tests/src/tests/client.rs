@@ -33,7 +33,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
 
-pub async fn client_builder_initializes_client_with_endpoint(
+pub async fn test_client_builder_initializes_client_with_endpoint(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
@@ -54,7 +54,7 @@ pub async fn client_builder_initializes_client_with_endpoint(
     Ok(())
 }
 
-pub async fn multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()> {
+pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -170,7 +170,7 @@ pub async fn multiple_tx_on_same_block(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
-pub async fn import_expected_notes(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
     let (first_basic_account, faucet_account) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
@@ -265,7 +265,7 @@ pub async fn import_expected_notes(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn import_expected_note_uncommitted(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
     let faucet_account =
         insert_new_fungible_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -308,7 +308,7 @@ pub async fn import_expected_note_uncommitted(client_config: ClientConfig) -> Re
     Ok(())
 }
 
-pub async fn import_expected_notes_from_the_past_as_committed(
+pub async fn test_import_expected_notes_from_the_past_as_committed(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
@@ -373,7 +373,7 @@ pub async fn import_expected_notes_from_the_past_as_committed(
     Ok(())
 }
 
-pub async fn get_account_update(client_config: ClientConfig) -> Result<()> {
+pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> {
     // Create a client with both public and private accounts.
     let (mut client, authenticator) = client_config.clone().into_client().await?;
 
@@ -406,7 +406,7 @@ pub async fn get_account_update(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn sync_detail_values(client_config: ClientConfig) -> Result<()> {
+pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> {
     let (mut client1, authenticator_1) = client_config.clone().into_client().await?;
     let (mut client2, authenticator_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -466,7 +466,7 @@ pub async fn sync_detail_values(client_config: ClientConfig) -> Result<()> {
 
 /// This test runs 3 mint transactions that get included in different blocks so that once we sync
 /// we can check that each transaction gets marked as committed in the corresponding block.
-pub async fn multiple_transactions_can_be_committed_in_different_blocks_without_sync(
+pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_without_sync(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
@@ -612,7 +612,7 @@ pub async fn multiple_transactions_can_be_committed_in_different_blocks_without_
 /// - Consuming multiple notes in a single transaction.
 /// - Consuming authenticated notes.
 /// - Consuming unauthenticated notes.
-pub async fn consume_multiple_expected_notes(client_config: ClientConfig) -> Result<()> {
+pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator_1) = client_config.clone().into_client().await?;
     let (mut unauth_client, authenticator_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -699,7 +699,7 @@ pub async fn consume_multiple_expected_notes(client_config: ClientConfig) -> Res
     Ok(())
 }
 
-pub async fn import_consumed_note_with_proof(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
@@ -761,7 +761,7 @@ pub async fn import_consumed_note_with_proof(client_config: ClientConfig) -> Res
     Ok(())
 }
 
-pub async fn import_consumed_note_with_id(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -817,7 +817,7 @@ pub async fn import_consumed_note_with_id(client_config: ClientConfig) -> Result
     Ok(())
 }
 
-pub async fn import_note_with_proof(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator)
@@ -876,7 +876,7 @@ pub async fn import_note_with_proof(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn discarded_transaction(client_config: ClientConfig) -> Result<()> {
+pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator_1) = client_config.clone().into_client().await?;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client_1, AccountStorageMode::Private, &authenticator_1)
@@ -1005,7 +1005,7 @@ impl TransactionProver for AlwaysFailingProver {
     }
 }
 
-pub async fn custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
+pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
@@ -1042,7 +1042,7 @@ pub async fn custom_transaction_prover(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
-pub async fn locked_account(client_config: ClientConfig) -> Result<()> {
+pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, authenticator) = client_config.clone().into_client().await?;
 
     let (faucet_account, _) =
@@ -1101,7 +1101,7 @@ pub async fn locked_account(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
+pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (faucet_account, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1145,7 +1145,7 @@ pub async fn expired_transaction_fails(client_config: ClientConfig) -> Result<()
 
 /// Tests that RPC methods that are not directly related to the client logic
 /// (like GetBlockByNumber) work correctly
-pub async fn unused_rpc_api(client_config: ClientConfig) -> Result<()> {
+pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
 
     let (first_basic_account, faucet_account) =
@@ -1305,7 +1305,7 @@ pub async fn unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
+pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
@@ -1346,7 +1346,7 @@ pub async fn ignore_invalid_notes(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn output_only_note(client_config: ClientConfig) -> Result<()> {
+pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
 
     let faucet =

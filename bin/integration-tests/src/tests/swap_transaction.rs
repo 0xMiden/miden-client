@@ -10,7 +10,7 @@ use crate::tests::config::ClientConfig;
 // SWAP FULLY ONCHAIN
 // ================================================================================================
 
-pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
+pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
     let (mut client1, authenticator_1) = client_config.clone().into_client().await?;
@@ -189,7 +189,7 @@ pub async fn swap_fully_onchain(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn swap_private(client_config: ClientConfig) -> Result<()> {
+pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     const OFFERED_ASSET_AMOUNT: u64 = 1;
     const REQUESTED_ASSET_AMOUNT: u64 = 25;
     let (mut client1, authenticator_1) = client_config.clone().into_client().await?;
