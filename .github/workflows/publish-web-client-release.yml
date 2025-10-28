@@ -34,43 +34,7 @@ jobs:
 
       - name: Ensure release tag has version bump
         id: check_version
-        run: |
-          set -eo pipefail
-
-          SHOULD_PUBLISH=true
-
-          RELEASE_SHA=$GITHUB_SHA
-
-          BASE_SHA=$(git rev-parse "${RELEASE_SHA}^" 2>/dev/null || true)
-
-          if [ -z "$BASE_SHA" ]; then
-            echo "Unable to determine parent commit for release tag $GITHUB_REF."
-            SHOULD_PUBLISH=false
-          fi
-
-          if [ "$SHOULD_PUBLISH" = "true" ]; then
-            if ! git show "$BASE_SHA:crates/web-client/package.json" > /tmp/base_package.json; then
-              echo "Unable to read crates/web-client/package.json from $BASE_SHA."
-              SHOULD_PUBLISH=false
-            fi
-          fi
-
-          if [ "$SHOULD_PUBLISH" = "true" ]; then
-            CURRENT_VERSION=$(jq -r '.version' crates/web-client/package.json)
-            PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_package.json)
-
-            if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
-              echo "Version $CURRENT_VERSION matches prior tagged commit; skipping publish."
-              SHOULD_PUBLISH=false
-            fi
-          fi
-
-          echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
-
-          if [ "$SHOULD_PUBLISH" = "true" ]; then
-            echo "previous_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
-            echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-          fi
+        run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"
 
       - name: Install & build web-client
         if: steps.check_version.outputs.should_publish == 'true'
