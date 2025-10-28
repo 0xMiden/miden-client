@@ -142,7 +142,7 @@
 
 ##### foreign\_accounts
 
-[`ForeignAccount`](ForeignAccount.md)[]
+[`ForeignAccountArray`](ForeignAccountArray.md)
 
 #### Returns
 

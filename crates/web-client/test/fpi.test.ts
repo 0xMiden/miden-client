@@ -118,7 +118,9 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest2 = new window.TransactionRequestBuilder()
       .withCustomScript(compiledTxScript)
-      .withForeignAccounts([foreignAccount])
+      .withForeignAccounts(
+        new window.MidenArrays.ForeignAccountArray([foreignAccount])
+      )
       .build();
 
     let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);

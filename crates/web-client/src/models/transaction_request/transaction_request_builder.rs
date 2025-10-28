@@ -17,8 +17,8 @@ use miden_client::vm::AdviceMap as NativeAdviceMap;
 use wasm_bindgen::prelude::*;
 
 use crate::models::advice_map::AdviceMap;
-use crate::models::foreign_account::ForeignAccount;
 use crate::models::miden_arrays::{
+    ForeignAccountArray,
     NoteAndArgsArray,
     NoteDetailsAndTagArray,
     NoteIdAndArgsArray,
@@ -96,9 +96,9 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withForeignAccounts")]
-    pub fn with_foreign_accounts(mut self, foreign_accounts: Vec<ForeignAccount>) -> Self {
+    pub fn with_foreign_accounts(mut self, foreign_accounts: &ForeignAccountArray) -> Self {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
-            foreign_accounts.into_iter().map(Into::into).collect();
+            foreign_accounts.__inner.iter().map(|account| account.clone().into()).collect();
         self.0 = self.0.foreign_accounts(native_foreign_accounts);
         self
     }
