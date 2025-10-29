@@ -123,14 +123,14 @@ fn silent_initialization_does_not_override_existing_config() {
     // Manual configuration file
     let config_path = temp_dir.join("miden-client.toml");
     let custom_config = r#"
-    [rpc]
-    endpoint = "https://custom-endpoint.com"
-    timeout_ms = 5000
-
     store_filepath = "custom-store.sqlite3"
     secret_keys_directory = "custom-keystore"
     token_symbol_map_filepath = "custom-tokens.toml"
     component_template_directory = "custom-templates"
+
+    [rpc]
+    endpoint = "https://custom-endpoint.com"
+    timeout_ms = 5000
     "#;
     std::fs::write(&config_path, custom_config).unwrap();
 
