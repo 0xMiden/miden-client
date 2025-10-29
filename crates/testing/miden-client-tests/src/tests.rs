@@ -2158,6 +2158,9 @@ async fn consume_note_with_custom_script() {
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
+    // At this point, the note script should no be stored locally
+    assert!(client.test_store().get_note_script(note_script.root()).await.is_err());
+
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(custom_note.clone())])
         .build()
@@ -2170,7 +2173,7 @@ async fn consume_note_with_custom_script() {
 
     // At this point, the note script should be stored locally
     let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
-    assert_eq!(stored_script.script_root(), note_script.root().to_hex());
+    assert_eq!(stored_script.script_root().to_hex(), note_script.root().to_hex());
 
     // Consume note
     let transaction_request = TransactionRequestBuilder::new()

@@ -156,8 +156,10 @@ pub trait Store: Send + Sync {
 
     /// Inserts the provided note scripts into the database. If a script with the same root already
     /// exists, it will be replaced.
-    async fn upsert_note_scripts(&self, note_script: &[NoteScriptRecord])
-    -> Result<(), StoreError>;
+    async fn upsert_note_scripts(
+        &self,
+        note_scripts: &[NoteScriptRecord],
+    ) -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------

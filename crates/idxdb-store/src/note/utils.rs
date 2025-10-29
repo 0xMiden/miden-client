@@ -230,6 +230,7 @@ pub fn parse_note_script_idxdb_object(
 ) -> Result<NoteScriptRecord, StoreError> {
     let NoteScriptIdxdbObject { note_script_root, serialized_note_script } = note_script_idxdb;
 
+    let note_script_root = Word::try_from(note_script_root)?;
     let note_script = NoteScript::read_from_bytes(&serialized_note_script)?;
 
     Ok(NoteScriptRecord::new(note_script_root, note_script))

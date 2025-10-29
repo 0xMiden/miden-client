@@ -1,23 +1,22 @@
-use alloc::string::String;
-
+use miden_objects::Word;
 use miden_objects::note::NoteScript;
 
 // NOTE SCRIPT RECORD
 // ================================================================================================
 
-/// Represents a `NoteScript` which the Store can keep track and retrieve.
+/// Represents a `NoteScript` which the Store can keep track of and retrieve.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NoteScriptRecord {
-    script_root: String,
+    script_root: Word,
     script: NoteScript,
 }
 
 impl NoteScriptRecord {
-    pub fn new(script_root: String, script: NoteScript) -> NoteScriptRecord {
+    pub fn new(script_root: Word, script: NoteScript) -> NoteScriptRecord {
         NoteScriptRecord { script_root, script }
     }
 
-    pub fn script_root(&self) -> &str {
+    pub fn script_root(&self) -> &Word {
         &self.script_root
     }
 
@@ -28,7 +27,7 @@ impl NoteScriptRecord {
 
 impl From<NoteScript> for NoteScriptRecord {
     fn from(script: NoteScript) -> Self {
-        let script_root = script.root().to_hex();
+        let script_root = script.root();
         NoteScriptRecord { script_root, script }
     }
 }

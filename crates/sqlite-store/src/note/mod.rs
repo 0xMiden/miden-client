@@ -488,7 +488,7 @@ pub(super) fn upsert_note_script_tx(
 
     const QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
-    tx.execute(QUERY, params![script_root, script,]).into_store_error()?;
+    tx.execute(QUERY, params![script_root.to_hex(), script,]).into_store_error()?;
 
     Ok(())
 }
@@ -507,7 +507,7 @@ fn parse_note_scripts_columns(
 fn parse_note_script(
     serialized_note_script_parts: SerializedNoteScriptPars,
 ) -> Result<NoteScriptRecord, StoreError> {
-    let script_root = serialized_note_script_parts.script_root;
+    let script_root = Word::try_from(serialized_note_script_parts.script_root)?;
     let script = NoteScript::from_bytes(&serialized_note_script_parts.script)?;
     Ok(NoteScriptRecord::new(script_root, script))
 }
