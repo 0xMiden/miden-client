@@ -2139,9 +2139,7 @@ async fn consume_note_with_custom_script() {
 
     let custom_note_script = "
         begin
-            # Simple validation: ensure two values are equal
-            push.1 push.1
-            assert_eq
+            nop
         end
     ";
     let note_script = client.script_builder().compile_note_script(custom_note_script).unwrap();
@@ -2177,7 +2175,8 @@ async fn consume_note_with_custom_script() {
 
     // Consume note
     let transaction_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![custom_note.id()])
+        .unauthenticated_input_notes(vec![(custom_note, None)])
+        .build()
         .unwrap();
 
     let transaction = Box::pin(client.new_transaction(receiver_id, transaction_request))
