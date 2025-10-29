@@ -153,7 +153,7 @@ pub struct NewAccountCmd {
     /// Account type to create.
     #[arg(long, value_enum)]
     pub account_type: CliAccountType,
-    /// List of files specifying packages files used to create an account components for the
+    /// List of files specifying package files used to create account components for the
     /// account.
     #[arg(short, long)]
     pub packages: Vec<PathBuf>,
