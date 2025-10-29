@@ -104,7 +104,7 @@ The `remote_prover_endpoint` field is used to configure the usage of a remote pr
 
 ### Package directory
 `Packages` are Miden's native packaging format.
-This structure contains the outputs of a compiled project, with all of its corresponding metadata. Specifically, a `Package` may contain the compiled MAST for an `Account Component` in the form of a `Library`
+This structure contains the outputs of a compiled project, with all of its corresponding metadata. Specifically, a `Package` may contain the compiled MAST for an `Account Component` in the form of a `Library`.
 
 The `package_directory` field is used to configure the path to the directory where the account components are stored in package (`.masp`) form. The default value is `./packages`.
 
