@@ -139,20 +139,20 @@ fn write_packages_files(cli_config: &CliConfig) -> Result<(), CliError> {
         )
     })?;
 
-    for component in DEFAULT_INCLUDED_PACKAGES {
-        let package_path = packages_dir.join(component.0);
+    for package in DEFAULT_INCLUDED_PACKAGES {
+        let package_path = packages_dir.join(package.0);
         let mut lib_file = File::create(&package_path).map_err(|err| {
             CliError::Config(
                 Box::new(err),
                 format!("Failed to create file at {}", package_path.display()),
             )
         })?;
-        lib_file.write_all(component.1).map_err(|err| {
+        lib_file.write_all(package.1).map_err(|err| {
             CliError::Config(
                 Box::new(err),
                 format!(
                     "Failed to write package {} into file {}",
-                    component.0,
+                    package.0,
                     package_path.display()
                 ),
             )
