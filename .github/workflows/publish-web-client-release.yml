@@ -1,0 +1,69 @@
+name: Publish Web Client SDK on Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Set up Rust and wasm target
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: wasm32-unknown-unknown
+          components: rust-src
+
+      - name: Ensure release tag has version bump
+        id: check_version
+        run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"
+
+      - name: Install & build web-client
+        if: steps.check_version.outputs.should_publish == 'true'
+        run: |
+          cd crates/web-client
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Publish to npm
+        if: steps.check_version.outputs.should_publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd crates/web-client
+          npm publish
+
+      - name: Done
+        if: steps.check_version.outputs.should_publish == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+        run: echo "✅ Build complete; published version $CURRENT_VERSION."
+
+      - name: Skipped publish
+        if: steps.check_version.outputs.should_publish != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ steps.check_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+        run: |
+          echo "ℹ️ Publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
