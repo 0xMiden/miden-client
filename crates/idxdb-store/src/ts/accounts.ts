@@ -440,6 +440,18 @@ export async function insertAccountAddress(
   }
 }
 
+export async function removeAccountAddress(address: Uint8Array) {
+  try {
+    // Perform the delete using Dexie
+    await addresses.where("address").equals(address).delete();
+  } catch (error) {
+    logWebStoreError(
+      error,
+      `Error removing address with value: ${String(address)}`
+    );
+  }
+}
+
 export async function upsertForeignAccountCode(
   accountId: string,
   code: Uint8Array,

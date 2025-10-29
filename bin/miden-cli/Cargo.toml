@@ -42,6 +42,7 @@ anyhow       = { workspace = true }
 assert_cmd   = { version = "2.0" }
 miden-client = { features = ["testing"], path = "../../crates/rust-client", version = "0.12" }
 predicates   = { version = "3.0" }
+regex        = { version = "1.0" }
 uuid         = { features = ["serde", "v4"], version = "1.10" }
 
 [lints]

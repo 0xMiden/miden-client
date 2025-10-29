@@ -22,6 +22,7 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
@@ -38,6 +39,7 @@ use crate::merkle_store::{
     update_storage_map_nodes,
 };
 use crate::sql_error::SqlResultExt;
+use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{insert_sql, subst};
 
 // TYPES
@@ -398,6 +400,35 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         query_account_addresses(conn, account_id)
+    }
+
+    pub(crate) fn insert_address(
+        tx: &Transaction<'_>,
+        address: &Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+
+        add_note_tag_tx(tx, &note_tag_record)?;
+        Self::insert_address_internal(tx, address, account_id)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn remove_address(
+        conn: &mut Connection,
+        address: &Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+
+        let tx = conn.transaction().into_store_error()?;
+        remove_note_tag_tx(&tx, note_tag_record)?;
+        Self::remove_address_internal(&tx, address)?;
+
+        tx.commit().into_store_error()
     }
 
     // ACCOUNT DELTA HELPERS
@@ -857,7 +888,7 @@ impl SqliteStore {
         Ok(())
     }
 
-    fn insert_address(
+    fn insert_address_internal(
         tx: &Transaction<'_>,
         address: &Address,
         account_id: AccountId,
@@ -866,6 +897,15 @@ impl SqliteStore {
         let serialized_address = address.to_bytes();
         tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
             .into_store_error()?;
+
+        Ok(())
+    }
+
+    fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
+        let serialized_address = address.to_bytes();
+
+        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
+        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         Ok(())
     }

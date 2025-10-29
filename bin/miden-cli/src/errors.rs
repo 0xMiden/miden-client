@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use miden_client::account::AddressError;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::ScriptBuilderError;
 use miden_client::{AccountError, AccountIdError, AssetError, ClientError, NetworkIdError};
@@ -20,6 +21,9 @@ pub enum CliError {
     #[error("account id error: {1}")]
     #[diagnostic(code(cli::accountid_error), help("Check the account ID format."))]
     AccountId(#[source] AccountIdError, String),
+    #[error("address error: {1}")]
+    #[diagnostic(code(cli::address_error), help("Check the address format."))]
+    Address(#[source] AddressError, String),
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),

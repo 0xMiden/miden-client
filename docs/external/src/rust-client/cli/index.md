@@ -269,6 +269,36 @@ The source account creates a `SWAP` note that offers some asset in exchange for 
 
 Usage: `miden-client swap --source <SOURCE ACCOUNT ID> --offered-asset <OFFERED AMOUNT>::<OFFERED FAUCET ID> --requested-asset <REQUESTED AMOUNT>::<REQUESTED FAUCET ID> --note-type <NOTE_TYPE>`
 
+### `address`
+
+View and manage addresses.
+
+#### Action Subcommands
+
+| Subcommand                       | Description                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `list <ID>`                      | List all addresses or only for the specified account ID (default command)             |
+| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for specified account ID with optional tag length    |
+| `remove <ID> <INTERFACE>`        | Remove an address for an interface for specified account ID                           |
+
+The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
+
+```sh
+miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
+```
+
+`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, these values can be:
+- `Unspecified`: The default interface.
+- `BasicWallet`: The basic wallet interface.
+
+```sh
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+```
+
+```sh
+miden-client address remove 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
+```
+
 #### Tips
 
 For `send` and `consume-notes`, you can omit the `--sender` and `--account` flags to use the default account defined in the [config](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md). If you omit the flag but have no default account defined in the config, you'll get an error instead.
