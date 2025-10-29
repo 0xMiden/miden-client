@@ -478,9 +478,11 @@ pub trait Store: Send + Sync {
     }
 
     /// Retrieves the storage for a specific account.
+    /// Takes an optional map root to retrieve only part of the storage.
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        map_root: Option<Word>,
     ) -> Result<AccountStorage, StoreError>;
 
     /// Retrieves a specific item from the account's storage map along with its Merkle proof.
@@ -492,7 +494,7 @@ pub trait Store: Send + Sync {
         index: u8,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        let storage = self.get_account_storage(account_id).await?;
+        let storage = self.get_account_storage(account_id, None).await?;
         let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };

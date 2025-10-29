@@ -316,14 +316,20 @@ impl SqliteStore {
     pub fn get_account_storage(
         conn: &Connection,
         account_id: AccountId,
+        map_root: Option<Word>,
     ) -> Result<AccountStorage, StoreError> {
-        let slots = query_storage_slots(
-            conn,
-            "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
-            params![account_id.to_hex()],
-        )?
-        .into_values()
-        .collect();
+        let (where_clause, params) = match map_root {
+            Some(root) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_value = ?",
+                params![account_id.to_hex(), root.to_hex()],
+            ),
+            None => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+                params![account_id.to_hex()],
+            ),
+        };
+
+        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
 
         Ok(AccountStorage::new(slots)?)
     }

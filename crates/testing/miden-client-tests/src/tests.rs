@@ -2003,7 +2003,7 @@ async fn storage_and_vault_proofs() {
         // Check that retrieved vault and storage match with the account.
         let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
 
-        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let storage = client.test_store().get_account_storage(account_id, None).await.unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
         assert_eq!(account.storage().commitment(), storage.commitment());

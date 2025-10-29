@@ -262,8 +262,9 @@ impl Store for WebStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        map_root: Option<Word>,
     ) -> Result<AccountStorage, StoreError> {
-        self.get_account_storage(account_id).await
+        self.get_account_storage(account_id, map_root).await
     }
 
     async fn get_addresses_by_account_id(

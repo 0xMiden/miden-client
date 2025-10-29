@@ -161,7 +161,7 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self.get_storage(account_header.storage_commitment()).await?;
+        let account_storage = self.get_storage(account_header.storage_commitment(), None).await?;
         let assets = self.get_vault_assets(account_header.vault_root()).await?;
         let account_vault = AssetVault::new(&assets)?;
 
@@ -192,16 +192,31 @@ impl WebStore {
         Ok(code)
     }
 
-    pub(super) async fn get_storage(&self, commitment: Word) -> Result<AccountStorage, StoreError> {
+    pub(super) async fn get_storage(
+        &self,
+        commitment: Word,
+        map_root: Option<Word>,
+    ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
         let promise = idxdb_get_account_storage(commitment_serialized);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
-        let promise = idxdb_get_account_storage_maps(
-            account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
-        );
+        let roots = match map_root {
+            Some(map_root) => {
+                if !account_storage_idxdb.iter().any(|a| a.slot_value == map_root.to_hex()) {
+                    return Err(StoreError::AccountStorageNotFound(map_root));
+                }
+                vec![map_root.to_hex()]
+            },
+            None => account_storage_idxdb
+                .iter()
+                .map(|s| s.slot_value.clone())
+                .collect::<Vec<String>>(),
+        };
+
+        let promise = idxdb_get_account_storage_maps(roots);
         let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
             await_js(promise, "failed to fetch account storage maps").await?;
 
@@ -311,6 +326,7 @@ impl WebStore {
     pub(crate) async fn get_account_storage(
         &self,
         account_id: AccountId,
+        map_root: Option<Word>,
     ) -> Result<AccountStorage, StoreError> {
         let account_header = self
             .get_account_header(account_id)
@@ -318,7 +334,7 @@ impl WebStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        self.get_storage(account_header.storage_commitment()).await
+        self.get_storage(account_header.storage_commitment(), map_root).await
     }
 
     pub(crate) async fn upsert_foreign_account_code(

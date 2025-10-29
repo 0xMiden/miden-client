@@ -135,7 +135,7 @@ impl DataStore for ClientDataStore {
         map_key: Word,
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
         // TODO: Refactor the store call to be able to retrieve by map root.
-        let account_storage = self.store.get_account_storage(account_id).await?;
+        let account_storage = self.store.get_account_storage(account_id, Some(map_root)).await?;
 
         for slot in account_storage.slots() {
             if let StorageSlot::Map(map) = slot
