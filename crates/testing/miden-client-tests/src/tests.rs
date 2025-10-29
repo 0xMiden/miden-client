@@ -2144,7 +2144,6 @@ async fn consume_note_with_custom_script() {
     ";
     let note_script = client.script_builder().compile_note_script(custom_note_script).unwrap();
 
-    let asset = FungibleAsset::new(faucet_id, TRANSFER_AMOUNT).unwrap();
     let note_inputs = NoteInputs::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(
@@ -2155,7 +2154,7 @@ async fn consume_note_with_custom_script() {
         Felt::default(),
     )
     .unwrap();
-    let note_assets = NoteAssets::new(vec![Asset::Fungible(asset)]).unwrap();
+    let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
@@ -2175,8 +2174,7 @@ async fn consume_note_with_custom_script() {
 
     // Consume note
     let transaction_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes(vec![(custom_note, None)])
-        .build()
+        .build_consume_notes(vec![custom_note.id()])
         .unwrap();
 
     let transaction = Box::pin(client.new_transaction(receiver_id, transaction_request))
