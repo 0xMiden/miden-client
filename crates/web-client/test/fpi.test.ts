@@ -130,7 +130,6 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 };
 
 test.describe("fpi test", () => {
-  test.setTimeout(50000);
   test("runs the standard fpi test successfully", async ({ page }) => {
     await expect(testStandardFpi(page)).resolves.toBeUndefined();
   });
