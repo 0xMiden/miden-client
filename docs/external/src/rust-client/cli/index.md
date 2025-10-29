@@ -60,6 +60,9 @@ miden-client init --network 18.203.155.106 --store-path db/store.sqlite3
 
 # You can set a remote prover to offload the proving process (along with the `--delegate-proving` flag in transaction commands)
 miden-client init --remote-prover-endpoint <PROVER_URL>
+
+# To enable the transport layer, specify the endpoint
+miden-client init --note-transport-endpoint <MIDEN_NOTE_TRANSPORT_URL>
 ```
 
 More information on the configuration file can be found in the [configuration section](https://github.com/0xMiden/miden-client/docs/typedoc/rust-client/cli-config.md).
@@ -149,14 +152,16 @@ View a summary of the current client state.
 
 ### `notes`
 
-View and manage notes.
+View and manage notes. Also, exchange private notes using the note transport network.
 
 #### Action Flags
 
-| Flags               | Description                                              | Short Flag |
-| ------------------- | -------------------------------------------------------- | ---------- |
-| `--list [<filter>]` | List input notes                                         | `-l`       |
-| `--show <ID>`       | Show details of the input note for the specified note ID | `-s`       |
+| Flags                   | Description                                              | Short Flag |
+| ----------------------- | -------------------------------------------------------- | ---------- |
+| `--list [<filter>]`     | List input notes                                         | `-l`       |
+| `--show <ID>`           | Show details of the input note for the specified note ID | `-s`       |
+| `--send <ID> <address>` | Send a note using the note transport network             |            |
+| `--fetch`               | Fetch notes from the note transport network              |            |
 
 The `--list` flag receives an optional filter: - expected: Only lists expected notes. - committed: Only lists committed notes. - consumed: Only lists consumed notes. - processing: Only lists processing notes. - consumable: Only lists consumable notes. An additional `--account-id <ID>` flag may be added to only show notes consumable by the specified account.
 If no filter is specified then all notes are listed.
@@ -171,6 +176,24 @@ You can call:
 
 ```sh
 miden-client notes --show 0x70b7ec
+```
+
+To send a private note, the `--send` flag sends a note using the note transport network.
+The note ID (hex, in full or a prefix) and recipient's address (bech32) must be provided.
+The note is assumed to be stored in the store (e.g., imported using [`import`](#import)).
+
+You can call:
+
+```sh
+miden-client notes --send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc
+```
+
+To fetch private notes, the `--fetch` allows to download notes from the note transport network.
+Only notes for tracked tags will be fetched (e.g. `miden-client tags --list`).
+The downloaded notes will be added to the store.
+
+```sh
+miden-client notes --fetch
 ```
 
 ### `sync`
@@ -330,3 +353,8 @@ The input file should contain a TOML table called `inputs`, as in the following 
 ```toml
 inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
 ```
+
+### `note-transport`
+
+Send and fetch private notes using the transport layer.
+

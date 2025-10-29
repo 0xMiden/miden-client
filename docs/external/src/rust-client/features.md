@@ -19,6 +19,8 @@ To enable such proofs, the client contains the functionality for executing, prov
 
 The Miden client enables users to interact with the Miden network. This includes syncing with the latest blockchain data and managing account information.
 
+__Note transport__ The client also supports connectivity with the Miden Note Transport network for the exchange of private notes (end-to-end encryption coming soon).
+
 ### Account generation and tracking
 
 The Miden client provides features for generating and tracking accounts within the Miden rollup ecosystem. Users can create accounts and track their transaction status.

@@ -1,6 +1,6 @@
 ---
 title: Examples
-sidebar_position: 10
+sidebar_position: 11
 ---
 
 # Miden SDK Examples
@@ -31,6 +31,7 @@ The examples in this section showcase various capabilities of the Miden SDK, inc
   - Retrieve input and output notes
   - Import and export notes
   - Working with consumable notes
+  - Send and fetch private notes using the note transport network
 
 For installation instructions, prerequisites, and setup details, please refer to the [SDK README](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
 
