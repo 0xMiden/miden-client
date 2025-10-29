@@ -179,7 +179,7 @@ miden-client notes --show 0x70b7ec
 ```
 
 To send a private note, the `--send` flag sends a note using the note transport network.
-The note ID (hex) and recipient's address (bech32) must be provided.
+The note ID (hex, in full or a prefix) and recipient's address (bech32) must be provided.
 The note is assumed to be stored in the store (e.g., imported using [`import`](#import)).
 
 You can call:
