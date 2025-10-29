@@ -8,8 +8,7 @@ use std::vec::Vec;
 use miden_client::Word;
 use miden_client::crypto::MerkleStore;
 use miden_client::note::ToInputNoteCommitments;
-use miden_client::store::{InputNoteState, StoreError, TransactionFilter};
-use miden_client::sync::NoteTagRecord;
+use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
     TransactionRecord,

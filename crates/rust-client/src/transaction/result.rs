@@ -14,7 +14,6 @@ use miden_objects::transaction::{
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
-use super::store_update::TransactionStoreUpdate;
 use crate::ClientError;
 
 // TRANSACTION RESULT

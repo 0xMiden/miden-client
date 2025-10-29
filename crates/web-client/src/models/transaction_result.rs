@@ -5,7 +5,6 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 use crate::models::executed_transaction::ExecutedTransaction;
 use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
-use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 /// WASM wrapper around the native [`TransactionResult`].
