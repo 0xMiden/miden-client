@@ -39,10 +39,18 @@ jobs:
         run: |
           rustup update --no-self-update
 
-      - name: Preflight - publish dry run (workspace)
-        run: cargo publish --workspace --dry-run
-
-      - name: Publish crates (workspace)
+      - name: Preflight - publish dry run
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish --workspace
+        run: |
+          cargo publish --workspace --exclude miden-client-web --dry-run
+          cd crates/web-client
+          cargo publish --dry-run
+
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          cargo publish --workspace --exclude miden-client-web
+          cd crates/web-client
+          cargo publish
