@@ -215,10 +215,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
     let consume_submission_height =
         client.submit_proven_transaction(consume_proven, &consume_result).await?;
-    let consume_update = client
-        .get_transaction_store_update(&consume_result, consume_submission_height)
-        .await?;
-    client.apply_transaction_update(consume_update).await?;
+    client.apply_transaction(&consume_result, consume_submission_height)?;
 
     wait_for_blocks(&mut client, 2).await;
 

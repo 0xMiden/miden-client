@@ -537,6 +537,26 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ***
 
+### insertAccountAddress()
+
+> **insertAccountAddress**(`account_id`, `address`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### address
+
+[`Address`](Address.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### listSettingKeys()
 
 > **listSettingKeys**(): `Promise`\<`string`[]\>
@@ -792,6 +812,26 @@ prover if none is supplied.
 
 ***
 
+### removeAccountAddress()
+
+> **removeAccountAddress**(`account_id`, `address`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### address
+
+[`Address`](Address.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### removeSetting()
 
 > **removeSetting**(`key`): `Promise`\<`void`\>
@@ -948,6 +988,26 @@ the chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+***
+
+### transactionStoreUpdate()
+
+> **transactionStoreUpdate**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### submission\_height
+
+`number`
+
+#### Returns
+
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 ***
 

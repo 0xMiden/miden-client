@@ -53,3 +53,33 @@ Returns the ID of the transaction.
 #### Returns
 
 [`TransactionId`](TransactionId.md)
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+Serializes the transaction result into bytes.
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `TransactionResult`
+
+Deserializes a transaction result from bytes.
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`TransactionResult`

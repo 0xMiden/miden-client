@@ -241,7 +241,18 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    pub use miden_objects::vm::{AdviceInputs, AdviceMap};
+    pub use miden_objects::vm::{
+        AdviceInputs,
+        AdviceMap,
+        AttributeSet,
+        MastArtifact,
+        Package,
+        PackageExport,
+        PackageManifest,
+        QualifiedProcedureName,
+        Section,
+        SectionId,
+    };
 }
 
 pub use errors::*;
