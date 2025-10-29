@@ -26,7 +26,7 @@ echo "Publishing all crates except miden-client-web..."
 cargo publish --workspace --exclude miden-client-web
 
 # Publish miden-client-web
-# This should use wasm32-unknown-unknown as target (specified on crates/web-client/config.toml,
+# This should use wasm32-unknown-unknown as target (specified on crates/web-client/.cargo/config.toml,
 # but publishing from the workspace root does not take it into account). So we publish it from the web-client directory.
 echo "Publishing miden-client-web..."
 cd crates/web-client
