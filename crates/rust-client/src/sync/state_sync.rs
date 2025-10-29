@@ -15,10 +15,10 @@ use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -144,22 +144,32 @@ impl StateSync {
             ..Default::default()
         };
 
-        let note_tags = Arc::new(note_tags);
+        let note_tags: Vec<NoteTag> = note_tags.into_iter().collect();
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
-        loop {
-            info!("Performing sync state step.");
+        let account_chunks: Vec<&[AccountId]> = build_chunks(&account_ids, ACCOUNT_ID_LIMIT);
+        let note_tag_chunks: Vec<&[NoteTag]> = build_chunks(&note_tags, NOTE_TAG_LIMIT);
 
-            let step = self
-                .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
-                .await?;
-            let Some(step) = step else {
-                break;
-            };
-            state_sync_update.block_num = step.block_header.block_num();
-            state_sync_steps.push(step);
+        for accounts_chunk in account_chunks {
+            for note_tags_chunk in note_tag_chunks.iter().copied() {
+                let mut current_block_num = state_sync_update.block_num;
+                loop {
+                    info!("Performing sync state step.");
+                    let step = self
+                        .sync_state_step(current_block_num, accounts_chunk, note_tags_chunk)
+                        .await?;
+                    let Some(step) = step else {
+                        break;
+                    };
+                    current_block_num = step.block_header.block_num();
+                    state_sync_steps.push(step);
+                }
+            }
         }
+        state_sync_update.block_num = state_sync_steps
+            .last()
+            .map_or(state_sync_update.block_num, |s| s.block_header.block_num());
 
         // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
         // (this would be a breaking change so it should be done separately)
@@ -242,12 +252,9 @@ impl StateSync {
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: Arc<BTreeSet<NoteTag>>,
+        note_tags: &[NoteTag],
     ) -> Result<Option<StateSyncInfo>, ClientError> {
-        let response = self
-            .rpc_api
-            .sync_state(current_block_num, account_ids, note_tags.as_ref())
-            .await?;
+        let response = self.rpc_api.sync_state(current_block_num, account_ids, note_tags).await?;
 
         // We don't need to continue if the chain has not advanced, there are no new changes
         if response.block_header.block_num() == current_block_num {
@@ -486,4 +493,14 @@ fn apply_mmr_changes(
         .append(&mut current_partial_mmr.add(new_block.commitment(), new_block_has_relevant_notes));
 
     Ok((new_peaks, new_authentication_nodes))
+}
+
+// Returns a vector containing the input chunked into slices of the given size. If the input is
+// empty, ensure a single element with an empty slice.
+fn build_chunks<T>(input: &[T], size: usize) -> Vec<&[T]> {
+    if input.is_empty() {
+        vec![&[][..]]
+    } else {
+        input.chunks(size).collect()
+    }
 }

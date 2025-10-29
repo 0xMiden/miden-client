@@ -146,7 +146,11 @@ impl MockRpcApi {
             .unwrap();
 
         // Collect notes that are in the next block
-        let notes = self.get_notes_in_block(next_block_num, note_tags, account_ids);
+        let notes = self.get_notes_in_block(
+            next_block_num,
+            &note_tags.iter().copied().collect(),
+            account_ids,
+        );
 
         let transactions = self
             .mock_chain
@@ -441,13 +445,17 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
+        note_tags: &[NoteTag],
     ) -> Result<StateSyncInfo, RpcError> {
         let block_range = BlockRange {
             block_from: block_num.as_u32(),
             block_to: None,
         };
-        let response = self.get_sync_state_request(block_range, note_tags, account_ids)?;
+        let response = self.get_sync_state_request(
+            block_range,
+            &note_tags.iter().copied().collect(),
+            account_ids,
+        )?;
 
         Ok(response.try_into().unwrap())
     }

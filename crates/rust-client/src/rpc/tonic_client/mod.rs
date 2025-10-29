@@ -216,7 +216,7 @@ impl NodeRpcClient for GrpcClient {
         &self,
         block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
+        note_tags: &[NoteTag],
     ) -> Result<StateSyncInfo, RpcError> {
         let account_ids = account_ids.iter().map(|acc| (*acc).into()).collect();
 

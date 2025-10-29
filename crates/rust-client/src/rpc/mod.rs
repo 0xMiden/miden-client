@@ -85,6 +85,12 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+pub const ACCOUNT_ID_LIMIT: usize = 500;
+pub const NOTE_TAG_LIMIT: usize = 500;
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -148,7 +154,7 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
+        note_tags: &[NoteTag],
     ) -> Result<StateSyncInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
