@@ -50,7 +50,7 @@ use crate::note_transport::{
     NoteTransportUpdate,
 };
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
-use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
+use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -522,6 +522,37 @@ pub enum TransactionFilter {
     /// A transaction is considered expired if is uncommitted and the transaction's block number
     /// is less than the provided block number.
     ExpiredBefore(BlockNumber),
+}
+
+// TRANSACTIONS FILTER HELPERS
+// ================================================================================================
+
+impl TransactionFilter {
+    /// Returns a [String] containing the query for this Filter.
+    pub fn to_query(&self) -> String {
+        const QUERY: &str = "SELECT tx.id, script.script, tx.details, tx.status \
+            FROM transactions AS tx LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
+        match self {
+            TransactionFilter::All => QUERY.to_string(),
+            TransactionFilter::Uncommitted => format!(
+                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                TransactionStatusVariant::Pending as u8,
+                TransactionStatusVariant::Discarded as u8
+            ),
+            TransactionFilter::Ids(_) => {
+                // Use SQLite's array parameter binding
+                format!("{QUERY} WHERE tx.id IN rarray(?)")
+            },
+            TransactionFilter::ExpiredBefore(block_num) => {
+                format!(
+                    "{QUERY} WHERE tx.block_num < {} AND tx.status_variant != {} AND tx.status_variant != {}",
+                    block_num.as_u32(),
+                    TransactionStatusVariant::Discarded as u8,
+                    TransactionStatusVariant::Committed as u8
+                )
+            },
+        }
+    }
 }
 
 // NOTE FILTER

@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use std::collections::BTreeSet;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::testing::mock_account::MockAccountExt;
@@ -71,7 +72,11 @@ async fn load_accounts_test() {
     let accounts = client.get_account_headers().await.unwrap();
 
     assert_eq!(accounts.len(), 2);
-    for (client_acc, expected_acc) in accounts.iter().zip(expected_accounts.iter()) {
-        assert_eq!(client_acc.0.commitment(), expected_acc.commitment());
-    }
+
+    let actual_commitments: BTreeSet<_> =
+        accounts.into_iter().map(|(header, _)| header.commitment()).collect();
+    let expected_commitments: BTreeSet<_> =
+        expected_accounts.into_iter().map(|account| account.commitment()).collect();
+
+    assert_eq!(actual_commitments, expected_commitments);
 }

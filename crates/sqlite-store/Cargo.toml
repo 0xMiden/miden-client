@@ -20,7 +20,6 @@ miden-objects = { workspace = true }
 anyhow      = { workspace = true }
 async-trait = { workspace = true }
 chrono      = { workspace = true }
-hex         = { workspace = true }
 thiserror   = { workspace = true }
 
 # External dependencies

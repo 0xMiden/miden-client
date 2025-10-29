@@ -41,7 +41,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_from_uint8array_failure_with_type_context() {
+    fn deserialize_from_uint8array_failure_with_type_context() {
         // Create some invalid bytes
         let uint8_array = Uint8Array::new_with_length(10);
 
