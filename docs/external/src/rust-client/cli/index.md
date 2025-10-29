@@ -122,7 +122,7 @@ This command has four flags:
   - `non-fungible-faucet`
   - `regular-account-immutable-code`
   - `regular-account-updatable-code`
-- `--component-templates <COMPONENT_TEMPLATES>`: Allows you to provide a list of file paths for account component template files to include in the account. These components are looked up from your configured `component_template_directory` field in `miden-client.toml`.
+- `--packages <PACKAGES>`: Allows you to provide a list of file paths for package files holding account components to include in the account. These components are looked up from your configured `packages_directory` field in `miden-client.toml`.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the provided component templates. The CLI will prompt for any keys that are not present in the file.
 
 After creating an account with the `new-account` command, the account is stored locally and tracked by the client, enabling it to execute transactions and synchronize state changes with the Miden network.

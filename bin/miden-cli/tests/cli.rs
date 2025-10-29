@@ -804,7 +804,7 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         storage_mode.to_string().as_str(),
         "--account-type",
         "fungible-faucet",
-        "-c",
+        "-p",
         "basic-fungible-faucet",
         "-i",
         INIT_DATA_FILENAME,
@@ -829,9 +829,14 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "Failed to create wallet {}",
+        String::from_utf8(output.stderr)
+            .map(|err_msg| format!("with error: {err_msg}"))
+            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+    );
 
-    //println!("stoud {}", String::from_utf8(output.stdout.clone()).unwrap());
     std::str::from_utf8(&output.stdout)
         .unwrap()
         .split_whitespace()
