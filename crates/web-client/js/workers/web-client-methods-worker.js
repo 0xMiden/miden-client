@@ -126,44 +126,6 @@ const methodHandlers = {
     const serializedProven = proven.serialize();
     return serializedProven.buffer;
   },
-  [MethodName.SUBMIT_TRANSACTION]: async (args) => {
-    const [serializedTransactionResult, proverPayload] = args;
-    const transactionResultBytes = new Uint8Array(serializedTransactionResult);
-    const transactionResult = wasm.TransactionResult.deserialize(
-      transactionResultBytes
-    );
-
-    let prover;
-    if (proverPayload) {
-      if (proverPayload === "local") {
-        prover = wasm.TransactionProver.newLocalProver();
-      } else if (proverPayload.startsWith("remote:")) {
-        const endpoint = proverPayload.slice("remote:".length);
-        if (!endpoint) {
-          throw new Error("Remote prover requires an endpoint");
-        }
-        prover = wasm.TransactionProver.newRemoteProver(endpoint);
-      } else {
-        throw new Error("Invalid prover tag received in worker");
-      }
-    }
-
-    const proven = await wasmWebClient.proveTransaction(
-      transactionResult,
-      prover
-    );
-    const submissionHeight = await wasmWebClient.submitProvenTransaction(
-      proven,
-      transactionResult
-    );
-    const update = await wasmWebClient.transactionStoreUpdate(
-      transactionResult,
-      submissionHeight
-    );
-    await wasmWebClient.applyTransaction(update);
-
-    return { submissionHeight };
-  },
   [MethodName.SUBMIT_NEW_TRANSACTION]: async (args) => {
     const [accountIdHex, serializedTransactionRequest] = args;
     const accountId = wasm.AccountId.fromHex(accountIdHex);
@@ -190,8 +152,6 @@ const methodHandlers = {
       result,
       submissionHeight
     );
-    await wasmWebClient.applyTransaction(update);
-
     return {
       transactionId,
       submissionHeight,
@@ -214,30 +174,6 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   );
 
   return await methodHandlers[MethodName.SYNC_STATE]();
-};
-
-methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
-  let serializedMockNoteTransportNode = args.pop();
-  let serializedMockChain = args.pop();
-  serializedMockChain = new Uint8Array(serializedMockChain);
-  serializedMockNoteTransportNode = serializedMockNoteTransportNode
-    ? new Uint8Array(serializedMockNoteTransportNode)
-    : null;
-  wasmWebClient = new wasm.WebClient();
-  await wasmWebClient.createMockClient(
-    wasmSeed,
-    serializedMockChain,
-    serializedMockNoteTransportNode
-  );
-
-  const result = await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
-
-  return {
-    submissionHeight: result.submissionHeight,
-    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-    serializedMockNoteTransportNode:
-      wasmWebClient.serializeMockNoteTransportNode().buffer,
-  };
 };
 
 methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {

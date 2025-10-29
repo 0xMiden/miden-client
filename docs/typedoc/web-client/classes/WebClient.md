@@ -66,6 +66,26 @@
 
 ***
 
+### applyTransactionResult()
+
+> **applyTransactionResult**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### submission\_height
+
+`number`
+
+#### Returns
+
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+***
+
 ### createClient()
 
 > **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`): `Promise`\<`any`\>

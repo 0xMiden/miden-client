@@ -739,16 +739,17 @@ export class MockWebClient extends WebClient {
         serializedMockChain,
         serializedMockNoteTransportNode
       );
-
-      const update = await this.wasmWebClient.transactionStoreUpdate(
-        transactionResult,
-        result.submissionHeight
-      );
-
       const newMockChain = new Uint8Array(result.serializedMockChain);
       const newMockNoteTransportNode = result.serializedMockNoteTransportNode
         ? new Uint8Array(result.serializedMockNoteTransportNode)
         : undefined;
+
+      if (!(this instanceof MockWebClient)) {
+        return await this.wasmWebClient.applyTransactionResult(
+          transactionResult,
+          result.submissionHeight
+        );
+      }
 
       this.wasmWebClient = new WasmWebClient();
       await this.wasmWebClient.createMockClient(
@@ -757,7 +758,10 @@ export class MockWebClient extends WebClient {
         newMockNoteTransportNode
       );
 
-      return update;
+      return await this.wasmWebClient.transactionStoreUpdate(
+        transactionResult,
+        result.submissionHeight
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
@@ -784,14 +788,22 @@ export class MockWebClient extends WebClient {
         serializedMockNoteTransportNode
       );
 
-      const transactionResult = wasm.TransactionResult.deserialize(
-        new Uint8Array(result.serializedTransactionResult)
-      );
-
       const newMockChain = new Uint8Array(result.serializedMockChain);
       const newMockNoteTransportNode = result.serializedMockNoteTransportNode
         ? new Uint8Array(result.serializedMockNoteTransportNode)
         : undefined;
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      if (!(this instanceof MockWebClient)) {
+        await this.wasmWebClient.applyTransactionResult(
+          transactionResult,
+          result.submissionHeight
+        );
+        return transactionResult.id();
+      }
 
       this.wasmWebClient = new WasmWebClient();
       await this.wasmWebClient.createMockClient(

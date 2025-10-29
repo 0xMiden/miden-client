@@ -83,11 +83,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.transactionStoreUpdate(
+    const transactionUpdate = await webClient.applyTransactionResult(
         result,
         submissionHeight
     );
-    await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
     console.log(
@@ -128,11 +127,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.transactionStoreUpdate(
+    const transactionUpdate = await webClient.applyTransactionResult(
         result,
         submissionHeight
     );
-    await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
     console.log(
@@ -182,11 +180,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.transactionStoreUpdate(
+    const transactionUpdate = await webClient.applyTransactionResult(
         result,
         submissionHeight
     );
-    await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
     console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
@@ -225,11 +222,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.transactionStoreUpdate(
+    const transactionUpdate = await webClient.applyTransactionResult(
         result,
         submissionHeight
     );
-    await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
     console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
@@ -334,11 +330,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.transactionStoreUpdate(
+    const transactionUpdate = await webClient.applyTransactionResult(
         result,
         submissionHeight
     );
-    await webClient.applyTransaction(transactionUpdate);
     
     // Access transaction details
     console.log("Block number:", transactionUpdate.blockNum());

@@ -9,8 +9,6 @@ export const MethodName = Object.freeze({
   NEW_FAUCET: "newFaucet",
   EXECUTE_TRANSACTION: "executeTransaction",
   PROVE_TRANSACTION: "proveTransaction",
-  SUBMIT_TRANSACTION: "submitTransaction",
-  SUBMIT_TRANSACTION_MOCK: "submitTransactionMock",
   SUBMIT_NEW_TRANSACTION: "submitNewTransaction",
   SUBMIT_NEW_TRANSACTION_MOCK: "submitNewTransactionMock",
   SYNC_STATE: "syncState",

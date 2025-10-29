@@ -147,6 +147,32 @@ impl WebClient {
         }
     }
 
+    #[wasm_bindgen(js_name = "applyTransactionResult")]
+    pub async fn apply_transaction_result(
+        &mut self,
+        transaction_result: &TransactionResult,
+        submission_height: u32,
+    ) -> Result<TransactionStoreUpdate, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let update = Box::pin(client.get_transaction_store_update(
+                transaction_result.native(),
+                BlockNumber::from(submission_height),
+            ))
+            .await
+            .map(TransactionStoreUpdate::from)
+            .map_err(|err| js_error_with_context(err, "failed to build transaction update"))?;
+
+            let native_update: NativeTransactionStoreUpdate = (&update).into();
+            Box::pin(client.apply_transaction_update(native_update))
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to apply transaction result"))?;
+
+            Ok(update)
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
     #[wasm_bindgen(js_name = "newMintTransactionRequest")]
     pub fn new_mint_transaction_request(
         &mut self,
