@@ -431,12 +431,8 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     let submission_height = client
         .submit_proven_transaction(proven_transaction, &transaction_result)
         .await?;
-    let tx_update = client
-        .get_transaction_store_update(&transaction_result, submission_height)
-        .await?;
-
     println!("Applying transaction to store...");
-    client.apply_transaction_update(tx_update).await?;
+    client.apply_transaction(&transaction_result, submission_height).await?;
 
     println!("Successfully created transaction.");
     println!("Transaction ID: {transaction_id}");

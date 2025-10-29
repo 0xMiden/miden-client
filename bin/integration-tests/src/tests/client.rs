@@ -108,10 +108,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // proofs at the same time, but we can't apply the transaction to the store before submitting
     // it to the node (since we need the submission height).
     let current_height = client.get_sync_height().await?;
-    let store_update = client
-        .get_transaction_store_update(&transaction_result_1, current_height)
-        .await?;
-    client.apply_transaction_update(store_update).await?;
+    client.apply_transaction(&transaction_result_1, current_height).await?;
 
     let transaction_result_2 =
         client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
@@ -126,10 +123,10 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
         .await
         .unwrap();
 
-    let tx_update = client
-        .get_transaction_store_update(&transaction_result_2, submission_height_2)
-        .await?;
-    client.apply_transaction_update(tx_update).await.unwrap();
+    client
+        .apply_transaction(&transaction_result_2, submission_height_2)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 
@@ -529,11 +526,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             .submit_proven_transaction(proven_transaction, &transaction_result)
             .await
             .unwrap();
-        let tx_update = client
-            .get_transaction_store_update(&transaction_result, submission_height)
-            .await
-            .unwrap();
-        client.apply_transaction_update(tx_update).await.unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -573,11 +566,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             .submit_proven_transaction(proven_transaction, &transaction_result)
             .await
             .unwrap();
-        let tx_update = client
-            .get_transaction_store_update(&transaction_result, submission_height)
-            .await
-            .unwrap();
-        client.apply_transaction_update(tx_update).await.unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -948,11 +937,10 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Apply the transaction
     let submission_height = client_1.get_sync_height().await.unwrap();
-    let tx_update = client_1
-        .get_transaction_store_update(&transaction_result, submission_height)
+    client_1
+        .apply_transaction(&transaction_result, submission_height)
         .await
         .unwrap();
-    client_1.apply_transaction_update(tx_update).await.unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
@@ -1157,12 +1145,8 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
     let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
     let submitted_tx_result =
         match client.submit_proven_transaction(proven_transaction, &transaction_result).await {
-            Ok(submission_height) => match client
-                .get_transaction_store_update(&transaction_result, submission_height)
-                .await
-            {
-                Ok(tx_update) => client.apply_transaction_update(tx_update).await,
-                Err(err) => Err(err),
+            Ok(submission_height) => {
+                client.apply_transaction(&transaction_result, submission_height).await
             },
             Err(err) => Err(err),
         };
