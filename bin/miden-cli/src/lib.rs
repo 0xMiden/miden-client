@@ -162,7 +162,7 @@ impl Cli {
 
         // Check if Client is not yet initialized => silently initialize the client
         if !current_dir.exists() {
-            let init_cmd = InitCmd::new_default();
+            let init_cmd = InitCmd::default();
             init_cmd.execute(&current_dir)?;
         }
 
