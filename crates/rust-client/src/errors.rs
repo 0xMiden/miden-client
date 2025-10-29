@@ -106,24 +106,6 @@ pub enum ClientError {
     ClientInitializationError(String),
 }
 
-#[derive(Debug, Error)]
-pub enum TransactionPipelineError {
-    #[error("recency condition not met")]
-    RecencyCondition,
-    #[error("missing expected output recipients")]
-    MissingOutputRecipients(Vec<Word>),
-    #[error("asset error")]
-    Asset(#[from] AssetError),
-    #[error("rpc api error")]
-    Rpc(#[from] RpcError),
-    #[error("transaction executor error")]
-    Executor(#[from] TransactionExecutorError),
-    #[error("transaction prover error")]
-    Prover(#[from] TransactionProverError),
-    #[error("transaction request error")]
-    Request(#[from] TransactionRequestError),
-}
-
 // CONVERSIONS
 // ================================================================================================
 
