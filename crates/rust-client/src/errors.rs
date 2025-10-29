@@ -94,8 +94,6 @@ pub enum ClientError {
     TransactionProvingError(#[from] TransactionProverError),
     #[error("transaction request error")]
     TransactionRequestError(#[from] TransactionRequestError),
-    #[error("transaction pipeline error: {0}")]
-    TransactionPipelineError(#[from] TransactionPipelineError),
     #[error("transaction script builder error")]
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("transaction script error")]
