@@ -82,7 +82,15 @@ use crate::note::{NoteScreener, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
-use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter};
+use crate::store::{
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    StoreError,
+    TransactionFilter,
+};
+use crate::sync::NoteTagRecord;
 
 mod prover;
 pub use prover::TransactionProver;
@@ -177,12 +185,7 @@ where
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
-        let future_notes = tx_result.future_notes().to_vec();
-        let executed_transaction = tx_result.into();
-        let tx_update =
-            TransactionStoreUpdate::new(executed_transaction, submission_height, future_notes);
-
-        self.apply_transaction(tx_update).await?;
+        self.apply_transaction(&tx_result, submission_height).await?;
 
         Ok(tx_id)
     }
@@ -329,9 +332,52 @@ where
         Ok(block_num)
     }
 
+    /// Builds a [`TransactionStoreUpdate`] for the provided transaction result at the specified
+    /// submission height.
+    pub async fn get_transaction_store_update(
+        &self,
+        tx_result: &TransactionResult,
+        submission_height: BlockNumber,
+    ) -> Result<TransactionStoreUpdate, ClientError> {
+        let note_updates = self.get_note_updates(submission_height, tx_result).await?;
+
+        let new_tags = note_updates
+            .updated_input_notes()
+            .filter_map(|note| {
+                let note = note.inner();
+
+                if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
+                    note.state()
+                {
+                    Some(NoteTagRecord::with_note_source(*tag, note.id()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(TransactionStoreUpdate::new(
+            tx_result.executed_transaction().clone(),
+            submission_height,
+            note_updates,
+            tx_result.future_notes().to_vec(),
+            new_tags,
+        ))
+    }
+
     /// Persists the effects of a submitted transaction into the local store,
     /// updating account data, note metadata, and future note tracking.
     pub async fn apply_transaction(
+        &self,
+        tx_result: &TransactionResult,
+        submission_height: BlockNumber,
+    ) -> Result<(), ClientError> {
+        let tx_update = self.get_transaction_store_update(tx_result, submission_height).await?;
+
+        self.apply_transaction_update(tx_update).await
+    }
+
+    pub async fn apply_transaction_update(
         &self,
         tx_update: TransactionStoreUpdate,
     ) -> Result<(), ClientError> {
@@ -353,15 +399,8 @@ where
                 final_commitment,
             )));
         }
-        let note_updates = self
-            .get_note_updates(
-                tx_update.submission_height(),
-                executed_transaction,
-                tx_update.future_notes(),
-            )
-            .await?;
 
-        self.store.apply_transaction(tx_update, note_updates).await?;
+        self.store.apply_transaction(tx_update).await?;
         info!("Transaction stored.");
         Ok(())
     }
@@ -426,9 +465,9 @@ where
     async fn get_note_updates(
         &self,
         submission_height: BlockNumber,
-        executed_tx: &ExecutedTransaction,
-        future_notes: &[(NoteDetails, NoteTag)],
+        tx_result: &TransactionResult,
     ) -> Result<NoteUpdateTracker, ClientError> {
+        let executed_tx = tx_result.executed_transaction();
         let current_timestamp = self.store.get_current_timestamp();
         let current_block_num = self.store.get_sync_height().await?;
 
@@ -470,7 +509,7 @@ where
         }
 
         // Track future input notes described in the transaction result.
-        new_input_notes.extend(future_notes.iter().map(|(note_details, tag)| {
+        new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
             InputNoteRecord::new(
                 note_details.clone(),
                 None,

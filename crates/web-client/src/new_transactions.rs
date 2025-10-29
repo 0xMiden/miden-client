@@ -42,7 +42,7 @@ impl WebClient {
         let submission_height =
             self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
         let transaction_update =
-            transaction_result.transaction_update_with_height(submission_height);
+            self.transaction_store_update(&transaction_result, submission_height).await?;
 
         self.apply_transaction(&transaction_update).await?;
 
@@ -111,6 +111,25 @@ impl WebClient {
         }
     }
 
+    #[wasm_bindgen(js_name = "transactionStoreUpdate")]
+    pub async fn transaction_store_update(
+        &mut self,
+        transaction_result: &TransactionResult,
+        submission_height: u32,
+    ) -> Result<TransactionStoreUpdate, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            Box::pin(client.get_transaction_store_update(
+                transaction_result.native(),
+                BlockNumber::from(submission_height),
+            ))
+            .await
+            .map(TransactionStoreUpdate::from)
+            .map_err(|err| js_error_with_context(err, "failed to build transaction update"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
     #[wasm_bindgen(js_name = "applyTransaction")]
     pub async fn apply_transaction(
         &mut self,
@@ -119,7 +138,7 @@ impl WebClient {
         let native_transaction_result: NativeTransactionStoreUpdate = tx_update.into();
 
         if let Some(client) = self.get_mut_inner() {
-            Box::pin(client.apply_transaction(native_transaction_result))
+            Box::pin(client.apply_transaction_update(native_transaction_result))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to apply transaction"))?;
             Ok(())

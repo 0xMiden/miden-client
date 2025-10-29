@@ -28,33 +28,21 @@ pub struct TransactionStoreUpdate {
 }
 
 impl TransactionStoreUpdate {
-    /// Creates a new [`TransactionStoreUpdate`] instance without note update information.
+    /// Creates a new [`TransactionStoreUpdate`] instance populated with all relevant note data.
     ///
     /// # Arguments
     /// - `executed_transaction`: The executed transaction details.
     /// - `submission_height`: The block number at which the transaction was submitted.
+    /// - `note_updates`: The note updates that need to be applied to the store after the
+    ///   transaction execution.
     /// - `future_notes`: Notes expected to be received in follow-up transactions (e.g. swap
     ///   paybacks).
+    /// - `new_tags`: New note tags that need to be tracked because of created notes.
     pub fn new(
         executed_transaction: ExecutedTransaction,
         submission_height: BlockNumber,
-        future_notes: Vec<(NoteDetails, NoteTag)>,
-    ) -> Self {
-        Self {
-            executed_transaction,
-            submission_height,
-            future_notes,
-            note_updates: NoteUpdateTracker::default(),
-            new_tags: Vec::new(),
-        }
-    }
-
-    /// Creates a new [`TransactionStoreUpdate`] populated with note update information.
-    pub fn with_note_updates(
-        executed_transaction: ExecutedTransaction,
-        submission_height: BlockNumber,
-        future_notes: Vec<(NoteDetails, NoteTag)>,
         note_updates: NoteUpdateTracker,
+        future_notes: Vec<(NoteDetails, NoteTag)>,
         new_tags: Vec<NoteTagRecord>,
     ) -> Self {
         Self {
@@ -65,7 +53,6 @@ impl TransactionStoreUpdate {
             new_tags,
         }
     }
-
     /// Returns the executed transaction.
     pub fn executed_transaction(&self) -> &ExecutedTransaction {
         &self.executed_transaction

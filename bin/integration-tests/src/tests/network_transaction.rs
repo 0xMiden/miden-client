@@ -194,8 +194,9 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .build()?;
 
     let bump_result = client.execute_transaction(wallet.id(), tx_request).await?;
-    let tx_update = bump_result.to_transaction_update(client.get_sync_height().await?);
-    client.apply_transaction(tx_update).await?;
+    let current_height = client.get_sync_height().await?;
+    let tx_update = client.get_transaction_store_update(&bump_result, current_height).await?;
+    client.apply_transaction_update(tx_update).await?;
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(vec![(network_note, None)])
@@ -208,12 +209,16 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     // Submit both transactions
     let bump_submission_height =
         client.submit_proven_transaction(bump_proven, &bump_result).await?;
-    let _bump_update = bump_result.to_transaction_update(bump_submission_height);
+    let _bump_update = client
+        .get_transaction_store_update(&bump_result, bump_submission_height)
+        .await?;
 
     let consume_submission_height =
         client.submit_proven_transaction(consume_proven, &consume_result).await?;
-    let consume_update = consume_result.to_transaction_update(consume_submission_height);
-    client.apply_transaction(consume_update).await?;
+    let consume_update = client
+        .get_transaction_store_update(&consume_result, consume_submission_height)
+        .await?;
+    client.apply_transaction_update(consume_update).await?;
 
     wait_for_blocks(&mut client, 2).await;
 

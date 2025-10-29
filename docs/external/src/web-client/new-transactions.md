@@ -83,7 +83,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
+    const transactionUpdate = await webClient.transactionStoreUpdate(
+        result,
+        submissionHeight
+    );
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -125,7 +128,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
+    const transactionUpdate = await webClient.transactionStoreUpdate(
+        result,
+        submissionHeight
+    );
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -176,7 +182,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
+    const transactionUpdate = await webClient.transactionStoreUpdate(
+        result,
+        submissionHeight
+    );
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -216,7 +225,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
+    const transactionUpdate = await webClient.transactionStoreUpdate(
+        result,
+        submissionHeight
+    );
     await webClient.applyTransaction(transactionUpdate);
 
     console.log("Block number:", transactionUpdate.blockNum());
@@ -322,7 +334,10 @@ try {
         proven,
         result
     );
-    const transactionUpdate = result.transactionUpdateWithHeight(submissionHeight);
+    const transactionUpdate = await webClient.transactionStoreUpdate(
+        result,
+        submissionHeight
+    );
     await webClient.applyTransaction(transactionUpdate);
     
     // Access transaction details

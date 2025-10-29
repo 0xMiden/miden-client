@@ -85,15 +85,6 @@ impl TransactionResult {
     pub fn consumed_notes(&self) -> &InputNotes<InputNote> {
         self.transaction.tx_inputs().input_notes()
     }
-
-    /// Builds a [`TransactionStoreUpdate`] using the provided submission height.
-    pub fn to_transaction_update(&self, submission_height: BlockNumber) -> TransactionStoreUpdate {
-        TransactionStoreUpdate::new(
-            self.transaction.clone(),
-            submission_height,
-            self.future_notes.clone(),
-        )
-    }
 }
 
 impl From<&TransactionResult> for TransactionInputs {

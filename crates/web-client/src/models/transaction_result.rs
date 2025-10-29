@@ -1,4 +1,3 @@
-use miden_client::BlockNumber;
 use miden_client::transaction::TransactionResult as NativeTransactionResult;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
@@ -40,12 +39,6 @@ impl TransactionResult {
                 NoteDetailsAndTag::new(note_details.into(), note_tag.into())
             })
             .collect()
-    }
-
-    /// Builds a store update using the provided submission height.
-    #[wasm_bindgen(js_name = "transactionUpdateWithHeight")]
-    pub fn transaction_update_with_height(&self, submission_height: u32) -> TransactionStoreUpdate {
-        self.result.to_transaction_update(BlockNumber::from(submission_height)).into()
     }
 
     /// Serializes the transaction result into bytes.

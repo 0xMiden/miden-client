@@ -974,8 +974,10 @@ export const discardedTransaction = async (
       consumeTransactionRequest
     );
     const submissionHeight = (await client.getSyncHeight()) + 1;
-    let targetTxUpdate =
-      targetPipeline.transactionUpdateWithHeight(submissionHeight);
+    let targetTxUpdate = await client.transactionStoreUpdate(
+      targetPipeline,
+      submissionHeight
+    );
 
     await client.applyTransaction(targetTxUpdate);
     // Get the account state after the transaction is applied

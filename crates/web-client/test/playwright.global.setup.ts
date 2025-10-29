@@ -249,9 +249,13 @@ export const test = base.extend<{ forEachTest: void }>({
               proven,
               result
             );
-            const submissionUpdate =
-              result.transactionUpdateWithHeight(submissionHeight);
-            await client.applyTransaction(submissionUpdate);
+            const submissionUpdate = await client.transactionStoreUpdate(
+              result,
+              submissionHeight
+            );
+            if (!(client instanceof window.MockWebClient)) {
+              await client.applyTransaction(submissionUpdate);
+            }
 
             return submissionUpdate;
           };

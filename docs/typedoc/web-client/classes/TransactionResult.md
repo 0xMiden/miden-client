@@ -53,21 +53,3 @@ Returns the ID of the transaction.
 #### Returns
 
 [`TransactionId`](TransactionId.md)
-
-***
-
-### transactionUpdateWithHeight()
-
-> **transactionUpdateWithHeight**(`submission_height`): [`TransactionStoreUpdate`](TransactionStoreUpdate.md)
-
-Builds a store update using the provided submission height.
-
-#### Parameters
-
-##### submission\_height
-
-`number`
-
-#### Returns
-
-[`TransactionStoreUpdate`](TransactionStoreUpdate.md)

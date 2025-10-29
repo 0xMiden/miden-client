@@ -135,13 +135,16 @@ const methodHandlers = {
 
     let prover;
     if (proverPayload) {
-      if (proverPayload.type === "remote") {
-        if (!proverPayload.endpoint) {
+      if (proverPayload === "local") {
+        prover = wasm.TransactionProver.newLocalProver();
+      } else if (proverPayload.startsWith("remote:")) {
+        const endpoint = proverPayload.slice("remote:".length);
+        if (!endpoint) {
           throw new Error("Remote prover requires an endpoint");
         }
-        prover = wasm.TransactionProver.newRemoteProver(proverPayload.endpoint);
+        prover = wasm.TransactionProver.newRemoteProver(endpoint);
       } else {
-        prover = wasm.TransactionProver.newLocalProver();
+        throw new Error("Invalid prover tag received in worker");
       }
     }
 
@@ -153,11 +156,13 @@ const methodHandlers = {
       proven,
       transactionResult
     );
-    const update =
-      transactionResult.transactionUpdateWithHeight(submissionHeight);
+    const update = await wasmWebClient.transactionStoreUpdate(
+      transactionResult,
+      submissionHeight
+    );
     await wasmWebClient.applyTransaction(update);
 
-    return update.serialize().buffer;
+    return { submissionHeight };
   },
   [MethodName.SUBMIT_NEW_TRANSACTION]: async (args) => {
     const [accountIdHex, serializedTransactionRequest] = args;
@@ -176,17 +181,21 @@ const methodHandlers = {
 
     const transactionId = result.id().toHex();
 
-    const proven = await wasmWebClient.proveTransaction(result, undefined);
+    const proven = await wasmWebClient.proveTransaction(result);
     const submissionHeight = await wasmWebClient.submitProvenTransaction(
       proven,
       result
     );
-    const update = result.transactionUpdateWithHeight(submissionHeight);
+    const update = await wasmWebClient.transactionStoreUpdate(
+      result,
+      submissionHeight
+    );
     await wasmWebClient.applyTransaction(update);
 
     return {
       transactionId,
-      serializedUpdate: update.serialize().buffer,
+      submissionHeight,
+      serializedTransactionResult: result.serialize().buffer,
     };
   },
 };
@@ -221,11 +230,10 @@ methodHandlers[MethodName.SUBMIT_TRANSACTION_MOCK] = async (args) => {
     serializedMockNoteTransportNode
   );
 
-  const serializedUpdate =
-    await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
+  const result = await methodHandlers[MethodName.SUBMIT_TRANSACTION](args);
 
   return {
-    serializedUpdate,
+    submissionHeight: result.submissionHeight,
     serializedMockChain: wasmWebClient.serializeMockChain().buffer,
     serializedMockNoteTransportNode:
       wasmWebClient.serializeMockNoteTransportNode().buffer,
@@ -251,7 +259,8 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
 
   return {
     transactionId: result.transactionId,
-    serializedUpdate: result.serializedUpdate,
+    submissionHeight: result.submissionHeight,
+    serializedTransactionResult: result.serializedTransactionResult,
     serializedMockChain: wasmWebClient.serializeMockChain().buffer,
     serializedMockNoteTransportNode:
       wasmWebClient.serializeMockNoteTransportNode().buffer,

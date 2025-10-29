@@ -1526,9 +1526,12 @@ async fn account_rollback() {
     let account_commitment_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
+    let submission_height = client.get_sync_height().await.unwrap();
     let tx_update =
-        transaction_result.to_transaction_update(client.get_sync_height().await.unwrap());
-    Box::pin(client.apply_transaction(tx_update)).await.unwrap();
+        Box::pin(client.get_transaction_store_update(&transaction_result, submission_height))
+            .await
+            .unwrap();
+    Box::pin(client.apply_transaction_update(tx_update)).await.unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
@@ -1616,10 +1619,13 @@ async fn subsequent_discarded_transactions() {
 
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
 
+    let submission_height = client.get_sync_height().await.unwrap();
     let tx_update =
-        transaction_result.to_transaction_update(client.get_sync_height().await.unwrap());
+        Box::pin(client.get_transaction_store_update(&transaction_result, submission_height))
+            .await
+            .unwrap();
 
-    Box::pin(client.apply_transaction(tx_update)).await.unwrap();
+    Box::pin(client.apply_transaction_update(tx_update)).await.unwrap();
 
     // Create a second transaction that will not expire
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -1635,9 +1641,12 @@ async fn subsequent_discarded_transactions() {
     let transaction_result =
         Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
     let second_tx_id = transaction_result.id();
+    let submission_height = client.get_sync_height().await.unwrap();
     let tx_update =
-        transaction_result.to_transaction_update(client.get_sync_height().await.unwrap());
-    Box::pin(client.apply_transaction(tx_update)).await.unwrap();
+        Box::pin(client.get_transaction_store_update(&transaction_result, submission_height))
+            .await
+            .unwrap();
+    Box::pin(client.apply_transaction_update(tx_update)).await.unwrap();
 
     // Sync the state, which should discard the first transaction
     mock_rpc_api.advance_blocks(3);
@@ -1760,8 +1769,11 @@ async fn input_note_checks() {
         .submit_proven_transaction(proven_transaction, &transaction_result)
         .await
         .unwrap();
-    let tx_update = transaction_result.to_transaction_update(submission_height);
-    Box::pin(client.apply_transaction(tx_update)).await.unwrap();
+    let tx_update =
+        Box::pin(client.get_transaction_store_update(&transaction_result, submission_height))
+            .await
+            .unwrap();
+    Box::pin(client.apply_transaction_update(tx_update)).await.unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 

@@ -26,7 +26,7 @@ use miden_client::account::{
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
-use miden_client::note::{BlockNumber, NoteUpdateTracker, Nullifier};
+use miden_client::note::{BlockNumber, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -119,12 +119,8 @@ impl Store for WebStore {
         self.get_transactions(transaction_filter).await
     }
 
-    async fn apply_transaction(
-        &self,
-        tx_update: TransactionStoreUpdate,
-        note_update_tracker: NoteUpdateTracker,
-    ) -> Result<(), StoreError> {
-        self.apply_transaction(tx_update, note_update_tracker).await
+    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
+        self.apply_transaction(tx_update).await
     }
 
     // NOTES

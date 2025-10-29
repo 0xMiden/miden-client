@@ -494,12 +494,17 @@ export class WebClient {
         serializedTransactionRequest
       );
 
-      const update = wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(result.serializedUpdate)
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      const update = await this.wasmWebClient.transactionStoreUpdate(
+        transactionResult,
+        result.submissionHeight
       );
       await this.wasmWebClient.applyTransaction(update);
 
-      return update.executedTransaction().id();
+      return transactionResult.id();
     } catch (error) {
       console.error(
         "INDEX.JS: Error in submitNewTransaction:",
@@ -546,8 +551,10 @@ export class WebClient {
             proven,
             transactionResult
           );
-        const update =
-          transactionResult.transactionUpdateWithHeight(submissionHeight);
+        const update = await this.wasmWebClient.transactionStoreUpdate(
+          transactionResult,
+          submissionHeight
+        );
         await this.wasmWebClient.applyTransaction(update);
         return update;
       }
@@ -555,14 +562,15 @@ export class WebClient {
       const serializedTransactionResult = transactionResult.serialize();
       const proverPayload = prover ? prover.serialize() : null;
 
-      const serializedUpdateBytes = await this.callMethodWithWorker(
+      const { submissionHeight } = await this.callMethodWithWorker(
         MethodName.SUBMIT_TRANSACTION,
         serializedTransactionResult,
         proverPayload
       );
 
-      const update = wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(serializedUpdateBytes)
+      const update = await this.wasmWebClient.transactionStoreUpdate(
+        transactionResult,
+        submissionHeight
       );
       await this.wasmWebClient.applyTransaction(update);
 
@@ -732,10 +740,10 @@ export class MockWebClient extends WebClient {
         serializedMockNoteTransportNode
       );
 
-      const update = wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(result.serializedUpdate)
+      const update = await this.wasmWebClient.transactionStoreUpdate(
+        transactionResult,
+        result.submissionHeight
       );
-      await this.wasmWebClient.applyTransaction(update);
 
       const newMockChain = new Uint8Array(result.serializedMockChain);
       const newMockNoteTransportNode = result.serializedMockNoteTransportNode
@@ -776,17 +784,14 @@ export class MockWebClient extends WebClient {
         serializedMockNoteTransportNode
       );
 
-      const update = wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(result.serializedUpdate)
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
       );
-      await this.wasmWebClient.applyTransaction(update);
 
       const newMockChain = new Uint8Array(result.serializedMockChain);
       const newMockNoteTransportNode = result.serializedMockNoteTransportNode
         ? new Uint8Array(result.serializedMockNoteTransportNode)
         : undefined;
-
-      const transactionId = update.executedTransaction().id();
 
       this.wasmWebClient = new WasmWebClient();
       await this.wasmWebClient.createMockClient(
@@ -795,7 +800,7 @@ export class MockWebClient extends WebClient {
         newMockNoteTransportNode
       );
 
-      return transactionId;
+      return transactionResult.id();
     } catch (error) {
       console.error(
         "INDEX.JS: Error in submitNewTransaction:",

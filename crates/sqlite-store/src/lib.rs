@@ -32,7 +32,7 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
-use miden_client::note::{BlockNumber, NoteTag, NoteUpdateTracker, Nullifier};
+use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -186,14 +186,10 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn apply_transaction(
-        &self,
-        tx_update: TransactionStoreUpdate,
-        note_updates: NoteUpdateTracker,
-    ) -> Result<(), StoreError> {
+    async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
         let merkle_store = self.merkle_store.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update, &note_updates)
+            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update)
         })
         .await
     }
