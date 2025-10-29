@@ -285,6 +285,31 @@ impl Store for WebStore {
         self.get_account_addresses(account_id).await
     }
 
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        let success = self.add_note_tag(note_tag_record).await?;
+        if !success {
+            return Err(StoreError::NoteTagAlreadyTracked(u64::from(derived_note_tag.as_u32())));
+        }
+        self.insert_address(address, &account_id).await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        self.remove_note_tag(note_tag_record).await?;
+        self.remove_address(address).await
+    }
+
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 

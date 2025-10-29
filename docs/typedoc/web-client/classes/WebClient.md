@@ -493,6 +493,26 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ***
 
+### insertAccountAddress()
+
+> **insertAccountAddress**(`account_id`, `address`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### address
+
+[`Address`](Address.md)
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### listSettingKeys()
 
 > **listSettingKeys**(): `Promise`\<`string`[]\>
@@ -742,6 +762,26 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `void`
+
+***
+
+### removeAccountAddress()
+
+> **removeAccountAddress**(`account_id`, `address`): `Promise`\<`void`\>
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### address
+
+[`Address`](Address.md)
+
+#### Returns
+
+`Promise`\<`void`\>
 
 ***
 

@@ -1,4 +1,4 @@
 extern crate alloc;
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

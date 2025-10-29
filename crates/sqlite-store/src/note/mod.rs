@@ -30,7 +30,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params, params_from_iter};
 
 use super::SqliteStore;
-use super::chain_data::set_block_header_has_client_notes;
+use crate::chain_data::set_block_header_has_client_notes;
 use crate::note::filters::{note_filter_to_query_input_notes, note_filter_to_query_output_notes};
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
