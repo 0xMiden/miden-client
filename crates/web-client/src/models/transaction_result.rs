@@ -1,11 +1,13 @@
 use miden_client::BlockNumber;
 use miden_client::transaction::TransactionResult as NativeTransactionResult;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::executed_transaction::ExecutedTransaction;
 use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
+use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 /// WASM wrapper around the native [`TransactionResult`].
 #[derive(Clone)]
@@ -44,6 +46,16 @@ impl TransactionResult {
     #[wasm_bindgen(js_name = "transactionUpdateWithHeight")]
     pub fn transaction_update_with_height(&self, submission_height: u32) -> TransactionStoreUpdate {
         self.result.to_transaction_update(BlockNumber::from(submission_height)).into()
+    }
+
+    /// Serializes the transaction result into bytes.
+    pub fn serialize(&self) -> Uint8Array {
+        serialize_to_uint8array(&self.result)
+    }
+
+    /// Deserializes a transaction result from bytes.
+    pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionResult, JsValue> {
+        deserialize_from_uint8array::<NativeTransactionResult>(bytes).map(TransactionResult::from)
     }
 }
 

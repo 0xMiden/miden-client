@@ -7,26 +7,6 @@ const mockChainTest = async (testingPage: Page) => {
     const client = await window.MockWebClient.createClient();
     await client.syncState();
 
-    const executeAndApply = async (accountId, transactionRequest) => {
-      const result = await client.executeTransaction(
-        accountId,
-        transactionRequest
-      );
-
-      const proven = await client.proveTransaction(
-        result,
-        window.TransactionProver.newLocalProver()
-      );
-      const submissionHeight = await client.submitProvenTransaction(
-        proven,
-        result
-      );
-      const update = result.transactionUpdateWithHeight(submissionHeight);
-      await client.applyTransaction(update);
-
-      return update;
-    };
-
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true
@@ -46,25 +26,30 @@ const mockChainTest = async (testingPage: Page) => {
       BigInt(1000)
     );
 
-    const mintTransactionUpdate = await executeAndApply(
+    const mintTransactionId = await client.submitNewTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
     await client.proveBlock();
     await client.syncState();
 
-    const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintTransactionUpdate
-        .executedTransaction()
-        .outputNotes()
-        .notes()[0]
-        .id()
-        .toString(),
-    ]);
-    const consumeTransactionUpdate = await executeAndApply(
-      account.id(),
-      consumeTransactionRequest
+    const [mintTransactionRecord] = await client.getTransactions(
+      window.TransactionFilter.ids([mintTransactionId])
     );
+    if (!mintTransactionRecord) {
+      throw new Error("Mint transaction record not found");
+    }
+
+    const mintedNoteId = mintTransactionRecord
+      .outputNotes()
+      .notes()[0]
+      .id()
+      .toString();
+
+    const consumeTransactionRequest = client.newConsumeTransactionRequest([
+      mintedNoteId,
+    ]);
+    await client.submitNewTransaction(account.id(), consumeTransactionRequest);
     await client.proveBlock();
     await client.syncState();
 
