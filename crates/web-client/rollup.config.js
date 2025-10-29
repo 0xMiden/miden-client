@@ -1,4 +1,5 @@
 import rust from "@wasm-tool/rollup-plugin-rust";
+import typescript from "@rollup/plugin-typescript";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import copy from "rollup-plugin-copy";
@@ -58,7 +59,7 @@ const baseCargoArgs = [
  */
 export default [
   {
-    input: "./js/wasm.js",
+    input: ["./js/wasm.js", "./js/index.ts"],
     output: {
       dir: `dist`,
       format: "es",
@@ -81,6 +82,11 @@ export default [
       }),
       resolve(),
       commonjs(),
+      typescript({
+        compilerOptions: { allowJs: true },
+        outDir: "dist",
+        strict: true,
+      }),
     ],
   },
   // Build the worker file
@@ -102,15 +108,5 @@ export default [
         verbose: true,
       }),
     ],
-  },
-  // Build the main entry point
-  {
-    input: "./js/index.js",
-    output: {
-      dir: `dist`,
-      format: "es",
-      sourcemap: true,
-    },
-    plugins: [resolve(), commonjs()],
   },
 ];
