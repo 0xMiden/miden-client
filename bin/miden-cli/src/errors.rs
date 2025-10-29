@@ -52,6 +52,9 @@ pub enum CliError {
     #[error("import error: {0}")]
     #[diagnostic(code(cli::import_error), help("Check the file name."))]
     Import(String),
+    #[error("init data error: {1}")]
+    #[diagnostic(code(cli::account_error))]
+    InitDataError(#[source] SourceError, String),
     #[error("input error: {0}")]
     #[diagnostic(code(cli::input_error))]
     Input(String),
