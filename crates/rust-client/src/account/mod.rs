@@ -74,7 +74,6 @@ use crate::store::{AccountRecord, AccountStatus};
 use crate::sync::NoteTagRecord;
 
 pub mod component {
-    pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
     pub use miden_lib::account::auth::*;
