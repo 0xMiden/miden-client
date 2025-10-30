@@ -21,6 +21,7 @@
 * Implemented missing RPC endpoints: `/SyncStorageMaps`, `/SyncAccountVault` & `/SyncTransactions` ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
 * Updated `submit_proven_transaction()` to include `TransactionInputs` for validator ([#1421](https://github.com/0xMiden/miden-client/pull/1421)).
 * [BREAKING] Replaced `AccountComponentTemplates` for `Packages` for account creation ([#1313](https://github.com/0xMiden/miden-client/pull/1313)).
+* Exposed all auth packages from `miden-base`: `no-auth`, `multisig-auth`, and `acl-auth` components are now available in the CLI under `packages/auth/` subdirectory ([#1132](https://github.com/0xMiden/miden-client/issues/1132)).
 
 ### Changes
 
