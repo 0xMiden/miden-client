@@ -285,22 +285,36 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
 
 /// Checks if an `AccountComponent` is an authentication component by inspecting its procedures.
 ///
-/// An auth component is identified by having at least one procedure that starts with "auth_".
+/// An auth component is identified by having exactly one procedure that starts with "auth_".
 /// This follows the convention used in miden-base.
-fn is_auth_component(component: &AccountComponent) -> bool {
+///
+/// Returns an error if more than one auth procedure is found.
+fn is_auth_component(component: &AccountComponent) -> Result<bool, CliError> {
+    let mut auth_procedure_count = 0;
+    let mut first_auth_procedure = String::new();
+
     for module in component.library().module_infos() {
         for (_proc_index, procedure_info) in module.procedures() {
             if procedure_info.name.starts_with("auth_") {
-                debug!(
-                    "Detected auth procedure: {} in module {}",
-                    procedure_info.name,
-                    module.path()
-                );
-                return true;
+                auth_procedure_count += 1;
+
+                if auth_procedure_count == 1 {
+                    first_auth_procedure = procedure_info.name.to_string();
+                } else if auth_procedure_count > 1 {
+                    return Err(CliError::InvalidArgument(format!(
+                        "Component has multiple auth procedures. Only one auth procedure is allowed per component. Found at least: {} and {}",
+                        first_auth_procedure, procedure_info.name
+                    )));
+                }
             }
         }
     }
-    false
+
+    if auth_procedure_count == 1 {
+        debug!("Detected auth procedure: {}", first_auth_procedure);
+    }
+
+    Ok(auth_procedure_count == 1)
 }
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
@@ -344,27 +358,24 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     let account_components = process_packages(packages, &init_storage_data)?;
 
     // Collect auth and non-auth components separately
-    let mut auth_components = Vec::new();
+    let mut auth_component: Option<AccountComponent> = None;
     let mut regular_components = Vec::new();
 
     for component in account_components {
-        if is_auth_component(&component) {
-            auth_components.push(component);
+        if is_auth_component(&component)? {
+            if auth_component.is_some() {
+                return Err(CliError::InvalidArgument(
+                    "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
+                ));
+            }
+            auth_component = Some(component);
         } else {
             regular_components.push(component);
         }
     }
 
-    // Validate that there is at most one auth component
-    if auth_components.len() > 1 {
-        return Err(CliError::InvalidArgument(format!(
-            "Multiple auth components found in packages. Only one auth component is allowed per account. Found {} auth components.",
-            auth_components.len()
-        )));
-    }
-
     // Add the auth component (either from packages or default Falcon)
-    let key_pair = if let Some(auth_component) = auth_components.into_iter().next() {
+    let key_pair = if let Some(auth_component) = auth_component {
         debug!("Adding auth component from package");
         builder = builder.with_auth_component(auth_component);
         None
