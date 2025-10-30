@@ -982,7 +982,9 @@ storage = []
         output_file.to_str().unwrap(),
     ]);
 
-    cmd.assert().success().stdout(contains("Successfully created package 'test_package'"));
+    cmd.assert()
+        .success()
+        .stdout(contains("Successfully created package 'test_package'"));
 
     // Verify the package file was created
     assert!(output_file.exists(), "Package file should exist");
@@ -1000,18 +1002,10 @@ fn package_command_with_multiple_sources() {
 
     // Create multiple .masm files
     let masm_file1 = temp_dir.join("module1.masm");
-    fs::write(
-        &masm_file1,
-        "export.procedure_one\n    push.1.2\n    drop drop\nend\n",
-    )
-    .unwrap();
+    fs::write(&masm_file1, "export.procedure_one\n    push.1.2\n    drop drop\nend\n").unwrap();
 
     let masm_file2 = temp_dir.join("module2.masm");
-    fs::write(
-        &masm_file2,
-        "export.procedure_two\n    push.3.4\n    drop drop\nend\n",
-    )
-    .unwrap();
+    fs::write(&masm_file2, "export.procedure_two\n    push.3.4\n    drop drop\nend\n").unwrap();
 
     // Create a metadata file
     let metadata_file = temp_dir.join("metadata.toml");
@@ -1054,4 +1048,3 @@ storage = []
     // Cleanup
     fs::remove_dir_all(&temp_dir).unwrap();
 }
-

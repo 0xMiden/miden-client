@@ -8,7 +8,12 @@ use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module,
 use miden_client::transaction::TransactionKernel;
 use miden_client::utils::Serializable;
 use miden_client::vm::{
-    MastArtifact, Package, PackageExport, PackageManifest, QualifiedProcedureName, Section,
+    MastArtifact,
+    Package,
+    PackageExport,
+    PackageManifest,
+    QualifiedProcedureName,
+    Section,
     SectionId,
 };
 use tracing::info;
@@ -60,16 +65,12 @@ impl PackageCmd {
         let library = self.compile_library(&component_metadata)?;
 
         // Build the package
-        let package = self.build_package(component_metadata, library)?;
+        let package = Self::build_package(&component_metadata, library);
 
         // Write the package to the output file
         self.write_package(&package)?;
 
-        println!(
-            "Successfully created package '{}' at {}",
-            package.name,
-            self.output.display()
-        );
+        println!("Successfully created package '{}' at {}", package.name, self.output.display());
 
         Ok(())
     }
@@ -92,10 +93,8 @@ impl PackageCmd {
             })?;
 
             // Extract the module name from the filename (without extension)
-            let module_name = source_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or_else(|| {
+            let module_name =
+                source_path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
                     CliError::PackageError(
                         Box::new(std::io::Error::new(
                             std::io::ErrorKind::InvalidInput,
@@ -107,23 +106,22 @@ impl PackageCmd {
 
             // Create a library path that includes the package name and module name
             let library_path_str = format!("{}::{}", component_metadata.name(), module_name);
-            let library_path = LibraryPath::try_from(library_path_str.as_str())
-                .map_err(|err| {
-                    CliError::PackageError(
-                        Box::new(err),
-                        format!(
-                            "Invalid library path '{}'",
-                            library_path_str
-                        ),
-                    )
-                })?;
+            let library_path = LibraryPath::try_from(library_path_str.as_str()).map_err(|err| {
+                CliError::PackageError(
+                    Box::new(err),
+                    format!("Invalid library path '{library_path_str}'"),
+                )
+            })?;
 
             // Parse the module using Module::parser
             let module = Module::parser(ModuleKind::Library)
                 .parse_str(library_path, source_code, &source_manager)
                 .map_err(|err| {
                     CliError::PackageError(
-                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string())),
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            err.to_string(),
+                        )),
                         format!("Failed to parse module from {}", source_path.display()),
                     )
                 })?;
@@ -132,23 +130,20 @@ impl PackageCmd {
         }
 
         // Compile all modules into a library
-        let library = assembler
-            .assemble_library(modules)
-            .map_err(|err| {
-                CliError::PackageError(
-                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string())),
-                    "Failed to assemble library from source files".to_string(),
-                )
-            })?;
+        let library = assembler.assemble_library(modules).map_err(|err| {
+            CliError::PackageError(
+                Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string())),
+                "Failed to assemble library from source files".to_string(),
+            )
+        })?;
 
         Ok(library)
     }
 
     fn build_package(
-        &self,
-        component_metadata: AccountComponentMetadata,
+        component_metadata: &AccountComponentMetadata,
         library: Library,
-    ) -> Result<Package, CliError> {
+    ) -> Package {
         // Gather all of the procedure metadata for exports of this package
         let mut exports: Vec<PackageExport> = Vec::new();
         for module_info in library.module_infos() {
@@ -168,25 +163,24 @@ impl PackageCmd {
         let account_component_metadata_section =
             Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, component_metadata.to_bytes());
 
-        let package = Package {
+        Package {
             name: component_metadata.name().to_string(),
             version: Some(component_metadata.version().clone()),
             description: Some(component_metadata.description().to_string()),
             mast,
             manifest,
             sections: vec![account_component_metadata_section],
-        };
-
-        Ok(package)
+        }
     }
 
     fn write_package(&self, package: &Package) -> Result<(), CliError> {
         // Ensure the output has the correct extension
-        let output_path = if self.output.extension().and_then(|s| s.to_str()) != Some(MIDEN_PACKAGE_EXTENSION) {
-            self.output.with_extension(MIDEN_PACKAGE_EXTENSION)
-        } else {
-            self.output.clone()
-        };
+        let output_path =
+            if self.output.extension().and_then(|s| s.to_str()) == Some(MIDEN_PACKAGE_EXTENSION) {
+                self.output.clone()
+            } else {
+                self.output.with_extension(MIDEN_PACKAGE_EXTENSION)
+            };
 
         // Create parent directories if they don't exist
         if let Some(parent) = output_path.parent() {

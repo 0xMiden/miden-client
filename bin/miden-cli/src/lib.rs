@@ -229,7 +229,9 @@ impl Cli {
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
             Command::Package(_) => {
                 // This case is handled earlier in the function before client initialization
-                unreachable!("Package command should have been handled before client initialization")
+                unreachable!(
+                    "Package command should have been handled before client initialization"
+                )
             },
         }
     }
