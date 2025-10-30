@@ -83,7 +83,7 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.applyTransactionResult(
+    const transactionUpdate = await webClient.applyTransaction(
         result,
         submissionHeight
     );
@@ -127,7 +127,7 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.applyTransactionResult(
+    const transactionUpdate = await webClient.applyTransaction(
         result,
         submissionHeight
     );
@@ -180,7 +180,7 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.applyTransactionResult(
+    const transactionUpdate = await webClient.applyTransaction(
         result,
         submissionHeight
     );
@@ -222,7 +222,7 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.applyTransactionResult(
+    const transactionUpdate = await webClient.applyTransaction(
         result,
         submissionHeight
     );
@@ -330,7 +330,7 @@ try {
         proven,
         result
     );
-    const transactionUpdate = await webClient.applyTransactionResult(
+    const transactionUpdate = await webClient.applyTransaction(
         result,
         submissionHeight
     );

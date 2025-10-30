@@ -52,23 +52,7 @@
 
 ### applyTransaction()
 
-> **applyTransaction**(`tx_update`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### tx\_update
-
-[`TransactionStoreUpdate`](TransactionStoreUpdate.md)
-
-#### Returns
-
-`Promise`\<`void`\>
-
-***
-
-### applyTransactionResult()
-
-> **applyTransactionResult**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+> **applyTransaction**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 #### Parameters
 
@@ -1008,26 +992,6 @@ the chain tip is performed, and the required block header is retrieved.
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-***
-
-### transactionStoreUpdate()
-
-> **transactionStoreUpdate**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
-
-#### Parameters
-
-##### transaction\_result
-
-[`TransactionResult`](TransactionResult.md)
-
-##### submission\_height
-
-`number`
-
-#### Returns
-
-`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
 
 ***
 

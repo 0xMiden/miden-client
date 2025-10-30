@@ -249,17 +249,7 @@ export const test = base.extend<{ forEachTest: void }>({
               proven,
               result
             );
-            if (client instanceof window.MockWebClient) {
-              return await client.transactionStoreUpdate(
-                result,
-                submissionHeight
-              );
-            }
-
-            return await client.applyTransactionResult(
-              result,
-              submissionHeight
-            );
+            return await client.applyTransaction(result, submissionHeight);
           };
 
           window.helpers.waitForBlocks = async (amountOfBlocks) => {

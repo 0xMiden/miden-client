@@ -148,14 +148,16 @@ const methodHandlers = {
       proven,
       result
     );
-    const update = await wasmWebClient.transactionStoreUpdate(
+    const transactionUpdate = await wasmWebClient.applyTransaction(
       result,
       submissionHeight
     );
+
     return {
       transactionId,
       submissionHeight,
       serializedTransactionResult: result.serialize().buffer,
+      serializedTransactionUpdate: transactionUpdate.serialize().buffer,
     };
   },
 };
@@ -197,6 +199,7 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
     transactionId: result.transactionId,
     submissionHeight: result.submissionHeight,
     serializedTransactionResult: result.serializedTransactionResult,
+    serializedTransactionUpdate: result.serializedTransactionUpdate,
     serializedMockChain: wasmWebClient.serializeMockChain().buffer,
     serializedMockNoteTransportNode:
       wasmWebClient.serializeMockNoteTransportNode().buffer,

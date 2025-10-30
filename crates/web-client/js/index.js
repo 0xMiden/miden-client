@@ -498,11 +498,10 @@ export class WebClient {
         new Uint8Array(result.serializedTransactionResult)
       );
 
-      const update = await this.wasmWebClient.transactionStoreUpdate(
+      await this.wasmWebClient.applyTransaction(
         transactionResult,
         result.submissionHeight
       );
-      await this.wasmWebClient.applyTransaction(update);
 
       return transactionResult.id();
     } catch (error) {
@@ -551,30 +550,32 @@ export class WebClient {
             proven,
             transactionResult
           );
-        const update = await this.wasmWebClient.transactionStoreUpdate(
+        return await this.wasmWebClient.applyTransaction(
           transactionResult,
           submissionHeight
         );
-        await this.wasmWebClient.applyTransaction(update);
-        return update;
       }
 
       const serializedTransactionResult = transactionResult.serialize();
       const proverPayload = prover ? prover.serialize() : null;
 
-      const { submissionHeight } = await this.callMethodWithWorker(
-        MethodName.SUBMIT_TRANSACTION,
-        serializedTransactionResult,
-        proverPayload
-      );
+      const { submissionHeight, serializedTransactionUpdate } =
+        await this.callMethodWithWorker(
+          MethodName.SUBMIT_TRANSACTION,
+          serializedTransactionResult,
+          proverPayload
+        );
 
-      const update = await this.wasmWebClient.transactionStoreUpdate(
+      if (this instanceof MockWebClient) {
+        return wasm.TransactionStoreUpdate.deserialize(
+          new Uint8Array(serializedTransactionUpdate)
+        );
+      }
+
+      return await this.wasmWebClient.applyTransaction(
         transactionResult,
         submissionHeight
       );
-      await this.wasmWebClient.applyTransaction(update);
-
-      return update;
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
       throw error;
@@ -745,7 +746,7 @@ export class MockWebClient extends WebClient {
         : undefined;
 
       if (!(this instanceof MockWebClient)) {
-        return await this.wasmWebClient.applyTransactionResult(
+        return await this.wasmWebClient.applyTransaction(
           transactionResult,
           result.submissionHeight
         );
@@ -758,9 +759,8 @@ export class MockWebClient extends WebClient {
         newMockNoteTransportNode
       );
 
-      return await this.wasmWebClient.transactionStoreUpdate(
-        transactionResult,
-        result.submissionHeight
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(result.serializedTransactionUpdate)
       );
     } catch (error) {
       console.error("INDEX.JS: Error in submitTransaction:", error.toString());
@@ -798,7 +798,7 @@ export class MockWebClient extends WebClient {
       );
 
       if (!(this instanceof MockWebClient)) {
-        await this.wasmWebClient.applyTransactionResult(
+        await this.wasmWebClient.applyTransaction(
           transactionResult,
           result.submissionHeight
         );
