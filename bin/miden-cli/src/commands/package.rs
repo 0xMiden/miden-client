@@ -81,18 +81,6 @@ impl PackageCmd {
         let assembler = TransactionKernel::assembler();
         let source_manager = Arc::new(DefaultSourceManager::default());
 
-        // Create a library path for the package
-        let library_path = LibraryPath::try_from(component_metadata.name())
-            .map_err(|err| {
-                CliError::PackageError(
-                    Box::new(err),
-                    format!(
-                        "Invalid library path for component name '{}'",
-                        component_metadata.name()
-                    ),
-                )
-            })?;
-
         // Read all source files and parse them into modules
         let mut modules = Vec::new();
         for source_path in &self.sources {
@@ -103,9 +91,36 @@ impl PackageCmd {
                 )
             })?;
 
+            // Extract the module name from the filename (without extension)
+            let module_name = source_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| {
+                    CliError::PackageError(
+                        Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "Invalid file name",
+                        )),
+                        format!("Could not extract module name from {}", source_path.display()),
+                    )
+                })?;
+
+            // Create a library path that includes the package name and module name
+            let library_path_str = format!("{}::{}", component_metadata.name(), module_name);
+            let library_path = LibraryPath::try_from(library_path_str.as_str())
+                .map_err(|err| {
+                    CliError::PackageError(
+                        Box::new(err),
+                        format!(
+                            "Invalid library path '{}'",
+                            library_path_str
+                        ),
+                    )
+                })?;
+
             // Parse the module using Module::parser
             let module = Module::parser(ModuleKind::Library)
-                .parse_str(library_path.clone(), source_code, &source_manager)
+                .parse_str(library_path, source_code, &source_manager)
                 .map_err(|err| {
                     CliError::PackageError(
                         Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string())),

@@ -937,3 +937,121 @@ fn exec_parse() {
 
     failure_cmd.current_dir(&temp_dir).assert().failure();
 }
+
+// PACKAGE TESTS
+// ================================================================================================
+
+#[test]
+fn package_command_creates_valid_package() {
+    let temp_dir = temp_dir().join(format!("miden-client-package-test-{}", rand::random::<u64>()));
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    // Create a simple .masm file
+    let masm_file = temp_dir.join("test.masm");
+    fs::write(
+        &masm_file,
+        "export.test_procedure\n    push.1.2.3.4\n    drop drop drop drop\nend\n",
+    )
+    .unwrap();
+
+    // Create a metadata file
+    let metadata_file = temp_dir.join("metadata.toml");
+    fs::write(
+        &metadata_file,
+        r#"name = "test_package"
+version = "0.1.0"
+description = "A test package"
+supported-types = ["RegularAccountImmutableCode"]
+storage = []
+"#,
+    )
+    .unwrap();
+
+    // Create output path
+    let output_file = temp_dir.join("test.masp");
+
+    // Run the package command
+    let mut cmd = Command::cargo_bin("miden-client").unwrap();
+    cmd.args([
+        "package",
+        "--metadata",
+        metadata_file.to_str().unwrap(),
+        "--sources",
+        masm_file.to_str().unwrap(),
+        "--output",
+        output_file.to_str().unwrap(),
+    ]);
+
+    cmd.assert().success().stdout(contains("Successfully created package 'test_package'"));
+
+    // Verify the package file was created
+    assert!(output_file.exists(), "Package file should exist");
+    assert!(output_file.metadata().unwrap().len() > 0, "Package file should not be empty");
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).unwrap();
+}
+
+#[test]
+fn package_command_with_multiple_sources() {
+    let temp_dir =
+        temp_dir().join(format!("miden-client-package-multi-test-{}", rand::random::<u64>()));
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    // Create multiple .masm files
+    let masm_file1 = temp_dir.join("module1.masm");
+    fs::write(
+        &masm_file1,
+        "export.procedure_one\n    push.1.2\n    drop drop\nend\n",
+    )
+    .unwrap();
+
+    let masm_file2 = temp_dir.join("module2.masm");
+    fs::write(
+        &masm_file2,
+        "export.procedure_two\n    push.3.4\n    drop drop\nend\n",
+    )
+    .unwrap();
+
+    // Create a metadata file
+    let metadata_file = temp_dir.join("metadata.toml");
+    fs::write(
+        &metadata_file,
+        r#"name = "multi_module_package"
+version = "0.1.0"
+description = "A package with multiple modules"
+supported-types = ["RegularAccountImmutableCode", "RegularAccountUpdatableCode"]
+storage = []
+"#,
+    )
+    .unwrap();
+
+    // Create output path
+    let output_file = temp_dir.join("multi.masp");
+
+    // Run the package command with multiple sources
+    let mut cmd = Command::cargo_bin("miden-client").unwrap();
+    cmd.args([
+        "package",
+        "--metadata",
+        metadata_file.to_str().unwrap(),
+        "--sources",
+        masm_file1.to_str().unwrap(),
+        "--sources",
+        masm_file2.to_str().unwrap(),
+        "--output",
+        output_file.to_str().unwrap(),
+    ]);
+
+    cmd.assert()
+        .success()
+        .stdout(contains("Successfully created package 'multi_module_package'"));
+
+    // Verify the package file was created
+    assert!(output_file.exists(), "Package file should exist");
+    assert!(output_file.metadata().unwrap().len() > 0, "Package file should not be empty");
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).unwrap();
+}
+
