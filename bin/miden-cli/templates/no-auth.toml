@@ -1,0 +1,5 @@
+name = "no_auth"
+description = "No authentication component. Only checks if account state changed and increments nonce accordingly. Provides no cryptographic authentication."
+version = "0.1.0"
+supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
+storage = []

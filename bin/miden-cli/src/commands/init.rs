@@ -26,12 +26,39 @@ const FAUCET_PACKAGE: (&str, &[u8]) = (
 /// Contains the account component template file generated on build.rs, corresponding to the basic
 /// auth component.
 const BASIC_AUTH_PACKAGE: (&str, &[u8]) = (
-    "basic-auth.masp",
-    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-auth.masp")),
+    "auth/basic-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "basic-auth.masp")),
 );
 
-const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
-    [BASIC_WALLET_PACKAGE, FAUCET_PACKAGE, BASIC_AUTH_PACKAGE];
+/// Contains the account component template file generated on build.rs, corresponding to the no-auth
+/// component.
+const NO_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/no-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "no-auth.masp")),
+);
+
+/// Contains the account component template file generated on build.rs, corresponding to the
+/// multisig auth component.
+const MULTISIG_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/multisig-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "multisig-auth.masp")),
+);
+
+/// Contains the account component template file generated on build.rs, corresponding to the
+/// ACL auth component.
+const ACL_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/acl-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "acl-auth.masp")),
+);
+
+const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 6] = [
+    BASIC_WALLET_PACKAGE,
+    FAUCET_PACKAGE,
+    BASIC_AUTH_PACKAGE,
+    NO_AUTH_PACKAGE,
+    MULTISIG_AUTH_PACKAGE,
+    ACL_AUTH_PACKAGE,
+];
 
 // INIT COMMAND
 // ================================================================================================
