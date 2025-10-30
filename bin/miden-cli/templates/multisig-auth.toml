@@ -14,8 +14,21 @@ value = [
     { value = "0" },
 ]
 
-# Note: Slots 1-3 are storage maps initialized by the component:
-# - Slot 1: Map with approver public keys (index -> pubkey)
-# - Slot 2: Map which stores executed transactions
-# - Slot 3: Map which stores procedure thresholds (PROC_ROOT -> threshold)
+[[storage]]
+name = "approvers"
+description = "Map with approver public keys (index -> pubkey)"
+slot = 1
+
+[[storage]]
+name = "executed_transactions"
+description = "Map which stores executed transactions"
+slot = 2
+
+[[storage]]
+name = "proc_thresholds"
+description = "Map which stores procedure thresholds (PROC_ROOT -> threshold)"
+slot = 3
+
+
+
 

@@ -20,6 +20,11 @@ value = [
     { value = "0" },
 ]
 
-# Note: Slot 2 is a storage map initialized by the component:
-# - Slot 2: Map with trigger procedure roots that require authentication
+[[storage]]
+name = "proc_roots"
+description = "Map with trigger procedure roots that require authentication"
+slot = 2
+
+
+
 
