@@ -11,6 +11,7 @@ members = [
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
+  "crates/rpc-client",
 ]
 
 default-members = ["bin/miden-cli", "crates/rust-client"]
