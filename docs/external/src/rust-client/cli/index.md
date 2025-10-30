@@ -140,7 +140,7 @@ miden-client new-wallet --storage-mode public --mutable
 miden-client new-wallet --extra-packages packages/custom-package.masp
 
 # Create a fungible faucet with interactive input
-miden-client new-account --account-type fungible-faucet -p packages/basic-fungible-faucet.masp
+miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp
 
 # Create a fungible faucet with preset fields
 miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp --init-storage-data-path init_data.toml
