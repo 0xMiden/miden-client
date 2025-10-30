@@ -345,25 +345,44 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-    let mut has_auth_component = false;
-    let mut key_pair = None;
-
+    
+    // Collect auth and non-auth components separately
+    let mut auth_components = Vec::new();
+    let mut regular_components = Vec::new();
+    
     for component in account_components {
         if is_auth_component(&component) {
-            debug!("Adding auth component from package");
-            builder = builder.with_auth_component(component);
-            has_auth_component = true;
+            auth_components.push(component);
         } else {
-            builder = builder.with_component(component);
+            regular_components.push(component);
         }
     }
 
-    // Add default Falcon auth component if requested and no auth component was found in packages
-    if add_default_auth && !has_auth_component {
+    // Validate that there is at most one auth component
+    if auth_components.len() > 1 {
+        return Err(CliError::InvalidArgument(format!(
+            "Multiple auth components found in packages. Only one auth component is allowed per account. Found {} auth components.",
+            auth_components.len()
+        )));
+    }
+
+    // Add the auth component (either from packages or default Falcon)
+    let key_pair = if let Some(auth_component) = auth_components.into_iter().next() {
+        debug!("Adding auth component from package");
+        builder = builder.with_auth_component(auth_component);
+        None
+    } else if add_default_auth {
         debug!("Adding default Falcon auth component");
         let kp = SecretKey::with_rng(client.rng());
         builder = builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().into()));
-        key_pair = Some(kp);
+        Some(kp)
+    } else {
+        None
+    };
+
+    // Add all regular (non-auth) components
+    for component in regular_components {
+        builder = builder.with_component(component);
     }
 
     let account = builder
