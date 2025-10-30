@@ -937,3 +937,104 @@ fn exec_parse() {
 
     failure_cmd.current_dir(&temp_dir).assert().failure();
 }
+
+// AUTH COMPONENT TESTS
+// ================================================================================================
+
+/// Tests creating an account with the no-auth component.
+/// Note: This test is expected to fail with "account code contains multiple auth components"
+/// until issue #1442 is resolved.
+#[test]
+#[ignore = "will fail until issue #1442 is resolved"]
+fn create_account_with_no_auth() {
+    let temp_dir = init_cli().1;
+
+    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/no-auth",
+    ]);
+
+    // Expected to fail with multiple auth components error until #1442 is resolved
+    create_account_cmd
+        .current_dir(&temp_dir)
+        .assert()
+        .failure()
+        .stderr(contains("account code contains multiple auth components"));
+}
+
+/// Tests creating an account with the multisig-auth component.
+/// Note: This test is expected to fail with "account code contains multiple auth components"
+/// until issue #1442 is resolved.
+#[test]
+#[ignore = "will fail until issue #1442 is resolved"]
+fn create_account_with_multisig_auth() {
+    let temp_dir = init_cli().1;
+
+    // Create init storage data file for multisig
+    let init_storage_data_toml = r#"
+        [threshold_and_count]
+        threshold=2
+        num_approvers=3
+        "#;
+    let file_path = temp_dir.join("multisig_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
+
+    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/multisig-auth",
+        "-i",
+        "multisig_init_data.toml",
+    ]);
+
+    // Expected to fail with multiple auth components error until #1442 is resolved
+    create_account_cmd
+        .current_dir(&temp_dir)
+        .assert()
+        .failure()
+        .stderr(contains("account code contains multiple auth components"));
+}
+
+/// Tests creating an account with the acl-auth component.
+/// Note: This test is expected to fail with "account code contains multiple auth components"
+/// until issue #1442 is resolved.
+#[test]
+#[ignore = "will fail until issue #1442 is resolved"]
+fn create_account_with_acl_auth() {
+    let temp_dir = init_cli().1;
+
+    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/acl-auth",
+    ]);
+
+    // Expected to fail with multiple auth components error until #1442 is resolved
+    create_account_cmd
+        .current_dir(&temp_dir)
+        .assert()
+        .failure()
+        .stderr(contains("account code contains multiple auth components"));
+}
