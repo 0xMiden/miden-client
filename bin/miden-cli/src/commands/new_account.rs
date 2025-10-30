@@ -285,42 +285,22 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
     }
 }
 
-/// Checks if any of the provided packages contains an authentication component.
+/// Checks if an `AccountComponent` is an authentication component by inspecting its procedures.
 ///
-/// This function examines each package's metadata to determine if it contains
-/// an authentication component by checking the component's name.
-/// Known auth component names include variations of:
-/// - "RpoFalcon512"
-/// - "NoAuth"
-/// - "auth" (case-insensitive)
-fn contains_auth_component(packages: &[Package]) -> bool {
-    for package in packages {
-        // Look for the account component metadata section
-        if let Some(metadata_section) = package.sections.iter().find(|section| {
-            section.id.as_str() == (SectionId::ACCOUNT_COMPONENT_METADATA).as_str()
-        }) {
-            // Try to deserialize the metadata
-            if let Ok(metadata) =
-                AccountComponentMetadata::read_from_bytes(&metadata_section.data)
-            {
-                let name_lower = metadata.name().to_lowercase();
-                // Check if the component name suggests it's an auth component
-                if name_lower.contains("auth")
-                    || name_lower.contains("falcon")
-                    || name_lower.contains("signature")
-                    || name_lower.contains("authenticat")
-                {
-                    debug!(
-                        "Detected auth component in package: {} (name: {})",
-                        package.name,
-                        metadata.name()
-                    );
-                    return true;
-                }
+/// An auth component is identified by having at least one procedure that starts with "auth_".
+/// This follows the convention used in miden-base.
+fn is_auth_component(component: &AccountComponent) -> bool {
+    for module in component.library().module_infos() {
+        for (_proc_index, procedure_info) in module.procedures() {
+            if procedure_info.name.starts_with("auth_") {
+                debug!(
+                    "Detected auth procedure: {} in module {}",
+                    procedure_info.name, module.path()
+                );
+                return true;
             }
         }
     }
-
     false
 }
 
@@ -363,20 +343,27 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .account_type(account_type)
         .storage_mode(storage_mode);
 
-    // Add default Falcon auth component if requested and no auth component is in packages
-    let should_add_falcon_auth = add_default_auth && !contains_auth_component(&packages);
-    let key_pair = if should_add_falcon_auth {
-        let key_pair = SecretKey::with_rng(client.rng());
-        builder = builder.with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().into()));
-        Some(key_pair)
-    } else {
-        None
-    };
-
-    // Process packages and add them to the account builder.
+    // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
+    let mut has_auth_component = false;
+    let mut key_pair = None;
+
     for component in account_components {
-        builder = builder.with_component(component);
+        if is_auth_component(&component) {
+            debug!("Adding auth component from package");
+            builder = builder.with_auth_component(component);
+            has_auth_component = true;
+        } else {
+            builder = builder.with_component(component);
+        }
+    }
+
+    // Add default Falcon auth component if requested and no auth component was found in packages
+    if add_default_auth && !has_auth_component {
+        debug!("Adding default Falcon auth component");
+        let kp = SecretKey::with_rng(client.rng());
+        builder = builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().into()));
+        key_pair = Some(kp);
     }
 
     let account = builder
