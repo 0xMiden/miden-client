@@ -122,6 +122,7 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
+            true, // Always add default Falcon auth for wallets
         )
         .await?;
 
@@ -183,6 +184,7 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
+            false, // Don't add default auth; use auth component from packages if present
         )
         .await?;
 
@@ -283,11 +285,50 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
     }
 }
 
+/// Checks if any of the provided packages contains an authentication component.
+///
+/// This function examines each package's metadata to determine if it contains
+/// an authentication component by checking the component's name.
+/// Known auth component names include variations of:
+/// - "RpoFalcon512"
+/// - "NoAuth"
+/// - "auth" (case-insensitive)
+fn contains_auth_component(packages: &[Package]) -> bool {
+    for package in packages {
+        // Look for the account component metadata section
+        if let Some(metadata_section) = package.sections.iter().find(|section| {
+            section.id.as_str() == (SectionId::ACCOUNT_COMPONENT_METADATA).as_str()
+        }) {
+            // Try to deserialize the metadata
+            if let Ok(metadata) =
+                AccountComponentMetadata::read_from_bytes(&metadata_section.data)
+            {
+                let name_lower = metadata.name().to_lowercase();
+                // Check if the component name suggests it's an auth component
+                if name_lower.contains("auth")
+                    || name_lower.contains("falcon")
+                    || name_lower.contains("signature")
+                    || name_lower.contains("authenticat")
+                {
+                    debug!(
+                        "Detected auth component in package: {} (name: {})",
+                        package.name,
+                        metadata.name()
+                    );
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
-/// The created account will have a Falcon-based auth component, additional to any specified
-/// component.
+/// If `add_default_auth` is true and no auth component is detected in the packages,
+/// a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
@@ -296,6 +337,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
+    add_default_auth: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
@@ -317,12 +359,19 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = SecretKey::with_rng(client.rng());
-
     let mut builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
-        .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().into()));
+        .storage_mode(storage_mode);
+
+    // Add default Falcon auth component if requested and no auth component is in packages
+    let should_add_falcon_auth = add_default_auth && !contains_auth_component(&packages);
+    let key_pair = if should_add_falcon_auth {
+        let key_pair = SecretKey::with_rng(client.rng());
+        builder = builder.with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().into()));
+        Some(key_pair)
+    } else {
+        None
+    };
 
     // Process packages and add them to the account builder.
     let account_components = process_packages(packages, &init_storage_data)?;
@@ -334,9 +383,12 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
-    keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
-        .map_err(CliError::KeyStore)?;
+    // Only add the Falcon key to the keystore if we generated one
+    if let Some(key_pair) = key_pair {
+        keystore
+            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+            .map_err(CliError::KeyStore)?;
+    }
 
     client.add_account(&account, false).await?;
 
