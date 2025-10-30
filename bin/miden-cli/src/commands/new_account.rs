@@ -122,7 +122,6 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
-            true, // Always add default Falcon auth for wallets
         )
         .await?;
 
@@ -184,7 +183,6 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
-            false, // Don't add default auth; use auth component from packages if present
         )
         .await?;
 
@@ -295,7 +293,8 @@ fn is_auth_component(component: &AccountComponent) -> bool {
             if procedure_info.name.starts_with("auth_") {
                 debug!(
                     "Detected auth procedure: {} in module {}",
-                    procedure_info.name, module.path()
+                    procedure_info.name,
+                    module.path()
                 );
                 return true;
             }
@@ -307,8 +306,7 @@ fn is_auth_component(component: &AccountComponent) -> bool {
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
-/// If `add_default_auth` is true and no auth component is detected in the packages,
-/// a Falcon-based auth component will be added.
+/// If no auth component is detected in the packages, a Falcon-based auth component will be added.
 async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
@@ -317,7 +315,6 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
-    add_default_auth: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
@@ -345,11 +342,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-    
+
     // Collect auth and non-auth components separately
     let mut auth_components = Vec::new();
     let mut regular_components = Vec::new();
-    
+
     for component in account_components {
         if is_auth_component(&component) {
             auth_components.push(component);
@@ -371,13 +368,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         debug!("Adding auth component from package");
         builder = builder.with_auth_component(auth_component);
         None
-    } else if add_default_auth {
+    } else {
         debug!("Adding default Falcon auth component");
         let kp = SecretKey::with_rng(client.rng());
         builder = builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().into()));
         Some(kp)
-    } else {
-        None
     };
 
     // Add all regular (non-auth) components
