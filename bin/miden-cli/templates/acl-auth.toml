@@ -1,5 +1,5 @@
 name = "acl_auth"
-description = "Access Control List (ACL) authentication component using RPO Falcon512. Provides fine-grained authentication control based on procedure calls and note operations."
+description = "Access Control List (ACL) authentication component using RPO Falcon512. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: Slot 0 - public key, Slot 1 - ACL config, Slot 2 - trigger procedures map"
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 
@@ -19,4 +19,7 @@ value = [
     { name = "allow_unauthorized_input_notes", type = "u32", description = "Whether unauthorized input notes are allowed (0=false, 1=true)" },
     { value = "0" },
 ]
+
+# Note: Slot 2 is a storage map initialized by the component:
+# - Slot 2: Map with trigger procedure roots that require authentication
 
