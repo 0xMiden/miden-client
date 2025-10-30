@@ -942,10 +942,9 @@ fn exec_parse() {
 // ================================================================================================
 
 /// Tests creating an account with the no-auth component.
-/// Note: This test is expected to fail with "account code contains multiple auth components"
-/// until issue #1442 is resolved.
+/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
+/// instead of the "multiple auth components" error.
 #[test]
-#[ignore = "will fail until issue #1442 is resolved"]
 fn create_account_with_no_auth() {
     let temp_dir = init_cli().1;
 
@@ -962,7 +961,8 @@ fn create_account_with_no_auth() {
         "auth/no-auth",
     ]);
 
-    // Expected to fail with multiple auth components error until #1442 is resolved
+    // TODO: Change this to .success() once #1442 is resolved
+    // Currently expected to fail with multiple auth components error
     create_account_cmd
         .current_dir(&temp_dir)
         .assert()
@@ -971,10 +971,9 @@ fn create_account_with_no_auth() {
 }
 
 /// Tests creating an account with the multisig-auth component.
-/// Note: This test is expected to fail with "account code contains multiple auth components"
-/// until issue #1442 is resolved.
+/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
+/// instead of the "multiple auth components" error.
 #[test]
-#[ignore = "will fail until issue #1442 is resolved"]
 fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
 
@@ -1002,7 +1001,8 @@ fn create_account_with_multisig_auth() {
         "multisig_init_data.toml",
     ]);
 
-    // Expected to fail with multiple auth components error until #1442 is resolved
+    // TODO: Change this to .success() once #1442 is resolved
+    // Currently expected to fail with multiple auth components error
     create_account_cmd
         .current_dir(&temp_dir)
         .assert()
@@ -1011,12 +1011,21 @@ fn create_account_with_multisig_auth() {
 }
 
 /// Tests creating an account with the acl-auth component.
-/// Note: This test is expected to fail with "account code contains multiple auth components"
-/// until issue #1442 is resolved.
+/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
+/// instead of the "multiple auth components" error.
 #[test]
-#[ignore = "will fail until issue #1442 is resolved"]
 fn create_account_with_acl_auth() {
     let temp_dir = init_cli().1;
+
+    // Create init storage data file for acl-auth with a test public key
+    let init_storage_data_toml = r#"
+        falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        acl_config.num_tracked_procs=0
+        acl_config.allow_unauthorized_output_notes=0
+        acl_config.allow_unauthorized_input_notes=0
+        "#;
+    let file_path = temp_dir.join("acl_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
 
     let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
     create_account_cmd.args([
@@ -1029,9 +1038,12 @@ fn create_account_with_acl_auth() {
         "basic-wallet",
         "-p",
         "auth/acl-auth",
+        "-i",
+        "acl_init_data.toml",
     ]);
 
-    // Expected to fail with multiple auth components error until #1442 is resolved
+    // TODO: Change this to .success() once #1442 is resolved
+    // Currently expected to fail with multiple auth components error
     create_account_cmd
         .current_dir(&temp_dir)
         .assert()
