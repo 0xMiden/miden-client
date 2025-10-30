@@ -291,27 +291,19 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
 /// Returns an error if more than one auth procedure is found.
 fn is_auth_component(component: &AccountComponent) -> Result<bool, CliError> {
     let mut auth_procedure_count = 0;
-    let mut first_auth_procedure = String::new();
 
     for module in component.library().module_infos() {
         for (_proc_index, procedure_info) in module.procedures() {
             if procedure_info.name.starts_with("auth_") {
                 auth_procedure_count += 1;
 
-                if auth_procedure_count == 1 {
-                    first_auth_procedure = procedure_info.name.to_string();
-                } else if auth_procedure_count > 1 {
-                    return Err(CliError::InvalidArgument(format!(
-                        "Component has multiple auth procedures. Only one auth procedure is allowed per component. Found at least: {} and {}",
-                        first_auth_procedure, procedure_info.name
-                    )));
+                if auth_procedure_count > 1 {
+                    return Err(CliError::InvalidArgument(
+                        "Component has multiple auth procedures. Only one auth procedure is allowed per component.".to_string()
+                    ));
                 }
             }
         }
-    }
-
-    if auth_procedure_count == 1 {
-        debug!("Detected auth procedure: {}", first_auth_procedure);
     }
 
     Ok(auth_procedure_count == 1)
