@@ -112,7 +112,7 @@ After creating an account with the `new-wallet` command, it is automatically sto
 
 Creates a new account and saves it locally.
 
-An account may be composed of one or more components, each with its own storage and distinct functionality. This command lets you build a custom account by selecting an account type and optionally adding extra packages.
+An account may be composed of one or more components, each with its own storage and distinct functionality. This command lets you build a custom account by selecting an account type and optionally adding extra component packages.
 
 This command has four flags:
 
