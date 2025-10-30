@@ -23,6 +23,7 @@ use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
 use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
 use commands::notes::NotesCmd;
+use commands::package::PackageCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
@@ -146,6 +147,7 @@ pub enum Command {
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
+    Package(PackageCmd),
 }
 
 /// CLI entry point.
@@ -159,6 +161,12 @@ impl Cli {
         // possible.
         if let Command::Init(init_cmd) = &self.action {
             init_cmd.execute(&current_dir)?;
+            return Ok(());
+        }
+
+        // Check if it's a package command - it doesn't need a client or config
+        if let Command::Package(package_cmd) = &self.action {
+            package_cmd.execute()?;
             return Ok(());
         }
 
@@ -219,6 +227,10 @@ impl Cli {
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
+            Command::Package(_) => {
+                // This case is handled earlier in the function before client initialization
+                unreachable!("Package command should have been handled before client initialization")
+            },
         }
     }
 

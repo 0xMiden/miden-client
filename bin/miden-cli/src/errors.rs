@@ -73,6 +73,9 @@ pub enum CliError {
     NetworkIdError(#[from] NetworkIdError),
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
+    #[error("package error: {1}")]
+    #[diagnostic(code(cli::package_error))]
+    PackageError(#[source] SourceError, String),
     #[error("parse error: {1}")]
     #[diagnostic(code(cli::parse_error), help("Check the inputs."))]
     Parse(#[source] SourceError, String),
