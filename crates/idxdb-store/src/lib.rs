@@ -30,6 +30,7 @@ use miden_client::note::{BlockNumber, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -262,9 +263,9 @@ impl Store for WebStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
-        map_root: Option<Word>,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        self.get_account_storage(account_id, map_root).await
+        self.get_account_storage(account_id, filter).await
     }
 
     async fn get_addresses_by_account_id(

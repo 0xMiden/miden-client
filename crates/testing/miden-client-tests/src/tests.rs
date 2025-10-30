@@ -11,7 +11,13 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteRelevance};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::store::{
+    AccountStorageFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    TransactionFilter,
+};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
@@ -2003,7 +2009,11 @@ async fn storage_and_vault_proofs() {
         // Check that retrieved vault and storage match with the account.
         let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
 
-        let storage = client.test_store().get_account_storage(account_id, None).await.unwrap();
+        let storage = client
+            .test_store()
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
         assert_eq!(account.storage().commitment(), storage.commitment());

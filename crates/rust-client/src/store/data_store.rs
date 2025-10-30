@@ -13,7 +13,7 @@ use miden_objects::vm::FutureMaybeSend;
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
-use super::{PartialBlockchainFilter, Store};
+use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
 use crate::store::StoreError;
 use crate::utils::RwLock;
 
@@ -134,23 +134,22 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
-        // TODO: Refactor the store call to be able to retrieve by map root.
-        let account_storage = self.store.get_account_storage(account_id, Some(map_root)).await?;
+        let account_storage = self
+            .store
+            .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
+            .await?;
 
-        for slot in account_storage.slots() {
-            if let StorageSlot::Map(map) = slot
-                && map.root() == map_root
-            {
+        match account_storage.slots().first() {
+            Some(StorageSlot::Map(map)) => {
                 let witness = map.open(&map_key);
-                return Ok(witness);
-            }
+                Ok(witness)
+            },
+            _ => Err(DataStoreError::Other {
+                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                    .into(),
+                source: None,
+            }),
         }
-
-        Err(DataStoreError::Other {
-            error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                .into(),
-            source: None,
-        })
     }
 
     async fn get_foreign_account_inputs(

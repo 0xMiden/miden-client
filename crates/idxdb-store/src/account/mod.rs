@@ -15,7 +15,7 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::store::{AccountRecord, AccountStatus, AccountStorageFilter, StoreError};
 use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
 
@@ -161,7 +161,9 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self.get_storage(account_header.storage_commitment(), None).await?;
+        let account_storage = self
+            .get_storage(account_header.storage_commitment(), AccountStorageFilter::All)
+            .await?;
         let assets = self.get_vault_assets(account_header.vault_root()).await?;
         let account_vault = AssetVault::new(&assets)?;
 
@@ -195,7 +197,7 @@ impl WebStore {
     pub(super) async fn get_storage(
         &self,
         commitment: Word,
-        map_root: Option<Word>,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
@@ -203,17 +205,25 @@ impl WebStore {
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
-        let roots = match map_root {
-            Some(map_root) => {
-                if !account_storage_idxdb.iter().any(|a| a.slot_value == map_root.to_hex()) {
-                    return Err(StoreError::AccountStorageNotFound(map_root));
-                }
-                vec![map_root.to_hex()]
-            },
-            None => account_storage_idxdb
+        let roots = match filter {
+            AccountStorageFilter::All => account_storage_idxdb
                 .iter()
                 .map(|s| s.slot_value.clone())
                 .collect::<Vec<String>>(),
+            AccountStorageFilter::Root(map_root) => {
+                if !account_storage_idxdb.iter().any(|a| a.slot_value == map_root.to_hex()) {
+                    return Err(StoreError::AccountStorageRootNotFound(map_root));
+                }
+                vec![map_root.to_hex()]
+            },
+            AccountStorageFilter::Index(index) => {
+                match account_storage_idxdb.iter().find(|a| a.slot_index as usize == index) {
+                    Some(account_storage) => {
+                        vec![account_storage.slot_value.clone()]
+                    },
+                    None => return Err(StoreError::AccountStorageIndexNotFound(index)),
+                }
+            },
         };
 
         let promise = idxdb_get_account_storage_maps(roots);
@@ -326,7 +336,7 @@ impl WebStore {
     pub(crate) async fn get_account_storage(
         &self,
         account_id: AccountId,
-        map_root: Option<Word>,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         let account_header = self
             .get_account_header(account_id)
@@ -334,7 +344,7 @@ impl WebStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        self.get_storage(account_header.storage_commitment(), map_root).await
+        self.get_storage(account_header.storage_commitment(), filter).await
     }
 
     pub(crate) async fn upsert_foreign_account_code(

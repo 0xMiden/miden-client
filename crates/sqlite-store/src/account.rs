@@ -21,7 +21,7 @@ use miden_client::account::{
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::store::{AccountRecord, AccountStatus, AccountStorageFilter, StoreError};
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
@@ -316,16 +316,20 @@ impl SqliteStore {
     pub fn get_account_storage(
         conn: &Connection,
         account_id: AccountId,
-        map_root: Option<Word>,
+        filter: &AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        let (where_clause, params) = match map_root {
-            Some(root) => (
+        let (where_clause, params) = match filter {
+            AccountStorageFilter::All => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+                params![account_id.to_hex()],
+            ),
+            AccountStorageFilter::Root(root) => (
                 "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_value = ?",
                 params![account_id.to_hex(), root.to_hex()],
             ),
-            None => (
-                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
-                params![account_id.to_hex()],
+            AccountStorageFilter::Index(index) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_index = ?",
+                params![account_id.to_hex(), index.clone()],
             ),
         };
 
@@ -383,7 +387,7 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex(), index],
         )?
         .remove(&index)
-        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
+        .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?
         else {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };

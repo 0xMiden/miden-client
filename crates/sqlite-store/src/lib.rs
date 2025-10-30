@@ -36,6 +36,7 @@ use miden_client::note::{BlockNumber, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -104,7 +105,7 @@ impl SqliteStore {
         // Initialize merkle store
         for id in store.get_account_ids().await? {
             let vault = store.get_account_vault(id).await?;
-            let storage = store.get_account_storage(id, None).await?;
+            let storage = store.get_account_storage(id, AccountStorageFilter::All).await?;
 
             let mut merkle_store =
                 store.merkle_store.write().expect("merkle_store write lock not poisoned");
@@ -408,10 +409,10 @@ impl Store for SqliteStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
-        map_root: Option<Word>,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_storage(conn, account_id, map_root)
+            SqliteStore::get_account_storage(conn, account_id, &filter)
         })
         .await
     }
