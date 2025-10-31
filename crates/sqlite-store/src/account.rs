@@ -26,6 +26,7 @@ use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
+use miden_objects::asset::VaultKey;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -456,8 +457,8 @@ impl SqliteStore {
 
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
-        let mut updated_assets: BTreeMap<Word, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<Word> = Vec::new();
+        let mut updated_assets: BTreeMap<VaultKey, Asset> = BTreeMap::new();
+        let mut removed_vault_keys: Vec<VaultKey> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
@@ -512,7 +513,10 @@ impl SqliteStore {
                 Rc::new(
                     removed_vault_keys
                         .into_iter()
-                        .map(|k| Value::from(k.to_hex()))
+                        .map(|k| {
+                            let k_word: Word = k.into();
+                            Value::from(k_word.to_hex())
+                        })
                         .collect::<Vec<Value>>(),
                 ),
             ],
@@ -871,13 +875,14 @@ impl SqliteStore {
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
         for asset in assets {
+            let vault_key_word: Word = asset.vault_key().into();
             const QUERY: &str =
                 insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![
                     root.to_hex(),
-                    asset.vault_key().to_hex(),
+                    vault_key_word.to_hex(),
                     asset.faucet_id_prefix().to_hex(),
                     Word::from(asset).to_hex(),
                 ],

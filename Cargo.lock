@@ -1535,6 +1535,8 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "rayon",
+ "serde",
 ]
 
 [[package]]
@@ -2356,7 +2358,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2517,6 +2519,7 @@ dependencies = [
  "flume",
  "getrandom 0.2.16",
  "glob",
+ "hashbrown 0.15.5",
  "hkdf",
  "k256",
  "num",
@@ -2525,6 +2528,7 @@ dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
  "rand_hc",
+ "rayon",
  "sha3",
  "thiserror 2.0.16",
  "winter-crypto",
@@ -2578,7 +2582,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "Inflector",
  "fs-err",
@@ -2650,7 +2654,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "futures",
@@ -2678,7 +2682,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "quote",
  "syn 2.0.106",
@@ -2687,7 +2691,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "futures",
@@ -2707,7 +2711,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2730,7 +2734,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "fs-err",
  "miette",
@@ -2742,12 +2746,13 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "futures",
  "http",
  "mediatype",
+ "miden-lib",
  "miden-node-proto",
  "miden-node-proto-build",
  "miden-node-utils",
@@ -2769,7 +2774,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2800,7 +2805,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2839,7 +2844,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -2894,7 +2899,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2939,7 +2944,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#80cb4a078997001ec0e6c1076992fc90967819dc"
+source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#7a7de7036755158c93d9d7e3a9db1604908e1cda"
 dependencies = [
  "getrandom 0.3.3",
  "miden-node-proto-build",
@@ -2975,7 +2980,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2994,7 +2999,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -3009,7 +3014,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-base?branch=next#f60406e92410fd993c4fda86342f5cd4dca994c9"
+source = "git+https://github.com/0xMiden/miden-base?branch=next#8230f7001c1b37c6164637de8160ae479c8448a7"
 dependencies = [
  "miden-objects",
  "miden-tx",

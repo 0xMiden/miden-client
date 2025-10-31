@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
-use miden_objects::asset::AssetWitness;
+use miden_objects::asset::{AssetWitness, VaultKey};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
 use miden_objects::note::NoteScript;
@@ -110,7 +110,7 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         vault_root: Word,
-        vault_key: Word,
+        vault_key: VaultKey,
     ) -> Result<AssetWitness, DataStoreError> {
         //TODO: Refactor `get_account_asset` for this.
         let vault = self.store.get_account_vault(account_id).await?;
