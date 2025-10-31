@@ -170,11 +170,7 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener = NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.source_manager.clone(),
-        );
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await
