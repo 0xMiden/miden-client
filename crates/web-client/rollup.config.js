@@ -59,7 +59,7 @@ const baseCargoArgs = [
  */
 export default [
   {
-    input: ["./js/wasm.js", "./js/index.ts"],
+    input: ["./js/wasm.js", "./js/index.js"],
     output: {
       dir: `dist`,
       format: "es",
@@ -82,11 +82,6 @@ export default [
       }),
       resolve(),
       commonjs(),
-      typescript({
-        compilerOptions: { allowJs: true },
-        outDir: "dist",
-        strict: true,
-      }),
     ],
   },
   // Build the worker file

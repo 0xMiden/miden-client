@@ -3,7 +3,6 @@ const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 export * from "../Cargo.toml";
 const { WebClient: WasmWebClient } = wasm;
-// TODO: We should properly add types for this file eventually.
 // @ts-nocheck
 /**
  * WebClient is a wrapper around the underlying WASM WebClient object.
