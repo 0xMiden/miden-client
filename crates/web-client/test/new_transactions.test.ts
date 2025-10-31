@@ -408,7 +408,7 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::account
+            use.miden::native_account
             use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
@@ -428,7 +428,7 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-                
+
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
@@ -459,7 +459,7 @@ export const customTransaction = async (
                 mem_load
                 # => [target_account_id_prefix]
 
-                exec.account::get_id swap drop
+                exec.native_account::get_id swap drop
                 # => [account_id_prefix, target_account_id_prefix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
@@ -719,7 +719,8 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # Inputs: [KEY, VALUE]
@@ -730,7 +731,7 @@ export const customAccountComponent = async (
             # => [index, KEY, VALUE]
 
             # Setting the key value pair in the map
-            exec.account::set_map_item
+            exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
             dropw dropw dropw dropw
@@ -744,7 +745,7 @@ export const customAccountComponent = async (
             push.1
             # => [index, KEY]
 
-            exec.account::get_map_item
+            exec.active_account::get_map_item
             # => [VALUE]
         end
 
@@ -752,7 +753,7 @@ export const customAccountComponent = async (
         # Outputs: [CURRENT_ROOT]
         export.get_current_map_root
             # Getting the current root from slot 1
-            push.1 exec.account::get_item
+            push.1 exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -1055,13 +1056,14 @@ export const counterAccountComponent = async (
 ): Promise<string | undefined> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # => []
         export.get_count
             push.0
-            exec.account::get_item
+            exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
@@ -1069,13 +1071,13 @@ export const counterAccountComponent = async (
         export.increment_count
             push.0
             # => [index]
-            exec.account::get_item
+            exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
             push.0
             # [index, count+1]
-            exec.account::set_item
+            exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
@@ -1234,12 +1236,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     # item index
                     push.0
                     # => [index, KEY]
-                    exec.::miden::account::get_map_item
+                    exec.::miden::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end

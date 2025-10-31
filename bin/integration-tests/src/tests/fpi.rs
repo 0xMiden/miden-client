@@ -53,7 +53,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)
@@ -132,7 +132,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)
@@ -251,7 +251,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)

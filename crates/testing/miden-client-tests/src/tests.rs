@@ -1902,18 +1902,18 @@ const BUMP_MAP_CODE: &str = "export.bump_map_item
                     # item index
                     push.0
                     # => [index, KEY]
-                    exec.::miden::account::get_map_item
+                    exec.::miden::active_account::get_map_item
                     add.1
                     push.{map_key}
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
                     dupw
                     push.0
                     # Set a new item each time as the value keeps changing
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     dropw dropw
                 end";
 

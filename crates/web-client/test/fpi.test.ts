@@ -27,7 +27,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 push.15.15.15.15
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end
         `;

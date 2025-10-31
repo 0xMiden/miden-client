@@ -1175,7 +1175,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     // Define the account code for the custom library
     let custom_code = "
-        use.miden::account
+        use.miden::native_account
 
         export.update_map
             push.1.2.3.4
@@ -1184,7 +1184,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
             # => [KEY, VALUE]
             push.1
             # => [index, KEY, VALUE]
-            exec.account::set_map_item
+            exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
     ";

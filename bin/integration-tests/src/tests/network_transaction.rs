@@ -32,13 +32,14 @@ use crate::tests::config::ClientConfig;
 // ================================================================================================
 
 const COUNTER_CONTRACT: &str = "
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # => []
         export.get_count
             push.0
-            exec.account::get_item
+            exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
@@ -46,22 +47,22 @@ const COUNTER_CONTRACT: &str = "
         export.increment_count
             push.0
             # => [index]
-            exec.account::get_item
+            exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
             push.0
             # [index, count+1]
-            exec.account::set_item
+            exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
         end";
 
 const INCR_NONCE_AUTH_CODE: &str = "
-    use.miden::account
+    use.miden::native_account
     export.auth__basic
-        exec.account::incr_nonce
+        exec.native_account::incr_nonce
         drop
     end
 ";
