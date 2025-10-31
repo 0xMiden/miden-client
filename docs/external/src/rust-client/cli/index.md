@@ -33,7 +33,7 @@ Creates a configuration file for the client in the current directory. Running th
 ```sh
 # This will create a config file named `miden-client.toml` using default values
 # This file contains information useful for the CLI like the RPC provider and database path
-miden-client init --network <network>
+miden-client init
 
 # You can set up the CLI for any of the default networks
 miden-client init --network testnet
