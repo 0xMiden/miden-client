@@ -46,7 +46,7 @@ pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint.
     #[clap(long, short)]
-    network: Network,
+    network: Option<Network>,
 
     /// Path to the store file.
     #[arg(long)]
@@ -84,8 +84,9 @@ impl InitCmd {
 
         let mut cli_config = CliConfig::default();
 
-        let endpoint = CliEndpoint::try_from(self.network.clone())?;
-        cli_config.rpc.endpoint = endpoint;
+        if let Some(network) = &self.network {
+            cli_config.rpc.endpoint = CliEndpoint::try_from(network.clone())?;
+        }
 
         if let Some(path) = &self.store_path {
             cli_config.store_filepath = PathBuf::from(path);
@@ -168,7 +169,7 @@ impl Default for InitCmd {
     // Create a new InitCmd with default values for silent initialization
     fn default() -> Self {
         Self {
-            network: Network::Testnet,
+            network: None,
             store_path: None,
             remote_prover_endpoint: None,
             note_transport_endpoint: None,
