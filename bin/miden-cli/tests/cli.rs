@@ -7,6 +7,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::address::AddressInterface;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -589,6 +590,115 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     Ok(())
 }
 
+// ADDRESSES TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn list_addresses_add() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+
+    let mut list_addresses_cmd = Command::cargo_bin("miden-client").unwrap();
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
+
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert!(formatted_output.contains(&AddressInterface::Unspecified.to_string()));
+    assert!(!formatted_output.contains(&AddressInterface::BasicWallet.to_string()));
+
+    // Add a basic wallet address to the account
+    let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
+    let custom_note_tag_len = "10";
+    add_address_cmd.args([
+        "address",
+        "add",
+        &basic_account_id,
+        &AddressInterface::BasicWallet.to_string(),
+        custom_note_tag_len,
+    ]);
+    let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain a BasicWallet address
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
+    assert_eq!(formatted_output.matches(&AddressInterface::BasicWallet.to_string()).count(), 1);
+
+    // Add another basic wallet address to the account
+    let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
+    let custom_note_tag_len = "5";
+    add_address_cmd.args([
+        "address",
+        "add",
+        &basic_account_id,
+        &AddressInterface::BasicWallet.to_string(),
+        custom_note_tag_len,
+    ]);
+    let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain two BasicWallet addresses
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
+    assert_eq!(formatted_output.matches(&AddressInterface::BasicWallet.to_string()).count(), 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn list_addresses_remove() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+
+    // List of addresses for created account should contain an Unspecified address
+    let mut list_addresses_cmd = Command::cargo_bin("miden-client").unwrap();
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
+
+    // Remove the Unspecified wallet from the account
+    let mut remove_address_cmd = Command::cargo_bin("miden-client").unwrap();
+    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+        .unwrap()
+        .find(&formatted_output)
+        .unwrap()
+        .as_str();
+    remove_address_cmd.args(["address", "remove", &basic_account_id, unspecified_wallet_address]);
+    let output = remove_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain one BasicWallet address
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 0);
+
+    Ok(())
+}
+
 // HELPERS
 // ================================================================================================
 
@@ -750,7 +860,7 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         storage_mode.to_string().as_str(),
         "--account-type",
         "fungible-faucet",
-        "-c",
+        "-p",
         "basic-fungible-faucet",
         "-i",
         INIT_DATA_FILENAME,
@@ -775,9 +885,14 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "Failed to create wallet {}",
+        String::from_utf8(output.stderr)
+            .map(|err_msg| format!("with error: {err_msg}"))
+            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+    );
 
-    //println!("stoud {}", String::from_utf8(output.stdout.clone()).unwrap());
     std::str::from_utf8(&output.stdout)
         .unwrap()
         .split_whitespace()

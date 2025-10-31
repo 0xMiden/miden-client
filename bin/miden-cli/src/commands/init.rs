@@ -11,18 +11,27 @@ use crate::errors::CliError;
 
 /// Contains the account component template file generated on build.rs, corresponding to the basic
 /// wallet component.
-const BASIC_WALLET_TEMPLATE_FILE: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/templates/", "basic-wallet.mct"));
+const BASIC_WALLET_PACKAGE: (&str, &[u8]) = (
+    "basic-wallet.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-wallet.masp")),
+);
 
 /// Contains the account component template file generated on build.rs, corresponding to the
 /// fungible faucet component.
-const FAUCET_TEMPLATE_FILE: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/templates/", "basic-fungible-faucet.mct"));
+const FAUCET_PACKAGE: (&str, &[u8]) = (
+    "basic-fungible-faucet.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-fungible-faucet.masp")),
+);
 
 /// Contains the account component template file generated on build.rs, corresponding to the basic
 /// auth component.
-const BASIC_AUTH_TEMPLATE_FILE: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/templates/", "basic-auth.mct"));
+const BASIC_AUTH_PACKAGE: (&str, &[u8]) = (
+    "basic-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-auth.masp")),
+);
+
+const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
+    [BASIC_WALLET_PACKAGE, FAUCET_PACKAGE, BASIC_AUTH_PACKAGE];
 
 // INIT COMMAND
 // ================================================================================================
@@ -107,7 +116,7 @@ impl InitCmd {
             CliError::Config("failed to create config file".to_string().into(), err.to_string())
         })?;
 
-        write_template_files(&cli_config)?;
+        write_packages_files(&cli_config)?;
 
         file_handle.write(config_as_toml_string.as_bytes()).map_err(|err| {
             CliError::Config("failed to write config file".to_string().into(), err.to_string())
@@ -119,35 +128,38 @@ impl InitCmd {
     }
 }
 
-/// Creates the directory specified by `cli_config.component_template_directory`
-/// and writes the default included component templates.
-fn write_template_files(cli_config: &CliConfig) -> Result<(), CliError> {
-    fs::create_dir_all(&cli_config.component_template_directory).map_err(|err| {
+/// Creates the directory specified by `cli_config.package_directory`
+/// and writes the ``DEFAULT_INCLUDED_PACKAGES``.
+fn write_packages_files(cli_config: &CliConfig) -> Result<(), CliError> {
+    let packages_dir = &cli_config.package_directory;
+    fs::create_dir_all(packages_dir).map_err(|err| {
         CliError::Config(
             Box::new(err),
             "failed to create account component templates directory".into(),
         )
     })?;
 
-    let wallet_template_path = cli_config.component_template_directory.join("basic-wallet.mct");
-    let mut wallet_file = File::create(&wallet_template_path)?;
-    wallet_file.write_all(BASIC_WALLET_TEMPLATE_FILE)?;
+    for package in DEFAULT_INCLUDED_PACKAGES {
+        let package_path = packages_dir.join(package.0);
+        let mut lib_file = File::create(&package_path).map_err(|err| {
+            CliError::Config(
+                Box::new(err),
+                format!("Failed to create file at {}", package_path.display()),
+            )
+        })?;
+        lib_file.write_all(package.1).map_err(|err| {
+            CliError::Config(
+                Box::new(err),
+                format!(
+                    "Failed to write package {} into file {}",
+                    package.0,
+                    package_path.display()
+                ),
+            )
+        })?;
+    }
 
-    // Write the faucet template file.
-    // TODO: io errors should probably have their own context.
-    let faucet_template_path =
-        cli_config.component_template_directory.join("basic-fungible-faucet.mct");
-    let mut faucet_file = File::create(&faucet_template_path)?;
-    faucet_file.write_all(FAUCET_TEMPLATE_FILE)?;
-
-    let basic_auth_template_path = cli_config.component_template_directory.join("basic-auth.mct");
-    let mut basic_auth_file = File::create(&basic_auth_template_path)?;
-    basic_auth_file.write_all(BASIC_AUTH_TEMPLATE_FILE)?;
-
-    info!(
-        "Template files successfully created in: {:?}",
-        cli_config.component_template_directory
-    );
+    info!("Packages files successfully created in: {:?}", packages_dir);
 
     Ok(())
 }
