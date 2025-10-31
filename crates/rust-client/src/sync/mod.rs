@@ -142,7 +142,7 @@ where
         let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Expected).await?;
+        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
 
         let uncommitted_transactions =
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;

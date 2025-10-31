@@ -225,11 +225,21 @@ impl NoteUpdateTracker {
         self.input_notes.is_empty() && self.output_notes.is_empty()
     }
 
+    /// Returns input and output note unspent nullifiers.
     pub fn unspent_nullifiers(&self) -> impl Iterator<Item = Nullifier> + '_ {
-        self.input_notes
+        let input_note_unspent_nullifiers = self
+            .input_notes
             .values()
             .filter(|note| !note.inner().is_consumed())
-            .map(|note| note.inner().nullifier())
+            .map(|note| note.inner().nullifier());
+
+        let output_note_unspent_nullifiers = self
+            .input_notes
+            .values()
+            .filter(|note| !note.inner().is_consumed())
+            .map(|note| note.inner().nullifier());
+
+        input_note_unspent_nullifiers.chain(output_note_unspent_nullifiers)
     }
 
     // UPDATE METHODS
