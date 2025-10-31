@@ -28,7 +28,7 @@ Note that the debug flag overrides the `MIDEN_DEBUG` environment variable.
 
 ### `init`
 
-Creates a configuration file for the client in the current directory.
+Creates a configuration file for the client in the current directory. Running this command is optional, as the client will self-initialize by default.
 
 ```sh
 # This will create a config file named `miden-client.toml` using default values
