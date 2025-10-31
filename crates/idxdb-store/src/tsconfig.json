@@ -12,7 +12,7 @@
     "moduleResolution": "Node",
     "outDir": "./js",
     "strict": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": ["./ts/*.ts"],
   "exclude": ["./js/**/*"]
