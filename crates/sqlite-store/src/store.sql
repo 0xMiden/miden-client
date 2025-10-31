@@ -154,9 +154,8 @@ CREATE TABLE state_sync (
 
 -- Create tags table
 CREATE TABLE tags (
-    tag BLOB NOT NULL,    -- the serialized tag
-    source BLOB NOT NULL  -- the serialized tag source
-    PRIMARY KEY (tag, source)
+    tag BLOB NOT NULL,     -- the serialized tag
+    source BLOB NOT NULL   -- the serialized tag source
 );
 
 -- insert initial row into state_sync table
