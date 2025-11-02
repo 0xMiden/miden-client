@@ -26,11 +26,11 @@ use miden_client::testing::common::{
     consume_notes,
     create_test_store_path,
     execute_failing_tx,
-    execute_tx,
     mint_and_consume,
     mint_note,
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
+    submit_and_await_tx,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
@@ -841,7 +841,7 @@ async fn added_notes() {
         )
         .unwrap();
     println!("Running Mint tx...");
-    execute_tx(&mut client, faucet_account_header.id(), tx_request).await;
+    submit_and_await_tx(&mut client, faucet_account_header.id(), tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -887,7 +887,7 @@ async fn p2id_transfer() {
         .unwrap();
 
     let note = tx_request.expected_output_own_notes().pop().unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
 
     // Check that a note tag started being tracked for this note.
     assert!(
@@ -922,7 +922,7 @@ async fn p2id_transfer() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, to_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1083,7 +1083,7 @@ async fn p2ide_transfer_consumed_by_target() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request.clone()).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request.clone()).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1096,7 +1096,7 @@ async fn p2ide_transfer_consumed_by_target() {
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, to_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
@@ -1170,7 +1170,7 @@ async fn p2ide_transfer_consumed_by_sender() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1205,7 +1205,7 @@ async fn p2ide_transfer_consumed_by_sender() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1265,7 +1265,7 @@ async fn p2ide_timelocked() {
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap();
 
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1292,7 +1292,7 @@ async fn p2ide_timelocked() {
 
     // Consume the note with the target account
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, to_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1360,7 +1360,7 @@ async fn get_consumable_notes() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1453,7 +1453,7 @@ async fn get_output_notes() {
     // Before executing, the output note is not found
     assert!(client.get_output_note(output_note_id).await.unwrap().is_none());
 
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    submit_and_await_tx(&mut client, from_account_id, tx_request).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1816,7 +1816,7 @@ async fn swap_chain_test() {
         // The notes are inserted in reverse order because the first note to be consumed will be the
         // last one generated.
         swap_notes.insert(0, tx_request.expected_output_own_notes()[0].id());
-        execute_tx(&mut client, pairs[0].0.id(), tx_request).await;
+        submit_and_await_tx(&mut client, pairs[0].0.id(), tx_request).await;
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
     }
@@ -1838,7 +1838,7 @@ async fn swap_chain_test() {
     ));
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
-    execute_tx(&mut client, last_wallet, tx_request).await;
+    submit_and_await_tx(&mut client, last_wallet, tx_request).await;
 
     // At the end, the last wallet should have the asset of the first wallet.
     let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();
@@ -1996,7 +1996,7 @@ async fn storage_and_vault_proofs() {
             .custom_script(tx_script.clone())
             .build()
             .unwrap();
-        execute_tx(&mut client, account_id, tx_request).await;
+        submit_and_await_tx(&mut client, account_id, tx_request).await;
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
 

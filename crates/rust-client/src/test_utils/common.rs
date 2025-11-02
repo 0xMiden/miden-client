@@ -148,7 +148,7 @@ pub async fn execute_failing_tx(
 }
 
 /// Executes a transaction and returns the transaction ID.
-pub async fn execute_tx(
+pub async fn submit_and_await_tx(
     client: &mut TestClient,
     account_id: AccountId,
     tx_request: TransactionRequest,
@@ -170,7 +170,7 @@ pub async fn execute_tx_and_sync(
     account_id: AccountId,
     tx_request: TransactionRequest,
 ) -> Result<()> {
-    let transaction_id = Box::pin(execute_tx(client, account_id, tx_request)).await;
+    let transaction_id = Box::pin(submit_and_await_tx(client, account_id, tx_request)).await;
     wait_for_tx(client, transaction_id).await?;
     Ok(())
 }
@@ -357,7 +357,8 @@ pub async fn mint_note(
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    let tx_id = Box::pin(execute_tx(client, fungible_asset.faucet_id(), tx_request.clone())).await;
+    let tx_id =
+        Box::pin(submit_and_await_tx(client, fungible_asset.faucet_id(), tx_request.clone())).await;
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
@@ -375,7 +376,7 @@ pub async fn consume_notes(
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(input_notes.iter().map(Note::id).collect())
         .unwrap();
-    Box::pin(execute_tx(client, account_id, tx_request)).await
+    Box::pin(submit_and_await_tx(client, account_id, tx_request)).await
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -462,13 +463,13 @@ pub async fn execute_tx_and_consume_output_notes(
         .map(|note| (note, None::<NoteArgs>))
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
-    Box::pin(execute_tx(client, executor, tx_request)).await;
+    Box::pin(submit_and_await_tx(client, executor, tx_request)).await;
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
-    Box::pin(execute_tx(client, consumer, tx_request)).await
+    Box::pin(submit_and_await_tx(client, consumer, tx_request)).await
 }
 
 /// Mints assets for the target account and consumes them immediately without waiting for the first
