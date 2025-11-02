@@ -234,10 +234,10 @@ impl NoteUpdateTracker {
             .map(|note| note.inner().nullifier());
 
         let output_note_unspent_nullifiers = self
-            .input_notes
+            .output_notes
             .values()
             .filter(|note| !note.inner().is_consumed())
-            .map(|note| note.inner().nullifier());
+            .filter_map(|note| note.inner().nullifier());
 
         input_note_unspent_nullifiers.chain(output_note_unspent_nullifiers)
     }
