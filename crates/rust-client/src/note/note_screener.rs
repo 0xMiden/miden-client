@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
-use miden_objects::assembly::debuginfo::SourceManagerSync;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
@@ -61,20 +60,14 @@ pub struct NoteScreener<AUTH> {
     store: Arc<dyn Store>,
     /// A reference to the transaction authenticator
     authenticator: Option<Arc<AUTH>>,
-    /// Shared source manager used when compiling scripts.
-    source_manager: Arc<dyn SourceManagerSync>,
 }
 
 impl<AUTH> NoteScreener<AUTH>
 where
     AUTH: TransactionAuthenticator + Sync,
 {
-    pub fn new(
-        store: Arc<dyn Store>,
-        authenticator: Option<Arc<AUTH>>,
-        source_manager: Arc<dyn SourceManagerSync>,
-    ) -> Self {
-        Self { store, authenticator, source_manager }
+    pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
+        Self { store, authenticator }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -139,8 +132,6 @@ where
         if let Some(authenticator) = &self.authenticator {
             transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
         }
-        transaction_executor =
-            transaction_executor.with_source_manager(self.source_manager.clone());
 
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
