@@ -97,10 +97,22 @@ pub async fn upsert_account_record(account: &Account) -> Result<(), JsValue> {
     Ok(())
 }
 
-pub async fn insert_account_address(account: &Account, address: Address) -> Result<(), JsValue> {
-    let account_id_str = account.id().to_string();
+pub async fn insert_account_address(
+    account_id: &AccountId,
+    address: Address,
+) -> Result<(), JsValue> {
+    let account_id_str = account_id.to_string();
     let serialized_address = address.to_bytes();
     let promise = idxdb_insert_account_address(account_id_str, serialized_address);
+    JsFuture::from(promise).await?;
+
+    Ok(())
+}
+
+pub async fn remove_account_address(address: Address) -> Result<(), JsValue> {
+    let serialized_address = address.to_bytes();
+    let promise =
+        crate::account::js_bindings::idxdb_remove_account_address(serialized_address.clone());
     JsFuture::from(promise).await?;
 
     Ok(())

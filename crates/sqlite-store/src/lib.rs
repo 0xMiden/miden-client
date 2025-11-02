@@ -438,6 +438,30 @@ impl Store for SqliteStore {
         })
         .await
     }
+
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            SqliteStore::insert_address(&tx, &address, account_id)?;
+            tx.commit().into_store_error()
+        })
+        .await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_address(conn, &address, account_id)
+        })
+        .await
+    }
 }
 
 // UTILS

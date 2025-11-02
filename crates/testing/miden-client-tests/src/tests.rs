@@ -12,7 +12,7 @@ use miden_client::note::{BlockNumber, NoteRelevance};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
-use miden_client::sync::NoteTagSource;
+use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -2076,6 +2076,48 @@ async fn account_addresses_non_basic_wallet() {
     let basic_wallet_address =
         Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
+}
+
+#[tokio::test]
+async fn account_add_address_after_creation() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account = Account::mock(
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+        AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+    );
+
+    client.add_account(&account, false).await.unwrap();
+
+    let unspecified_default_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+
+    // The default unspecified address cannot be added
+    // as it is already present after account creation
+    assert!(client.add_address(unspecified_default_address, account.id()).await.is_err());
+
+    // The basic wallet address cannot be added
+    // as it is already present after account creation
+    let basic_wallet_address =
+        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
+
+    // We can remove the basic wallet address
+    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
+
+    // Derived note tag should also be removed
+    let derived_note_tag = basic_wallet_address.to_note_tag();
+    let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account.id());
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(!note_tags.contains(&note_tag_record));
+
+    // Then add it again
+    assert!(client.add_address(basic_wallet_address, account.id()).await.is_ok());
+
+    // Derived note tag should now be available
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&note_tag_record));
 }
 
 // HELPERS

@@ -22,11 +22,15 @@ secret_keys_directory = "keystore"
 default_account_id = "0x012345678"
 token_symbol_map_filepath = "token_symbol_map.toml"
 remote_prover_endpoint = "http://localhost:8080"
-component_template_directory = "./templates"
+package_directory         = "./packages"
 max_block_number_delta = 256
 
 [rpc]
 endpoint = { protocol = "http", host = "localhost", port = 57291 }
+timeout_ms = 10000
+
+[note-transport] # optional
+endpoint = "http://localhost:57292"
 timeout_ms = 10000
 ```
 
@@ -102,31 +106,17 @@ Notice how the amount specified when using the token symbol takes into account t
 
 The `remote_prover_endpoint` field is used to configure the usage of a remote prover. You can set a remote prover when calling the `miden-client prover` command with the `--remote-prover-endpoint` flag. The prover will be used for all transactions that are executed with the `miden` command. By default, no remote prover is used and all transactions are executed locally.
 
-### Component template directory
+### Package directory
+`Packages` are Miden's native packaging format.
+This structure contains the outputs of a compiled project, with all of its corresponding metadata. Specifically, a `Package` may contain the compiled MAST for an `Account Component` in the form of a `Library`.
 
-The `component_template_directory` field is used to configure the path to the directory where the account component templates are stored. The default value is `./templates`.
+The `package_directory` field is used to configure the path to the directory where the account components are stored in package (`.masp`) form. The default value is `./packages`.
 
-In this directory you can place the templates used to create the account components. These templates define the interface of the account that will be created.
+In this directory you can place the packages used to create the account components. These define the interface of the account that will be created.
 
-A sample template file looks like this:
-
-```toml
-name = "basic_fungible_faucet"
-description = ""
-version = "0.1.0"
-supported-types = ["FungibleFaucet"]
-
-[[storage]]
-name = "token_metadata"
-description = "Contains metadata about the token associated to the faucet account"
-slot = 0
-value = [
-    { name = "max_supply", type = "felt", description = "Maximum supply of the token in base units" },
-    { name = "decimals",type = "u8", description = "Number of decimal places" },
-    { name = "ticker", type = "token_symbol", description = "Token symbol of the faucet's asset, limited to 4 characters." },
-    { value = "0" },
-]
-```
+For more information on miden packages, see:
+- [The mast-package crate](https://github.com/0xMiden/miden-vm/blob/next/crates/mast-package/README.md)
+- [The Miden package's status article on the Miden compiler](https://0xmiden.github.io/compiler/appendix/known-limitations.html#packaging)
 
 ### Block Delta
 
@@ -141,3 +131,13 @@ miden-client init --block-delta 256
 ### Environment variables
 
 - `MIDEN_DEBUG`: When set to `true`, enables debug mode on the transaction executor and the script compiler. For any script that has been compiled and executed in this mode, debug logs will be output in order to facilitate MASM debugging ([these instructions](https://0xMiden.github.io/miden-vm/user_docs/assembly/debugging.html) can be used to do so). This variable can be overridden by the `--debug` CLI flag.
+
+### Note Transport
+
+A `note-transport` section is used to configure the connection to the Miden Note Transport node used in the exchange of private notes. It contains the following fields:
+- `endpoint`: The endpoint of the Miden Note Transport node;
+- `timeout-ms`: The timeout employed in client requests to the node.
+
+> [!Note]
+> - Running the node locally for development is encouraged.
+> - However, the endpoint can point to any remote node.

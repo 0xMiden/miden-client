@@ -144,3 +144,37 @@ test.describe("Note tag tests", () => {
     await expect(instanceAddressTestNoteTag(page)).resolves.toBeTruthy();
   });
 });
+
+// ADDRESS INSERTION & DELETION TESTS
+// =======================================================================================================
+
+const instanceAddressRemoveThenInsert = async (page: Page) => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    const newAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    console.log("newAccount ID:", newAccount.id());
+
+    const address = window.Address.fromAccountId(
+      newAccount.id(),
+      "Unspecified"
+    );
+
+    console.log("address:", address);
+
+    // First we remove the address tracked by default
+    await client.removeAccountAddress(newAccount.id(), address);
+
+    // Then we add it again
+    await client.insertAccountAddress(newAccount.id(), address);
+    return true;
+  });
+};
+
+test.describe("Address insertion & deletion tests", () => {
+  test("address can be remove and then re-inserted", async ({ page }) => {
+    await expect(instanceAddressRemoveThenInsert(page)).resolves.toBeTruthy();
+  });
+});

@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Script to publish all miden-node crates to crates.io. 
+# Script to publish all miden-client crates to crates.io.
+# This should only be invoked manually in case the automated publishing CI workflows fail.
 # Usage: ./publish-crates.sh [args] 
 # 
 # E.G: ./publish-crates.sh
@@ -20,27 +21,13 @@ echo "Checking out main branch..."
 git checkout main
 git pull origin main
 
-echo "Publishing crates..."
+# Publish
+echo "Publishing all crates except miden-client-web..."
+cargo publish --workspace --exclude miden-client-web
 
-crates=(
-  miden-client
-  miden-client-sqlite-store
-  miden-client-cli
-)
-
-for crate in "${crates[@]}"; do
-    echo "Publishing $crate..."
-    cargo publish -p "$crate"
-done
-
-# Publish wasm crates
-
-crates_wasm=(
-  miden-client-web
-  miden-idxdb-store
-)
-
-for crate in "${crates_wasm[@]}"; do
-    echo "Publishing $crate (wasm)..."
-    cargo publish -p "$crate" --target wasm32-unknown-unknown
-done
+# Publish miden-client-web
+# This should use wasm32-unknown-unknown as target (specified on crates/web-client/.cargo/config.toml,
+# but publishing from the workspace root does not take it into account). So we publish it from the web-client directory.
+echo "Publishing miden-client-web..."
+cd crates/web-client
+cargo publish

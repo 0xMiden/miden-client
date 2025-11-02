@@ -17,7 +17,7 @@ In this section, we show you how to make private transactions and send funds to 
 Remember to use the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for clarifications.
 :::
 
-1. Create a second account to send funds with. Previously, we created a type `mutable` account (account A). Now, create another `mutable` (account B) using the following command:
+1. Create a second account to send funds with. Previously, we created a type `mutable` account (`Account A`). Now, create another `mutable` (`Account B`) using the following command:
 
    ```shell
    miden-client new-wallet --mutable
@@ -35,7 +35,7 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
 
 ## Transfer assets between accounts
 
-1. Now we can transfer some of the tokens we received from the faucet to our second account B.
+1. Now we can transfer some of the tokens we received from the faucet to our second `Account B`.
 
    To do this, run:
 
@@ -90,6 +90,28 @@ Remember to use the [Miden client documentation](https://0xMiden.github.io/miden
    <!-- ![Result of listing miden accounts](../img/get-started/account-a.png) -->
 
 Wanna do more? [Sending public notes](p2p-public)
+
+## Using the note transport network
+
+The steps above assume that the client owns both accounts. To exchange notes with other users, the note transport network can be used.
+For this the sender (`Account A`) will need the address (bech32 string) of the recipient (`Account B`).
+After creating the note (step 1 above), get the created note ID with `miden-client notes --list`. Then send that note through the note transport network,
+```sh
+miden-client notes --send <note-id> <address-B>
+```
+Then the recipient can fetch that note using `miden-client sync`, or more specifically,
+```sh
+miden-client notes --fetch
+```
+The note will then be available to be consumed.
+
+:::note
+
+The client will fetch notes for tracked note tags.
+By default, note tags are derived from the recipient's account ID. However these can also be random to increase privacy.
+In this case, to track a specific tag, run `miden-client tags --add <tag>`.
+
+:::
 
 ## Congratulations!
 

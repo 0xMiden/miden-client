@@ -32,6 +32,11 @@ let keystore = FilesystemKeyStore::new(path.into())?;
 
 // Instantiate the client using a gRPC client
 let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
+
+// Optionally, setup a connection to the note transport network
+let nt_endpoint = "http://localhost:57292".to_string();
+let nt_client = CanonicalNoteTransportClient::connect(nt_endpoint, 10_000).await?;
+
 let client:Client = Client::new(
     Arc::new(GrpcClient::new(&endpoint, 10_000)),
     rng,
@@ -40,6 +45,7 @@ let client:Client = Client::new(
     false, // Set to true for debug mode, if needed.
     None, // Set to Some to enable stale transactions after an amount of blocks.
     None, // Set to Some to enable recency checks when executing transactions.
+    Some(Arc::new(nt_client)),
 );
 ```
 
