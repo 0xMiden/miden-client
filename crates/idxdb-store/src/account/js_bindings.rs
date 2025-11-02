@@ -77,6 +77,9 @@ extern "C" {
     #[wasm_bindgen(js_name = insertAccountAddress)]
     pub fn idxdb_insert_account_address(account_id: String, address: Vec<u8>) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = removeAccountAddress)]
+    pub fn idxdb_remove_account_address(address: Vec<u8>) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = upsertForeignAccountCode)]
     pub fn idxdb_upsert_foreign_account_code(
         account_id: String,

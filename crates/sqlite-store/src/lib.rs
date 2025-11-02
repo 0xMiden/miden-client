@@ -50,6 +50,7 @@ use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
+use sql_error::SqlResultExt;
 
 use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 
@@ -364,7 +365,10 @@ impl Store for SqliteStore {
     }
 
     async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| set_setting(conn, &key, &value)).await
+        self.interact_with_connection(move |conn| {
+            set_setting(conn, &key, &value).into_store_error()
+        })
+        .await
     }
 
     async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
@@ -431,6 +435,30 @@ impl Store for SqliteStore {
     ) -> Result<Vec<Address>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_addresses(conn, account_id)
+        })
+        .await
+    }
+
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            SqliteStore::insert_address(&tx, &address, account_id)?;
+            tx.commit().into_store_error()
+        })
+        .await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_address(conn, &address, account_id)
         })
         .await
     }

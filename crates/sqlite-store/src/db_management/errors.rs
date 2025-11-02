@@ -14,14 +14,10 @@ pub enum SqliteStoreError {
     DatabaseError(String),
     #[error("Migration error: {0}")]
     MigrationError(String),
-    #[error("Schema version mismatch")]
-    SchemaVersionMismatch,
     #[error("No migrations table in the database")]
     MissingMigrationsTable,
     #[error("Migration hashes mismatch")]
     MigrationHashMismatch,
-    #[error("Failed to decode hex string: {0}")]
-    HexDecodeError(String),
 }
 
 impl From<RusqliteError> for SqliteStoreError {

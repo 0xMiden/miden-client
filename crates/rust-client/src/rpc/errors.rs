@@ -38,6 +38,8 @@ pub enum RpcError {
     },
     #[error("note with id {0} was not found")]
     NoteNotFound(NoteId),
+    #[error("invalid node endpoint: {0}")]
+    InvalidNodeEndpoint(String),
 }
 
 impl From<DeserializationError> for RpcError {

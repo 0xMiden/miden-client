@@ -39,6 +39,7 @@ use alloc::vec::Vec;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
@@ -74,7 +75,7 @@ use crate::store::{AccountRecord, AccountStatus};
 use crate::sync::NoteTagRecord;
 
 pub mod component {
-    pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
+    pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
     pub use miden_lib::account::auth::*;
     pub use miden_lib::account::components::{
@@ -87,7 +88,6 @@ pub mod component {
     pub use miden_objects::account::{
         AccountComponent,
         AccountComponentMetadata,
-        AccountComponentTemplate,
         FeltRepresentation,
         InitStorageData,
         StorageEntry,
@@ -219,6 +219,57 @@ impl<AUTH> Client<AUTH> {
         };
 
         self.add_account(&account, true).await
+    }
+
+    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the address is already being tracked.
+    pub async fn add_address(
+        &mut self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        let network_id = self.rpc_api.get_network_id().await?;
+        let address_bench32 = address.to_bech32(network_id);
+        if self.store.get_addresses_by_account_id(account_id).await?.contains(&address) {
+            return Err(ClientError::AddressAlreadyTracked(address_bench32));
+        }
+
+        let tracked_account = self.store.get_account(account_id).await?;
+        match tracked_account {
+            None => Err(ClientError::AccountDataNotFound(account_id)),
+            Some(_tracked_account) => {
+                // Check that the Address is not already tracked
+                let derived_note_tag: NoteTag = address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(derived_note_tag, account_id);
+                if self.store.get_note_tags().await?.contains(&note_tag_record) {
+                    return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
+                        address_bench32,
+                        derived_note_tag,
+                    ));
+                }
+
+                self.store.insert_address(address, account_id).await?;
+                Ok(())
+            },
+        }
+    }
+
+    /// Removes an [`Address`] from the associated [`AccountId`], alongside its derived [`NoteTag`].
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the address is not being tracked.
+    pub async fn remove_address(
+        &mut self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        self.store.remove_address(address, account_id).await?;
+        Ok(())
     }
 
     // ACCOUNT DATA RETRIEVAL

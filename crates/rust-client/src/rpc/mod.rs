@@ -52,6 +52,7 @@ use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::address::NetworkId;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
 use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
@@ -227,19 +228,26 @@ pub trait NodeRpcClient: Send + Sync {
         note_ids: &[NoteId],
         current_timestamp: Option<u64>,
     ) -> Result<Vec<InputNoteRecord>, RpcError> {
-        let note_details = self.get_notes_by_id(note_ids).await?;
+        if note_ids.is_empty() {
+            return Ok(vec![]);
+        }
 
-        let mut public_notes = vec![];
-        for detail in note_details {
-            if let FetchedNote::Public(note, inclusion_proof) = detail {
-                let state = UnverifiedNoteState {
-                    metadata: *note.metadata(),
-                    inclusion_proof,
+        let mut public_notes = Vec::with_capacity(note_ids.len());
+        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
+        for chunk in note_ids.chunks(1_000) {
+            let note_details = self.get_notes_by_id(chunk).await?;
+
+            for detail in note_details {
+                if let FetchedNote::Public(note, inclusion_proof) = detail {
+                    let state = UnverifiedNoteState {
+                        metadata: *note.metadata(),
+                        inclusion_proof,
+                    }
+                    .into();
+                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                    public_notes.push(note);
                 }
-                .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                public_notes.push(note);
             }
         }
 
@@ -342,6 +350,11 @@ pub trait NodeRpcClient: Send + Sync {
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
     ) -> Result<TransactionsInfo, RpcError>;
+
+    /// Fetches the network ID of the node.
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
 }
 
 // RPC API ENDPOINT
