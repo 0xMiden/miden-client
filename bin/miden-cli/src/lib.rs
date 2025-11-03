@@ -16,6 +16,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
+use commands::clear::ClearCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
@@ -136,6 +137,7 @@ pub enum Command {
     Import(ImportCmd),
     Export(ExportCmd),
     Init(InitCmd),
+    Clear(ClearCmd),
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
@@ -154,22 +156,24 @@ pub enum Command {
 /// CLI entry point.
 impl Cli {
     pub async fn execute(&self) -> Result<(), CliError> {
-        let mut config_file_path = std::env::current_dir()?;
-        config_file_path.push(MIDEN_DIR);
-        config_file_path.push(CLIENT_CONFIG_FILE_NAME);
-
-        // Check if it's an init command before anything else. When we run the init command for
-        // the first time we won't have a config file and thus creating the store would not be
-        // possible.
-        if let Command::Init(init_cmd) = &self.action {
-            init_cmd.execute(&config_file_path)?;
-            return Ok(());
+        // Handle commands that don't require client initialization
+        match &self.action {
+            Command::Init(init_cmd) => {
+                init_cmd.execute()?;
+                return Ok(());
+            },
+            Command::Clear(clear_cmd) => {
+                clear_cmd.execute()?;
+                return Ok(());
+            },
+            _ => {},
         }
 
         // Check if Client is not yet initialized => silently initialize the client
-        if !config_file_path.exists() {
+        // This uses the priority-based config loading: checks local first, then global
+        if load_config_file().is_err() {
             let init_cmd = InitCmd::default();
-            init_cmd.execute(&config_file_path)?;
+            init_cmd.execute()?;
         }
 
         // Define whether we want to use the executor's debug mode based on the env var and
@@ -215,6 +219,7 @@ impl Cli {
             },
             Command::Import(import) => import.execute(client, keystore).await,
             Command::Init(_) => Ok(()),
+            Command::Clear(_) => Ok(()), // Already handled earlier
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,

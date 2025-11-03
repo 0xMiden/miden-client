@@ -12,8 +12,24 @@ use serde::{Deserialize, Serialize};
 use crate::errors::CliError;
 
 pub const MIDEN_DIR: &str = ".miden";
-const TOKEN_SYMBOL_MAP_FILEPATH: &str = "token_symbol_map.toml";
-const DEFAULT_PACKAGES_DIR: &str = "packages";
+pub const TOKEN_SYMBOL_MAP_FILENAME: &str = "token_symbol_map.toml";
+pub const DEFAULT_PACKAGES_DIR: &str = "packages";
+pub const STORE_FILENAME: &str = "store.sqlite3";
+pub const KEYSTORE_DIRECTORY: &str = "keystore";
+
+/// Returns the global miden directory path in the user's home directory
+pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
+    dirs::home_dir()
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine home directory")
+        })
+        .map(|home| home.join(MIDEN_DIR))
+}
+
+/// Returns the local miden directory path relative to the current working directory
+pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
+    std::env::current_dir().map(|cwd| cwd.join(MIDEN_DIR))
+}
 
 // CLI CONFIG
 // ================================================================================================

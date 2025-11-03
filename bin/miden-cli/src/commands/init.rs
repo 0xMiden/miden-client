@@ -1,11 +1,20 @@
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use tracing::info;
 
-use crate::config::{CliConfig, CliEndpoint, Network, NoteTransportConfig};
+use crate::CLIENT_CONFIG_FILE_NAME;
+use crate::config::{
+    CliConfig,
+    CliEndpoint,
+    MIDEN_DIR,
+    Network,
+    NoteTransportConfig,
+    get_global_miden_dir,
+    get_local_miden_dir,
+};
 use crate::errors::CliError;
 
 /// Contains the account component template file generated on build.rs, corresponding to the basic
@@ -35,10 +44,21 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // INIT COMMAND
 // ================================================================================================
 
-#[derive(Debug, Clone, Parser, Default)]
-#[command(about = "Initialize the client. It will create a `.miden` directory with a \
-`miden-client.toml` file that holds the CLI and client configurations")]
+#[derive(Debug, Clone, Parser)]
+#[command(
+    about = "Initialize the client. By default creates a global `.miden` directory in the home directory. \
+Use --local to create a local `.miden` directory in the current working directory. \
+Use --copy-global to copy the entire global configuration to the local directory."
+)]
 pub struct InitCmd {
+    /// Create configuration in the local working directory instead of the global home directory
+    #[clap(long)]
+    local: bool,
+
+    /// Copy existing global configuration to local directory
+    #[clap(long)]
+    copy_global: bool,
+
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
     #[clap(long, short)]
@@ -68,28 +88,100 @@ pub struct InitCmd {
 }
 
 impl InitCmd {
-    pub fn execute(&self, config_file_path: &PathBuf) -> Result<(), CliError> {
-        if config_file_path.exists() {
+    pub fn execute(&self) -> Result<(), CliError> {
+        if self.copy_global {
+            // Copy global config to local - always targets local directory
+            self.copy_global_to_local()
+        } else {
+            // Create new config in target directory (local or global)
+            self.create_new_config()
+        }
+    }
+
+    fn copy_global_to_local(&self) -> Result<(), CliError> {
+        let global_miden_dir = get_global_miden_dir().map_err(|e| {
+            CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
+        })?;
+
+        let local_miden_dir = get_local_miden_dir()?;
+
+        // Check if global config exists
+        if !global_miden_dir.exists() {
             return Err(CliError::Config(
-                "Error with the configuration file".to_string().into(),
+                "Global configuration not found".to_string().into(),
+                format!("Cannot copy global config: {} does not exist", global_miden_dir.display()),
+            ));
+        }
+
+        // Check if local config already exists
+        if local_miden_dir.exists() {
+            return Err(CliError::Config(
+                "Local configuration already exists".to_string().into(),
                 format!(
                     "The file \"{:?}\" already exists in the working directory. Please try using another directory or removing the file.",
                     config_file_path.display(),
+                    "Cannot copy to local directory: {} already exists. Remove it first.",
+                    local_miden_dir.display()
                 ),
             ));
         }
 
-        // Create the .miden directory if it doesn't exist
-        if let Some(parent_dir) = config_file_path.parent() {
-            fs::create_dir_all(parent_dir).map_err(|err| {
-                CliError::Config(
-                    Box::new(err),
-                    format!("failed to create .miden directory in {}", parent_dir.display()),
-                )
-            })?;
+        // Copy entire global miden directory to local
+        copy_dir_all(&global_miden_dir, &local_miden_dir)?;
+
+        println!(
+            "Successfully copied global configuration from {} to {}",
+            global_miden_dir.display(),
+            local_miden_dir.display()
+        );
+
+        Ok(())
+    }
+
+    fn create_new_config(&self) -> Result<(), CliError> {
+        // Determine target directory based on flags
+        let (target_miden_dir, config_type) = if self.local {
+            (get_local_miden_dir()?, "local")
+        } else {
+            (
+                get_global_miden_dir().map_err(|e| {
+                    CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
+                })?,
+                "global",
+            )
+        };
+
+        let config_file_path = target_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
+
+        // Check if config already exists
+        if config_file_path.exists() {
+            return Err(CliError::Config(
+                "Error with the configuration file".to_string().into(),
+                format!(
+                    "The file \"{}\" already exists in the {} {} directory ({}). Please remove it first or use a different location.",
+                    CLIENT_CONFIG_FILE_NAME,
+                    config_type,
+                    MIDEN_DIR,
+                    target_miden_dir.display()
+                ),
+            ));
         }
 
-        let mut cli_config = CliConfig::default();
+        // Create the miden directory if not existent
+        fs::create_dir_all(&target_miden_dir).map_err(|err| {
+            CliError::Config(
+                Box::new(err),
+                format!(
+                    "failed to create {} {} directory in {}",
+                    config_type,
+                    MIDEN_DIR,
+                    target_miden_dir.display()
+                ),
+            )
+        })?;
+
+        // Create new config for target directory
+        let mut cli_config = CliConfig::for_directory(&target_miden_dir);
 
         if let Some(network) = &self.network {
             cli_config.rpc.endpoint = CliEndpoint::try_from(network.clone())?;
@@ -119,10 +211,10 @@ impl InitCmd {
         let mut file_handle = File::options()
             .write(true)
             .create_new(true)
-            .open(config_file_path)
+            .open(&config_file_path)
             .map_err(|err| {
-            CliError::Config("failed to create config file".to_string().into(), err.to_string())
-        })?;
+                CliError::Config("failed to create config file".to_string().into(), err.to_string())
+            })?;
 
         // Resolve package directory relative to .miden directory before writing files
         let config_dir = config_file_path.parent().unwrap();
@@ -133,11 +225,15 @@ impl InitCmd {
         };
         write_packages_files(&resolved_package_dir)?;
 
-        file_handle.write(config_as_toml_string.as_bytes()).map_err(|err| {
+        file_handle.write_all(config_as_toml_string.as_bytes()).map_err(|err| {
             CliError::Config("failed to write config file".to_string().into(), err.to_string())
         })?;
 
-        println!("Config file successfully created at: {}", config_file_path.display());
+        println!(
+            "Config file successfully created at: {} ({})",
+            config_file_path.display(),
+            config_type
+        );
 
         Ok(())
     }
@@ -174,5 +270,54 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
 
     info!("Packages files successfully created in: {:?}", packages_dir);
 
+    Ok(())
+}
+
+impl Default for InitCmd {
+    // Create a new InitCmd with default values for silent initialization
+    fn default() -> Self {
+        Self {
+            local: false, // Global by default for silent initialization
+            copy_global: false,
+            network: None,
+            store_path: None,
+            remote_prover_endpoint: None,
+            note_transport_endpoint: None,
+            block_delta: None,
+        }
+    }
+}
+
+/// Recursively copies all files and directories from source to destination
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), CliError> {
+    fs::create_dir_all(dst).map_err(|e| {
+        CliError::Config(Box::new(e), format!("Failed to create directory {}", dst.display()))
+    })?;
+
+    for entry in fs::read_dir(src).map_err(|e| {
+        CliError::Config(Box::new(e), format!("Failed to read directory {}", src.display()))
+    })? {
+        let entry = entry.map_err(|e| {
+            CliError::Config(
+                Box::new(e),
+                format!("Failed to read directory entry in {}", src.display()),
+            )
+        })?;
+
+        let ty = entry
+            .file_type()
+            .map_err(|e| CliError::Config(Box::new(e), "Failed to get file type".to_string()))?;
+
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name())).map_err(|e| {
+                CliError::Config(
+                    Box::new(e),
+                    format!("Failed to copy file {}", entry.path().display()),
+                )
+            })?;
+        }
+    }
     Ok(())
 }

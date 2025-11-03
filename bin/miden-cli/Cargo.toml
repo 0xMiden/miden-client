@@ -24,6 +24,7 @@ miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../
 # External dependencies
 clap               = { features = ["derive"], version = "4.5" }
 comfy-table        = { version = "7.1" }
+dirs               = { version = "6.0" }
 figment            = { features = ["env", "toml"], version = "0.10" }
 miette             = { workspace = true }
 rand               = { workspace = true }
