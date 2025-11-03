@@ -112,6 +112,18 @@ stop-node: ## Stop the testing node server
 	-pkill -f "node-builder"
 	sleep 1
 
+.PHONY: start-note-transport-background
+start-note-transport-background: ## Start the note transport service in background
+	./scripts/start-note-transport-bg.sh
+
+.PHONY: stop-note-transport
+stop-transport: ## Stop the note transport service
+	./scripts/stop-note-transport.sh
+
+.PHONY: start-note-transport
+start-note-transport:
+	./scripts/start-note-transport.sh
+
 .PHONY: integration-test
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
@@ -130,13 +142,13 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 	cd ./crates/web-client && yarn run test:remote_prover -- --project=chromium
 
 .PHONY: integration-test-full
-integration-test-full: ## Run the integration test binary with ignored tests included
-	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
+	TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: integration-test-binary
-integration-test-binary: ## Run the integration tests using the standalone binary
-	cargo run --package miden-client-integration-tests --release --locked
+integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
+	TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover
@@ -208,6 +220,7 @@ install-tools: ## Installs Rust + Node tools required by the Makefile
 	command -v yarn >/dev/null 2>&1 || npm install -g yarn
 	yarn --cwd $(WEB_CLIENT_DIR) --silent  # installs prettier, eslint, typedoc, etc.
 	yarn --cwd crates/idxdb-store/src --silent
+	yarn install --prefix docs/external --no-progress
 	yarn --silent
 	yarn
 	@echo "Development tools installation complete!"
