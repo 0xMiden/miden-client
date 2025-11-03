@@ -1,5 +1,4 @@
 import rust from "@wasm-tool/rollup-plugin-rust";
-import typescript from "@rollup/plugin-typescript";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import copy from "rollup-plugin-copy";

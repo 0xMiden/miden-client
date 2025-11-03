@@ -172,6 +172,7 @@ impl SqliteStore {
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;
 
+        // Note tags
         for tag_record in tx_update.new_tags() {
             add_note_tag_tx(&tx, tag_record)?;
         }

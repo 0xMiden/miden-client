@@ -33,3 +33,11 @@ pub struct OutputNoteIdxdbObject {
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub state: Vec<u8>,
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteScriptIdxdbObject {
+    pub note_script_root: String,
+    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    pub serialized_note_script: Vec<u8>,
+}
