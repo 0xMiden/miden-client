@@ -181,6 +181,7 @@ enum TestCategory {
     NetworkTransaction,
     Onchain,
     SwapTransaction,
+    Transport,
 }
 
 impl AsRef<str> for TestCategory {
@@ -192,6 +193,7 @@ impl AsRef<str> for TestCategory {
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
             TestCategory::SwapTransaction => "swap_transaction",
+            TestCategory::Transport => "transport",
         }
     }
 }

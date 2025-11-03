@@ -2,7 +2,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::note::Nullifier;
+use miden_client::note::{NoteScript, Nullifier};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -15,6 +15,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::js_sys::{Array, Promise};
 
 use super::WebStore;
+use crate::note::utils::upsert_note_script_tx;
 use crate::promise::await_js;
 
 mod js_bindings;
@@ -22,6 +23,7 @@ use js_bindings::{
     idxdb_get_input_notes,
     idxdb_get_input_notes_from_ids,
     idxdb_get_input_notes_from_nullifiers,
+    idxdb_get_note_script,
     idxdb_get_output_notes,
     idxdb_get_output_notes_from_ids,
     idxdb_get_output_notes_from_nullifiers,
@@ -29,10 +31,15 @@ use js_bindings::{
 };
 
 mod models;
-use models::{InputNoteIdxdbObject, OutputNoteIdxdbObject};
+use models::{InputNoteIdxdbObject, NoteScriptIdxdbObject, OutputNoteIdxdbObject};
 
 pub(crate) mod utils;
-use utils::{parse_input_note_idxdb_object, parse_output_note_idxdb_object, upsert_input_note_tx};
+use utils::{
+    parse_input_note_idxdb_object,
+    parse_note_script_idxdb_object,
+    parse_output_note_idxdb_object,
+    upsert_input_note_tx,
+};
 
 impl WebStore {
     pub(crate) async fn get_input_notes(
@@ -61,6 +68,18 @@ impl WebStore {
             .collect::<Result<Vec<_>, _>>() // Collect results into a single Result
     }
 
+    pub(crate) async fn get_note_script(
+        &self,
+        script_root: Word,
+    ) -> Result<NoteScript, StoreError> {
+        let script_root = script_root.to_hex();
+        let promise = idxdb_get_note_script(script_root);
+        let script_idxdb: NoteScriptIdxdbObject =
+            await_js(promise, "failed to get note script").await?;
+
+        parse_note_script_idxdb_object(script_idxdb)
+    }
+
     pub(crate) async fn get_unspent_input_note_nullifiers(
         &self,
     ) -> Result<Vec<Nullifier>, StoreError> {
@@ -80,6 +99,17 @@ impl WebStore {
     ) -> Result<(), StoreError> {
         for note in notes {
             upsert_input_note_tx(note).await?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn upsert_note_scripts(
+        &self,
+        note_scripts: &[NoteScript],
+    ) -> Result<(), StoreError> {
+        for note_script in note_scripts {
+            upsert_note_script_tx(note_script).await?;
         }
 
         Ok(())
