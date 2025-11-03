@@ -103,8 +103,8 @@ This command has three optional flags:
 
 - `--storage-mode <TYPE>`: Used to select the storage mode of the account (private if not specified). It may receive "private" or "public".
 - `--mutable`: Makes the account code mutable (it's immutable by default).
-- `--extra-components <TEMPLATE_FILES_LIST>`: Allows to pass a list of account component template files which can be added to the account. If the templates contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
-- `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the provided component templates. The CLI will prompt for any keys that are not present in the file.
+- `--extra-packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
+- `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
 After creating an account with the `new-wallet` command, it is automatically stored and tracked by the client. This means the client can execute transactions that modify the state of accounts and track related changes by synchronizing with the Miden network.
 
@@ -112,7 +112,7 @@ After creating an account with the `new-wallet` command, it is automatically sto
 
 Creates a new account and saves it locally.
 
-An account may be composed of one or more components, each with its own storage and distinct functionality. This command lets you build a custom account by selecting an account type and optionally adding extra component templates.
+An account may be composed of one or more components, each with its own storage and distinct functionality. This command lets you build a custom account by selecting an account type and optionally adding extra component packages.
 
 This command has four flags:
 
@@ -122,8 +122,8 @@ This command has four flags:
   - `non-fungible-faucet`
   - `regular-account-immutable-code`
   - `regular-account-updatable-code`
-- `--packages <PACKAGES>`: Allows you to provide a list of file paths for package files holding account components to include in the account. These components are looked up from your configured `packages_directory` field in `miden-client.toml`.
-- `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the provided component templates. The CLI will prompt for any keys that are not present in the file.
+- `--packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
+- `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
 After creating an account with the `new-account` command, the account is stored locally and tracked by the client, enabling it to execute transactions and synchronize state changes with the Miden network.
 
@@ -136,14 +136,21 @@ miden-client new-wallet
 # Create a new wallet with public storage and a mutable code
 miden-client new-wallet --storage-mode public --mutable
 
-# Create a new wallet that includes extra components from local templates
-miden-client new-wallet --extra-components template1,template2
+# Create a new wallet that includes custom packages
+miden-client new-wallet --extra-packages packages/custom-package.masp
 
 # Create a fungible faucet with interactive input
-miden-client new-account --account-type fungible-faucet -c basic-fungible-faucet
+miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp
 
 # Create a fungible faucet with preset fields
-miden-client new-account --account-type fungible-faucet --component-templates basic-fungible-faucet --init-storage-data-path init_data.toml
+miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp --init-storage-data-path init_data.toml
+```
+
+where `init_data.toml` is a TOML file with the following example content:
+```toml
+token_metadata.max_supply = 1000000000
+token_metadata.decimals = 6
+token_metadata.ticker = "TEST"
 ```
 
 ### `info`
