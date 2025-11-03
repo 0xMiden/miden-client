@@ -62,11 +62,12 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest = new window.TransactionRequestBuilder().build();
 
-    let txResult = await client.newTransaction(foreignAccountId, txRequest);
+    let txResult = await window.helpers.executeAndApplyTransaction(
+      foreignAccountId,
+      txRequest
+    );
 
     let txId = txResult.executedTransaction().id();
-
-    await client.submitTransaction(txResult);
 
     await window.helpers.waitForTransaction(txId.toHex());
 
@@ -123,14 +124,14 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       )
       .build();
 
-    let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);
-
-    await client.submitTransaction(txResult2);
+    let txResult2 = await window.helpers.executeAndApplyTransaction(
+      newAccount.id(),
+      txRequest2
+    );
   });
 };
 
 test.describe("fpi test", () => {
-  test.setTimeout(50000);
   test("runs the standard fpi test successfully", async ({ page }) => {
     await expect(testStandardFpi(page)).resolves.toBeUndefined();
   });

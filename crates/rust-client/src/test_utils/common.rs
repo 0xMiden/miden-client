@@ -19,8 +19,13 @@ use rand::RngCore;
 use rand::rngs::StdRng;
 use uuid::Uuid;
 
-use crate::account::component::{AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet};
-use crate::account::{AccountBuilder, AccountType};
+use crate::account::component::{
+    AccountComponent,
+    AuthRpoFalcon512,
+    BasicFungibleFaucet,
+    BasicWallet,
+};
+use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSecretKey;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
@@ -31,6 +36,7 @@ use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
     NoteArgs,
+    TransactionKernel,
     TransactionRequest,
     TransactionRequestBuilder,
     TransactionRequestError,
@@ -133,29 +139,12 @@ pub async fn execute_failing_tx(
     println!("Executing transaction...");
     // We compare string since we can't compare the error directly
     assert_eq!(
-        Box::pin(client.new_transaction(account_id, tx_request))
+        Box::pin(client.submit_new_transaction(account_id, tx_request))
             .await
             .unwrap_err()
             .to_string(),
         expected_error.to_string()
     );
-}
-
-/// Executes a transaction and returns the transaction ID.
-pub async fn execute_tx(
-    client: &mut TestClient,
-    account_id: AccountId,
-    tx_request: TransactionRequest,
-) -> TransactionId {
-    println!("Executing transaction...");
-    let transaction_execution_result =
-        Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap();
-    let transaction_id = transaction_execution_result.executed_transaction().id();
-
-    println!("Sending transaction to node");
-    Box::pin(client.submit_transaction(transaction_execution_result)).await.unwrap();
-
-    transaction_id
 }
 
 /// Executes a transaction and waits for it to be committed.
@@ -164,7 +153,7 @@ pub async fn execute_tx_and_sync(
     account_id: AccountId,
     tx_request: TransactionRequest,
 ) -> Result<()> {
-    let transaction_id = Box::pin(execute_tx(client, account_id, tx_request)).await;
+    let transaction_id = Box::pin(client.submit_new_transaction(account_id, tx_request)).await?;
     wait_for_tx(client, transaction_id).await?;
     Ok(())
 }
@@ -351,7 +340,10 @@ pub async fn mint_note(
     let tx_request = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset, basic_account_id, note_type, client.rng())
         .unwrap();
-    let tx_id = Box::pin(execute_tx(client, fungible_asset.faucet_id(), tx_request.clone())).await;
+    let tx_id =
+        Box::pin(client.submit_new_transaction(fungible_asset.faucet_id(), tx_request.clone()))
+            .await
+            .unwrap();
 
     // Check that note is committed and return it
     println!("Fetching Committed Notes...");
@@ -369,7 +361,7 @@ pub async fn consume_notes(
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(input_notes.iter().map(Note::id).collect())
         .unwrap();
-    Box::pin(execute_tx(client, account_id, tx_request)).await
+    Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap()
 }
 
 /// Asserts that the account has a single asset with the expected amount.
@@ -406,7 +398,7 @@ pub async fn assert_note_cannot_be_consumed_twice(
         .build_consume_notes(vec![note_to_consume_id])
         .unwrap();
 
-    match Box::pin(client.new_transaction(consuming_account_id, tx_request)).await {
+    match Box::pin(client.submit_new_transaction(consuming_account_id, tx_request)).await {
         Err(ClientError::TransactionRequestError(
             TransactionRequestError::InputNoteAlreadyConsumed(_),
         )) => {},
@@ -456,13 +448,13 @@ pub async fn execute_tx_and_consume_output_notes(
         .map(|note| (note, None::<NoteArgs>))
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
-    Box::pin(execute_tx(client, executor, tx_request)).await;
+    Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
 
     let tx_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes(output_notes)
         .build()
         .unwrap();
-    Box::pin(execute_tx(client, consumer, tx_request)).await
+    Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()
 }
 
 /// Mints assets for the target account and consumes them immediately without waiting for the first
@@ -489,4 +481,38 @@ pub async fn mint_and_consume(
         basic_account_id,
     ))
     .await
+}
+
+/// Creates and inserts an account with custom code as a component into the client.
+pub async fn insert_account_with_custom_component(
+    client: &mut TestClient,
+    custom_code: &str,
+    storage_slots: Vec<StorageSlot>,
+    storage_mode: AccountStorageMode,
+    keystore: &TestClientKeyStore,
+) -> Result<(Account, SecretKey), ClientError> {
+    let assembler = TransactionKernel::assembler();
+    let custom_component = AccountComponent::compile(custom_code, assembler.clone(), storage_slots)
+        .map_err(ClientError::AccountError)?
+        .with_supports_all_types();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let pub_key = key_pair.public_key();
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.into()))
+        .with_component(BasicWallet)
+        .with_component(custom_component)
+        .build()
+        .map_err(ClientError::AccountError)?;
+
+    client.add_account(&account, false).await?;
+
+    Ok((account, key_pair))
 }

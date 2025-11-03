@@ -83,6 +83,7 @@ export const test = base.extend<{ forEachTest: void }>({
             NoteId,
             Signature,
             SigningInputs,
+            SigningInputsType,
             SlotAndKeys,
             SlotAndKeysArray,
             StorageMap,
@@ -93,12 +94,11 @@ export const test = base.extend<{ forEachTest: void }>({
             TransactionKernel,
             TransactionProver,
             TransactionRequest,
-            TransactionResult,
+            TransactionStoreUpdate,
             TransactionRequestBuilder,
             TransactionScript,
             TransactionScriptInputPair,
             TransactionScriptInputPairArray,
-            TransactionSummary,
             Word,
             WebClient,
             MockWebClient,
@@ -108,7 +108,13 @@ export const test = base.extend<{ forEachTest: void }>({
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await WebClient.createClient(rpcUrl, undefined);
+          const client = await WebClient.createClient(
+            rpcUrl,
+            undefined,
+            undefined
+          );
+
+          window.rpcUrl = rpcUrl;
 
           window.client = client;
           window.Account = Account;
@@ -165,6 +171,7 @@ export const test = base.extend<{ forEachTest: void }>({
           window.SecretKey = SecretKey;
           window.Signature = Signature;
           window.SigningInputs = SigningInputs;
+          window.SigningInputsType = SigningInputsType;
           window.SlotAndKeys = SlotAndKeys;
           window.SlotAndKeysArray = SlotAndKeysArray;
           window.StorageMap = StorageMap;
@@ -175,13 +182,12 @@ export const test = base.extend<{ forEachTest: void }>({
           window.TransactionKernel = TransactionKernel;
           window.TransactionProver = TransactionProver;
           window.TransactionRequest = TransactionRequest;
-          window.TransactionResult = TransactionResult;
+          window.TransactionStoreUpdate = TransactionStoreUpdate;
           window.TransactionRequestBuilder = TransactionRequestBuilder;
           window.TransactionScript = TransactionScript;
           window.TransactionScriptInputPair = TransactionScriptInputPair;
           window.TransactionScriptInputPairArray =
             TransactionScriptInputPairArray;
-          window.TransactionSummary = TransactionSummary;
           window.WebClient = WebClient;
           window.Word = Word;
           window.MockWebClient = MockWebClient;
@@ -193,7 +199,6 @@ export const test = base.extend<{ forEachTest: void }>({
 
           // Add the remote prover url to window
           window.remoteProverUrl = proverUrl;
-          window.rpcUrl = rpcUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(window.remoteProverUrl);
@@ -225,6 +230,31 @@ export const test = base.extend<{ forEachTest: void }>({
             }
           };
 
+          window.helpers.executeAndApplyTransaction = async (
+            accountId,
+            transactionRequest,
+            prover
+          ) => {
+            const client = window.client;
+            const result = await client.executeTransaction(
+              accountId,
+              transactionRequest
+            );
+
+            const useRemoteProver =
+              prover != null && window.remoteProverUrl != null;
+            const proverToUse = useRemoteProver
+              ? window.TransactionProver.newRemoteProver(window.remoteProverUrl)
+              : window.TransactionProver.newLocalProver();
+
+            const proven = await client.proveTransaction(result, proverToUse);
+            const submissionHeight = await client.submitProvenTransaction(
+              proven,
+              result
+            );
+            return await client.applyTransaction(result, submissionHeight);
+          };
+
           window.helpers.waitForBlocks = async (amountOfBlocks) => {
             const client = window.client;
             let currentBlock = await client.getSyncHeight();
@@ -245,7 +275,11 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(rpcUrl, initSeed);
+            const client = await WebClient.createClient(
+              rpcUrl,
+              undefined,
+              initSeed
+            );
             window.client = client;
             await window.client.syncState();
           };

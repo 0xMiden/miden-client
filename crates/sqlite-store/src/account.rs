@@ -22,6 +22,7 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
@@ -38,6 +39,7 @@ use crate::merkle_store::{
     update_storage_map_nodes,
 };
 use crate::sql_error::SqlResultExt;
+use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{insert_sql, subst};
 
 // TYPES
@@ -57,7 +59,7 @@ impl SqliteStore {
     // --------------------------------------------------------------------------------------------
 
     pub(super) fn get_account_ids(conn: &mut Connection) -> Result<Vec<AccountId>, StoreError> {
-        const QUERY: &str = "SELECT DISTINCT id FROM accounts";
+        const QUERY: &str = "SELECT id FROM tracked_accounts";
 
         conn.prepare(QUERY)
             .into_store_error()?
@@ -73,11 +75,50 @@ impl SqliteStore {
     pub(super) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        query_account_headers(
-            conn,
-            "nonce = (SELECT MAX(max.nonce) FROM accounts max WHERE max.id = accounts.id)",
-            params![],
-        )
+        const QUERY: &str = "
+            SELECT
+                a.id,
+                a.nonce,
+                a.vault_root,
+                a.storage_commitment,
+                a.code_commitment,
+                a.account_seed,
+                a.locked
+            FROM accounts AS a
+            JOIN (
+                SELECT id, MAX(nonce) AS nonce
+                FROM accounts
+                GROUP BY id
+            ) AS latest
+            ON a.id = latest.id
+            AND a.nonce = latest.nonce
+            ORDER BY a.id;
+            ";
+
+        conn.prepare(QUERY)
+            .into_store_error()?
+            .query_map(params![], |row| {
+                let id: String = row.get(0)?;
+                let nonce: u64 = column_value_as_u64(row, 1)?;
+                let vault_root: String = row.get(2)?;
+                let storage_commitment: String = row.get(3)?;
+                let code_commitment: String = row.get(4)?;
+                let account_seed: Option<Vec<u8>> = row.get(5)?;
+                let locked: bool = row.get(6)?;
+
+                Ok(SerializedHeaderData {
+                    id,
+                    nonce,
+                    vault_root,
+                    storage_commitment,
+                    code_commitment,
+                    account_seed,
+                    locked,
+                })
+            })
+            .into_store_error()?
+            .map(|result| parse_accounts(result.into_store_error()?))
+            .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
     }
 
     pub(crate) fn get_account_header(
@@ -359,6 +400,35 @@ impl SqliteStore {
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         query_account_addresses(conn, account_id)
+    }
+
+    pub(crate) fn insert_address(
+        tx: &Transaction<'_>,
+        address: &Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+
+        add_note_tag_tx(tx, &note_tag_record)?;
+        Self::insert_address_internal(tx, address, account_id)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn remove_address(
+        conn: &mut Connection,
+        address: &Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+
+        let tx = conn.transaction().into_store_error()?;
+        remove_note_tag_tx(&tx, note_tag_record)?;
+        Self::remove_address_internal(&tx, address)?;
+
+        tx.commit().into_store_error()
     }
 
     // ACCOUNT DELTA HELPERS
@@ -727,6 +797,8 @@ impl SqliteStore {
             ],
         )
         .into_store_error()?;
+
+        Self::insert_tracked_account_id_tx(tx, account.id())?;
         Ok(())
     }
 
@@ -738,6 +810,15 @@ impl SqliteStore {
         const QUERY: &str = insert_sql!(account_code { commitment, code } | IGNORE);
         tx.execute(QUERY, params![account_code.commitment().to_hex(), account_code.to_bytes()])
             .into_store_error()?;
+        Ok(())
+    }
+
+    fn insert_tracked_account_id_tx(
+        tx: &Transaction<'_>,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        const QUERY: &str = insert_sql!(tracked_accounts { id } | IGNORE);
+        tx.execute(QUERY, params![account_id.to_hex()]).into_store_error()?;
         Ok(())
     }
 
@@ -807,7 +888,7 @@ impl SqliteStore {
         Ok(())
     }
 
-    fn insert_address(
+    fn insert_address_internal(
         tx: &Transaction<'_>,
         address: &Address,
         account_id: AccountId,
@@ -816,6 +897,15 @@ impl SqliteStore {
         let serialized_address = address.to_bytes();
         tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
             .into_store_error()?;
+
+        Ok(())
+    }
+
+    fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
+        let serialized_address = address.to_bytes();
+
+        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
+        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         Ok(())
     }
@@ -1135,7 +1225,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_additions() -> anyhow::Result<()> {
+    async fn apply_account_delta_additions() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let dummy_component = AccountComponent::new(
@@ -1213,7 +1303,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_apply_account_delta_removals() -> anyhow::Result<()> {
+    async fn apply_account_delta_removals() -> anyhow::Result<()> {
         let store = create_test_store().await;
 
         let mut dummy_map = StorageMap::new();

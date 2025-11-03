@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::models::account::Account;
 use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
+use crate::models::address::Address;
 use crate::models::secret_key::SecretKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
@@ -59,5 +60,38 @@ impl WebClient {
         let NativeAuthSecretKey::RpoFalcon512(secret_key) = auth_secret_key;
 
         Ok(secret_key.into())
+    }
+
+    #[wasm_bindgen(js_name = "insertAccountAddress")]
+    pub async fn insert_account_address(
+        &mut self,
+        account_id: &AccountId,
+        address: &Address,
+    ) -> Result<(), JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client
+                .add_address(address.into(), account_id.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to add address to account"))?;
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    #[wasm_bindgen(js_name = "removeAccountAddress")]
+    pub async fn remove_account_address(
+        &mut self,
+        account_id: &AccountId,
+        address: &Address,
+    ) -> Result<(), JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            client.remove_address(address.into(), account_id.into()).await.map_err(|err| {
+                js_error_with_context(err, "failed to remove address from account")
+            })?;
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
     }
 }

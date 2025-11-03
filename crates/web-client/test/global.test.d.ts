@@ -50,6 +50,7 @@ import {
   SecretKey,
   Signature,
   SigningInputs,
+  SigningInputsType,
   SlotAndKeys,
   SlotAndKeysArray,
   StorageMap,
@@ -60,12 +61,11 @@ import {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
-  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
@@ -81,7 +81,6 @@ declare global {
     MockWebClient: typeof MockWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
-    rpcUrl?: string;
     Account: typeof Account;
     AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
@@ -138,6 +137,7 @@ declare global {
     SecretKey: typeof SecretKey;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
+    SigningInputsType: typeof SigningInputsType;
     SlotAndKeys: typeof SlotAndKeys;
     SlotAndKeysArray: typeof SlotAndKeysArray;
     StorageMap: typeof StorageMap;
@@ -148,12 +148,11 @@ declare global {
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
-    TransactionResult: typeof TransactionResult;
+    TransactionStoreUpdate: typeof TransactionStoreUpdate;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
-    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;

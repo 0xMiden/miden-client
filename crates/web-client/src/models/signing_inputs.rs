@@ -2,13 +2,22 @@ use miden_client::auth::SigningInputs as NativeSigningInputs;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use super::miden_arrays::FeltArray;
 use crate::models::felt::Felt;
 use crate::models::transaction_summary::TransactionSummary;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
-#[derive(Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SigningInputsType {
+    TransactionSummary,
+    Arbitrary,
+    Blind,
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Debug)]
 pub struct SigningInputs {
     inner: NativeSigningInputs,
 }
@@ -36,12 +45,49 @@ impl SigningInputs {
         }
     }
 
-    #[wasm_bindgen(getter, js_name = "variantType")]
-    pub fn variant_type(&self) -> String {
+    #[wasm_bindgen(js_name = "transactionSummaryPayload")]
+    pub fn transaction_summary_payload(&self) -> Result<TransactionSummary, JsValue> {
         match &self.inner {
-            NativeSigningInputs::TransactionSummary(_) => "TransactionSummary".to_string(),
-            NativeSigningInputs::Arbitrary(_) => "Arbitrary".to_string(),
-            NativeSigningInputs::Blind(_) => "Blind".to_string(),
+            NativeSigningInputs::TransactionSummary(ts) => {
+                Ok(TransactionSummary::from((**ts).clone()))
+            },
+            _ => Err(JsValue::from_str(&format!(
+                "transactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "arbitraryPayload")]
+    pub fn arbitrary_payload(&self) -> Result<FeltArray, JsValue> {
+        match &self.inner {
+            NativeSigningInputs::Arbitrary(felts) => {
+                Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into())
+            },
+            _ => Err(JsValue::from_str(&format!(
+                "arbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "blindPayload")]
+    pub fn blind_payload(&self) -> Result<Word, JsValue> {
+        match &self.inner {
+            NativeSigningInputs::Blind(word) => Ok(Word::from(*word)),
+            _ => Err(JsValue::from_str(&format!(
+                "blindPayload requires SigningInputs::Blind (found {:?})",
+                self.variant_type()
+            ))),
+        }
+    }
+
+    #[wasm_bindgen(getter, js_name = "variantType")]
+    pub fn variant_type(&self) -> SigningInputsType {
+        match &self.inner {
+            NativeSigningInputs::TransactionSummary(_) => SigningInputsType::TransactionSummary,
+            NativeSigningInputs::Arbitrary(_) => SigningInputsType::Arbitrary,
+            NativeSigningInputs::Blind(_) => SigningInputsType::Blind,
         }
     }
 
@@ -51,8 +97,8 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "toElements")]
-    pub fn to_elements(&self) -> Vec<Felt> {
-        self.inner.to_elements().into_iter().map(Into::into).collect()
+    pub fn to_elements(&self) -> FeltArray {
+        self.inner.to_elements().into_iter().map(Into::into).collect::<Vec<_>>().into()
     }
 
     pub fn serialize(&self) -> Uint8Array {

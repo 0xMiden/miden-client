@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::ClientError;
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::{AccountId, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
@@ -22,12 +22,14 @@ use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
+    TransactionKernel,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client_sqlite_store::SqliteStore;
+use miden_client::{ClientError, Felt, ScriptBuilder};
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 use crate::tests::config::ClientConfig;
 
@@ -36,12 +38,10 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 ) -> Result<()> {
     let (endpoint, _, store_config, auth_path) = client_config.as_parts();
 
-    let sqlite_store = SqliteStore::new(store_config).await?;
-
     let mut client = ClientBuilder::<FilesystemKeyStore<_>>::new()
         .grpc_client(&endpoint, Some(10_000))
         .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
-        .store(Arc::new(sqlite_store))
+        .sqlite_store(store_config)
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
         .await?;
@@ -99,28 +99,39 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     println!("Running P2ID tx...");
 
     // Create transactions
-    let transaction_execution_result_1 =
-        client.new_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_execution_result_1.executed_transaction().id();
-    let tx_prove_1 =
-        client.testing_prove_transaction(&transaction_execution_result_1).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_1).await.unwrap();
+    let transaction_result_1 =
+        client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
+    let transaction_id_1 = transaction_result_1.id();
+    let proven_transaction_1 = client.prove_transaction(&transaction_result_1).await.unwrap();
 
-    let transaction_execution_result_2 =
-        client.new_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_execution_result_2.executed_transaction().id();
-    let tx_prove_2 =
-        client.testing_prove_transaction(&transaction_execution_result_2).await.unwrap();
-    client.testing_apply_transaction(transaction_execution_result_2).await.unwrap();
+    // NOTE: we manually construct a [`TransactionStoreUpdate`] because we want to submit both
+    // proofs at the same time, but we can't apply the transaction to the store before submitting
+    // it to the node (since we need the submission height).
+    let current_height = client.get_sync_height().await?;
+    client.apply_transaction(&transaction_result_1, current_height).await?;
+
+    let transaction_result_2 =
+        client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
+    let transaction_id_2 = transaction_result_2.id();
+    let proven_transaction_2 = client.prove_transaction(&transaction_result_2).await.unwrap();
+
+    client
+        .submit_proven_transaction(proven_transaction_1, &transaction_result_1)
+        .await?;
+    let submission_height_2 = client
+        .submit_proven_transaction(proven_transaction_2, &transaction_result_2)
+        .await
+        .unwrap();
+
+    client
+        .apply_transaction(&transaction_result_2, submission_height_2)
+        .await
+        .unwrap();
 
     client.sync_state().await.unwrap();
 
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
-
-    // Submit the proven transactions
-    client.testing_submit_proven_transaction(tx_prove_1).await.unwrap();
-    client.testing_submit_proven_transaction(tx_prove_2).await.unwrap();
 
     // wait for 1 block
     wait_for_tx(&mut client, transaction_id_1).await?;
@@ -473,13 +484,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
-
-        println!("Sending transaction to node");
+        let transaction_id =
+            client.submit_new_transaction(faucet_account_id, tx_request.clone()).await?;
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-        client.submit_transaction(transaction_execution_result).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -498,9 +505,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -514,7 +521,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -533,9 +545,9 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         )?;
 
         println!("Executing transaction...");
-        let transaction_execution_result =
-            client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
-        let transaction_id = transaction_execution_result.executed_transaction().id();
+        let transaction_result =
+            client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+        let transaction_id = transaction_result.id();
 
         println!("Sending transaction to node");
         // May need a few attempts until it gets included
@@ -549,7 +561,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         {
             std::thread::sleep(Duration::from_secs(3));
         }
-        client.submit_transaction(transaction_execution_result).await.unwrap();
+        let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+        let submission_height = client
+            .submit_proven_transaction(proven_transaction, &transaction_result)
+            .await
+            .unwrap();
+        client.apply_transaction(&transaction_result, submission_height).await.unwrap();
 
         (note_id, transaction_id)
     };
@@ -643,8 +660,11 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
         .unauthenticated_input_notes(unauth_owned_notes.iter().map(|note| ((*note).clone(), None)))
         .build()?;
 
-    let tx_id_1 = execute_tx(&mut client, to_account_ids[0], tx_request_1).await;
-    let tx_id_2 = execute_tx(&mut unauth_client, to_account_ids[1], tx_request_2).await;
+    let tx_id_1 = client.submit_new_transaction(to_account_ids[0], tx_request_1).await.unwrap();
+    let tx_id_2 = unauth_client
+        .submit_new_transaction(to_account_ids[1], tx_request_2)
+        .await
+        .unwrap();
 
     // Ensure notes are processed
     assert!(!client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty());
@@ -907,16 +927,20 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
 
     // Consume the note in client 1 but dont submit it to the node
-    let tx_result = client_1.new_transaction(from_account_id, tx_request.clone()).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client_1.testing_prove_transaction(&tx_result).await.unwrap();
+    let transaction_result =
+        client_1.execute_transaction(from_account_id, tx_request.clone()).await.unwrap();
+    let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
     let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
     let account_hash_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
-    client_1.testing_apply_transaction(tx_result).await.unwrap();
+    let submission_height = client_1.get_sync_height().await.unwrap();
+    client_1
+        .apply_transaction(&transaction_result, submission_height)
+        .await
+        .unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
@@ -987,7 +1011,9 @@ impl TransactionProver for AlwaysFailingProver {
     }
 }
 
-pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Result<()> {
+pub async fn test_custom_transaction_prover_error_caught(
+    client_config: ClientConfig,
+) -> Result<()> {
     let (mut client, authenticator) = client_config.into_client().await?;
     let (first_regular_account, faucet_account_header) =
         setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator).await?;
@@ -1004,23 +1030,20 @@ pub async fn test_custom_transaction_prover(client_config: ClientConfig) -> Resu
         client.rng(),
     )?;
 
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
 
     let result = client
-        .submit_transaction_with_prover(
-            transaction_execution_result,
-            Arc::new(AlwaysFailingProver::new()),
-        )
+        .prove_transaction_with(&transaction_result, Arc::new(AlwaysFailingProver::new()))
         .await;
 
-    assert!(matches!(
-        result,
-        Err(ClientError::TransactionProvingError(TransactionProverError::Other {
-            error_msg: _,
-            source: _
-        }))
-    ));
+    let Err(ClientError::TransactionProvingError(TransactionProverError::Other {
+        error_msg, ..
+    })) = result
+    else {
+        panic!("expected different prover error");
+    };
+    assert_eq!(error_msg.as_ref(), "This prover always fails");
     Ok(())
 }
 
@@ -1112,14 +1135,21 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
         )?;
 
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(faucet_account_id, tx_request).await.unwrap();
+    let transaction_result =
+        client.execute_transaction(faucet_account_id, tx_request).await.unwrap();
 
     println!("Transaction executed successfully");
     wait_for_blocks(&mut client, (expiration_delta + 1).into()).await;
 
     println!("Sending transaction to node");
-    let submitted_tx_result = client.submit_transaction(transaction_execution_result).await;
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    let submitted_tx_result =
+        match client.submit_proven_transaction(proven_transaction, &transaction_result).await {
+            Ok(submission_height) => {
+                client.apply_transaction(&transaction_result, submission_height).await
+            },
+            Err(err) => Err(err),
+        };
 
     assert!(submitted_tx_result.is_err());
     Ok(())
@@ -1155,7 +1185,84 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
 
+    // Define the account code for the custom library
+    let custom_code = "
+        use.miden::account
+
+        export.update_map
+            push.1.2.3.4
+            # => [VALUE]
+            push.0.0.0.0
+            # => [KEY, VALUE]
+            push.1
+            # => [index, KEY, VALUE]
+            exec.account::set_map_item
+            dropw dropw dropw dropw
+        end
+    ";
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(
+        [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into(),
+        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+    )?;
+
+    let storage_slots = vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)];
+    let (account_with_map_item, _) = insert_account_with_custom_component(
+        &mut client,
+        custom_code,
+        storage_slots,
+        AccountStorageMode::Public,
+        &keystore,
+    )
+    .await?;
+
     client.sync_state().await.unwrap();
+
+    let assembler = TransactionKernel::assembler();
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("custom_library::set_map_item_library")
+                .context("failed to create library path for custom library")?,
+            custom_code,
+            &source_manager,
+        )
+        .unwrap();
+    let custom_lib = assembler.assemble_library([module]).unwrap();
+
+    let tx_script = ScriptBuilder::new(true)
+        .with_statically_linked_library(&custom_lib)?
+        .compile_tx_script(
+            "
+        use.custom_library::set_map_item_library
+
+        begin
+             call.set_map_item_library::update_map
+        end
+        ",
+        )?;
+
+    let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+    execute_tx_and_sync(&mut client, account_with_map_item.id(), tx_request.clone()).await?;
+
+    // Mint a new fungible asset to check account vault changes
+    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+        .await?
+        .0;
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT)?;
+    let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+        fungible_asset,
+        first_basic_account.id(),
+        NoteType::Public,
+        client.rng(),
+    )?;
+    let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
+    execute_tx_and_sync(&mut client, fungible_asset.faucet_id(), tx_request.clone()).await?;
+
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id])?;
+    execute_tx_and_sync(&mut client, first_basic_account.id(), tx_request).await?;
 
     let nullifier = note.nullifier();
 
@@ -1178,6 +1285,21 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .get_note_script_by_root(note.script().root())
         .await
         .unwrap();
+    let sync_storage_maps = client
+        .test_rpc_api()
+        .sync_storage_maps(0.into(), None, account_with_map_item.id())
+        .await
+        .unwrap();
+    let account_vault_info = client
+        .test_rpc_api()
+        .sync_account_vault(0.into(), None, first_basic_account.id())
+        .await
+        .unwrap();
+    let transactions_info = client
+        .test_rpc_api()
+        .sync_transactions(0.into(), None, vec![first_basic_account.id()])
+        .await
+        .unwrap();
 
     // Remove debug decorators from original note script, as they are not persisted on submission
     // https://github.com/0xMiden/miden-base/issues/1812
@@ -1188,6 +1310,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note_script, retrieved_note_script);
+    assert!(!sync_storage_maps.updates.is_empty());
+    assert!(!account_vault_info.updates.is_empty());
+    assert!(!transactions_info.transaction_records.is_empty());
 
     Ok(())
 }

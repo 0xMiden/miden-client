@@ -26,7 +26,7 @@ use miden_client::account::{
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
-use miden_client::note::{BlockNumber, Nullifier};
+use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -141,6 +141,14 @@ impl Store for WebStore {
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
+    }
+
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError> {
+        self.get_note_script(script_root).await
+    }
+
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError> {
+        self.upsert_note_scripts(note_scripts).await
     }
 
     // CHAIN DATA
@@ -271,6 +279,31 @@ impl Store for WebStore {
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         self.get_account_addresses(account_id).await
+    }
+
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        let success = self.add_note_tag(note_tag_record).await?;
+        if !success {
+            return Err(StoreError::NoteTagAlreadyTracked(u64::from(derived_note_tag.as_u32())));
+        }
+        self.insert_address(address, &account_id).await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        self.remove_note_tag(note_tag_record).await?;
+        self.remove_address(address).await
     }
 
     // SETTINGS

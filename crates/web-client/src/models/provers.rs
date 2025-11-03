@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct TransactionProver {
-    prover: Arc<dyn TransactionProverTrait>,
+    prover: Arc<dyn TransactionProverTrait + Send + Sync>,
     endpoint: Option<String>,
 }
 
@@ -65,7 +65,13 @@ impl TransactionProver {
 }
 
 impl TransactionProver {
-    pub fn get_prover(&self) -> Arc<dyn TransactionProverTrait> {
+    pub fn get_prover(&self) -> Arc<dyn TransactionProverTrait + Send + Sync> {
         self.prover.clone()
+    }
+}
+
+impl From<Arc<dyn TransactionProverTrait + Send + Sync>> for TransactionProver {
+    fn from(prover: Arc<dyn TransactionProverTrait + Send + Sync>) -> Self {
+        TransactionProver { prover, endpoint: None }
     }
 }

@@ -193,7 +193,7 @@ db.version(1).stores({
     "storageRoot",
     "vaultRoot"
   ),
-  [Table.Addresses]: indexes("id"),
+  [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),

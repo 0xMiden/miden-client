@@ -32,7 +32,7 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
-use miden_client::note::{BlockNumber, NoteTag, Nullifier};
+use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -50,10 +50,12 @@ use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
 use rusqlite::Connection;
 use rusqlite::types::Value;
+use sql_error::SqlResultExt;
 
 use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
 
 mod account;
+mod builder;
 mod chain_data;
 mod db_management;
 mod merkle_store;
@@ -61,6 +63,8 @@ mod note;
 mod sql_error;
 mod sync;
 mod transaction;
+
+pub use builder::ClientBuilderSqliteExt;
 
 // SQLITE STORE
 // ================================================================================================
@@ -80,7 +84,7 @@ impl SqliteStore {
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
-        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath.clone());
+        let sqlite_pool_manager = SqlitePoolManager::new(database_filepath);
         let pool = Pool::builder(sqlite_pool_manager)
             .build()
             .map_err(|e| StoreError::DatabaseError(e.to_string()))?;
@@ -210,6 +214,19 @@ impl Store for SqliteStore {
         let notes = notes.to_vec();
         self.interact_with_connection(move |conn| SqliteStore::upsert_input_notes(conn, &notes))
             .await
+    }
+
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::get_note_script(conn, script_root))
+            .await
+    }
+
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError> {
+        let note_scripts = note_scripts.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::upsert_note_scripts(conn, &note_scripts)
+        })
+        .await
     }
 
     async fn insert_block_header(
@@ -361,7 +378,10 @@ impl Store for SqliteStore {
     }
 
     async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| set_setting(conn, &key, &value)).await
+        self.interact_with_connection(move |conn| {
+            set_setting(conn, &key, &value).into_store_error()
+        })
+        .await
     }
 
     async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError> {
@@ -428,6 +448,30 @@ impl Store for SqliteStore {
     ) -> Result<Vec<Address>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_addresses(conn, account_id)
+        })
+        .await
+    }
+
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            SqliteStore::insert_address(&tx, &address, account_id)?;
+            tx.commit().into_store_error()
+        })
+        .await
+    }
+
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::remove_address(conn, &address, account_id)
         })
         .await
     }

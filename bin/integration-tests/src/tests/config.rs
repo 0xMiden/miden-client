@@ -9,7 +9,7 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{TestClient, TestClientKeyStore, create_test_store_path};
 use miden_client::{DebugMode, Felt};
-use miden_client_sqlite_store::SqliteStore;
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
 
@@ -64,13 +64,6 @@ impl ClientConfig {
 
         let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
 
-        let store = {
-            let sqlite_store = SqliteStore::new(store_config)
-                .await
-                .with_context(|| "failed to create SQLite store")?;
-            Arc::new(sqlite_store)
-        };
-
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
         })?;
@@ -78,7 +71,7 @@ impl ClientConfig {
         let builder = ClientBuilder::new()
             .rpc(Arc::new(GrpcClient::new(&rpc_endpoint, rpc_timeout)))
             .rng(Box::new(rng))
-            .store(store)
+            .sqlite_store(store_config)
             .filesystem_keystore(auth_path.to_str().with_context(|| {
                 format!("failed to convert auth path to string: {}", auth_path.to_string_lossy())
             })?)

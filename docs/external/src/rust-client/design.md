@@ -10,6 +10,7 @@ The Miden client has the following architectural components:
 - [Transaction executor](#transaction-executor)
 - [Keystore](#keystore)
 - [Note screener](#note-screener)
+- [Note transport](#note-transport)
 
 :::tip
 
@@ -76,3 +77,17 @@ It can find the tracked accounts that can consume a note, and whether the note c
 The state sync component encapsulates the logic for dealing with synchronization of the client state with the network. It repeatedly queries the node with sync state requests until the chain tip is reached. On every requests it updates the provided tracked elements (accounts, notes, transactions, etc.) and returns an updated state at the end which can be used to update the store (this component does not modify the store directly).
 
 The component also exposes a specific customizable callback which can be used to react to new note arrivals.
+
+## Note transport
+
+Access to the note transport network to exchange private notes is also provided.
+The provided client uses gRPC methods to communicate with the note transport network, working both in `std` and `wasm` environments.
+
+Targeting privacy, notes are primarily exchanged using their tags as identifiers. By default, when notes are created the tag is derived from the recipient account ID, however the tag can also be random.
+
+The system is also prepared for end-to-end encryption (to be implemented).
+
+gRPC methods include:
+
+- `SendNote`: Sends a note to the note transport network. The recipient address is employed to encrypt the outgoing note (to be implemented).
+- `FetchNotes`: Fetch notes from the network by note tag. A pagination mechanism using a monotonic-increasing cursor is also employed. The cursor is created by the network and used by the client to reduce the number of fetched notes (to avoid downloading already fetched notes).

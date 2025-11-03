@@ -40,7 +40,7 @@ use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
@@ -50,7 +50,7 @@ use crate::note_transport::{
     NoteTransportUpdate,
 };
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
-use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
+use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -149,6 +149,13 @@ pub trait Store: Send + Sync {
     /// Inserts the provided input notes into the database. If a note with the same ID already
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
+
+    /// Returns the note script associated with the given root.
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError>;
+
+    /// Inserts the provided note scripts into the database. If a script with the same root already
+    /// exists, it will be replaced.
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------
@@ -296,6 +303,20 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
+    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
+    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
     // SETTINGS
     // --------------------------------------------------------------------------------------------
 
@@ -360,7 +381,7 @@ pub trait Store: Send + Sync {
         let cursor_bytes = self
             .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
             .await?
-            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+            .ok_or(StoreError::NoteTransportCursorNotFound)?;
         let array: [u8; 8] = cursor_bytes
             .as_slice()
             .try_into()
@@ -522,6 +543,37 @@ pub enum TransactionFilter {
     /// A transaction is considered expired if is uncommitted and the transaction's block number
     /// is less than the provided block number.
     ExpiredBefore(BlockNumber),
+}
+
+// TRANSACTIONS FILTER HELPERS
+// ================================================================================================
+
+impl TransactionFilter {
+    /// Returns a [String] containing the query for this Filter.
+    pub fn to_query(&self) -> String {
+        const QUERY: &str = "SELECT tx.id, script.script, tx.details, tx.status \
+            FROM transactions AS tx LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
+        match self {
+            TransactionFilter::All => QUERY.to_string(),
+            TransactionFilter::Uncommitted => format!(
+                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                TransactionStatusVariant::Pending as u8,
+                TransactionStatusVariant::Discarded as u8
+            ),
+            TransactionFilter::Ids(_) => {
+                // Use SQLite's array parameter binding
+                format!("{QUERY} WHERE tx.id IN rarray(?)")
+            },
+            TransactionFilter::ExpiredBefore(block_num) => {
+                format!(
+                    "{QUERY} WHERE tx.block_num < {} AND tx.status_variant != {} AND tx.status_variant != {}",
+                    block_num.as_u32(),
+                    TransactionStatusVariant::Discarded as u8,
+                    TransactionStatusVariant::Committed as u8
+                )
+            },
+        }
+    }
 }
 
 // NOTE FILTER

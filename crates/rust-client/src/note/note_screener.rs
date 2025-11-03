@@ -11,7 +11,12 @@ use miden_objects::assembly::debuginfo::SourceManagerSync;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{
+    NoteCheckerError,
+    NoteConsumptionChecker,
+    NoteConsumptionStatus,
+    TransactionExecutor,
+};
 use thiserror::Error;
 
 use crate::ClientError;
@@ -19,7 +24,7 @@ use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -51,6 +56,7 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
+#[derive(Clone)]
 pub struct NoteScreener<AUTH> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
@@ -74,10 +80,6 @@ where
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
     /// accounts monitored by this screener.
-    ///
-    /// Does a fast check for known scripts (P2ID, P2IDE, SWAP). We're currently
-    /// unable to execute notes that aren't committed so a slow check for other scripts is
-    /// currently not available.
     ///
     /// If relevance can't be determined, the screener defaults to setting the note as consumable.
     pub async fn check_relevance(
@@ -128,7 +130,7 @@ where
 
         let tx_script = transaction_request.build_transaction_script(
             &AccountInterface::from(account),
-            crate::DebugMode::Enabled,
+            crate::DebugMode::Disabled,
         )?;
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
@@ -144,19 +146,27 @@ where
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
         data_store.mast_store().load_account_code(account.code());
-        let note_execution_check = consumption_checker
-            .check_notes_consumability(
+        let note_consumption_check = consumption_checker
+            .can_consume(
                 account.id(),
                 self.store.get_sync_height().await?,
-                vec![note.clone()],
+                InputNote::unauthenticated(note.clone()),
                 tx_args,
             )
             .await?;
-        if !note_execution_check.successful.is_empty() {
-            return Ok(Some(NoteRelevance::Now));
-        }
 
-        Ok(None)
+        let result = match note_consumption_check {
+            NoteConsumptionStatus::ConsumableAfter(block_number) => {
+                Some(NoteRelevance::After(block_number.as_u32()))
+            },
+            NoteConsumptionStatus::Consumable
+            | NoteConsumptionStatus::ConsumableWithAuthorization => Some(NoteRelevance::Now),
+            // NOTE: NoteConsumptionStatus::Unconsumable means that state-related context does not
+            // allow for consumption, so don't keep for now. In the next version, we should be more
+            // careful about this
+            NoteConsumptionStatus::Unconsumable | NoteConsumptionStatus::Incompatible => None,
+        };
+        Ok(result)
     }
 
     /// Special relevance check for P2IDE notes. It checks if the sender account can consume and
