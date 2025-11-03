@@ -32,14 +32,13 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
-use miden_client::note::{BlockNumber, NoteTag, Nullifier};
+use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
-    NoteScriptRecord,
     OutputNoteRecord,
     PartialBlockchainFilter,
     Store,
@@ -217,15 +216,12 @@ impl Store for SqliteStore {
             .await
     }
 
-    async fn get_note_script(&self, script_root: Word) -> Result<NoteScriptRecord, StoreError> {
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError> {
         self.interact_with_connection(move |conn| SqliteStore::get_note_script(conn, script_root))
             .await
     }
 
-    async fn upsert_note_scripts(
-        &self,
-        note_scripts: &[NoteScriptRecord],
-    ) -> Result<(), StoreError> {
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError> {
         let note_scripts = note_scripts.to_vec();
         self.interact_with_connection(move |conn| {
             SqliteStore::upsert_note_scripts(conn, &note_scripts)

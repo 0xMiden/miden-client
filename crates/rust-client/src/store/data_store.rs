@@ -176,7 +176,7 @@ impl DataStore for ClientDataStore {
 
         async move {
             if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(note_script.into())
+                Ok(note_script)
             } else {
                 // If no matching note found, return an error
                 // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not

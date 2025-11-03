@@ -2,12 +2,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::note::Nullifier;
+use miden_client::note::{NoteScript, Nullifier};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
-    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -72,7 +71,7 @@ impl WebStore {
     pub(crate) async fn get_note_script(
         &self,
         script_root: Word,
-    ) -> Result<NoteScriptRecord, StoreError> {
+    ) -> Result<NoteScript, StoreError> {
         let script_root = script_root.to_hex();
         let promise = idxdb_get_note_script(script_root);
         let script_idxdb: NoteScriptIdxdbObject =
@@ -107,7 +106,7 @@ impl WebStore {
 
     pub(crate) async fn upsert_note_scripts(
         &self,
-        note_scripts: &[NoteScriptRecord],
+        note_scripts: &[NoteScript],
     ) -> Result<(), StoreError> {
         for note_script in note_scripts {
             upsert_note_script_tx(note_script).await?;

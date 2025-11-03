@@ -15,7 +15,6 @@ use miden_client::note::{
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
-    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -128,9 +127,9 @@ pub async fn upsert_input_note_tx(note: &InputNoteRecord) -> Result<(), StoreErr
     Ok(())
 }
 
-pub async fn upsert_note_script_tx(note_script: &NoteScriptRecord) -> Result<(), StoreError> {
-    let note_script_bytes = note_script.script().to_bytes();
-    let note_script_root = note_script.script_root().into();
+pub async fn upsert_note_script_tx(note_script: &NoteScript) -> Result<(), StoreError> {
+    let note_script_bytes = note_script.to_bytes();
+    let note_script_root = note_script.root().into();
 
     let promise = idxdb_upsert_note_script(note_script_root, note_script_bytes);
     await_js_value(promise, "failed to upsert note script").await?;
@@ -227,13 +226,14 @@ pub fn parse_output_note_idxdb_object(
 
 pub fn parse_note_script_idxdb_object(
     note_script_idxdb: NoteScriptIdxdbObject,
-) -> Result<NoteScriptRecord, StoreError> {
-    let NoteScriptIdxdbObject { note_script_root, serialized_note_script } = note_script_idxdb;
+) -> Result<NoteScript, StoreError> {
+    let NoteScriptIdxdbObject {
+        note_script_root: _,
+        serialized_note_script,
+    } = note_script_idxdb;
 
-    let note_script_root = Word::try_from(note_script_root)?;
     let note_script = NoteScript::read_from_bytes(&serialized_note_script)?;
-
-    Ok(NoteScriptRecord::new(note_script_root, note_script))
+    Ok(note_script)
 }
 
 pub(crate) async fn apply_note_updates_tx(

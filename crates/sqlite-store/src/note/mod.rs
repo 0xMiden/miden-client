@@ -20,7 +20,6 @@ use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
-    NoteScriptRecord,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
@@ -87,7 +86,6 @@ struct SerializedOutputNoteParts {
 
 /// Represents the pars retrieved form the database to build a `NoteScript`
 struct SerializedNoteScriptPars {
-    pub script_root: String,
     pub script: Vec<u8>,
 }
 
@@ -174,7 +172,7 @@ impl SqliteStore {
 
     pub(crate) fn upsert_note_scripts(
         conn: &mut Connection,
-        note_scripts: &[NoteScriptRecord],
+        note_scripts: &[NoteScript],
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -189,7 +187,7 @@ impl SqliteStore {
     pub(crate) fn get_note_script(
         conn: &mut Connection,
         script_root: Word,
-    ) -> Result<NoteScriptRecord, StoreError> {
+    ) -> Result<NoteScript, StoreError> {
         let script_root = script_root.to_hex();
         let query = "SELECT * FROM notes_scripts WHERE script_root = ?";
         let note_script = conn
@@ -197,8 +195,8 @@ impl SqliteStore {
             .into_store_error()?
             .query_map([script_root.clone()], parse_note_scripts_columns)
             .expect("no binding parameters used in query")
-            .map(|result| Ok(result.into_store_error()?).and_then(parse_note_script))
-            .collect::<Result<Vec<NoteScriptRecord>, _>>()?
+            .map(|result| Ok(result.into_store_error()?).and_then(|s| parse_note_script(&s)))
+            .collect::<Result<Vec<NoteScript>, _>>()?
             .first()
             .cloned()
             .ok_or(StoreError::NoteScriptNotFound(script_root))?;
@@ -481,14 +479,12 @@ pub(crate) fn apply_note_updates_tx(
 /// replaced.
 pub(super) fn upsert_note_script_tx(
     tx: &Transaction<'_>,
-    note_script_record: &NoteScriptRecord,
+    note_script: &NoteScript,
 ) -> Result<(), StoreError> {
-    let script = note_script_record.script().to_bytes();
-    let script_root = note_script_record.script_root();
-
     const QUERY: &str =
         insert_sql!(notes_scripts { script_root, serialized_note_script } | REPLACE);
-    tx.execute(QUERY, params![script_root.to_hex(), script,]).into_store_error()?;
+    tx.execute(QUERY, params![note_script.root().to_hex(), note_script.to_bytes(),])
+        .into_store_error()?;
 
     Ok(())
 }
@@ -497,17 +493,18 @@ pub(super) fn upsert_note_script_tx(
 fn parse_note_scripts_columns(
     row: &rusqlite::Row<'_>,
 ) -> Result<SerializedNoteScriptPars, rusqlite::Error> {
-    let script_root = row.get(0)?;
+    // The script root can be derived from the script itself.
+    // There's no need to retrieve it separately.
+    // let script_root = row.get(0)?;
     let script = row.get(1)?;
 
-    Ok(SerializedNoteScriptPars { script_root, script })
+    Ok(SerializedNoteScriptPars { script })
 }
 
 /// Parse a note script from the provided parts.
 fn parse_note_script(
-    serialized_note_script_parts: SerializedNoteScriptPars,
-) -> Result<NoteScriptRecord, StoreError> {
-    let script_root = Word::try_from(serialized_note_script_parts.script_root)?;
-    let script = NoteScript::from_bytes(&serialized_note_script_parts.script)?;
-    Ok(NoteScriptRecord::new(script_root, script))
+    serialized_note_script_parts: &SerializedNoteScriptPars,
+) -> Result<NoteScript, StoreError> {
+    let note_script = NoteScript::from_bytes(&serialized_note_script_parts.script)?;
+    Ok(note_script)
 }
