@@ -226,7 +226,7 @@ impl NoteUpdateTracker {
     }
 
     /// Returns input and output note unspent nullifiers.
-    pub fn unspent_nullifiers(&self) -> impl Iterator<Item = Nullifier> + '_ {
+    pub fn unspent_nullifiers(&self) -> impl Iterator<Item = Nullifier> {
         let input_note_unspent_nullifiers = self
             .input_notes
             .values()
