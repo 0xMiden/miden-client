@@ -381,7 +381,7 @@ pub trait Store: Send + Sync {
         let cursor_bytes = self
             .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
             .await?
-            .ok_or_else(|| StoreError::NoteTransportCursorNotFound)?;
+            .ok_or(StoreError::NoteTransportCursorNotFound)?;
         let array: [u8; 8] = cursor_bytes
             .as_slice()
             .try_into()

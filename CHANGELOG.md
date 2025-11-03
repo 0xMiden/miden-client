@@ -21,8 +21,9 @@
 * Implemented missing RPC endpoints: `/SyncStorageMaps`, `/SyncAccountVault` & `/SyncTransactions` ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
 * Updated `submit_proven_transaction()` to include `TransactionInputs` for validator ([#1421](https://github.com/0xMiden/miden-client/pull/1421)).
 * [BREAKING] Replaced `AccountComponentTemplates` for `Packages` for account creation ([#1313](https://github.com/0xMiden/miden-client/pull/1313)).
-* Allow for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
+* Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
+* [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 
 ### Changes
 
@@ -42,6 +43,7 @@
 * [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
 * Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
 * [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374))
+* [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 
 ## 0.11.11 (2025-10-16)
 
