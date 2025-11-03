@@ -40,7 +40,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::CliKeyStore;
+use miden_client_cli::{CliKeyStore, MIDEN_DIR};
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -82,6 +82,7 @@ fn init_with_params() {
 
     // Assert the config file contains the specified contents
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();
@@ -107,13 +108,19 @@ fn silent_initialization_uses_default_values() {
     account_cmd.current_dir(&temp_dir).assert().success();
 
     // Read and verify the config file contents
-    let config_path = temp_dir.join("miden-client.toml");
+    let config_path = temp_dir.join(MIDEN_DIR).join("miden-client.toml");
     let config_content = std::fs::read_to_string(&config_path).unwrap();
 
     // Verify default values are used
     assert!(config_content.contains("testnet"), "Should use testnet as default network");
-    assert!(config_content.contains("store.sqlite3"), "Should use default store path");
-    assert!(config_content.contains("keystore"), "Should use default keystore directory");
+    assert!(
+        config_content.contains(&format!("{}/store.sqlite3", MIDEN_DIR)),
+        "Should use default store path in {MIDEN_DIR}"
+    );
+    assert!(
+        config_content.contains(&format!("{}/keystore", MIDEN_DIR)),
+        "Should use default keystore directory in {MIDEN_DIR}"
+    );
 }
 
 #[test]
@@ -121,19 +128,24 @@ fn silent_initialization_does_not_override_existing_config() {
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
+    // Create the MIDEN_DIR directory and manual configuration file
+    let miden_dir = temp_dir.join(MIDEN_DIR);
+    std::fs::create_dir_all(&miden_dir).unwrap();
+    let config_path = miden_dir.join("miden-client.toml");
     // Manual configuration file
-    let config_path = temp_dir.join("miden-client.toml");
-    let custom_config = r#"
-    store_filepath = "custom-store.sqlite3"
-    secret_keys_directory = "custom-keystore"
-    token_symbol_map_filepath = "custom-tokens.toml"
-    component_template_directory = "custom-templates"
-    package_directory = "packages"
+    let custom_config = format!(
+        r#"
+        store_filepath = "{0}/custom-store.sqlite3"
+        secret_keys_directory = "{0}/custom-keystore"
+        token_symbol_map_filepath = "{0}/custom-tokens.toml"
+        package_directory = "{0}/custom-templates"
 
-    [rpc]
-    endpoint = "https://custom-endpoint.com"
-    timeout_ms = 5000
-    "#;
+        [rpc]
+        endpoint = "https://custom-endpoint.com"
+        timeout_ms = 5000
+        "#,
+        MIDEN_DIR
+    );
     std::fs::write(&config_path, custom_config).unwrap();
 
     // Run command without explicitly initializing
@@ -186,8 +198,8 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create faucet account
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
 
-    // Create a token symbol mapping file
-    let token_symbol_map_path = temp_dir.join("token_symbol_map.toml");
+    // Create a token symbol mapping file in the MIDEN_DIR directory
+    let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
     let token_symbol_map_content =
         format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
@@ -477,6 +489,7 @@ async fn init_with_devnet() -> Result<()> {
 
     // Check in the config file that the network is devnet
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();
@@ -494,6 +507,7 @@ async fn init_with_testnet() -> Result<()> {
 
     // Check in the config file that the network is testnet
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();

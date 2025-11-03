@@ -6,9 +6,9 @@ use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::Address;
 
-use super::config::CliConfig;
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
+use crate::config::{CliConfig, MIDEN_DIR};
 use crate::errors::CliError;
 use crate::faucet_details_map::FaucetDetailsMap;
 
@@ -77,18 +77,18 @@ pub(crate) async fn parse_account_id<AUTH>(
     }
 }
 
-/// Loads config file from current directory and default filename and returns it alongside its path.
+/// Loads config file from .miden directory and returns it alongside its path.
 ///
-/// This function will look for the configuration file at the provided path. If the path is
-/// relative, searches in parent directories all the way to the root as well.
+/// This function will look for the configuration file at the .miden/miden-client.toml path.
+/// If the path is relative, searches in parent directories all the way to the root as well.
 pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
-    let mut current_dir = std::env::current_dir()?;
-    current_dir.push(CLIENT_CONFIG_FILE_NAME);
-    let config_path = current_dir.as_path();
+    let mut config_path = std::env::current_dir()?;
+    config_path.push(MIDEN_DIR);
+    config_path.push(CLIENT_CONFIG_FILE_NAME);
 
-    let cli_config = load_config(config_path)?;
+    let cli_config = load_config(config_path.as_path())?;
 
-    Ok((cli_config, config_path.into()))
+    Ok((cli_config, config_path))
 }
 
 /// Loads the client configuration.

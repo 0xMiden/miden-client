@@ -38,9 +38,8 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 
 #[derive(Debug, Clone, Parser, Default)]
 #[command(
-    about = "Initialize the client. It will create a file named `miden-client.toml` that holds \
-the CLI and client configurations, and will be placed by default in the current working \
-directory"
+    about = "Initialize the client. It will create a `.miden` directory with a \
+`miden-client.toml` file that holds the CLI and client configurations"
 )]
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
@@ -77,9 +76,19 @@ impl InitCmd {
             return Err(CliError::Config(
                 "Error with the configuration file".to_string().into(),
                 format!(
-                    "The file \"{CLIENT_CONFIG_FILE_NAME}\" already exists in the working directory. Please try using another directory or removing the file.",
+                    "The file \"{CLIENT_CONFIG_FILE_NAME}\" already exists in the .miden directory. Please try using another directory or removing the file.",
                 ),
             ));
+        }
+
+        // Create the .miden directory if it doesn't exist
+        if let Some(parent_dir) = config_file_path.parent() {
+            fs::create_dir_all(parent_dir).map_err(|err| {
+                CliError::Config(
+                    Box::new(err),
+                    "failed to create .miden directory".into(),
+                )
+            })?;
         }
 
         let mut cli_config = CliConfig::default();

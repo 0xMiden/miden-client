@@ -38,6 +38,9 @@ mod faucet_details_map;
 mod info;
 mod utils;
 
+/// Re-export `MIDEN_DIR` for use in tests
+pub use config::MIDEN_DIR;
+
 /// Config file name.
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
 
@@ -151,21 +154,22 @@ pub enum Command {
 /// CLI entry point.
 impl Cli {
     pub async fn execute(&self) -> Result<(), CliError> {
-        let mut current_dir = std::env::current_dir()?;
-        current_dir.push(CLIENT_CONFIG_FILE_NAME);
+        let mut config_file_path = std::env::current_dir()?;
+        config_file_path.push(MIDEN_DIR);
+        config_file_path.push(CLIENT_CONFIG_FILE_NAME);
 
         // Check if it's an init command before anything else. When we run the init command for
         // the first time we won't have a config file and thus creating the store would not be
         // possible.
         if let Command::Init(init_cmd) = &self.action {
-            init_cmd.execute(&current_dir)?;
+            init_cmd.execute(&config_file_path)?;
             return Ok(());
         }
 
         // Check if Client is not yet initialized => silently initialize the client
-        if !current_dir.exists() {
+        if !config_file_path.exists() {
             let init_cmd = InitCmd::default();
-            init_cmd.execute(&current_dir)?;
+            init_cmd.execute(&config_file_path)?;
         }
 
         // Define whether we want to use the executor's debug mode based on the env var and
