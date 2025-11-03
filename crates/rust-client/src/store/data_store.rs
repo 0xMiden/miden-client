@@ -14,7 +14,6 @@ use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
-use crate::rpc::NodeRpcClient;
 use crate::store::StoreError;
 use crate::utils::RwLock;
 
@@ -29,20 +28,14 @@ pub(crate) struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
-    /// RPC client for fetching data from the node when not available locally.
-    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl ClientDataStore {
-    pub fn new(
-        store: alloc::sync::Arc<dyn Store>,
-        rpc_api: alloc::sync::Arc<dyn NodeRpcClient>,
-    ) -> Self {
+    pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
-            rpc_api,
         }
     }
 
@@ -182,23 +175,15 @@ impl DataStore for ClientDataStore {
         let store = self.store.clone();
 
         async move {
-            match store.get_note_script(script_root).await.map_err(|err| {
-                DataStoreError::other_with_source("Failed to retrieved note script", err)
-            }) {
-                Ok(note_script) => Ok(note_script.into()),
-                Err(err) => match err {
-                    DataStoreError::NoteScriptNotFound(script_root) => {
-                        self.rpc_api.get_note_script_by_root(script_root).await.map_err(|_| {
-                            DataStoreError::other(
-                                "Note script not found on data store nor rpc server",
-                            )
-                        })
-                    },
-                    _ => Err(DataStoreError::other_with_source(
-                        "Failed to retrieved note script",
-                        err,
-                    )),
-                },
+            if let Ok(note_script) = store.get_note_script(script_root).await {
+                Ok(note_script.into())
+            } else {
+                // If no matching note found, return an error
+                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
+                // found https://github.com/0xMiden/miden-client/issues/1410
+                Err(DataStoreError::other(
+                    format!("Note script with root {script_root} not found",),
+                ))
             }
         }
     }

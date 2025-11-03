@@ -20,7 +20,6 @@ use miden_tx::{
 use thiserror::Error;
 
 use crate::ClientError;
-use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
@@ -64,8 +63,6 @@ pub struct NoteScreener<AUTH> {
     authenticator: Option<Arc<AUTH>>,
     /// Shared source manager used when compiling scripts.
     source_manager: Arc<dyn SourceManagerSync>,
-    /// RPC client for fetching data from the node when not available locally.
-    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl<AUTH> NoteScreener<AUTH>
@@ -76,14 +73,8 @@ where
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         source_manager: Arc<dyn SourceManagerSync>,
-        rpc_api: Arc<dyn NodeRpcClient>,
     ) -> Self {
-        Self {
-            store,
-            authenticator,
-            source_manager,
-            rpc_api,
-        }
+        Self { store, authenticator, source_manager }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -143,7 +134,7 @@ where
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
-        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
         if let Some(authenticator) = &self.authenticator {
             transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());
