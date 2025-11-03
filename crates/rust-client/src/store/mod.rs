@@ -40,7 +40,7 @@ use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
@@ -149,6 +149,13 @@ pub trait Store: Send + Sync {
     /// Inserts the provided input notes into the database. If a note with the same ID already
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
+
+    /// Returns the note script associated with the given root.
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError>;
+
+    /// Inserts the provided note scripts into the database. If a script with the same root already
+    /// exists, it will be replaced.
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------

@@ -77,7 +77,7 @@ use alloc::vec::Vec;
 use miden_objects::account::{Account, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
@@ -241,6 +241,13 @@ where
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
+
+        let output_note_scripts: Vec<NoteScript> = transaction_request
+            .expected_output_own_notes()
+            .iter()
+            .map(|n| n.script().clone())
+            .collect();
+        self.store.upsert_note_scripts(&output_note_scripts).await?;
 
         let tx_args = transaction_request.into_transaction_args(tx_script);
 

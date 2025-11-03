@@ -175,21 +175,16 @@ impl DataStore for ClientDataStore {
         let store = self.store.clone();
 
         async move {
-            let notes = store.get_input_notes(super::NoteFilter::All).await.map_err(|err| {
-                DataStoreError::other_with_source("Failed to retrieve input notes", err)
-            })?;
-
-            for note_record in notes {
-                let recipient = note_record.details().recipient();
-                if recipient.script().root() == script_root {
-                    return Ok(recipient.script().clone());
-                }
+            if let Ok(note_script) = store.get_note_script(script_root).await {
+                Ok(note_script)
+            } else {
+                // If no matching note found, return an error
+                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
+                // found https://github.com/0xMiden/miden-client/issues/1410
+                Err(DataStoreError::other(
+                    format!("Note script with root {script_root} not found",),
+                ))
             }
-
-            // If no matching note found, return an error
-            // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not found
-            // https://github.com/0xMiden/miden-client/issues/1410
-            Err(DataStoreError::other(format!("Note script with root {script_root} not found",)))
         }
     }
 }

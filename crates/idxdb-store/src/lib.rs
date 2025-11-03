@@ -26,7 +26,7 @@ use miden_client::account::{
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
-use miden_client::note::{BlockNumber, Nullifier};
+use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
@@ -141,6 +141,14 @@ impl Store for WebStore {
 
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
+    }
+
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError> {
+        self.get_note_script(script_root).await
+    }
+
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError> {
+        self.upsert_note_scripts(note_scripts).await
     }
 
     // CHAIN DATA

@@ -92,6 +92,18 @@ export async function getUnspentInputNoteNullifiers() {
   }
 }
 
+export async function getNoteScript(scriptRoot: string) {
+  try {
+    const noteScript = await notesScripts
+      .where("scriptRoot")
+      .equals(scriptRoot)
+      .first();
+    return noteScript;
+  } catch (err) {
+    logWebStoreError(err, "Failed to get note script from root");
+  }
+}
+
 export async function upsertInputNote(
   noteId: string,
   assets: Uint8Array,
@@ -213,4 +225,22 @@ async function processOutputNotes(notes: IOutputNote[]) {
       };
     })
   );
+}
+
+export async function upsertNoteScript(
+  scriptRoot: string,
+  serializedNoteScript: Uint8Array
+) {
+  return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+    try {
+      const noteScriptData = {
+        scriptRoot,
+        serializedNoteScript,
+      };
+
+      await tx.notesScripts.put(noteScriptData);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
+    }
+  });
 }
