@@ -28,7 +28,6 @@
 * [BREAKING] Incremented MSRV to 1.89.
 * [BREAKING] Unified chain tip and block number types to use `BlockNumber` instead of `u32` ([#1415](https://github.com/0xMiden/miden-client/pull/1415)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
-* [BREAKING] Replaced `TransactionPipeline` with client-scoped lifecycle APIs and the new `TransactionResult` type (TBD).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
 * [BREAKING] Added `block_to` parameter to `NodeRpcClient::sync_nullifiers` for better pagination control ([#1309](https://github.com/0xMiden/miden-client/pull/1309)).
 * [BREAKING] Removed `web-tonic` feature ([#1268](https://github.com/0xMiden/miden-client/pull/1268)).
@@ -42,6 +41,7 @@
 * [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
 * Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
 * [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374))
+* [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 
 ## 0.11.11 (2025-10-16)
 
