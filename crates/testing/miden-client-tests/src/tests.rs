@@ -8,7 +8,7 @@ use std::sync::Arc;
 use miden_client::account::{AccountIdAddress, Address, AddressInterface};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{BlockNumber, NoteRelevance};
+use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
@@ -91,7 +91,7 @@ use miden_objects::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_objects::transaction::{InputNote, OutputNote};
+use miden_objects::transaction::OutputNote;
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -138,17 +138,13 @@ async fn input_notes_round_trip() {
     let retrieved_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(retrieved_notes.len(), 4);
 
-    let recorded_notes: Vec<InputNoteRecord> = available_notes
-        .into_iter()
-        .map(|n| {
-            let input_note: InputNote = n.try_into().unwrap();
-            input_note.into()
-        })
-        .collect();
+    let chain_notes_commitments: std::collections::HashSet<NoteId> =
+        available_notes.into_iter().map(|n| n.id()).collect();
     // compare notes
-    for (recorded_note, retrieved_note) in recorded_notes.iter().zip(retrieved_notes) {
-        assert_eq!(recorded_note.id(), retrieved_note.id());
-    }
+    assert_eq!(
+        chain_notes_commitments,
+        retrieved_notes.iter().map(InputNoteRecord::id).collect()
+    );
 }
 
 #[tokio::test]
