@@ -41,6 +41,7 @@ export const test = base.extend<{ forEachTest: void }>({
             undefined,
             undefined
           );
+          window.rpcUrl = rpcUrl;
 
           window.client = client;
 
