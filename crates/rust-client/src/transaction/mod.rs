@@ -23,11 +23,7 @@
 //! use miden_client::Client;
 //! use miden_client::auth::TransactionAuthenticator;
 //! use miden_client::crypto::FeltRng;
-//! use miden_client::transaction::{
-//!     PaymentNoteDescription,
-//!     TransactionRequestBuilder,
-//!     TransactionResult,
-//! };
+//! use miden_client::transaction::{PaymentNoteDescription, TransactionRequestBuilder};
 //! use miden_objects::account::AccountId;
 //! use miden_objects::asset::FungibleAsset;
 //! use miden_objects::note::NoteType;
@@ -56,11 +52,8 @@
 //!         client.rng(),
 //!     )?;
 //!
-//!     // Execute the transaction. This returns a TransactionResult.
-//!     let tx_result: TransactionResult = client.new_transaction(sender_id, tx_request).await?;
-//!
-//!     // Prove and submit the transaction, persisting its details to the local store.
-//!     client.submit_transaction(tx_result).await?;
+//!     // Execute, prove, and submit the transaction in a single call.
+//!     let _tx_id = client.submit_new_transaction(sender_id, tx_request).await?;
 //!
 //!     Ok(())
 //! }
@@ -77,7 +70,7 @@ use alloc::vec::Vec;
 use miden_objects::account::{Account, AccountId};
 use miden_objects::asset::{Asset, NonFungibleAsset};
 use miden_objects::block::BlockNumber;
-use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_objects::transaction::AccountInputs;
 use miden_objects::{AssetError, Felt, Word};
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
@@ -111,12 +104,22 @@ pub use record::{
     TransactionStatusVariant,
 };
 
+mod store_update;
+pub use store_update::TransactionStoreUpdate;
+
 mod request;
+pub use request::{
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
+};
 
 mod result;
-pub use result::TransactionResult;
-
-mod store_update;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
@@ -143,17 +146,7 @@ pub use miden_tx::{
     TransactionExecutorError,
     TransactionProverError,
 };
-pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
-};
-pub use store_update::TransactionStoreUpdate;
+pub use result::TransactionResult;
 
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
@@ -174,6 +167,29 @@ where
     // TRANSACTION
     // --------------------------------------------------------------------------------------------
 
+    /// Executes a transaction specified by the request against the specified account,
+    /// proves it, submits it to the network, and updates the local database.
+    ///
+    /// If the transaction utilizes foreign account data, there is a chance that the client
+    /// doesn't have the required block header in the local database. In these scenarios, a sync to
+    /// the chain tip is performed, and the required block header is retrieved.
+    pub async fn submit_new_transaction(
+        &mut self,
+        account_id: AccountId,
+        transaction_request: TransactionRequest,
+    ) -> Result<TransactionId, ClientError> {
+        let tx_result = self.execute_transaction(account_id, transaction_request).await?;
+        let tx_id = tx_result.executed_transaction().id();
+
+        let proven_transaction = self.prove_transaction(&tx_result).await?;
+        let submission_height =
+            self.submit_proven_transaction(proven_transaction, &tx_result).await?;
+
+        self.apply_transaction(&tx_result, submission_height).await?;
+
+        Ok(tx_id)
+    }
+
     /// Creates and executes a transaction specified by the request against the specified account,
     /// but doesn't change the local database.
     ///
@@ -187,7 +203,7 @@ where
     ///   notes are not a subset of executor's output notes.
     /// - Returns a [`ClientError::TransactionExecutorError`] if the execution fails.
     /// - Returns a [`ClientError::TransactionRequestError`] if the request is invalid.
-    pub async fn new_transaction(
+    pub async fn execute_transaction(
         &mut self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
@@ -242,6 +258,13 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
+        let output_note_scripts: Vec<NoteScript> = transaction_request
+            .expected_output_own_notes()
+            .iter()
+            .map(|n| n.script().clone())
+            .collect();
+        self.store.upsert_note_scripts(&output_note_scripts).await?;
+
         let tx_args = transaction_request.into_transaction_args(tx_script);
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -275,34 +298,16 @@ where
         TransactionResult::new(executed_transaction, future_notes)
     }
 
-    /// Proves the specified transaction using a local prover, submits it to the network, and saves
-    /// the transaction into the local database for tracking.
-    pub async fn submit_transaction(
+    /// Proves the specified transaction using the prover configured for this client.
+    pub async fn prove_transaction(
         &mut self,
-        tx_result: TransactionResult,
-    ) -> Result<(), ClientError> {
-        self.submit_transaction_with_prover(tx_result, self.tx_prover.clone()).await
+        tx_result: &TransactionResult,
+    ) -> Result<ProvenTransaction, ClientError> {
+        self.prove_transaction_with(tx_result, self.tx_prover.clone()).await
     }
 
-    /// Proves the specified transaction using the provided prover, submits it to the network, and
-    /// saves the transaction into the local database for tracking.
-    pub async fn submit_transaction_with_prover(
-        &mut self,
-        tx_result: TransactionResult,
-        tx_prover: Arc<dyn TransactionProver>,
-    ) -> Result<(), ClientError> {
-        let proven_transaction = self.prove_transaction(&tx_result, tx_prover).await?;
-        let block_num = self
-            .submit_proven_transaction(
-                proven_transaction,
-                tx_result.executed_transaction().tx_inputs().clone(),
-            )
-            .await?;
-        self.apply_transaction(block_num, tx_result).await
-    }
-
-    /// Proves the specified transaction result using the provided prover.
-    async fn prove_transaction(
+    /// Proves the specified transaction using the provided prover.
+    pub async fn prove_transaction_with(
         &mut self,
         tx_result: &TransactionResult,
         tx_prover: Arc<dyn TransactionProver>,
@@ -317,45 +322,31 @@ where
         Ok(proven_transaction)
     }
 
-    async fn submit_proven_transaction(
+    /// Submits a previously proven transaction to the RPC endpoint and returns the node’s chain tip
+    /// upon mempool admission.
+    pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
-        transaction_inputs: TransactionInputs,
+        transaction_inputs: impl Into<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
         info!("Submitting transaction to the network...");
         let block_num = self
             .rpc_api
-            .submit_proven_transaction(proven_transaction, transaction_inputs)
+            .submit_proven_transaction(proven_transaction, transaction_inputs.into())
             .await?;
         info!("Transaction submitted.");
 
         Ok(block_num)
     }
 
-    async fn apply_transaction(
+    /// Builds a [`TransactionStoreUpdate`] for the provided transaction result at the specified
+    /// submission height.
+    pub async fn get_transaction_store_update(
         &self,
+        tx_result: &TransactionResult,
         submission_height: BlockNumber,
-        tx_result: TransactionResult,
-    ) -> Result<(), ClientError> {
-        // Transaction was proven and submitted to the node correctly, persist note details and
-        // update account
-        info!("Applying transaction to the local store...");
-
-        let account_id = tx_result.executed_transaction().account_id();
-        let account_record = self.try_get_account(account_id).await?;
-
-        if account_record.is_locked() {
-            return Err(ClientError::AccountLocked(account_id));
-        }
-
-        let final_commitment = tx_result.executed_transaction().final_account().commitment();
-        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
-            return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
-                final_commitment,
-            )));
-        }
-
-        let note_updates = self.get_note_updates(submission_height, &tx_result).await?;
+    ) -> Result<TransactionStoreUpdate, ClientError> {
+        let note_updates = self.get_note_updates(submission_height, tx_result).await?;
 
         let new_tags = note_updates
             .updated_input_notes()
@@ -372,12 +363,49 @@ where
             })
             .collect();
 
-        let tx_update = TransactionStoreUpdate::new(
-            tx_result.into(),
+        Ok(TransactionStoreUpdate::new(
+            tx_result.executed_transaction().clone(),
             submission_height,
             note_updates,
+            tx_result.future_notes().to_vec(),
             new_tags,
-        );
+        ))
+    }
+
+    /// Persists the effects of a submitted transaction into the local store,
+    /// updating account data, note metadata, and future note tracking.
+    pub async fn apply_transaction(
+        &self,
+        tx_result: &TransactionResult,
+        submission_height: BlockNumber,
+    ) -> Result<(), ClientError> {
+        let tx_update = self.get_transaction_store_update(tx_result, submission_height).await?;
+
+        self.apply_transaction_update(tx_update).await
+    }
+
+    pub async fn apply_transaction_update(
+        &self,
+        tx_update: TransactionStoreUpdate,
+    ) -> Result<(), ClientError> {
+        // Transaction was proven and submitted to the node correctly, persist note details and
+        // update account
+        info!("Applying transaction to the local store...");
+
+        let executed_transaction = tx_update.executed_transaction();
+        let account_id = executed_transaction.account_id();
+        let account_record = self.try_get_account(account_id).await?;
+
+        if account_record.is_locked() {
+            return Err(ClientError::AccountLocked(account_id));
+        }
+
+        let final_commitment = executed_transaction.final_account().commitment();
+        if self.store.get_account_header_by_commitment(final_commitment).await?.is_some() {
+            return Err(ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(
+                final_commitment,
+            )));
+        }
 
         self.store.apply_transaction(tx_update).await?;
         info!("Transaction stored.");
@@ -593,6 +621,8 @@ where
         Ok(collect_assets(all_incoming_assets))
     }
 
+    /// Ensures a transaction request is compatible with the current account state,
+    /// primarily by checking asset balances against the requested transfers.
     async fn validate_basic_account_request(
         &self,
         transaction_request: &TransactionRequest,
@@ -666,8 +696,7 @@ where
 
             if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
                 return Err(ClientError::RecencyConditionError(
-                    "The client is too far behind the chain tip to execute the transaction"
-                        .to_string(),
+                    "The client is too far behind the chain tip to execute the transaction",
                 ));
             }
         }
@@ -682,6 +711,8 @@ where
         }
     }
 
+    /// Filters out invalid or non-consumable input notes by simulating
+    /// note consumption and removing any that fail validation.
     async fn get_valid_input_notes(
         &self,
         account: Account,
@@ -812,6 +843,8 @@ where
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 
+    /// Creates a transaction executor configured with the client's runtime options,
+    /// authenticator, and source manager.
     pub(crate) fn build_executor<'store, 'auth, STORE: DataStore + Sync>(
         &'auth self,
         data_store: &'store STORE,
@@ -826,37 +859,10 @@ where
     }
 }
 
-// TESTING HELPERS
-// ================================================================================================
-
-#[cfg(feature = "testing")]
-impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
-    pub async fn testing_prove_transaction(
-        &mut self,
-        tx_result: &TransactionResult,
-    ) -> Result<ProvenTransaction, ClientError> {
-        self.prove_transaction(tx_result, self.tx_prover.clone()).await
-    }
-
-    pub async fn testing_submit_proven_transaction(
-        &mut self,
-        proven_transaction: ProvenTransaction,
-        tx_inputs: TransactionInputs,
-    ) -> Result<BlockNumber, ClientError> {
-        self.submit_proven_transaction(proven_transaction, tx_inputs).await
-    }
-
-    pub async fn testing_apply_transaction(
-        &self,
-        tx_result: TransactionResult,
-    ) -> Result<(), ClientError> {
-        self.apply_transaction(self.get_sync_height().await.unwrap(), tx_result).await
-    }
-}
-
 // HELPERS
 // ================================================================================================
 
+/// Accumulates fungible totals and collectable non-fungible assets from an iterator of assets.
 fn collect_assets<'a>(
     assets: impl Iterator<Item = &'a Asset>,
 ) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {

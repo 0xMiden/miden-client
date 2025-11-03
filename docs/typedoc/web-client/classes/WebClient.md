@@ -50,6 +50,26 @@
 
 ***
 
+### applyTransaction()
+
+> **applyTransaction**(`transaction_result`, `submission_height`): `Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### submission\_height
+
+`number`
+
+#### Returns
+
+`Promise`\<[`TransactionStoreUpdate`](TransactionStoreUpdate.md)\>
+
+***
+
 ### createClient()
 
 > **createClient**(`node_url?`, `node_note_transport_url?`, `seed?`): `Promise`\<`any`\>
@@ -150,6 +170,34 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 #### Returns
 
 [`ScriptBuilder`](ScriptBuilder.md)
+
+***
+
+### executeTransaction()
+
+> **executeTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
+
+Executes a transaction specified by the request against the specified account but does not
+submit it to the network nor update the local database. The returned [`TransactionResult`]
+retains the execution artifacts needed to continue with the transaction lifecycle.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionResult`](TransactionResult.md)\>
 
 ***
 
@@ -711,26 +759,6 @@ Returns all the existing setting keys from the store.
 
 ***
 
-### newTransaction()
-
-> **newTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-#### Parameters
-
-##### account\_id
-
-[`AccountId`](AccountId.md)
-
-##### transaction\_request
-
-[`TransactionRequest`](TransactionRequest.md)
-
-#### Returns
-
-`Promise`\<[`TransactionResult`](TransactionResult.md)\>
-
-***
-
 ### newWallet()
 
 > **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
@@ -762,6 +790,29 @@ Returns all the existing setting keys from the store.
 #### Returns
 
 `void`
+
+***
+
+### proveTransaction()
+
+> **proveTransaction**(`transaction_result`, `prover?`): `Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
+
+Generates a transaction proof using either the provided prover or the client's default
+prover if none is supplied.
+
+#### Parameters
+
+##### transaction\_result
+
+[`TransactionResult`](TransactionResult.md)
+
+##### prover?
+
+[`TransactionProver`](TransactionProver.md)
+
+#### Returns
+
+`Promise`\<[`ProvenTransaction`](ProvenTransaction.md)\>
 
 ***
 
@@ -887,23 +938,50 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 
 ***
 
-### submitTransaction()
+### submitNewTransaction()
 
-> **submitTransaction**(`transaction_result`, `prover?`): `Promise`\<`void`\>
+> **submitNewTransaction**(`account_id`, `transaction_request`): `Promise`\<[`TransactionId`](TransactionId.md)\>
+
+Executes a transaction specified by the request against the specified account,
+proves it, submits it to the network, and updates the local database.
+
+If the transaction utilizes foreign account data, there is a chance that the client doesn't
+have the required block header in the local database. In these scenarios, a sync to
+the chain tip is performed, and the required block header is retrieved.
 
 #### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionId`](TransactionId.md)\>
+
+***
+
+### submitProvenTransaction()
+
+> **submitProvenTransaction**(`proven_transaction`, `transaction_result`): `Promise`\<`number`\>
+
+#### Parameters
+
+##### proven\_transaction
+
+[`ProvenTransaction`](ProvenTransaction.md)
 
 ##### transaction\_result
 
 [`TransactionResult`](TransactionResult.md)
 
-##### prover?
-
-[`TransactionProver`](TransactionProver.md)
-
 #### Returns
 
-`Promise`\<`void`\>
+`Promise`\<`number`\>
 
 ***
 
@@ -914,22 +992,6 @@ Sets a setting key-value in the store. It can then be retrieved using `get_setti
 #### Returns
 
 `Promise`\<[`SyncSummary`](SyncSummary.md)\>
-
-***
-
-### testingApplyTransaction()
-
-> **testingApplyTransaction**(`tx_result`): `Promise`\<`void`\>
-
-#### Parameters
-
-##### tx\_result
-
-[`TransactionResult`](TransactionResult.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 

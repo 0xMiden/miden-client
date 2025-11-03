@@ -72,6 +72,8 @@ pub enum StoreError {
     NoteTagAlreadyTracked(u64),
     #[error("note transport cursor not found")]
     NoteTransportCursorNotFound,
+    #[error("note script with root {0} not found")]
+    NoteScriptNotFound(String),
     #[error("failed to parse data retrieved from the database: {0}")]
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]

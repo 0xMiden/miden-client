@@ -6,51 +6,15 @@
 
 # Class: TransactionResult
 
+WASM wrapper around the native [`TransactionResult`].
+
 ## Methods
-
-### accountDelta()
-
-> **accountDelta**(): [`AccountDelta`](AccountDelta.md)
-
-#### Returns
-
-[`AccountDelta`](AccountDelta.md)
-
-***
-
-### blockNum()
-
-> **blockNum**(): `number`
-
-#### Returns
-
-`number`
-
-***
-
-### consumedNotes()
-
-> **consumedNotes**(): [`InputNotes`](InputNotes.md)
-
-#### Returns
-
-[`InputNotes`](InputNotes.md)
-
-***
-
-### createdNotes()
-
-> **createdNotes**(): [`OutputNotes`](OutputNotes.md)
-
-#### Returns
-
-[`OutputNotes`](OutputNotes.md)
-
-***
 
 ### executedTransaction()
 
 > **executedTransaction**(): [`ExecutedTransaction`](ExecutedTransaction.md)
+
+Returns the executed transaction.
 
 #### Returns
 
@@ -68,9 +32,35 @@
 
 ***
 
+### futureNotes()
+
+> **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+Returns notes that are expected to be created as a result of follow-up executions.
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+***
+
+### id()
+
+> **id**(): [`TransactionId`](TransactionId.md)
+
+Returns the ID of the transaction.
+
+#### Returns
+
+[`TransactionId`](TransactionId.md)
+
+***
+
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the transaction result into bytes.
 
 #### Returns
 
@@ -78,19 +68,11 @@
 
 ***
 
-### transactionArguments()
-
-> **transactionArguments**(): [`TransactionArgs`](TransactionArgs.md)
-
-#### Returns
-
-[`TransactionArgs`](TransactionArgs.md)
-
-***
-
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionResult`
+
+Deserializes a transaction result from bytes.
 
 #### Parameters
 
