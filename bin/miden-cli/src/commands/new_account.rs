@@ -387,7 +387,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         .build()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
-    // Only add the Falcon key to the keystore if we generated one
+    // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
