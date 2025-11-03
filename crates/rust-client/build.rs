@@ -70,24 +70,24 @@ fn compile_tonic_note_transport_proto() -> miette::Result<()> {
 fn compile_tonic_client_proto() -> miette::Result<()> {
     let file_descriptors = rpc_api_descriptor();
 
-    let mut prost_config = prost_build::Config::new();
+    let mut prost_config = tonic_prost_build::Config::new();
     prost_config.skip_debug(["AccountId", "Digest"]);
 
-    let mut web_tonic_prost_config = prost_build::Config::new();
+    let mut web_tonic_prost_config = tonic_prost_build::Config::new();
     web_tonic_prost_config.skip_debug(["AccountId", "Digest"]);
 
     // Generate the header of the user facing server from its proto file
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_transport(false)
         .build_server(false)
         .out_dir(NO_STD_PROTO_OUT_DIR)
-        .compile_fds_with_config(web_tonic_prost_config, file_descriptors.clone())
+        .compile_fds_with_config(file_descriptors.clone(), web_tonic_prost_config)
         .into_diagnostic()?;
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_server(false)
         .out_dir(STD_PROTO_OUT_DIR)
-        .compile_fds_with_config(prost_config, file_descriptors)
+        .compile_fds_with_config(file_descriptors, prost_config)
         .into_diagnostic()?;
 
     Ok(())

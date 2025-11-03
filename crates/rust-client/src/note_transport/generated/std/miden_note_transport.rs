@@ -181,7 +181,7 @@ pub mod miden_note_transport_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/miden_note_transport.MidenNoteTransport/SendNote",
             );
@@ -211,7 +211,7 @@ pub mod miden_note_transport_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/miden_note_transport.MidenNoteTransport/FetchNotes",
             );
@@ -241,7 +241,7 @@ pub mod miden_note_transport_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/miden_note_transport.MidenNoteTransport/StreamNotes",
             );
@@ -268,7 +268,7 @@ pub mod miden_note_transport_client {
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
-            let codec = tonic::codec::ProstCodec::default();
+            let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/miden_note_transport.MidenNoteTransport/Stats",
             );
