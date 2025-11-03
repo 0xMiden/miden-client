@@ -24,7 +24,8 @@
 * Implemented missing RPC endpoints: `/SyncStorageMaps`, `/SyncAccountVault` & `/SyncTransactions` ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
 * Updated `submit_proven_transaction()` to include `TransactionInputs` for validator ([#1421](https://github.com/0xMiden/miden-client/pull/1421)).
 * [BREAKING] Replaced `AccountComponentTemplates` for `Packages` for account creation ([#1313](https://github.com/0xMiden/miden-client/pull/1313)).
-* CLI: Allow `new-account` command to create accounts with non-Falcon auth components by detecting auth components in provided packages ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
+* Allowed `new-account` command to create accounts with non-Falcon auth components ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
+* Allow for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Added support for silently initializing the client CLI ([#1424](https://github.com/0xMiden/miden-client/pull/1424)).
 * Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
