@@ -2207,9 +2207,7 @@ async fn consume_note_with_custom_script() {
         .own_output_notes(vec![OutputNote::Full(custom_note.clone())])
         .build()
         .unwrap();
-    let transaction = Box::pin(client.new_transaction(sender_id, tx_request)).await.unwrap();
-
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
+    let _tx_id = Box::pin(client.submit_new_transaction(sender_id, tx_request)).await.unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -2222,12 +2220,11 @@ async fn consume_note_with_custom_script() {
         .build_consume_notes(vec![custom_note.id()])
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(receiver_id, transaction_request))
+    // The transaction should be submitted successfully
+    let _transaction = Box::pin(client.submit_new_transaction(receiver_id, transaction_request))
         .await
         .unwrap();
 
-    // The transaction should be submitted successfully
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 }
