@@ -16,7 +16,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
-RUST_CLIENT_DIR=crates/rust-client
+RUST_CLIENT_DIR=crates/miden-client-core
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
 
@@ -33,14 +33,16 @@ clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web clien
 	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs, building tests with proper features to avoid type split.
-	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
-	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
+fix: ## Run format and clippy across the workspace using the nightly toolchain.
+	cargo +nightly fmt --all
+	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --all-targets -- -A clippy::duplicated_attributes -A clippy::implicit_clone -D warnings
+	cargo +nightly clippy --package testing-remote-prover --all-targets -- -D warnings
 
 .PHONY: fix-wasm
-fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
-	cargo +nightly fix --package miden-client-web --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
-	cargo +nightly fix --package miden-idxdb-store --target wasm32-unknown-unknown --allow-staged --allow-dirty --all-targets
+fix-wasm: ## Run formatting and clippy for the wasm packages (web client and idxdb store)
+	cargo +nightly fmt --package miden-client-web --package miden-idxdb-store
+	cargo +nightly clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -A clippy::duplicated_attributes -A clippy::implicit_clone -D warnings
+	cargo +nightly clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -A clippy::duplicated_attributes -A clippy::implicit_clone -D warnings
 
 .PHONY: format
 format: ## Run format using nightly toolchain
@@ -73,7 +75,7 @@ rust-client-ts-lint:
 
 .PHONY: doc
 doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
-	@cd crates/rust-client && \
+	@cd $(RUST_CLIENT_DIR) && \
 	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
 

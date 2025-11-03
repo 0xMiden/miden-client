@@ -20,8 +20,8 @@ use miden_objects::note::{
     NoteMetadata,
     NoteTag,
 };
-use miden_tx::auth::TransactionAuthenticator;
 
+use crate::note::NoteScreenerAuth;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::FetchedNote;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -32,7 +32,7 @@ use crate::{Client, ClientError};
 /// Note importing methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: NoteScreenerAuth + 'static,
 {
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------

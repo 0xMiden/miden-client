@@ -1,12 +1,12 @@
-use miden_client::auth::{
+use miden_client_core::auth::{
     AuthSecretKey,
     Signature as NativeSignature,
     SigningInputs as NativeSigningInputs,
 };
-use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
-use miden_client::keystore::KeyStoreError;
-use miden_client::utils::Deserializable;
-use miden_client::{AuthenticationError, Word as NativeWord};
+use miden_client_core::crypto::rpo_falcon512::PublicKey as NativePublicKey;
+use miden_client_core::keystore::KeyStoreError;
+use miden_client_core::utils::Deserializable;
+use miden_client_core::{AuthenticationError, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::{Function, Promise, Uint8Array};

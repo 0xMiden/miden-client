@@ -1,10 +1,9 @@
 use miden_client::Client;
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::TransactionFilter;
 use miden_client::transaction::TransactionRecord;
 
 use crate::errors::CliError;
-use crate::{Parser, create_dynamic_table};
+use crate::{CliAuthenticator, Parser, create_dynamic_table};
 
 #[derive(Default, Debug, Parser, Clone)]
 #[command(about = "Manage and view transactions. Defaults to `list` command")]
@@ -15,7 +14,7 @@ pub struct TransactionCmd {
 }
 
 impl TransactionCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -26,9 +25,7 @@ impl TransactionCmd {
 
 // LIST TRANSACTIONS
 // ================================================================================================
-async fn list_transactions<AUTH: TransactionAuthenticator + Sync + 'static>(
-    client: Client<AUTH>,
-) -> Result<(), CliError> {
+async fn list_transactions<AUTH: CliAuthenticator>(client: Client<AUTH>) -> Result<(), CliError> {
     let transactions = client.get_transactions(TransactionFilter::All).await?;
     print_transactions_summary(&transactions);
     Ok(())

@@ -2,16 +2,16 @@ use alloc::string::ToString;
 use alloc::sync::Arc;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
-use miden_client::auth::{
+use miden_client_core::auth::{
     AuthSecretKey,
     PublicKeyCommitment,
     Signature,
     SigningInputs,
     TransactionAuthenticator,
 };
-use miden_client::keystore::KeyStoreError;
-use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Word as NativeWord};
+use miden_client_core::keystore::KeyStoreError;
+use miden_client_core::utils::{RwLock, Serializable};
+use miden_client_core::{AuthenticationError, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 

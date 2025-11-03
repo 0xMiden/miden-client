@@ -1,6 +1,6 @@
-use miden_client::note::{NoteDetails as NativeNoteDetails, NoteId as NativeNoteId};
-use miden_client::notes::NoteFile as NativeNoteFile;
-use miden_client::{Deserializable, Serializable};
+use miden_client_core::note::{NoteDetails as NativeNoteDetails, NoteId as NativeNoteId};
+use miden_client_core::notes::NoteFile as NativeNoteFile;
+use miden_client_core::{Deserializable, Serializable};
 use wasm_bindgen::prelude::*;
 
 use super::input_note::InputNote;

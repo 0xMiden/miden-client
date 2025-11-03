@@ -2,15 +2,14 @@ use std::fs;
 
 use miden_client::Client;
 use miden_client::account::AccountId;
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::NoteFilter;
 
 use super::config::CliConfig;
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::errors::CliError;
-use crate::load_config_file;
+use crate::{CliAuthenticator, load_config_file};
 
-pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
+pub async fn print_client_info<AUTH: CliAuthenticator>(
     client: &Client<AUTH>,
 ) -> Result<(), CliError> {
     let (config, _) = load_config_file()?;
@@ -22,9 +21,7 @@ pub async fn print_client_info<AUTH: TransactionAuthenticator + Sync + 'static>(
 
 // HELPERS
 // ================================================================================================
-async fn print_client_stats<AUTH: TransactionAuthenticator + Sync + 'static>(
-    client: &Client<AUTH>,
-) -> Result<(), CliError> {
+async fn print_client_stats<AUTH: CliAuthenticator>(client: &Client<AUTH>) -> Result<(), CliError> {
     println!("Block number: {}", client.get_sync_height().await?);
     println!("Tracked accounts: {}", client.get_account_headers().await?.len());
     println!("Expected notes: {}", client.get_input_notes(NoteFilter::Expected).await?.len());

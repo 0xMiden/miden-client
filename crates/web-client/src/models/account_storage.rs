@@ -1,5 +1,5 @@
 use idxdb_store::account::JsStorageMapEntry;
-use miden_client::account::{AccountStorage as NativeAccountStorage, StorageSlot};
+use miden_client_core::account::{AccountStorage as NativeAccountStorage, StorageSlot};
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;

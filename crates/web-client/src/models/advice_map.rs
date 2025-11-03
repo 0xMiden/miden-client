@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
-use miden_client::vm::AdviceMap as NativeAdviceMap;
-use miden_client::{Felt as NativeFelt, Word as NativeWord};
+use miden_client_core::vm::AdviceMap as NativeAdviceMap;
+use miden_client_core::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
 use super::felt::{Felt, FeltArray};

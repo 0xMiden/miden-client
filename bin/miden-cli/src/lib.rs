@@ -32,6 +32,9 @@ use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 
+pub trait CliAuthenticator: TransactionAuthenticator + Send + Sync + 'static {}
+impl<T> CliAuthenticator for T where T: TransactionAuthenticator + Send + Sync + 'static {}
+
 mod config;
 mod errors;
 mod faucet_details_map;
@@ -251,7 +254,7 @@ pub fn create_dynamic_table(headers: &[&str]) -> Table {
 ///   `note_id_prefix` is a prefix of its ID.
 /// - Returns [`IdPrefixFetchError::MultipleMatches`] if there were more than one note found where
 ///   `note_id_prefix` is a prefix of its ID.
-pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticator + Sync>(
+pub(crate) async fn get_output_note_with_id_prefix<AUTH: CliAuthenticator>(
     client: &Client<AUTH>,
     note_id_prefix: &str,
 ) -> Result<OutputNoteRecord, IdPrefixFetchError> {
@@ -300,7 +303,10 @@ pub(crate) async fn get_output_note_with_id_prefix<AUTH: TransactionAuthenticato
 async fn get_account_with_id_prefix<AUTH>(
     client: &Client<AUTH>,
     account_id_prefix: &str,
-) -> Result<AccountHeader, IdPrefixFetchError> {
+) -> Result<AccountHeader, IdPrefixFetchError>
+where
+    AUTH: CliAuthenticator,
+{
     let mut accounts = client
         .get_account_headers()
         .await

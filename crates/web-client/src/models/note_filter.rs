@@ -1,4 +1,4 @@
-use miden_client::store::NoteFilter as NativeNoteFilter;
+use miden_client_core::store::NoteFilter as NativeNoteFilter;
 use wasm_bindgen::prelude::*;
 
 use super::note_id::NoteId;

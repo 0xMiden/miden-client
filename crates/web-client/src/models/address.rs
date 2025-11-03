@@ -1,4 +1,4 @@
-use miden_client::address::{
+use miden_client_core::address::{
     AccountIdAddress as NativeAccountIdAddress,
     Address as NativeAddress,
     AddressInterface as NativeAddressInterface,

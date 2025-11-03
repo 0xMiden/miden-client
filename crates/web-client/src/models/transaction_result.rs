@@ -1,4 +1,4 @@
-use miden_client::transaction::TransactionResult as NativeTransactionResult;
+use miden_client_core::transaction::TransactionResult as NativeTransactionResult;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

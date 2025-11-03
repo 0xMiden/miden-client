@@ -1,4 +1,4 @@
-use miden_client::sync::SyncSummary as NativeSyncSummary;
+use miden_client_core::sync::SyncSummary as NativeSyncSummary;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

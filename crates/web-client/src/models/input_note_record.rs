@@ -1,5 +1,5 @@
-use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
-use miden_client::transaction::InputNote as NativeInputNote;
+use miden_client_core::store::InputNoteRecord as NativeInputNoteRecord;
+use miden_client_core::transaction::InputNote as NativeInputNote;
 use wasm_bindgen::prelude::*;
 
 use super::input_note_state::InputNoteState;

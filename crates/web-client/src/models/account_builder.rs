@@ -1,5 +1,5 @@
-use miden_client::account::AccountBuilder as NativeAccountBuilder;
-use miden_client::auth::NoAuth;
+use miden_client_core::account::AccountBuilder as NativeAccountBuilder;
+use miden_client_core::auth::NoAuth;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

@@ -2,8 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use chrono::Utc;
-use miden_client::Word;
-use miden_client::note::{
+use miden_client_core::Word;
+use miden_client_core::note::{
     NoteAssets,
     NoteDetails,
     NoteInputs,
@@ -12,14 +12,14 @@ use miden_client::note::{
     NoteScript,
     NoteUpdateTracker,
 };
-use miden_client::store::{
+use miden_client_core::store::{
     InputNoteRecord,
     InputNoteState,
     OutputNoteRecord,
     OutputNoteState,
     StoreError,
 };
-use miden_client::utils::{Deserializable, Serializable};
+use miden_client_core::utils::{Deserializable, Serializable};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::js_bindings::{idxdb_upsert_input_note, idxdb_upsert_output_note};

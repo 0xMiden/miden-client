@@ -1,9 +1,9 @@
-use miden_client::Felt;
-use miden_client::account::component::BasicFungibleFaucet;
-use miden_client::account::{AccountBuilder, AccountType};
-use miden_client::asset::TokenSymbol;
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, PublicKeyCommitment};
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client_core::Felt;
+use miden_client_core::account::component::BasicFungibleFaucet;
+use miden_client_core::account::{AccountBuilder, AccountType};
+use miden_client_core::asset::TokenSymbol;
+use miden_client_core::auth::{AuthRpoFalcon512, AuthSecretKey, PublicKeyCommitment};
+use miden_client_core::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
 

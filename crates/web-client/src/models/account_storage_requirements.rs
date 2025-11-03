@@ -1,4 +1,4 @@
-use miden_client::rpc::domain::account::{
+use miden_client_core::rpc::domain::account::{
     AccountStorageRequirements as NativeAccountStorageRequirements,
     StorageMapKey as NativeStorageMapKey,
 };

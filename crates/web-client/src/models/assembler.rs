@@ -1,6 +1,6 @@
-use miden_client::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
-use miden_client::note::NoteScript as NativeNoteScript;
-use miden_client::transaction::TransactionScript as NativeTransactionScript;
+use miden_client_core::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
+use miden_client_core::note::NoteScript as NativeNoteScript;
+use miden_client_core::transaction::TransactionScript as NativeTransactionScript;
 use wasm_bindgen::prelude::*;
 
 use crate::models::library::Library;

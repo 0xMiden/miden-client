@@ -64,11 +64,10 @@ use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteId, NoteTag};
 use miden_objects::transaction::TransactionId;
-use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::info;
 
-use crate::note::NoteScreener;
+use crate::note::{NoteScreener, NoteScreenerAuth};
 use crate::note_transport::NoteTransport;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
@@ -91,7 +90,7 @@ pub use state_sync_update::{
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: NoteScreenerAuth + 'static,
 {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
@@ -120,7 +119,10 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
+    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError>
+    where
+        AUTH: NoteScreenerAuth,
+    {
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(
@@ -212,7 +214,7 @@ where
 // ================================================================================================
 
 /// Contains stats about the sync operation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncSummary {
     /// Block number up to which the client has been synced.
     pub block_num: BlockNumber,

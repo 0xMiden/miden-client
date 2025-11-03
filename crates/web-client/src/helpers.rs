@@ -1,7 +1,7 @@
-use miden_client::account::component::BasicWallet;
-use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, PublicKeyCommitment};
-use miden_client::crypto::rpo_falcon512::SecretKey;
+use miden_client_core::account::component::BasicWallet;
+use miden_client_core::account::{Account, AccountBuilder, AccountType};
+use miden_client_core::auth::{AuthRpoFalcon512, PublicKeyCommitment};
+use miden_client_core::crypto::rpo_falcon512::SecretKey;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;

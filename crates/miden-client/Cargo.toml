@@ -1,0 +1,31 @@
+[package]
+authors.workspace      = true
+categories             = ["asynchronous"]
+description            = "Std-enabled orchestration layer for interacting with the Miden network"
+documentation          = "https://docs.rs/miden-client/0.12.0"
+edition.workspace      = true
+keywords               = ["client", "miden", "service"]
+license.workspace      = true
+name                   = "miden-client"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[features]
+default = ["std"]
+std     = ["miden-client-core/std"]
+testing = ["miden-client-core/testing", "std"]
+tonic   = ["miden-client-core/tonic", "std"]
+
+[dependencies]
+anyhow            = { workspace = true }
+async-trait       = { workspace = true }
+futures           = { version = "0.3" }
+miden-client-core = { default-features = false, path = "../miden-client-core", version = "0.12" }
+thiserror         = { workspace = true }
+tokio             = { workspace = true }
+tracing           = { workspace = true }
+
+[lints]
+workspace = true

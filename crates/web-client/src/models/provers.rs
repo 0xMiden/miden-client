@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
-use miden_client::RemoteTransactionProver;
-use miden_client::transaction::{
+use miden_client_core::RemoteTransactionProver;
+use miden_client_core::transaction::{
     LocalTransactionProver,
     ProvingOptions,
     TransactionProver as TransactionProverTrait,

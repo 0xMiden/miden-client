@@ -1,4 +1,4 @@
-use miden_client::transaction::{DiscardCause, TransactionStatus as NativeTransactionStatus};
+use miden_client_core::transaction::{DiscardCause, TransactionStatus as NativeTransactionStatus};
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]

@@ -1,5 +1,5 @@
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::transaction::ProvenTransaction as NativeProvenTransaction;
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::transaction::ProvenTransaction as NativeProvenTransaction;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

@@ -295,6 +295,8 @@ use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
 
+use crate::transaction::TransactionProver;
+
 // MIDEN CLIENT
 // ================================================================================================
 
@@ -368,7 +370,7 @@ where
     /// Returns an error if the client couldn't be instantiated.
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        rng: Box<dyn FeltRng>,
+        rng: Box<dyn FeltRng + Send>,
         store: Arc<dyn Store>,
         authenticator: Option<Arc<AUTH>>,
         exec_options: ExecutionOptions,
@@ -409,6 +411,36 @@ where
         self.exec_options.enable_debugging()
     }
 
+    /// Returns a clone of the client's store handle.
+    pub fn store(&self) -> Arc<dyn Store> {
+        self.store.clone()
+    }
+
+    /// Returns a clone of the client's RPC client handle.
+    pub fn rpc_client(&self) -> Arc<dyn NodeRpcClient> {
+        self.rpc_api.clone()
+    }
+
+    /// Returns the default transaction prover used by the client.
+    pub fn transaction_prover(&self) -> Arc<dyn TransactionProver> {
+        self.tx_prover.clone()
+    }
+
+    /// Returns the transaction authenticator associated with the client, if any.
+    pub fn authenticator(&self) -> Option<Arc<AUTH>> {
+        self.authenticator.clone()
+    }
+
+    /// Returns the MASM source manager used by the client.
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
+        self.source_manager.clone()
+    }
+
+    /// Returns the note transport client if present.
+    pub fn note_transport_client(&self) -> Option<Arc<dyn NoteTransportClient>> {
+        self.note_transport_api.clone()
+    }
+
     /// Returns an instance of the `ScriptBuilder`
     pub fn script_builder(&self) -> ScriptBuilder {
         ScriptBuilder::with_source_manager(self.source_manager.clone())
@@ -439,14 +471,14 @@ where
 
 /// A wrapper around a [`FeltRng`] that implements the [`RngCore`] trait.
 /// This allows the user to pass their own generic RNG so that it's used by the client.
-pub struct ClientRng(Box<dyn FeltRng>);
+pub struct ClientRng(Box<dyn FeltRng + Send>);
 
 impl ClientRng {
-    pub fn new(rng: Box<dyn FeltRng>) -> Self {
+    pub fn new(rng: Box<dyn FeltRng + Send>) -> Self {
         Self(rng)
     }
 
-    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng> {
+    pub fn inner_mut(&mut self) -> &mut Box<dyn FeltRng + Send> {
         &mut self.0
     }
 }

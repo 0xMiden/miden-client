@@ -11,6 +11,7 @@ use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
@@ -21,7 +22,10 @@ pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
 pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
 /// Client note transport methods.
-impl<AUTH> Client<AUTH> {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync,
+{
     /// Check if note transport connection is configured
     pub fn is_note_transport_enabled(&self) -> bool {
         self.note_transport_api.is_some()

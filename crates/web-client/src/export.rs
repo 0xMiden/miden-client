@@ -1,7 +1,7 @@
-use miden_client::Word;
-use miden_client::account::AccountFile as NativeAccountFile;
-use miden_client::store::NoteExportType;
-use miden_client::utils::get_public_keys_from_account;
+use miden_client_core::Word;
+use miden_client_core::account::AccountFile as NativeAccountFile;
+use miden_client_core::store::NoteExportType;
+use miden_client_core::utils::get_public_keys_from_account;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_file::AccountFile;

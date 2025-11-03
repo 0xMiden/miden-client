@@ -4,14 +4,13 @@ use std::path::PathBuf;
 
 use miden_client::Client;
 use miden_client::account::{Account, AccountFile};
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::store::NoteExportType;
 use miden_client::utils::{Serializable, get_public_keys_from_account};
 use tracing::info;
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
-use crate::{CliKeyStore, Parser, get_output_note_with_id_prefix};
+use crate::{CliAuthenticator, CliKeyStore, Parser, get_output_note_with_id_prefix};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Export client output notes, or account data")]
@@ -55,7 +54,7 @@ impl From<&ExportType> for NoteExportType {
 }
 
 impl ExportCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -81,7 +80,10 @@ async fn export_account<AUTH>(
     keystore: &CliKeyStore,
     account_id: &str,
     filename: Option<PathBuf>,
-) -> Result<File, CliError> {
+) -> Result<File, CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_id = parse_account_id(client, account_id).await?;
 
     let account = client
@@ -122,7 +124,7 @@ async fn export_account<AUTH>(
 // EXPORT NOTE
 // ================================================================================================
 
-async fn export_note<AUTH: TransactionAuthenticator + Sync>(
+async fn export_note<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     note_id: &str,
     filename: Option<PathBuf>,

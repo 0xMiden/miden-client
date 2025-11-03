@@ -66,7 +66,7 @@ pub struct ClientBuilder<AUTH> {
     /// An optional store provided by the user.
     pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
-    rng: Option<Box<dyn FeltRng>>,
+    rng: Option<Box<dyn FeltRng + Send>>,
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -138,7 +138,7 @@ where
 
     /// Optionally provide a custom RNG.
     #[must_use]
-    pub fn rng(mut self, rng: Box<dyn FeltRng>) -> Self {
+    pub fn rng(mut self, rng: Box<dyn FeltRng + Send>) -> Self {
         self.rng = Some(rng);
         self
     }

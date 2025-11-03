@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
-use miden_client::ScriptBuilder as NativeScriptBuilder;
-use miden_client::assembly::{
+use miden_client_core::ScriptBuilder as NativeScriptBuilder;
+use miden_client_core::assembly::{
     Assembler,
     Library as NativeLibrary,
     LibraryPath,
@@ -11,7 +11,7 @@ use miden_client::assembly::{
     Report,
     SourceManagerSync,
 };
-use miden_client::transaction::TransactionKernel;
+use miden_client_core::transaction::TransactionKernel;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;

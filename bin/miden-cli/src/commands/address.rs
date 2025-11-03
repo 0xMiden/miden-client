@@ -7,7 +7,7 @@ use miden_client::note::NoteExecutionMode;
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
-use crate::{Parser, Subcommand, create_dynamic_table, load_config_file};
+use crate::{CliAuthenticator, Parser, Subcommand, create_dynamic_table, load_config_file};
 
 #[derive(Debug, Clone)]
 pub enum CliAddressInterface {
@@ -68,7 +68,10 @@ pub struct AddressCmd {
 }
 
 impl AddressCmd {
-    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
+    pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError>
+    where
+        AUTH: CliAuthenticator,
+    {
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
                 let (cli_config, _) = load_config_file()?;
@@ -110,7 +113,10 @@ fn print_account_addresses(account_id: &String, addresses: &Vec<Address>, networ
 async fn list_all_addresses<AUTH>(
     client: Client<AUTH>,
     network_id: NetworkId,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     println!("Listing addresses for all accounts:\n");
     let accounts = client.get_account_headers().await?;
     for (acc_header, _) in accounts {
@@ -129,7 +135,10 @@ async fn list_account_addresses<AUTH>(
     client: Client<AUTH>,
     account_id: &String,
     network_id: NetworkId,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let id = parse_account_id(&client, account_id).await?;
     let addresses = match client.get_account(id).await? {
         Some(account) => account.addresses().clone(),
@@ -149,7 +158,10 @@ async fn add_address<AUTH>(
     account_id: String,
     interface: CliAddressInterface,
     tag_len: Option<u8>,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_id = parse_account_id(&client, &account_id).await?;
     let interface = interface.into();
     let account_id_address = match tag_len {
@@ -173,7 +185,10 @@ async fn remove_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
     address: String,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_id = parse_account_id(&client, &account_id).await?;
     let (_, address) = Address::from_bech32(&address).map_err(|e| CliError::Address(e, address))?;
     let execution_mode = match address.to_note_tag().execution_mode() {

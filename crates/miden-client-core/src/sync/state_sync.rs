@@ -3,7 +3,6 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use async_trait::async_trait;
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber};
@@ -37,7 +36,8 @@ pub enum NoteUpdateAction {
     Discard,
 }
 
-#[async_trait(?Send)]
+#[cfg_attr(feature = "std", async_trait::async_trait)]
+#[cfg_attr(not(feature = "std"), async_trait::async_trait(?Send))]
 pub trait OnNoteReceived {
     /// Callback that gets executed when a new note is received as part of the sync response.
     ///
@@ -65,12 +65,18 @@ pub trait OnNoteReceived {
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
+#[cfg(feature = "std")]
+type NoteScreenerHandle = Arc<dyn OnNoteReceived + Send + Sync>;
+
+#[cfg(not(feature = "std"))]
+type NoteScreenerHandle = Arc<dyn OnNoteReceived>;
+
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
-    note_screener: Arc<dyn OnNoteReceived>,
+    note_screener: NoteScreenerHandle,
     /// The number of blocks that are considered old enough to discard pending transactions. If
     /// `None`, there is no limit and transactions will be kept indefinitely.
     tx_graceful_blocks: Option<u32>,
@@ -87,7 +93,7 @@ impl StateSync {
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        note_screener: Arc<dyn OnNoteReceived>,
+        note_screener: NoteScreenerHandle,
         tx_graceful_blocks: Option<u32>,
     ) -> Self {
         Self {

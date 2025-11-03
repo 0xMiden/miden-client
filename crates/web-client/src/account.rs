@@ -1,6 +1,6 @@
-use miden_client::account::Account as NativeAccount;
-use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
-use miden_client::store::AccountRecord;
+use miden_client_core::account::Account as NativeAccount;
+use miden_client_core::auth::AuthSecretKey as NativeAuthSecretKey;
+use miden_client_core::store::AccountRecord;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -39,7 +39,7 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to get account"))?;
             let account: Option<NativeAccount> = result.map(AccountRecord::into);
 
-            Ok(account.map(miden_client::account::Account::into))
+            Ok(account.map(miden_client_core::account::Account::into))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

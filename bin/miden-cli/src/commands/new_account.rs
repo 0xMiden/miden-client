@@ -12,7 +12,7 @@ use miden_client::account::component::{
     MIDEN_PACKAGE_EXTENSION,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
@@ -23,7 +23,7 @@ use tracing::debug;
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::{CliKeyStore, client_binary_name, load_config_file};
+use crate::{CliAuthenticator, CliKeyStore, client_binary_name, load_config_file};
 
 // CLI TYPES
 // ================================================================================================
@@ -97,7 +97,7 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -170,7 +170,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -288,7 +288,7 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
 ///
 /// The created account will have a Falcon-based auth component, additional to any specified
 /// component.
-async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn create_client_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -348,7 +348,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn deploy_account<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {

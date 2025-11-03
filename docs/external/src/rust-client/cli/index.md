@@ -8,6 +8,13 @@ The following document lists the commands that the CLI currently supports.
 Use `--help` as a flag on any command for more information.
 :::
 
+:::info
+The CLI is built on top of the std-enabled `miden-client` crate, which wraps the shared
+`miden-client-core` functionality together with the new background service runtime introduced in
+this release. Existing workflows continue to work, but long-running applications can now rely on
+the same crate to spawn a continuously syncing client service.
+:::
+
 ## Usage
 
 Call a command on the `miden-client` like this:
@@ -394,4 +401,3 @@ inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000
 ### `note-transport`
 
 Send and fetch private notes using the transport layer.
-

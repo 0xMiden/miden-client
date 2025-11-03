@@ -1,10 +1,10 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::Word;
-use miden_client::account::{StorageMap, StorageSlot};
-use miden_client::asset::Asset;
-use miden_client::utils::Serializable;
+use miden_client_core::Word;
+use miden_client_core::account::{StorageMap, StorageSlot};
+use miden_client_core::asset::Asset;
+use miden_client_core::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 

@@ -1,7 +1,7 @@
-use miden_client::account::StorageSlot as NativeStorageSlot;
-use miden_client::account::component::AccountComponent as NativeAccountComponent;
-use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client_core::account::StorageSlot as NativeStorageSlot;
+use miden_client_core::account::component::AccountComponent as NativeAccountComponent;
+use miden_client_core::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
+use miden_client_core::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 

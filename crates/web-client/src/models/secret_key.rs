@@ -1,5 +1,5 @@
-use miden_client::auth::Signature as NativeSignature;
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client_core::auth::Signature as NativeSignature;
+use miden_client_core::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;

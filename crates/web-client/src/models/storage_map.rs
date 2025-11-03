@@ -1,4 +1,4 @@
-use miden_client::account::StorageMap as NativeStorageMap;
+use miden_client_core::account::StorageMap as NativeStorageMap;
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;

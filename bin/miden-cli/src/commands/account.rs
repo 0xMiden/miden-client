@@ -10,7 +10,7 @@ use miden_client::{Client, PrettyPrint, ZERO};
 use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::{load_config_file, load_faucet_details_map, parse_account_id};
-use crate::{client_binary_name, create_dynamic_table};
+use crate::{CliAuthenticator, client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
 
@@ -40,7 +40,10 @@ pub struct AccountCmd {
 }
 
 impl AccountCmd {
-    pub async fn execute<AUTH>(&self, mut client: Client<AUTH>) -> Result<(), CliError> {
+    pub async fn execute<AUTH>(&self, mut client: Client<AUTH>) -> Result<(), CliError>
+    where
+        AUTH: CliAuthenticator,
+    {
         let (cli_config, _) = load_config_file()?;
         match self {
             AccountCmd {
@@ -97,7 +100,10 @@ impl AccountCmd {
 // LIST ACCOUNTS
 // ================================================================================================
 
-async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
+async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let accounts = client.get_account_headers().await?;
 
     let mut table =
@@ -131,7 +137,10 @@ pub async fn show_account<AUTH>(
     account_id: AccountId,
     cli_config: &CliConfig,
     with_code: bool,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account = if let Some(account) = client.get_account(account_id).await? {
         account.into()
     } else {
@@ -234,7 +243,10 @@ async fn print_summary_table<AUTH>(
     account: &Account,
     client: &Client<AUTH>,
     cli_config: &CliConfig,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let mut table = create_dynamic_table(&["Account Information"]);
     table
         .load_preset(presets::UTF8_HORIZONTAL_ONLY)
@@ -288,7 +300,10 @@ fn account_type_display_name(account_id: &AccountId) -> Result<String, CliError>
 pub(crate) async fn set_default_account_if_unset<AUTH>(
     client: &mut Client<AUTH>,
     account_id: AccountId,
-) -> Result<(), CliError> {
+) -> Result<(), CliError>
+where
+    AUTH: CliAuthenticator,
+{
     if client
         .get_setting::<AccountId>(DEFAULT_ACCOUNT_ID_KEY.to_string())
         .await?
@@ -312,7 +327,10 @@ async fn account_bech_32<AUTH>(
     account_id: AccountId,
     client: &Client<AUTH>,
     cli_config: &CliConfig,
-) -> Result<String, CliError> {
+) -> Result<String, CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_record = client.try_get_account(account_id).await?;
 
     let account_interface: AccountInterface = account_record.account().into();

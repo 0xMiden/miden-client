@@ -3,7 +3,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
-use async_trait::async_trait;
 use miden_lib::account::interface::AccountInterface;
 use miden_lib::note::well_known_note::WellKnownNote;
 use miden_objects::account::{Account, AccountId};
@@ -25,6 +24,16 @@ use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
 use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
+
+#[cfg(feature = "std")]
+pub trait NoteScreenerAuth: TransactionAuthenticator + Send + Sync {}
+#[cfg(feature = "std")]
+impl<T> NoteScreenerAuth for T where T: TransactionAuthenticator + Send + Sync {}
+
+#[cfg(not(feature = "std"))]
+pub trait NoteScreenerAuth: TransactionAuthenticator + Sync {}
+#[cfg(not(feature = "std"))]
+impl<T> NoteScreenerAuth for T where T: TransactionAuthenticator + Sync {}
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -67,7 +76,7 @@ pub struct NoteScreener<AUTH> {
 
 impl<AUTH> NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync,
+    AUTH: NoteScreenerAuth,
 {
     pub fn new(
         store: Arc<dyn Store>,
@@ -197,10 +206,11 @@ where
 // DEFAULT CALLBACK IMPLEMENTATIONS
 // ================================================================================================
 
-#[async_trait(?Send)]
+#[cfg_attr(feature = "std", async_trait::async_trait)]
+#[cfg_attr(not(feature = "std"), async_trait::async_trait(?Send))]
 impl<AUTH> OnNoteReceived for NoteScreener<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync,
+    AUTH: NoteScreenerAuth,
 {
     /// Default implementation of the [`OnNoteReceived`] callback. It queries the store for the
     /// committed note to check if it's relevant. If the note wasn't being tracked but it came in

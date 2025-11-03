@@ -4,6 +4,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
@@ -17,7 +18,10 @@ use crate::errors::ClientError;
 /// - **Settings accessors:** Methods to get, set, and delete setting values from the store.
 /// - **Default account ID:** Methods to get, set, and delete the default account ID. This is a
 ///   wrapper around a specific setting value.
-impl<AUTH> Client<AUTH> {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync,
+{
     // SETTINGS ACCESSORS
     // --------------------------------------------------------------------------------------------
 

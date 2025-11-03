@@ -3,7 +3,6 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use miden_client::account::{AccountFile, AccountId};
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::NoteFile;
 use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
@@ -11,7 +10,7 @@ use tracing::info;
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::errors::CliError;
-use crate::{CliKeyStore, Parser};
+use crate::{CliAuthenticator, CliKeyStore, Parser};
 
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Import notes or accounts")]
@@ -25,7 +24,7 @@ pub struct ImportCmd {
 }
 
 impl ImportCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -71,7 +70,10 @@ async fn import_account<AUTH>(
     keystore: &CliKeyStore,
     account_data_file_contents: &[u8],
     overwrite: bool,
-) -> Result<AccountId, CliError> {
+) -> Result<AccountId, CliError>
+where
+    AUTH: CliAuthenticator,
+{
     let account_data = AccountFile::read_from_bytes(account_data_file_contents)
         .map_err(ClientError::DataDeserializationError)?;
     let account_id = account_data.account.id();

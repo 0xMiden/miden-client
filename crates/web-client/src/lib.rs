@@ -3,13 +3,13 @@ use alloc::sync::Arc;
 use core::fmt::Write;
 
 use idxdb_store::WebStore;
-use miden_client::crypto::RpoRandomCoin;
-use miden_client::note_transport::NoteTransportClient;
-use miden_client::note_transport::grpc::GrpcNoteTransportClient;
-use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
-use miden_client::testing::mock::MockRpcApi;
-use miden_client::testing::note_transport::MockNoteTransportApi;
-use miden_client::{
+use miden_client_core::crypto::RpoRandomCoin;
+use miden_client_core::note_transport::NoteTransportClient;
+use miden_client_core::note_transport::grpc::GrpcNoteTransportClient;
+use miden_client_core::rpc::{Endpoint, GrpcClient, NodeRpcClient};
+use miden_client_core::testing::mock::MockRpcApi;
+use miden_client_core::testing::note_transport::MockNoteTransportApi;
+use miden_client_core::{
     Client,
     ExecutionOptions,
     Felt,

@@ -85,7 +85,7 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreener, NoteUpdateTracker};
+use crate::note::{NoteScreener, NoteScreenerAuth, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -158,7 +158,7 @@ pub use store_update::TransactionStoreUpdate;
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: NoteScreenerAuth + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ where
         Ok(proven_transaction)
     }
 
-    async fn submit_proven_transaction(
+    pub async fn submit_proven_transaction(
         &mut self,
         proven_transaction: ProvenTransaction,
         transaction_inputs: TransactionInputs,
@@ -332,7 +332,7 @@ where
         Ok(block_num)
     }
 
-    async fn apply_transaction(
+    pub async fn apply_transaction(
         &self,
         submission_height: BlockNumber,
         tx_result: TransactionResult,
@@ -445,7 +445,10 @@ where
         &self,
         submission_height: BlockNumber,
         tx_result: &TransactionResult,
-    ) -> Result<NoteUpdateTracker, ClientError> {
+    ) -> Result<NoteUpdateTracker, ClientError>
+    where
+        AUTH: NoteScreenerAuth,
+    {
         let executed_tx = tx_result.executed_transaction();
         let current_timestamp = self.store.get_current_timestamp();
         let current_block_num = self.store.get_sync_height().await?;
@@ -834,7 +837,7 @@ where
 // ================================================================================================
 
 #[cfg(feature = "testing")]
-impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
+impl<AUTH: NoteScreenerAuth + 'static> Client<AUTH> {
     pub async fn testing_prove_transaction(
         &mut self,
         tx_result: &TransactionResult,

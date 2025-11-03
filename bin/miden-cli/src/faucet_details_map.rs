@@ -7,6 +7,7 @@ use miden_client::asset::FungibleAsset;
 use miden_client::utils::{base_units_to_tokens, tokens_to_base_units};
 use serde::{Deserialize, Serialize};
 
+use crate::CliAuthenticator;
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
 
@@ -97,7 +98,10 @@ impl FaucetDetailsMap {
         &self,
         client: &Client<AUTH>,
         arg: &str,
-    ) -> Result<FungibleAsset, CliError> {
+    ) -> Result<FungibleAsset, CliError>
+    where
+        AUTH: CliAuthenticator,
+    {
         let (amount, asset) = arg.split_once("::").ok_or(CliError::Parse(
             "separator `::` not found".into(),
             "Failed to parse amount and asset".to_string(),

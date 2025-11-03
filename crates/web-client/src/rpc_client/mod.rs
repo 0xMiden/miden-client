@@ -5,10 +5,10 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_client::note::NoteId as NativeNoteId;
-use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
-use miden_client::rpc::{GrpcClient, NodeRpcClient};
-use miden_client::transaction::InputNote as NativeInputNote;
+use miden_client_core::note::NoteId as NativeNoteId;
+use miden_client_core::rpc::domain::note::FetchedNote as NativeFetchedNote;
+use miden_client_core::rpc::{GrpcClient, NodeRpcClient};
+use miden_client_core::transaction::InputNote as NativeInputNote;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 

@@ -1,11 +1,11 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::account::AccountId;
-use miden_client::note::{BlockNumber, NoteId, NoteTag};
-use miden_client::store::StoreError;
-use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
-use miden_client::utils::{Deserializable, Serializable};
+use miden_client_core::account::AccountId;
+use miden_client_core::note::{BlockNumber, NoteId, NoteTag};
+use miden_client_core::store::StoreError;
+use miden_client_core::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use miden_client_core::utils::{Deserializable, Serializable};
 
 use super::WebStore;
 use super::chain_data::utils::{

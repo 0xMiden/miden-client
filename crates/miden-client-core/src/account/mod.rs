@@ -67,6 +67,7 @@ pub use miden_objects::{
     },
     address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
 };
+use miden_tx::auth::TransactionAuthenticator;
 
 use super::Client;
 use crate::errors::ClientError;
@@ -111,7 +112,10 @@ pub mod component {
 ///   with the network.
 ///
 /// - **Data retrieval:** The module also provides methods to fetch account-related data.
-impl<AUTH> Client<AUTH> {
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync,
+{
     // ACCOUNT CREATION
     // --------------------------------------------------------------------------------------------
 

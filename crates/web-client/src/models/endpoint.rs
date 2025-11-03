@@ -1,4 +1,4 @@
-use miden_client::rpc::Endpoint as NativeEndpoint;
+use miden_client_core::rpc::Endpoint as NativeEndpoint;
 use wasm_bindgen::prelude::*;
 
 /// Represents a network endpoint for connecting to Miden nodes.

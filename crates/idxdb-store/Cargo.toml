@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Miden dependencies
-miden-client = { default-features = false, path = "../rust-client", version = "0.12" }
+miden-client-core = { default-features = false, path = "../miden-client-core", version = "0.12" }
 
 # Workspace dependencies
 async-trait = { workspace = true }

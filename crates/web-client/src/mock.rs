@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
 
-use miden_client::testing::MockChain;
-use miden_client::testing::mock::MockRpcApi;
-use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
-use miden_client::utils::{Deserializable, RwLock, Serializable};
+use miden_client_core::testing::MockChain;
+use miden_client_core::testing::mock::MockRpcApi;
+use miden_client_core::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
+use miden_client_core::utils::{Deserializable, RwLock, Serializable};
 use wasm_bindgen::prelude::*;
 
 use crate::{WebClient, js_error_with_context};

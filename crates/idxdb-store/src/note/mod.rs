@@ -1,9 +1,9 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::Word;
-use miden_client::note::Nullifier;
-use miden_client::store::{
+use miden_client_core::Word;
+use miden_client_core::note::Nullifier;
+use miden_client_core::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,

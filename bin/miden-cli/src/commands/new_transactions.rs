@@ -4,7 +4,6 @@ use std::sync::Arc;
 use clap::{Parser, ValueEnum};
 use miden_client::account::AccountId;
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
-use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     BlockNumber,
     NoteType as MidenNoteType,
@@ -24,7 +23,6 @@ use miden_client::transaction::{
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
-use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
@@ -33,6 +31,7 @@ use crate::utils::{
     load_faucet_details_map,
     parse_account_id,
 };
+use crate::{CliAuthenticator, create_dynamic_table};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum NoteType {
@@ -72,7 +71,7 @@ pub struct MintCmd {
 }
 
 impl MintCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -143,7 +142,7 @@ pub struct SendCmd {
 }
 
 impl SendCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -225,7 +224,7 @@ pub struct SwapCmd {
 }
 
 impl SwapCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -304,7 +303,7 @@ pub struct ConsumeNotesCmd {
 }
 
 impl ConsumeNotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: CliAuthenticator>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -375,7 +374,7 @@ impl ConsumeNotesCmd {
 // EXECUTE TRANSACTION
 // ================================================================================================
 
-async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn execute_transaction<AUTH: CliAuthenticator>(
     client: &mut Client<AUTH>,
     account_id: AccountId,
     transaction_request: TransactionRequest,

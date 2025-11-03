@@ -1,5 +1,5 @@
-use miden_client::note::Note as NativeNote;
-use miden_client::transaction::TransactionRequest as NativeTransactionRequest;
+use miden_client_core::note::Note as NativeNote;
+use miden_client_core::transaction::TransactionRequest as NativeTransactionRequest;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 

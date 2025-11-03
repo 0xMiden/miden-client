@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use miden_client::Felt as NativeFelt;
-use miden_client::account::AccountId as NativeAccountId;
-use miden_client::address::{
+use miden_client_core::Felt as NativeFelt;
+use miden_client_core::account::AccountId as NativeAccountId;
+use miden_client_core::address::{
     AccountIdAddress,
     Address,
     AddressInterface as NativeAccountInterface,

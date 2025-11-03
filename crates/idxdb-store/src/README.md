@@ -13,4 +13,5 @@ files under `src/js`. This is because to use extern functions, we still need to 
 
 To unify and make this setup straightforward, the top-most makefile from this project has a
 useful target: `make rust-client-ts-build`, which takes the .ts files and compiles them down to .js files.
-
+The target name is kept for backwards compatibility, but it now invokes the tooling that lives
+under the `miden-client-core` crate.
