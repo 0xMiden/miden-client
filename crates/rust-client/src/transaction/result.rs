@@ -9,6 +9,8 @@ use miden_objects::transaction::{
     InputNotes,
     OutputNotes,
     TransactionArgs,
+    TransactionId,
+    TransactionInputs,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
@@ -37,6 +39,11 @@ impl TransactionResult {
         Ok(Self { transaction, future_notes })
     }
 
+    /// Returns a unique identifier of this transaction.
+    pub fn id(&self) -> TransactionId {
+        self.transaction.id()
+    }
+
     /// Returns the [`ExecutedTransaction`].
     pub fn executed_transaction(&self) -> &ExecutedTransaction {
         &self.transaction
@@ -63,8 +70,12 @@ impl TransactionResult {
         self.transaction.tx_args()
     }
 
-    /// Returns the [`AccountDelta`] that describes the change of state for the executing
-    /// [`crate::account::Account`].
+    /// Returns a reference to the [`TransactionInputs`].
+    pub fn tx_inputs(&self) -> &TransactionInputs {
+        self.transaction.tx_inputs()
+    }
+
+    /// Returns the [`AccountDelta`] that describes the change of state for the executing account.
     pub fn account_delta(&self) -> &AccountDelta {
         self.transaction.account_delta()
     }
@@ -72,6 +83,19 @@ impl TransactionResult {
     /// Returns input notes that were consumed as part of the transaction.
     pub fn consumed_notes(&self) -> &InputNotes<InputNote> {
         self.transaction.tx_inputs().input_notes()
+    }
+}
+
+impl From<&TransactionResult> for TransactionInputs {
+    fn from(value: &TransactionResult) -> Self {
+        value.executed_transaction().tx_inputs().clone()
+    }
+}
+
+impl From<TransactionResult> for TransactionInputs {
+    fn from(value: TransactionResult) -> Self {
+        let (inputs, ..) = value.transaction.into_parts();
+        inputs
     }
 }
 

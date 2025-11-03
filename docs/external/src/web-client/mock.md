@@ -19,14 +19,35 @@ try {
   // Initialize the mock web client
   const mockWebClient = await MockWebClient.createClient();
 
-  // Running a mint transaction (assuming the client was setup previously)
-  const mintTransactionResult = await mockWebClient.newTransaction(
+  const mintTransactionId = await mockWebClient.submitNewTransaction(
     faucetAccount.id(),
     mintTransactionRequest
   );
 
-  await mockWebClient.submitTransaction(mintTransactionResult);
-  await mockWebClient.proveBlock(); // Creates a new block that will include the submitted transaction
+  console.log("Mint transaction submitted:", mintTransactionId.toString());
+
+  // Advance the mock chain and refresh local state
+  await mockWebClient.proveBlock();
+  await mockWebClient.syncState();
+
+  const consumableNotes = await mockWebClient.getConsumableNotes(
+    userAccount.id()
+  );
+  const noteIdToConsume = consumableNotes[0]
+    .inputNoteRecord()
+    .id()
+    .toString();
+
+  const consumeRequest = mockWebClient.newConsumeTransactionRequest([
+    noteIdToConsume,
+  ]);
+
+  const consumeTransactionId = await mockWebClient.submitNewTransaction(
+    userAccount.id(),
+    consumeRequest
+  );
+
+  await mockWebClient.proveBlock();
   await mockWebClient.syncState();
 } catch (error) {
   console.error(

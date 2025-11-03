@@ -23,7 +23,7 @@ try {
     // Access synchronization details
     console.log("Current block number:", syncSummary.blockNum());
     console.log("Committed notes:", syncSummary.committedNotes().map(id => id.toString()));
-    console.log("Consumed notes:", syncSummary.consumedNotes().map(id => id.toString()));
+    console.log("Consumed notes:", syncSummary.executedTransaction().inputNotes().map(id => id.toString()));
     console.log("Updated accounts:", syncSummary.updatedAccounts().map(id => id.toString()));
     console.log("Committed transactions:", syncSummary.committedTransactions().map(id => id.toString()));
 } catch (error) {
@@ -51,4 +51,4 @@ For more detailed information about sync functionality, refer to the following A
 - [AccountId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/AccountId.md) - Class for working with account IDs
 - [TransactionId](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/TransactionId.md) - Class for working with transaction IDs
 
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

@@ -48,6 +48,26 @@
 
 ***
 
+### futureNotes()
+
+> **futureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
 ### submissionHeight()
 
 > **submissionHeight**(): `number`
@@ -55,3 +75,19 @@
 #### Returns
 
 `number`
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `TransactionStoreUpdate`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`TransactionStoreUpdate`
