@@ -145,6 +145,27 @@ impl NewWalletCmd {
 ///
 /// An account may comprise one or more components, each with its own storage and distinct
 /// functionality.
+///
+/// # Authentication Components
+///
+/// If a package with an authentication component is provided via `-p`, it will be used for
+/// the account. Otherwise, a default `RpoFalcon512` authentication component will be added
+/// automatically.
+///
+/// Each account can only have one authentication component. If multiple packages contain
+/// authentication components, an error will be returned.
+///
+/// # Examples
+///
+/// Create an account with default Falcon auth:
+/// ```bash
+/// miden-client new-account --account-type regular-account-immutable-code -p basic-wallet
+/// ```
+///
+/// Create an account with a custom auth component (e.g., NoAuth):
+/// ```bash
+/// miden-client new-account --account-type regular-account-immutable-code -p no-auth -p basic-wallet
+/// ```
 #[derive(Debug, Parser, Clone)]
 pub struct NewAccountCmd {
     /// Storage mode of the account.
@@ -309,6 +330,32 @@ fn is_auth_component(component: &AccountComponent) -> Result<bool, CliError> {
     Ok(auth_procedure_count == 1)
 }
 
+/// Separates account components into auth and regular components.
+///
+/// Returns a tuple of (`auth_component`, `regular_components`).
+/// Returns an error if multiple auth components are found.
+fn separate_auth_components(
+    components: Vec<AccountComponent>,
+) -> Result<(Option<AccountComponent>, Vec<AccountComponent>), CliError> {
+    let mut auth_component: Option<AccountComponent> = None;
+    let mut regular_components = Vec::new();
+
+    for component in components {
+        if is_auth_component(&component)? {
+            if auth_component.is_some() {
+                return Err(CliError::InvalidArgument(
+                    "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
+                ));
+            }
+            auth_component = Some(component);
+        } else {
+            regular_components.push(component);
+        }
+    }
+
+    Ok((auth_component, regular_components))
+}
+
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
@@ -348,23 +395,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-
-    // Collect auth and non-auth components separately
-    let mut auth_component: Option<AccountComponent> = None;
-    let mut regular_components = Vec::new();
-
-    for component in account_components {
-        if is_auth_component(&component)? {
-            if auth_component.is_some() {
-                return Err(CliError::InvalidArgument(
-                    "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
-                ));
-            }
-            auth_component = Some(component);
-        } else {
-            regular_components.push(component);
-        }
-    }
+    let (auth_component, regular_components) = separate_auth_components(account_components)?;
 
     // Add the auth component (either from packages or default Falcon)
     let key_pair = if let Some(auth_component) = auth_component {
@@ -392,6 +423,9 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         keystore
             .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
             .map_err(CliError::KeyStore)?;
+        println!("Generated and stored Falcon512 authentication key in keystore.");
+    } else {
+        println!("Using custom authentication component from package (no key generated).");
     }
 
     client.add_account(&account, false).await?;
