@@ -40,14 +40,16 @@
 * [BREAKING] Renamed `TonicRpcClient` to `GrpcClient` and `tonic_rpc_client()` method to `grpc_client()` ([#1360](https://github.com/0xMiden/miden-client/pull/1360)).
 * [BREAKING] Removed WebClient's `compileNoteScript` method and both `TransactionScript` and `NoteScript` compile methods; the new `ScriptBuilder` should be used instead ([#1331](https://github.com/0xMiden/miden-client/pull/1274)).
 * [BREAKING] Implemented `AccountFile` in the WebClient ([#1258](https://github.com/0xMiden/miden-client/pull/1258)).
-* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371))
-* Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416))
-* [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374))
+* [BREAKING] Added remote key storage and signature requesting to the `WebKeyStore` ([#1371](https://github.com/0xMiden/miden-client/pull/1371)).
+* Added `sqlite_store` under `ClientBuilderSqliteExt` method to the `ClientBuilder` ([#1416](https://github.com/0xMiden/miden-client/pull/1416)).
+* [BREAKING] Updated the Web Client to integrate Note Transport ([#1374](https://github.com/0xMiden/miden-client/pull/1374)).
 * [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
+* Updated Dexie indexes and SQL schema; fixed sync-related transaction state bug ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
+* Started syncing output note nullifiers by default, to track when they are consumed ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 
 ## 0.11.11 (2025-10-16)
 
-* Added Missing Details to `SigningInputs` Object to Fetch Underlying Data Type ([#1389](https://github.com/0xMiden/miden-client/pull/1389)).
+* Added missing details to `SigningInputs` object to fetch underlying data type ([#1389](https://github.com/0xMiden/miden-client/pull/1389)).
 
 ## 0.11.10 (2025-10-15)
 

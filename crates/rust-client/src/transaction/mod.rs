@@ -490,11 +490,7 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let note_screener = NoteScreener::new(
-            self.store.clone(),
-            self.authenticator.clone(),
-            self.source_manager.clone(),
-        );
+        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
 
         for note in notes_from_output(executed_tx.output_notes()) {
             // TODO: check_relevance() should have the option to take multiple notes
