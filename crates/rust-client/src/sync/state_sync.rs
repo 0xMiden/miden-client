@@ -65,6 +65,7 @@ pub trait OnNoteReceived {
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
+#[derive(Clone)]
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
