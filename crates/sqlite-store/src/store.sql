@@ -31,7 +31,7 @@ CREATE TABLE account_storage (
     slot_value TEXT NULL,                   -- top-level value of the slot (e.g., if the slot is a map it contains the root)
     slot_type BLOB NOT NULL,                -- type of the slot, serialized
     PRIMARY KEY (commitment, slot_index)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX idx_account_storage_commitment ON account_storage(commitment);
 
@@ -41,8 +41,7 @@ CREATE TABLE storage_map_entries (
     key TEXT NOT NULL,      -- key of the storage map entry
     value TEXT NOT NULL,    -- value of the storage map entry
     PRIMARY KEY (root, key)
-);
-
+) WITHOUT ROWID;
 CREATE INDEX idx_storage_map_entries_root ON storage_map_entries(root);
 
 -- Create account_assets table
@@ -52,7 +51,7 @@ CREATE TABLE account_assets (
     faucet_id_prefix TEXT NOT NULL,                 -- prefix of the faucet ID, used to identify the faucet
     asset TEXT NULL,                                -- value that represents the asset in the vault
     PRIMARY KEY (root, vault_key)
-);
+) WITHOUT ROWID;
 
 CREATE INDEX idx_account_assets_root ON account_assets(root);
 
@@ -79,8 +78,8 @@ CREATE TABLE accounts (
 
     CONSTRAINT check_seed_nonzero CHECK (NOT (nonce = 0 AND account_seed IS NULL))
 );
-
-CREATE UNIQUE INDEX idx_account_commitment ON accounts(account_commitment);
+CREATE INDEX idx_accounts_id_nonce ON accounts(id, nonce DESC);
+CREATE INDEX idx_accounts_id ON accounts(id);
 
 -- Create transactions table
 CREATE TABLE transactions (
@@ -92,14 +91,16 @@ CREATE TABLE transactions (
     status BLOB NOT NULL,                            -- Serialized transaction status
     FOREIGN KEY (script_root) REFERENCES transaction_scripts(script_root),
     PRIMARY KEY (id)
-);
+) WITHOUT ROWID;
+CREATE INDEX idx_transactions_uncommitted ON transactions(status_variant);
+
 
 CREATE TABLE transaction_scripts (
     script_root TEXT NOT NULL,                       -- Transaction script root
     script BLOB,                                     -- serialized Transaction script
 
     PRIMARY KEY (script_root)
-);
+) WITHOUT ROWID;
 
 -- Create input notes table
 CREATE TABLE input_notes (
@@ -113,9 +114,11 @@ CREATE TABLE input_notes (
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
 
-    PRIMARY KEY (note_id)
+    PRIMARY KEY (note_id),
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
-);
+) WITHOUT ROWID;
+CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
+CREATE INDEX idx_input_notes_nullifier ON input_notes(nullifier);
 
 -- Create output notes table
 CREATE TABLE output_notes (
@@ -131,7 +134,9 @@ CREATE TABLE output_notes (
     state BLOB NOT NULL,                                    -- serialized note state
 
     PRIMARY KEY (note_id)
-);
+) WITHOUT ROWID;
+CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
+CREATE INDEX idx_output_notes_nullifier ON output_notes(nullifier);
 
 -- Create note's scripts table, used for both input and output notes
 CREATE TABLE notes_scripts (
@@ -149,8 +154,8 @@ CREATE TABLE state_sync (
 
 -- Create tags table
 CREATE TABLE tags (
-    tag BLOB NOT NULL,    -- the serialized tag
-    source BLOB NOT NULL  -- the serialized tag source
+    tag BLOB NOT NULL,     -- the serialized tag
+    source BLOB NOT NULL   -- the serialized tag source
 );
 
 -- insert initial row into state_sync table
@@ -168,13 +173,14 @@ CREATE TABLE block_headers (
     has_client_notes BOOL NOT NULL,       -- whether the block has notes relevant to the client
     PRIMARY KEY (block_num)
 );
+CREATE INDEX IF NOT EXISTS idx_block_headers_has_notes ON block_headers(block_num) WHERE has_client_notes = 1;
 
 -- Create partial blockchain nodes
 CREATE TABLE partial_blockchain_nodes (
     id UNSIGNED BIG INT NOT NULL,   -- in-order index of the internal MMR node
     node BLOB NOT NULL,             -- internal node value (commitment)
     PRIMARY KEY (id)
-);
+) WITHOUT ROWID;
 
 -- Create addresses table
 CREATE TABLE addresses (
@@ -186,28 +192,9 @@ CREATE TABLE addresses (
 
 CREATE INDEX idx_addresses_account_id ON addresses(account_id);
 
-CREATE INDEX IF NOT EXISTS idx_accounts_id_nonce ON accounts(id, nonce DESC);
-
-CREATE INDEX IF NOT EXISTS idx_input_notes_state ON input_notes(state_discriminant);
-
-CREATE INDEX IF NOT EXISTS idx_output_notes_state ON output_notes(state_discriminant);
-
-CREATE INDEX IF NOT EXISTS idx_accounts_id ON accounts(id);
-
-CREATE INDEX IF NOT EXISTS idx_input_notes_nullifier ON input_notes(nullifier);
-
-CREATE INDEX IF NOT EXISTS idx_output_notes_nullifier ON output_notes(nullifier);
-
-CREATE INDEX IF NOT EXISTS idx_block_headers_has_notes ON block_headers(block_num) WHERE has_client_notes = 1;
-
-CREATE INDEX IF NOT EXISTS idx_transactions_uncommitted ON transactions(status_variant);
-
 -- Create tracked_accounts table to easily read account IDs
 -- TODO: this should maybe use the settings table in the future?
 
-CREATE TABLE IF NOT EXISTS tracked_accounts (
+CREATE TABLE tracked_accounts (
     id TEXT NOT NULL PRIMARY KEY
 );
-
-INSERT OR IGNORE INTO tracked_accounts (id)
-SELECT DISTINCT id FROM accounts;

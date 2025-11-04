@@ -6,7 +6,6 @@ use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     Note,
     NoteConsumability,
-    NoteId,
     NoteInputs,
     NoteMetadata,
     WellKnownNote,
@@ -61,8 +60,8 @@ pub struct NotesCmd {
     #[arg(short, long, value_name = "account_id")]
     account_id: Option<String>,
     /// Send a stored private note through the note transport network.
-    /// Define both the note ID (as hex string) and address (as Bech32 string) such as:
-    /// `--send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc`
+    /// Define both the note ID (as hex string, in full or a prefix) and address (as Bech32 string)
+    /// such as: `--send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc`
     #[arg(long, group = "action", num_args = 2, value_names = ["note_id", "address"])]
     send: Option<Vec<String>>,
     /// Fetch notes from the note transport network.
@@ -340,11 +339,9 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
     note_id: &str,
     address: &str,
 ) -> Result<(), CliError> {
-    let id = NoteId::try_from_hex(note_id).map_err(|e| CliError::Input(e.to_string()))?;
-    let note_record = client
-        .get_input_note(id)
-        .await?
-        .ok_or_else(|| CliError::Input(format!("note {note_id} not found")))?;
+    let note_record = get_input_note_with_id_prefix(client, note_id)
+        .await
+        .map_err(|e| CliError::Input(format!("note not found: {e}")))?;
     let note: Note = note_record
         .try_into()
         .map_err(|e| CliError::Client(ClientError::NoteRecordConversionError(e)))?;

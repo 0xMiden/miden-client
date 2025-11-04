@@ -34,6 +34,7 @@ enum Table {
   Tags = "tags",
   ForeignAccountCode = "foreignAccountCode",
   Settings = "settings",
+  TrackedAccounts = "trackedAccounts",
 }
 
 export interface IAccountCode {
@@ -159,6 +160,10 @@ export interface ISetting {
   value: Uint8Array;
 }
 
+export interface ITrackedAccount {
+  id: string;
+}
+
 const db = new Dexie(DATABASE_NAME) as Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -178,6 +183,7 @@ const db = new Dexie(DATABASE_NAME) as Dexie & {
   tags: Dexie.Table<ITag, number>;
   foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
   settings: Dexie.Table<ISetting, string>;
+  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 
 db.version(1).stores({
@@ -189,12 +195,13 @@ db.version(1).stores({
   [Table.Accounts]: indexes(
     "&accountCommitment",
     "id",
+    "[id+nonce]",
     "codeRoot",
     "storageRoot",
     "vaultRoot"
   ),
-  [Table.Addresses]: indexes("id"),
-  [Table.Transactions]: indexes("id"),
+  [Table.Addresses]: indexes("address", "id"),
+  [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
   [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
   [Table.OutputNotes]: indexes(
@@ -210,6 +217,7 @@ db.version(1).stores({
   [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
   [Table.ForeignAccountCode]: indexes("accountId"),
   [Table.Settings]: indexes("key"),
+  [Table.TrackedAccounts]: indexes("&id"),
 });
 
 function indexes(...items: string[]): string {
@@ -249,6 +257,9 @@ const foreignAccountCode = db.table<IForeignAccountCode, string>(
   Table.ForeignAccountCode
 );
 const settings = db.table<ISetting, string>(Table.Settings);
+const trackedAccounts = db.table<ITrackedAccount, string>(
+  Table.TrackedAccounts
+);
 
 export {
   db,
@@ -270,4 +281,5 @@ export {
   tags,
   foreignAccountCode,
   settings,
+  trackedAccounts,
 };

@@ -74,6 +74,11 @@ impl InputNoteUpdate {
     pub fn update_type(&self) -> &NoteUpdateType {
         &self.update_type
     }
+
+    /// Returns the identifier of the inner note.
+    pub fn id(&self) -> NoteId {
+        self.note.id()
+    }
 }
 
 /// Represents the possible states of an output note record in a [`NoteUpdateTracker`].
@@ -126,6 +131,11 @@ impl OutputNoteUpdate {
     /// Returns the type of the note update.
     pub fn update_type(&self) -> &NoteUpdateType {
         &self.update_type
+    }
+
+    /// Returns the identifier of the inner note.
+    pub fn id(&self) -> NoteId {
+        self.note.id()
     }
 }
 
@@ -225,11 +235,21 @@ impl NoteUpdateTracker {
         self.input_notes.is_empty() && self.output_notes.is_empty()
     }
 
-    pub fn unspent_nullifiers(&self) -> impl Iterator<Item = Nullifier> + '_ {
-        self.input_notes
+    /// Returns input and output note unspent nullifiers.
+    pub fn unspent_nullifiers(&self) -> impl Iterator<Item = Nullifier> {
+        let input_note_unspent_nullifiers = self
+            .input_notes
             .values()
             .filter(|note| !note.inner().is_consumed())
-            .map(|note| note.inner().nullifier())
+            .map(|note| note.inner().nullifier());
+
+        let output_note_unspent_nullifiers = self
+            .output_notes
+            .values()
+            .filter(|note| !note.inner().is_consumed())
+            .filter_map(|note| note.inner().nullifier());
+
+        input_note_unspent_nullifiers.chain(output_note_unspent_nullifiers)
     }
 
     // UPDATE METHODS
