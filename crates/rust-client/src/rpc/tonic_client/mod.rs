@@ -334,7 +334,7 @@ impl NodeRpcClient for GrpcClient {
 
             let request = proto::rpc_store::AccountProofRequest {
                 account_id: Some(account_id.into()),
-                block_num: block_num.as_u32(),
+                block_num: Some(proto::blockchain::BlockNumber { block_num: block_num.as_u32() }),
                 details: account_details,
             };
 
