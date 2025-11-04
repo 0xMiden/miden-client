@@ -124,6 +124,86 @@ fn silent_initialization_uses_default_values() {
 }
 
 #[test]
+fn miden_directory_structure_creation() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Run init command to create .miden directory structure
+    let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
+    init_cmd.args(["init"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    let miden_dir = temp_dir.join(MIDEN_DIR);
+
+    // Verify .miden directory exists
+    assert!(miden_dir.exists(), ".miden directory should be created");
+    assert!(miden_dir.is_dir(), ".miden should be a directory");
+
+    // Verify expected files that are created during init
+    let config_file = miden_dir.join("miden-client.toml");
+    assert!(config_file.exists(), "config file should be created");
+    assert!(config_file.is_file(), "config should be a file");
+
+    // Verify packages directory is created with template files
+    let packages_dir = miden_dir.join("packages");
+    assert!(packages_dir.exists(), "packages directory should be created");
+    assert!(packages_dir.is_dir(), "packages should be a directory");
+
+    // Check that expected package files exist
+    let basic_wallet_package = packages_dir.join("basic-wallet.masp");
+    assert!(basic_wallet_package.exists(), "basic-wallet package should be created");
+
+    let basic_auth_package = packages_dir.join("basic-auth.masp");
+    assert!(basic_auth_package.exists(), "basic-auth package should be created");
+
+    let basic_faucet_package = packages_dir.join("basic-fungible-faucet.masp");
+    assert!(basic_faucet_package.exists(), "basic-fungible-faucet package should be created");
+
+    // Verify config file contains correct paths relative to .miden directory
+    let config_content = std::fs::read_to_string(&config_file).unwrap();
+    assert!(
+        config_content.contains(&format!("{}/store.sqlite3", MIDEN_DIR)),
+        "Config should reference store in .miden directory"
+    );
+    assert!(
+        config_content.contains(&format!("{}/keystore", MIDEN_DIR)),
+        "Config should reference keystore in .miden directory"
+    );
+    assert!(
+        config_content.contains(&format!("{}/packages", MIDEN_DIR)),
+        "Config should reference packages in .miden directory"
+    );
+    assert!(
+        config_content.contains(&format!("{}/token_symbol_map.toml", MIDEN_DIR)),
+        "Config should reference token symbol map in .miden directory"
+    );
+
+    // Verify default RPC endpoint is set
+    assert!(
+        config_content.contains("https://rpc.testnet.miden.io"),
+        "Config should have default testnet RPC endpoint"
+    );
+
+    // Test that keystore directory doesn't exist initially (created on demand)
+    let keystore_dir = miden_dir.join("keystore");
+    assert!(!keystore_dir.exists(), "keystore directory should not exist until first use");
+
+    // Test that token symbol map file doesn't exist initially (created on demand)
+    let token_map_file = miden_dir.join("token_symbol_map.toml");
+    assert!(!token_map_file.exists(), "token symbol map should not exist until first use");
+
+    // Test that running any command after init creates keystore directory on-demand
+    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Now keystore directory should exist
+    let keystore_dir = miden_dir.join("keystore");
+    assert!(keystore_dir.exists(), "keystore directory should be created on first use");
+    assert!(keystore_dir.is_dir(), "keystore should be a directory");
+}
+
+#[test]
 fn silent_initialization_does_not_override_existing_config() {
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
