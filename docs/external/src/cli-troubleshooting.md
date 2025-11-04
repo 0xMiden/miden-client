@@ -6,9 +6,9 @@ This guide helps you troubleshoot common issues and understand the end-to-end li
 
 > Note: This section applies to the Miden CLI client. Guidance for the Rust and Web clients may differ.
 
-- Ensure you are running commands in the same directory that contains `miden-client.toml`.
-- If you need a clean local state, delete the SQLite store file referenced by `store_filepath` (default: `store.sqlite3`). It will be recreated automatically on the next command.
-- Verify your node RPC endpoint is reachable and correct in `miden-client.toml`.
+- Ensure you are running commands in the same directory that contains the `.miden` directory with `miden-client.toml`.
+- If you need a clean local state, delete the SQLite store file referenced by `store_filepath` (default: `.miden/store.sqlite3`). It will be recreated automatically on the next command.
+- Verify your node RPC endpoint is reachable and correct in `.miden/miden-client.toml`.
 - Run with debug output when troubleshooting: add `--debug` or set `MIDEN_DEBUG=true`.
 - Run `miden-client sync` to refresh local state after errors involving missing data or outdated heights.
 
@@ -40,7 +40,7 @@ Below are representative errors you may encounter, their likely causes, and sugg
 
 #### `RpcError.GrpcError: Unavailable` / `DeadlineExceeded`
 - Cause: Node is down, unreachable, or behind a load balancer that blocked the request.
-- Fix: Check `rpc.endpoint` in `miden-client.toml`, verify the node is running/accessible, and retry.
+- Fix: Check `rpc.endpoint` in `.miden/miden-client.toml`, verify the node is running/accessible, and retry.
 
 #### `RpcError.InvalidArgument` / `ExpectedDataMissing` / `InvalidResponse`
 - Cause: Malformed request parameters or unexpected server response.
@@ -117,7 +117,7 @@ Key states the CLI surfaces:
 1. Re-run with `--debug` or `MIDEN_DEBUG=true` for richer logs.
 2. Verify `rpc.endpoint` connectivity and timeouts.
 3. Run `miden-client sync` to refresh local headers/notes.
-4. If local DB is inconsistent for development purposes, delete `store.sqlite3` (or configured path) and retry.
+4. If local DB is inconsistent for development purposes, delete `.miden/store.sqlite3` (or configured path) and retry.
 5. Adjust `max_block_number_delta` if strict recency checks block validation.
 6. If proving errors persist with a remote prover, confirm `remote_prover_endpoint` and consider running locally to isolate the issue.
 
