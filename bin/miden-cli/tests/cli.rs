@@ -71,7 +71,7 @@ fn init_without_params() {
 
     // Trying to init twice should result in an error
     let mut init_cmd = cargo_bin_cmd!("miden-client");
-    init_cmd.args(["init"]);
+    init_cmd.args(["init", "--local"]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
@@ -94,23 +94,34 @@ fn init_with_params() {
 
     // Trying to init twice should result in an error
     let mut init_cmd = cargo_bin_cmd!("miden-client");
-    init_cmd.args(["init", "--network", "devnet", "--store-path", store_path.to_str().unwrap()]);
+    init_cmd.args([
+        "init",
+        "--local",
+        "--network",
+        "devnet",
+        "--store-path",
+        store_path.to_str().unwrap(),
+    ]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
 #[test]
+#[serial_test::serial(global_config)]
 fn silent_initialization_uses_default_values() {
+    // Clean up any existing global config first
+    cleanup_global_config();
+
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
-    // Run any command to trigger silent initialization
+    // Run any command to trigger silent initialization (should create global config)
     let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
-    // Read and verify the config file contents
-    let config_path = temp_dir.join(MIDEN_DIR).join("miden-client.toml");
-    let config_content = std::fs::read_to_string(&config_path).unwrap();
+    // Read and verify the global config file contents
+    let global_config_path = dirs::home_dir().unwrap().join(MIDEN_DIR).join("miden-client.toml");
+    let config_content = std::fs::read_to_string(&global_config_path).unwrap();
 
     // Verify default values are used
     assert!(config_content.contains("testnet"), "Should use testnet as default network");
@@ -128,6 +139,16 @@ fn silent_initialization_uses_default_values() {
         !config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
         "Paths should be relative to config file, not include {MIDEN_DIR}/ prefix"
     );
+
+    // Verify no local config was created
+    let local_config_path = temp_dir.join(MIDEN_DIR).join("miden-client.toml");
+    assert!(
+        !local_config_path.exists(),
+        "Should not create local config during silent initialization"
+    );
+
+    // Clean up
+    cleanup_global_config();
 }
 
 #[test]
@@ -137,7 +158,7 @@ fn miden_directory_structure_creation() {
 
     // Run init command to create .miden directory structure
     let mut init_cmd = cargo_bin_cmd!("miden-client");
-    init_cmd.args(["init"]);
+    init_cmd.args(["init", "--local"]);
     init_cmd.current_dir(&temp_dir).assert().success();
 
     let miden_dir = temp_dir.join(MIDEN_DIR);
@@ -917,6 +938,7 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args([
         "init",
+        "--local", // Use local mode to maintain test isolation
         "--network",
         endpoint.to_string().as_str(),
         "--store-path",
@@ -925,6 +947,22 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     init_cmd.current_dir(&temp_dir).assert().success();
 
     temp_dir
+}
+
+/// Helper function to clean up global config for testing
+fn cleanup_global_config() {
+    if let Some(home_dir) = dirs::home_dir() {
+        let global_miden_dir = home_dir.join(MIDEN_DIR);
+        if global_miden_dir.exists() {
+            // Try multiple times in case of file locks
+            for _ in 0..3 {
+                if std::fs::remove_dir_all(&global_miden_dir).is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
 }
 
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
