@@ -26,24 +26,30 @@ const mockChainTest = async (testingPage: Page) => {
       BigInt(1000)
     );
 
-    const mintTransactionResult = await client.newTransaction(
+    const mintTransactionId = await client.submitNewTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
-
-    await client.submitTransaction(mintTransactionResult);
     await client.proveBlock();
     await client.syncState();
 
-    const consumeTransactionRequest = client.newConsumeTransactionRequest([
-      mintTransactionResult.createdNotes().notes()[0].id().toString(),
-    ]);
-    const consumeTransactionResult = await client.newTransaction(
-      account.id(),
-      consumeTransactionRequest
+    const [mintTransactionRecord] = await client.getTransactions(
+      window.TransactionFilter.ids([mintTransactionId])
     );
+    if (!mintTransactionRecord) {
+      throw new Error("Mint transaction record not found");
+    }
 
-    await client.submitTransaction(consumeTransactionResult);
+    const mintedNoteId = mintTransactionRecord
+      .outputNotes()
+      .notes()[0]
+      .id()
+      .toString();
+
+    const consumeTransactionRequest = client.newConsumeTransactionRequest([
+      mintedNoteId,
+    ]);
+    await client.submitNewTransaction(account.id(), consumeTransactionRequest);
     await client.proveBlock();
     await client.syncState();
 

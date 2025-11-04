@@ -7,6 +7,7 @@ use super::note_details::NoteDetails;
 use super::note_id::NoteId;
 use super::note_inclusion_proof::NoteInclusionProof;
 use super::note_metadata::NoteMetadata;
+use super::word::Word;
 use crate::js_error_with_context;
 use crate::models::input_note::InputNote;
 
@@ -30,6 +31,10 @@ impl InputNoteRecord {
 
     pub fn metadata(&self) -> Option<NoteMetadata> {
         self.0.metadata().map(Into::into)
+    }
+
+    pub fn commitment(&self) -> Option<Word> {
+        self.0.commitment().map(Into::into)
     }
 
     #[wasm_bindgen(js_name = "inclusionProof")]
