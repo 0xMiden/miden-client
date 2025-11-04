@@ -34,7 +34,50 @@ endpoint = "http://localhost:57292"
 timeout_ms = 10000
 ```
 
-The TOML file resides in the `.miden` directory, which is created in the current working directory when you run `miden-client init`. This directory structure keeps all client-related files organized in one place.
+### Configuration Location and Priority
+
+The client supports both **global** and **local** configuration with intelligent priority handling:
+
+1. **Global Configuration** (default): Located at `~/.miden/miden-client.toml` in your home directory
+2. **Local Configuration** (project-specific): Located at `./.miden/miden-client.toml` in your current working directory
+
+**Priority Order**: Local configuration takes precedence over global configuration. If both exist, the client will use the local configuration and ignore the global one.
+
+### Initialization Options
+
+```bash
+# Create global configuration (default behavior)
+miden-client init
+
+# Create local configuration in current directory
+miden-client init --local
+
+# Copy existing global configuration to local directory
+miden-client init --copy-global
+```
+
+The global configuration approach reduces per-project setup overhead while still allowing project-specific customization when needed.
+
+### Configuration Management
+
+#### Clear Command
+
+The `clear` command helps manage configuration by removing existing setups:
+
+```bash
+# Remove local config if present, otherwise remove global config
+miden-client clear
+
+# Force removal of global configuration only
+miden-client clear --global
+```
+
+**Priority Behavior**: The clear command follows the same priority logic as config loading - it will remove the local configuration first if it exists, and only remove the global configuration if no local configuration is found. This ensures you don't accidentally lose both configurations at once.
+
+**Use Cases**:
+- Resetting configuration between releases when changes require clean state
+- Switching from local to global configuration (or vice versa)
+- Troubleshooting configuration-related issues
 
 ### RPC
 
