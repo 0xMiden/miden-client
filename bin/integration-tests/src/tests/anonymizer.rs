@@ -106,7 +106,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
         .expected_output_recipients(vec![anonymized_note_details_1.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note_1.id()])
         .unwrap();
-    let tx_id = execute_tx(&mut client, anonymizer_account.id(), tx_request.clone()).await;
+    let tx_id = client.submit_new_transaction(anonymizer_account.id(), tx_request.clone()).await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     let tx_record = client
@@ -125,7 +125,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
         .expected_output_recipients(vec![anonymized_note_details_2.recipient().clone()])
         .build_consume_notes(vec![anonymizer_note_2.id()])
         .unwrap();
-    let tx_id = execute_tx(&mut client, anonymizer_account.id(), tx_request.clone()).await;
+    let tx_id = client.submit_new_transaction(anonymizer_account.id(), tx_request.clone()).await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     let tx_record = client
