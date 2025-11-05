@@ -6,11 +6,15 @@
 
 # Class: StorageMap
 
+Key/value storage map used within accounts.
+
 ## Constructors
 
 ### Constructor
 
 > **new StorageMap**(): `StorageMap`
+
+Creates an empty storage map.
 
 #### Returns
 
@@ -31,6 +35,8 @@
 ### insert()
 
 > **insert**(`key`, `value`): [`Word`](Word.md)
+
+Inserts or updates a key and returns the previous value (or zero if absent).
 
 #### Parameters
 

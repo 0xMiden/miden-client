@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Helper structure representing a storage slot index with the keys to retain.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct SlotAndKeys {
@@ -16,30 +17,36 @@ pub struct SlotAndKeys {
 #[wasm_bindgen]
 impl SlotAndKeys {
     #[wasm_bindgen(constructor)]
+    /// Creates a new [`SlotAndKeys`] entry.
     pub fn new(storage_slot_index: u8, storage_map_keys: Vec<Word>) -> SlotAndKeys {
         SlotAndKeys { storage_slot_index, storage_map_keys }
     }
 
+    /// Returns the index of the storage slot.
     pub fn storage_slot_index(&self) -> u8 {
         self.storage_slot_index
     }
 
+    /// Returns the map keys that must be available for this slot.
     pub fn storage_map_keys(&self) -> Vec<Word> {
         self.storage_map_keys.clone()
     }
 }
 
+/// Wrapper around storage requirements returned by RPC endpoints.
 #[wasm_bindgen]
 pub struct AccountStorageRequirements(NativeAccountStorageRequirements);
 
 #[wasm_bindgen]
 impl AccountStorageRequirements {
     #[wasm_bindgen(constructor)]
+    /// Creates empty storage requirements.
     pub fn new() -> AccountStorageRequirements {
         AccountStorageRequirements(NativeAccountStorageRequirements::default())
     }
 
     #[wasm_bindgen(js_name = "fromSlotAndKeysArray")]
+    /// Builds requirements from a list of slot/key pairs.
     pub fn from_slot_and_keys_array(
         slots_and_keys: Vec<SlotAndKeys>,
     ) -> Result<AccountStorageRequirements, JsValue> {

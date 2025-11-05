@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use super::felt::Felt;
 use super::word::Word;
 
+/// Advice inputs passed into the Miden VM at transaction execution time.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AdviceInputs(NativeAdviceInputs);
@@ -16,11 +17,13 @@ impl AdviceInputs {
 
     // TODO: Destructors
 
+    /// Returns the advice stack contents as field elements.
     pub fn stack(&self) -> Vec<Felt> {
         self.0.stack.iter().map(Into::into).collect()
     }
 
     #[wasm_bindgen(js_name = "mappedValues")]
+    /// Returns the list stored under the provided key in the advice map.
     pub fn mapped_values(&self, key: &Word) -> Option<Vec<Felt>> {
         let native_key: miden_client::Word = key.into();
         self.0

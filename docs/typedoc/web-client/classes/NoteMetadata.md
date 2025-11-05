@@ -6,11 +6,15 @@
 
 # Class: NoteMetadata
 
+Metadata describing the origin and policy for a note.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteMetadata**(`sender`, `note_type`, `note_tag`, `note_execution_hint`, `aux?`): `NoteMetadata`
+
+Creates note metadata from sender, type, tag, execution hint, and optional auxiliary data.
 
 #### Parameters
 
@@ -54,6 +58,8 @@
 
 > **noteType**(): [`NoteType`](../enumerations/NoteType.md)
 
+Returns the note type (private, encrypted, public).
+
 #### Returns
 
 [`NoteType`](../enumerations/NoteType.md)
@@ -64,6 +70,8 @@
 
 > **sender**(): [`AccountId`](AccountId.md)
 
+Returns the sender account identifier.
+
 #### Returns
 
 [`AccountId`](AccountId.md)
@@ -73,6 +81,8 @@
 ### tag()
 
 > **tag**(): [`NoteTag`](NoteTag.md)
+
+Returns the tag describing the note use case.
 
 #### Returns
 

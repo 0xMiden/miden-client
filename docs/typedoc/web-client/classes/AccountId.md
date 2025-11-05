@@ -6,6 +6,11 @@
 
 # Class: AccountId
 
+Identifier for an account exposed to JavaScript.
+
+Wraps [`miden_client::account::AccountId`] and provides convenience helpers for formatting and
+network-aware conversions.
+
 ## Methods
 
 ### free()
@@ -22,6 +27,8 @@
 
 > **isFaucet**(): `boolean`
 
+Returns `true` if the identifier belongs to a faucet account.
+
 #### Returns
 
 `boolean`
@@ -31,6 +38,8 @@
 ### isRegularAccount()
 
 > **isRegularAccount**(): `boolean`
+
+Returns `true` if the identifier belongs to a regular account.
 
 #### Returns
 
@@ -42,6 +51,8 @@
 
 > **prefix**(): [`Felt`](Felt.md)
 
+Returns the high-word prefix of the account identifier.
+
 #### Returns
 
 [`Felt`](Felt.md)
@@ -51,6 +62,8 @@
 ### suffix()
 
 > **suffix**(): [`Felt`](Felt.md)
+
+Returns the low-word suffix of the account identifier.
 
 #### Returns
 
@@ -110,6 +123,8 @@ network ID.
 
 > **toString**(): `string`
 
+Returns the canonical hex representation of this identifier.
+
 #### Returns
 
 `string`
@@ -119,6 +134,8 @@ network ID.
 ### fromHex()
 
 > `static` **fromHex**(`hex`): `AccountId`
+
+Parses an account identifier from a hex string.
 
 #### Parameters
 

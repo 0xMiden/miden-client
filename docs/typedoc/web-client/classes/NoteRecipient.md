@@ -6,11 +6,15 @@
 
 # Class: NoteRecipient
 
+Target recipient information for a note, including script and serial number.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteRecipient**(`serial_num`, `note_script`, `inputs`): `NoteRecipient`
+
+Creates a new note recipient from serial number, script, and inputs.
 
 #### Parameters
 
@@ -36,6 +40,8 @@
 
 > **digest**(): [`Word`](Word.md)
 
+Returns the digest identifying this recipient.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -56,6 +62,8 @@
 
 > **inputs**(): [`NoteInputs`](NoteInputs.md)
 
+Returns the inputs passed to the recipient script.
+
 #### Returns
 
 [`NoteInputs`](NoteInputs.md)
@@ -66,6 +74,8 @@
 
 > **script**(): [`NoteScript`](NoteScript.md)
 
+Returns the script associated with this recipient.
+
 #### Returns
 
 [`NoteScript`](NoteScript.md)
@@ -75,6 +85,8 @@
 ### serialNum()
 
 > **serialNum**(): [`Word`](Word.md)
+
+Returns the recipient serial number word.
 
 #### Returns
 

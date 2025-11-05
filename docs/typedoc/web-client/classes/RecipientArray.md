@@ -6,11 +6,15 @@
 
 # Class: RecipientArray
 
+Convenience wrapper for arrays of note recipients.
+
 ## Constructors
 
 ### Constructor
 
 > **new RecipientArray**(`recipient_array?`): `RecipientArray`
+
+Creates a new recipient array.
 
 #### Parameters
 
@@ -37,6 +41,8 @@
 ### push()
 
 > **push**(`recipient`): `void`
+
+Appends a recipient to the array.
 
 #### Parameters
 

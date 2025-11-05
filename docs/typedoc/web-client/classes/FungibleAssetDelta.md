@@ -6,11 +6,15 @@
 
 # Class: FungibleAssetDelta
 
+Aggregated changes to fungible asset balances.
+
 ## Methods
 
 ### amount()
 
 > **amount**(`faucet_id`): `bigint`
+
+Returns the signed change for the given faucet, if present.
 
 #### Parameters
 
@@ -27,6 +31,8 @@
 ### assets()
 
 > **assets**(): [`FungibleAssetDeltaItem`](FungibleAssetDeltaItem.md)[]
+
+Returns all faucet deltas contained in this structure.
 
 #### Returns
 
@@ -48,6 +54,8 @@
 
 > **isEmpty**(): `boolean`
 
+Returns `true` if no balances changed.
+
 #### Returns
 
 `boolean`
@@ -57,6 +65,8 @@
 ### numAssets()
 
 > **numAssets**(): `number`
+
+Returns the number of faucet entries tracked in this delta.
 
 #### Returns
 
@@ -78,6 +88,8 @@
 
 > `static` **deserialize**(`bytes`): `FungibleAssetDelta`
 
+Deserializes a fungible asset delta from bytes.
+
 #### Parameters
 
 ##### bytes
@@ -87,3 +99,7 @@
 #### Returns
 
 `FungibleAssetDelta`
+
+#### Throws
+
+Throws if the bytes are invalid.

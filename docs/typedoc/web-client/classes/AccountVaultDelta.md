@@ -6,11 +6,17 @@
 
 # Class: AccountVaultDelta
 
+Wrapper around [`miden_client::asset::AccountVaultDelta`].
+
+Describes changes to the fungible assets stored in an account's vault.
+
 ## Methods
 
 ### addedFungibleAssets()
 
 > **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+
+Returns fungible assets that were added, paired with the increase amount.
 
 #### Returns
 
@@ -32,6 +38,8 @@
 
 > **fungible**(): [`FungibleAssetDelta`](FungibleAssetDelta.md)
 
+Returns the aggregated fungible asset delta for this vault.
+
 #### Returns
 
 [`FungibleAssetDelta`](FungibleAssetDelta.md)
@@ -42,6 +50,8 @@
 
 > **isEmpty**(): `boolean`
 
+Returns `true` if the vault delta leaves all balances unchanged.
+
 #### Returns
 
 `boolean`
@@ -51,6 +61,8 @@
 ### removedFungibleAssets()
 
 > **removedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+
+Returns fungible assets that were removed, paired with the decrease amount.
 
 #### Returns
 
@@ -72,6 +84,8 @@
 
 > `static` **deserialize**(`bytes`): `AccountVaultDelta`
 
+Deserializes a vault delta from bytes.
+
 #### Parameters
 
 ##### bytes
@@ -81,3 +95,7 @@
 #### Returns
 
 `AccountVaultDelta`
+
+#### Throws
+
+Throws if the byte representation is invalid.

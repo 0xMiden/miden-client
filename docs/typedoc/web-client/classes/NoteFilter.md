@@ -6,11 +6,15 @@
 
 # Class: NoteFilter
 
+Filters notes returned from the data store using type- or ID-based criteria.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteFilter**(`note_type`, `note_ids?`): `NoteFilter`
+
+Creates a new filter from a filter type and optional note IDs.
 
 #### Parameters
 

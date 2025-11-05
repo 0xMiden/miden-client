@@ -6,11 +6,15 @@
 
 # Class: NoteExecutionHint
 
+Scheduling hint describing when a note becomes consumable.
+
 ## Methods
 
 ### canBeConsumed()
 
 > **canBeConsumed**(`block_num`): `boolean`
+
+Returns whether the hint allows consumption at the provided block.
 
 #### Parameters
 
@@ -38,6 +42,8 @@
 
 > `static` **afterBlock**(`block_num`): `NoteExecutionHint`
 
+Returns a hint that defers consumption until after the given block number.
+
 #### Parameters
 
 ##### block\_num
@@ -54,6 +60,8 @@
 
 > `static` **always**(): `NoteExecutionHint`
 
+Returns a hint that allows consumption at any time.
+
 #### Returns
 
 `NoteExecutionHint`
@@ -63,6 +71,8 @@
 ### fromParts()
 
 > `static` **fromParts**(`tag`, `payload`): `NoteExecutionHint`
+
+Recreates a hint from low-level tag/payload components.
 
 #### Parameters
 
@@ -84,6 +94,8 @@
 
 > `static` **none**(): `NoteExecutionHint`
 
+Returns a hint with no additional restrictions.
+
 #### Returns
 
 `NoteExecutionHint`
@@ -93,6 +105,8 @@
 ### onBlockSlot()
 
 > `static` **onBlockSlot**(`epoch_len`, `slot_len`, `slot_offset`): `NoteExecutionHint`
+
+Returns a hint that limits consumption to a specific slot schedule.
 
 #### Parameters
 

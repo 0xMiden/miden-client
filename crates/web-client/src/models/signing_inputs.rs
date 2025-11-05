@@ -7,14 +7,20 @@ use crate::models::transaction_summary::TransactionSummary;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
+/// Enumerates the supported signing input variants.
 #[wasm_bindgen]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SigningInputsType {
+    /// Signing inputs derived from a transaction summary.
     TransactionSummary,
+    /// Signing inputs consisting of arbitrary field elements.
     Arbitrary,
+    /// Signing inputs represented by a single blind commitment word.
     Blind,
 }
 
+#[wasm_bindgen]
+/// Wrapper for the data that gets hashed when producing a signature.
 #[wasm_bindgen]
 pub struct SigningInputs {
     inner: NativeSigningInputs,
@@ -23,6 +29,7 @@ pub struct SigningInputs {
 #[wasm_bindgen]
 impl SigningInputs {
     #[wasm_bindgen(js_name = "newTransactionSummary")]
+    /// Creates signing inputs from a transaction summary.
     pub fn new_transaction_summary(summary: TransactionSummary) -> Self {
         Self {
             inner: NativeSigningInputs::TransactionSummary(Box::new(summary.into())),
@@ -30,6 +37,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "newArbitrary")]
+    /// Creates signing inputs from arbitrary field elements.
     pub fn new_arbitrary(felts: Vec<Felt>) -> Self {
         Self {
             inner: NativeSigningInputs::Arbitrary(felts.into_iter().map(Into::into).collect()),
@@ -37,6 +45,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "newBlind")]
+    /// Creates signing inputs from a single blind commitment word.
     pub fn new_blind(word: &Word) -> Self {
         Self {
             inner: NativeSigningInputs::Blind(word.into()),
@@ -44,6 +53,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "transactionSummaryPayload")]
+    /// Returns the underlying transaction summary when the variant matches.
     pub fn transaction_summary_payload(&self) -> Result<TransactionSummary, JsValue> {
         match &self.inner {
             NativeSigningInputs::TransactionSummary(ts) => {
@@ -57,6 +67,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "arbitraryPayload")]
+    /// Returns the arbitrary payload when the variant matches.
     pub fn arbitrary_payload(&self) -> Result<Box<[Felt]>, JsValue> {
         match &self.inner {
             NativeSigningInputs::Arbitrary(felts) => {
@@ -70,6 +81,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "blindPayload")]
+    /// Returns the blind commitment payload when the variant matches.
     pub fn blind_payload(&self) -> Result<Word, JsValue> {
         match &self.inner {
             NativeSigningInputs::Blind(word) => Ok(Word::from(*word)),
@@ -81,6 +93,7 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(getter, js_name = "variantType")]
+    /// Returns the active signing input variant.
     pub fn variant_type(&self) -> SigningInputsType {
         match &self.inner {
             NativeSigningInputs::TransactionSummary(_) => SigningInputsType::TransactionSummary,
@@ -90,19 +103,23 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "toCommitment")]
+    /// Returns the commitment over the signing inputs.
     pub fn to_commitment(&self) -> Word {
         self.inner.to_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "toElements")]
+    /// Returns the signing inputs as an array of field elements.
     pub fn to_elements(&self) -> Vec<Felt> {
         self.inner.to_elements().into_iter().map(Into::into).collect()
     }
 
+    /// Serializes the signing inputs into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.inner)
     }
 
+    /// Deserializes signing inputs from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
         let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
         Ok(native_signing_inputs.into())

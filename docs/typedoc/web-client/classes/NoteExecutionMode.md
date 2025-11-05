@@ -6,6 +6,8 @@
 
 # Class: NoteExecutionMode
 
+Determines where a note should be executed (locally or on the network).
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **toString**(): `string`
 
+Returns a human-readable representation of the execution mode.
+
 #### Returns
 
 `string`
@@ -32,6 +36,8 @@
 
 > `static` **newLocal**(): `NoteExecutionMode`
 
+Returns the local execution mode.
+
 #### Returns
 
 `NoteExecutionMode`
@@ -41,6 +47,8 @@
 ### newNetwork()
 
 > `static` **newNetwork**(): `NoteExecutionMode`
+
+Returns the network execution mode.
 
 #### Returns
 

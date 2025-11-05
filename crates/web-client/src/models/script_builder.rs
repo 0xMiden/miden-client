@@ -19,6 +19,7 @@ use crate::models::library::Library;
 use crate::models::note_script::NoteScript;
 use crate::models::transaction_script::TransactionScript;
 
+/// High-level helper that links libraries and compiles Miden scripts from JavaScript.
 #[derive(Clone)]
 #[wasm_bindgen(inspectable)]
 pub struct ScriptBuilder {

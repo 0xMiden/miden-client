@@ -14,50 +14,60 @@ use super::note_metadata::NoteMetadata;
 use super::partial_note::PartialNote;
 use super::word::Word;
 
+/// Represents a note produced by executing a transaction.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct OutputNote(NativeOutputNote);
 
 #[wasm_bindgen]
 impl OutputNote {
+    /// Wraps a full note payload.
     pub fn full(note: &Note) -> OutputNote {
         let native_note: NativeNote = note.into();
         OutputNote(NativeOutputNote::Full(native_note))
     }
 
+    /// Wraps a partial note payload (header plus metadata).
     pub fn partial(partial_note: &PartialNote) -> OutputNote {
         let native_partial_note: NativePartialNote = partial_note.into();
         OutputNote(NativeOutputNote::Partial(native_partial_note))
     }
 
+    /// Wraps only the note header.
     pub fn header(note_header: &NoteHeader) -> OutputNote {
         let native_note_header: NativeNoteHeader = note_header.into();
         OutputNote(NativeOutputNote::Header(native_note_header))
     }
 
+    /// Returns the note assets if they are available.
     pub fn assets(&self) -> Option<NoteAssets> {
         self.0.assets().map(Into::into)
     }
 
+    /// Returns the note identifier.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
     #[wasm_bindgen(js_name = "recipientDigest")]
+    /// Returns the recipient digest if known.
     pub fn recipient_digest(&self) -> Option<Word> {
         self.0.recipient_digest().map(Into::into)
     }
 
+    /// Returns the note metadata.
     pub fn metadata(&self) -> NoteMetadata {
         self.0.metadata().into()
     }
 
     #[must_use]
+    /// Shrinks the note to the minimal representation containing the same information.
     pub fn shrink(&self) -> OutputNote {
         self.0.shrink().into()
     }
 
     #[wasm_bindgen(js_name = "intoFull")]
+    /// Consumes the wrapper and returns the full note if available.
     pub fn into_full(self) -> Option<Note> {
         match self.0 {
             NativeOutputNote::Full(note) => Some(note.into()),
@@ -97,6 +107,7 @@ impl From<&OutputNote> for NativeOutputNote {
     }
 }
 
+/// Array wrapper to pass lists of [`OutputNote`] across the WASM boundary.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct OutputNotesArray(Vec<OutputNote>);
@@ -104,11 +115,13 @@ pub struct OutputNotesArray(Vec<OutputNote>);
 #[wasm_bindgen]
 impl OutputNotesArray {
     #[wasm_bindgen(constructor)]
+    /// Creates a new array of output notes.
     pub fn new(output_notes_array: Option<Vec<OutputNote>>) -> OutputNotesArray {
         let output_notes = output_notes_array.unwrap_or_default();
         OutputNotesArray(output_notes)
     }
 
+    /// Appends an output note to the array.
     pub fn append(&mut self, output_note: &OutputNote) {
         self.0.push(output_note.clone());
     }

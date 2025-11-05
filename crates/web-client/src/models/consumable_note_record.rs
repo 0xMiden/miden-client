@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 use super::account_id::AccountId;
 use super::input_note_record::InputNoteRecord;
 
+/// Note together with metadata describing when each account may consume it.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct ConsumableNoteRecord {
@@ -12,6 +13,7 @@ pub struct ConsumableNoteRecord {
     note_consumability: Vec<NoteConsumability>,
 }
 
+/// Describes when a specific account will be able to consume the note.
 #[derive(Clone, Copy)]
 #[wasm_bindgen]
 pub struct NoteConsumability {
@@ -32,11 +34,13 @@ impl NoteConsumability {
     }
 
     #[wasm_bindgen(js_name = "accountId")]
+    /// Returns the account allowed to consume the note.
     pub fn account_id(&self) -> AccountId {
         self.account_id
     }
 
     #[wasm_bindgen(js_name = "consumableAfterBlock")]
+    /// Returns the block height after which the note can be consumed, if any.
     pub fn consumable_after_block(&self) -> Option<u32> {
         self.consumable_after_block
     }
@@ -45,6 +49,7 @@ impl NoteConsumability {
 #[wasm_bindgen]
 impl ConsumableNoteRecord {
     #[wasm_bindgen(constructor)]
+    /// Creates a consumable note record with explicit consumability metadata.
     pub fn new(
         input_note_record: InputNoteRecord,
         note_consumability: Vec<NoteConsumability>,
@@ -53,11 +58,13 @@ impl ConsumableNoteRecord {
     }
 
     #[wasm_bindgen(js_name = "inputNoteRecord")]
+    /// Returns the underlying input note record.
     pub fn input_note_record(&self) -> InputNoteRecord {
         self.input_note_record.clone()
     }
 
     #[wasm_bindgen(js_name = "noteConsumability")]
+    /// Returns per-account consumability entries for the note.
     pub fn note_consumability(&self) -> Vec<NoteConsumability> {
         self.note_consumability.clone()
     }

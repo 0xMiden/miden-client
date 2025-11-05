@@ -6,11 +6,15 @@
 
 # Class: NoteDetailsArray
 
+Convenience wrapper for passing arrays of [`NoteDetails`].
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteDetailsArray**(`note_details_array?`): `NoteDetailsArray`
+
+Creates an array of note details.
 
 #### Parameters
 
@@ -37,6 +41,8 @@
 ### push()
 
 > **push**(`note_details`): `void`
+
+Pushes another note details entry into the collection.
 
 #### Parameters
 

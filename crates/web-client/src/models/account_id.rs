@@ -13,45 +13,60 @@ use wasm_bindgen::prelude::*;
 use super::felt::Felt;
 use crate::js_error_with_context;
 
+/// Identifier for an account exposed to JavaScript.
+///
+/// Wraps [`miden_client::account::AccountId`] and provides convenience helpers for formatting and
+/// network-aware conversions.
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct AccountId(NativeAccountId);
 
+/// Known network prefixes supported by the SDK.
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum NetworkId {
+    /// Miden mainnet.
     Mainnet = 0,
+    /// Miden testnet.
     Testnet = 1,
+    /// Miden devnet.
     Devnet = 2,
 }
 
+/// Identifies the interface contract implemented by an account.
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum AccountInterface {
+    /// Account interface is unspecified.
     Unspecified = 0,
+    /// Basic wallet interface.
     BasicWallet = 1,
 }
 
 #[wasm_bindgen]
 impl AccountId {
     #[wasm_bindgen(js_name = "fromHex")]
+    /// Parses an account identifier from a hex string.
     pub fn from_hex(hex: &str) -> AccountId {
         let native_account_id = NativeAccountId::from_hex(hex).unwrap();
         AccountId(native_account_id)
     }
 
     #[wasm_bindgen(js_name = "isFaucet")]
+    /// Returns `true` if the identifier belongs to a faucet account.
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
     }
 
     #[wasm_bindgen(js_name = "isRegularAccount")]
+    /// Returns `true` if the identifier belongs to a regular account.
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
     }
 
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
+    /// Returns the canonical hex representation of this identifier.
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
@@ -87,11 +102,13 @@ impl AccountId {
         Ok(address.to_bech32(network_id))
     }
 
+    /// Returns the high-word prefix of the account identifier.
     pub fn prefix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.prefix().as_felt();
         native_felt.into()
     }
 
+    /// Returns the low-word suffix of the account identifier.
     pub fn suffix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()

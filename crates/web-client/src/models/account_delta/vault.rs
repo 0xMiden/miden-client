@@ -10,6 +10,9 @@ use crate::models::account_id::AccountId;
 use crate::models::fungible_asset::FungibleAsset;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
+/// Wrapper around [`miden_client::asset::AccountVaultDelta`].
+///
+/// Describes changes to the fungible assets stored in an account's vault.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountVaultDelta(NativeAccountVaultDelta);
@@ -20,20 +23,26 @@ impl AccountVaultDelta {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a vault delta from bytes.
+    ///
+    /// @throws Throws if the byte representation is invalid.
     pub fn deserialize(bytes: &Uint8Array) -> Result<AccountVaultDelta, JsValue> {
         deserialize_from_uint8array::<NativeAccountVaultDelta>(bytes).map(AccountVaultDelta)
     }
 
     #[wasm_bindgen(js_name = "isEmpty")]
+    /// Returns `true` if the vault delta leaves all balances unchanged.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Returns the aggregated fungible asset delta for this vault.
     pub fn fungible(&self) -> FungibleAssetDelta {
         self.0.fungible().into()
     }
 
     #[wasm_bindgen(js_name = "addedFungibleAssets")]
+    /// Returns fungible assets that were added, paired with the increase amount.
     pub fn added_fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .fungible()
@@ -44,6 +53,7 @@ impl AccountVaultDelta {
     }
 
     #[wasm_bindgen(js_name = "removedFungibleAssets")]
+    /// Returns fungible assets that were removed, paired with the decrease amount.
     pub fn removed_fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .fungible()
@@ -54,6 +64,7 @@ impl AccountVaultDelta {
     }
 }
 
+/// Single entry of a fungible asset delta, containing faucet ID and delta amount.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct FungibleAssetDeltaItem {
@@ -64,11 +75,13 @@ pub struct FungibleAssetDeltaItem {
 #[wasm_bindgen]
 impl FungibleAssetDeltaItem {
     #[wasm_bindgen(getter, js_name = "faucetId")]
+    /// Returns the faucet identifier associated with this delta entry.
     pub fn faucet_id(&self) -> AccountId {
         self.faucet_id
     }
 
     #[wasm_bindgen(getter)]
+    /// Returns the signed balance change (positive adds assets, negative removes).
     pub fn amount(&self) -> i64 {
         self.amount
     }
@@ -83,6 +96,7 @@ impl From<(&NativeAccountId, &i64)> for FungibleAssetDeltaItem {
     }
 }
 
+/// Aggregated changes to fungible asset balances.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct FungibleAssetDelta(NativeFungibleAssetDelta);
@@ -93,25 +107,32 @@ impl FungibleAssetDelta {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a fungible asset delta from bytes.
+    ///
+    /// @throws Throws if the bytes are invalid.
     pub fn deserialize(bytes: &Uint8Array) -> Result<FungibleAssetDelta, JsValue> {
         deserialize_from_uint8array::<NativeFungibleAssetDelta>(bytes).map(FungibleAssetDelta)
     }
 
     #[wasm_bindgen(js_name = "isEmpty")]
+    /// Returns `true` if no balances changed.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Returns the signed change for the given faucet, if present.
     pub fn amount(&self, faucet_id: &AccountId) -> Option<i64> {
         let native_faucet_id: NativeAccountId = faucet_id.into();
         self.0.amount(&native_faucet_id)
     }
 
     #[wasm_bindgen(js_name = "numAssets")]
+    /// Returns the number of faucet entries tracked in this delta.
     pub fn num_assets(&self) -> usize {
         self.0.num_assets()
     }
 
+    /// Returns all faucet deltas contained in this structure.
     pub fn assets(&self) -> Vec<FungibleAssetDeltaItem> {
         self.0.iter().map(Into::into).collect()
     }

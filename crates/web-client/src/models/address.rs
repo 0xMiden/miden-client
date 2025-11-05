@@ -11,12 +11,13 @@ use super::account_id::{AccountId, NetworkId};
 use super::note_tag::NoteTag;
 use crate::js_error_with_context;
 
+/// Wrapper around account addresses that can be exposed to JavaScript.
 #[wasm_bindgen(inspectable)]
 #[derive(Clone, Debug)]
 pub struct Address(NativeAddress);
 
-#[wasm_bindgen]
 /// Specifies which procedures an account accepts, and by extension which notes it can consume.
+#[wasm_bindgen]
 pub enum AddressInterface {
     Unspecified = "Unspecified",
     BasicWallet = "BasicWallet",
@@ -28,6 +29,7 @@ impl Address {
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
+    /// Builds an address from an account identifier and interface name.
     pub fn from_account_id(account_id: &AccountId, interface: &str) -> Result<Self, JsValue> {
         let interface: NativeAddressInterface = match interface {
             "Unspecified" => NativeAddressInterface::Unspecified,
@@ -45,6 +47,7 @@ impl Address {
     }
 
     #[wasm_bindgen(js_name = fromBech32)]
+    /// Parses an address from its bech32 representation.
     pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
         let (_net_id, address) = NativeAddress::from_bech32(bech32).map_err(|err| {
             js_error_with_context(err, "could not convert bech32 into an address")
@@ -52,11 +55,13 @@ impl Address {
         Ok(Self(address))
     }
 
+    /// Returns the interface associated with this address.
     pub fn interface(&self) -> Result<AddressInterface, JsValue> {
         self.0.interface().try_into()
     }
 
     #[wasm_bindgen(js_name = "accountId")]
+    /// Returns the underlying account identifier, if this is an account address.
     pub fn account_id(&self) -> Result<AccountId, JsValue> {
         match &self.0 {
             NativeAddress::AccountId(account_id_address) => Ok(account_id_address.id().into()),
@@ -65,11 +70,13 @@ impl Address {
     }
 
     #[wasm_bindgen(js_name = "toNoteTag")]
+    /// Converts the address into a note tag for note filters.
     pub fn to_note_tag(&self) -> NoteTag {
         self.0.to_note_tag().into()
     }
 
     #[wasm_bindgen(js_name = "toBech32")]
+    /// Encodes the address into the network-specific bech32 representation.
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
         let net_id: NativeNetworkId = network_id.into();
         Ok(self.0.to_bech32(net_id))

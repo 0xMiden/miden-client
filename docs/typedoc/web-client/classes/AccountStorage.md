@@ -6,11 +6,15 @@
 
 # Class: AccountStorage
 
+WASM-facing view over account storage slots.
+
 ## Methods
 
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the storage commitment of the account.
 
 #### Returns
 
@@ -31,6 +35,8 @@
 ### getItem()
 
 > **getItem**(`index`): [`Word`](Word.md)
+
+Returns the value stored at the given index if it is a value slot.
 
 #### Parameters
 
@@ -67,6 +73,8 @@ Returns `[]` if the map exists but is empty.
 ### getMapItem()
 
 > **getMapItem**(`index`, `key`): [`Word`](Word.md)
+
+Returns the value stored under `key` for the map slot at `index`.
 
 #### Parameters
 

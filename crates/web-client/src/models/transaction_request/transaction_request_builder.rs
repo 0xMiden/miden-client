@@ -27,6 +27,7 @@ use crate::models::transaction_request::note_id_and_args::NoteIdAndArgsArray;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
 
+/// Fluent builder for assembling [`TransactionRequest`] instances from JavaScript.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionRequestBuilder(NativeTransactionRequestBuilder);
@@ -34,12 +35,14 @@ pub struct TransactionRequestBuilder(NativeTransactionRequestBuilder);
 #[wasm_bindgen]
 impl TransactionRequestBuilder {
     #[wasm_bindgen(constructor)]
+    /// Creates an empty transaction request builder.
     pub fn new() -> TransactionRequestBuilder {
         let native_transaction_request = NativeTransactionRequestBuilder::new();
         TransactionRequestBuilder(native_transaction_request)
     }
 
     #[wasm_bindgen(js_name = "withUnauthenticatedInputNotes")]
+    /// Adds unauthenticated input notes to the request.
     pub fn with_unauthenticated_input_notes(mut self, notes: &NoteAndArgsArray) -> Self {
         let native_note_and_note_args: Vec<(NativeNote, Option<NativeNoteArgs>)> = notes.into();
         self.0 = self.0.unauthenticated_input_notes(native_note_and_note_args);
@@ -47,6 +50,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withAuthenticatedInputNotes")]
+    /// Adds authenticated input notes to the request.
     pub fn with_authenticated_input_notes(mut self, notes: &NoteIdAndArgsArray) -> Self {
         let native_note_id_and_note_args: Vec<(NativeNoteId, Option<NativeNoteArgs>)> =
             notes.into();
@@ -55,6 +59,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
+    /// Specifies the output notes owned by the originating account.
     pub fn with_own_output_notes(mut self, notes: &OutputNotesArray) -> Self {
         let native_output_notes: Vec<NativeOutputNote> = notes.into();
         self.0 = self.0.own_output_notes(native_output_notes);
@@ -62,6 +67,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withCustomScript")]
+    /// Overrides the default transaction script.
     pub fn with_custom_script(mut self, script: &TransactionScript) -> Self {
         let native_script: NativeTransactionScript = script.into();
         self.0 = self.0.custom_script(native_script);
@@ -69,6 +75,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withExpectedOutputRecipients")]
+    /// Declares the recipients expected to receive notes from the transaction.
     pub fn with_expected_output_notes(mut self, recipients: &RecipientArray) -> Self {
         let native_recipients: Vec<NativeNoteRecipient> = recipients.into();
         self.0 = self.0.expected_output_recipients(native_recipients);
@@ -76,6 +83,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withExpectedFutureNotes")]
+    /// Declares future notes the transaction expects to create.
     pub fn with_expected_future_notes(
         mut self,
         note_details_and_tag: &NoteDetailsAndTagArray,
@@ -87,6 +95,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "extendAdviceMap")]
+    /// Adds additional advice inputs to the transaction.
     pub fn extend_advice_map(mut self, advice_map: &AdviceMap) -> Self {
         let native_advice_map: NativeAdviceMap = advice_map.into();
         self.0 = self.0.extend_advice_map(native_advice_map);
@@ -94,6 +103,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withForeignAccounts")]
+    /// Attaches foreign accounts required for script execution.
     pub fn with_foreign_accounts(mut self, foreign_accounts: Vec<ForeignAccount>) -> Self {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
             foreign_accounts.into_iter().map(Into::into).collect();
@@ -102,6 +112,7 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withScriptArg")]
+    /// Sets the script argument for the transaction script.
     pub fn with_script_arg(mut self, script_arg: &Word) -> Self {
         let native_word: NativeWord = script_arg.into();
         self.0 = self.0.script_arg(native_word);
@@ -109,12 +120,14 @@ impl TransactionRequestBuilder {
     }
 
     #[wasm_bindgen(js_name = "withAuthArg")]
+    /// Sets the authentication argument for the transaction script.
     pub fn with_auth_arg(mut self, auth_arg: &Word) -> Self {
         let native_word: NativeWord = auth_arg.into();
         self.0 = self.0.auth_arg(native_word);
         self
     }
 
+    /// Builds the transaction request.
     pub fn build(self) -> TransactionRequest {
         TransactionRequest(self.0.build().unwrap())
     }

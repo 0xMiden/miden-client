@@ -6,11 +6,15 @@
 
 # Class: Note
 
+Wrapper around a note, the fundamental unit of value transfer in Miden.
+
 ## Constructors
 
 ### Constructor
 
 > **new Note**(`note_assets`, `note_metadata`, `note_recipient`): `Note`
+
+Creates a new note from assets, metadata, and recipient information.
 
 #### Parameters
 
@@ -36,6 +40,8 @@
 
 > **assets**(): [`NoteAssets`](NoteAssets.md)
 
+Returns the assets locked into the note.
+
 #### Returns
 
 [`NoteAssets`](NoteAssets.md)
@@ -56,6 +62,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the note identifier.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -65,6 +73,8 @@
 ### metadata()
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+
+Returns the note metadata.
 
 #### Returns
 
@@ -76,6 +86,8 @@
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)
 
+Returns the note recipient.
+
 #### Returns
 
 [`NoteRecipient`](NoteRecipient.md)
@@ -85,6 +97,8 @@
 ### script()
 
 > **script**(): [`NoteScript`](NoteScript.md)
+
+Returns the script that governs note consumption.
 
 #### Returns
 
@@ -96,6 +110,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the note into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -105,6 +121,8 @@
 ### createP2IDENote()
 
 > `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `aux`): `Note`
+
+Creates a pay-to-identity-with-embedded-conditions note.
 
 #### Parameters
 
@@ -146,6 +164,8 @@
 
 > `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `aux`): `Note`
 
+Creates a pay-to-identity note with a random blinding coin.
+
 #### Parameters
 
 ##### sender
@@ -177,6 +197,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Note`
+
+Deserializes a note from bytes produced by [`serialize`].
 
 #### Parameters
 

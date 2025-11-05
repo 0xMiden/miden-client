@@ -3,16 +3,19 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Key/value storage map used within accounts.
 #[wasm_bindgen]
 pub struct StorageMap(NativeStorageMap);
 
 #[wasm_bindgen]
 impl StorageMap {
     #[wasm_bindgen(constructor)]
+    /// Creates an empty storage map.
     pub fn new() -> StorageMap {
         StorageMap(NativeStorageMap::new())
     }
 
+    /// Inserts or updates a key and returns the previous value (or zero if absent).
     pub fn insert(&mut self, key: &Word, value: &Word) -> Word {
         self.0.insert(key.into(), value.into()).unwrap_or_default().into()
     }

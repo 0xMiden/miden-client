@@ -6,11 +6,15 @@
 
 # Enumeration: NetworkId
 
+Known network prefixes supported by the SDK.
+
 ## Enumeration Members
 
 ### Devnet
 
 > **Devnet**: `2`
+
+Miden devnet.
 
 ***
 
@@ -18,8 +22,12 @@
 
 > **Mainnet**: `0`
 
+Miden mainnet.
+
 ***
 
 ### Testnet
 
 > **Testnet**: `1`
+
+Miden testnet.

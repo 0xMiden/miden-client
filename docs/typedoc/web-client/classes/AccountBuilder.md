@@ -6,11 +6,17 @@
 
 # Class: AccountBuilder
 
+JavaScript wrapper around [`miden_client::account::AccountBuilder`].
+
+Provides a builder interface for configuring and creating new accounts in the browser.
+
 ## Constructors
 
 ### Constructor
 
 > **new AccountBuilder**(`init_seed`): `AccountBuilder`
+
+Creates a new account builder from a 32-byte seed.
 
 #### Parameters
 
@@ -18,15 +24,23 @@
 
 `Uint8Array`
 
+Seed bytes; must be exactly 32 bytes.
+
 #### Returns
 
 `AccountBuilder`
+
+#### Throws
+
+Throws if the seed length is invalid.
 
 ## Methods
 
 ### accountType()
 
 > **accountType**(`account_type`): `AccountBuilder`
+
+Sets the account type for the builder.
 
 #### Parameters
 
@@ -44,9 +58,15 @@
 
 > **build**(): [`AccountBuilderResult`](AccountBuilderResult.md)
 
+Builds the account using the accumulated configuration.
+
 #### Returns
 
 [`AccountBuilderResult`](AccountBuilderResult.md)
+
+#### Throws
+
+Throws if the underlying account creation fails.
 
 ***
 
@@ -64,6 +84,8 @@
 
 > **storageMode**(`storage_mode`): `AccountBuilder`
 
+Sets the account storage mode (e.g. private or network).
+
 #### Parameters
 
 ##### storage\_mode
@@ -79,6 +101,8 @@
 ### withAuthComponent()
 
 > **withAuthComponent**(`account_component`): `AccountBuilder`
+
+Sets the authentication component to use for the account.
 
 #### Parameters
 
@@ -96,6 +120,8 @@
 
 > **withComponent**(`account_component`): `AccountBuilder`
 
+Adds an additional account component to the builder.
+
 #### Parameters
 
 ##### account\_component
@@ -111,6 +137,8 @@
 ### withNoAuthComponent()
 
 > **withNoAuthComponent**(): `AccountBuilder`
+
+Configures the account to use the built-in no-auth component.
 
 #### Returns
 

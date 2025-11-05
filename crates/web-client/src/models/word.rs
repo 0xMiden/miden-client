@@ -5,6 +5,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 use super::felt::Felt;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
+/// Represents four field elements packed together, matching the VM word type.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Word(NativeWord);
@@ -12,6 +13,7 @@ pub struct Word(NativeWord);
 #[wasm_bindgen]
 impl Word {
     #[wasm_bindgen(constructor)]
+    /// Creates a word from four `u64` values.
     pub fn new(u64_vec: Vec<u64>) -> Word {
         let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
 
@@ -39,6 +41,7 @@ impl Word {
 
     #[wasm_bindgen(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
+    /// Creates a word from four field elements.
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {
         let native_felt_vec: [NativeFelt; 4] = felt_vec
             .iter()
@@ -53,25 +56,30 @@ impl Word {
     }
 
     #[wasm_bindgen(js_name = "toHex")]
+    /// Returns the hex string representation of the word.
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }
 
+    /// Serializes the word into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a word from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<Word, JsValue> {
         let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
         Ok(Word(native_word))
     }
 
     #[wasm_bindgen(js_name = "toU64s")]
+    /// Returns the four `u64` limbs contained in the word.
     pub fn to_u64s(&self) -> Vec<u64> {
         self.0.iter().map(NativeFelt::as_int).collect::<Vec<u64>>()
     }
 
     #[wasm_bindgen(js_name = "toFelts")]
+    /// Returns the four field elements contained in the word.
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()
     }

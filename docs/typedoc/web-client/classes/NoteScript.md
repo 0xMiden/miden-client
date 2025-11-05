@@ -6,6 +6,8 @@
 
 # Class: NoteScript
 
+Executable script that governs when and how a note can be consumed.
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **root**(): [`Word`](Word.md)
 
+Returns the MAST root hash of the script.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -31,6 +35,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the note script into bytes.
 
 #### Returns
 
@@ -54,6 +60,8 @@ Print the MAST source for this script.
 
 > `static` **deserialize**(`bytes`): `NoteScript`
 
+Deserializes a note script from bytes.
+
 #### Parameters
 
 ##### bytes
@@ -70,6 +78,8 @@ Print the MAST source for this script.
 
 > `static` **p2id**(): `NoteScript`
 
+Returns the well-known pay-to-identity note script.
+
 #### Returns
 
 `NoteScript`
@@ -80,6 +90,8 @@ Print the MAST source for this script.
 
 > `static` **p2ide**(): `NoteScript`
 
+Returns the well-known pay-to-identity with embedded conditions script.
+
 #### Returns
 
 `NoteScript`
@@ -89,6 +101,8 @@ Print the MAST source for this script.
 ### swap()
 
 > `static` **swap**(): `NoteScript`
+
+Returns the built-in swap note script.
 
 #### Returns
 

@@ -10,28 +10,33 @@ use crate::models::signing_inputs::SigningInputs;
 use crate::models::word::Word;
 use crate::utils::serialize_to_uint8array;
 
+/// Public key used for RPO Falcon signatures.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct PublicKey(NativePublicKey);
 
 #[wasm_bindgen]
 impl PublicKey {
+    /// Serializes the public key into bytes.
     pub fn serialize(&self) -> Uint8Array {
         let native_public_key = &self.0;
         serialize_to_uint8array(&native_public_key)
     }
 
+    /// Deserializes a public key from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
         let native_public_key = NativePublicKey::read_from_bytes(&bytes.to_vec())
             .map_err(|e| js_error_with_context(e, "Failed to deserialize public key"))?;
         Ok(PublicKey(native_public_key))
     }
 
+    /// Verifies a signature over a simple message commitment.
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
         self.verify_data(&SigningInputs::new_blind(message), signature)
     }
 
     #[wasm_bindgen(js_name = "verifyData")]
+    /// Verifies a signature over arbitrary signing inputs.
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
         let native_signature = signature.into();

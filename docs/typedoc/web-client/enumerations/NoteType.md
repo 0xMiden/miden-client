@@ -6,6 +6,8 @@
 
 # Enumeration: NoteType
 
+Indicates how note data is shared on the network.
+
 ## Enumeration Members
 
 ### Encrypted

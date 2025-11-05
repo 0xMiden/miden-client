@@ -5,6 +5,7 @@ use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_recipient::NoteRecipient;
 
+/// Note details used in transaction requests and note stores.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetails(NativeNoteDetails);
@@ -12,18 +13,22 @@ pub struct NoteDetails(NativeNoteDetails);
 #[wasm_bindgen]
 impl NoteDetails {
     #[wasm_bindgen(constructor)]
+    /// Creates new note details from assets and recipient.
     pub fn new(note_assets: &NoteAssets, note_recipient: &NoteRecipient) -> NoteDetails {
         NoteDetails(NativeNoteDetails::new(note_assets.into(), note_recipient.into()))
     }
 
+    /// Returns the note identifier.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
+    /// Returns the assets locked in the note.
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().into()
     }
 
+    /// Returns the note recipient descriptor.
     pub fn recipient(&self) -> NoteRecipient {
         self.0.recipient().into()
     }
@@ -53,6 +58,7 @@ impl From<&NativeNoteDetails> for NoteDetails {
     }
 }
 
+/// Convenience wrapper for passing arrays of [`NoteDetails`].
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetailsArray(Vec<NoteDetails>);
@@ -60,11 +66,13 @@ pub struct NoteDetailsArray(Vec<NoteDetails>);
 #[wasm_bindgen]
 impl NoteDetailsArray {
     #[wasm_bindgen(constructor)]
+    /// Creates an array of note details.
     pub fn new(note_details_array: Option<Vec<NoteDetails>>) -> NoteDetailsArray {
         let note_details_array = note_details_array.unwrap_or_default();
         NoteDetailsArray(note_details_array)
     }
 
+    /// Pushes another note details entry into the collection.
     pub fn push(&mut self, note_details: &NoteDetails) {
         self.0.push(note_details.clone());
     }

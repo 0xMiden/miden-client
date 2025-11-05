@@ -5,12 +5,14 @@ use wasm_bindgen::prelude::*;
 use super::felt::{Felt, FeltArray};
 use super::word::Word;
 
+/// Exposes the RPO256 hashing function to JavaScript.
 #[wasm_bindgen]
 pub struct Rpo256;
 
 #[wasm_bindgen]
 impl Rpo256 {
     #[wasm_bindgen(js_name = "hashElements")]
+    /// Computes the RPO256 hash of the provided field elements.
     pub fn hash_elements(felt_array: &FeltArray) -> Word {
         let felts: Vec<Felt> = felt_array.into();
         let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();

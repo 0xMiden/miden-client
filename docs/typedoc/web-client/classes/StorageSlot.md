@@ -6,6 +6,8 @@
 
 # Class: StorageSlot
 
+Represents a single storage slot within an account (value or map).
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > `static` **emptyValue**(): `StorageSlot`
 
+Returns an empty value slot.
+
 #### Returns
 
 `StorageSlot`
@@ -31,6 +35,8 @@
 ### fromValue()
 
 > `static` **fromValue**(`value`): `StorageSlot`
+
+Creates a slot holding a value word.
 
 #### Parameters
 
@@ -47,6 +53,8 @@
 ### map()
 
 > `static` **map**(`storage_map`): `StorageSlot`
+
+Creates a slot containing a storage map.
 
 #### Parameters
 

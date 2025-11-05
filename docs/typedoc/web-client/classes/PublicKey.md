@@ -6,6 +6,8 @@
 
 # Class: PublicKey
 
+Public key used for RPO Falcon signatures.
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the public key into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -31,6 +35,8 @@
 ### verify()
 
 > **verify**(`message`, `signature`): `boolean`
+
+Verifies a signature over a simple message commitment.
 
 #### Parameters
 
@@ -52,6 +58,8 @@
 
 > **verifyData**(`signing_inputs`, `signature`): `boolean`
 
+Verifies a signature over arbitrary signing inputs.
+
 #### Parameters
 
 ##### signing\_inputs
@@ -71,6 +79,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `PublicKey`
+
+Deserializes a public key from bytes.
 
 #### Parameters
 

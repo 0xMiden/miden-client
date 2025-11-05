@@ -6,11 +6,15 @@
 
 # Class: NoteConsumability
 
+Describes when a specific account will be able to consume the note.
+
 ## Methods
 
 ### accountId()
 
 > **accountId**(): [`AccountId`](AccountId.md)
+
+Returns the account allowed to consume the note.
 
 #### Returns
 
@@ -21,6 +25,8 @@
 ### consumableAfterBlock()
 
 > **consumableAfterBlock**(): `number`
+
+Returns the block height after which the note can be consumed, if any.
 
 #### Returns
 

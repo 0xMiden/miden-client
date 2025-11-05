@@ -10,11 +10,21 @@ use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 
+/// JavaScript wrapper around [`miden_client::account::component::AccountComponent`].
+///
+/// Represents compiled account code together with its metadata so it can be combined into new
+/// accounts from JavaScript.
 #[wasm_bindgen]
 pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]
 impl AccountComponent {
+    /// Compiles account component source code into an executable component.
+    ///
+    /// @param account_code - Account component source code in Miden assembly.
+    /// @param builder - Script builder containing the assembler state.
+    /// @param storage_slots - Storage slots required by the component.
+    /// @throws Throws if compilation fails.
     pub fn compile(
         account_code: &str,
         builder: &ScriptBuilder,
@@ -29,12 +39,17 @@ impl AccountComponent {
     }
 
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
+    /// Marks the component as supporting all note types.
     pub fn with_supports_all_types(mut self) -> Self {
         self.0 = self.0.with_supports_all_types();
         self
     }
 
     #[wasm_bindgen(js_name = "getProcedureHash")]
+    /// Returns the hash of a procedure exported by this component.
+    ///
+    /// @param procedure_name - Name of the exported procedure to inspect.
+    /// @throws Throws if the procedure cannot be found.
     pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
         let get_proc_export = self
             .0
@@ -64,6 +79,7 @@ impl AccountComponent {
     }
 
     #[wasm_bindgen(js_name = "createAuthComponent")]
+    /// Builds an authentication component from a secret key.
     pub fn create_auth_component(secret_key: &SecretKey) -> AccountComponent {
         let native_secret_key: NativeSecretKey = secret_key.into();
         let native_auth_component: NativeAccountComponent = NativeRpoFalcon512::new(

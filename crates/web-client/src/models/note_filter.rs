@@ -5,6 +5,7 @@ use super::note_id::NoteId;
 
 // TODO: Add nullfiier support
 
+/// Filters notes returned from the data store using type- or ID-based criteria.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteFilter {
@@ -15,22 +16,33 @@ pub struct NoteFilter {
 #[wasm_bindgen]
 impl NoteFilter {
     #[wasm_bindgen(constructor)]
+    /// Creates a new filter from a filter type and optional note IDs.
     pub fn new(note_type: NoteFilterTypes, note_ids: Option<Vec<NoteId>>) -> NoteFilter {
         NoteFilter { note_type, note_ids }
     }
 }
 
+/// Enumerates the different note filter variants supported by the client.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub enum NoteFilterTypes {
+    /// Return all notes.
     All,
+    /// Only include notes that were consumed.
     Consumed,
+    /// Only include notes that are committed.
     Committed,
+    /// Only include notes that are expected.
     Expected,
+    /// Only include notes currently being processed.
     Processing,
+    /// Filter to a specific list of note IDs.
     List,
+    /// Filter to a single unique note ID.
     Unique,
+    /// Filter by note nullifiers (currently unused placeholder).
     Nullifiers,
+    /// Only include notes that are unverified.
     Unverified,
 }
 

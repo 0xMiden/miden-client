@@ -6,6 +6,8 @@
 
 # Class: ScriptBuilder
 
+High-level helper that links libraries and compiles Miden scripts from JavaScript.
+
 ## Methods
 
 ### buildLibrary()

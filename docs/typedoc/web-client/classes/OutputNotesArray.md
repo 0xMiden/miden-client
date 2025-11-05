@@ -6,11 +6,15 @@
 
 # Class: OutputNotesArray
 
+Array wrapper to pass lists of [`OutputNote`] across the WASM boundary.
+
 ## Constructors
 
 ### Constructor
 
 > **new OutputNotesArray**(`output_notes_array?`): `OutputNotesArray`
+
+Creates a new array of output notes.
 
 #### Parameters
 
@@ -27,6 +31,8 @@
 ### append()
 
 > **append**(`output_note`): `void`
+
+Appends an output note to the array.
 
 #### Parameters
 

@@ -7,6 +7,7 @@ use super::note_execution_hint::NoteExecutionHint;
 use super::note_tag::NoteTag;
 use super::note_type::NoteType;
 
+/// Metadata describing the origin and policy for a note.
 #[derive(Clone, Copy)]
 #[wasm_bindgen]
 pub struct NoteMetadata(NativeNoteMetadata);
@@ -14,6 +15,7 @@ pub struct NoteMetadata(NativeNoteMetadata);
 #[wasm_bindgen]
 impl NoteMetadata {
     #[wasm_bindgen(constructor)]
+    /// Creates note metadata from sender, type, tag, execution hint, and optional auxiliary data.
     pub fn new(
         sender: &AccountId,
         note_type: NoteType,
@@ -32,15 +34,18 @@ impl NoteMetadata {
         NoteMetadata(native_note_metadata)
     }
 
+    /// Returns the sender account identifier.
     pub fn sender(&self) -> AccountId {
         self.0.sender().into()
     }
 
+    /// Returns the tag describing the note use case.
     pub fn tag(&self) -> NoteTag {
         self.0.tag().into()
     }
 
     #[wasm_bindgen(js_name = "noteType")]
+    /// Returns the note type (private, encrypted, public).
     pub fn note_type(&self) -> NoteType {
         self.0.note_type().into()
     }

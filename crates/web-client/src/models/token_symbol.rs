@@ -3,12 +3,14 @@ use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 
+/// Symbol string identifying a fungible token.
 #[wasm_bindgen]
 pub struct TokenSymbol(NativeTokenSymbol);
 
 #[wasm_bindgen]
 impl TokenSymbol {
     #[wasm_bindgen(constructor)]
+    /// Creates a token symbol from its string representation.
     pub fn new(symbol: &str) -> Result<TokenSymbol, JsValue> {
         let native_token_symbol = NativeTokenSymbol::new(symbol)
             .map_err(|err| js_error_with_context(err, "failed to create token symbol"))?;
@@ -17,6 +19,7 @@ impl TokenSymbol {
 
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
+    /// Returns the string representation of the symbol.
     pub fn to_string(&self) -> Result<String, JsValue> {
         self.0
             .to_string()

@@ -6,6 +6,8 @@
 
 # Class: AssetVault
 
+Representation of an account's asset vault exposed to JavaScript.
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
 
+Returns all fungible assets stored in the vault.
+
 #### Returns
 
 [`FungibleAsset`](FungibleAsset.md)[]
@@ -31,6 +35,8 @@
 ### getBalance()
 
 > **getBalance**(`faucet_id`): `bigint`
+
+Returns the balance for the provided faucet identifier.
 
 #### Parameters
 
@@ -47,6 +53,8 @@
 ### root()
 
 > **root**(): [`Word`](Word.md)
+
+Returns the Merkle root commitment for the vault contents.
 
 #### Returns
 

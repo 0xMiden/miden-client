@@ -6,6 +6,8 @@
 
 # Class: AdviceInputs
 
+Advice inputs passed into the Miden VM at transaction execution time.
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **mappedValues**(`key`): [`Felt`](Felt.md)[]
 
+Returns the list stored under the provided key in the advice map.
+
 #### Parameters
 
 ##### key
@@ -37,6 +41,8 @@
 ### stack()
 
 > **stack**(): [`Felt`](Felt.md)[]
+
+Returns the advice stack contents as field elements.
 
 #### Returns
 

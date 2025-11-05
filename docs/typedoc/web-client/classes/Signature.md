@@ -6,6 +6,8 @@
 
 # Class: Signature
 
+Cryptographic signature produced by the Miden authentication scheme.
+
 ## Methods
 
 ### free()
@@ -22,6 +24,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the signature into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -32,6 +36,8 @@
 
 > **toPreparedSignature**(): [`Felt`](Felt.md)[]
 
+Returns the pre-processed signature elements expected by the verifier circuit.
+
 #### Returns
 
 [`Felt`](Felt.md)[]
@@ -41,6 +47,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Signature`
+
+Deserializes a signature from bytes.
 
 #### Parameters
 

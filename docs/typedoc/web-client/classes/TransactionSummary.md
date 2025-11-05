@@ -6,11 +6,15 @@
 
 # Class: TransactionSummary
 
+Summary of a transaction used when requesting signatures.
+
 ## Methods
 
 ### accountDelta()
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
+
+Returns the account delta captured in the summary.
 
 #### Returns
 
@@ -32,6 +36,8 @@
 
 > **inputNotes**(): [`InputNotes`](InputNotes.md)
 
+Returns the input notes included in the summary.
+
 #### Returns
 
 [`InputNotes`](InputNotes.md)
@@ -41,6 +47,8 @@
 ### outputNotes()
 
 > **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+
+Returns the expected output notes included in the summary.
 
 #### Returns
 
@@ -52,6 +60,8 @@
 
 > **salt**(): [`Word`](Word.md)
 
+Returns the random salt mixed into the summary commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -62,6 +72,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the transaction summary into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -71,6 +83,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionSummary`
+
+Deserializes a transaction summary from bytes.
 
 #### Parameters
 

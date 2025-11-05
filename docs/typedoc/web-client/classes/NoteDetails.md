@@ -6,11 +6,15 @@
 
 # Class: NoteDetails
 
+Note details used in transaction requests and note stores.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteDetails**(`note_assets`, `note_recipient`): `NoteDetails`
+
+Creates new note details from assets and recipient.
 
 #### Parameters
 
@@ -32,6 +36,8 @@
 
 > **assets**(): [`NoteAssets`](NoteAssets.md)
 
+Returns the assets locked in the note.
+
 #### Returns
 
 [`NoteAssets`](NoteAssets.md)
@@ -52,6 +58,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the note identifier.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -61,6 +69,8 @@
 ### recipient()
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)
+
+Returns the note recipient descriptor.
 
 #### Returns
 

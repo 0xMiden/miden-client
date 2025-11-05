@@ -6,11 +6,15 @@
 
 # Class: AdviceMap
 
+Map of advice values made available to the VM during script execution.
+
 ## Constructors
 
 ### Constructor
 
 > **new AdviceMap**(): `AdviceMap`
+
+Creates an empty advice map.
 
 #### Returns
 
@@ -31,6 +35,8 @@
 ### insert()
 
 > **insert**(`key`, `value`): [`Felt`](Felt.md)[]
+
+Inserts a list of field elements for the given key and returns any previous mapping.
 
 #### Parameters
 

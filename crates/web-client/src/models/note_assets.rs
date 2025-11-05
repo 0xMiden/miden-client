@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 
 use super::fungible_asset::FungibleAsset;
 
+/// Collection of assets locked within a note.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteAssets(NativeNoteAssets);
@@ -11,17 +12,20 @@ pub struct NoteAssets(NativeNoteAssets);
 #[wasm_bindgen]
 impl NoteAssets {
     #[wasm_bindgen(constructor)]
+    /// Creates a new note asset list from optional assets.
     pub fn new(assets_array: Option<Vec<FungibleAsset>>) -> NoteAssets {
         let assets = assets_array.unwrap_or_default();
         let native_assets: Vec<NativeAsset> = assets.into_iter().map(Into::into).collect();
         NoteAssets(NativeNoteAssets::new(native_assets).unwrap())
     }
 
+    /// Adds a fungible asset to the note.
     pub fn push(&mut self, asset: &FungibleAsset) {
         self.0.add_asset(asset.into()).unwrap();
     }
 
     #[wasm_bindgen(js_name = "fungibleAssets")]
+    /// Returns the fungible assets contained in the note.
     pub fn fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .iter()
