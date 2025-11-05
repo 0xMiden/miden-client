@@ -65,6 +65,7 @@ pub trait OnNoteReceived {
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
+#[derive(Clone)]
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
@@ -123,7 +124,7 @@ impl StateSync {
     /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
-        self,
+        &self,
         mut current_partial_mmr: PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,

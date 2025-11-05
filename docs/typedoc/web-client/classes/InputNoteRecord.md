@@ -8,6 +8,16 @@
 
 ## Methods
 
+### commitment()
+
+> **commitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### consumerTransactionId()
 
 > **consumerTransactionId**(): `string`

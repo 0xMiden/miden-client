@@ -36,7 +36,7 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // INIT COMMAND
 // ================================================================================================
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 #[command(
     about = "Initialize the client. It will create a file named `miden-client.toml` that holds \
 the CLI and client configurations, and will be placed by default in the current working \
@@ -44,9 +44,9 @@ directory"
 )]
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
-    /// endpoint.
+    /// endpoint. By default, the command uses the Testnet network.
     #[clap(long, short)]
-    network: Network,
+    network: Option<Network>,
 
     /// Path to the store file.
     #[arg(long)]
@@ -84,8 +84,9 @@ impl InitCmd {
 
         let mut cli_config = CliConfig::default();
 
-        let endpoint = CliEndpoint::try_from(self.network.clone())?;
-        cli_config.rpc.endpoint = endpoint;
+        if let Some(network) = &self.network {
+            cli_config.rpc.endpoint = CliEndpoint::try_from(network.clone())?;
+        }
 
         if let Some(path) = &self.store_path {
             cli_config.store_filepath = PathBuf::from(path);

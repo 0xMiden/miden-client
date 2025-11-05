@@ -5,6 +5,7 @@ use super::note::Note;
 use super::note_id::NoteId;
 use super::note_inclusion_proof::NoteInclusionProof;
 use super::note_location::NoteLocation;
+use super::word::Word;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -22,6 +23,10 @@ impl InputNote {
 
     pub fn note(&self) -> Note {
         self.0.note().into()
+    }
+
+    pub fn commitment(&self) -> Word {
+        self.0.note().commitment().into()
     }
 
     pub fn proof(&self) -> Option<NoteInclusionProof> {
