@@ -334,11 +334,6 @@ export class WebClient {
         new Uint8Array(result.serializedTransactionResult)
       );
 
-      await this.wasmWebClient.applyTransaction(
-        transactionResult,
-        result.submissionHeight
-      );
-
       return transactionResult.id();
     } catch (error) {
       console.error(
@@ -634,10 +629,6 @@ export class MockWebClient extends WebClient {
       );
 
       if (!(this instanceof MockWebClient)) {
-        await this.wasmWebClient.applyTransaction(
-          transactionResult,
-          result.submissionHeight
-        );
         return transactionResult.id();
       }
 
