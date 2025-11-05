@@ -420,15 +420,9 @@ fn process_packages(
                 continue;
             }
 
-            println!("init_storage_data: {:?}", init_storage_data);
-
             if let Some(entries) = init_storage_data.map_entries(&placeholder_key) {
-                println!("entries: {:?}", entries);
-                println!("placeholder_key: {:?}", placeholder_key);
                 map_entries.insert(placeholder_key.clone(), entries.clone());
                 continue;
-            } else {
-                println!("no entries found for placeholder_key: {:?}", placeholder_key);
             }
 
             let description = placeholder_type.description.unwrap_or("[No description]".into());

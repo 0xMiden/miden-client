@@ -26,3 +26,9 @@ description = "Map which stores executed transactions"
 slot = 2
 type = "map"
 values = []
+
+[[storage]]
+name = "proc_thresholds"
+description = "Map which stores procedure thresholds (PROC_ROOT -> threshold)"
+slot = 3
+type = "map"
