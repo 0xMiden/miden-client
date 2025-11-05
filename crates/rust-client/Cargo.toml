@@ -46,7 +46,7 @@ chrono       = { optional = false, version = "0.4" }
 futures      = { version = "0.3" }
 hex          = { workspace = true }
 prost        = { default-features = false, features = ["derive"], version = "0.14" }
-prost-types  = { version = "0.14" }                                                    # TODO: remove once updated miden-note-transport
+prost-types  = { version = "0.14" }
 rand         = { workspace = true }
 thiserror    = { workspace = true }
 tonic        = { features = ["codegen"], version = "0.14" }
@@ -66,8 +66,8 @@ miden-node-proto-build           = { workspace = true }
 miden-note-transport-proto-build = { workspace = true }
 miden-objects                    = { workspace = true }
 miette                           = { workspace = true }
-prost-build                      = { version = "0.13" } # TODO: remove once updated miden-note-transport
-tonic-build                      = { version = "0.13" } # TODO: remove once updated miden-note-transport
+prost-build                      = { version = "0.14" }
+tonic-build                      = { version = "0.14" }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
