@@ -36,7 +36,7 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // INIT COMMAND
 // ================================================================================================
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 #[command(
     about = "Initialize the client. It will create a file named `miden-client.toml` that holds \
 the CLI and client configurations, and will be placed by default in the current working \
@@ -163,17 +163,4 @@ fn write_packages_files(cli_config: &CliConfig) -> Result<(), CliError> {
     info!("Packages files successfully created in: {:?}", packages_dir);
 
     Ok(())
-}
-
-impl Default for InitCmd {
-    // Create a new InitCmd with default values for silent initialization
-    fn default() -> Self {
-        Self {
-            network: None,
-            store_path: None,
-            remote_prover_endpoint: None,
-            note_transport_endpoint: None,
-            block_delta: None,
-        }
-    }
 }
