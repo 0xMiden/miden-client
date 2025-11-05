@@ -270,6 +270,7 @@ pub use miden_objects::{
 };
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
+pub use async_trait::async_trait;
 
 /// Provides test utilities for working with accounts and account IDs
 /// within the Miden network. This module is only available when the `testing` feature is
