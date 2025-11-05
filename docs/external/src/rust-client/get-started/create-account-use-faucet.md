@@ -28,12 +28,6 @@ Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/mide
 
    You can now use the `miden-client --version` command, and you should see `Miden 0.10.0`.
 
-3. Initialize the client. This creates the `miden-client.toml` file.
-
-   ```shell
-   miden-client init --network testnet # Creates a miden-client.toml configured with the testnet node's IP
-   ```
-
 ## Create a new Miden account
 
 1. Create a new account of type `mutable` using the following command:
