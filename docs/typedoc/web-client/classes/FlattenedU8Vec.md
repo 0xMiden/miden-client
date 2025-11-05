@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### data()
 
 > **data**(): `Uint8Array`

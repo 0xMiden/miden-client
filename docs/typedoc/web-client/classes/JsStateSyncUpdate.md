@@ -114,6 +114,16 @@ Transaction data for transactions included in this update.
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`
