@@ -114,11 +114,11 @@ fn silent_initialization_uses_default_values() {
     // Verify default values are used
     assert!(config_content.contains("testnet"), "Should use testnet as default network");
     assert!(
-        config_content.contains(&format!("{}/store.sqlite3", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
         "Should use default store path in {MIDEN_DIR}"
     );
     assert!(
-        config_content.contains(&format!("{}/keystore", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/keystore")),
         "Should use default keystore directory in {MIDEN_DIR}"
     );
 }
@@ -162,19 +162,19 @@ fn miden_directory_structure_creation() {
     // Verify config file contains correct paths relative to .miden directory
     let config_content = std::fs::read_to_string(&config_file).unwrap();
     assert!(
-        config_content.contains(&format!("{}/store.sqlite3", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
         "Config should reference store in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/keystore", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/keystore")),
         "Config should reference keystore in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/packages", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/packages")),
         "Config should reference packages in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/token_symbol_map.toml", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/token_symbol_map.toml")),
         "Config should reference token symbol map in .miden directory"
     );
 
@@ -215,16 +215,15 @@ fn silent_initialization_does_not_override_existing_config() {
     // Manual configuration file
     let custom_config = format!(
         r#"
-        store_filepath = "{0}/custom-store.sqlite3"
-        secret_keys_directory = "{0}/custom-keystore"
-        token_symbol_map_filepath = "{0}/custom-tokens.toml"
-        package_directory = "{0}/custom-templates"
+        store_filepath = "{MIDEN_DIR}/custom-store.sqlite3"
+        secret_keys_directory = "{MIDEN_DIR}/custom-keystore"
+        token_symbol_map_filepath = "{MIDEN_DIR}/custom-tokens.toml"
+        package_directory = "{MIDEN_DIR}/custom-templates"
 
         [rpc]
         endpoint = "https://custom-endpoint.com"
         timeout_ms = 5000
-        "#,
-        MIDEN_DIR
+        "#
     );
     std::fs::write(&config_path, custom_config).unwrap();
 

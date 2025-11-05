@@ -37,10 +37,8 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // ================================================================================================
 
 #[derive(Debug, Clone, Parser, Default)]
-#[command(
-    about = "Initialize the client. It will create a `.miden` directory with a \
-`miden-client.toml` file that holds the CLI and client configurations"
-)]
+#[command(about = "Initialize the client. It will create a `.miden` directory with a \
+`miden-client.toml` file that holds the CLI and client configurations")]
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
@@ -84,10 +82,7 @@ impl InitCmd {
         // Create the .miden directory if it doesn't exist
         if let Some(parent_dir) = config_file_path.parent() {
             fs::create_dir_all(parent_dir).map_err(|err| {
-                CliError::Config(
-                    Box::new(err),
-                    "failed to create .miden directory".into(),
-                )
+                CliError::Config(Box::new(err), "failed to create .miden directory".into())
             })?;
         }
 
