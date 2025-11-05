@@ -26,7 +26,7 @@ use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
-use miden_objects::asset::VaultKey;
+use miden_objects::asset::AssetVaultKey;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -457,8 +457,8 @@ impl SqliteStore {
 
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
-        let mut updated_assets: BTreeMap<VaultKey, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<VaultKey> = Vec::new();
+        let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
+        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
@@ -1146,10 +1146,8 @@ mod tests {
         AccountDelta,
         AccountHeader,
         AccountId,
-        AccountIdAddress,
         AccountType,
         Address,
-        AddressInterface,
         StorageMap,
         StorageSlot,
     };
@@ -1246,8 +1244,7 @@ mod tests {
             .with_component(dummy_component)
             .build()?;
 
-        let default_address =
-            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        let default_address = Address::new(account.id());
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
@@ -1336,8 +1333,7 @@ mod tests {
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
-        let default_address =
-            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        let default_address = Address::new(account.id());
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();

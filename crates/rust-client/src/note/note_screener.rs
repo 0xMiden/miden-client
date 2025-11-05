@@ -5,18 +5,13 @@ use core::fmt;
 
 use async_trait::async_trait;
 use miden_lib::account::interface::AccountInterface;
-use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::note::{NoteConsumptionStatus, WellKnownNote};
 use miden_objects::account::{Account, AccountId};
 use miden_objects::assembly::debuginfo::SourceManagerSync;
 use miden_objects::note::{Note, NoteId};
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{
-    NoteCheckerError,
-    NoteConsumptionChecker,
-    NoteConsumptionStatus,
-    TransactionExecutor,
-};
+use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 
 use crate::ClientError;
@@ -160,10 +155,11 @@ where
             },
             NoteConsumptionStatus::Consumable
             | NoteConsumptionStatus::ConsumableWithAuthorization => Some(NoteRelevance::Now),
-            // NOTE: NoteConsumptionStatus::Unconsumable means that state-related context does not
-            // allow for consumption, so don't keep for now. In the next version, we should be more
-            // careful about this
-            NoteConsumptionStatus::Unconsumable | NoteConsumptionStatus::Incompatible => None,
+            // NOTE: NoteConsumptionStatus::UnconsumableConditions means that state-related context
+            // does not allow for consumption, so don't keep for now. In the next
+            // version, we should be more careful about this
+            NoteConsumptionStatus::UnconsumableConditions
+            | NoteConsumptionStatus::NeverConsumable(_) => None,
         };
         Ok(result)
     }

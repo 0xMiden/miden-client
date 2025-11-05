@@ -1,7 +1,7 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use miden_objects::asset::{Asset, VaultKey};
+use miden_objects::asset::{Asset, AssetVaultKey};
 use miden_objects::block::BlockNumber;
 use miden_objects::{AssetError, Word};
 
@@ -60,7 +60,7 @@ pub struct AccountVaultUpdate {
     /// Asset value related to the vault key. If not present, the asset was removed from the vault.
     pub asset: Option<Asset>,
     /// Vault key associated with the asset.
-    pub vault_key: VaultKey,
+    pub vault_key: AssetVaultKey,
 }
 
 // ACCOUNT VAULT UPDATE CONVERSION
@@ -93,7 +93,7 @@ impl TryFrom<proto::rpc_store::AccountVaultUpdate> for AccountVaultUpdate {
                 vault_key
             )))?
             .try_into()?;
-        let vault_key = VaultKey::new_unchecked(vault_key_inner);
+        let vault_key = AssetVaultKey::new_unchecked(vault_key_inner);
 
         Ok(Self {
             block_num: block_num.into(),

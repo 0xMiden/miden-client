@@ -236,7 +236,13 @@ pub mod crypto {
 
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
-    pub use miden_objects::address::{AccountIdAddress, Address, AddressInterface, NetworkId};
+    pub use miden_objects::address::{
+        Address,
+        AddressId,
+        AddressInterface,
+        NetworkId,
+        RoutingParameters,
+    };
 }
 
 /// Provides types for working with the virtual machine within the Miden network.

@@ -553,8 +553,8 @@ async fn list_addresses_add() -> Result<()> {
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
-    assert!(formatted_output.contains(&AddressInterface::Unspecified.to_string()));
-    assert!(!formatted_output.contains(&AddressInterface::BasicWallet.to_string()));
+    assert!(formatted_output.contains("Unspecified"));
+    assert!(!formatted_output.contains("BasicWallet"));
 
     // Add a basic wallet address to the account
     let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
@@ -575,8 +575,8 @@ async fn list_addresses_add() -> Result<()> {
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
-    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
-    assert_eq!(formatted_output.matches(&AddressInterface::BasicWallet.to_string()).count(), 1);
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
+    assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
     // Add another basic wallet address to the account
     let mut add_address_cmd = Command::cargo_bin("miden-client").unwrap();
@@ -597,8 +597,8 @@ async fn list_addresses_add() -> Result<()> {
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
-    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
-    assert_eq!(formatted_output.matches(&AddressInterface::BasicWallet.to_string()).count(), 2);
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
+    assert_eq!(formatted_output.matches("BasicWallet").count(), 2);
 
     Ok(())
 }
@@ -619,7 +619,7 @@ async fn list_addresses_remove() -> Result<()> {
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
-    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 1);
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
 
     // Remove the Unspecified wallet from the account
     let mut remove_address_cmd = Command::cargo_bin("miden-client").unwrap();
@@ -638,7 +638,7 @@ async fn list_addresses_remove() -> Result<()> {
     assert!(output.status.success());
     let formatted_output = String::from_utf8(output.stdout).unwrap();
     assert!(formatted_output.contains(&basic_account_id));
-    assert_eq!(formatted_output.matches(&AddressInterface::Unspecified.to_string()).count(), 0);
+    assert_eq!(formatted_output.matches("Unspecified").count(), 0);
 
     Ok(())
 }

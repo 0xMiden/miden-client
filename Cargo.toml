@@ -41,7 +41,7 @@ miden-node-proto-build = { branch = "jmunoz-update-miden-base", default-features
 miden-node-rpc = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }
-miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-note-transport" }
+miden-note-transport-proto-build = { branch = "tomasarrachea-update-deps", default-features = false, git = "https://github.com/lambdaclass/miden-note-transport" }
 miden-remote-prover = { branch = "jmunoz-update-miden-base", features = [
   "concurrent",
 ], git = "https://github.com/0xMiden/miden-node" }

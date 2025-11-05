@@ -3,6 +3,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
+use miden_objects::Word;
 use miden_objects::account::{
     AccountId,
     PartialAccount,
@@ -11,7 +12,6 @@ use miden_objects::account::{
     StorageMap,
 };
 use miden_objects::asset::PartialVault;
-use miden_objects::crypto::merkle::PartialSmt;
 use miden_objects::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
@@ -160,8 +160,7 @@ impl TryFrom<AccountProof> for AccountInputs {
                     code,
                     PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
                     // We don't use vault information so we leave it empty
-                    PartialVault::new(PartialSmt::new())
-                        .expect("Empty partial vault shouldn't fail"),
+                    PartialVault::new(Word::default()),
                     None,
                 )?,
                 witness,

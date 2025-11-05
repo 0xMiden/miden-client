@@ -5,7 +5,8 @@ use std::println;
 use std::string::ToString;
 use std::sync::Arc;
 
-use miden_client::account::{AccountIdAddress, Address, AddressInterface};
+use miden_client::account::{Address, AddressInterface};
+use miden_client::address::RoutingParameters;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteRelevance};
@@ -50,8 +51,7 @@ use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::well_known_note::WellKnownNote;
-use miden_lib::note::{create_p2id_note, utils};
+use miden_lib::note::{WellKnownNote, create_p2id_note, utils};
 use miden_lib::testing::mock_account::MockAccountExt;
 use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
@@ -2049,13 +2049,13 @@ async fn account_addresses_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
     assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
     // Even when the account has a basic wallet, the address list should not contain it by default
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
@@ -2069,12 +2069,12 @@ async fn account_addresses_non_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
     assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
@@ -2090,8 +2090,7 @@ async fn account_add_address_after_creation() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
 
     // The default unspecified address cannot be added
     // as it is already present after account creation
@@ -2099,8 +2098,9 @@ async fn account_add_address_after_creation() {
 
     // The basic wallet address cannot be added
     // as it is already present after account creation
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
 
     // We can remove the basic wallet address
@@ -2322,8 +2322,11 @@ async fn transport_basic() {
     let mock_ntnode = Arc::new(RwLock::new(MockNoteTransportNode::new()));
     let (mut sender, sender_account) = create_test_user_transport(mock_ntnode.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_ntnode.clone()).await;
-    let recipient_address =
-        Address::from(AccountIdAddress::new(recipient_account.id(), AddressInterface::BasicWallet));
+
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(routing_params)
+        .unwrap();
     let (mut observer, _observer_account) = create_test_user_transport(mock_ntnode.clone()).await;
 
     // Create note
