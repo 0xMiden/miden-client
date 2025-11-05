@@ -18,21 +18,17 @@ value = [
 name = "approvers"
 description = "Map with approver public keys (index -> pubkey)"
 slot = 1
-values = []
+type = "map"
 
 [[storage]]
 name = "executed_transactions"
 description = "Map which stores executed transactions"
 slot = 2
+type = "map"
 values = []
 
 [[storage]]
 name = "proc_thresholds"
 description = "Map which stores procedure thresholds (PROC_ROOT -> threshold)"
 slot = 3
-values = []
-
-
-
-
-
+type = "map"

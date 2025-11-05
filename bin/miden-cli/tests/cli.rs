@@ -1141,11 +1141,19 @@ fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
 
     // Create init storage data file for multisig
-    let init_storage_data_toml = r"
+    let init_storage_data_toml = r#"
+        approvers = [
+        { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+        ]
+
+        proc_thresholds = [
+        { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+        ]
+
         [threshold_and_count]
         threshold=2
         num_approvers=3
-        ";
+        "#;
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
 
