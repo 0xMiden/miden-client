@@ -159,7 +159,7 @@ async fn create_anonymizer_account<AUTH: TransactionAuthenticator>(
 
     let auth_component = AuthRpoFalcon512Acl::new(pub_key.clone().into(), acl_config).unwrap();
 
-    let (account, seed) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Private)
         .with_auth_component(auth_component)
@@ -167,7 +167,7 @@ async fn create_anonymizer_account<AUTH: TransactionAuthenticator>(
         .build()
         .unwrap();
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(&account, false).await?;
     Ok(account)
 }
 
