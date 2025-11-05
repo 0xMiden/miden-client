@@ -128,6 +128,7 @@ fn silent_initialization_does_not_override_existing_config() {
     secret_keys_directory = "custom-keystore"
     token_symbol_map_filepath = "custom-tokens.toml"
     component_template_directory = "custom-templates"
+    package_directory = "packages"
 
     [rpc]
     endpoint = "https://custom-endpoint.com"
