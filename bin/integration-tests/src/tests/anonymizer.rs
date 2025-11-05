@@ -151,13 +151,13 @@ async fn create_anonymizer_account<AUTH: TransactionAuthenticator>(
     client.rng().fill_bytes(&mut init_seed);
 
     let key_pair = SecretKey::with_rng(client.rng());
-    let pub_key = key_pair.public_key();
+    let pub_key = key_pair.public_key().to_commitment();
 
     let acl_config = AuthRpoFalcon512AclConfig::new()
         .with_allow_unauthorized_input_notes(true)
         .with_allow_unauthorized_output_notes(true);
 
-    let auth_component = AuthRpoFalcon512Acl::new(pub_key, acl_config).unwrap();
+    let auth_component = AuthRpoFalcon512Acl::new(pub_key.clone().into(), acl_config).unwrap();
 
     let (account, seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
