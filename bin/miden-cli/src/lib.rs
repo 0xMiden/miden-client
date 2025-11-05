@@ -218,8 +218,7 @@ impl Cli {
                 Box::pin(new_account.execute(client, keystore)).await
             },
             Command::Import(import) => import.execute(client, keystore).await,
-            Command::Init(_) => Ok(()),
-            Command::Clear(_) => Ok(()), // Already handled earlier
+            Command::Init(_) | Command::Clear(_) => Ok(()), // Already handled earlier
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,

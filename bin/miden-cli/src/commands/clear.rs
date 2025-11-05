@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use crate::config::{get_global_miden_dir, get_local_miden_dir, MIDEN_DIR};
+use crate::config::{MIDEN_DIR, get_global_miden_dir, get_local_miden_dir};
 use crate::errors::CliError;
 
 // CLEAR COMMAND
@@ -24,33 +24,33 @@ impl ClearCmd {
     pub fn execute(&self) -> Result<(), CliError> {
         if self.global {
             // Clear global config specifically
-            self.clear_global_config()
+            Self::clear_global_config()
         } else {
             // Priority logic: local first, then global
-            self.clear_with_priority()
+            Self::clear_with_priority()
         }
     }
 
-    fn clear_with_priority(&self) -> Result<(), CliError> {
+    fn clear_with_priority() -> Result<(), CliError> {
         // Try local config first
         let local_miden_dir = get_local_miden_dir()?;
         if local_miden_dir.exists() {
-            self.remove_directory(&local_miden_dir, "local")?;
+            Self::remove_directory(&local_miden_dir, "local")?;
             return Ok(());
         }
 
         // Fallback to global config
-        self.clear_global_config()?;
+        Self::clear_global_config()?;
         Ok(())
     }
 
-    fn clear_global_config(&self) -> Result<(), CliError> {
+    fn clear_global_config() -> Result<(), CliError> {
         let global_miden_dir = get_global_miden_dir().map_err(|e| {
             CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
         })?;
 
         if global_miden_dir.exists() {
-            self.remove_directory(&global_miden_dir, "global")?;
+            Self::remove_directory(&global_miden_dir, "global")?;
         } else {
             println!("No global miden configuration found to clear.");
         }
@@ -58,17 +58,17 @@ impl ClearCmd {
         Ok(())
     }
 
-    fn remove_directory(&self, dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
-        println!("Removing {} miden configuration at: {}", config_type, dir_path.display());
+    fn remove_directory(dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
+        println!("Removing {config_type} miden configuration at: {}", dir_path.display());
 
         fs::remove_dir_all(dir_path).map_err(|err| {
             CliError::Config(
                 Box::new(err),
-                format!("Failed to remove {} {} directory", config_type, MIDEN_DIR),
+                format!("Failed to remove {config_type} {MIDEN_DIR} directory"),
             )
         })?;
 
-        println!("Successfully removed {} miden configuration.", config_type);
+        println!("Successfully removed {config_type} miden configuration.");
         Ok(())
     }
 }

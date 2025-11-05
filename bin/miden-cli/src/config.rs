@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use figment::value::{Dict, Map};

@@ -44,7 +44,7 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // INIT COMMAND
 // ================================================================================================
 
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, Default)]
 #[command(
     about = "Initialize the client. By default creates a global `.miden` directory in the home directory. \
 Use --local to create a local `.miden` directory in the current working directory. \
@@ -91,14 +91,14 @@ impl InitCmd {
     pub fn execute(&self) -> Result<(), CliError> {
         if self.copy_global {
             // Copy global config to local - always targets local directory
-            self.copy_global_to_local()
+            Self::copy_global_to_local()
         } else {
             // Create new config in target directory (local or global)
             self.create_new_config()
         }
     }
 
-    fn copy_global_to_local(&self) -> Result<(), CliError> {
+    fn copy_global_to_local() -> Result<(), CliError> {
         let global_miden_dir = get_global_miden_dir().map_err(|e| {
             CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
         })?;
@@ -271,21 +271,6 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
     info!("Packages files successfully created in: {:?}", packages_dir);
 
     Ok(())
-}
-
-impl Default for InitCmd {
-    // Create a new InitCmd with default values for silent initialization
-    fn default() -> Self {
-        Self {
-            local: false, // Global by default for silent initialization
-            copy_global: false,
-            network: None,
-            store_path: None,
-            remote_prover_endpoint: None,
-            note_transport_endpoint: None,
-            block_delta: None,
-        }
-    }
 }
 
 /// Recursively copies all files and directories from source to destination
