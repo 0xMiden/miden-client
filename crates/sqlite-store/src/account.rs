@@ -1169,7 +1169,7 @@ mod tests {
     use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::PublicKeyCommitment;
+    use miden_objects::account::auth::PublicKeyCommitment;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;

@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
+use miden_client::auth::{AuthSecretKey, PublicKeyCommitment};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteRelevance};
@@ -65,8 +66,6 @@ use miden_objects::account::{
     AccountId,
     AccountStorageMode,
     AccountType,
-    AuthSecretKey,
-    PublicKeyCommitment,
     StorageMap,
     StorageSlot,
 };

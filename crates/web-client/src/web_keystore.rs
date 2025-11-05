@@ -11,7 +11,7 @@ use miden_client::auth::{
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
-use miden_client::{AuthenticationError, Word as NativeWord};
+use miden_client::{AuthenticationError, Word, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
@@ -76,14 +76,20 @@ impl<R: Rng> WebKeyStore<R> {
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
-            let secret_key = match &key {
+            let secret_key = match key {
                 AuthSecretKey::RpoFalcon512(k) => SecretKey::from(k.clone()),
+                _ => todo!(), // TODO: how to handle other cases
             };
             insert_key_cb.insert_key(&secret_key).await?;
             return Ok(());
         }
-        let pub_key = match &key {
+        let pub_key = match key {
             AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment().to_hex(),
+            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment().to_hex(),
+            other => {
+                let commitment: Word = other.public_key().to_commitment().into();
+                commitment.to_hex()
+            },
         };
         let secret_key_hex = hex::encode(key.to_bytes());
 
@@ -142,11 +148,15 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
 
         let mut rng = self.rng.write();
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key.ok_or(
-            AuthenticationError::UnknownPublicKey(Into::<NativeWord>::into(pub_key).to_hex()),
-        )?;
+        let signature = match secret_key {
+            Some(AuthSecretKey::RpoFalcon512(k)) => {
+                Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng))
+            },
+            Some(AuthSecretKey::EcdsaK256Keccak(k)) => Signature::EcdsaK256Keccak(k.sign(message)),
+            Some(other_k) => other_k.sign(message),
+            None => return Err(AuthenticationError::UnknownPublicKey(pub_key)),
+        };
 
-        let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
         Ok(signature)
     }
 }

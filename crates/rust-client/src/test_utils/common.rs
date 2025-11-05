@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use std::vec::Vec;
 
 use anyhow::{Context, Result};
+use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountId, AccountStorageMode};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
@@ -26,7 +27,6 @@ use crate::account::component::{
     BasicWallet,
 };
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
-use crate::auth::AuthSecretKey;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
 use crate::note::{Note, create_p2id_note};

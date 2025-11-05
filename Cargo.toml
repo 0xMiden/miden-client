@@ -29,10 +29,10 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden base/protocol dependencies
-miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
-miden-tx      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base" }
+miden-lib     = { default-features = false, version = "0.12" }
+miden-objects = { default-features = false, version = "0.12" }
+miden-testing = { default-features = false, version = "0.12" }
+miden-tx      = { default-features = false, version = "0.12" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "jmunoz-update-miden-base", git = "https://github.com/0xMiden/miden-node" }

@@ -433,7 +433,7 @@ fn process_packages(
 
         let account_component = AccountComponent::from_package_with_init_data(
             &package,
-            &InitStorageData::new(init_storage_data),
+            &InitStorageData::new(init_storage_data, vec![]),
         )
         .map_err(|e| {
             CliError::Account(
