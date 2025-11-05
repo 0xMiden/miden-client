@@ -104,6 +104,10 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("note tags limit exceeded (max {0})")]
+    NoteTagsLimitExceeded(usize),
+    #[error("accounts limit exceeded (max {0})")]
+    AccountsLimitExceeded(usize),
 }
 
 // CONVERSIONS

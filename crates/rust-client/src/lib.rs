@@ -296,6 +296,7 @@ use rpc::NodeRpcClient;
 use store::Store;
 
 use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
 use crate::transaction::TransactionProver;
 
 // MIDEN CLIENT
@@ -425,6 +426,27 @@ where
 
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
+    }
+}
+
+impl<AUTH> Client<AUTH> {
+    // LIMITS
+    // --------------------------------------------------------------------------------------------
+
+    /// Checks if the note tag limit has been exceeded.
+    pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_unique_note_tags().await?.len() >= NOTE_TAG_LIMIT {
+            return Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT));
+        }
+        Ok(())
+    }
+
+    /// Checks if the account limit has been exceeded.
+    pub async fn check_account_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_account_ids().await?.len() >= ACCOUNT_ID_LIMIT {
+            return Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT));
+        }
+        Ok(())
     }
 
     // TEST HELPERS

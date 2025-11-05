@@ -9,7 +9,7 @@ use miden_client::account::{AccountIdAddress, Address, AddressInterface};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
-use miden_client::rpc::NodeRpcClient;
+use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
@@ -2223,6 +2223,69 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
+}
+
+#[tokio::test]
+async fn import_note_fails_if_note_tag_limit_is_exceeded() {
+    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // add note tags until the limit is exceeded
+    for i in 0..NOTE_TAG_LIMIT {
+        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+    }
+
+    // try to import a note
+    let serial_num = client.rng().draw_word();
+    let recipient = utils::build_p2id_recipient(account.id(), serial_num).unwrap();
+    let tag = NoteTag::from_account_id(account.id());
+    let metadata =
+        NoteMetadata::new(account.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
+            .unwrap();
+    let vault = NoteAssets::new(vec![]).unwrap();
+
+    let note = Note::new(vault.clone(), metadata, recipient.clone());
+    let note_id = note.id();
+    let note_file = NoteFile::NoteId(note_id);
+    let result = client.import_note(note_file).await;
+
+    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT))));
+}
+
+#[tokio::test]
+async fn add_account_fails_if_accounts_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // add accounts until the limit is exceeded
+    for i in 0..ACCOUNT_ID_LIMIT {
+        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
+        client
+            .add_account(
+                &Account::mock(
+                    (i << 8) as u128,
+                    AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                ),
+                false,
+            )
+            .await
+            .unwrap();
+    }
+
+    // try to add an account
+    let result = client
+        .add_account(
+            &Account::mock(
+                (ACCOUNT_ID_LIMIT << 8) as u128,
+                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+            ),
+            false,
+        )
+        .await;
+
+    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT))));
 }
 
 // HELPERS

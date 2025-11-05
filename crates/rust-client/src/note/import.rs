@@ -52,7 +52,11 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn import_note(&mut self, note_file: NoteFile) -> Result<NoteId, ClientError> {
+        self.check_note_tag_limit().await?;
+
         let id = match &note_file {
             NoteFile::NoteId(id) => *id,
             NoteFile::NoteDetails { details, .. } => details.id(),
