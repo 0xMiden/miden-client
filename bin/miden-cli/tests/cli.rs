@@ -254,19 +254,19 @@ fn miden_directory_structure_creation() {
     // Verify config file contains correct paths relative to .miden directory
     let config_content = std::fs::read_to_string(&config_file).unwrap();
     assert!(
-        config_content.contains(&format!("{}/store.sqlite3", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
         "Config should reference store in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/keystore", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/keystore")),
         "Config should reference keystore in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/packages", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/packages")),
         "Config should reference packages in .miden directory"
     );
     assert!(
-        config_content.contains(&format!("{}/token_symbol_map.toml", MIDEN_DIR)),
+        config_content.contains(&format!("{MIDEN_DIR}/token_symbol_map.toml")),
         "Config should reference token symbol map in .miden directory"
     );
 
