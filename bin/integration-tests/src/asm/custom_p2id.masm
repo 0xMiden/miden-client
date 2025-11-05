@@ -31,7 +31,7 @@ begin
     # read first word
     push.{mem_address}
     # => [data_mem_address]
-    mem_loadw
+    mem_loadw_be
     # => [NOTE_ARG_1]
 
     push.{expected_note_arg_1} assert_eqw.err="First note argument didn't match expected"
@@ -40,7 +40,7 @@ begin
     # read second word
     push.{mem_address_2}
     # => [data_mem_address_2]
-    mem_loadw
+    mem_loadw_be
     # => [NOTE_ARG_2]
 
     push.{expected_note_arg_2} assert_eqw.err="Second note argument didn't match expected"

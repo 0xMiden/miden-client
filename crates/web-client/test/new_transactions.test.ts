@@ -432,7 +432,7 @@ export const customTransaction = async (
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -441,7 +441,7 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
