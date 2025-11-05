@@ -49,7 +49,7 @@ prost        = { default-features = false, features = ["derive"], version = "0.1
 prost-types  = { version = "0.14" }
 rand         = { workspace = true }
 thiserror    = { workspace = true }
-tonic        = { features = ["codegen"], version = "0.14" }
+tonic        = { default-features = false, features = ["codegen"], version = "0.14" }
 tonic-health = { version = "0.14" }
 tonic-prost  = { version = "0.14" }
 tracing      = { workspace = true }

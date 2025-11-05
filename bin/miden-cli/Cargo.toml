@@ -30,7 +30,7 @@ rand               = { workspace = true }
 serde              = { features = ["derive"], version = "1.0" }
 thiserror          = { workspace = true }
 tokio              = { workspace = true }
-toml               = { version = "0.8" }
+toml               = { version = "0.9" }
 tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
