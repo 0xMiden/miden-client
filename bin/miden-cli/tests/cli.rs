@@ -103,7 +103,7 @@ fn silent_initialization_uses_default_values() {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     // Run any command to trigger silent initialization
-    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
@@ -138,7 +138,7 @@ fn silent_initialization_does_not_override_existing_config() {
     std::fs::write(&config_path, custom_config).unwrap();
 
     // Run command without explicitly initializing
-    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
