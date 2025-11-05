@@ -39,6 +39,11 @@ impl<AUTH> Client<AUTH> {
         Ok(genesis_block)
     }
 
+    /// Fetches from the store the current view of the chain's [`PartialMmr`].
+    pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
+        self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
