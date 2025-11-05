@@ -2,10 +2,12 @@ use miden_client::Felt as NativeFelt;
 use miden_client::crypto::Rpo256 as NativeRpo256;
 use wasm_bindgen::prelude::*;
 
-use super::felt::{Felt, FeltArray};
+use super::felt::Felt;
 use super::word::Word;
+use crate::models::miden_arrays::FeltArray;
 
 #[wasm_bindgen]
+#[derive(Copy, Clone)]
 pub struct Rpo256;
 
 #[wasm_bindgen]

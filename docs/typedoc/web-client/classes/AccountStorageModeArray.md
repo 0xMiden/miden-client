@@ -1,0 +1,121 @@
+[**@demox-labs/miden-sdk**](../README.md)
+
+***
+
+[@demox-labs/miden-sdk](../README.md) / AccountStorageModeArray
+
+# Class: AccountStorageModeArray
+
+## Constructors
+
+### Constructor
+
+> **new AccountStorageModeArray**(`elements?`): `AccountStorageModeArray`
+
+#### Parameters
+
+##### elements?
+
+[`AccountStorageMode`](AccountStorageMode.md)[]
+
+#### Returns
+
+`AccountStorageModeArray`
+
+## Methods
+
+### free()
+
+> **free**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### get()
+
+> **get**(`index`): [`AccountStorageMode`](AccountStorageMode.md)
+
+Get element at index, will always return a clone to avoid aliasing issues.
+
+#### Parameters
+
+##### index
+
+`number`
+
+#### Returns
+
+[`AccountStorageMode`](AccountStorageMode.md)
+
+***
+
+### length()
+
+> **length**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
+### push()
+
+> **push**(`element`): `void`
+
+#### Parameters
+
+##### element
+
+[`AccountStorageMode`](AccountStorageMode.md)
+
+#### Returns
+
+`void`
+
+***
+
+### replaceAt()
+
+> **replaceAt**(`index`, `elem`): `void`
+
+#### Parameters
+
+##### index
+
+`number`
+
+##### elem
+
+[`AccountStorageMode`](AccountStorageMode.md)
+
+#### Returns
+
+`void`
+
+***
+
+### toJSON()
+
+> **toJSON**(): `Object`
+
+* Return copy of self without private attributes.
+
+#### Returns
+
+`Object`
+
+***
+
+### toString()
+
+> **toString**(): `string`
+
+Return stringified version of self.
+
+#### Returns
+
+`string`
