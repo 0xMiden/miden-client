@@ -7,6 +7,7 @@ use miden_objects::note::{
     Note,
     NoteAssets,
     NoteDetails,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -81,6 +82,11 @@ impl InputNoteRecord {
     /// Returns the note's recipient.
     pub fn recipient(&self) -> Word {
         self.details.recipient().digest()
+    }
+
+    /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
+    pub fn commitment(&self) -> Option<Word> {
+        self.metadata().map(|m| NoteHeader::new(self.id(), *m).commitment())
     }
 
     /// Returns the note's assets.
@@ -282,6 +288,7 @@ impl Deserializable for InputNoteRecord {
 
 // CONVERSION
 // ================================================================================================
+
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
         let metadata = *value.metadata();

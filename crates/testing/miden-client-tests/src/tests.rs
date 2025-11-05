@@ -10,7 +10,7 @@ use miden_client::address::RoutingParameters;
 use miden_client::auth::{AuthSecretKey, PublicKeyCommitment};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{BlockNumber, NoteRelevance};
+use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
@@ -28,14 +28,12 @@ use miden_client::testing::common::{
     consume_notes,
     create_test_store_path,
     execute_failing_tx,
-    execute_tx,
     mint_and_consume,
     mint_note,
     setup_two_wallets_and_faucet,
     setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
-use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
@@ -45,14 +43,13 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use miden_client::utils::RwLock;
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::{WellKnownNote, create_p2id_note, utils};
+use miden_lib::note::{WellKnownNote, utils};
 use miden_lib::testing::mock_account::MockAccountExt;
 use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
@@ -93,7 +90,7 @@ use miden_objects::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_objects::transaction::{InputNote, OutputNote};
+use miden_objects::transaction::OutputNote;
 use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -102,6 +99,7 @@ use rand::{Rng, RngCore};
 
 pub mod store;
 mod transaction;
+mod transport;
 
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
@@ -139,17 +137,13 @@ async fn input_notes_round_trip() {
     let retrieved_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(retrieved_notes.len(), 4);
 
-    let recorded_notes: Vec<InputNoteRecord> = available_notes
-        .into_iter()
-        .map(|n| {
-            let input_note: InputNote = n.try_into().unwrap();
-            input_note.into()
-        })
-        .collect();
+    let chain_notes_commitments: std::collections::HashSet<NoteId> =
+        available_notes.into_iter().map(|n| n.id()).collect();
     // compare notes
-    for (recorded_note, retrieved_note) in recorded_notes.iter().zip(retrieved_notes) {
-        assert_eq!(recorded_note.id(), retrieved_note.id());
-    }
+    assert_eq!(
+        chain_notes_commitments,
+        retrieved_notes.iter().map(InputNoteRecord::id).collect()
+    );
 }
 
 #[tokio::test]
@@ -510,11 +504,13 @@ async fn mint_transaction() {
         )
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
-        .await
-        .unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(faucet.id(), transaction_request.clone()))
+            .await
+            .unwrap();
+    let executed_tx = transaction_result.executed_transaction().clone();
 
-    assert_eq!(transaction.executed_transaction().account_delta().nonce_delta(), ONE);
+    assert_eq!(executed_tx.account_delta().nonce_delta(), ONE);
 }
 
 #[tokio::test]
@@ -543,8 +539,7 @@ async fn import_note_validation() {
         .await
         .unwrap();
 
-    let expected_note = client
-        .get_input_note(expected_note.note().unwrap().id())
+    let expected_note = Box::pin(client.get_input_note(expected_note.note().unwrap().id()))
         .await
         .unwrap()
         .unwrap();
@@ -579,11 +574,12 @@ async fn transaction_request_expiration() {
         )
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
-        .await
-        .unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(faucet.id(), transaction_request.clone()))
+            .await
+            .unwrap();
 
-    let (_, tx_outputs, ..) = transaction.executed_transaction().clone().into_parts();
+    let (_, tx_outputs, ..) = transaction_result.executed_transaction().clone().into_parts();
 
     assert_eq!(tx_outputs.expiration_block_num, current_height + 5);
 }
@@ -613,10 +609,9 @@ async fn import_processing_note_returns_error() {
         )
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request.clone()))
+    Box::pin(client.submit_new_transaction(faucet.id(), transaction_request.clone()))
         .await
         .unwrap();
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
@@ -626,10 +621,9 @@ async fn import_processing_note_returns_error() {
         .unauthenticated_input_notes(input)
         .build()
         .unwrap();
-    let transaction = Box::pin(client.new_transaction(account.id(), consume_note_request.clone()))
+    Box::pin(client.submit_new_transaction(account.id(), consume_note_request))
         .await
         .unwrap();
-    Box::pin(client.submit_transaction(transaction.clone())).await.unwrap();
 
     let processing_notes = client.get_input_notes(NoteFilter::Processing).await.unwrap();
 
@@ -674,7 +668,7 @@ async fn note_without_asset() {
         .unwrap();
 
     let transaction =
-        Box::pin(client.new_transaction(wallet.id(), transaction_request.clone())).await;
+        Box::pin(client.execute_transaction(wallet.id(), transaction_request.clone())).await;
 
     assert!(transaction.is_ok());
 
@@ -689,7 +683,7 @@ async fn note_without_asset() {
         .build()
         .unwrap();
 
-    let error = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+    let error = Box::pin(client.submit_new_transaction(faucet.id(), transaction_request))
         .await
         .unwrap_err();
 
@@ -789,10 +783,9 @@ async fn real_note_roundtrip() {
         .unwrap();
 
     let note_id = transaction_request.expected_output_own_notes().pop().unwrap().id();
-    let transaction = Box::pin(client.new_transaction(faucet.id(), transaction_request))
+    Box::pin(client.submit_new_transaction(faucet.id(), transaction_request))
         .await
         .unwrap();
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     let note = client.get_input_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), &InputNoteState::Expected(_)));
@@ -807,10 +800,9 @@ async fn real_note_roundtrip() {
     let transaction_request =
         TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
 
-    let transaction = Box::pin(client.new_transaction(wallet.id(), transaction_request))
+    Box::pin(client.submit_new_transaction(wallet.id(), transaction_request))
         .await
         .unwrap();
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
@@ -840,7 +832,9 @@ async fn added_notes() {
         )
         .unwrap();
     println!("Running Mint tx...");
-    execute_tx(&mut client, faucet_account_header.id(), tx_request).await;
+    Box::pin(client.submit_new_transaction(faucet_account_header.id(), tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -886,7 +880,9 @@ async fn p2id_transfer() {
         .unwrap();
 
     let note = tx_request.expected_output_own_notes().pop().unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
 
     // Check that a note tag started being tracked for this note.
     assert!(
@@ -921,7 +917,9 @@ async fn p2id_transfer() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(to_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1082,7 +1080,11 @@ async fn p2ide_transfer_consumed_by_target() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request.clone()).await;
+
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request.clone()))
+        .await
+        .unwrap();
+
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1095,7 +1097,9 @@ async fn p2ide_transfer_consumed_by_target() {
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
     println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(to_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
@@ -1169,7 +1173,9 @@ async fn p2ide_transfer_consumed_by_sender() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1184,7 +1190,7 @@ async fn p2ide_transfer_consumed_by_sender() {
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
     let transaction_execution_result =
-        Box::pin(client.new_transaction(from_account_id, tx_request)).await;
+        Box::pin(client.execute_transaction(from_account_id, tx_request)).await;
     assert!(transaction_execution_result.is_err_and(|err| {
         matches!(
             err,
@@ -1204,7 +1210,9 @@ async fn p2ide_transfer_consumed_by_sender() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].id()])
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1264,15 +1272,17 @@ async fn p2ide_timelocked() {
         .unwrap();
     let note = tx_request.expected_output_own_notes().pop().unwrap();
 
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
     // Check that it's still too early to consume by both accounts
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
     let results = [
-        Box::pin(client.new_transaction(from_account_id, tx_request.clone())).await,
-        Box::pin(client.new_transaction(to_account_id, tx_request)).await,
+        Box::pin(client.execute_transaction(from_account_id, tx_request.clone())).await,
+        Box::pin(client.execute_transaction(to_account_id, tx_request)).await,
     ];
     assert!(results.iter().all(|result| {
         result.as_ref().is_err_and(|err| {
@@ -1291,7 +1301,9 @@ async fn p2ide_timelocked() {
 
     // Consume the note with the target account
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note.id()]).unwrap();
-    execute_tx(&mut client, to_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(to_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1359,7 +1371,10 @@ async fn get_consumable_notes() {
             client.rng(),
         )
         .unwrap();
-    execute_tx(&mut client, from_account_id, tx_request).await;
+
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1452,7 +1467,9 @@ async fn get_output_notes() {
     // Before executing, the output note is not found
     assert!(client.get_output_note(output_note_id).await.unwrap().is_none());
 
-    execute_tx(&mut client, from_account_id, tx_request).await;
+    Box::pin(client.submit_new_transaction(from_account_id, tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1498,16 +1515,19 @@ async fn account_rollback() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
+    let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
     let account_commitment_before_tx = account_before_tx.account().commitment();
 
     // Apply the transaction
-    Box::pin(client.testing_apply_transaction(tx_result)).await.unwrap();
+    let submission_height = client.get_sync_height().await.unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
@@ -1589,13 +1609,16 @@ async fn subsequent_discarded_transactions() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap();
-    let first_tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
+    let first_tx_id = transaction_result.id();
 
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
 
-    Box::pin(client.testing_apply_transaction(tx_result)).await.unwrap();
+    let submission_height = client.get_sync_height().await.unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
 
     // Create a second transaction that will not expire
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
@@ -1608,10 +1631,13 @@ async fn subsequent_discarded_transactions() {
         .unwrap();
 
     // Execute the transaction but don't submit it to the node
-    let tx_result = Box::pin(client.new_transaction(account_id, tx_request)).await.unwrap();
-    let second_tx_id = tx_result.executed_transaction().id();
-    client.testing_prove_transaction(&tx_result).await.unwrap();
-    Box::pin(client.testing_apply_transaction(tx_result)).await.unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
+    let second_tx_id = transaction_result.id();
+    let submission_height = client.get_sync_height().await.unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
 
     // Sync the state, which should discard the first transaction
     mock_rpc_api.advance_blocks(3);
@@ -1680,7 +1706,9 @@ async fn missing_recipient_digest() {
         )
         .unwrap();
 
-    let error = Box::pin(client.new_transaction(faucet.id(), tx_request)).await.unwrap_err();
+    let error = Box::pin(client.submit_new_transaction(faucet.id(), tx_request))
+        .await
+        .unwrap_err();
 
     if let ClientError::MissingOutputRecipients(digests) = error {
         assert!(digests == vec![dummy_recipient_digest]);
@@ -1716,16 +1744,25 @@ async fn input_note_checks() {
         .build_consume_notes(mint_notes.iter().map(Note::id).collect())
         .unwrap();
 
-    let transaction = Box::pin(client.new_transaction(wallet.id(), tx_request)).await.unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(wallet.id(), tx_request)).await.unwrap();
+    let transaction = transaction_result.executed_transaction().clone();
 
-    let input_notes = transaction.executed_transaction().input_notes().iter();
+    let input_notes = transaction.input_notes().iter();
 
     // Check that the input notes have the same order as the original notes
     for (i, input_note) in input_notes.enumerate() {
         assert_eq!(input_note.id(), mint_notes[i].id());
     }
 
-    Box::pin(client.submit_transaction(transaction)).await.unwrap();
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    let submission_height = client
+        .submit_proven_transaction(proven_transaction, &transaction_result)
+        .await
+        .unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1733,7 +1770,7 @@ async fn input_note_checks() {
     let consumed_note_tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![mint_notes[0].id()])
         .unwrap();
-    let error = Box::pin(client.new_transaction(wallet.id(), consumed_note_tx_request))
+    let error = Box::pin(client.submit_new_transaction(wallet.id(), consumed_note_tx_request))
         .await
         .unwrap_err();
 
@@ -1748,7 +1785,7 @@ async fn input_note_checks() {
         .build_consume_notes(vec![EMPTY_WORD.into()])
         .unwrap();
     let error =
-        Box::pin(client.new_transaction(wallet.id(), missing_authenticated_note_tx_request))
+        Box::pin(client.submit_new_transaction(wallet.id(), missing_authenticated_note_tx_request))
             .await
             .unwrap_err();
 
@@ -1815,7 +1852,9 @@ async fn swap_chain_test() {
         // The notes are inserted in reverse order because the first note to be consumed will be the
         // last one generated.
         swap_notes.insert(0, tx_request.expected_output_own_notes()[0].id());
-        execute_tx(&mut client, pairs[0].0.id(), tx_request).await;
+        Box::pin(client.submit_new_transaction(pairs[0].0.id(), tx_request))
+            .await
+            .unwrap();
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
     }
@@ -1828,7 +1867,9 @@ async fn swap_chain_test() {
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(swap_notes.iter().rev().copied().collect())
         .unwrap();
-    let error = Box::pin(client.new_transaction(last_wallet, tx_request)).await.unwrap_err();
+    let error = Box::pin(client.submit_new_transaction(last_wallet, tx_request))
+        .await
+        .unwrap_err();
     assert!(matches!(
         error,
         ClientError::TransactionExecutorError(
@@ -1837,7 +1878,7 @@ async fn swap_chain_test() {
     ));
 
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(swap_notes).unwrap();
-    execute_tx(&mut client, last_wallet, tx_request).await;
+    Box::pin(client.submit_new_transaction(last_wallet, tx_request)).await.unwrap();
 
     // At the end, the last wallet should have the asset of the first wallet.
     let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();
@@ -1995,7 +2036,7 @@ async fn storage_and_vault_proofs() {
             .custom_script(tx_script.clone())
             .build()
             .unwrap();
-        execute_tx(&mut client, account_id, tx_request).await;
+        Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap();
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
 
@@ -2117,6 +2158,73 @@ async fn account_add_address_after_creation() {
     // Derived note tag should now be available
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(note_tags.contains(&note_tag_record));
+}
+
+#[tokio::test]
+async fn consume_note_with_custom_script() {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    let (sender_account, receiver_account, faucet_account) =
+        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
+            .await
+            .unwrap();
+
+    let sender_id = sender_account.id();
+    let receiver_id = receiver_account.id();
+    let faucet_id = faucet_account.id();
+
+    mint_and_consume(&mut client, sender_id, faucet_id, NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let custom_note_script = "
+        begin
+            nop
+        end
+    ";
+    let note_script = client.script_builder().compile_note_script(custom_note_script).unwrap();
+
+    let note_inputs = NoteInputs::new(vec![]).unwrap();
+    let serial_num = client.rng().draw_word();
+    let note_metadata = NoteMetadata::new(
+        sender_id,
+        NoteType::Private,
+        NoteTag::from_account_id(receiver_id),
+        NoteExecutionHint::None,
+        Felt::default(),
+    )
+    .unwrap();
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_inputs);
+    let custom_note = Note::new(note_assets, note_metadata, note_recipient);
+
+    // At this point, the note script should no be stored locally
+    assert!(client.test_store().get_note_script(note_script.root()).await.is_err());
+
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(custom_note.clone())])
+        .build()
+        .unwrap();
+    let _tx_id = Box::pin(client.submit_new_transaction(sender_id, tx_request)).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // At this point, the note script should be stored locally
+    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    assert_eq!(stored_script.root().to_hex(), note_script.root().to_hex());
+
+    // Consume note
+    let transaction_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![custom_note.id()])
+        .unwrap();
+
+    // The transaction should be submitted successfully
+    let _transaction = Box::pin(client.submit_new_transaction(receiver_id, transaction_request))
+        .await
+        .unwrap();
+
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
 }
 
 // HELPERS
@@ -2290,77 +2398,4 @@ async fn insert_new_fungible_faucet(
 
     client.add_account(&account, false).await?;
     Ok(account)
-}
-
-pub async fn create_test_client_transport(
-    mock_ntnode: Arc<RwLock<MockNoteTransportNode>>,
-) -> (MockClient<FilesystemKeyStore<StdRng>>, FilesystemKeyStore<StdRng>) {
-    let (builder, _, keystore) = create_test_client_builder().await;
-    let transport_client = MockNoteTransportApi::new(mock_ntnode);
-    let builder_w_transport = builder.note_transport(Arc::new(transport_client));
-
-    let mut client = builder_w_transport.build().await.unwrap();
-    client.ensure_genesis_in_place().await.unwrap();
-
-    (client, keystore)
-}
-
-pub async fn create_test_user_transport(
-    mock_ntnode: Arc<RwLock<MockNoteTransportNode>>,
-) -> (MockClient<FilesystemKeyStore<StdRng>>, Account) {
-    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_ntnode.clone())).await;
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    (client, account)
-}
-
-#[tokio::test]
-async fn transport_basic() {
-    // Setup entities
-    let mock_ntnode = Arc::new(RwLock::new(MockNoteTransportNode::new()));
-    let (mut sender, sender_account) = create_test_user_transport(mock_ntnode.clone()).await;
-    let (mut recipient, recipient_account) = create_test_user_transport(mock_ntnode.clone()).await;
-
-    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
-    let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(routing_params)
-        .unwrap();
-    let (mut observer, _observer_account) = create_test_user_transport(mock_ntnode.clone()).await;
-
-    // Create note
-    let note = create_p2id_note(
-        sender_account.id(),
-        recipient_account.id(),
-        vec![],
-        NoteType::Private,
-        Felt::default(),
-        sender.rng(),
-    )
-    .unwrap();
-
-    // Sync-state / fetch notes
-    // No notes before sending
-    recipient.sync_state().await.unwrap();
-    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(notes.len(), 0);
-
-    // Send note
-    sender.send_private_note(note, &recipient_address).await.unwrap();
-
-    // Sync-state / fetch notes
-    // 1 note stored
-    recipient.sync_state().await.unwrap();
-    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(notes.len(), 1);
-
-    // Sync again, should be only 1 note stored
-    recipient.sync_state().await.unwrap();
-    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(notes.len(), 1);
-
-    // Third user shouldn't receive any note
-    observer.sync_state().await.unwrap();
-    let notes = observer.get_input_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(notes.len(), 0);
 }

@@ -378,8 +378,7 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
             CliError::Transaction(err.into(), "Failed to build deploy transaction".to_string())
         })?;
 
-    let tx = client.new_transaction(account.id(), tx_request).await?;
-    client.submit_transaction(tx).await?;
+    client.submit_new_transaction(account.id(), tx_request).await?;
     Ok(())
 }
 

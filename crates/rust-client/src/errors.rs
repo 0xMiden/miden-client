@@ -85,7 +85,7 @@ pub enum ClientError {
     #[error("rpc api error")]
     RpcError(#[from] RpcError),
     #[error("recency condition error: {0}")]
-    RecencyConditionError(String),
+    RecencyConditionError(&'static str),
     #[error("note screener error")]
     NoteScreenerError(#[from] NoteScreenerError),
     #[error("store error")]
