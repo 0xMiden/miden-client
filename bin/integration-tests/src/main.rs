@@ -175,25 +175,25 @@ impl std::fmt::Debug for TestCase {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum TestCategory {
-    Anonymizer,
     Client,
     CustomTransaction,
     #[allow(unused)] // ignoring due to bug, see miden-base#1878
     Fpi,
     NetworkTransaction,
     Onchain,
+    PassThrough,
     SwapTransaction,
 }
 
 impl AsRef<str> for TestCategory {
     fn as_ref(&self) -> &str {
         match self {
-            TestCategory::Anonymizer => "anonymizer",
             TestCategory::Client => "client",
             TestCategory::CustomTransaction => "custom_transaction",
             TestCategory::Fpi => "fpi",
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
+            TestCategory::PassThrough => "pass_through",
             TestCategory::SwapTransaction => "swap_transaction",
         }
     }
