@@ -71,3 +71,9 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
+
+[patch."https://github.com/0xMiden/miden-base"]
+miden-lib = { path = "../miden-base/crates/miden-lib" }
+miden-objects = { path = "../miden-base/crates/miden-objects" }
+miden-testing = { path = "../miden-base/crates/miden-testing" }
+miden-tx = { path = "../miden-base/crates/miden-tx" }

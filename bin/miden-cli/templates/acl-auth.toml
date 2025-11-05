@@ -24,7 +24,7 @@ value = [
 name = "proc_roots"
 description = "Map with trigger procedure roots that require authentication"
 slot = 2
-values = []
+type = "map"
 
 
 
