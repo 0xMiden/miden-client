@@ -8,14 +8,14 @@ use.miden::tx
 # ERRORS
 # =================================================================================================
 
-# ANONYMIZER script expects exactly 12 note inputs
-const.ERR_ANONYMIZER_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
+# PASS_THROUGH script expects exactly 12 note inputs
+const.ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS="wrong number of inputs"
 
-# ANONYMIZER script requires exactly 1 note asset
-const.ERR_ANONYMIZER_WRONG_NUMBER_OF_ASSETS="wrong number of assets"
+# PASS_THROUGH script requires exactly 1 note asset
+const.ERR_PASS_THROUGH_WRONG_NUMBER_OF_ASSETS="wrong number of assets"
 
-#! ANONYMIZER script:
-#! Creates a note consumable by anonymizer, containing the same asset.
+#! PASS_THROUGH script:
+#! Creates a note consumable by pass-through, containing the same asset.
 #!
 #! Inputs:  []
 #! Outputs: []
@@ -34,7 +34,7 @@ begin
     # => [num_inputs, inputs_ptr]
 
     # make sure the number of inputs is 12
-    eq.12 assert.err=ERR_ANONYMIZER_WRONG_NUMBER_OF_INPUTS
+    eq.12 assert.err=ERR_PASS_THROUGH_WRONG_NUMBER_OF_INPUTS
     # => [inputs_ptr]
 
     # load ASSET

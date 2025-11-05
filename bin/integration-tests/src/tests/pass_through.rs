@@ -31,10 +31,10 @@ use rand::RngCore;
 
 use crate::tests::config::ClientConfig;
 
-// ANONYMIZING THE NOTE (change sender from Alice -> Anonymizer account)
+// PASS-THROUGH TRANSACTIONS (change sender from Alice -> Pass-through account)
 // ================================================================================================
 
-pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
+pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     const ASSET_AMOUNT: u64 = 1;
     let (mut client, authenticator_1) = client_config.clone().into_client().await?;
 
@@ -59,7 +59,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
     let (target, ..) =
         insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
 
-    let anonymizer_account = create_anonymizer_account(&mut client).await?;
+    let pass_through_account = create_pass_through_account(&mut client).await?;
 
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) =
@@ -73,40 +73,42 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
         mint_and_consume(&mut client, sender.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client, tx_id).await?;
 
-    // Create a note that we will send to an anonymizer account
+    // Create a note that we will send to a pass-through account
     println!("creating note with accountA");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
-    let (anonymizer_note_1, anonymized_note_details_1) =
-        create_anonymizer_note(sender.id(), target.id(), asset.into(), client.rng())?;
+    let (pass_through_note_1, pass_through_note_details_1) =
+        create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
-    let (anonymizer_note_2, anonymized_note_details_2) =
-        create_anonymizer_note(sender.id(), target.id(), asset.into(), client.rng())?;
+    let (pass_through_note_2, pass_through_note_details_2) =
+        create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![
-            OutputNote::Full(anonymizer_note_1.clone()),
-            OutputNote::Full(anonymizer_note_2.clone()),
+            OutputNote::Full(pass_through_note_1.clone()),
+            OutputNote::Full(pass_through_note_2.clone()),
         ])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
-    println!("consuming anonymizer note");
+    println!("consuming pass-through note");
 
-    client.import_note(NoteFile::NoteId(anonymizer_note_1.id())).await?;
-    client.import_note(NoteFile::NoteId(anonymizer_note_2.id())).await?;
+    client.import_note(NoteFile::NoteId(pass_through_note_1.id())).await?;
+    client.import_note(NoteFile::NoteId(pass_through_note_2.id())).await?;
     client.sync_state().await?;
-    let input_note_record = client.get_input_note(anonymizer_note_1.id()).await?.unwrap();
+    let input_note_record = client.get_input_note(pass_through_note_1.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
-    let input_note_record = client.get_input_note(anonymizer_note_2.id()).await?.unwrap();
+    let input_note_record = client.get_input_note(pass_through_note_2.id()).await?.unwrap();
     assert!(matches!(input_note_record.state(), InputNoteState::Committed { .. }));
 
     let tx_request = TransactionRequestBuilder::new()
-        .expected_output_recipients(vec![anonymized_note_details_1.recipient().clone()])
-        .build_consume_notes(vec![anonymizer_note_1.id()])
+        .expected_output_recipients(vec![pass_through_note_details_1.recipient().clone()])
+        .build_consume_notes(vec![pass_through_note_1.id()])
         .unwrap();
-    let tx_id = client.submit_new_transaction(anonymizer_account.id(), tx_request.clone()).await?;
+    let tx_id = client
+        .submit_new_transaction(pass_through_account.id(), tx_request.clone())
+        .await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     let tx_record = client
@@ -117,15 +119,17 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         tx_record.details.output_notes.get_note(0).metadata().sender(),
-        anonymizer_account.id()
+        pass_through_account.id()
     );
 
-    // now try another transaction against the anonymizer account
+    // now try another transaction against the pass-through account
     let tx_request = TransactionRequestBuilder::new()
-        .expected_output_recipients(vec![anonymized_note_details_2.recipient().clone()])
-        .build_consume_notes(vec![anonymizer_note_2.id()])
+        .expected_output_recipients(vec![pass_through_note_details_2.recipient().clone()])
+        .build_consume_notes(vec![pass_through_note_2.id()])
         .unwrap();
-    let tx_id = client.submit_new_transaction(anonymizer_account.id(), tx_request.clone()).await?;
+    let tx_id = client
+        .submit_new_transaction(pass_through_account.id(), tx_request.clone())
+        .await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     let tx_record = client
@@ -136,7 +140,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         tx_record.details.output_notes.get_note(0).metadata().sender(),
-        anonymizer_account.id()
+        pass_through_account.id()
     );
 
     Ok(())
@@ -144,7 +148,7 @@ pub async fn test_anonymizer(client_config: ClientConfig) -> Result<()> {
 
 // HELPERS
 // ================================================================================================
-async fn create_anonymizer_account<AUTH: TransactionAuthenticator>(
+async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     client: &mut Client<AUTH>,
 ) -> Result<Account> {
     let mut init_seed = [0u8; 32];
@@ -171,22 +175,22 @@ async fn create_anonymizer_account<AUTH: TransactionAuthenticator>(
     Ok(account)
 }
 
-fn get_anonymizer_note_script() -> NoteScript {
-    let note_script_code = include_str!("../asm/ANONYMIZER.masm");
+fn get_pass_through_note_script() -> NoteScript {
+    let note_script_code = include_str!("../asm/PASS_THROUGH.masm");
 
     ScriptBuilder::new(true).compile_note_script(note_script_code).unwrap()
 }
 
 // Creates a note eventually meant for the target account.
-// First, the note is mixed by the anonymizer account.
-// The output note script guarantees the output of the mixing is `target`.
-fn create_anonymizer_note(
+// First, the note is processed by the pass-through account.
+// The output note script guarantees the output of the processing is `target`.
+fn create_pass_through_note(
     sender: AccountId,
     target: AccountId,
     asset: Asset,
     rng: &mut ClientRng,
 ) -> Result<(Note, NoteDetails)> {
-    let note_script = get_anonymizer_note_script();
+    let note_script = get_pass_through_note_script();
 
     let asset_word: Word = asset.into();
 
@@ -208,7 +212,7 @@ fn create_anonymizer_note(
     ])?;
 
     let serial_num = rng.draw_word();
-    let anonymizer_recipient = NoteRecipient::new(serial_num, note_script, inputs);
+    let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
     let metadata = NoteMetadata::new(
         sender,
@@ -217,8 +221,9 @@ fn create_anonymizer_note(
         NoteExecutionHint::always(),
         Felt::new(0u64),
     )?;
-    let note = Note::new(NoteAssets::new(vec![asset])?, metadata, anonymizer_recipient);
+    let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
-    let anonymized_note_details = NoteDetails::new(NoteAssets::new(vec![asset])?, target_recipient);
-    Ok((note, anonymized_note_details))
+    let pass_through_note_details =
+        NoteDetails::new(NoteAssets::new(vec![asset])?, target_recipient);
+    Ok((note, pass_through_note_details))
 }
