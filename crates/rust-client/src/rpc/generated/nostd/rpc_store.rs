@@ -398,13 +398,6 @@ pub struct StorageMapUpdate {
     #[prost(message, optional, tag = "4")]
     pub value: ::core::option::Option<super::primitives::Digest>,
 }
-/// Represents a note script or nothing.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct MaybeNoteScript {
-    /// The script for a note by its root.
-    #[prost(message, optional, tag = "1")]
-    pub script: ::core::option::Option<super::note::NoteScript>,
-}
 /// Represents a block range.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct BlockRange {
@@ -728,7 +721,7 @@ pub mod rpc_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::note::NoteRoot>,
         ) -> core::result::Result<
-            tonic::Response<super::MaybeNoteScript>,
+            tonic::Response<super::super::shared::MaybeNoteScript>,
             tonic::Status,
         > {
             self.inner

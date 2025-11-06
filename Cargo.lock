@@ -2897,6 +2897,7 @@ dependencies = [
  "tonic",
  "tower-http",
  "tracing",
+ "tracing-forest",
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
@@ -5842,6 +5843,19 @@ checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
  "valuable",
+]
+
+[[package]]
+name = "tracing-forest"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3298fe855716711a00474eceb89cc7dc254bbe67f6bc4afafdeec5f0c538771c"
+dependencies = [
+ "chrono",
+ "smallvec",
+ "thiserror 2.0.17",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
