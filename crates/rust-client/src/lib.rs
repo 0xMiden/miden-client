@@ -255,6 +255,7 @@ pub mod vm {
     };
 }
 
+pub use async_trait::async_trait;
 pub use errors::*;
 use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_objects::{

@@ -21,12 +21,14 @@
 * Implemented missing RPC endpoints: `/SyncStorageMaps`, `/SyncAccountVault` & `/SyncTransactions` ([#1362](https://github.com/0xMiden/miden-client/pull/1362)).
 * Updated `submit_proven_transaction()` to include `TransactionInputs` for validator ([#1421](https://github.com/0xMiden/miden-client/pull/1421)).
 * [BREAKING] Replaced `AccountComponentTemplates` for `Packages` for account creation ([#1313](https://github.com/0xMiden/miden-client/pull/1313)).
+* Added support for silently initializing the client CLI ([#1424](https://github.com/0xMiden/miden-client/pull/1424)).
 * Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 
 ### Changes
 
+* Added typed arrays for each public web-client model/struct ([#1292](https://github.com/0xMiden/miden-client/pull/1292))
 * [BREAKING] Incremented MSRV to 1.89.
 * [BREAKING] Unified chain tip and block number types to use `BlockNumber` instead of `u32` ([#1415](https://github.com/0xMiden/miden-client/pull/1415)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).

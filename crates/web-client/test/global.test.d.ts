@@ -69,6 +69,7 @@ import {
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  MidenArrays,
   ScriptBuilder,
   ScriptBuilderMode,
 } from "../dist/index";
@@ -156,6 +157,7 @@ declare global {
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    MidenArrays: typeof MidenArrays;
     ScriptBuilder: typeof ScriptBuilder;
     ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;

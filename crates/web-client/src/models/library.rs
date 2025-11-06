@@ -2,6 +2,7 @@ use miden_client::assembly::Library as NativeLibrary;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Library(NativeLibrary);
 
 // CONVERSIONS

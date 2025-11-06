@@ -1,172 +1,21 @@
-import loadWasm from "../dist/wasm.js";
+import loadWasm from "./wasm.js";
 const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
-
-const {
-  Account,
-  AccountBuilder,
-  AccountComponent,
-  AccountDelta,
-  AccountFile,
-  AccountHeader,
-  AccountId,
-  AccountInterface,
-  AccountStorageDelta,
-  AccountStorageMode,
-  AccountStorageRequirements,
-  AccountType,
-  AccountVaultDelta,
-  Address,
-  AddressInterface,
-  AdviceMap,
-  AuthSecretKey,
-  BasicFungibleFaucetComponent,
-  ConsumableNoteRecord,
-  Endpoint,
-  Felt,
-  FeltArray,
-  ForeignAccount,
-  FungibleAsset,
-  FungibleAssetDelta,
-  InputNoteRecord,
-  InputNoteState,
-  Library,
-  Note,
-  NoteAndArgs,
-  NoteAndArgsArray,
-  NoteAssets,
-  NoteConsumability,
-  NoteDetails,
-  NoteExecutionHint,
-  NoteExecutionMode,
-  NoteFilter,
-  NoteFile,
-  NoteFilterTypes,
-  NoteId,
-  NoteIdAndArgs,
-  NoteIdAndArgsArray,
-  NoteInputs,
-  NoteMetadata,
-  NoteRecipient,
-  NoteScript,
-  NoteTag,
-  NetworkId,
-  NoteType,
-  OutputNote,
-  OutputNotesArray,
-  ProvenTransaction,
-  PublicKey,
-  Rpo256,
-  RpcClient,
-  ScriptBuilder,
-  SecretKey,
-  Signature,
-  SigningInputs,
-  SigningInputsType,
-  SlotAndKeys,
-  SlotAndKeysArray,
-  StorageMap,
-  StorageSlot,
-  TestUtils,
-  TokenSymbol,
-  TransactionFilter,
-  TransactionKernel,
-  TransactionResult,
-  TransactionProver,
-  TransactionRequest,
-  TransactionId,
-  TransactionStoreUpdate,
-  TransactionRequestBuilder,
-  TransactionScript,
-  TransactionScriptInputPair,
-  TransactionScriptInputPairArray,
-  TransactionSummary,
-  Word,
-  WebClient: WasmWebClient, // Alias the WASM-exported WebClient
-} = wasm;
-
-export {
-  Account,
-  AccountBuilder,
-  AccountComponent,
-  AccountDelta,
-  AccountFile,
-  AccountVaultDelta,
-  AccountHeader,
-  AccountId,
-  AccountInterface,
-  AccountStorageDelta,
-  AccountStorageMode,
-  AccountStorageRequirements,
-  AccountType,
-  Address,
-  AddressInterface,
-  AdviceMap,
-  ScriptBuilder,
-  AuthSecretKey,
-  BasicFungibleFaucetComponent,
-  ConsumableNoteRecord,
-  Endpoint,
-  Felt,
-  FeltArray,
-  ForeignAccount,
-  FungibleAsset,
-  FungibleAssetDelta,
-  InputNoteRecord,
-  InputNoteState,
-  Library,
-  NetworkId,
-  Note,
-  NoteAndArgs,
-  NoteAndArgsArray,
-  NoteAssets,
-  NoteConsumability,
-  NoteDetails,
-  NoteExecutionHint,
-  NoteExecutionMode,
-  NoteFilter,
-  NoteFile,
-  NoteFilterTypes,
-  NoteId,
-  NoteIdAndArgs,
-  NoteIdAndArgsArray,
-  NoteInputs,
-  NoteMetadata,
-  NoteRecipient,
-  NoteScript,
-  NoteTag,
-  NoteType,
-  OutputNote,
-  OutputNotesArray,
-  ProvenTransaction,
-  PublicKey,
-  Rpo256,
-  RpcClient,
-  SecretKey,
-  Signature,
-  SigningInputs,
-  SigningInputsType,
-  SlotAndKeys,
-  SlotAndKeysArray,
-  StorageMap,
-  StorageSlot,
-  TestUtils,
-  TokenSymbol,
-  TransactionFilter,
-  TransactionKernel,
-  TransactionResult,
-  TransactionProver,
-  TransactionRequest,
-  TransactionId,
-  TransactionStoreUpdate,
-  TransactionRequestBuilder,
-  TransactionScript,
-  TransactionScriptInputPair,
-  TransactionScriptInputPairArray,
-  TransactionSummary,
-  Word,
+export * from "../Cargo.toml";
+const buildTypedArraysExport = (exportObject) => {
+  return Object.entries(exportObject).reduce(
+    (exports, [exportName, _export]) => {
+      if (exportName.endsWith("Array")) {
+        exports[exportName] = _export;
+      }
+      return exports;
+    },
+    {}
+  );
 };
 
+export const MidenArrays = buildTypedArraysExport(wasm);
+const { WebClient: WasmWebClient } = wasm;
 /**
  * WebClient is a wrapper around the underlying WASM WebClient object.
  *
@@ -498,11 +347,6 @@ export class WebClient {
         new Uint8Array(result.serializedTransactionResult)
       );
 
-      await this.wasmWebClient.applyTransaction(
-        transactionResult,
-        result.submissionHeight
-      );
-
       return transactionResult.id();
     } catch (error) {
       console.error(
@@ -798,10 +642,6 @@ export class MockWebClient extends WebClient {
       );
 
       if (!(this instanceof MockWebClient)) {
-        await this.wasmWebClient.applyTransaction(
-          transactionResult,
-          result.submissionHeight
-        );
         return transactionResult.id();
       }
 

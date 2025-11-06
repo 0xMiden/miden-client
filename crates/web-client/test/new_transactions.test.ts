@@ -375,8 +375,11 @@ export const customTransaction = async (
       let felt8 = new window.Felt(BigInt(9));
 
       let noteArgs = [felt1, felt2, felt3, felt4, felt5, felt6, felt7, felt8];
-      let feltArray = new window.FeltArray();
-      noteArgs.forEach((felt) => feltArray.append(felt));
+      let feltArray = new window.MidenArrays.FeltArray();
+
+      noteArgs.forEach((felt) => {
+        feltArray.push(felt);
+      });
 
       let noteAssets = new window.NoteAssets([
         new window.FungibleAsset(faucetAccount.id(), BigInt(10)),
@@ -395,6 +398,7 @@ export const customTransaction = async (
       let memAddress2 = "1004";
       let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
       let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+
       let noteScript = `
             # Custom P2ID note script
             #
@@ -471,7 +475,7 @@ export const customTransaction = async (
       let builder = client.createScriptBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
+        new window.MidenArrays.FeltArray([
           walletAccount.id().prefix(),
           walletAccount.id().suffix(),
         ])
@@ -480,6 +484,7 @@ export const customTransaction = async (
       const serialNum = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
+
       let noteRecipient = new window.NoteRecipient(
         serialNum,
         compiledNoteScript,
@@ -494,9 +499,11 @@ export const customTransaction = async (
           : undefined;
 
       // Creating First Custom Transaction Request to Mint the Custom Note
+
+      const outputNote = window.OutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
         .withOwnOutputNotes(
-          new window.OutputNotesArray([window.OutputNote.full(note)])
+          new window.MidenArrays.OutputNoteArray([outputNote])
         )
         .build();
 
@@ -528,10 +535,13 @@ export const customTransaction = async (
       // with Invalid/Valid Transaction Script
       let transactionScript = await builder.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
+
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
@@ -604,12 +614,12 @@ const customTxWithMultipleNotes = async (
 
       const p2idScript = window.NoteScript.p2id();
 
-      let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
-          targetAccount.id().suffix(),
-          targetAccount.id().prefix(),
-        ])
-      );
+      const inputNotes = new window.MidenArrays.FeltArray([
+        targetAccount.id().suffix(),
+        targetAccount.id().prefix(),
+      ]);
+
+      let noteInputs = new window.NoteInputs(inputNotes);
 
       let noteRecipient1 = new window.NoteRecipient(
         serialNum1,
@@ -625,13 +635,15 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
+      const notes = [
+        window.OutputNote.full(note1),
+        window.OutputNote.full(note2),
+      ];
+
+      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
+
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.OutputNotesArray([
-            window.OutputNote.full(note1),
-            window.OutputNote.full(note2),
-          ])
-        )
+        .withOwnOutputNotes(outputNotes)
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -1127,12 +1139,16 @@ export const counterAccountComponent = async (
     // Create transaction with network note
     let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let noteInputs = new window.NoteInputs(new window.FeltArray([]));
+    let noteInputs = new window.NoteInputs(
+      new window.MidenArrays.FeltArray([])
+    );
 
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
+
     let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
+
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
@@ -1153,7 +1169,7 @@ export const counterAccountComponent = async (
 
     let transactionRequest = new window.TransactionRequestBuilder()
       .withOwnOutputNotes(
-        new window.OutputNotesArray([window.OutputNote.full(note)])
+        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
       )
       .build();
 

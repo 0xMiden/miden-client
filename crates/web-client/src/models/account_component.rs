@@ -11,6 +11,7 @@ use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]

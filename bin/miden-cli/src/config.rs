@@ -90,7 +90,7 @@ pub struct RpcConfig {
 impl Default for RpcConfig {
     fn default() -> Self {
         Self {
-            endpoint: Endpoint::default().into(),
+            endpoint: Endpoint::testnet().into(),
             timeout_ms: 10000,
         }
     }
