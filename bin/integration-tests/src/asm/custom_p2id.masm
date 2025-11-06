@@ -1,13 +1,13 @@
 # Custom P2ID note script
 #
-# This note script asserts that the note args are exactly the same as passed 
+# This note script asserts that the note args are exactly the same as passed
 # (currently defined as {expected_note_arg_1} and {expected_note_arg_2}).
-# Since the args are too big to fit in a single note arg, we provide them via advice inputs and 
+# Since the args are too big to fit in a single note arg, we provide them via advice inputs and
 # address them via their commitment (noted as NOTE_ARG)
-# This note script is based off of the P2ID note script because notes currently need to have 
-# assets, otherwise it could have been boiled down to the assert. 
+# This note script is based off of the P2ID note script because notes currently need to have
+# assets, otherwise it could have been boiled down to the assert.
 
-use.miden::account
+use.miden::native_account
 use.miden::active_note
 use.miden::contracts::wallets::basic->wallet
 use.std::mem
@@ -27,20 +27,20 @@ begin
     # => [target_mem_addr']
     dropw
     # => []
-    
+
     # read first word
     push.{mem_address}
     # => [data_mem_address]
-    mem_loadw
+    mem_loadw_be
     # => [NOTE_ARG_1]
-    
+
     push.{expected_note_arg_1} assert_eqw.err="First note argument didn't match expected"
     # => []
 
     # read second word
     push.{mem_address_2}
     # => [data_mem_address_2]
-    mem_loadw
+    mem_loadw_be
     # => [NOTE_ARG_2]
 
     push.{expected_note_arg_2} assert_eqw.err="Second note argument didn't match expected"
@@ -58,7 +58,7 @@ begin
     mem_load
     # => [target_account_id_prefix]
 
-    exec.account::get_id swap drop
+    exec.native_account::get_id swap drop
     # => [account_id_prefix, target_account_id_prefix, ...]
 
     # ensure account_id = target_account_id, fails otherwise

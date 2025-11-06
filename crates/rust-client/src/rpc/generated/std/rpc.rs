@@ -275,7 +275,7 @@ pub mod api_client {
             &mut self,
             request: impl tonic::IntoRequest<super::super::note::NoteRoot>,
         ) -> std::result::Result<
-            tonic::Response<super::super::rpc_store::MaybeNoteScript>,
+            tonic::Response<super::super::shared::MaybeNoteScript>,
             tonic::Status,
         > {
             self.inner

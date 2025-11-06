@@ -40,10 +40,10 @@ fn main() -> miette::Result<()> {
 fn compile_tonic_note_transport_proto() -> miette::Result<()> {
     let file_descriptors = mnt_api_descriptor();
 
-    let mut prost_config = prost_build::Config::new();
+    let mut prost_config = tonic_prost_build::Config::new();
     prost_config.skip_debug(["AccountId", "Digest"]);
 
-    let mut web_tonic_prost_config = prost_build::Config::new();
+    let mut web_tonic_prost_config = tonic_prost_build::Config::new();
     web_tonic_prost_config.skip_debug(["AccountId", "Digest"]);
 
     // Generate the header of the user facing server from its proto file

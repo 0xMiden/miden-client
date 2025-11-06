@@ -66,8 +66,11 @@ miden-node-proto-build           = { workspace = true }
 miden-note-transport-proto-build = { workspace = true }
 miden-objects                    = { workspace = true }
 miette                           = { workspace = true }
-prost-build                      = { version = "0.14" }
+prost                            = { default-features = false, features = ["derive"], version = "0.14" }
+prost-build                      = { default-features = false, version = "0.14" }
+protox                           = { version = "0.7" }
 tonic-build                      = { version = "0.14" }
+tonic-prost                      = { version = "0.14" }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]

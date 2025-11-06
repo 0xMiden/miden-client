@@ -57,7 +57,10 @@ impl WebClient {
             .await
             .map_err(|err| js_error_with_context(err, "failed to get public key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
-        let NativeAuthSecretKey::RpoFalcon512(secret_key) = auth_secret_key;
+
+        let NativeAuthSecretKey::RpoFalcon512(secret_key) = auth_secret_key else {
+            todo!() // TODO: what to do with other types of signatures?
+        };
 
         Ok(secret_key.into())
     }

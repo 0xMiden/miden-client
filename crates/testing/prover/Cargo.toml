@@ -16,7 +16,7 @@ miden-remote-prover = { features = ["concurrent"], workspace = true }
 anyhow             = { workspace = true }
 tokio              = { features = ["net"], workspace = true }
 tokio-stream       = { features = ["net"], version = "0.1" }
-tonic              = { default-features = false, features = ["transport"], version = "0.14" }
+tonic              = { default-features = false, features = ["router", "transport"], version = "0.14" }
 tonic-web          = { version = "0.14" }
 tracing            = { version = "0.1" }
 tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
