@@ -3,7 +3,6 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 
-use miden_objects::Word;
 use miden_objects::account::{
     AccountId,
     PartialAccount,

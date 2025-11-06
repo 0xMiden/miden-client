@@ -422,8 +422,8 @@ async fn deploy_foreign_account(
         )
         .await?;
     wait_for_tx(client, tx_id).await?;
-    
-    // NOTE: We get the new account state here since the first transaction updates the nonce from 
+
+    // NOTE: We get the new account state here since the first transaction updates the nonce from
     // to 1
     let foreign_account: Account = client.get_account(foreign_account_id).await?.unwrap().into();
 
