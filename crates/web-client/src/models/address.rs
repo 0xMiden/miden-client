@@ -29,21 +29,26 @@ impl Address {
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
-    pub fn from_account_id(account_id: &AccountId, interface: &str) -> Result<Self, JsValue> {
-        let interface: NativeAddressInterface = match interface {
-            "BasicWallet" => NativeAddressInterface::BasicWallet,
-            _else => {
+    pub fn from_account_id(
+        account_id: &AccountId,
+        interface: Option<String>,
+    ) -> Result<Self, JsValue> {
+        let native_account_id: NativeAccountId = account_id.into();
+        let native_address = match interface {
+            None => NativeAddress::new(native_account_id),
+            Some(interface) if &interface == "BasicWallet" => {
+                let routing_params = RoutingParameters::new(NativeAddressInterface::BasicWallet);
+                NativeAddress::new(native_account_id)
+                    .with_routing_parameters(routing_params)
+                    .map_err(|err| js_error_with_context(err, "failed to set routing params"))?
+            },
+            Some(other_interface) => {
                 return Err(JsValue::from_str(&format!(
-                    "failed to build address from account id, wrong interface value given: {interface}"
+                    "failed to build address from account id, wrong interface value given: {other_interface}"
                 )));
             },
         };
 
-        let native_account_id: NativeAccountId = account_id.into();
-        let routing_params = RoutingParameters::new(interface);
-        let native_address = NativeAddress::new(native_account_id)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing params"))?;
         Ok(Self(native_address))
     }
 
