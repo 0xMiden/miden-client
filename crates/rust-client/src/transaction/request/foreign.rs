@@ -11,7 +11,7 @@ use miden_objects::account::{
     PartialStorageMap,
     StorageMap,
 };
-use miden_objects::asset::PartialVault;
+use miden_objects::asset::{AssetVault, PartialVault};
 use miden_objects::transaction::AccountInputs;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 
@@ -137,7 +137,7 @@ impl TryFrom<AccountProof> for AccountInputs {
             header: account_header,
             code,
             storage_details,
-            vault_details: _,
+            vault_details,
         }) = account_details
         {
             // discard slot indices - not needed for execution
@@ -153,14 +153,14 @@ impl TryFrom<AccountProof> for AccountInputs {
                 storage_map_proofs.push(partial_storage);
             }
 
+            let vault: AssetVault = AssetVault::new(&vault_details.assets).unwrap();
             return Ok(AccountInputs::new(
                 PartialAccount::new(
                     account_header.id(),
                     account_header.nonce(),
                     code,
                     PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
-                    // We don't use vault information so we leave it empty
-                    PartialVault::new(Word::default()),
+                    PartialVault::new_full(vault),
                     None,
                 )?,
                 witness,

@@ -828,7 +828,7 @@ where
 
         // Optionally retrieve block header if we don't have it
         if self.store.get_block_header_by_num(block_num).await?.is_none() {
-            info!(
+            std::println!(
                 "Getting current block header data to execute transaction with foreign account requirements"
             );
             let summary = self.sync_state().await?;
