@@ -40,11 +40,11 @@
 
 ### interface()
 
-> **interface**(): [`AddressInterface`](../type-aliases/AddressInterface.md)
+> **interface**(): `"BasicWallet"`
 
 #### Returns
 
-[`AddressInterface`](../type-aliases/AddressInterface.md)
+`"BasicWallet"`
 
 ***
 
@@ -100,7 +100,7 @@ Return stringified version of self.
 
 ### fromAccountId()
 
-> `static` **fromAccountId**(`account_id`, `_interface`): `Address`
+> `static` **fromAccountId**(`account_id`, `_interface?`): `Address`
 
 #### Parameters
 
@@ -108,7 +108,7 @@ Return stringified version of self.
 
 [`AccountId`](AccountId.md)
 
-##### \_interface
+##### \_interface?
 
 `string`
 
