@@ -7,6 +7,7 @@ use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
@@ -79,12 +80,15 @@ impl AccountComponent {
     #[wasm_bindgen(js_name = "fromPackage")]
     pub fn from_package(
         package: &Package,
-        storage_slots: Vec<StorageSlot>,
+        storage_slots: &StorageSlotArray,
     ) -> Result<AccountComponent, JsValue> {
         let native_package: NativePackage = package.into();
         let native_library = native_package.unwrap_library().as_ref().clone();
-        let native_slots: Vec<NativeStorageSlot> =
-            storage_slots.into_iter().map(Into::into).collect();
+        let native_slots: Vec<NativeStorageSlot> = storage_slots
+            .__inner
+            .iter()
+            .map(|storage_slot| storage_slot.clone().into())
+            .collect();
 
         NativeAccountComponent::new(native_library, native_slots)
             .map(AccountComponent)

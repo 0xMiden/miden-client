@@ -1,6 +1,5 @@
 import { Page } from "@playwright/test";
 import test from "./playwright.global.setup";
-// import { AccountComponent, Package, StorageMap, StorageSlot, TestUtils } from "../dist/crates/miden_client_web";
 
 export const deserializePackageFromBytes = async (
   testingPage: Page
@@ -21,10 +20,13 @@ export const createAccountComponentFromPackage = async (
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
 
-    window.AccountComponent.fromPackage(deserializedPackage, [
-      emptyStorageSlot,
-      storageSlotMap,
-    ]);
+    window.AccountComponent.fromPackage(
+      deserializedPackage,
+      new window.MidenArrays.StorageSlotArray([
+        emptyStorageSlot,
+        storageSlotMap,
+      ])
+    );
   });
 };
 

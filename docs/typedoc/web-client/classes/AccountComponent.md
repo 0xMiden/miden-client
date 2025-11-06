@@ -96,7 +96,7 @@
 
 ##### storage\_slots
 
-[`StorageSlot`](StorageSlot.md)[]
+[`StorageSlotArray`](StorageSlotArray.md)
 
 #### Returns
 
