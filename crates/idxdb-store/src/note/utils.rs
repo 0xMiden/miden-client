@@ -77,7 +77,7 @@ pub struct SerializedOutputNoteData {
 // ================================================================================================
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let note_id = note.id().to_hex().to_string();
+    let note_id = note.id().to_hex().clone();
     let note_assets = note.assets().to_bytes();
 
     let details = note.details();
@@ -138,7 +138,7 @@ pub async fn upsert_note_script_tx(note_script: &NoteScript) -> Result<(), Store
 }
 
 pub(crate) fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
-    let note_id = note.id().to_hex().to_string();
+    let note_id = note.id().to_hex().clone();
     let note_assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
     let metadata = note.metadata().to_bytes();
