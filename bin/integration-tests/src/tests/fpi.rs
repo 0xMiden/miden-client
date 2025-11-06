@@ -64,7 +64,6 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let code = format!(
         "
         use.miden::tx
-        use.miden::account
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
@@ -412,6 +411,9 @@ async fn deploy_foreign_account(
         .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
+    println!("account commitment before tx {}", foreign_account.commitment());
+    println!("account nonce before tx {}", foreign_account.nonce());
+
     println!("Deploying foreign account");
 
     let tx_id = client
@@ -423,6 +425,17 @@ async fn deploy_foreign_account(
         )
         .await?;
     wait_for_tx(client, tx_id).await?;
+
+    let foreign_account: Account = client.get_account(foreign_account_id).await?.unwrap().into();
+    println!("account commitment after tx {}", foreign_account.commitment());
+    println!("account nonce after tx {}", foreign_account.nonce());
+
+
+            std::println!("foreign_account_inputs nonce {}", foreign_account.nonce());
+        std::println!("foreign_account_inputs storage comm {}", foreign_account.storage().commitment());
+        std::println!("foreign_account_inputs vault comm {}", foreign_account.vault().root());
+        std::println!("foreign_account_inputs code comm {}", foreign_account.code().commitment());
+
 
     Ok((foreign_account, proc_root))
 }
