@@ -52,7 +52,6 @@ thiserror         = { workspace = true }
 tonic             = { default-features = false, features = ["codegen"], version = "0.14" }
 tonic-health      = { version = "0.14" }
 tonic-prost       = { version = "0.14" }
-tonic-prost-build = { version = "0.14" }
 tracing           = { workspace = true }
 uuid              = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
 
