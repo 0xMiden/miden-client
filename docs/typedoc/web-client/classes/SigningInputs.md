@@ -14,6 +14,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### arbitraryPayload()
 
 > **arbitraryPayload**(): [`FeltArray`](FeltArray.md)

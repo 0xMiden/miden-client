@@ -42,6 +42,16 @@ The vault key associated with the asset.
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`
