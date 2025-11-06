@@ -128,7 +128,7 @@ impl JsVaultAsset {
     pub fn from_asset(asset: &Asset, vault_root: Word) -> Self {
         Self {
             root: vault_root.to_hex(),
-            vault_key: asset.vault_key().to_hex(),
+            vault_key: Word::from(asset.vault_key()).to_hex(),
             faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
             asset: Word::from(asset).to_hex(),
         }

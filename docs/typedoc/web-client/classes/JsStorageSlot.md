@@ -42,6 +42,16 @@ The value stored in the storage slot.
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`

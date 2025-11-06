@@ -32,6 +32,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### digest()
 
 > **digest**(): [`Word`](Word.md)

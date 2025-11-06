@@ -224,7 +224,7 @@ impl MockRpcApi {
                     let account_vault_update = AccountVaultUpdate {
                         block_num: block_number,
                         asset: Some(asset),
-                        vault_key: asset.vault_key(),
+                        vault_key: asset.vault_key().into(),
                     };
                     updates.push(account_vault_update);
                 }
