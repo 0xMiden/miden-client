@@ -4,7 +4,8 @@ use miden_client::vm::AdviceMap as NativeAdviceMap;
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 
-use super::felt::{Felt, FeltArray};
+use super::felt::Felt;
+use crate::models::miden_arrays::FeltArray;
 use crate::models::word::Word;
 
 #[derive(Clone)]

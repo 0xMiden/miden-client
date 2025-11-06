@@ -290,7 +290,7 @@ try {
     // Create note arguments
     const noteArgs = [new Felt(BigInt(9)), new Felt(BigInt(12))];
     const feltArray = new FeltArray();
-    noteArgs.forEach(felt => feltArray.append(felt));
+    noteArgs.forEach(felt => feltArray.push(felt));
 
     // Create custom note script
     const noteScript = `

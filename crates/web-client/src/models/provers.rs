@@ -9,6 +9,7 @@ use miden_client::transaction::{
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct TransactionProver {
     prover: Arc<dyn TransactionProverTrait + Send + Sync>,
     endpoint: Option<String>,

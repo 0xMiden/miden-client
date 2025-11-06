@@ -31,6 +31,7 @@ export {
   InputNoteRecord,
   InputNoteState,
   Library,
+  MidenArrays,
   NetworkId,
   Note,
   NoteAndArgs,
