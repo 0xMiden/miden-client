@@ -28,7 +28,7 @@ miden-objects             = { workspace = true }
 anyhow      = { workspace = true }
 rand        = { workspace = true }
 rand_chacha = { version = "0.9" }
-tokio       = { features = ["full"], version = "1.0" }
+tokio       = { features = ["signal"], workspace = true }
 url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]

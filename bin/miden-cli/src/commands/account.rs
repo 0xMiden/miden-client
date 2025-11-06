@@ -178,7 +178,7 @@ pub async fn show_account<AUTH>(
                     )
                 },
             };
-            table.add_row(vec![asset_type, &faucet, &amount.to_string()]);
+            table.add_row(vec![asset_type, &faucet, &amount.clone()]);
         }
 
         println!("{table}\n");

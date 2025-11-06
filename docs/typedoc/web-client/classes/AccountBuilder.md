@@ -24,6 +24,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### accountType()
 
 > **accountType**(`account_type`): `AccountBuilder`

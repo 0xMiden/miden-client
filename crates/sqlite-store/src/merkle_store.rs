@@ -12,10 +12,10 @@ pub fn get_asset_proof(
     asset: &Asset,
 ) -> Result<SmtProof, StoreError> {
     let path = merkle_store
-        .get_path(vault_root, get_node_index(asset.vault_key())?)?
+        .get_path(vault_root, get_node_index(asset.vault_key().into())?)?
         .path
         .try_into()?;
-    let leaf = SmtLeaf::new_single(asset.vault_key(), (*asset).into());
+    let leaf = SmtLeaf::new_single(asset.vault_key().into(), (*asset).into());
 
     Ok(SmtProof::new(path, leaf)?)
 }
@@ -30,8 +30,8 @@ pub fn update_asset_nodes(
         root = merkle_store
             .set_node(
                 root,
-                get_node_index(asset.vault_key())?,
-                get_node_value(asset.vault_key(), asset.into()),
+                get_node_index(asset.vault_key().into())?,
+                get_node_value(asset.vault_key().into(), asset.into()),
             )?
             .root;
     }
@@ -45,7 +45,8 @@ pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
     // we don't have direct access to the vault's SMT nodes.
     // Safe unwrap as we are sure that the vault's SMT nodes are valid.
     let smt =
-        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key(), asset.into()))).unwrap();
+        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key().into(), asset.into())))
+            .unwrap();
     merkle_store.extend(smt.inner_nodes());
 }
 
