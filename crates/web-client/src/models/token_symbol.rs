@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use crate::js_error_with_context;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct TokenSymbol(NativeTokenSymbol);
 
 #[wasm_bindgen]

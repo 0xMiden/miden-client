@@ -20,7 +20,7 @@
 
 ##### felts
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 #### Returns
 
@@ -40,11 +40,11 @@
 
 ### felts()
 
-> **felts**(): [`Felt`](Felt.md)[]
+> **felts**(): [`FeltArray`](FeltArray.md)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 ***
 

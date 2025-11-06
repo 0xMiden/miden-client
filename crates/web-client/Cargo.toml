@@ -32,6 +32,7 @@ hex                      = { version = "0.4" }
 miden-core               = { version = "0.18.1" }                              # TODO: used only to access MastNodeExt trait, consider re-exporting through base/client crate
 rand                     = { workspace = true }
 serde-wasm-bindgen       = { version = "0.6" }
+thiserror.workspace      = true
 wasm-bindgen             = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures     = { version = "0.4" }
 

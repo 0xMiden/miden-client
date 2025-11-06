@@ -26,11 +26,11 @@
 
 ### arbitraryPayload()
 
-> **arbitraryPayload**(): [`Felt`](Felt.md)[]
+> **arbitraryPayload**(): [`FeltArray`](FeltArray.md)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 ***
 
@@ -76,11 +76,11 @@
 
 ### toElements()
 
-> **toElements**(): [`Felt`](Felt.md)[]
+> **toElements**(): [`FeltArray`](FeltArray.md)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 ***
 

@@ -10,11 +10,11 @@
 
 ### Constructor
 
-> **new NoteDetailsArray**(`note_details_array?`): `NoteDetailsArray`
+> **new NoteDetailsArray**(`elements?`): `NoteDetailsArray`
 
 #### Parameters
 
-##### note\_details\_array?
+##### elements?
 
 [`NoteDetails`](NoteDetails.md)[]
 
@@ -44,16 +44,88 @@
 
 ***
 
-### push()
+### get()
 
-> **push**(`note_details`): `void`
+> **get**(`index`): [`NoteDetails`](NoteDetails.md)
+
+Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Parameters
 
-##### note\_details
+##### index
+
+`number`
+
+#### Returns
+
+[`NoteDetails`](NoteDetails.md)
+
+***
+
+### length()
+
+> **length**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
+### push()
+
+> **push**(`element`): `void`
+
+#### Parameters
+
+##### element
 
 [`NoteDetails`](NoteDetails.md)
 
 #### Returns
 
 `void`
+
+***
+
+### replaceAt()
+
+> **replaceAt**(`index`, `elem`): `void`
+
+#### Parameters
+
+##### index
+
+`number`
+
+##### elem
+
+[`NoteDetails`](NoteDetails.md)
+
+#### Returns
+
+`void`
+
+***
+
+### toJSON()
+
+> **toJSON**(): `Object`
+
+* Return copy of self without private attributes.
+
+#### Returns
+
+`Object`
+
+***
+
+### toString()
+
+> **toString**(): `string`
+
+Return stringified version of self.
+
+#### Returns
+
+`string`

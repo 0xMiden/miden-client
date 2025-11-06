@@ -136,7 +136,7 @@
 
 ##### recipients
 
-[`RecipientArray`](RecipientArray.md)
+[`NoteRecipientArray`](NoteRecipientArray.md)
 
 #### Returns
 
@@ -152,7 +152,7 @@
 
 ##### foreign\_accounts
 
-[`ForeignAccount`](ForeignAccount.md)[]
+[`ForeignAccountArray`](ForeignAccountArray.md)
 
 #### Returns
 
@@ -168,7 +168,7 @@
 
 ##### notes
 
-[`OutputNotesArray`](OutputNotesArray.md)
+[`OutputNoteArray`](OutputNoteArray.md)
 
 #### Returns
 
