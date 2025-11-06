@@ -25,6 +25,7 @@
 * Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
+* Introduce an accounts and note tags limit to be tracked by the client. ([#1476](https://github.com/0xMiden/miden-client/pull/1476)).
 
 ### Changes
 
