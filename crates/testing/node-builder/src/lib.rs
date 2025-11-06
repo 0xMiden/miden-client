@@ -314,13 +314,13 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NetworkTransactionBuilder {
+                NetworkTransactionBuilder::new(
                     store_url,
                     block_producer_url,
-                    tx_prover_url: None,
-                    ticker_interval: Duration::from_millis(200),
-                    bp_checkpoint: production_checkpoint,
-                }
+                    None,
+                    Duration::from_millis(200),
+                    production_checkpoint,
+                )
                 .serve_new()
                 .await
                 .context("failed while serving ntx builder component")

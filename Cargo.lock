@@ -2320,6 +2320,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96051b46fc183dc9cd4a223960ef37b9af631b55191852a8274bfef064cda20f"
+
+[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2722,7 +2728,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "futures",
@@ -2750,7 +2756,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "quote",
  "syn 2.0.109",
@@ -2759,10 +2765,11 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "futures",
+ "lru 0.16.2",
  "miden-node-proto",
  "miden-node-utils",
  "miden-objects",
@@ -2779,7 +2786,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2801,7 +2808,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "fs-err",
  "miette",
@@ -2812,7 +2819,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "futures",
@@ -2839,7 +2846,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2871,7 +2878,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2968,7 +2975,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3012,7 +3019,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=jmunoz-update-miden-base#edd94b9123590db112320d42fee49dcf893f93ca"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
 dependencies = [
  "getrandom 0.3.4",
  "miden-node-proto-build",
@@ -3718,7 +3725,7 @@ dependencies = [
  "httpdate",
  "indexmap 1.9.3",
  "log",
- "lru",
+ "lru 0.14.0",
  "once_cell",
  "parking_lot",
  "pingora-core",
@@ -3877,7 +3884,7 @@ checksum = "996c574f30a6e1ad10b47ac1626a86e0e47d5075953dd049d60df16ba5f7076e"
 dependencies = [
  "crossbeam-queue",
  "log",
- "lru",
+ "lru 0.14.0",
  "parking_lot",
  "pingora-timeout",
  "thread_local",
