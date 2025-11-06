@@ -35,3 +35,13 @@
 #### Returns
 
 [`AccountId`](AccountId.md)
+
+***
+
+### createMockSerializedPackage()
+
+> `static` **createMockSerializedPackage**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`

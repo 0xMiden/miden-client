@@ -55,6 +55,7 @@ export {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  Package,
   PublicKey,
   Rpo256,
   RpcClient,
