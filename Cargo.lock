@@ -1842,7 +1842,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2693,9 +2693,9 @@ dependencies = [
 
 [[package]]
 name = "miden-lib"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42e16595f7c2c37689b9fd0fffaedb978c1b9e9aa795751ad82108365530dae8"
+checksum = "44abeb7f67252547fa54605e61e89256fa546e2f25de382ccac78a1ced07ff88"
 dependencies = [
  "Inflector",
  "fs-err",
@@ -2953,9 +2953,9 @@ dependencies = [
 
 [[package]]
 name = "miden-objects"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb47d96f891e22114d27748353db7dfd93247d777e1679bac44ee544ea9b204d"
+checksum = "0ef49472012d00be68f68dcbb13b4f28867fb6271c76c014bc555ef6e8e0958a"
 dependencies = [
  "bech32",
  "getrandom 0.3.3",
@@ -3091,9 +3091,9 @@ dependencies = [
 
 [[package]]
 name = "miden-testing"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e5612893747091011d535b3a8a9904feab931415dd015d74d939f345d5b7dc"
+checksum = "7e64b086dfad33bc235d847cde20959d7b88d46d1da50d48ad2192321dbc2bcf"
 dependencies = [
  "anyhow",
  "itertools",
@@ -3111,9 +3111,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0ca3864d4a5ed445aeb1b8580e76e347d34691c642b67a79278aeb7b429f073"
+checksum = "a8d0ddcbaaa1002b954525212ebfa7ee097e6af9d26847b3d977b3ffa9f3edeb"
 dependencies = [
  "miden-lib",
  "miden-objects",
