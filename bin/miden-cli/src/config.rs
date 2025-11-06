@@ -133,7 +133,7 @@ impl TryFrom<&str> for CliEndpoint {
     type Error = String;
 
     fn try_from(endpoint: &str) -> Result<Self, Self::Error> {
-        let endpoint = Endpoint::try_from(endpoint).map_err(|err| err.to_string())?;
+        let endpoint = Endpoint::try_from(endpoint).map_err(|err| err.clone())?;
         Ok(Self(endpoint))
     }
 }

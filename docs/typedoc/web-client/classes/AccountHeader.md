@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### codeCommitment()
 
 > **codeCommitment**(): [`Word`](Word.md)

@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### decimals()
 
 > **decimals**(): `number`

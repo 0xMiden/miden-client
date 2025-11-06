@@ -274,7 +274,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
                 1.0.to_string(),
             ),
         };
-        table.add_row(vec![asset_type, &faucet, &amount.to_string()]);
+        table.add_row(vec![asset_type, &faucet, &amount.clone()]);
     }
     println!("{table}");
 

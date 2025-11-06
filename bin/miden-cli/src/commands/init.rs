@@ -99,7 +99,7 @@ impl InitCmd {
 
         cli_config.note_transport =
             self.note_transport_endpoint.as_ref().map(|rpc| NoteTransportConfig {
-                endpoint: rpc.to_string(),
+                endpoint: rpc.clone(),
                 ..Default::default()
             });
 

@@ -10,6 +10,16 @@ A serialized representation of a note.
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`

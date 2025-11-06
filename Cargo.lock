@@ -39,17 +39,6 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
-dependencies = [
- "getrandom 0.2.16",
- "once_cell",
- "version_check",
-]
-
-[[package]]
-name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
@@ -188,13 +177,12 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "2.0.17"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd389a4b2970a01282ee455294913c0a43724daedcd1a24c3eb0ec1c1320b66"
+checksum = "bcbb6924530aa9e0432442af08bbcafdad182db80d2e560da42a6d442535bf85"
 dependencies = [
  "anstyle",
  "bstr",
- "doc-comment",
  "libc",
  "predicates",
  "predicates-core",
@@ -1101,12 +1089,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8975ffdaa0ef3661bfe02dbdcc06c9f829dfafe6a3c474de366a8d5e44276921"
 
 [[package]]
-name = "doc-comment"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
-
-[[package]]
 name = "document-features"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1605,9 +1587,6 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-dependencies = [
- "ahash 0.7.8",
-]
 
 [[package]]
 name = "hashbrown"
@@ -1842,7 +1821,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2026,17 +2005,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "io-uring"
-version = "0.7.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "046fa2d4d00aea763528b4950358d0ead425372445dc8ff86312b3c69ff7727b"
-dependencies = [
- "bitflags 2.9.4",
- "cfg-if",
- "libc",
 ]
 
 [[package]]
@@ -2517,7 +2485,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.16",
  "tokio",
- "toml 0.8.23",
+ "toml 0.9.7",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -3751,7 +3719,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef622051fbb2cb98a524df3a8112f02d0919ccda600a44d705ec550f1a28fe2"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "blake2",
  "bytes",
@@ -3787,7 +3755,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76f63d3f67d99c95a1f85623fc43242fd644dd12ccbaa18c38a54e1580c6846a"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "brotli",
  "bytes",
@@ -3819,7 +3787,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "sfv",
- "socket2 0.5.10",
+ "socket2",
  "strum",
  "strum_macros",
  "tokio",
@@ -3877,7 +3845,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b93c897e8cc04ff0d077ee2a655142910618222aeefc83f7f99f5b9fc59ccb13"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
 ]
 
 [[package]]
@@ -3909,7 +3877,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba89e4400cb978f0d7be1c14bd7ab4168c8e2c00d97ff19f964fc0048780237c"
 dependencies = [
  "arrayvec",
- "hashbrown 0.12.3",
+ "hashbrown 0.16.0",
  "parking_lot",
  "rand 0.8.5",
 ]
@@ -4217,7 +4185,7 @@ version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac6c3320f9abac597dcbc668774ef006702672474aad53c6d596b62e487b40b1"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools",
  "log",
  "multimap",
@@ -5105,16 +5073,6 @@ checksum = "b7c388c1b5e93756d0c740965c41e8822f866621d41acbdf6336a6a168f8840c"
 
 [[package]]
 name = "socket2"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e22376abed350d73dd1cd119b57ffccad95b4e585a7cda43e286245ce23c0678"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "socket2"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
@@ -5502,29 +5460,26 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.47.1"
+version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89e49afdadebb872d3145a5638b59eb0691ea23e46ca484037cfab3b76b95038"
+checksum = "ff360e02eab121e0bc37a2d3b4d4dc622e6eda3a8e5253d5435ecf5bd4c68408"
 dependencies = [
- "backtrace",
  "bytes",
- "io-uring",
  "libc",
  "mio",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "slab",
- "socket2 0.6.0",
+ "socket2",
  "tokio-macros",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.1",
 ]
 
 [[package]]
 name = "tokio-macros"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
+checksum = "af407857209536a95c8e56f8231ef2c2e2aff839b22e07a1ffcbc617e9db9fa5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5689,7 +5644,7 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "rustls-native-certs",
- "socket2 0.6.0",
+ "socket2",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",

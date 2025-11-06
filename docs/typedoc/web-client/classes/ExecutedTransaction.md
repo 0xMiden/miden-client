@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### accountDelta()
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
