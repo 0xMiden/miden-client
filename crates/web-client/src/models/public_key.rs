@@ -40,6 +40,7 @@ impl PublicKey {
                 let message = signing_inputs.to_commitment().into();
                 native_public_key.verify(message, &falcon_signature)
             },
+            NativeSignature::EcdsaK256Keccak(_) => todo!(), // TODO: how to handle this case
         }
     }
 }

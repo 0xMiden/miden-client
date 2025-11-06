@@ -10,6 +10,16 @@ WASM wrapper around the native [`ProvenTransaction`].
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### accountId()
 
 > **accountId**(): [`AccountId`](AccountId.md)

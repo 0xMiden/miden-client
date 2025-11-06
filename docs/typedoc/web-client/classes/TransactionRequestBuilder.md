@@ -18,6 +18,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### build()
 
 > **build**(): [`TransactionRequest`](TransactionRequest.md)
@@ -126,7 +136,7 @@
 
 ##### recipients
 
-[`RecipientArray`](RecipientArray.md)
+[`NoteRecipientArray`](NoteRecipientArray.md)
 
 #### Returns
 
@@ -142,7 +152,7 @@
 
 ##### foreign\_accounts
 
-[`ForeignAccount`](ForeignAccount.md)[]
+[`ForeignAccountArray`](ForeignAccountArray.md)
 
 #### Returns
 
@@ -158,7 +168,7 @@
 
 ##### notes
 
-[`OutputNotesArray`](OutputNotesArray.md)
+[`OutputNoteArray`](OutputNoteArray.md)
 
 #### Returns
 

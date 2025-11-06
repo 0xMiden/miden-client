@@ -20,7 +20,7 @@
 
 ##### felts
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 #### Returns
 
@@ -28,13 +28,23 @@
 
 ## Methods
 
-### felts()
+### \[dispose\]()
 
-> **felts**(): [`Felt`](Felt.md)[]
+> **\[dispose\]**(): `void`
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+`void`
+
+***
+
+### felts()
+
+> **felts**(): [`FeltArray`](FeltArray.md)
+
+#### Returns
+
+[`FeltArray`](FeltArray.md)
 
 ***
 

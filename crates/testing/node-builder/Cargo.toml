@@ -21,14 +21,14 @@ miden-node-block-producer = { workspace = true }
 miden-node-ntx-builder    = { workspace = true }
 miden-node-rpc            = { workspace = true }
 miden-node-store          = { workspace = true }
-miden-node-utils          = { workspace = true }
+miden-node-utils          = { features = ["testing", "tracing-forest"], workspace = true }
 miden-objects             = { workspace = true }
 
 # External dependencies
 anyhow      = { workspace = true }
 rand        = { workspace = true }
 rand_chacha = { version = "0.9" }
-tokio       = { features = ["full"], version = "1.0" }
+tokio       = { features = ["signal"], workspace = true }
 url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]

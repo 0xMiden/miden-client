@@ -1,9 +1,8 @@
 use std::str::FromStr;
 
 use miden_client::Client;
-use miden_client::account::AccountIdAddress;
-use miden_client::address::{Address, AddressInterface, NetworkId};
-use miden_client::note::NoteExecutionMode;
+use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
+use miden_client::note::{NoteExecutionMode, NoteTag};
 
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
@@ -12,7 +11,6 @@ use crate::{Parser, Subcommand, create_dynamic_table, load_config_file};
 #[derive(Debug, Clone)]
 pub enum CliAddressInterface {
     BasicWallet,
-    Unspecified,
 }
 
 impl FromStr for CliAddressInterface {
@@ -21,7 +19,6 @@ impl FromStr for CliAddressInterface {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "BasicWallet" => Ok(CliAddressInterface::BasicWallet),
-            "Unspecified" => Ok(CliAddressInterface::Unspecified),
             other => Err(format!(
                 "Invalid interface: {other}. Valid values are: BasicWallet, Unspecified",
             )),
@@ -33,7 +30,6 @@ impl From<CliAddressInterface> for AddressInterface {
     fn from(value: CliAddressInterface) -> Self {
         match value {
             CliAddressInterface::BasicWallet => AddressInterface::BasicWallet,
-            CliAddressInterface::Unspecified => AddressInterface::Unspecified,
         }
     }
 }
@@ -99,8 +95,11 @@ fn print_account_addresses(account_id: &String, addresses: &Vec<Address>, networ
     println!("Addresses for AccountId {account_id}:");
     let mut table = create_dynamic_table(&["Address", "Interface"]);
     for address in addresses {
-        let address_bech32 = address.to_bech32(network_id.clone());
-        let interface = address.interface().to_string();
+        let address_bech32 = address.encode(network_id.clone());
+        let interface = match address.interface() {
+            Some(interface) => interface.to_string(),
+            None => "Unspecified".to_string(),
+        };
         table.add_row(vec![address_bech32, interface]);
     }
 
@@ -152,18 +151,22 @@ async fn add_address<AUTH>(
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
     let interface = interface.into();
-    let account_id_address = match tag_len {
-        Some(tag_len) => AccountIdAddress::new(account_id, interface)
-            .with_tag_len(tag_len)
+    let routing_params = match tag_len {
+        Some(tag_len) => RoutingParameters::new(interface)
+            .with_note_tag_len(tag_len)
             .map_err(|e| CliError::Address(e, String::new()))?,
-        None => AccountIdAddress::new(account_id, interface),
+        None => RoutingParameters::new(interface),
     };
+    let address = Address::new(account_id)
+        .with_routing_parameters(routing_params)
+        .map_err(|err| CliError::Address(err, "Failed to set routing params".to_string()))?;
 
-    let execution_mode = match account_id_address.to_note_tag().execution_mode() {
+    let note_tag = NoteTag::from_account_id(account_id);
+    let execution_mode = match note_tag.execution_mode() {
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",
     };
-    client.add_address(account_id_address.into(), account_id).await?;
+    client.add_address(address, account_id).await?;
 
     println!("Address added: Account Id {account_id} - Execution mode: {execution_mode}");
     Ok(())
@@ -175,7 +178,7 @@ async fn remove_address<AUTH>(
     address: String,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let (_, address) = Address::from_bech32(&address).map_err(|e| CliError::Address(e, address))?;
+    let (_, address) = Address::decode(&address).map_err(|e| CliError::Address(e, address))?;
     let execution_mode = match address.to_note_tag().execution_mode() {
         NoteExecutionMode::Local => "Local",
         NoteExecutionMode::Network => "Network",

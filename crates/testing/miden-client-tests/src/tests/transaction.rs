@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 
 use miden_client::ClientError;
+use miden_client::auth::AuthSecretKey;
 use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
@@ -9,7 +10,6 @@ use miden_objects::account::{
     AccountBuilder,
     AccountComponent,
     AccountStorageMode,
-    AuthSecretKey,
     StorageMap,
     StorageSlot,
 };

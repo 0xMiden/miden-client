@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use miden_client::Felt;
 use miden_client::account::{Account, AccountStorageMode};
-use miden_client::address::{AccountIdAddress, Address, AddressInterface};
+use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
 use miden_client::store::NoteFilter;
@@ -20,8 +20,9 @@ async fn transport_basic() {
     let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
-    let recipient_address =
-        Address::from(AccountIdAddress::new(recipient_account.id(), AddressInterface::BasicWallet));
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
+        .unwrap();
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
     // Create note

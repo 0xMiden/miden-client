@@ -65,7 +65,7 @@ pub use miden_objects::{
         StorageSlot,
         StorageSlotType,
     },
-    address::{AccountIdAddress, Address, AddressInterface, AddressType, NetworkId},
+    address::{Address, AddressInterface, AddressType, NetworkId},
 };
 
 use super::Client;
@@ -162,10 +162,7 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
-                let default_address = Address::AccountId(AccountIdAddress::new(
-                    account.id(),
-                    AddressInterface::Unspecified,
-                ));
+                let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
@@ -243,7 +240,7 @@ impl<AUTH> Client<AUTH> {
         account_id: AccountId,
     ) -> Result<(), ClientError> {
         let network_id = self.rpc_api.get_network_id().await?;
-        let address_bench32 = address.to_bech32(network_id);
+        let address_bench32 = address.encode(network_id);
         if self.store.get_addresses_by_account_id(account_id).await?.contains(&address) {
             return Err(ClientError::AddressAlreadyTracked(address_bench32));
         }

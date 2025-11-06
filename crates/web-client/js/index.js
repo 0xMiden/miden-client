@@ -2,6 +2,19 @@ import loadWasm from "./wasm.js";
 const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 export * from "../Cargo.toml";
+const buildTypedArraysExport = (exportObject) => {
+  return Object.entries(exportObject).reduce(
+    (exports, [exportName, _export]) => {
+      if (exportName.endsWith("Array")) {
+        exports[exportName] = _export;
+      }
+      return exports;
+    },
+    {}
+  );
+};
+
+export const MidenArrays = buildTypedArraysExport(wasm);
 const { WebClient: WasmWebClient } = wasm;
 /**
  * WebClient is a wrapper around the underlying WASM WebClient object.

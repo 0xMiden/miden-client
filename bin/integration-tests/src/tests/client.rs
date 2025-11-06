@@ -687,9 +687,7 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     );
 
     // Validate the final asset amounts in each account
-    for (client, account_id) in
-        vec![(client, to_account_ids[0]), (unauth_client, to_account_ids[1])]
-    {
+    for (client, account_id) in [(client, to_account_ids[0]), (unauth_client, to_account_ids[1])] {
         assert_account_has_single_asset(
             &client,
             account_id,
@@ -1187,16 +1185,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     // Define the account code for the custom library
     let custom_code = "
-        use.miden::account
+        use.miden::native_account
 
         export.update_map
             push.1.2.3.4
             # => [VALUE]
             push.0.0.0.0
             # => [KEY, VALUE]
-            push.1
+            push.0
             # => [index, KEY, VALUE]
-            exec.account::set_map_item
+            exec.native_account::set_map_item
             dropw dropw dropw dropw
         end
     ";
@@ -1207,7 +1205,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
     )?;
 
-    let storage_slots = vec![StorageSlot::empty_map(), StorageSlot::Map(storage_map)];
+    let storage_slots = vec![StorageSlot::Map(storage_map)];
     let (account_with_map_item, _) = insert_account_with_custom_component(
         &mut client,
         custom_code,

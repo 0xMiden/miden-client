@@ -77,6 +77,7 @@ pub mod note_tag;
 pub mod note_type;
 pub mod output_note;
 pub mod output_notes;
+pub mod package;
 pub mod partial_note;
 pub mod proven_transaction;
 pub mod provers;
@@ -102,3 +103,81 @@ pub mod transaction_status;
 pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
+
+declare_js_miden_arrays! {
+    // TODO: Types that do not implement RefWasmAbi:
+    // (crate::models::account_type::AccountType) -> AccountTypeArray,
+    // (crate::models::note_type::NoteType) -> NoteTypeArray,
+    // (crate::models::input_note_state::InputNoteState) -> InputNoteStateArray,
+    // TODO: These types are missing the Clone trait
+    // (crate::models::transaction_kernel::TransactionKernel) -> TransactionKernelArray,
+    // (crate::models::basic_fungible_faucet_component::BasicFungibleFaucetComponent) -> BasicFungibleFaucetComponentArray,
+    // (crate::models::sync_summary::SyncSummary) -> SyncSummaryArray,
+    (crate::models::account::Account) -> AccountArray,
+    (crate::models::account_builder::AccountBuilder) -> AccountBuilderArray,
+    (crate::models::account_code::AccountCode) -> AccountCodeArray,
+    (crate::models::account_component::AccountComponent) -> AccountComponentArray,
+    (crate::models::account_delta::AccountDelta) -> AccountDeltaArray,
+    (crate::models::account_header::AccountHeader) -> AccountHeaderArray,
+    (crate::models::account_id::AccountId) -> AccountIdArray,
+    (crate::models::account_storage::AccountStorage) -> AccountStorageArray,
+    (crate::models::account_storage_mode::AccountStorageMode) -> AccountStorageModeArray,
+    (crate::models::account_storage_requirements::AccountStorageRequirements) -> AccountStorageRequirementsArray,
+    (crate::models::address::Address) -> AddressArray,
+    (crate::models::advice_inputs::AdviceInputs) -> AdviceInputsArray,
+    (crate::models::advice_map::AdviceMap) -> AdviceMapArray,
+    (crate::models::asset_vault::AssetVault) -> AssetVaultArray,
+    (crate::models::auth_secret_key::AuthSecretKey) -> AuthSecretKeyArray,
+    (crate::models::block_header::BlockHeader) -> BlockHeaderArray,
+    (crate::models::consumable_note_record::ConsumableNoteRecord) -> ConsumableNoteRecordArray,
+    (crate::models::endpoint::Endpoint) -> EndpointArray,
+    (crate::models::executed_transaction::ExecutedTransaction) -> ExecutedTransactionArray,
+    (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
+    (crate::models::fungible_asset::FungibleAsset) -> FungibleAssetArray,
+    (crate::models::input_note::InputNote) -> InputNoteArray,
+    (crate::models::input_note_record::InputNoteRecord) -> InputNoteRecordArray,
+    (crate::models::input_notes::InputNotes) -> InputNotesArray,
+    (crate::models::library::Library) -> LibraryArray,
+    (crate::models::merkle_path::MerklePath) -> MerklePathArray,
+    (crate::models::note::Note) -> NoteArray,
+    (crate::models::note_execution_hint::NoteExecutionHint) -> NoteExecutionHintArray,
+    (crate::models::note_execution_mode::NoteExecutionMode) -> NoteExecutionModeArray,
+    (crate::models::note_filter::NoteFilter) -> NoteFilterArray,
+    (crate::models::note_header::NoteHeader) -> NoteHeaderArray,
+    (crate::models::note_id::NoteId) -> NoteIdArray,
+    (crate::models::note_inclusion_proof::NoteInclusionProof) -> NoteInclusionProofArray,
+    (crate::models::note_inputs::NoteInputs) -> NoteInputsArray,
+    (crate::models::note_location::NoteLocation) -> NoteLocationArray,
+    (crate::models::note_metadata::NoteMetadata) -> NoteMetadataArray,
+    (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
+    (crate::models::note_script::NoteScript) -> NoteScriptArray,
+    (crate::models::note_tag::NoteTag) -> NoteTagArray,
+    (crate::models::output_note::OutputNote) -> OutputNoteArray,
+    (crate::models::partial_note::PartialNote) -> PartialNoteArray,
+    (crate::models::provers::TransactionProver) -> TransactionProverArray,
+    (crate::models::public_key::PublicKey) -> PublicKeyArray,
+    (crate::models::rpo256::Rpo256) -> Rpo256Array,
+    (crate::models::secret_key::SecretKey) -> SecretKeyArray,
+    (crate::models::signature::Signature) -> SignatureArray,
+    (crate::models::signing_inputs::SigningInputs) -> SigningInputsArray,
+    (crate::models::storage_map::StorageMap) -> StorageMapArray,
+    (crate::models::storage_slot::StorageSlot) -> StorageSlotArray,
+    (crate::models::token_symbol::TokenSymbol) -> TokenSymbolArray,
+    (crate::models::transaction_args::TransactionArgs) -> TransactionArgsArray,
+    (crate::models::transaction_filter::TransactionFilter) -> TransactionFilterArray,
+    (crate::models::transaction_id::TransactionId) -> TransactionIdArray,
+    (crate::models::transaction_record::TransactionRecord) -> TransactionRecordArray,
+    (crate::models::transaction_request::TransactionRequest) -> TransactionRequestArray,
+    (crate::models::transaction_result::TransactionResult) -> TransactionResultArray,
+    (crate::models::transaction_script::TransactionScript) -> TransactionScriptArray,
+    (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
+    (crate::models::transaction_status::TransactionStatus) -> TransactionStatusArray,
+    (crate::models::transaction_summary::TransactionSummary) -> TransactionSummaryArray,
+    (crate::models::word::Word) -> WordArray,
+    (crate::models::felt::Felt) -> FeltArray,
+    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
+    (crate::models::note_details::NoteDetails) -> NoteDetailsArray,
+    (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
+    (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
+    (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
+}

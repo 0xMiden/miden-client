@@ -14,13 +14,23 @@
 
 ## Methods
 
-### arbitraryPayload()
+### \[dispose\]()
 
-> **arbitraryPayload**(): [`Felt`](Felt.md)[]
+> **\[dispose\]**(): `void`
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+`void`
+
+***
+
+### arbitraryPayload()
+
+> **arbitraryPayload**(): [`FeltArray`](FeltArray.md)
+
+#### Returns
+
+[`FeltArray`](FeltArray.md)
 
 ***
 
@@ -66,11 +76,11 @@
 
 ### toElements()
 
-> **toElements**(): [`Felt`](Felt.md)[]
+> **toElements**(): [`FeltArray`](FeltArray.md)
 
 #### Returns
 
-[`Felt`](Felt.md)[]
+[`FeltArray`](FeltArray.md)
 
 ***
 

@@ -12,6 +12,7 @@ use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct SecretKey(NativeSecretKey);
 
 #[wasm_bindgen]

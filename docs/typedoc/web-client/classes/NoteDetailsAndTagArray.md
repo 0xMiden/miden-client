@@ -10,11 +10,11 @@
 
 ### Constructor
 
-> **new NoteDetailsAndTagArray**(`note_details_and_tag_array?`): `NoteDetailsAndTagArray`
+> **new NoteDetailsAndTagArray**(`elements?`): `NoteDetailsAndTagArray`
 
 #### Parameters
 
-##### note\_details\_and\_tag\_array?
+##### elements?
 
 [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
 
@@ -23,6 +23,16 @@
 `NoteDetailsAndTagArray`
 
 ## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
 
 ### free()
 
@@ -34,16 +44,88 @@
 
 ***
 
-### push()
+### get()
 
-> **push**(`note_details_and_tag`): `void`
+> **get**(`index`): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)
+
+Get element at index, will always return a clone to avoid aliasing issues.
 
 #### Parameters
 
-##### note\_details\_and\_tag
+##### index
+
+`number`
+
+#### Returns
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)
+
+***
+
+### length()
+
+> **length**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
+### push()
+
+> **push**(`element`): `void`
+
+#### Parameters
+
+##### element
 
 [`NoteDetailsAndTag`](NoteDetailsAndTag.md)
 
 #### Returns
 
 `void`
+
+***
+
+### replaceAt()
+
+> **replaceAt**(`index`, `elem`): `void`
+
+#### Parameters
+
+##### index
+
+`number`
+
+##### elem
+
+[`NoteDetailsAndTag`](NoteDetailsAndTag.md)
+
+#### Returns
+
+`void`
+
+***
+
+### toJSON()
+
+> **toJSON**(): `Object`
+
+* Return copy of self without private attributes.
+
+#### Returns
+
+`Object`
+
+***
+
+### toString()
+
+> **toString**(): `string`
+
+Return stringified version of self.
+
+#### Returns
+
+`string`

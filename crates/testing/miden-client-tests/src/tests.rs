@@ -5,7 +5,9 @@ use std::println;
 use std::string::ToString;
 use std::sync::Arc;
 
-use miden_client::account::{AccountIdAddress, Address, AddressInterface};
+use miden_client::account::{Address, AddressInterface};
+use miden_client::address::RoutingParameters;
+use miden_client::auth::{AuthSecretKey, PublicKeyCommitment};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
@@ -47,8 +49,7 @@ use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::faucets::BasicFungibleFaucet;
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_lib::account::wallets::BasicWallet;
-use miden_lib::note::utils;
-use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::note::{WellKnownNote, utils};
 use miden_lib::testing::mock_account::MockAccountExt;
 use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
@@ -62,8 +63,6 @@ use miden_objects::account::{
     AccountId,
     AccountStorageMode,
     AccountType,
-    AuthSecretKey,
-    PublicKeyCommitment,
     StorageMap,
     StorageSlot,
 };
@@ -1081,9 +1080,11 @@ async fn p2ide_transfer_consumed_by_target() {
             client.rng(),
         )
         .unwrap();
+
     Box::pin(client.submit_new_transaction(from_account_id, tx_request.clone()))
         .await
         .unwrap();
+
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -1370,6 +1371,7 @@ async fn get_consumable_notes() {
             client.rng(),
         )
         .unwrap();
+
     Box::pin(client.submit_new_transaction(from_account_id, tx_request))
         .await
         .unwrap();
@@ -1940,18 +1942,18 @@ const BUMP_MAP_CODE: &str = "export.bump_map_item
                     # item index
                     push.0
                     # => [index, KEY]
-                    exec.::miden::account::get_map_item
+                    exec.::miden::active_account::get_map_item
                     add.1
                     push.{map_key}
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     dropw
                     # => [OLD_VALUE]
                     dupw
                     push.0
                     # Set a new item each time as the value keeps changing
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     dropw dropw
                 end";
 
@@ -2087,13 +2089,13 @@ async fn account_addresses_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
     assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
     // Even when the account has a basic wallet, the address list should not contain it by default
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
@@ -2107,12 +2109,12 @@ async fn account_addresses_non_basic_wallet() {
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
     assert!(retrieved_acc.addresses().contains(&unspecified_default_address));
 
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(!retrieved_acc.addresses().contains(&basic_wallet_address));
 }
 
@@ -2128,8 +2130,7 @@ async fn account_add_address_after_creation() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let unspecified_default_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+    let unspecified_default_address = Address::new(account.id());
 
     // The default unspecified address cannot be added
     // as it is already present after account creation
@@ -2137,8 +2138,9 @@ async fn account_add_address_after_creation() {
 
     // The basic wallet address cannot be added
     // as it is already present after account creation
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address =
-        Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::BasicWallet));
+        Address::new(account.id()).with_routing_parameters(routing_params).unwrap();
     assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
 
     // We can remove the basic wallet address
