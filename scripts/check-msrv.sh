@@ -86,7 +86,7 @@ while IFS=$'\t' read -r pkg_id package_name manifest_path rust_version; do
   # Add wasm target for WASM packages
   msrv_cmd="cargo msrv verify --manifest-path \"$package_dir/Cargo.toml\""
   if [[ "$package_name" == "miden-client-web" || "$package_name" == "miden-idxdb-store" ]]; then
-    msrv_cmd="$msrv_cmd --target wasm32-unknown-unknown"
+    msrv_cmd+=" --target wasm32-unknown-unknown"
     echo "   Using wasm target for $package_name"
   fi
 
