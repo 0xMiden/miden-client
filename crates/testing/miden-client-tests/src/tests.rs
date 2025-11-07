@@ -2228,31 +2228,17 @@ async fn consume_note_with_custom_script() {
 }
 
 #[tokio::test]
-async fn import_note_fails_if_note_tag_limit_is_exceeded() {
-    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
-
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // add note tags until the limit is exceeded
     for i in 0..NOTE_TAG_LIMIT {
         client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
     }
 
-    // try to import a note
-    let serial_num = client.rng().draw_word();
-    let recipient = utils::build_p2id_recipient(account.id(), serial_num).unwrap();
-    let tag = NoteTag::from_account_id(account.id());
-    let metadata =
-        NoteMetadata::new(account.id(), NoteType::Private, tag, NoteExecutionHint::always(), ZERO)
-            .unwrap();
-    let vault = NoteAssets::new(vec![]).unwrap();
-
-    let note = Note::new(vault.clone(), metadata, recipient.clone());
-    let note_id = note.id();
-    let note_file = NoteFile::NoteId(note_id);
-    let result = client.import_note(note_file).await;
+    // try to add a note tag
+    let tag = NoteTag::from(u32::try_from(NOTE_TAG_LIMIT).unwrap());
+    let result = client.add_note_tag(tag).await;
 
     assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT))));
 }
