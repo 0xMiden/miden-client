@@ -1,5 +1,6 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::fmt;
 
 use miden_lib::account::interface::AccountInterfaceError;
 use miden_objects::account::AccountId;
@@ -25,6 +26,34 @@ use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
 use crate::transaction::TransactionRequestError;
+
+// ACTIONABLE HINTS
+// ================================================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionableHint {
+    message: String,
+    docs_url: Option<&'static str>,
+}
+
+impl ActionableHint {
+    pub fn into_help_message(self) -> String {
+        self.to_string()
+    }
+}
+
+impl fmt::Display for ActionableHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.docs_url {
+            Some(url) => write!(f, "{} See docs: {}", self.message, url),
+            None => f.write_str(self.message.as_str()),
+        }
+    }
+}
+
+// TODO: This is mostly illustrative but we could add a URL with fragemtn identifiers
+// for each error
+const TROUBLESHOOTING_DOC: &str = "https://0xmiden.github.io/miden-client/cli-troubleshooting.html";
 
 // CLIENT ERROR
 // ================================================================================================
@@ -112,6 +141,94 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl ClientError {
+    pub fn actionable_hint(&self) -> Option<ActionableHint> {
+        match self {
+            ClientError::MissingOutputRecipients(recipients) => {
+                Some(missing_recipient_hint(recipients))
+            },
+            ClientError::TransactionRequestError(err) => err.actionable_hint(),
+            ClientError::TransactionExecutorError(err) => transaction_executor_hint(err),
+            ClientError::NoteNotFoundOnChain(note_id) => Some(ActionableHint {
+                message: format!(
+                    "Note {note_id} has not been found on chain. Double-check the note ID, ensure it has been committed, and run `miden-client sync` before retrying."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(commitment)) => {
+                Some(ActionableHint {
+                    message: format!(
+                        "Account commitment {commitment:?} already exists locally. Sync to confirm the transaction status and avoid resubmitting it; if you need a clean slate for development, reset the store."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
+            _ => None,
+        }
+    }
+}
+
+impl TransactionRequestError {
+    pub fn actionable_hint(&self) -> Option<ActionableHint> {
+        match self {
+            TransactionRequestError::MissingAuthenticatedInputNote(note_id) => {
+                Some(ActionableHint {
+                    message: format!(
+                        "Note {note_id} was listed via `TransactionRequestBuilder::authenticated_input_notes(...)`, but the store lacks an authenticated `InputNoteRecord`. Import or sync the note so its record and authentication data are available before executing the request."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
+            TransactionRequestError::NoInputNotesNorAccountChange => Some(ActionableHint {
+                message: "Transactions must consume input notes or mutate tracked account state. Add at least one authenticated/unauthenticated input note or include an explicit account state update in the request.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            TransactionRequestError::StorageSlotNotFound(slot, account_id) => {
+                Some(actionable_storage_miss_hint(*slot, *account_id))
+            },
+            _ => None,
+        }
+    }
+}
+
+fn missing_recipient_hint(recipients: &[Word]) -> ActionableHint {
+    let message = format!(
+        "Recipients {recipients:?} were missing from the transaction outputs. Keep `TransactionRequestBuilder::expected_output_recipients(...)` aligned with the MASM program so the declared recipients appear in the outputs."
+    );
+
+    ActionableHint {
+        message,
+        docs_url: Some(TROUBLESHOOTING_DOC),
+    }
+}
+
+fn actionable_storage_miss_hint(slot: u8, account_id: AccountId) -> ActionableHint {
+    ActionableHint {
+        message: format!(
+            "Storage slot {slot} was not found on account {account_id}. Verify the account ABI and component ordering, then adjust the slot index used in the transaction."
+        ),
+        docs_url: Some(TROUBLESHOOTING_DOC),
+    }
+}
+
+fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ActionableHint> {
+    match err {
+        TransactionExecutorError::ForeignAccountNotAnchoredInReference(account_id) => {
+            Some(ActionableHint {
+                message: format!(
+                    "The foreign account proof for {account_id} was built against a different block. Re-fetch the account proof anchored at the request's reference block before retrying."
+                ),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            })
+        },
+        TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ActionableHint {
+            message: "Re-run the transaction with debug mode enabled , capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
+            docs_url: Some(TROUBLESHOOTING_DOC),
+        }),
+        _ => None,
     }
 }
 

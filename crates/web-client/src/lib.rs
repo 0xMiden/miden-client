@@ -1,6 +1,7 @@
 extern crate alloc;
 use alloc::sync::Arc;
 use core::fmt::Write;
+use std::error::Error as StdError;
 
 use idxdb_store::WebStore;
 use miden_client::crypto::RpoRandomCoin;
@@ -11,6 +12,7 @@ use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
     Client,
+    ClientError,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -213,13 +215,29 @@ impl WebClient {
 
 fn js_error_with_context<T>(err: T, context: &str) -> JsValue
 where
-    T: core::error::Error,
+    T: StdError + 'static,
 {
     let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn core::error::Error);
+    let mut source = Some(&err as &dyn StdError);
     while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeeds");
+        write!(error_string, ": {err}").expect("writing to string should always succeed");
         source = err.source();
     }
-    JsValue::from(error_string)
+
+    let help = actionable_help_from_error(&err);
+    let js_error = JsError::new(&error_string);
+
+    if let Some(help) = help {
+        let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    }
+
+    js_error.into()
+}
+
+fn actionable_help_from_error(err: &(dyn StdError + 'static)) -> Option<String> {
+    if let Some(client_error) = err.downcast_ref::<ClientError>() {
+        return client_error.actionable_hint().map(|hint| hint.into_help_message());
+    }
+
+    err.source().and_then(actionable_help_from_error)
 }

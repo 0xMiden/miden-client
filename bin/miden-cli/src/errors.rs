@@ -27,9 +27,14 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error")]
+    #[error("client error: {error}")]
     #[diagnostic(code(cli::client_error))]
-    Client(#[from] ClientError),
+    Client {
+        #[source]
+        error: ClientError,
+        #[help]
+        help: Option<String>,
+    },
     #[error("config error: {1}")]
     #[diagnostic(
         code(cli::config_error),
@@ -82,4 +87,11 @@ pub enum CliError {
     #[error("transaction error: {1}")]
     #[diagnostic(code(cli::transaction_error))]
     Transaction(#[source] SourceError, String),
+}
+
+impl From<ClientError> for CliError {
+    fn from(error: ClientError) -> Self {
+        let help = error.actionable_hint().map(miden_client::ActionableHint::into_help_message);
+        CliError::Client { error, help }
+    }
 }

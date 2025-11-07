@@ -49,6 +49,7 @@
 * [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 * Updated Dexie indexes and SQL schema; fixed sync-related transaction state bug ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 * Started syncing output note nullifiers by default, to track when they are consumed ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
+* Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)). 
 
 ## 0.11.11 (2025-10-16)
 
