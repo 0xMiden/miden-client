@@ -4,6 +4,7 @@ use core::fmt::Write;
 use std::error::Error as StdError;
 
 use idxdb_store::WebStore;
+use js_sys::{Function, Reflect};
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
@@ -22,7 +23,6 @@ use models::script_builder::ScriptBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Function;
 
 pub mod account;
 pub mod export;
@@ -225,13 +225,13 @@ where
     }
 
     let help = actionable_help_from_error(&err);
-    let js_error = JsError::new(&error_string);
+    let js_error: JsValue = JsError::new(&error_string).into();
 
     if let Some(help) = help {
         let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
     }
 
-    js_error.into()
+    js_error
 }
 
 fn actionable_help_from_error(err: &(dyn StdError + 'static)) -> Option<String> {
