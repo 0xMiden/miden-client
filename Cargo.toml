@@ -41,7 +41,7 @@ miden-node-proto-build = { branch = "next", default-features = false, git = "htt
 miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
 miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-note-transport-proto-build = { branch = "tomasarrachea-update-deps", default-features = false, git = "https://github.com/lambdaclass/miden-note-transport" }
+miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport" }
 miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",

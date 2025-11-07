@@ -14,6 +14,7 @@ use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, Transac
 use miden_objects::vm::AdviceMap;
 use miden_objects::{
     AccountError,
+    AssetVaultError,
     NoteError,
     StorageMapError,
     TransactionInputError,
@@ -466,6 +467,8 @@ pub enum TransactionRequestError {
     TransactionInputError(#[from] TransactionInputError),
     #[error("storage map error")]
     StorageMapError(#[from] StorageMapError),
+    #[error("asset vault error")]
+    AssetVaultError(#[from] AssetVaultError),
 }
 
 // TESTS

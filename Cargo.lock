@@ -2907,7 +2907,7 @@ dependencies = [
 [[package]]
 name = "miden-note-transport-proto-build"
 version = "0.1.0"
-source = "git+https://github.com/lambdaclass/miden-note-transport?branch=tomasarrachea-update-deps#a4cf0c84d962a6a7c94c34926eaabd3d4632a7f3"
+source = "git+https://github.com/0xMiden/miden-note-transport?branch=main#bd374356c99f88023af28384f6a0ee0af6399417"
 dependencies = [
  "fs-err",
  "miette",
