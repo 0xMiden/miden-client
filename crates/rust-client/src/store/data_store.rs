@@ -112,20 +112,30 @@ impl DataStore for ClientDataStore {
         vault_root: Word,
         vault_key: AssetVaultKey,
     ) -> Result<AssetWitness, DataStoreError> {
-        //TODO: Refactor `get_account_asset` for this.
-        let vault = self.store.get_account_vault(account_id).await?;
+        match self.store.get_account_asset(account_id, vault_key.faucet_id_prefix()).await {
+            Ok(Some((_, asset_witness))) => Ok(asset_witness),
+            Ok(None) => {
+                let vault = self.store.get_account_vault(account_id).await?;
 
-        if vault.root() != vault_root {
-            return Err(DataStoreError::Other {
-                error_msg: "Vault root mismatch".into(),
-                source: None,
-            });
+                if vault.root() != vault_root {
+                    return Err(DataStoreError::Other {
+                        error_msg: "Vault root mismatch".into(),
+                        source: None,
+                    });
+                }
+
+                AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
+                    DataStoreError::Other {
+                        error_msg: "Failed to open vault asset tree".into(),
+                        source: Some(Box::new(err)),
+                    }
+                })
+            },
+            Err(err) => Err(DataStoreError::Other {
+                error_msg: "Failed to get account asset".into(),
+                source: Some(Box::new(err)),
+            }),
         }
-
-        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
-            error_msg: "Failed to open vault asset tree".into(),
-            source: Some(Box::new(err)),
-        })
     }
 
     async fn get_storage_map_witness(
