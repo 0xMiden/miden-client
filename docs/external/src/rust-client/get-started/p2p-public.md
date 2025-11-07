@@ -30,7 +30,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
     ```
 2. On the new client, create a new [basic account](https://0xMiden.github.io/miden-docs/miden-base/architecture/accounts.html):
 
-    ```shell
+    ```sh
     miden-client new-wallet --mutable -s public
     ```
 
@@ -38,7 +38,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 
 3. List and view the account with the following command:
 
-      ```shell
+      ```sh
       miden-client account -l
       ```
 
@@ -48,7 +48,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 
     To do this, from the first client run:
 
-    ```shell
+    ```sh
     miden-client send --sender <basic-account-id-A> --target <basic-account-id-C> --asset 50::<faucet-account-id> --note-type public
     ```
 
@@ -60,7 +60,7 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 
 2. First, sync the account on the new client.
 
-    ```shell
+    ```sh
     miden-client sync
     ```
 
