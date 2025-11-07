@@ -66,7 +66,7 @@ use miden_objects::note::{NoteId, NoteTag};
 use miden_objects::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::note::NoteScreener;
 use crate::note_transport::NoteTransport;
@@ -172,7 +172,7 @@ where
         };
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
-        info!(sync_summary = ?sync_summary, "Sync summary computed");
+        debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
         // Apply received and computed updates to the store
