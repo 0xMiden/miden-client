@@ -230,8 +230,6 @@ impl<AUTH> Client<AUTH> {
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
-    /// - If the client has reached the accounts limit
-    ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
     /// - If the client has reached the note tags limit
     ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_address(
@@ -260,9 +258,7 @@ impl<AUTH> Client<AUTH> {
                     ));
                 }
 
-                self.check_account_limit().await?;
                 self.check_note_tag_limit().await?;
-
                 self.store.insert_address(address, account_id).await?;
                 Ok(())
             },

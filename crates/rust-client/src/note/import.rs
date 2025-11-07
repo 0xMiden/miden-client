@@ -86,9 +86,7 @@ where
         if let Some(note) = note {
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
-                self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.id()))
-                    .await?;
+                self.insert_note_tag(NoteTagRecord::with_note_source(*tag, note.id())).await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
         }
@@ -199,9 +197,11 @@ where
             } else {
                 // If the note is in the future we import it as unverified. We add the note tag so
                 // that the note is verified naturally in the next sync.
-                self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(metadata.tag(), note_record.id()))
-                    .await?;
+                self.insert_note_tag(NoteTagRecord::with_note_source(
+                    metadata.tag(),
+                    note_record.id(),
+                ))
+                .await?;
             }
 
             if note_changed { Ok(Some(note_record)) } else { Ok(None) }
