@@ -193,12 +193,10 @@ impl Cli {
         }
 
         if let Some(tl_config) = cli_config.note_transport {
-            let client = GrpcNoteTransportClient::connect(
-                tl_config.endpoint.to_string(),
-                tl_config.timeout_ms,
-            )
-            .await
-            .map_err(|e| CliError::Client(e.into()))?;
+            let client =
+                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
+                    .await
+                    .map_err(|e| CliError::Client(e.into()))?;
             builder = builder.note_transport(Arc::new(client));
         }
 

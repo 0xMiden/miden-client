@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -25,3 +35,13 @@
 #### Returns
 
 [`AccountId`](AccountId.md)
+
+***
+
+### createMockSerializedPackage()
+
+> `static` **createMockSerializedPackage**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`

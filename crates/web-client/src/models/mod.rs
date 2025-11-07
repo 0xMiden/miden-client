@@ -77,6 +77,7 @@ pub mod note_tag;
 pub mod note_type;
 pub mod output_note;
 pub mod output_notes;
+pub mod package;
 pub mod partial_note;
 pub mod proven_transaction;
 pub mod provers;

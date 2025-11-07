@@ -22,7 +22,8 @@ use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+use miden_objects::account::auth::AuthSecretKey;
+use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
 use miden_objects::block::FeeParameters;
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
@@ -313,13 +314,13 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NetworkTransactionBuilder {
+                NetworkTransactionBuilder::new(
                     store_url,
                     block_producer_url,
-                    tx_prover_url: None,
-                    ticker_interval: Duration::from_millis(200),
-                    bp_checkpoint: production_checkpoint,
-                }
+                    None,
+                    Duration::from_millis(200),
+                    production_checkpoint,
+                )
                 .serve_new()
                 .await
                 .context("failed while serving ntx builder component")

@@ -7,7 +7,7 @@ use std::string::ToString;
 use std::sync::{Arc, RwLock};
 
 use miden_objects::Word;
-use miden_objects::account::{AuthSecretKey, PublicKeyCommitment, Signature};
+use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::{Deserializable, Serializable};
@@ -47,6 +47,8 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match key {
             AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment(),
+            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment(),
+            other_key => other_key.public_key().to_commitment().into(),
         };
 
         let filename = hash_pub_key(pub_key);
@@ -135,10 +137,15 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
             .get_key(pub_key.into())
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) = secret_key
-            .ok_or(AuthenticationError::UnknownPublicKey(Into::<Word>::into(pub_key).to_hex()))?;
+        let signature = match secret_key {
+            Some(AuthSecretKey::RpoFalcon512(k)) => {
+                Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng))
+            },
+            Some(AuthSecretKey::EcdsaK256Keccak(k)) => Signature::EcdsaK256Keccak(k.sign(message)),
+            Some(other_k) => other_k.sign(message),
+            None => return Err(AuthenticationError::other("missing secret key".to_string())),
+        };
 
-        let signature = Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng));
         Ok(signature)
     }
 }

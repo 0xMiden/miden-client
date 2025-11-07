@@ -10,10 +10,4 @@
 
 ### BasicWallet
 
-> **BasicWallet**: `1`
-
-***
-
-### Unspecified
-
-> **Unspecified**: `0`
+> **BasicWallet**: `0`

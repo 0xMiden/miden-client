@@ -478,7 +478,8 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
-    use miden_objects::account::{AccountBuilder, AccountId, AccountType, PublicKeyCommitment};
+    use miden_objects::account::auth::PublicKeyCommitment;
+    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
     use miden_objects::asset::FungibleAsset;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};

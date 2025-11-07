@@ -128,6 +128,7 @@
 - [OutputNoteArray](classes/OutputNoteArray.md)
 - [OutputNotes](classes/OutputNotes.md)
 - [OutputNotesArray](classes/OutputNotesArray.md)
+- [Package](classes/Package.md)
 - [PartialNote](classes/PartialNote.md)
 - [PartialNoteArray](classes/PartialNoteArray.md)
 - [ProvenTransaction](classes/ProvenTransaction.md)

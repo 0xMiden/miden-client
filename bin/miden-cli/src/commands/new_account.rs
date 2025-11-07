@@ -363,7 +363,7 @@ async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
             "
                     begin
                         # [AUTH_PROCEDURE_MAST_ROOT]
-                        mem_storew.4000 push.4000
+                        mem_storew_be.4000 push.4000
                         # [auth_procedure_mast_root_ptr]
                         dyncall
                     end",
@@ -432,7 +432,7 @@ fn process_packages(
 
         let account_component = AccountComponent::from_package_with_init_data(
             &package,
-            &InitStorageData::new(init_storage_data),
+            &InitStorageData::new(init_storage_data, vec![]),
         )
         .map_err(|e| {
             CliError::Account(

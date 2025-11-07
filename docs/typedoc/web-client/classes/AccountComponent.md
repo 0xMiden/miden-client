@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -77,6 +87,26 @@
 ##### secret\_key
 
 [`SecretKey`](SecretKey.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### fromPackage()
+
+> `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
+
+#### Parameters
+
+##### \_package
+
+[`Package`](Package.md)
+
+##### storage\_slots
+
+[`StorageSlotArray`](StorageSlotArray.md)
 
 #### Returns
 

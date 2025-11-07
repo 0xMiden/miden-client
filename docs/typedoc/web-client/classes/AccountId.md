@@ -8,6 +8,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -75,7 +85,7 @@ testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
 
 #### Returns
 
@@ -98,7 +108,7 @@ network ID.
 
 ##### account\_interface
 
-[`AccountInterface`](../enumerations/AccountInterface.md)
+[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
 
 #### Returns
 

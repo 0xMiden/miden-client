@@ -89,7 +89,7 @@ test.describe("Address instantiation tests", () => {
       instanceAddress({
         page,
         accountId: "notAnAccountId",
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
     ).rejects.toThrow();
   });
@@ -100,9 +100,9 @@ test.describe("Address instantiation tests", () => {
     await expect(
       instanceAddress({
         page,
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
-    ).resolves.toBe("Unspecified");
+    ).resolves.toBe("BasicWallet");
   });
 });
 
@@ -122,19 +122,19 @@ test.describe("Bech32 tests", () => {
   });
   test("bech32 succeeds with mainnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mm")).resolves.toHaveLength(
-      38
+      47
     );
   });
 
   test("bech32 succeeds with testnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mtst")).resolves.toHaveLength(
-      40
+      49
     );
   });
 
   test("bech32 succeeds with dev prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mdev")).resolves.toHaveLength(
-      40
+      49
     );
   });
 });
@@ -157,10 +157,7 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     );
     console.log("newAccount ID:", newAccount.id());
 
-    const address = window.Address.fromAccountId(
-      newAccount.id(),
-      "Unspecified"
-    );
+    const address = window.Address.fromAccountId(newAccount.id(), null);
 
     console.log("address:", address);
 
