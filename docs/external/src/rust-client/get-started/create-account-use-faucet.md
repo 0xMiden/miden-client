@@ -22,7 +22,7 @@ Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/mide
 
 2. Install the Miden client.
 
-   ```shell
+   ```sh
    cargo install miden-client-cli --locked
    ```
 
@@ -32,13 +32,13 @@ Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/mide
 
 1. Create a new account of type `mutable` using the following command:
 
-   ```shell
+   ```sh
    miden-client new-wallet --mutable
    ```
 
 2. List all created accounts by running the following command:
 
-   ```shell
+   ```sh
    miden-client account -l
    ```
 
@@ -68,7 +68,7 @@ You can also click **Send Public Note**. If you do this, the note's details will
 
 1. Import the private note that you have received using the following commands:
 
-   ```shell
+   ```sh
    miden-client import <path-to-note>/note.mno
    ```
 
@@ -80,7 +80,7 @@ You can also click **Send Public Note**. If you do this, the note's details will
 
 3. Now that the note has been successfully imported, you can view the note's information using the following command:
 
-   ```shell
+   ```sh
    miden-client notes
    ```
 
@@ -100,7 +100,7 @@ You can also click **Send Public Note**. If you do this, the note's details will
 
 Do this periodically to keep informed about any updates on the node by running the `sync` command:
 
-```shell
+```sh
 miden-client sync
 ```
 
@@ -120,7 +120,7 @@ Committed transactions: 0
 
 1. Now that we have synced the client, the input-note imported from the faucet should have a `Committed` status, confirming it exists at the rollup level:
 
-   ```shell
+   ```sh
    miden-client notes
    ```
 
@@ -130,14 +130,14 @@ Committed transactions: 0
 
 3. Find your account and note id by listing both `accounts` and `notes`:
 
-   ```shell
+   ```sh
    miden-client account
    miden-client notes
    ```
 
 4. Consume the note and add the funds from its vault to our account using the following command:
 
-   ```shell
+   ```sh
    miden-client consume-notes --account <Account-Id> <Note-Id>
    ```
 
@@ -147,7 +147,7 @@ Committed transactions: 0
 
 6. After confirming you can view the new note status by running the following command:
 
-   ```shell
+   ```sh
    miden-client notes
    ```
 
@@ -157,13 +157,13 @@ Committed transactions: 0
 
 8. The note is `Processing`. This means that the proof of the transaction was sent, but there is no network confirmation yet. You can update your view of the rollup by syncing again:
 
-   ```shell
+   ```sh
    miden-client sync
    ```
 
 9. After syncing, you should have received confirmation of the consumed note. You should see the note as `Consumed` after listing the notes:
 
-   ```shell
+   ```sh
    miden-client notes
    ```
 
@@ -179,7 +179,7 @@ You only need to copy the top line of characters of the Note ID.
 
 5. View your updated account's vault containing the tokens sent by the faucet by running the following command:
 
-   ```shell
+   ```sh
    miden-client account --show <Account-Id>
    ```
 
