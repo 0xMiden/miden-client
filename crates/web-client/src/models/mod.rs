@@ -106,6 +106,7 @@ pub mod word;
 
 declare_js_miden_arrays! {
     (crate::models::account::Account) -> AccountArray,
+    (crate::models::account_id::AccountId) -> AccountIdArray,
     (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
     (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
     (crate::models::output_note::OutputNote) -> OutputNoteArray,

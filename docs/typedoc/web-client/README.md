@@ -26,6 +26,7 @@
 - [AccountFile](classes/AccountFile.md)
 - [AccountHeader](classes/AccountHeader.md)
 - [AccountId](classes/AccountId.md)
+- [AccountIdArray](classes/AccountIdArray.md)
 - [AccountStorage](classes/AccountStorage.md)
 - [AccountStorageDelta](classes/AccountStorageDelta.md)
 - [AccountStorageMode](classes/AccountStorageMode.md)
