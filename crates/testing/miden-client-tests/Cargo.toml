@@ -1,9 +1,9 @@
 [package]
-edition           = "2024"
-name              = "miden-client-unit-tests"
-publish           = false
+edition                = "2024"
+name                   = "miden-client-unit-tests"
+publish                = false
 rust-version.workspace = true
-version.workspace = true
+version.workspace      = true
 
 [dev-dependencies]
 miden-client              = { features = ["std", "testing"], path = "../../rust-client" }
