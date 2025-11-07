@@ -31,18 +31,18 @@ use crate::transaction::TransactionRequestError;
 // ================================================================================================
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActionableHint {
+pub struct ErrorHint {
     message: String,
     docs_url: Option<&'static str>,
 }
 
-impl ActionableHint {
+impl ErrorHint {
     pub fn into_help_message(self) -> String {
         self.to_string()
     }
 }
 
-impl fmt::Display for ActionableHint {
+impl fmt::Display for ErrorHint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.docs_url {
             Some(url) => write!(f, "{} See docs: {}", self.message, url),
@@ -144,22 +144,22 @@ impl From<ClientError> for String {
     }
 }
 
-impl ClientError {
-    pub fn actionable_hint(&self) -> Option<ActionableHint> {
-        match self {
+impl From<&ClientError> for Option<ErrorHint> {
+    fn from(err: &ClientError) -> Self {
+        match err {
             ClientError::MissingOutputRecipients(recipients) => {
                 Some(missing_recipient_hint(recipients))
             },
-            ClientError::TransactionRequestError(err) => err.actionable_hint(),
-            ClientError::TransactionExecutorError(err) => transaction_executor_hint(err),
-            ClientError::NoteNotFoundOnChain(note_id) => Some(ActionableHint {
+            ClientError::TransactionRequestError(inner) => inner.into(),
+            ClientError::TransactionExecutorError(inner) => transaction_executor_hint(inner),
+            ClientError::NoteNotFoundOnChain(note_id) => Some(ErrorHint {
                 message: format!(
                     "Note {note_id} has not been found on chain. Double-check the note ID, ensure it has been committed, and run `miden-client sync` before retrying."
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
             ClientError::StoreError(StoreError::AccountCommitmentAlreadyExists(commitment)) => {
-                Some(ActionableHint {
+                Some(ErrorHint {
                     message: format!(
                         "Account commitment {commitment:?} already exists locally. Sync to confirm the transaction status and avoid resubmitting it; if you need a clean slate for development, reset the store."
                     ),
@@ -171,42 +171,54 @@ impl ClientError {
     }
 }
 
-impl TransactionRequestError {
-    pub fn actionable_hint(&self) -> Option<ActionableHint> {
-        match self {
+impl ClientError {
+    pub fn error_hint(&self) -> Option<ErrorHint> {
+        self.into()
+    }
+}
+
+impl From<&TransactionRequestError> for Option<ErrorHint> {
+    fn from(err: &TransactionRequestError) -> Self {
+        match err {
             TransactionRequestError::MissingAuthenticatedInputNote(note_id) => {
-                Some(ActionableHint {
+                Some(ErrorHint {
                     message: format!(
                         "Note {note_id} was listed via `TransactionRequestBuilder::authenticated_input_notes(...)`, but the store lacks an authenticated `InputNoteRecord`. Import or sync the note so its record and authentication data are available before executing the request."
                     ),
                     docs_url: Some(TROUBLESHOOTING_DOC),
                 })
             },
-            TransactionRequestError::NoInputNotesNorAccountChange => Some(ActionableHint {
+            TransactionRequestError::NoInputNotesNorAccountChange => Some(ErrorHint {
                 message: "Transactions must consume input notes or mutate tracked account state. Add at least one authenticated/unauthenticated input note or include an explicit account state update in the request.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
             TransactionRequestError::StorageSlotNotFound(slot, account_id) => {
-                Some(actionable_storage_miss_hint(*slot, *account_id))
+                Some(storage_miss_hint(*slot, *account_id))
             },
             _ => None,
         }
     }
 }
 
-fn missing_recipient_hint(recipients: &[Word]) -> ActionableHint {
+impl TransactionRequestError {
+    pub fn error_hint(&self) -> Option<ErrorHint> {
+        self.into()
+    }
+}
+
+fn missing_recipient_hint(recipients: &[Word]) -> ErrorHint {
     let message = format!(
         "Recipients {recipients:?} were missing from the transaction outputs. Keep `TransactionRequestBuilder::expected_output_recipients(...)` aligned with the MASM program so the declared recipients appear in the outputs."
     );
 
-    ActionableHint {
+    ErrorHint {
         message,
         docs_url: Some(TROUBLESHOOTING_DOC),
     }
 }
 
-fn actionable_storage_miss_hint(slot: u8, account_id: AccountId) -> ActionableHint {
-    ActionableHint {
+fn storage_miss_hint(slot: u8, account_id: AccountId) -> ErrorHint {
+    ErrorHint {
         message: format!(
             "Storage slot {slot} was not found on account {account_id}. Verify the account ABI and component ordering, then adjust the slot index used in the transaction."
         ),
@@ -214,17 +226,17 @@ fn actionable_storage_miss_hint(slot: u8, account_id: AccountId) -> ActionableHi
     }
 }
 
-fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ActionableHint> {
+fn transaction_executor_hint(err: &TransactionExecutorError) -> Option<ErrorHint> {
     match err {
         TransactionExecutorError::ForeignAccountNotAnchoredInReference(account_id) => {
-            Some(ActionableHint {
+            Some(ErrorHint {
                 message: format!(
                     "The foreign account proof for {account_id} was built against a different block. Re-fetch the account proof anchored at the request's reference block before retrying."
                 ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             })
         },
-        TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ActionableHint {
+        TransactionExecutorError::TransactionProgramExecutionFailed(_) => Some(ErrorHint {
             message: "Re-run the transaction with debug mode enabled , capture VM diagnostics, and inspect the source manager output to understand why execution failed.".to_string(),
             docs_url: Some(TROUBLESHOOTING_DOC),
         }),

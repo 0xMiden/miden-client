@@ -3,7 +3,14 @@ use std::error::Error;
 use miden_client::account::AddressError;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::ScriptBuilderError;
-use miden_client::{AccountError, AccountIdError, AssetError, ClientError, NetworkIdError};
+use miden_client::{
+    AccountError,
+    AccountIdError,
+    AssetError,
+    ClientError,
+    ErrorHint,
+    NetworkIdError,
+};
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -91,7 +98,7 @@ pub enum CliError {
 
 impl From<ClientError> for CliError {
     fn from(error: ClientError) -> Self {
-        let help = error.actionable_hint().map(miden_client::ActionableHint::into_help_message);
+        let help = Option::<ErrorHint>::from(&error).map(ErrorHint::into_help_message);
         CliError::Client { error, help }
     }
 }

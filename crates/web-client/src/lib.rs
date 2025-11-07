@@ -12,9 +12,9 @@ use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
-    ActionableHint,
     Client,
     ClientError,
+    ErrorHint,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -225,7 +225,7 @@ where
         source = err.source();
     }
 
-    let help = actionable_help_from_error(&err);
+    let help = hint_from_error(&err);
     let js_error: JsValue = JsError::new(&error_string).into();
 
     if let Some(help) = help {
@@ -235,10 +235,10 @@ where
     js_error
 }
 
-fn actionable_help_from_error(err: &(dyn Error + 'static)) -> Option<String> {
+fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {
     if let Some(client_error) = err.downcast_ref::<ClientError>() {
-        return client_error.actionable_hint().map(ActionableHint::into_help_message);
+        return Option::<ErrorHint>::from(client_error).map(ErrorHint::into_help_message);
     }
 
-    err.source().and_then(actionable_help_from_error)
+    err.source().and_then(hint_from_error)
 }
