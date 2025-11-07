@@ -2,6 +2,7 @@
 edition           = "2024"
 name              = "miden-client-unit-tests"
 publish           = false
+rust-version.workspace = true
 version.workspace = true
 
 [dev-dependencies]

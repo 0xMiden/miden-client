@@ -490,9 +490,9 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
 name = "cc"
-version = "1.2.44"
+version = "1.2.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37521ac7aabe3d13122dc382493e20c9416f299d2ccd5b3a5340a2570cdeb0f3"
+checksum = "35900b6c8d709fb1d854671ae27aeaa9eec2f8b01b364e1619a40da3e6fe2afe"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2039,22 +2039,22 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jiff"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be1f93b8b1eb69c77f24bbb0afdf66f54b632ee39af40ca21c4365a1d7347e49"
+checksum = "49cce2b81f2098e7e3efc35bc2e0a6b7abec9d34128283d7a26fa8f32a6dbb35"
 dependencies = [
  "jiff-static",
  "log",
  "portable-atomic",
  "portable-atomic-util",
- "serde",
+ "serde_core",
 ]
 
 [[package]]
 name = "jiff-static"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03343451ff899767262ec32146f6d559dd759fdadf42ff0e227c7c48f72594b4"
+checksum = "980af8b43c3ad5d8d349ace167ec8170839f753a42d233ba19e08afe1850fa69"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2728,7 +2728,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "futures",
@@ -2756,7 +2756,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "quote",
  "syn 2.0.109",
@@ -2765,7 +2765,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "futures",
@@ -2786,7 +2786,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2808,7 +2808,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "fs-err",
  "miette",
@@ -2819,7 +2819,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "futures",
@@ -2846,7 +2846,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2878,7 +2878,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2976,7 +2976,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3020,7 +3020,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "git+https://github.com/0xMiden/miden-node?branch=next#015b18c66d67e2373711010105a9737d0639e3ee"
 dependencies = [
  "getrandom 0.3.4",
  "miden-node-proto-build",
@@ -3146,9 +3146,9 @@ dependencies = [
 
 [[package]]
 name = "midenc-hir-type"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7798671ffbf6596de00619a9abaec67dc26965b891328c9d65c4cb6007597d50"
+checksum = "9d4cfab04baffdda3fb9eafa5f873604059b89a1699aa95e4f1057397a69f0b5"
 dependencies = [
  "miden-formatting",
  "smallvec",
@@ -4366,9 +4366,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.41"
+version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
+checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
 dependencies = [
  "proc-macro2",
 ]
@@ -5946,9 +5946,9 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "trybuild"
-version = "1.0.113"
+version = "1.0.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "559b6a626c0815c942ac98d434746138b4f89ddd6a1b8cbb168c6845fb3376c5"
+checksum = "3e17e807bff86d2a06b52bca4276746584a78375055b6e45843925ce2802b335"
 dependencies = [
  "dissimilar",
  "glob",
