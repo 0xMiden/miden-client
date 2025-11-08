@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.0 (TBD)
+## 0.12.0 (2025-11-08)
 
 ### Features
 
@@ -29,8 +29,8 @@
 
 ### Changes
 
+* [BREAKING] Incremented MSRV to 1.90.
 * Added typed arrays for each public web-client model/struct ([#1292](https://github.com/0xMiden/miden-client/pull/1292))
-* [BREAKING] Incremented MSRV to 1.89.
 * [BREAKING] Unified chain tip and block number types to use `BlockNumber` instead of `u32` ([#1415](https://github.com/0xMiden/miden-client/pull/1415)).
 * Modified the RPC client to avoid reconnection when setting commitment header ([#1166](https://github.com/0xMiden/miden-client/pull/1166)).
 * [BREAKING] Moved `SqliteStore` and `WebStore` into their own separate crates ([#1253](https://github.com/0xMiden/miden-client/pull/1253)).
