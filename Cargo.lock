@@ -2728,7 +2728,8 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c058cf627da74bb2cfd4d29e06041583caf7f5d24e10bd18cc181703f8b61dfe"
 dependencies = [
  "anyhow",
  "futures",
@@ -2756,7 +2757,8 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b40a2e39dc897dd3df2dd0b30c396ff730912ad561a4a90593b2207586dc1f2"
 dependencies = [
  "quote",
  "syn 2.0.109",
@@ -2765,7 +2767,8 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2ac088bad78f38d6e32edb1e1ee6713ab11dd0b8adbfeba9694754f6f1d7437"
 dependencies = [
  "anyhow",
  "futures",
@@ -2786,7 +2789,8 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70d8a7bfa7292ee8fa1953373957a5b4b572776c7fa914984dc90c29acc55497"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2808,7 +2812,8 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c6a101b2a1d84a81e30ecc989f58739944dee17f121f8ceb7d9d304cfdaafe2"
 dependencies = [
  "fs-err",
  "miette",
@@ -2819,7 +2824,8 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae7cb666b6f7a5f3d8882faaef7d82204b1b1a90067acbf60471e734f47f5bb9"
 dependencies = [
  "anyhow",
  "futures",
@@ -2846,7 +2852,8 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4eceff55b1253c0d53aa13e05c18c9b92e093e9e003a5ce4a082700c9e03cea4"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2878,7 +2885,8 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1103969c1fe73d76f615f849cf9da46801a477527aade3de66a0dc4cc68eca5b"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2906,7 +2914,8 @@ dependencies = [
 [[package]]
 name = "miden-note-transport-proto-build"
 version = "0.1.0"
-source = "git+https://github.com/0xMiden/miden-note-transport?branch=main#bd374356c99f88023af28384f6a0ee0af6399417"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86d7a7b3a64c71d33f771d32cde58559207819a64ada9add0acb31857e111b9d"
 dependencies = [
  "fs-err",
  "miette",
@@ -2976,7 +2985,8 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e58d9a3ad9e109724e1ff4f1f9a79be52f5398d637ebeef71f75fd05d0296fad"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3020,7 +3030,8 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.12.0"
-source = "git+https://github.com/0xMiden/miden-node?branch=next#9ef1dc2540173a9f72ea0d518e31991e42eddeea"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71d3628967f5f2b3fb3785fb1843ef95c04244590c8c40cca680e103d70560a0"
 dependencies = [
  "getrandom 0.3.4",
  "miden-node-proto-build",
