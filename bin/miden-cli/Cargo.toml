@@ -1,8 +1,8 @@
 [package]
 authors.workspace      = true
 categories             = ["command-line-utilities"]
-description            = "The official command line client for interacting with the Miden rollup"
-documentation          = "https://docs.rs/miden-client-cli"
+description            = "The official command line client for interacting with the Miden network"
+documentation          = "https://docs.rs/miden-client-cli/0.12.0"
 edition.workspace      = true
 keywords               = ["cli", "client", "miden"]
 license.workspace      = true
@@ -16,16 +16,10 @@ version.workspace      = true
 name = "miden-client"
 path = "src/main.rs"
 
-[features]
-default = []
-
 [dependencies]
 # Workspace dependencies
-miden-client = { features = ["sqlite", "tonic"], path = "../../crates/rust-client", version = "0.11" }
-
-# Miden dependencies
-miden-lib     = { workspace = true }
-miden-objects = { workspace = true }
+miden-client              = { features = ["tonic"], path = "../../crates/rust-client", version = "0.12" }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store", version = "0.12" }
 
 # External dependencies
 clap               = { features = ["derive"], version = "4.5" }
@@ -36,20 +30,20 @@ rand               = { workspace = true }
 serde              = { features = ["derive"], version = "1.0" }
 thiserror          = { workspace = true }
 tokio              = { workspace = true }
-toml               = { version = "0.8" }
+toml               = { version = "0.9" }
 tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client  = { path = "../../crates/rust-client", version = "0.11" }
-miden-lib     = { workspace = true }
-miden-objects = { workspace = true }
+miden-client = { path = "../../crates/rust-client", version = "0.12" }
 
 [dev-dependencies]
-anyhow     = { workspace = true }
-assert_cmd = { version = "2.0" }
-predicates = { version = "3.0" }
-uuid       = { features = ["serde", "v4"], version = "1.10" }
+anyhow       = { workspace = true }
+assert_cmd   = { version = "2.0" }
+miden-client = { features = ["testing"], path = "../../crates/rust-client", version = "0.12" }
+predicates   = { version = "3.0" }
+regex        = { version = "1.0" }
+uuid         = { features = ["serde", "v4"], version = "1.10" }
 
 [lints]
 workspace = true

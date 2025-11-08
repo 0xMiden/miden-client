@@ -1,4 +1,5 @@
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
+use miden_client::transaction::InputNote as NativeInputNote;
 use wasm_bindgen::prelude::*;
 
 use super::input_note_state::InputNoteState;
@@ -6,6 +7,9 @@ use super::note_details::NoteDetails;
 use super::note_id::NoteId;
 use super::note_inclusion_proof::NoteInclusionProof;
 use super::note_metadata::NoteMetadata;
+use super::word::Word;
+use crate::js_error_with_context;
+use crate::models::input_note::InputNote;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -27,6 +31,10 @@ impl InputNoteRecord {
 
     pub fn metadata(&self) -> Option<NoteMetadata> {
         self.0.metadata().map(Into::into)
+    }
+
+    pub fn commitment(&self) -> Option<Word> {
+        self.0.commitment().map(Into::into)
     }
 
     #[wasm_bindgen(js_name = "inclusionProof")]
@@ -56,6 +64,14 @@ impl InputNoteRecord {
     #[wasm_bindgen(js_name = "isProcessing")]
     pub fn is_processing(&self) -> bool {
         self.0.is_processing()
+    }
+
+    #[wasm_bindgen(js_name = "toInputNote")]
+    pub fn to_input_note(&self) -> Result<InputNote, JsValue> {
+        let input_note: NativeInputNote = self.0.clone().try_into().map_err(|err| {
+            js_error_with_context(err, "could not create InputNote from InputNoteRecord")
+        })?;
+        Ok(InputNote(input_note))
     }
 }
 

@@ -13,13 +13,13 @@ use miden_client::note::{
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
+    ExecutedTransaction,
     InputNote,
     OutputNote,
     PaymentNoteDescription,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
-    TransactionResult,
 };
 use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
@@ -383,11 +383,12 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     delegated_proving: bool,
 ) -> Result<(), CliError> {
     println!("Executing transaction...");
-    let transaction_execution_result =
-        client.new_transaction(account_id, transaction_request).await?;
+    let transaction_result = client.execute_transaction(account_id, transaction_request).await?;
+
+    let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    print_transaction_details(&transaction_execution_result)?;
+    print_transaction_details(&executed_transaction)?;
     if !force {
         println!(
             "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"
@@ -401,16 +402,16 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         }
     }
 
-    println!("Proving transaction and then submitting it to node...");
-
-    let transaction_id = transaction_execution_result.executed_transaction().id();
-    let output_notes = transaction_execution_result
-        .created_notes()
+    let transaction_id = executed_transaction.id();
+    let output_notes = executed_transaction
+        .output_notes()
         .iter()
         .map(OutputNote::id)
         .collect::<Vec<_>>();
 
-    if delegated_proving {
+    println!("Proving transaction...");
+
+    let prover = if delegated_proving {
         let (cli_config, _) = load_config_file()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
@@ -418,14 +419,20 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
                 "remote prover endpoint is not set in the configuration file".to_string(),
             ))?;
 
-        let remote_prover =
-            Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()));
-        client
-            .submit_transaction_with_prover(transaction_execution_result, remote_prover)
-            .await?;
+        Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()))
     } else {
-        client.submit_transaction(transaction_execution_result).await?;
-    }
+        client.prover()
+    };
+
+    let proven_transaction = client.prove_transaction_with(&transaction_result, prover).await?;
+
+    println!("Submitting transaction to node...");
+
+    let submission_height = client
+        .submit_proven_transaction(proven_transaction, &transaction_result)
+        .await?;
+    println!("Applying transaction to store...");
+    client.apply_transaction(&transaction_result, submission_height).await?;
 
     println!("Successfully created transaction.");
     println!("Transaction ID: {transaction_id}");
@@ -442,16 +449,11 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     Ok(())
 }
 
-fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(), CliError> {
+fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
     println!("The transaction will have the following effects:\n");
 
     // INPUT NOTES
-    let input_note_ids = transaction_result
-        .executed_transaction()
-        .input_notes()
-        .iter()
-        .map(InputNote::id)
-        .collect::<Vec<_>>();
+    let input_note_ids = executed_tx.input_notes().iter().map(InputNote::id).collect::<Vec<_>>();
     if input_note_ids.is_empty() {
         println!("No notes will be consumed.");
     } else {
@@ -463,7 +465,7 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
     println!();
 
     // OUTPUT NOTES
-    let output_note_count = transaction_result.executed_transaction().output_notes().iter().count();
+    let output_note_count = executed_tx.output_notes().iter().count();
     if output_note_count == 0 {
         println!("No notes will be created as a result of this transaction.");
     } else {
@@ -472,12 +474,9 @@ fn print_transaction_details(transaction_result: &TransactionResult) -> Result<(
     println!();
 
     // ACCOUNT CHANGES
-    println!(
-        "The account with ID {} will be modified as follows:",
-        transaction_result.executed_transaction().account_id()
-    );
+    println!("The account with ID {} will be modified as follows:", executed_tx.account_id());
 
-    let account_delta = transaction_result.account_delta();
+    let account_delta = executed_tx.account_delta();
 
     let has_storage_changes = !account_delta.storage().is_empty();
     if has_storage_changes {

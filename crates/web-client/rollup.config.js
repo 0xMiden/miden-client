@@ -6,6 +6,18 @@ import copy from "rollup-plugin-copy";
 // Flag that indicates if the build is meant for development purposes.
 // If true, wasm-opt is not applied.
 const devMode = process.env.MIDEN_WEB_DEV === "true";
+
+// Arguments to tell cargo to add debug symbols
+// to the generated .wasm file.
+const cargoArgsUseDebugSymbols = [
+  // Generate debug symbols for the release cargo profile.
+  "--config",
+  "profile.release.debug='full'",
+  // Do not remove debug symbols from the final binary,
+  "--config",
+  "profile.release.strip='none'",
+];
+
 const wasmOptArgs = [
   devMode ? "-O0" : "-O3",
   "--enable-bulk-memory",
@@ -17,9 +29,9 @@ const baseCargoArgs = [
   "--features",
   "testing",
   "--config",
-  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296"]`,
+  `build.rustflags=["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals", "-C", "link-arg=--max-memory=4294967296", "-C", "panic=abort"]`,
   "--no-default-features",
-];
+].concat(devMode ? cargoArgsUseDebugSymbols : []);
 
 /**
  * Rollup configuration file for building a Cargo project and creating a WebAssembly (WASM) module,
@@ -46,7 +58,7 @@ const baseCargoArgs = [
  */
 export default [
   {
-    input: "./js/wasm.js",
+    input: ["./js/wasm.js", "./js/index.js"],
     output: {
       dir: `dist`,
       format: "es",
@@ -59,6 +71,8 @@ export default [
         extraArgs: {
           cargo: [...baseCargoArgs],
           wasmOpt: wasmOptArgs,
+          // Keep debug symbols if in dev mode.
+          wasmBindgen: devMode ? ["--keep-debug"] : [],
         },
         experimental: {
           typescriptDeclarationDir: "dist/crates",
@@ -88,15 +102,5 @@ export default [
         verbose: true,
       }),
     ],
-  },
-  // Build the main entry point
-  {
-    input: "./js/index.js",
-    output: {
-      dir: `dist`,
-      format: "es",
-      sourcemap: true,
-    },
-    plugins: [resolve(), commonjs()],
   },
 ];

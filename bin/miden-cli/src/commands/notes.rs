@@ -1,8 +1,10 @@
 use clap::ValueEnum;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
+use miden_client::address::Address;
 use miden_client::asset::Asset;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
+    Note,
     NoteConsumability,
     NoteInputs,
     NoteMetadata,
@@ -10,8 +12,7 @@ use miden_client::note::{
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError};
-use miden_objects::PrettyPrint;
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};
@@ -58,12 +59,21 @@ pub struct NotesCmd {
     /// consumable by this account will be shown.
     #[arg(short, long, value_name = "account_id")]
     account_id: Option<String>,
+    /// Send a stored private note through the note transport network.
+    /// Define both the note ID (as hex string, in full or a prefix) and address (as Bech32 string)
+    /// such as: `--send 0xc1234567 mm1qpkdyek2c0ywwvzupakc7zlzty8qn2qnfc`
+    #[arg(long, group = "action", num_args = 2, value_names = ["note_id", "address"])]
+    send: Option<Vec<String>>,
+    /// Fetch notes from the note transport network.
+    /// Fetched notes for tracked note tags will be added to the store.
+    #[arg(long, group = "action")]
+    fetch: bool,
 }
 
 impl NotesCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
         &self,
-        client: Client<AUTH>,
+        mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
         match self {
             NotesCmd { list: Some(NoteFilter::Consumable), .. } => {
@@ -78,6 +88,14 @@ impl NotesCmd {
             },
             NotesCmd { show: Some(id), .. } => {
                 show_note(client, id.to_owned(), self.with_code).await?;
+            },
+            NotesCmd { send: Some(args), .. } => {
+                let note_id = &args[0];
+                let address = &args[1];
+                send(&mut client, note_id, address).await?;
+            },
+            NotesCmd { fetch: true, .. } => {
+                fetch(&mut client).await?;
             },
             _ => {
                 list_notes(client, ClientNoteFilter::All).await?;
@@ -256,7 +274,7 @@ async fn show_note<AUTH: TransactionAuthenticator + Sync>(
                 1.0.to_string(),
             ),
         };
-        table.add_row(vec![asset_type, &faucet, &amount.to_string()]);
+        table.add_row(vec![asset_type, &faucet, &amount.clone()]);
     }
     println!("{table}");
 
@@ -309,6 +327,40 @@ async fn list_consumable_notes<AUTH: TransactionAuthenticator + Sync>(
     };
     let notes = client.get_consumable_notes(account_id).await?;
     print_consumable_notes_summary(&notes);
+    Ok(())
+}
+
+// SEND
+// ================================================================================================
+
+/// Send a (stored) note
+async fn send<AUTH: TransactionAuthenticator + Sync>(
+    client: &mut Client<AUTH>,
+    note_id: &str,
+    address: &str,
+) -> Result<(), CliError> {
+    let note_record = get_input_note_with_id_prefix(client, note_id)
+        .await
+        .map_err(|e| CliError::Input(format!("note not found: {e}")))?;
+    let note: Note = note_record
+        .try_into()
+        .map_err(|e| CliError::from(ClientError::NoteRecordConversionError(e)))?;
+    let (_netid, address) = Address::decode(address).map_err(|e| CliError::Input(e.to_string()))?;
+
+    client.send_private_note(note, &address).await?;
+
+    Ok(())
+}
+
+// FETCH
+// ================================================================================================
+
+/// Retrieve notes for all tracked tags
+///
+/// Fetched notes are stored in the store.
+async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError> {
+    client.fetch_private_notes().await?;
+
     Ok(())
 }
 

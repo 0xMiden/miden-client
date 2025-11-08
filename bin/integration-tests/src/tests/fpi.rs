@@ -1,8 +1,16 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountStorageMode,
+    PartialAccount,
+    PartialStorage,
+    StorageMap,
+    StorageSlot,
+};
 use miden_client::auth::AuthSecretKey;
-use miden_client::crypto::SecretKey;
+use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
@@ -45,7 +53,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)
@@ -53,19 +61,17 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     )
     .await?;
     let foreign_account_id = foreign_account.id();
-
     let code = format!(
         "
         use.miden::tx
-        use.miden::account
         begin
             # push the root of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
         end
         ",
@@ -125,7 +131,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)
@@ -171,11 +177,11 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{outer_proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} add.1 assert_eqw
         end
@@ -215,9 +221,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
-    let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
+    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
-    client2.submit_transaction(tx_result).await?;
     Ok(())
 }
 
@@ -244,7 +249,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
                 push.{map_key}
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end",
             map_key = Word::from(MAP_KEY)
@@ -263,11 +268,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
         begin
             # push the hash of the `get_fpi_item` account procedure
             push.{proc_root}
-    
+
             # push the foreign account id
             push.{account_id_suffix} push.{account_id_prefix}
             # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-    
+
             exec.tx::execute_foreign_procedure
             push.{fpi_value} assert_eqw
         end
@@ -304,7 +309,18 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .await?
             .context("failed to find foreign account after deploiyng")?
             .into();
-        ForeignAccount::private(foreign_account)
+
+        let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
+        let acc = PartialAccount::new(
+            id,
+            nonce,
+            code,
+            PartialStorage::new_full(storage),
+            Default::default(),
+            seed,
+        )?;
+
+        ForeignAccount::private(acc)
     };
 
     let tx_request = builder.foreign_accounts([foreign_account?]).build()?;
@@ -319,9 +335,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
     let (native_account, ..) =
         insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
 
-    let tx_result = client2.new_transaction(native_account.id(), tx_request).await?;
-
-    client2.submit_transaction(tx_result).await?;
+    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -344,10 +358,10 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
-) -> Result<(Account, Word, Word, SecretKey)> {
+) -> Result<(Account, Word, SecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
-    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into());
+    storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
 
     let get_item_component = AccountComponent::compile(
         code,
@@ -358,9 +372,9 @@ fn foreign_account_with_code(
     .with_supports_all_types();
 
     let secret_key = SecretKey::new();
-    let auth_component = AuthRpoFalcon512::new(secret_key.public_key());
+    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment().into());
 
-    let (account, seed) = AccountBuilder::new(Default::default())
+    let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
         .with_auth_component(auth_component)
         .storage_mode(storage_mode)
@@ -372,7 +386,7 @@ fn foreign_account_with_code(
         .procedure_digests()
         .next()
         .context("failed to get procedure root from component MAST forest")?;
-    Ok((account, seed, proc_root, secret_key))
+    Ok((account, proc_root, secret_key))
 }
 
 /// Deploys a foreign account to the network with the specified code and storage mode. The account
@@ -389,28 +403,29 @@ async fn deploy_foreign_account(
     storage_mode: AccountStorageMode,
     code: String,
 ) -> Result<(Account, Word)> {
-    let (foreign_account, foreign_seed, proc_root, secret_key) =
-        foreign_account_with_code(storage_mode, code)?;
+    let (foreign_account, proc_root, secret_key) = foreign_account_with_code(storage_mode, code)?;
     let foreign_account_id = foreign_account.id();
 
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(secret_key))
         .with_context(|| "failed to add key to keystore")?;
-    client.add_account(&foreign_account, Some(foreign_seed), false).await?;
+    client.add_account(&foreign_account, false).await?;
 
     println!("Deploying foreign account");
 
-    let tx = client
-        .new_transaction(
+    let tx_id = client
+        .submit_new_transaction(
             foreign_account_id,
             TransactionRequestBuilder::new()
                 .build()
                 .with_context(|| "failed to build transaction request")?,
         )
         .await?;
-    let tx_id = tx.executed_transaction().id();
-    client.submit_transaction(tx).await?;
     wait_for_tx(client, tx_id).await?;
+
+    // NOTE: We get the new account state here since the first transaction updates the nonce from
+    // to 1
+    let foreign_account: Account = client.get_account(foreign_account_id).await?.unwrap().into();
 
     Ok((foreign_account, proc_root))
 }

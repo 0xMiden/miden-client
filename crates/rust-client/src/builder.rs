@@ -9,12 +9,9 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::Rng;
 
 use crate::keystore::FilesystemKeyStore;
+use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
-#[cfg(feature = "tonic")]
-use crate::rpc::{Endpoint, TonicRpcClient};
-use crate::store::Store;
-#[cfg(feature = "sqlite")]
-use crate::store::sqlite_store::SqliteStore;
+use crate::store::{Store, StoreError};
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -38,6 +35,23 @@ enum AuthenticatorConfig<AUTH> {
     Instance(Arc<AUTH>),
 }
 
+// STORE BUILDER
+// ================================================================================================
+
+/// Allows the [`ClientBuilder`] to accept either an already built store instance or a factory for
+/// deferring the store instantiation.
+pub enum StoreBuilder {
+    Store(Arc<dyn Store>),
+    Factory(Box<dyn StoreFactory>),
+}
+
+/// Trait for building a store instance.
+#[async_trait::async_trait]
+pub trait StoreFactory {
+    /// Returns a new store instance.
+    async fn build(&self) -> Result<Arc<dyn Store>, StoreError>;
+}
+
 // CLIENT BUILDER
 // ================================================================================================
 
@@ -48,14 +62,11 @@ enum AuthenticatorConfig<AUTH> {
 /// uses `FilesystemKeyStore<rand::rngs::StdRng>`.
 pub struct ClientBuilder<AUTH> {
     /// An optional custom RPC client. If provided, this takes precedence over `rpc_endpoint`.
-    rpc_api: Option<Arc<dyn NodeRpcClient + Send>>,
+    rpc_api: Option<Arc<dyn NodeRpcClient>>,
     /// An optional store provided by the user.
-    store: Option<Arc<dyn Store>>,
+    pub store: Option<StoreBuilder>,
     /// An optional RNG provided by the user.
     rng: Option<Box<dyn FeltRng>>,
-    /// The store path to use when no store is directly provided via `store()`.
-    #[cfg(feature = "sqlite")]
-    store_path: String,
     /// The keystore configuration provided by the user.
     keystore: Option<AuthenticatorConfig<AUTH>>,
     /// A flag to enable debug mode.
@@ -66,6 +77,8 @@ pub struct ClientBuilder<AUTH> {
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
+    /// An optional custom note transport client.
+    note_transport_api: Option<Arc<dyn NoteTransportClient>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -74,19 +87,18 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             rpc_api: None,
             store: None,
             rng: None,
-            #[cfg(feature = "sqlite")]
-            store_path: "store.sqlite3".to_string(),
             keystore: None,
             in_debug_mode: DebugMode::Disabled,
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
+            note_transport_api: None,
         }
     }
 }
 
 impl<AUTH> ClientBuilder<AUTH>
 where
-    AUTH: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static,
+    AUTH: BuilderAuthenticator,
 {
     /// Create a new `ClientBuilder` with default settings.
     #[must_use]
@@ -103,31 +115,24 @@ where
 
     /// Sets a custom RPC client directly.
     #[must_use]
-    pub fn rpc(mut self, client: Arc<dyn NodeRpcClient + Send>) -> Self {
+    pub fn rpc(mut self, client: Arc<dyn NodeRpcClient>) -> Self {
         self.rpc_api = Some(client);
         self
     }
 
-    /// Sets the a tonic RPC client from the endpoint and optional timeout.
+    /// Sets a gRPC client from the endpoint and optional timeout.
+    #[must_use]
     #[cfg(feature = "tonic")]
-    #[must_use]
-    pub fn tonic_rpc_client(mut self, endpoint: &Endpoint, timeout_ms: Option<u64>) -> Self {
-        self.rpc_api = Some(Arc::new(TonicRpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
+    pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
+        self.rpc_api =
+            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
         self
     }
 
-    /// Optionally set a custom store path.
-    #[cfg(feature = "sqlite")]
-    #[must_use]
-    pub fn sqlite_store(mut self, path: &str) -> Self {
-        self.store_path = path.to_string();
-        self
-    }
-
-    /// Optionally provide a store directly.
+    /// Provide a store to be used by the client.
     #[must_use]
     pub fn store(mut self, store: Arc<dyn Store>) -> Self {
-        self.store = Some(store);
+        self.store = Some(StoreBuilder::Store(store));
         self
     }
 
@@ -172,6 +177,13 @@ where
         self
     }
 
+    /// Sets a custom note transport client directly.
+    #[must_use]
+    pub fn note_transport(mut self, client: Arc<dyn NoteTransportClient>) -> Self {
+        self.note_transport_api = Some(client);
+        self
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
@@ -182,30 +194,24 @@ where
     #[allow(clippy::unused_async, unused_mut)]
     pub async fn build(mut self) -> Result<Client<AUTH>, ClientError> {
         // Determine the RPC client to use.
-        let rpc_api: Arc<dyn NodeRpcClient + Send> = if let Some(client) = self.rpc_api {
+        let rpc_api: Arc<dyn NodeRpcClient> = if let Some(client) = self.rpc_api {
             client
         } else {
             return Err(ClientError::ClientInitializationError(
-                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)` if `tonic` is enabled."
+                "RPC client or endpoint is required. Call `.rpc(...)` or `.tonic_rpc_client(...)`."
                     .into(),
             ));
         };
 
-        #[cfg(feature = "sqlite")]
-        if self.store.is_none() {
-            let store = SqliteStore::new(self.store_path.into())
-                .await
-                .map_err(ClientError::StoreError)?;
-            self.store = Some(Arc::new(store));
-        }
-
-        // If no store was provided, create a SQLite store from the given path.
-        let arc_store: Arc<dyn Store> = if let Some(store) = self.store {
-            store
+        // Ensure a store was provided.
+        let store = if let Some(store_builder) = self.store {
+            match store_builder {
+                StoreBuilder::Store(store) => store,
+                StoreBuilder::Factory(factory) => factory.build().await?,
+            }
         } else {
             return Err(ClientError::ClientInitializationError(
-                "Store must be specified. Call `.store(...)` or `.sqlite_store(...)` with a store path if `sqlite` is enabled."
-                    .into(),
+                "Store must be specified. Call `.store(...)`.".into(),
             ));
         };
 
@@ -232,7 +238,7 @@ where
         Client::new(
             rpc_api,
             rng,
-            arc_store,
+            store,
             authenticator,
             ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
@@ -243,7 +249,22 @@ where
             .expect("Default executor's options should always be valid"),
             self.tx_graceful_blocks,
             self.max_block_number_delta,
+            self.note_transport_api,
         )
         .await
     }
+}
+
+// AUTH TRAIT MARKER
+// ================================================================================================
+
+/// Marker trait to capture the bounds the builder requires for the authenticator type
+/// parameter
+pub trait BuilderAuthenticator:
+    TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+{
+}
+impl<T> BuilderAuthenticator for T where
+    T: TransactionAuthenticator + From<FilesystemKeyStore<rand::rngs::StdRng>> + 'static
+{
 }

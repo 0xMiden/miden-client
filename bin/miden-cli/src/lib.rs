@@ -9,8 +9,10 @@ use miden_client::account::AccountHeader;
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, DebugMode, IdPrefixFetchError};
+use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
@@ -26,6 +28,7 @@ use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
 use self::utils::load_config_file;
+use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
 
@@ -135,6 +138,7 @@ pub enum Command {
     /// View a summary of the current client state.
     Info,
     Tags(TagsCmd),
+    Address(AddressCmd),
     #[command(name = "tx")]
     Transaction(TransactionCmd),
     Mint(MintCmd),
@@ -158,6 +162,12 @@ impl Cli {
             return Ok(());
         }
 
+        // Check if Client is not yet initialized => silently initialize the client
+        if !current_dir.exists() {
+            let init_cmd = InitCmd::default();
+            init_cmd.execute(&current_dir)?;
+        }
+
         // Define whether we want to use the executor's debug mode based on the env var and
         // the flag override
         let in_debug_mode = match env::var("MIDEN_DEBUG") {
@@ -172,11 +182,8 @@ impl Cli {
             .map_err(CliError::KeyStore)?;
 
         let mut builder = ClientBuilder::new()
-            .sqlite_store(cli_config.store_filepath.to_str().expect("Store path should be valid"))
-            .tonic_rpc_client(
-                &cli_config.rpc.endpoint.clone().into(),
-                Some(cli_config.rpc.timeout_ms),
-            )
+            .sqlite_store(cli_config.store_filepath.clone())
+            .grpc_client(&cli_config.rpc.endpoint.clone().into(), Some(cli_config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore.clone()))
             .in_debug_mode(in_debug_mode)
             .tx_graceful_blocks(Some(TX_GRACEFUL_BLOCK_DELTA));
@@ -185,9 +192,15 @@ impl Cli {
             builder = builder.max_block_number_delta(delta);
         }
 
-        let mut client = builder.build().await?;
+        if let Some(tl_config) = cli_config.note_transport {
+            let client =
+                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
+                    .await
+                    .map_err(|e| CliError::from(ClientError::from(e)))?;
+            builder = builder.note_transport(Arc::new(client));
+        }
 
-        client.ensure_genesis_in_place().await?;
+        let client = builder.build().await?;
 
         // Execute CLI command
         match &self.action {
@@ -202,6 +215,7 @@ impl Cli {
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,
             Command::Tags(tags) => tags.execute(client).await,
+            Command::Address(addresses) => addresses.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
             Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,

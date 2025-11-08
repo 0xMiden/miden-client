@@ -1,13 +1,14 @@
 #!/bin/sh
 
-# Script to publish all miden-node crates to crates.io.
-# Usage: ./publish-crates.sh [args]
-#
-# E.G:   ./publish-crates.sh
+# Script to publish all miden-client crates to crates.io.
+# This should only be invoked manually in case the automated publishing CI workflows fail.
+# Usage: ./publish-crates.sh [args] 
+# 
+# E.G: ./publish-crates.sh
 
 set -e
 
-# Check
+# Check credentials
 credentials=~/.cargo/credentials.toml
 if [ ! -f "$credentials" ]; then
     red="\033[0;31m"
@@ -15,27 +16,18 @@ if [ ! -f "$credentials" ]; then
     echo "\033[0m"
 fi
 
-# Checkout
+# Checkout main
 echo "Checking out main branch..."
 git checkout main
 git pull origin main
 
 # Publish
-echo "Publishing crates..."
-
-crates=(
-    miden-client
-    miden-client-cli
-    miden-client-integration-tests
-)
-
-for crate in ${crates[@]}; do
-    echo "Publishing $crate..."
-    cargo publish -p "$crate" 
-done
+echo "Publishing all crates except miden-client-web..."
+cargo publish --workspace --exclude miden-client-web
 
 # Publish miden-client-web
-# This should use wasm32-unknown-unknown as target (specified on crates/web-client/config.toml,
-# but publishing from the workspace root does not take it into account)
+# This should use wasm32-unknown-unknown as target (specified on crates/web-client/.cargo/config.toml,
+# but publishing from the workspace root does not take it into account). So we publish it from the web-client directory.
 echo "Publishing miden-client-web..."
-cargo publish -p miden-client-web --target wasm32-unknown-unknown
+cd crates/web-client
+cargo publish

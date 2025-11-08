@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "dexie": ["./node_modules/dexie/dist/dexie"],
+      "dexie/*": ["./node_modules/dexie/dist/*"]
+    },
+    "tsBuildInfoFile": "./tsconfig.bundler.tsbuildinfo"
+  }
+}

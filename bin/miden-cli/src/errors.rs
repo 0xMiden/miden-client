@@ -1,9 +1,16 @@
 use std::error::Error;
 
-use miden_client::ClientError;
+use miden_client::account::AddressError;
 use miden_client::keystore::KeyStoreError;
-use miden_lib::utils::ScriptBuilderError;
-use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
+use miden_client::utils::ScriptBuilderError;
+use miden_client::{
+    AccountError,
+    AccountIdError,
+    AssetError,
+    ClientError,
+    ErrorHint,
+    NetworkIdError,
+};
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -21,12 +28,20 @@ pub enum CliError {
     #[error("account id error: {1}")]
     #[diagnostic(code(cli::accountid_error), help("Check the account ID format."))]
     AccountId(#[source] AccountIdError, String),
+    #[error("address error: {1}")]
+    #[diagnostic(code(cli::address_error), help("Check the address format."))]
+    Address(#[source] AddressError, String),
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error")]
+    #[error("client error: {error}")]
     #[diagnostic(code(cli::client_error))]
-    Client(#[from] ClientError),
+    Client {
+        #[source]
+        error: ClientError,
+        #[help]
+        help: Option<String>,
+    },
     #[error("config error: {1}")]
     #[diagnostic(
         code(cli::config_error),
@@ -49,6 +64,9 @@ pub enum CliError {
     #[error("import error: {0}")]
     #[diagnostic(code(cli::import_error), help("Check the file name."))]
     Import(String),
+    #[error("init data error: {1}")]
+    #[diagnostic(code(cli::account_error))]
+    InitDataError(#[source] SourceError, String),
     #[error("input error: {0}")]
     #[diagnostic(code(cli::input_error))]
     Input(String),
@@ -76,4 +94,11 @@ pub enum CliError {
     #[error("transaction error: {1}")]
     #[diagnostic(code(cli::transaction_error))]
     Transaction(#[source] SourceError, String),
+}
+
+impl From<ClientError> for CliError {
+    fn from(error: ClientError) -> Self {
+        let help = Option::<ErrorHint>::from(&error).map(ErrorHint::into_help_message);
+        CliError::Client { error, help }
+    }
 }

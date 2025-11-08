@@ -2,14 +2,16 @@ use alloc::string::String;
 use core::num::TryFromIntError;
 
 use miden_objects::account::AccountId;
-use miden_objects::crypto::merkle::MmrError;
+use miden_objects::crypto::merkle::{MerkleError, MmrError, SmtProofError};
 use miden_objects::utils::{DeserializationError, HexParseError};
 use miden_objects::{
     AccountError,
     AccountIdError,
+    AddressError,
     AssetError,
     AssetVaultError,
     NoteError,
+    StorageMapError,
     TransactionScriptError,
     Word,
     WordError,
@@ -36,6 +38,8 @@ pub enum StoreError {
     AccountDataNotFound(AccountId),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("address error")]
+    AddressError(#[from] AddressError),
     #[error("account id error")]
     AccountIdError(#[from] AccountIdError),
     #[error("account commitment {0} already exists")]
@@ -58,16 +62,26 @@ pub enum StoreError {
     InvalidInt(#[from] TryFromIntError),
     #[error("note record error")]
     NoteRecordError(#[from] NoteRecordError),
+    #[error("error in merkle store")]
+    MerkleStoreError(#[from] MerkleError),
     #[error("error constructing mmr")]
     MmrError(#[from] MmrError),
     #[error("inclusion proof creation error")]
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
+    #[error("note transport cursor not found")]
+    NoteTransportCursorNotFound,
+    #[error("note script with root {0} not found")]
+    NoteScriptNotFound(String),
     #[error("failed to parse data retrieved from the database: {0}")]
     ParsingError(String),
     #[error("failed to retrieve data from the database: {0}")]
     QueryError(String),
+    #[error("error with the SMT proof")]
+    SmtProofError(#[from] SmtProofError),
+    #[error("error with a storage map")]
+    StorageMapError(#[from] StorageMapError),
     #[error("error instantiating transaction script")]
     TransactionScriptError(#[from] TransactionScriptError),
     #[error("account vault data for root {0} not found")]

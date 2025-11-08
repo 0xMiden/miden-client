@@ -9,19 +9,20 @@
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
 //!
-//! In addition, the module provides implementations for different environments (e.g. tonic-based or
-//! web-based) via feature flags ( `tonic` and `web-tonic`).
+//! The client implementation adapts to the target environment automatically:
+//! - Native targets use `tonic` transport with TLS.
+//! - `wasm32` targets use `tonic-web-wasm-client` transport.
 //!
 //! ## Example
 //!
 //! ```no_run
-//! # use miden_client::rpc::{Endpoint, NodeRpcClient, TonicRpcClient};
+//! # use miden_client::rpc::{Endpoint, NodeRpcClient, GrpcClient};
 //! # use miden_objects::block::BlockNumber;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a Tonic RPC client instance (assumes default endpoint configuration).
+//! // Create a gRPC client instance (assumes default endpoint configuration).
 //! let endpoint = Endpoint::new("https".into(), "localhost".into(), Some(57291));
-//! let mut rpc_client = TonicRpcClient::new(&endpoint, 1000);
+//! let mut rpc_client = GrpcClient::new(&endpoint, 1000);
 //!
 //! // Fetch the latest block header (by passing None).
 //! let (block_header, mmr_proof) = rpc_client.get_block_header_by_number(None, true).await?;
@@ -40,7 +41,7 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -51,10 +52,11 @@ use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::address::NetworkId;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
-use miden_objects::transaction::ProvenTransaction;
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -71,14 +73,14 @@ mod generated;
 #[cfg(feature = "testing")]
 pub mod generated;
 
-#[cfg(all(feature = "tonic", feature = "web-tonic"))]
-compile_error!("features `tonic` and `web-tonic` are mutually exclusive");
-
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
+#[cfg(feature = "tonic")]
 mod tonic_client;
-#[cfg(any(feature = "tonic", feature = "web-tonic"))]
-pub use tonic_client::TonicRpcClient;
+#[cfg(feature = "tonic")]
+pub use tonic_client::GrpcClient;
 
+use crate::rpc::domain::account_vault::AccountVaultInfo;
+use crate::rpc::domain::storage_map::StorageMapInfo;
+use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
@@ -104,6 +106,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn submit_proven_transaction(
         &self,
         proven_transaction: ProvenTransaction,
+        transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
@@ -161,19 +164,23 @@ pub trait NodeRpcClient: Send + Sync {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError>;
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
-    /// `/CheckNullifiersByPrefix` RPC endpoint.
+    /// `/SyncNullifiers` RPC endpoint.
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_num` is the block number to start the search from. Nullifiers created in this block
     ///   or the following blocks will be included.
-    async fn check_nullifiers_by_prefix(
+    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
+    ///   to the network chain tip.
+    async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_num: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
@@ -189,7 +196,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn get_account_proofs(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        known_account_codes: Vec<AccountCode>,
+        known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
@@ -197,13 +204,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// The `block_num` parameter is the block number to start the search from.
     ///
     /// The default implementation of this method uses
-    /// [`NodeRpcClient::check_nullifiers_by_prefix`].
+    /// [`NodeRpcClient::sync_nullifiers`].
     async fn get_nullifier_commit_height(
         &self,
         nullifier: &Nullifier,
         block_num: BlockNumber,
-    ) -> Result<Option<u32>, RpcError> {
-        let nullifiers = self.check_nullifiers_by_prefix(&[nullifier.prefix()], block_num).await?;
+    ) -> Result<Option<BlockNumber>, RpcError> {
+        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
 
         Ok(nullifiers
             .iter()
@@ -264,6 +271,7 @@ pub trait NodeRpcClient: Send + Sync {
             let response = self.get_account_details(local_account.id()).await?;
 
             if let FetchedAccount::Public(account, _) = response {
+                let account = *account;
                 // We should only return an account if it's newer, otherwise we ignore it
                 if account.nonce().as_int() > local_account.nonce().as_int() {
                     public_accounts.push(account);
@@ -297,6 +305,56 @@ pub trait NodeRpcClient: Send + Sync {
         let notes = self.get_notes_by_id(&[note_id]).await?;
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }
+
+    /// Fetches the note script with the specified root.
+    ///
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
+
+    /// Fetches storage map updates for specified account and storage slots within a block range,
+    /// using the `/SyncStorageMaps` RPC endpoint.
+    ///
+    /// - `block_from`: The starting block number for the range.
+    /// - `block_to`: The ending block number for the range.
+    /// - `account_id`: The account ID for which to fetch storage map updates.
+    async fn sync_storage_maps(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<StorageMapInfo, RpcError>;
+
+    /// Fetches account vault updates for specified account within a block range,
+    /// using the `/SyncAccountVault` RPC endpoint.
+    ///
+    /// - `block_from`: The starting block number for the range.
+    /// - `block_to`: The ending block number for the range.
+    /// - `account_id`: The account ID for which to fetch storage map updates.
+    async fn sync_account_vault(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_id: AccountId,
+    ) -> Result<AccountVaultInfo, RpcError>;
+
+    /// Fetches transactions records for specific accounts within a block range.
+    /// Using the `/SyncTransactions` RPC endpoint.
+    ///
+    /// - `block_from`: The starting block number for the range.
+    /// - `block_to`: The ending block number for the range.
+    /// - `account_ids`: The account IDs for which to fetch storage map updates.
+    async fn sync_transactions(
+        &self,
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+        account_ids: Vec<AccountId>,
+    ) -> Result<TransactionsInfo, RpcError>;
+
+    /// Fetches the network ID of the node.
+    /// Errors:
+    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -306,7 +364,7 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug)]
 pub enum NodeRpcClientEndpoint {
     CheckNullifiers,
-    CheckNullifiersByPrefix,
+    SyncNullifiers,
     GetAccountDetails,
     GetAccountStateDelta,
     GetAccountProofs,
@@ -316,14 +374,18 @@ pub enum NodeRpcClientEndpoint {
     SyncState,
     SubmitProvenTx,
     SyncNotes,
+    GetNoteScriptByRoot,
+    SyncStorageMaps,
+    SyncAccountVault,
+    SyncTransactions,
 }
 
 impl fmt::Display for NodeRpcClientEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
-            NodeRpcClientEndpoint::CheckNullifiersByPrefix => {
-                write!(f, "check_nullifiers_by_prefix")
+            NodeRpcClientEndpoint::SyncNullifiers => {
+                write!(f, "sync_nullifiers")
             },
             NodeRpcClientEndpoint::GetAccountDetails => write!(f, "get_account_details"),
             NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
@@ -336,6 +398,10 @@ impl fmt::Display for NodeRpcClientEndpoint {
             NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
             NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
             NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
+            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
+            NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
+            NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
+            NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
         }
     }
 }

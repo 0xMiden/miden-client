@@ -3,7 +3,7 @@ use core::fmt::{self, Display};
 
 use chrono::{Local, TimeZone};
 use miden_objects::account::AccountId;
-use miden_objects::block::BlockHeader;
+use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_objects::transaction::TransactionId;
 pub use miden_tx::utils::{
@@ -42,7 +42,7 @@ use super::NoteRecordError;
 pub enum InputNoteState {
     /// Tracked by the client but without a network inclusion proof.
     Expected(ExpectedNoteState),
-    /// The store holds the note's inclusion proof, but  it was not yet verified.
+    /// The store holds the note's inclusion proof, but it was not yet verified.
     Unverified(UnverifiedNoteState),
     /// The store holds the note's inclusion proof, which was verified.
     Committed(CommittedNoteState),
@@ -87,20 +87,8 @@ impl InputNoteState {
         }
     }
 
-    pub(crate) fn metadata(&self) -> Option<&NoteMetadata> {
-        self.inner().metadata()
-    }
-
-    pub(crate) fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
-        self.inner().inclusion_proof()
-    }
-
-    pub(crate) fn consumer_transaction_id(&self) -> Option<&TransactionId> {
-        self.inner().consumer_transaction_id()
-    }
-
     /// Returns a unique identifier for each note state.
-    pub(crate) fn discriminant(&self) -> u8 {
+    pub fn discriminant(&self) -> u8 {
         match self {
             InputNoteState::Expected(_) => Self::STATE_EXPECTED,
             InputNoteState::Unverified(_) => Self::STATE_UNVERIFIED,
@@ -118,6 +106,18 @@ impl InputNoteState {
         }
     }
 
+    pub(crate) fn metadata(&self) -> Option<&NoteMetadata> {
+        self.inner().metadata()
+    }
+
+    pub(crate) fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
+        self.inner().inclusion_proof()
+    }
+
+    pub(crate) fn consumer_transaction_id(&self) -> Option<&TransactionId> {
+        self.inner().consumer_transaction_id()
+    }
+
     /// Returns a new state to reflect that the note has received an inclusion proof. The proof is
     /// assumed to be unverified until the block header information is received. If the note state
     /// doesn't change, `None` is returned.
@@ -133,7 +133,7 @@ impl InputNoteState {
     /// If the note state doesn't change, `None` is returned.
     pub(crate) fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         self.inner().consumed_externally(nullifier_block_height)
     }
@@ -166,7 +166,7 @@ impl InputNoteState {
     pub(crate) fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         self.inner().transaction_committed(transaction_id, block_height)
     }
@@ -311,7 +311,7 @@ pub trait NoteStateHandler {
 
     fn consumed_externally(
         &self,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 
     fn block_header_received(
@@ -330,7 +330,7 @@ pub trait NoteStateHandler {
     fn transaction_committed(
         &self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 }
 

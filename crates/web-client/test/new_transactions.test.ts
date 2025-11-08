@@ -18,7 +18,7 @@ import {
 // NEW_MINT_TRANSACTION TESTS
 // =======================================================================================================
 
-interface MultipleMintsTransactionResult {
+interface MultipleMintsTransactionUpdate {
   transactionIds: string[];
   createdNoteIds: string[];
   numOutputNotesCreated: number;
@@ -31,7 +31,7 @@ const multipleMintsTest = async (
   targetAccount: string,
   faucetAccount: string,
   withRemoteProver: boolean = false
-): Promise<MultipleMintsTransactionResult> => {
+): Promise<MultipleMintsTransactionUpdate> => {
   return await testingPage.evaluate(
     async ({ targetAccount, faucetAccount, withRemoteProver }) => {
       const client = window.client;
@@ -39,6 +39,11 @@ const multipleMintsTest = async (
       const targetAccountId = window.AccountId.fromHex(targetAccount);
       const faucetAccountId = window.AccountId.fromHex(faucetAccount);
       await client.syncState();
+
+      const prover =
+        withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
 
       // Mint 3 notes
       let result: {
@@ -59,32 +64,31 @@ const multipleMintsTest = async (
           BigInt(1000)
         );
 
-        const mintTransactionResult = await client.newTransaction(
-          faucetAccountId,
-          mintTransactionRequest
-        );
-
-        if (withRemoteProver && window.remoteProverUrl != null) {
-          await client.submitTransaction(
-            mintTransactionResult,
-            window.remoteProverInstance
+        const mintTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            faucetAccountId,
+            mintTransactionRequest,
+            prover
           );
-        } else {
-          await client.submitTransaction(mintTransactionResult);
-        }
 
         await window.helpers.waitForTransaction(
-          mintTransactionResult.executedTransaction().id().toHex()
+          mintTransactionUpdate.executedTransaction().id().toHex()
         );
 
         result.createdNoteIds.push(
-          mintTransactionResult.createdNotes().notes()[0].id().toString()
+          mintTransactionUpdate
+            .executedTransaction()
+            .outputNotes()
+            .notes()[0]
+            .id()
+            .toString()
         );
         result.transactionIds.push(
-          mintTransactionResult.executedTransaction().id().toHex()
+          mintTransactionUpdate.executedTransaction().id().toHex()
         );
-        result.numOutputNotesCreated += mintTransactionResult
-          .createdNotes()
+        result.numOutputNotesCreated += mintTransactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .numNotes();
       }
 
@@ -93,22 +97,15 @@ const multipleMintsTest = async (
         const consumeTransactionRequest = client.newConsumeTransactionRequest([
           result.createdNoteIds[i],
         ]);
-        const consumeTransactionResult = await client.newTransaction(
-          targetAccountId,
-          consumeTransactionRequest
-        );
-
-        if (withRemoteProver && window.remoteProverUrl != null) {
-          await client.submitTransaction(
-            consumeTransactionResult,
-            window.remoteProverInstance
+        const consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccountId,
+            consumeTransactionRequest,
+            prover
           );
-        } else {
-          await client.submitTransaction(consumeTransactionResult);
-        }
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
       }
 
@@ -192,7 +189,7 @@ test.describe("consume transaction tests", () => {
 // NEW_SEND_TRANSACTION TESTS
 // =======================================================================================================
 
-interface SendTransactionResult {
+interface SendTransactionUpdate {
   senderAccountBalance: string;
   changedTargetBalance: string;
 }
@@ -202,7 +199,7 @@ export const sendTransactionTest = async (
   senderAccount: string,
   targetAccount: string,
   faucetAccount: string
-): Promise<SendTransactionResult> => {
+): Promise<SendTransactionUpdate> => {
   return await testingPage.evaluate(
     async ({ senderAccount, targetAccount, faucetAccount }) => {
       const client = window.client;
@@ -344,10 +341,9 @@ export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
   withRemoteProver: boolean
-): Promise<boolean> => {
+): Promise<void> => {
   return await testingPage.evaluate(
     async ({ assertedValue, withRemoteProver }) => {
-      debugger;
       const client = window.client;
 
       const walletAccount = await client.newWallet(
@@ -379,8 +375,11 @@ export const customTransaction = async (
       let felt8 = new window.Felt(BigInt(9));
 
       let noteArgs = [felt1, felt2, felt3, felt4, felt5, felt6, felt7, felt8];
-      let feltArray = new window.FeltArray();
-      noteArgs.forEach((felt) => feltArray.append(felt));
+      let feltArray = new window.MidenArrays.FeltArray();
+
+      noteArgs.forEach((felt) => {
+        feltArray.push(felt);
+      });
 
       let noteAssets = new window.NoteAssets([
         new window.FungibleAsset(faucetAccount.id(), BigInt(10)),
@@ -399,6 +398,7 @@ export const customTransaction = async (
       let memAddress2 = "1004";
       let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
       let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+
       let noteScript = `
             # Custom P2ID note script
             #
@@ -409,59 +409,10 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::account
-            use.miden::note
+            use.miden::native_account
+            use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
-
-
-            proc.add_note_assets_to_account
-                push.0 exec.note::get_assets
-                # => [num_of_assets, 0 = ptr, ...]
-
-                # compute the pointer at which we should stop iterating
-                mul.4 dup.1 add
-                # => [end_ptr, ptr, ...]
-
-                # pad the stack and move the pointer to the top
-                padw movup.5
-                # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                # compute the loop latch
-                dup dup.6 neq
-                # => [latch, ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                while.true
-                    # => [ptr, 0, 0, 0, 0, end_ptr, ...]
-
-                    # save the pointer so that we can use it later
-                    dup movdn.5
-                    # => [ptr, 0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # load the asset
-                    mem_loadw
-                    # => [ASSET, ptr, end_ptr, ...]
-
-                    # pad the stack before call
-                    padw swapw padw padw swapdw
-                    # => [ASSET, pad(12), ptr, end_ptr, ...]
-
-                    # add asset to the account
-                    call.wallet::receive_asset
-                    # => [pad(16), ptr, end_ptr, ...]
-
-                    # clean the stack after call
-                    dropw dropw dropw
-                    # => [0, 0, 0, 0, ptr, end_ptr, ...]
-
-                    # increment the pointer and compare it to the end_ptr
-                    movup.4 add.4 dup dup.6 neq
-                    # => [latch, ptr+4, ASSET, end_ptr, ...]
-                end
-
-                # clear the stack
-                drop dropw drop
-            end
 
             begin
                 # push data from the advice map into the advice stack
@@ -482,7 +433,7 @@ export const customTransaction = async (
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -491,14 +442,14 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
                 # store the note inputs to memory starting at address 0
-                push.0 exec.note::get_inputs
+                push.0 exec.active_note::get_inputs
                 # => [num_inputs, inputs_ptr]
 
                 # make sure the number of inputs is 2
@@ -509,21 +460,22 @@ export const customTransaction = async (
                 mem_load
                 # => [target_account_id_prefix]
 
-                exec.account::get_id swap drop
+                exec.native_account::get_id swap drop
                 # => [account_id_prefix, target_account_id_prefix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
                 assert_eq.err="P2ID's target account address and transaction address do not match"
                 # => [...]
 
-                exec.add_note_assets_to_account
+                exec.active_note::add_assets_to_account
                 # => [...]
             end
         `;
 
-      let compiledNoteScript = await client.compileNoteScript(noteScript);
+      let builder = client.createScriptBuilder();
+      let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
+        new window.MidenArrays.FeltArray([
           walletAccount.id().prefix(),
           walletAccount.id().suffix(),
         ])
@@ -532,6 +484,7 @@ export const customTransaction = async (
       const serialNum = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
+
       let noteRecipient = new window.NoteRecipient(
         serialNum,
         compiledNoteScript,
@@ -540,30 +493,29 @@ export const customTransaction = async (
 
       let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
+      const prover =
+        withRemoteProver && window.remoteProverUrl != null
+          ? window.remoteProverInstance
+          : undefined;
+
       // Creating First Custom Transaction Request to Mint the Custom Note
+
+      const outputNote = window.OutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
         .withOwnOutputNotes(
-          new window.OutputNotesArray([window.OutputNote.full(note)])
+          new window.MidenArrays.OutputNoteArray([outputNote])
         )
         .build();
 
       // Execute and Submit Transaction
-      let transactionResult = await client.newTransaction(
+      let transactionUpdate = await window.helpers.executeAndApplyTransaction(
         faucetAccount.id(),
-        transactionRequest
+        transactionRequest,
+        prover
       );
 
-      if (withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          transactionResult,
-          window.remoteProverInstance
-        );
-      } else {
-        await client.submitTransaction(transactionResult);
-      }
-
       await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
+        transactionUpdate.executedTransaction().id().toHex()
       );
 
       // Just like in the miden test, you can modify this script to get the execution to fail
@@ -581,12 +533,15 @@ export const customTransaction = async (
 
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
-      let transactionScript = await client.compileTxScript(txScript);
+      let transactionScript = await builder.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
+
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
@@ -596,22 +551,14 @@ export const customTransaction = async (
         .build();
 
       // Execute and Submit Transaction
-      let transactionResult2 = await client.newTransaction(
+      let transactionUpdate2 = await window.helpers.executeAndApplyTransaction(
         walletAccount.id(),
-        transactionRequest2
+        transactionRequest2,
+        prover
       );
 
-      if (withRemoteProver && window.remoteProverUrl != null) {
-        await client.submitTransaction(
-          transactionResult2,
-          window.remoteProverInstance
-        );
-      } else {
-        await client.submitTransaction(transactionResult2);
-      }
-
       await window.helpers.waitForTransaction(
-        transactionResult2.executedTransaction().id().toHex()
+        transactionUpdate2.executedTransaction().id().toHex()
       );
     },
     {
@@ -667,12 +614,12 @@ const customTxWithMultipleNotes = async (
 
       const p2idScript = window.NoteScript.p2id();
 
-      let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
-          targetAccount.id().suffix(),
-          targetAccount.id().prefix(),
-        ])
-      );
+      const inputNotes = new window.MidenArrays.FeltArray([
+        targetAccount.id().suffix(),
+        targetAccount.id().prefix(),
+      ]);
+
+      let noteInputs = new window.NoteInputs(inputNotes);
 
       let noteRecipient1 = new window.NoteRecipient(
         serialNum1,
@@ -688,24 +635,24 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
+      const notes = [
+        window.OutputNote.full(note1),
+        window.OutputNote.full(note2),
+      ];
+
+      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
+
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.OutputNotesArray([
-            window.OutputNote.full(note1),
-            window.OutputNote.full(note2),
-          ])
-        )
+        .withOwnOutputNotes(outputNotes)
         .build();
 
-      let transactionResult = await client.newTransaction(
+      let transactionUpdate = await window.helpers.executeAndApplyTransaction(
         senderAccountId,
         transactionRequest
       );
 
-      await client.submitTransaction(transactionResult);
-
       await window.helpers.waitForTransaction(
-        transactionResult.executedTransaction().id().toHex()
+        transactionUpdate.executedTransaction().id().toHex()
       );
     },
     {
@@ -768,18 +715,19 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
         export.write_to_map
             # The storage map is in storage slot 1
-            push.1
+            push.0
             # => [index, KEY, VALUE]
 
             # Setting the key value pair in the map
-            exec.account::set_map_item
+            exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
             dropw dropw dropw dropw
@@ -790,10 +738,10 @@ export const customAccountComponent = async (
         # Outputs: [VALUE]
         export.get_value_in_map
             # The storage map is in storage slot 1
-            push.1
+            push.0
             # => [index, KEY]
 
-            exec.account::get_map_item
+            exec.active_account::get_map_item
             # => [VALUE]
         end
 
@@ -801,7 +749,7 @@ export const customAccountComponent = async (
         # Outputs: [CURRENT_ROOT]
         export.get_current_map_root
             # Getting the current root from slot 1
-            push.1 exec.account::get_item
+            push.0 exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -836,15 +784,14 @@ export const customAccountComponent = async (
         end
       `;
     const client = window.client;
-    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
+    let builder = client.createScriptBuilder();
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
 
     let mappingAccountComponent = window.AccountComponent.compile(
       accountCode,
-      assembler,
-      [emptyStorageSlot, storageSlotMap]
+      builder,
+      [storageSlotMap]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
@@ -861,35 +808,27 @@ export const customAccountComponent = async (
       .build();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     await client.syncState();
 
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "miden_by_example::mapping_example_contract",
-        accountCode
-      );
-
-    let txScript = window.TransactionScript.compile(
-      scriptCode,
-      assembler.withLibrary(accountComponentLib)
+    let accountCodeLib = builder.buildLibrary(
+      "miden_by_example::mapping_example_contract",
+      accountCode
     );
+
+    builder.linkStaticLibrary(accountCodeLib);
+
+    let txScript = builder.compileTxScript(scriptCode);
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
       .withCustomScript(txScript)
       .build();
 
-    let txResult = await client.newTransaction(
+    let txResult = await window.helpers.executeAndApplyTransaction(
       accountBuilderResult.account.id(),
       txIncrementRequest
     );
-    await client.submitTransaction(txResult);
 
     await window.helpers.waitForTransaction(
       txResult.executedTransaction().id().toHex()
@@ -900,8 +839,7 @@ export const customAccountComponent = async (
 
     // Read a map value from storage slot 1 with key 0x0
     const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-    // NOTE: the map slot is in index 2 because the auth component takes one slot
-    const retrieveMapKey = updated?.storage().getMapItem(2, keyZero);
+    const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
 
     const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
 
@@ -924,7 +862,7 @@ test.describe("custom account component tests", () => {
 // DISCARDED TRANSACTIONS TESTS
 // ================================================================================================
 
-interface DiscardedTransactionResult {
+interface DiscardedTransactionUpdate {
   discardedTransactions: TransactionRecord[];
   commitmentBeforeTx: string;
   commitmentAfterTx: string;
@@ -933,7 +871,7 @@ interface DiscardedTransactionResult {
 
 export const discardedTransaction = async (
   testingPage: Page
-): Promise<DiscardedTransactionResult> => {
+): Promise<DiscardedTransactionUpdate> => {
   return await testingPage.evaluate(async () => {
     const client = window.client;
 
@@ -960,26 +898,28 @@ export const discardedTransaction = async (
       window.NoteType.Private,
       BigInt(1000)
     );
-    let mintTransactionResult = await client.newTransaction(
+    let mintTransactionUpdate = await window.helpers.executeAndApplyTransaction(
       faucetAccount.id(),
       mintTransactionRequest
     );
-    await client.submitTransaction(mintTransactionResult);
-    let createdNotes = mintTransactionResult.createdNotes().notes();
+    let createdNotes = mintTransactionUpdate
+      .executedTransaction()
+      .outputNotes()
+      .notes();
     let createdNoteIds = createdNotes.map((note: Note) => note.id().toString());
     await window.helpers.waitForTransaction(
-      mintTransactionResult.executedTransaction().id().toHex()
+      mintTransactionUpdate.executedTransaction().id().toHex()
     );
 
     const senderConsumeTransactionRequest =
       client.newConsumeTransactionRequest(createdNoteIds);
-    let senderConsumeTransactionResult = await client.newTransaction(
-      senderAccount.id(),
-      senderConsumeTransactionRequest
-    );
-    await client.submitTransaction(senderConsumeTransactionResult);
+    let senderConsumeTransactionUpdate =
+      await window.helpers.executeAndApplyTransaction(
+        senderAccount.id(),
+        senderConsumeTransactionRequest
+      );
     await window.helpers.waitForTransaction(
-      senderConsumeTransactionResult.executedTransaction().id().toHex()
+      senderConsumeTransactionUpdate.executedTransaction().id().toHex()
     );
 
     let sendTransactionRequest = client.newSendTransactionRequest(
@@ -991,18 +931,20 @@ export const discardedTransaction = async (
       1,
       null
     );
-    let sendTransactionResult = await client.newTransaction(
+    let sendTransactionUpdate = await window.helpers.executeAndApplyTransaction(
       senderAccount.id(),
       sendTransactionRequest
     );
-    await client.submitTransaction(sendTransactionResult);
-    let sendCreatedNotes = sendTransactionResult.createdNotes().notes();
+    let sendCreatedNotes = sendTransactionUpdate
+      .executedTransaction()
+      .outputNotes()
+      .notes();
     let sendCreatedNoteIds = sendCreatedNotes.map((note: Note) =>
       note.id().toString()
     );
 
     await window.helpers.waitForTransaction(
-      sendTransactionResult.executedTransaction().id().toHex()
+      sendTransactionUpdate.executedTransaction().id().toHex()
     );
 
     let noteIdAndArgs = new window.NoteIdAndArgs(
@@ -1019,11 +961,10 @@ export const discardedTransaction = async (
     // Sender retrieves the note
     let senderTxRequest =
       await client.newConsumeTransactionRequest(sendCreatedNoteIds);
-    let senderTxResult = await client.newTransaction(
+    let senderTxResult = await window.helpers.executeAndApplyTransaction(
       senderAccount.id(),
       senderTxRequest
     );
-    await client.submitTransaction(senderTxResult);
     await window.helpers.waitForTransaction(
       senderTxResult.executedTransaction().id().toHex()
     );
@@ -1039,12 +980,12 @@ export const discardedTransaction = async (
     }
 
     // Target tries consuming but the transaction will not be submitted
-    let targetTxResult = await client.newTransaction(
+    let targetPipeline = await client.executeTransaction(
       targetAccount.id(),
       consumeTransactionRequest
     );
-
-    await client.testingApplyTransaction(targetTxResult);
+    const submissionHeight = (await client.getSyncHeight()) + 1;
+    await client.applyTransaction(targetPipeline, submissionHeight);
     // Get the account state after the transaction is applied
     const accountStateAfterTx = (await client.getAccount(
       targetAccount.id()
@@ -1111,13 +1052,14 @@ export const counterAccountComponent = async (
 ): Promise<string | undefined> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # => []
         export.get_count
             push.0
-            exec.account::get_item
+            exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
@@ -1125,13 +1067,13 @@ export const counterAccountComponent = async (
         export.increment_count
             push.0
             # => [index]
-            exec.account::get_item
+            exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
             push.0
             # [index, count+1]
-            exec.account::set_item
+            exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
@@ -1143,43 +1085,29 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
-    const incrNonceAuthCode = `use.miden::account
-        export.auth__basic
-          exec.account::incr_nonce
-          drop
-        end`;
     const client = window.client;
 
     // Create counter account
-    let assembler = window.TransactionKernel.assembler().withDebugMode(true);
     let emptyStorageSlot = window.StorageSlot.emptyValue();
+
+    let builder = client.createScriptBuilder();
 
     let counterAccountComponent = window.AccountComponent.compile(
       accountCode,
-      assembler,
+      builder,
       [emptyStorageSlot]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let incrNonceAuth = window.AccountComponent.compile(
-      incrNonceAuthCode,
-      assembler,
-      []
-    ).withSupportsAllTypes();
-
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
       .storageMode(window.AccountStorageMode.network())
-      .withAuthComponent(incrNonceAuth)
+      .withNoAuthComponent()
       .withComponent(counterAccountComponent)
       .build();
 
-    await client.newAccount(
-      accountBuilderResult.account,
-      accountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(accountBuilderResult.account, false);
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
@@ -1189,44 +1117,38 @@ export const counterAccountComponent = async (
     await client.syncState();
 
     // Deploy counter account
-    let accountComponentLib =
-      window.AssemblerUtils.createAccountComponentLibrary(
-        assembler,
-        "external_contract::counter_contract",
-        accountCode
-      );
-
-    let txScript = window.TransactionScript.compile(
-      scriptCode,
-      assembler.withLibrary(accountComponentLib)
+    let accountComponentLib = builder.buildLibrary(
+      "external_contract::counter_contract",
+      accountCode
     );
+    builder.linkDynamicLibrary(accountComponentLib);
+    let txScript = builder.compileTxScript(scriptCode);
 
     let txIncrementRequest = new window.TransactionRequestBuilder()
       .withCustomScript(txScript)
       .build();
 
-    let txResult = await client.newTransaction(
+    let txUpdate = await window.helpers.executeAndApplyTransaction(
       accountBuilderResult.account.id(),
       txIncrementRequest
     );
-    await client.submitTransaction(txResult);
     await window.helpers.waitForTransaction(
-      txResult.executedTransaction().id().toHex()
+      txUpdate.executedTransaction().id().toHex()
     );
 
     // Create transaction with network note
-    assembler = window.TransactionKernel.assembler()
-      .withDebugMode(true)
-      .withLibrary(accountComponentLib);
+    let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let compiledNoteScript = await assembler.compileNoteScript(scriptCode);
-
-    let noteInputs = new window.NoteInputs(new window.FeltArray([]));
+    let noteInputs = new window.NoteInputs(
+      new window.MidenArrays.FeltArray([])
+    );
 
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
+
     let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
+
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
@@ -1247,18 +1169,16 @@ export const counterAccountComponent = async (
 
     let transactionRequest = new window.TransactionRequestBuilder()
       .withOwnOutputNotes(
-        new window.OutputNotesArray([window.OutputNote.full(note)])
+        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
       )
       .build();
 
-    let transactionResult = await client.newTransaction(
+    let transactionUpdate = await window.helpers.executeAndApplyTransaction(
       nativeAccount.id(),
       transactionRequest
     );
-
-    await client.submitTransaction(transactionResult);
     await window.helpers.waitForTransaction(
-      transactionResult.executedTransaction().id().toHex()
+      transactionUpdate.executedTransaction().id().toHex()
     );
 
     // Wait for network account to update
@@ -1275,7 +1195,165 @@ test.describe("counter account component tests", () => {
   test("counter account component transaction completes successfully", async ({
     page,
   }) => {
+    page.on("console", (msg) => console.log(msg));
     let finalCounter = await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
+  });
+});
+
+export const testStorageMap = async (page: Page): Promise<any> => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    await client.syncState();
+
+    const normalizeHexWord = (hex) => {
+      if (!hex) return undefined;
+      const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      return normalized;
+    };
+
+    // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
+    // --------------------------------------------------------------------------
+
+    const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
+    const FPI_STORAGE_VALUE = new window.Word(
+      new BigUint64Array([0n, 0n, 0n, 1n])
+    );
+
+    let storageMap = new window.StorageMap();
+    storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+    storageMap.insert(
+      new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
+      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+    );
+
+    const accountCode = `export.bump_map_item
+                    # map key
+                    push.1.1.1.1 # Map key
+                    # item index
+                    push.0
+                    # => [index, KEY]
+                    exec.::miden::active_account::get_map_item
+                    add.1
+                    push.1.1.1.1 # Map key
+                    push.0
+                    # => [index, KEY, BUMPED_VALUE]
+                    exec.::miden::native_account::set_map_item
+                    # => [OLD_MAP_ROOT, OLD_VALUE]
+                    dropw dropw
+                end
+        `;
+
+    let builder = client.createScriptBuilder();
+    let bumpItemComponent = window.AccountComponent.compile(
+      accountCode,
+      builder,
+      [window.StorageSlot.map(storageMap)]
+    ).withSupportsAllTypes();
+
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
+
+    let secretKey = window.SecretKey.withRng(walletSeed);
+    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+
+    let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
+      .withAuthComponent(authComponent)
+      .withComponent(bumpItemComponent)
+      .storageMode(window.AccountStorageMode.public())
+      .build();
+
+    await client.addAccountSecretKeyToWebStore(secretKey);
+    await client.newAccount(bumpItemAccountBuilderResult.account, false);
+    await client.syncState();
+
+    let initialMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    // Deploy counter account
+
+    let accountComponentLib = builder.buildLibrary(
+      "external_contract::bump_item_contract",
+      accountCode
+    );
+
+    builder.linkDynamicLibrary(accountComponentLib);
+
+    let txScript = builder.compileTxScript(
+      `use.external_contract::bump_item_contract
+      begin
+          call.bump_item_contract::bump_map_item
+      end`
+    );
+
+    let txIncrementRequest = new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .build();
+
+    let txResult = await window.helpers.executeAndApplyTransaction(
+      bumpItemAccountBuilderResult.account.id(),
+      txIncrementRequest
+    );
+    await window.helpers.waitForTransaction(
+      txResult.executedTransaction().id().toHex()
+    );
+
+    let finalMapValue = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )
+      ?.storage()
+      .getMapItem(1, MAP_KEY)
+      ?.toHex();
+
+    // Test getMapEntries() functionality
+    let accountStorage = (
+      await client.getAccount(bumpItemAccountBuilderResult.account.id())
+    )?.storage();
+    let mapEntries = accountStorage?.getMapEntries(1);
+
+    // Verify we get the expected entries
+    let expectedKey = MAP_KEY.toHex();
+    let expectedValue = normalizeHexWord(finalMapValue);
+
+    let mapEntriesData = {
+      entriesCount: mapEntries?.length || 0,
+      hasExpectedEntry: false,
+      expectedKey: expectedKey,
+      expectedValue: expectedValue,
+    };
+
+    if (expectedValue && mapEntries && mapEntries.length > 0) {
+      mapEntriesData.hasExpectedEntry = mapEntries.some(
+        (entry) =>
+          entry.key === expectedKey &&
+          normalizeHexWord(entry.value) === expectedValue
+      );
+    }
+
+    return {
+      initialMapValue: normalizeHexWord(initialMapValue),
+      finalMapValue: normalizeHexWord(finalMapValue),
+      mapEntries: mapEntriesData,
+    };
+  });
+};
+
+test.describe("storage map test", () => {
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue, mapEntries } =
+      await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
+
+    // Test getMapEntries() functionality
+    expect(mapEntries.entriesCount).toBeGreaterThan(1);
+    expect(mapEntries.hasExpectedEntry).toBe(true);
+    expect(mapEntries.expectedKey).toBeDefined();
+    expect(mapEntries.expectedValue).toBe("2");
   });
 });

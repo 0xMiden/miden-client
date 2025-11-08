@@ -202,7 +202,7 @@ impl TransactionUpdateTracker {
     ) {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
-            transaction.commit_transaction(transaction_inclusion.block_num.into(), timestamp);
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }
 
@@ -223,6 +223,8 @@ impl TransactionUpdateTracker {
             );
         }
 
+        // NOTE: we check for <= new_sync height because at this point we would have committed the
+        // transaction otherwise
         self.discard_transaction_with_predicate(
             |transaction| transaction.details.expiration_block_num <= new_sync_height,
             DiscardCause::Expired,
@@ -263,8 +265,12 @@ impl TransactionUpdateTracker {
         let mut new_invalid_account_states = vec![];
 
         for transaction in self.mutable_pending_transactions() {
-            if predicate(transaction) {
-                transaction.discard_transaction(discard_cause);
+            // Discard transactions, and also push the invalid account state if the transaction
+            // got correctly discarded
+            // NOTE: previous updates in a chain of state syncs could have committed a transaction,
+            // so we need to check that `discard_transaction` returns `true` here (aka, it got
+            // discarded from a valid state)
+            if predicate(transaction) && transaction.discard_transaction(discard_cause) {
                 new_invalid_account_states.push(transaction.details.final_account_state);
             }
         }

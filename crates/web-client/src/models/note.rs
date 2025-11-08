@@ -1,10 +1,12 @@
-use miden_client::note::Note as NativeNote;
-use miden_lib::note::{create_p2id_note, create_p2ide_note};
-use miden_objects::Felt as NativeFelt;
-use miden_objects::asset::Asset as NativeAsset;
-use miden_objects::block::BlockNumber as NativeBlockNumber;
-use miden_objects::crypto::rand::RpoRandomCoin;
-use miden_objects::note::NoteAssets as NativeNoteAssets;
+use miden_client::asset::Asset as NativeAsset;
+use miden_client::crypto::RpoRandomCoin;
+use miden_client::note::{
+    Note as NativeNote,
+    NoteAssets as NativeNoteAssets,
+    create_p2id_note,
+    create_p2ide_note,
+};
+use miden_client::{BlockNumber as NativeBlockNumber, Felt as NativeFelt};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
@@ -18,6 +20,7 @@ use super::note_metadata::NoteMetadata;
 use super::note_recipient::NoteRecipient;
 use super::note_script::NoteScript;
 use super::note_type::NoteType;
+use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -46,6 +49,10 @@ impl Note {
 
     pub fn id(&self) -> NoteId {
         self.0.id().into()
+    }
+
+    pub fn commitment(&self) -> Word {
+        self.0.commitment().into()
     }
 
     pub fn metadata(&self) -> NoteMetadata {

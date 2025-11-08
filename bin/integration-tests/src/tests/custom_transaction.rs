@@ -12,7 +12,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::store::NoteFilter;
+use miden_client::store::{NoteFilter, TransactionFilter};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     AdviceMap,
@@ -59,10 +59,10 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _seed, _) =
+    let (regular_account, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
-    let (fungible_faucet, _seed, _) =
+    let (fungible_faucet, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 
@@ -101,7 +101,12 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
         .build()?;
 
     // This fails because of {asserted_value} having the incorrect number passed in
-    assert!(client.new_transaction(regular_account.id(), transaction_request).await.is_err());
+    assert!(
+        client
+            .execute_transaction(regular_account.id(), transaction_request)
+            .await
+            .is_err()
+    );
 
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
@@ -118,20 +123,22 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let deserialized_transaction_request = TransactionRequest::read_from_bytes(&buffer)?;
     assert_eq!(transaction_request, deserialized_transaction_request);
 
-    let transaction_execution_result =
-        client.new_transaction(regular_account.id(), transaction_request).await?;
+    let tx_id = client.submit_new_transaction(regular_account.id(), transaction_request).await?;
+    let transaction = client
+        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+        .await?
+        .pop()
+        .with_context(|| "failed to find transaction after submission")?;
 
     // Assert that the custom note was used in the transaction
     assert!(
-        transaction_execution_result
-            .executed_transaction()
-            .input_notes()
+        transaction
+            .details
+            .input_note_nullifiers
             .into_iter()
-            .any(|input_note| input_note.note().id() == note.id())
+            .any(|nullifier| nullifier == note.nullifier().as_word())
     );
 
-    let tx_id = transaction_execution_result.executed_transaction().id();
-    client.submit_transaction(transaction_execution_result).await?;
     wait_for_tx(&mut client, tx_id).await?;
 
     // Assert that the note was consumed on chain
@@ -149,10 +156,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _seed, _) =
+    let (regular_account, _) =
         insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
 
-    let (fungible_faucet, _seed, _) =
+    let (fungible_faucet, _) =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
             .await?;
 
@@ -190,7 +197,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
              push.{num_leaves} push.4000 mem_store
 
              # merkle root -> mem[4004]
-             push.{} push.4004 mem_storew dropw
+             push.{} push.4004 mem_storew_be dropw
         ",
         merkle_root.to_hex()
     );

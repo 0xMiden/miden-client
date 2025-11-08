@@ -4,7 +4,10 @@ resolver = "2"
 members = [
   "bin/integration-tests",
   "bin/miden-cli",
+  "crates/idxdb-store",
   "crates/rust-client",
+  "crates/sqlite-store",
+  "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
   "crates/web-client",
@@ -17,32 +20,41 @@ authors      = ["miden contributors"]
 edition      = "2024"
 license      = "MIT"
 repository   = "https://github.com/0xMiden/miden-client"
-rust-version = "1.88"
-version      = "0.11.11"
+rust-version = "1.90"
+version      = "0.12.0"
+
+[profile.test-dev]
+inherits  = "dev"
+opt-level = 1
 
 [workspace.dependencies]
-# Miden dependencies
-miden-lib                  = { default-features = false, version = "0.11" }
-miden-node-block-producer  = { version = "0.11" }
-miden-node-ntx-builder     = { version = "0.11" }
-miden-node-proto-build     = { default-features = false, version = "0.11" }
-miden-node-rpc             = { version = "0.11" }
-miden-node-store           = { version = "0.11" }
-miden-node-utils           = { version = "0.11" }
-miden-objects              = { default-features = false, version = "0.11" }
-miden-remote-prover        = { features = ["concurrent"], version = "0.11" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], version = "0.11" }
-miden-testing              = { default-features = false, features = [], version = "0.11" }
-miden-tx                   = { default-features = false, version = "0.11" }
+# Miden base/protocol dependencies
+miden-lib     = { default-features = false, version = "0.12" }
+miden-objects = { default-features = false, version = "0.12" }
+miden-testing = { default-features = false, version = "0.12" }
+miden-tx      = { default-features = false, version = "0.12" }
+
+# Miden node dependencies
+miden-node-block-producer        = { version = "0.12" }
+miden-node-ntx-builder           = { version = "0.12" }
+miden-node-proto-build           = { default-features = false, version = "0.12" }
+miden-node-rpc                   = { version = "0.12" }
+miden-node-store                 = { version = "0.12" }
+miden-node-utils                 = { version = "0.12" }
+miden-note-transport-proto-build = { default-features = false, version = "0.1" }
+miden-remote-prover              = { features = ["concurrent"], version = "0.12" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.12" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
-async-trait = "0.1"
+async-trait = { version = "0.1" }
+chrono      = { version = "0.4" }
+hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }
-tokio       = { features = ["macros", "net", "rt-multi-thread"], version = "1.40" }
+tokio       = { features = ["macros", "rt-multi-thread"], version = "1.48" }
 tracing     = { version = "0.1" }
 
 # Lints are set to warn for development, which are promoted to errors in CI.

@@ -1,4 +1,4 @@
-use miden_objects::block::{BlockHeader, FeeParameters};
+use miden_objects::block::{BlockHeader, BlockNumber, FeeParameters};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
@@ -119,5 +119,14 @@ impl TryFrom<proto::blockchain::FeeParameters> for FeeParameters {
 
     fn try_from(value: proto::blockchain::FeeParameters) -> Result<Self, Self::Error> {
         FeeParameters::try_from(&value)
+    }
+}
+
+// BLOCK NUMBER
+// ================================================================================================
+
+impl From<BlockNumber> for proto::blockchain::BlockNumber {
+    fn from(value: BlockNumber) -> Self {
+        Self { block_num: value.as_u32() }
     }
 }

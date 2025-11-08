@@ -1,8 +1,10 @@
-use miden_objects::account::NetworkId as NativeNetworkId;
-use miden_objects::address::{
-    AccountIdAddress as NativeAccountIdAddress,
+use miden_client::account::AccountId as NativeAccountId;
+use miden_client::address::{
     Address as NativeAddress,
+    AddressId,
     AddressInterface as NativeAddressInterface,
+    NetworkId as NativeNetworkId,
+    RoutingParameters,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -18,7 +20,6 @@ pub struct Address(NativeAddress);
 #[wasm_bindgen]
 /// Specifies which procedures an account accepts, and by extension which notes it can consume.
 pub enum AddressInterface {
-    Unspecified = "Unspecified",
     BasicWallet = "BasicWallet",
 }
 
@@ -28,38 +29,48 @@ impl Address {
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a
     // constant for the JS SDK.
-    pub fn from_account_id(account_id: &AccountId, interface: &str) -> Result<Self, JsValue> {
-        let interface: NativeAddressInterface = match interface {
-            "Unspecified" => NativeAddressInterface::Unspecified,
-            "BasicWallet" => NativeAddressInterface::BasicWallet,
-            _else => {
+    pub fn from_account_id(
+        account_id: &AccountId,
+        interface: Option<String>,
+    ) -> Result<Self, JsValue> {
+        let native_account_id: NativeAccountId = account_id.into();
+        let native_address = match interface {
+            None => NativeAddress::new(native_account_id),
+            Some(interface) if &interface == "BasicWallet" => {
+                let routing_params = RoutingParameters::new(NativeAddressInterface::BasicWallet);
+                NativeAddress::new(native_account_id)
+                    .with_routing_parameters(routing_params)
+                    .map_err(|err| js_error_with_context(err, "failed to set routing params"))?
+            },
+            Some(other_interface) => {
                 return Err(JsValue::from_str(&format!(
-                    "failed to build address from account id, wrong interface value given: {interface}"
+                    "failed to build address from account id, wrong interface value given: {other_interface}"
                 )));
             },
         };
 
-        let address = NativeAccountIdAddress::new(account_id.into(), interface);
-
-        Ok(Address(NativeAddress::AccountId(address)))
+        Ok(Self(native_address))
     }
 
     #[wasm_bindgen(js_name = fromBech32)]
     pub fn from_bech32(bech32: &str) -> Result<Self, JsValue> {
-        let (_net_id, address) = NativeAddress::from_bech32(bech32).map_err(|err| {
+        let (_net_id, address) = NativeAddress::decode(bech32).map_err(|err| {
             js_error_with_context(err, "could not convert bech32 into an address")
         })?;
         Ok(Self(address))
     }
 
     pub fn interface(&self) -> Result<AddressInterface, JsValue> {
-        self.0.interface().try_into()
+        match self.0.interface() {
+            Some(interface) => interface.try_into(),
+            None => Err(JsValue::from_str("address has no specified interface")),
+        }
     }
 
     #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> Result<AccountId, JsValue> {
-        match &self.0 {
-            NativeAddress::AccountId(account_id_address) => Ok(account_id_address.id().into()),
+        match &self.0.id() {
+            AddressId::AccountId(account_id_address) => Ok(account_id_address.into()),
             _other => Err("Unsupported Account address type".into()),
         }
     }
@@ -72,7 +83,7 @@ impl Address {
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
         let net_id: NativeNetworkId = network_id.into();
-        Ok(self.0.to_bech32(net_id))
+        Ok(self.0.encode(net_id))
     }
 }
 
@@ -108,7 +119,6 @@ impl TryFrom<AddressInterface> for NativeAddressInterface {
     fn try_from(value: AddressInterface) -> Result<Self, &'static str> {
         match value {
             AddressInterface::BasicWallet => Ok(NativeAddressInterface::BasicWallet),
-            AddressInterface::Unspecified => Ok(NativeAddressInterface::Unspecified),
             AddressInterface::__Invalid => Err("Non-valid address interface given"),
         }
     }
@@ -119,7 +129,6 @@ impl TryFrom<NativeAddressInterface> for AddressInterface {
     fn try_from(value: NativeAddressInterface) -> Result<Self, Self::Error> {
         match value {
             NativeAddressInterface::BasicWallet => Ok(AddressInterface::BasicWallet),
-            NativeAddressInterface::Unspecified => Ok(AddressInterface::Unspecified),
             _other => {
                 Err("AddressInterface from miden-objects crate was instantiated with an unsupported value"
                     .into())

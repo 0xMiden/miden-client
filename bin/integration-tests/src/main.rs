@@ -42,7 +42,7 @@ fn main() {
     let base_config = match BaseConfig::try_from(args.clone()) {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Error: Failed to create configuration: {}", e);
+            eprintln!("Error: Failed to create configuration: {e}");
             std::process::exit(1);
         },
     };
@@ -181,6 +181,7 @@ enum TestCategory {
     NetworkTransaction,
     Onchain,
     SwapTransaction,
+    Transport,
 }
 
 impl AsRef<str> for TestCategory {
@@ -192,6 +193,7 @@ impl AsRef<str> for TestCategory {
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
             TestCategory::SwapTransaction => "swap_transaction",
+            TestCategory::Transport => "transport",
         }
     }
 }
@@ -242,7 +244,7 @@ fn filter_tests(tests: Vec<TestCase>, args: &Args) -> Vec<TestCase> {
         if let Ok(regex) = Regex::new(filter_pattern) {
             filtered_tests.retain(|test| regex.is_match(&test.name));
         } else {
-            eprintln!("Warning: Invalid regex pattern in filter: {}", filter_pattern);
+            eprintln!("Warning: Invalid regex pattern in filter: {filter_pattern}");
         }
     }
 
@@ -256,7 +258,7 @@ fn filter_tests(tests: Vec<TestCase>, args: &Args) -> Vec<TestCase> {
         if let Ok(regex) = Regex::new(exclude_pattern) {
             filtered_tests.retain(|test| !regex.is_match(&test.name));
         } else {
-            eprintln!("Warning: Invalid regex pattern in exclude: {}", exclude_pattern);
+            eprintln!("Warning: Invalid regex pattern in exclude: {exclude_pattern}");
         }
     }
 
@@ -349,7 +351,7 @@ fn format_error_report(error: anyhow::Error) -> String {
         if !first {
             output.push_str("\n  Caused by: ");
         }
-        output.push_str(&format!("{}", err));
+        output.push_str(&format!("{err}"));
         first = false;
     }
 
@@ -367,7 +369,7 @@ fn run_tests_parallel(
     verbose: bool,
 ) -> Vec<TestResult> {
     let total_tests = tests.len();
-    println!("Running {} tests with {} parallel jobs...", total_tests, jobs);
+    println!("Running {total_tests} tests with {jobs} parallel jobs...");
     println!("==========================================================");
     println!("Using:");
     println!(" - RPC endpoint: {}", base_config.rpc_endpoint);
@@ -402,7 +404,7 @@ fn run_tests_parallel(
                 let test_name = test.name.clone();
 
                 if verbose {
-                    println!("[Worker {}] Starting test: {}", worker_id, test_name);
+                    println!("[Worker {worker_id}] Starting test: {test_name}");
                 }
 
                 let result = run_single_test(&test, &base_config);
@@ -436,7 +438,7 @@ fn run_tests_parallel(
                 if !result.passed
                     && let Some(ref error) = result.error_message
                 {
-                    println!("   Error: {}", error);
+                    println!("   Error: {error}");
                 }
 
                 // Update results
@@ -449,7 +451,7 @@ fn run_tests_parallel(
                 drop(count);
 
                 if !verbose {
-                    println!("   Progress: {}/{}", progress, total_tests);
+                    println!("   Progress: {progress}/{total_tests}");
                 }
             }
         });
@@ -476,8 +478,8 @@ fn print_summary(results: &[TestResult], total_duration: Duration) {
 
     println!("\n=== TEST SUMMARY ===");
     println!("Total: {} tests", results.len());
-    println!("Passed: {} tests", passed);
-    println!("Failed: {} tests", failed);
+    println!("Passed: {passed} tests");
+    println!("Failed: {failed} tests");
     println!("Total time: {:.2}s", total_duration.as_secs_f64());
 
     if failed > 0 {
@@ -485,7 +487,7 @@ fn print_summary(results: &[TestResult], total_duration: Duration) {
         for result in results.iter().filter(|r| !r.passed) {
             println!("  - {} ({})", result.name, result.category.as_ref());
             if let Some(ref error) = result.error_message {
-                println!("    Error: {}", error);
+                println!("    Error: {error}");
             }
         }
     }

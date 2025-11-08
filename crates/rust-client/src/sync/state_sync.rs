@@ -3,12 +3,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use async_trait::async_trait;
 use miden_objects::Word;
 use miden_objects::account::{Account, AccountHeader, AccountId};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_objects::note::{NoteId, NoteTag};
-use tonic::async_trait;
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -65,9 +65,10 @@ pub trait OnNoteReceived {
 ///
 /// When created it receives a callback that will be executed when a new note inclusion is received
 /// in the sync response.
+#[derive(Clone)]
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
-    rpc_api: Arc<dyn NodeRpcClient + Send>,
+    rpc_api: Arc<dyn NodeRpcClient>,
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
@@ -86,7 +87,7 @@ impl StateSync {
     /// * `tx_graceful_blocks` - The number of blocks that are considered old enough to discard.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     pub fn new(
-        rpc_api: Arc<dyn NodeRpcClient + Send>,
+        rpc_api: Arc<dyn NodeRpcClient>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_graceful_blocks: Option<u32>,
     ) -> Self {
@@ -123,7 +124,7 @@ impl StateSync {
     /// * `unspent_input_notes` - The current state of unspent input notes tracked by the client.
     /// * `unspent_output_notes` - The current state of unspent output notes tracked by the client.
     pub async fn sync_state(
-        self,
+        &self,
         mut current_partial_mmr: PartialMmr,
         accounts: Vec<AccountHeader>,
         note_tags: BTreeSet<NoteTag>,
@@ -148,17 +149,20 @@ impl StateSync {
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
-        loop {
-            info!("Performing sync state step.");
+        while let Some(step) = self
+            .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
+            .await?
+        {
+            let sync_block_num = step.block_header.block_num();
 
-            let step = self
-                .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
-                .await?;
-            let Some(step) = step else {
-                break;
-            };
-            state_sync_update.block_num = step.block_header.block_num();
+            let reached_tip = step.chain_tip == sync_block_num;
+
+            state_sync_update.block_num = sync_block_num;
             state_sync_steps.push(step);
+
+            if reached_tip {
+                break;
+            }
         }
 
         // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
@@ -242,8 +246,9 @@ impl StateSync {
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: Arc<BTreeSet<NoteTag>>,
+        note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<StateSyncInfo>, ClientError> {
+        info!("Performing sync state step.");
         let response = self
             .rpc_api
             .sync_state(current_block_num, account_ids, note_tags.as_ref())
@@ -394,7 +399,7 @@ impl StateSync {
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses
-    /// the `check_nullifiers_by_prefix` endpoint to check if there are new nullifiers for these
+    /// the `sync_nullifiers` endpoint to check if there are new nullifiers for these
     /// notes. It then processes the nullifiers to apply the state transitions on the note updates.
     ///
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
@@ -417,12 +422,12 @@ impl StateSync {
 
         let mut new_nullifiers = self
             .rpc_api
-            .check_nullifiers_by_prefix(&nullifiers_tags, current_block_num)
+            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(state_sync_update.block_num))
             .await?;
 
         // Discard nullifiers that are newer than the current block (this might happen if the block
         // changes between the sync_state and the check_nullifier calls)
-        new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num.as_u32());
+        new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
             state_sync_update.note_updates.apply_nullifiers_state_transitions(

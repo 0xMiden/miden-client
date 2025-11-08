@@ -20,15 +20,14 @@
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
-//! let (account, seed) = AccountBuilder::new(random_seed)
+//! let account = AccountBuilder::new(random_seed)
 //!     .account_type(AccountType::RegularAccountImmutableCode)
 //!     .storage_mode(AccountStorageMode::Private)
 //!     .with_component(BasicWallet)
 //!     .build()?;
 //!
-//! // Add the account to the client. The account seed and authentication key are required
-//! // for new accounts.
-//! client.add_account(&account, Some(seed), false).await?;
+//! // Add the account to the client. The account already embeds its seed information.
+//! client.add_account(&account, false).await?;
 //! #   Ok(())
 //! # }
 //! ```
@@ -39,8 +38,8 @@ use alloc::vec::Vec;
 
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::Word;
 use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
@@ -55,35 +54,43 @@ pub use miden_objects::{
         AccountFile,
         AccountHeader,
         AccountId,
+        AccountIdPrefix,
         AccountStorage,
         AccountStorageMode,
         AccountType,
-        NetworkId,
+        PartialAccount,
+        PartialStorage,
+        PartialStorageMap,
         StorageMap,
         StorageSlot,
+        StorageSlotType,
     },
-    address::{AccountIdAddress, Address, AddressInterface, AddressType},
+    address::{Address, AddressInterface, AddressType, NetworkId},
 };
 
 use super::Client;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
+use crate::sync::NoteTagRecord;
 
 pub mod component {
-    pub const COMPONENT_TEMPLATE_EXTENSION: &str = "mct";
+    pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
     pub use miden_lib::account::auth::*;
+    pub use miden_lib::account::components::{
+        basic_fungible_faucet_library,
+        basic_wallet_library,
+        rpo_falcon_512_library,
+    };
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
         AccountComponent,
         AccountComponentMetadata,
-        AccountComponentTemplate,
         FeltRepresentation,
         InitStorageData,
         StorageEntry,
-        StorageSlotType,
         StorageValueName,
         TemplateType,
         WordRepresentation,
@@ -111,11 +118,12 @@ impl<AUTH> Client<AUTH> {
     /// Adds the provided [Account] in the store so it can start being tracked by the client.
     ///
     /// If the account is already being tracked and `overwrite` is set to `true`, the account will
-    /// be overwritten. The `account_seed` should be provided if the account is newly created.
+    /// be overwritten. Newly created accounts must embed their seed (`account.seed()` must return
+    /// `Some(_)`).
     ///
     /// # Errors
     ///
-    /// - If the account is new but no seed is provided.
+    /// - If the account is new but it does not contain the seed.
     /// - If the account is already tracked and `overwrite` is set to `false`.
     /// - If `overwrite` is set to `true` and the `account_data` nonce is lower than the one already
     ///   being tracked.
@@ -124,38 +132,40 @@ impl<AUTH> Client<AUTH> {
     pub async fn add_account(
         &mut self,
         account: &Account,
-        account_seed: Option<Word>,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        let account_seed = if account.is_new() {
-            if account_seed.is_none() {
+        if account.is_new() {
+            if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
             }
-            account_seed
         } else {
             // Ignore the seed since it's not a new account
 
             // TODO: The alternative approach to this is to store the seed anyway, but
             // ignore it at the point of executing against this transaction, but that
             // approach seems a little bit more incorrect
-            if account_seed.is_some() {
+            if account.seed().is_some() {
                 tracing::warn!(
                     "Added an existing account and still provided a seed when it is not needed. It's possible that the account's file was incorrectly generated. The seed will be ignored."
                 );
             }
-            None
-        };
+        }
 
         let tracked_account = self.store.get_account(account.id()).await?;
 
         match tracked_account {
             None => {
+                let default_address = Address::new(account.id());
+
                 // If the account is not being tracked, insert it into the store regardless of the
                 // `overwrite` flag
-                self.store.add_note_tag(account.into()).await?;
+                let default_address_note_tag = default_address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                self.store.add_note_tag(note_tag_record).await?;
 
                 self.store
-                    .insert_account(account, account_seed)
+                    .insert_account(account, default_address)
                     .await
                     .map_err(ClientError::StoreError)
             },
@@ -202,10 +212,61 @@ impl<AUTH> Client<AUTH> {
             FetchedAccount::Private(..) => {
                 return Err(ClientError::AccountIsPrivate(account_id));
             },
-            FetchedAccount::Public(account, ..) => account,
+            FetchedAccount::Public(account, ..) => *account,
         };
 
-        self.add_account(&account, None, true).await
+        self.add_account(&account, true).await
+    }
+
+    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the address is already being tracked.
+    pub async fn add_address(
+        &mut self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        let network_id = self.rpc_api.get_network_id().await?;
+        let address_bench32 = address.encode(network_id);
+        if self.store.get_addresses_by_account_id(account_id).await?.contains(&address) {
+            return Err(ClientError::AddressAlreadyTracked(address_bench32));
+        }
+
+        let tracked_account = self.store.get_account(account_id).await?;
+        match tracked_account {
+            None => Err(ClientError::AccountDataNotFound(account_id)),
+            Some(_tracked_account) => {
+                // Check that the Address is not already tracked
+                let derived_note_tag: NoteTag = address.to_note_tag();
+                let note_tag_record =
+                    NoteTagRecord::with_account_source(derived_note_tag, account_id);
+                if self.store.get_note_tags().await?.contains(&note_tag_record) {
+                    return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
+                        address_bench32,
+                        derived_note_tag,
+                    ));
+                }
+
+                self.store.insert_address(address, account_id).await?;
+                Ok(())
+            },
+        }
+    }
+
+    /// Removes an [`Address`] from the associated [`AccountId`], alongside its derived [`NoteTag`].
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the address is not being tracked.
+    pub async fn remove_address(
+        &mut self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        self.store.remove_address(address, account_id).await?;
+        Ok(())
     }
 
     // ACCOUNT DATA RETRIEVAL
@@ -304,103 +365,12 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let (account, _) = AccountBuilder::new(init_seed)
+    let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(public_key))
+        .with_auth_component(AuthRpoFalcon512::new(public_key.into()))
         .with_component(BasicWallet)
         .build()?;
 
     Ok(account.id())
-}
-
-// TESTS
-// ================================================================================================
-
-#[cfg(test)]
-pub mod tests {
-    use alloc::boxed::Box;
-    use alloc::collections::BTreeSet;
-    use alloc::vec::Vec;
-
-    use miden_lib::account::auth::AuthRpoFalcon512;
-    use miden_lib::testing::mock_account::MockAccountExt;
-    use miden_objects::account::{Account, AccountFile, AuthSecretKey};
-    use miden_objects::crypto::dsa::rpo_falcon512::{PublicKey, SecretKey};
-    use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
-    };
-    use miden_objects::{EMPTY_WORD, Word, ZERO};
-
-    use crate::tests::create_test_client;
-
-    fn create_account_data(account_id: u128) -> AccountFile {
-        let account = Account::mock(account_id, AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)));
-
-        AccountFile::new(
-            account.clone(),
-            Some(Word::default()),
-            vec![AuthSecretKey::RpoFalcon512(SecretKey::new())],
-        )
-    }
-
-    pub fn create_initial_accounts_data() -> Vec<AccountFile> {
-        let account = create_account_data(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET);
-
-        let faucet_account = create_account_data(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET);
-
-        // Create Genesis state and save it to a file
-        let accounts = vec![account, faucet_account];
-
-        accounts
-    }
-
-    #[tokio::test]
-    pub async fn try_add_account() {
-        // generate test client
-        let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-
-        let account = Account::mock(
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-            AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)),
-        );
-
-        // The mock account has nonce 1, we need it to be 0 for the test.
-        let (id, vault, storage, code, _) = account.into_parts();
-        let account = Account::from_parts(id, vault, storage, code, ZERO);
-
-        assert!(client.add_account(&account, None, false).await.is_err());
-        assert!(client.add_account(&account, Some(Word::default()), false).await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn load_accounts_test() {
-        // generate test client
-        let (mut client, ..) = Box::pin(create_test_client()).await;
-
-        let created_accounts_data = create_initial_accounts_data();
-
-        for account_data in created_accounts_data.clone() {
-            client
-                .add_account(&account_data.account, account_data.account_seed, false)
-                .await
-                .unwrap();
-        }
-
-        let expected_accounts: Vec<Account> = created_accounts_data
-            .into_iter()
-            .map(|account_data| account_data.account)
-            .collect();
-        let accounts = client.get_account_headers().await.unwrap();
-
-        assert_eq!(accounts.len(), 2);
-
-        let actual_commitments: BTreeSet<_> =
-            accounts.into_iter().map(|(header, _)| header.commitment()).collect();
-        let expected_commitments: BTreeSet<_> =
-            expected_accounts.into_iter().map(|account| account.commitment()).collect();
-
-        assert_eq!(actual_commitments, expected_commitments);
-    }
 }

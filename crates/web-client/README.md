@@ -91,7 +91,7 @@ This runs a suite of integration tests to verify the SDK’s functionality in a 
 
 ## Usage
 
-The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/src/web-client/api).
+The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
 
 ### Create a New Wallet
 
@@ -130,20 +130,18 @@ const consumeTransactionRequest = webClient.newConsumeTransactionRequest([
   noteIdToConsume,
 ]);
 
-// Execute and prove the transaction client side
-const consumeTransactionResult = await webClient.newTransaction(
+// Execute, prove, submit, and apply the transaction in one step
+const transactionId = await webClient.submitNewTransaction(
   account,
   consumeTransactionRequest
 );
-
-// Submit the transaction to the node
-await webClient.submitTransaction(consumeTransactionResult);
 
 // Need to sync state again (in a loop) until the node verifies the transaction
 await syncState();
 
 // Check new account balance
-const accountBalance = account
+const updatedAccount = await webClient.getAccount(account);
+const accountBalance = updatedAccount
   .vault()
   .getBalance(/* id of remote faucet */)
   .toString();

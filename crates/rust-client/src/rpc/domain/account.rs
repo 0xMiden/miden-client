@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
@@ -9,12 +10,16 @@ use miden_objects::account::{
     AccountHeader,
     AccountId,
     AccountStorageHeader,
+    StorageSlotType,
 };
+use miden_objects::asset::Asset;
 use miden_objects::block::{AccountWitness, BlockNumber};
-use miden_objects::crypto::merkle::{MerklePath, SmtProof};
+use miden_objects::crypto::merkle::SparseMerklePath;
 use miden_tx::utils::{Deserializable, Serializable, ToHex};
 use thiserror::Error;
 
+use crate::alloc::borrow::ToOwned;
+use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
@@ -30,10 +35,21 @@ pub enum FetchedAccount {
     Private(AccountId, AccountUpdateSummary),
     /// Public accounts are recorded on-chain. As such, its state is shared with the network and
     /// can always be retrieved through the appropriate RPC method.
-    Public(Account, AccountUpdateSummary),
+    Public(Box<Account>, AccountUpdateSummary),
 }
 
 impl FetchedAccount {
+    /// Creates a [`FetchedAccount`] corresponding to a private account tracked only by its ID and
+    /// update summary.
+    pub fn new_private(account_id: AccountId, summary: AccountUpdateSummary) -> Self {
+        Self::Private(account_id, summary)
+    }
+
+    /// Creates a [`FetchedAccount`] for a public account with its full [`Account`] state.
+    pub fn new_public(account: Account, summary: AccountUpdateSummary) -> Self {
+        Self::Public(Box::new(account), summary)
+    }
+
     /// Returns the account ID.
     pub fn account_id(&self) -> AccountId {
         match self {
@@ -53,7 +69,7 @@ impl FetchedAccount {
     pub fn account(&self) -> Option<&Account> {
         match self {
             Self::Private(..) => None,
-            Self::Public(account, _) => Some(account),
+            Self::Public(account, _) => Some(account.as_ref()),
         }
     }
 }
@@ -62,7 +78,7 @@ impl From<FetchedAccount> for Option<Account> {
     fn from(acc: FetchedAccount) -> Self {
         match acc {
             FetchedAccount::Private(..) => None,
-            FetchedAccount::Public(account, _) => Some(account),
+            FetchedAccount::Public(account, _) => Some(*account),
         }
     }
 }
@@ -123,19 +139,39 @@ impl TryFrom<proto::account::AccountId> for AccountId {
 // ACCOUNT HEADER
 // ================================================================================================
 
-impl proto::account::AccountHeader {
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
-    pub fn into_domain(self, account_id: AccountId) -> Result<AccountHeader, crate::rpc::RpcError> {
+pub(crate) struct SlotTypeProto(pub u32);
+
+impl TryInto<StorageSlotType> for SlotTypeProto {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<StorageSlotType, Self::Error> {
+        match self.0 {
+            0 => Ok(StorageSlotType::Map),
+            1 => Ok(StorageSlotType::Value),
+            _ => Err(RpcError::InvalidResponse("Invalid storage slot type".into())),
+        }
+    }
+}
+
+impl TryInto<AccountHeader> for proto::account::AccountHeader {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<AccountHeader, Self::Error> {
         use miden_objects::Felt;
 
         use crate::rpc::domain::MissingFieldHelper;
 
         let proto::account::AccountHeader {
+            account_id,
             nonce,
             vault_root,
             storage_commitment,
             code_commitment,
         } = self;
+
+        let account_id: AccountId = account_id
+            .ok_or(proto::account::AccountHeader::missing_field(stringify!(account_id)))?
+            .try_into()?;
         let vault_root = vault_root
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(vault_root)))?
             .try_into()?;
@@ -156,10 +192,39 @@ impl proto::account::AccountHeader {
     }
 }
 
+// ACCOUNT STORAGE HEADER
+// ================================================================================================
+
+impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
+    type Error = crate::rpc::RpcError;
+
+    fn try_into(self) -> Result<AccountStorageHeader, Self::Error> {
+        use crate::rpc::domain::MissingFieldHelper;
+
+        let mut header_slots: Vec<(StorageSlotType, Word)> = Vec::with_capacity(self.slots.len());
+
+        for slot in self.slots {
+            let commitment: Word = slot
+                .commitment
+                .ok_or(proto::account::account_storage_header::StorageSlot::missing_field(
+                    stringify!(commitment),
+                ))?
+                .try_into()?;
+
+            let slot_type: StorageSlotType = SlotTypeProto(slot.slot_type).try_into()?;
+
+            header_slots.push((slot_type, commitment));
+        }
+
+        Ok(AccountStorageHeader::new(header_slots))
+    }
+}
+
 // FROM PROTO ACCOUNT HEADERS
 // ================================================================================================
 
-impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
+#[cfg(feature = "tonic")]
+impl proto::rpc_store::account_proof_response::AccountDetails {
     /// Converts the RPC response into `StateHeaders`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
@@ -169,42 +234,40 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
     /// # Errors
     /// - If account code is missing both on `self` and `known_account_codes`
     /// - If data cannot be correctly deserialized
-    #[cfg(any(feature = "tonic", feature = "web-tonic"))]
     pub fn into_domain(
         self,
-        account_id: AccountId,
         known_account_codes: &BTreeMap<Word, AccountCode>,
-    ) -> Result<StateHeaders, crate::rpc::RpcError> {
+    ) -> Result<AccountDetails, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
-        use crate::rpc::generated::rpc_store::account_proofs::account_proof::account_state_header::StorageSlotMapProof;
 
-        let proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
+        let proto::rpc_store::account_proof_response::AccountDetails {
             header,
-            storage_header,
-            account_code,
-            storage_maps,
+            storage_details,
+            code,
+            vault_details,
         } = self;
-        let account_header = header
-            .ok_or(
-                proto::rpc_store::account_proofs::account_proof::AccountStateHeader::missing_field(
-                    stringify!(header),
-                ),
-            )?
-            .into_domain(account_id)?;
+        let header: AccountHeader = header
+            .ok_or(proto::rpc_store::account_proof_response::AccountDetails::missing_field(
+                stringify!(header),
+            ))?
+            .try_into()?;
 
-        let storage_header = AccountStorageHeader::read_from_bytes(&storage_header)?;
+        let storage_details = storage_details
+            .ok_or(proto::rpc_store::account_proof_response::AccountDetails::missing_field(
+                stringify!(storage_details),
+            ))?
+            .try_into()?;
 
         // If an account code was received, it means the previously known account code is no longer
         // valid. If it was not, it means we sent a code commitment that matched and so our code
         // is still valid
         let code = {
-            let received_code =
-                account_code.map(|c| AccountCode::read_from_bytes(&c)).transpose()?;
+            let received_code = code.map(|c| AccountCode::read_from_bytes(&c)).transpose()?;
             match received_code {
                 Some(code) => code,
                 None => known_account_codes
-                    .get(&account_header.code_commitment())
+                    .get(&header.code_commitment())
                     .ok_or(RpcError::InvalidResponse(
                         "Account code was not provided, but the response did not contain it either"
                             .into(),
@@ -213,28 +276,15 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
             }
         };
 
-        // Get map values into slot |-> (key, value, proof) mapping
-        let mut storage_slot_proofs: BTreeMap<u8, Vec<SmtProof>> = BTreeMap::new();
-        for StorageSlotMapProof { storage_slot, smt_proof } in storage_maps {
-            let proof = SmtProof::read_from_bytes(&smt_proof)?;
-            match storage_slot_proofs
-                .get_mut(&(u8::try_from(storage_slot).expect("there are no more than 256 slots")))
-            {
-                Some(list) => list.push(proof),
-                None => {
-                    _ = storage_slot_proofs.insert(
-                        u8::try_from(storage_slot).expect("only 256 storage slots"),
-                        vec![proof],
-                    );
-                },
-            }
-        }
+        let vault_details = vault_details
+            .ok_or(proto::rpc_store::AccountVaultDetails::missing_field(stringify!(vault_details)))?
+            .try_into()?;
 
-        Ok(StateHeaders {
-            account_header,
-            storage_header,
+        Ok(AccountDetails {
+            header,
+            storage_details,
             code,
-            storage_slots: storage_slot_proofs,
+            vault_details,
         })
     }
 }
@@ -245,15 +295,163 @@ impl proto::rpc_store::account_proofs::account_proof::AccountStateHeader {
 /// Contains a block number, and a list of account proofs at that block.
 pub type AccountProofs = (BlockNumber, Vec<AccountProof>);
 
-/// Account state headers.
+// ACCOUNT DETAILS
+// ================================================================================================
+
+/// An account details.
 #[derive(Clone, Debug)]
-pub struct StateHeaders {
-    // TODO: should this be renamed? or storage_slots moved to AccountProof
-    pub account_header: AccountHeader,
-    pub storage_header: AccountStorageHeader,
+pub struct AccountDetails {
+    pub header: AccountHeader,
+    pub storage_details: AccountStorageDetails,
     pub code: AccountCode,
-    pub storage_slots: BTreeMap<StorageSlotIndex, Vec<SmtProof>>,
+    pub vault_details: AccountVaultDetails,
 }
+
+// ACCOUNT STORAGE DETAILS
+// ================================================================================================
+
+/// Account storage details for `AccountProofResponse`
+#[derive(Clone, Debug)]
+pub struct AccountStorageDetails {
+    /// Account storage header (storage slot info for up to 256 slots)
+    pub header: AccountStorageHeader,
+    /// Additional data for the requested storage maps
+    pub map_details: Vec<AccountStorageMapDetails>,
+}
+
+impl TryFrom<proto::rpc_store::AccountStorageDetails> for AccountStorageDetails {
+    type Error = RpcError;
+
+    fn try_from(value: proto::rpc_store::AccountStorageDetails) -> Result<Self, Self::Error> {
+        let header = value
+            .header
+            .ok_or(proto::account::AccountStorageHeader::missing_field(stringify!(header)))?
+            .try_into()?;
+        let map_details = value
+            .map_details
+            .iter()
+            .map(|entry| entry.to_owned().try_into())
+            .collect::<Result<Vec<AccountStorageMapDetails>, RpcError>>()?;
+
+        Ok(Self { header, map_details })
+    }
+}
+
+// ACCOUNT MAP DETAILS
+// ================================================================================================
+
+#[derive(Clone, Debug)]
+pub struct AccountStorageMapDetails {
+    /// slot index of the storage map
+    pub slot_index: u32,
+    /// A flag that is set to `true` if the number of to-be-returned entries in the
+    /// storage map would exceed a threshold. This indicates to the user that `SyncStorageMaps`
+    /// endpoint should be used to get all storage map data.
+    pub too_many_entries: bool,
+    /// By default we provide all storage entries.
+    pub entries: Vec<StorageMapEntry>,
+}
+
+impl TryFrom<proto::rpc_store::account_storage_details::AccountStorageMapDetails>
+    for AccountStorageMapDetails
+{
+    type Error = RpcError;
+
+    fn try_from(
+        value: proto::rpc_store::account_storage_details::AccountStorageMapDetails,
+    ) -> Result<Self, Self::Error> {
+        let slot_index = value.slot_index;
+        let too_many_entries = value.too_many_entries;
+
+        let entries = value
+            .entries
+            .ok_or(
+                proto::rpc_store::account_storage_details::AccountStorageMapDetails::missing_field(
+                    stringify!(entries),
+                ),
+            )?
+            .entries
+            .iter_mut()
+            .map(|entry| entry.to_owned().try_into())
+            .collect::<Result<Vec<StorageMapEntry>, RpcError>>()?;
+
+        Ok(Self { slot_index, too_many_entries, entries })
+    }
+}
+
+// STORAGE MAP ENTRY
+// ================================================================================================
+
+#[derive(Clone, Debug)]
+pub struct StorageMapEntry {
+    pub key: Word,
+    pub value: Word,
+}
+
+impl TryFrom<proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry>
+    for StorageMapEntry
+{
+    type Error = RpcError;
+
+    fn try_from(value: proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
+        let key = value.key.ok_or(
+            proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
+                stringify!(key),
+            ))?.try_into()?;
+
+        let value = value.value.ok_or(
+            proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
+                stringify!(value),
+            ))?.try_into()?;
+
+        Ok(Self {
+            key,
+            value
+        })
+    }
+}
+
+// ACCOUNT VAULT DETAILS
+// ================================================================================================
+
+#[derive(Clone, Debug)]
+pub struct AccountVaultDetails {
+    /// A flag that is set to true if the account contains too many assets. This indicates
+    /// to the user that `SyncAccountVault` endpoint should be used to retrieve the
+    /// account's assets
+    pub too_many_assets: bool,
+    /// When `too_many_assets` == false, this will contain the list of assets in the
+    /// account's vault
+    pub assets: Vec<Asset>,
+}
+
+impl TryFrom<proto::rpc_store::AccountVaultDetails> for AccountVaultDetails {
+    type Error = RpcError;
+
+    fn try_from(value: proto::rpc_store::AccountVaultDetails) -> Result<Self, Self::Error> {
+        let too_many_assets = value.too_many_assets;
+        let assets = value
+            .assets
+            .into_iter()
+            .map(|asset| {
+                let native_digest: Word = asset
+                    .asset
+                    .ok_or(proto::rpc_store::AccountVaultDetails::missing_field(stringify!(
+                        assets
+                    )))?
+                    .try_into()?;
+                native_digest
+                    .try_into()
+                    .map_err(|_| RpcError::DeserializationError("asset".to_string()))
+            })
+            .collect::<Result<Vec<Asset>, RpcError>>()?;
+
+        Ok(Self { too_many_assets, assets })
+    }
+}
+
+// ACCOUNT PROOF
+// ================================================================================================
 
 /// Represents a proof of existence of an account's state at a specific block number.
 #[derive(Clone, Debug)]
@@ -261,18 +459,21 @@ pub struct AccountProof {
     /// Account witness.
     account_witness: AccountWitness,
     /// State headers of public accounts.
-    state_headers: Option<StateHeaders>,
+    state_headers: Option<AccountDetails>,
 }
 
 impl AccountProof {
     /// Creates a new [`AccountProof`].
     pub fn new(
         account_witness: AccountWitness,
-        state_headers: Option<StateHeaders>,
+        account_details: Option<AccountDetails>,
     ) -> Result<Self, AccountProofError> {
-        if let Some(StateHeaders {
-            account_header, storage_header: _, code, ..
-        }) = &state_headers
+        if let Some(AccountDetails {
+            header: account_header,
+            storage_details: _,
+            code,
+            ..
+        }) = &account_details
         {
             if account_header.commitment() != account_witness.state_commitment() {
                 return Err(AccountProofError::InconsistentAccountCommitment);
@@ -285,7 +486,10 @@ impl AccountProof {
             }
         }
 
-        Ok(Self { account_witness, state_headers })
+        Ok(Self {
+            account_witness,
+            state_headers: account_details,
+        })
     }
 
     /// Returns the account ID related to the account proof.
@@ -295,12 +499,14 @@ impl AccountProof {
 
     /// Returns the account header, if present.
     pub fn account_header(&self) -> Option<&AccountHeader> {
-        self.state_headers.as_ref().map(|headers| &headers.account_header)
+        self.state_headers.as_ref().map(|account_details| &account_details.header)
     }
 
     /// Returns the storage header, if present.
     pub fn storage_header(&self) -> Option<&AccountStorageHeader> {
-        self.state_headers.as_ref().map(|headers| &headers.storage_header)
+        self.state_headers
+            .as_ref()
+            .map(|account_details| &account_details.storage_details.header)
     }
 
     /// Returns the account code, if present.
@@ -323,12 +529,12 @@ impl AccountProof {
     }
 
     /// Returns the proof of the account's inclusion.
-    pub fn merkle_proof(&self) -> &MerklePath {
+    pub fn merkle_proof(&self) -> &SparseMerklePath {
         self.account_witness.path()
     }
 
     /// Deconstructs `AccountProof` into its individual parts.
-    pub fn into_parts(self) -> (AccountWitness, Option<StateHeaders>) {
+    pub fn into_parts(self) -> (AccountWitness, Option<AccountDetails>) {
         (self.account_witness, self.state_headers)
     }
 }
@@ -392,22 +598,30 @@ impl AccountStorageRequirements {
 }
 
 impl From<AccountStorageRequirements>
-    for Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest>
+    for Vec<
+        proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest,
+    >
 {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc_store::account_proofs_request::account_request::StorageRequest> {
-        let mut requests = Vec::with_capacity(value.0.len());
-        for (slot_index, map_keys) in value.0 {
-            requests.push(
-                proto::rpc_store::account_proofs_request::account_request::StorageRequest {
-                    storage_slot_index: u32::from(slot_index),
-                    map_keys: map_keys
-                        .into_iter()
-                        .map(crate::rpc::generated::primitives::Digest::from)
-                        .collect(),
-                },
-            );
+    ) -> Vec<proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest>
+    {
+        use proto::rpc_store::account_proof_request::account_detail_request;
+        use proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request;
+        let request_map = value.0;
+        let mut requests = Vec::with_capacity(request_map.len());
+        for (slot_index, map_keys) in request_map {
+            let map_keys = storage_map_detail_request::MapKeys {
+                map_keys: map_keys
+                    .into_iter()
+                    .map(crate::rpc::generated::primitives::Digest::from)
+                    .collect(),
+            };
+            let slot_data = Some(storage_map_detail_request::SlotData::MapKeys(map_keys));
+            requests.push(account_detail_request::StorageMapDetailRequest {
+                slot_index: u32::from(slot_index),
+                slot_data,
+            });
         }
         requests
     }

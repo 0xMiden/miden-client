@@ -1,0 +1,53 @@
+[**@demox-labs/miden-sdk**](../README.md)
+
+***
+
+[@demox-labs/miden-sdk](../README.md) / AdviceInputs
+
+# Class: AdviceInputs
+
+## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### free()
+
+> **free**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### mappedValues()
+
+> **mappedValues**(`key`): [`Felt`](Felt.md)[]
+
+#### Parameters
+
+##### key
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
+### stack()
+
+> **stack**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]

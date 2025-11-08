@@ -27,16 +27,14 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 push.15.15.15.15
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end
         `;
-
-    let getItemComponent = window.AccountComponent.compile(
-      code,
-      window.TransactionKernel.assembler(),
-      [window.StorageSlot.map(storageMap)]
-    ).withSupportsAllTypes();
+    let builder = client.createScriptBuilder();
+    let getItemComponent = window.AccountComponent.compile(code, builder, [
+      window.StorageSlot.map(storageMap),
+    ]).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
@@ -59,20 +57,17 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     let foreignAccountId = getItemAccountBuilderResult.account.id();
 
     await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(
-      getItemAccountBuilderResult.account,
-      getItemAccountBuilderResult.seed,
-      false
-    );
+    await client.newAccount(getItemAccountBuilderResult.account, false);
     await client.syncState();
 
     let txRequest = new window.TransactionRequestBuilder().build();
 
-    let txResult = await client.newTransaction(foreignAccountId, txRequest);
+    let txResult = await window.helpers.executeAndApplyTransaction(
+      foreignAccountId,
+      txRequest
+    );
 
     let txId = txResult.executedTransaction().id();
-
-    await client.submitTransaction(txResult);
 
     await window.helpers.waitForTransaction(txId.toHex());
 
@@ -90,11 +85,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
             begin
                 # push the hash of the {} account procedure
                 push.{proc_root}
-        
+
                 # push the foreign account id
                 push.{account_id_suffix} push.{account_id_prefix}
                 # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
-        
+
                 exec.tx::execute_foreign_procedure
                 push.9.12.18.30 assert_eqw
             end
@@ -107,10 +102,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
         foreignAccountId.prefix().asInt().toString()
       );
 
-    let compiledTxScript = window.TransactionScript.compile(
-      txScript,
-      window.TransactionKernel.assembler()
-    );
+    let compiledTxScript = builder.compileTxScript(txScript);
 
     await client.syncState();
 
@@ -127,17 +119,19 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest2 = new window.TransactionRequestBuilder()
       .withCustomScript(compiledTxScript)
-      .withForeignAccounts([foreignAccount])
+      .withForeignAccounts(
+        new window.MidenArrays.ForeignAccountArray([foreignAccount])
+      )
       .build();
 
-    let txResult2 = await client.newTransaction(newAccount.id(), txRequest2);
-
-    await client.submitTransaction(txResult2);
+    let txResult2 = await window.helpers.executeAndApplyTransaction(
+      newAccount.id(),
+      txRequest2
+    );
   });
 };
 
 test.describe("fpi test", () => {
-  test.setTimeout(50000);
   test("runs the standard fpi test successfully", async ({ page }) => {
     await expect(testStandardFpi(page)).resolves.toBeUndefined();
   });

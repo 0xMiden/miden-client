@@ -66,9 +66,10 @@ use miden_objects::note::{NoteId, NoteTag};
 use miden_objects::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::note::NoteScreener;
+use crate::note_transport::NoteTransport;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
@@ -126,6 +127,9 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
+        let note_transport =
+            self.note_transport_api.as_ref().map(|api| NoteTransport::new(api.clone()));
+
         // Get current state of the client
         let accounts = self
             .store
@@ -138,27 +142,37 @@ where
         let note_tags: BTreeSet<NoteTag> = self.store.get_unique_note_tags().await?;
 
         let unspent_input_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Expected).await?;
+        let unspent_output_notes = self.store.get_output_notes(NoteFilter::Unspent).await?;
 
         let uncommitted_transactions =
             self.store.get_transactions(TransactionFilter::Uncommitted).await?;
 
         // Build current partial MMR
-        let current_partial_mmr = self.build_current_partial_mmr().await?;
+        let current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update: StateSyncUpdate = state_sync
             .sync_state(
                 current_partial_mmr,
                 accounts,
-                note_tags,
+                note_tags.clone(),
                 unspent_input_notes,
                 unspent_output_notes,
                 uncommitted_transactions,
             )
             .await?;
 
+        // Note Transport update
+        // TODO We can run both sync_state, fetch_notes futures in parallel
+        let note_transport_update = if let Some(mut note_transport) = note_transport {
+            let cursor = self.store.get_note_transport_cursor().await?;
+            Some(note_transport.fetch_notes(cursor, note_tags).await?)
+        } else {
+            None
+        };
+
         let sync_summary: SyncSummary = (&state_sync_update).into();
+        debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
         // Apply received and computed updates to the store
@@ -167,7 +181,13 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        info!("Pruning block headers.");
+        if let Some(note_transport_update) = note_transport_update {
+            self.store
+                .apply_note_transport_update(note_transport_update)
+                .await
+                .map_err(ClientError::StoreError)?;
+        }
+
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
 

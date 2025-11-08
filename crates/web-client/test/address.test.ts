@@ -1,12 +1,12 @@
 import { expect, Page } from "@playwright/test";
 import test from "./playwright.global.setup";
-import { AddressInterface, AccountId, Address, NetworkId } from "../js";
+import { AddressInterface, AccountId } from "../js";
 const instanceAddress = async ({
   page,
   accountId,
   _interface,
 }: {
-  page: typeof Page;
+  page: Page;
   accountId?: typeof AccountId;
   _interface: typeof AddressInterface;
 }) => {
@@ -89,7 +89,7 @@ test.describe("Address instantiation tests", () => {
       instanceAddress({
         page,
         accountId: "notAnAccountId",
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
     ).rejects.toThrow();
   });
@@ -100,9 +100,9 @@ test.describe("Address instantiation tests", () => {
     await expect(
       instanceAddress({
         page,
-        _interface: "Unspecified",
+        _interface: "BasicWallet",
       })
-    ).resolves.toBe("Unspecified");
+    ).resolves.toBe("BasicWallet");
   });
 });
 
@@ -122,19 +122,19 @@ test.describe("Bech32 tests", () => {
   });
   test("bech32 succeeds with mainnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mm")).resolves.toHaveLength(
-      38
+      47
     );
   });
 
   test("bech32 succeeds with testnet prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mtst")).resolves.toHaveLength(
-      40
+      49
     );
   });
 
   test("bech32 succeeds with dev prefix", async ({ page }) => {
     await expect(instanceNewAddressBech32(page, "mdev")).resolves.toHaveLength(
-      40
+      49
     );
   });
 });
@@ -142,5 +142,36 @@ test.describe("Bech32 tests", () => {
 test.describe("Note tag tests", () => {
   test("note tag is returned and read", async ({ page }) => {
     await expect(instanceAddressTestNoteTag(page)).resolves.toBeTruthy();
+  });
+});
+
+// ADDRESS INSERTION & DELETION TESTS
+// =======================================================================================================
+
+const instanceAddressRemoveThenInsert = async (page: Page) => {
+  return await page.evaluate(async () => {
+    const client = window.client;
+    const newAccount = await client.newWallet(
+      window.AccountStorageMode.private(),
+      true
+    );
+    console.log("newAccount ID:", newAccount.id());
+
+    const address = window.Address.fromAccountId(newAccount.id(), null);
+
+    console.log("address:", address);
+
+    // First we remove the address tracked by default
+    await client.removeAccountAddress(newAccount.id(), address);
+
+    // Then we add it again
+    await client.insertAccountAddress(newAccount.id(), address);
+    return true;
+  });
+};
+
+test.describe("Address insertion & deletion tests", () => {
+  test("address can be remove and then re-inserted", async ({ page }) => {
+    await expect(instanceAddressRemoveThenInsert(page)).resolves.toBeTruthy();
   });
 });

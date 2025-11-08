@@ -1,9 +1,9 @@
-use miden_objects::note::{
+use miden_client::note::{
     Note as NativeNote,
     NoteHeader as NativeNoteHeader,
     PartialNote as NativePartialNote,
 };
-use miden_objects::transaction::OutputNote as NativeOutputNote;
+use miden_client::transaction::OutputNote as NativeOutputNote;
 use wasm_bindgen::prelude::*;
 
 use super::note::Note;
@@ -13,6 +13,7 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::partial_note::PartialNote;
 use super::word::Word;
+use crate::models::miden_arrays::OutputNoteArray;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -64,6 +65,10 @@ impl OutputNote {
             _ => None,
         }
     }
+
+    pub(crate) fn note(&self) -> &NativeOutputNote {
+        &self.0
+    }
 }
 
 // CONVERSIONS
@@ -93,34 +98,17 @@ impl From<&OutputNote> for NativeOutputNote {
     }
 }
 
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct OutputNotesArray(Vec<OutputNote>);
-
-#[wasm_bindgen]
-impl OutputNotesArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(output_notes_array: Option<Vec<OutputNote>>) -> OutputNotesArray {
-        let output_notes = output_notes_array.unwrap_or_default();
-        OutputNotesArray(output_notes)
-    }
-
-    pub fn append(&mut self, output_note: &OutputNote) {
-        self.0.push(output_note.clone());
-    }
-}
-
 // CONVERSIONS
 // ================================================================================================
 
-impl From<OutputNotesArray> for Vec<NativeOutputNote> {
-    fn from(output_notes_array: OutputNotesArray) -> Self {
-        output_notes_array.0.into_iter().map(Into::into).collect()
+impl From<OutputNoteArray> for Vec<NativeOutputNote> {
+    fn from(output_notes_array: OutputNoteArray) -> Self {
+        output_notes_array.__inner.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<&OutputNotesArray> for Vec<NativeOutputNote> {
-    fn from(output_notes_array: &OutputNotesArray) -> Self {
-        output_notes_array.0.iter().map(Into::into).collect()
+impl From<&OutputNoteArray> for Vec<NativeOutputNote> {
+    fn from(output_notes_array: &OutputNoteArray) -> Self {
+        output_notes_array.__inner.iter().map(Into::into).collect()
     }
 }

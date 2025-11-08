@@ -9,167 +9,41 @@ const REMOTE_TX_PROVER_PORT = 50051;
 export const test = base.extend<{ forEachTest: void }>({
   forEachTest: [
     async ({ page }, use) => {
+      page.on("console", (msg) => {
+        if (msg.type() === "debug") {
+          console.log(`PAGE DEBUG: ${msg.text()}`);
+        }
+      });
+
+      page.on("pageerror", (err) => {
+        console.error("PAGE ERROR:", err);
+      });
+
+      page.on("error", (err) => {
+        console.error("PUPPETEER ERROR:", err);
+      });
+
       await page.goto("http://localhost:8080");
       await page.evaluate(
         async ({ MIDEN_NODE_PORT, remoteProverPort }) => {
-          const {
-            Account,
-            AccountBuilder,
-            AccountComponent,
-            AccountDelta,
-            AccountStorageDelta,
-            AccountVaultDelta,
-            AccountHeader,
-            AccountId,
-            AccountInterface,
-            AccountStorageMode,
-            AccountStorageRequirements,
-            AccountType,
-            Address,
-            AddressInterface,
-            AdviceMap,
-            Assembler,
-            AssemblerUtils,
-            AuthSecretKey,
-            BasicFungibleFaucetComponent,
-            ConsumableNoteRecord,
-            Felt,
-            FeltArray,
-            ForeignAccount,
-            FungibleAsset,
-            FungibleAssetDelta,
-            Library,
-            NetworkId,
-            Note,
-            NoteAndArgs,
-            NoteAndArgsArray,
-            NoteAssets,
-            NoteConsumability,
-            NoteExecutionHint,
-            NoteExecutionMode,
-            NoteFilter,
-            NoteFilterTypes,
-            NoteIdAndArgs,
-            NoteIdAndArgsArray,
-            NoteInputs,
-            NoteMetadata,
-            NoteRecipient,
-            NoteScript,
-            NoteTag,
-            NoteType,
-            OutputNote,
-            OutputNotesArray,
-            PublicKey,
-            Rpo256,
-            SecretKey,
-            Endpoint,
-            RpcClient,
-            NoteId,
-            Signature,
-            SigningInputs,
-            SigningInputsType,
-            SlotAndKeys,
-            SlotAndKeysArray,
-            StorageMap,
-            StorageSlot,
-            TestUtils,
-            TokenSymbol,
-            TransactionFilter,
-            TransactionKernel,
-            TransactionProver,
-            TransactionRequest,
-            TransactionResult,
-            TransactionRequestBuilder,
-            TransactionScript,
-            TransactionScriptInputPair,
-            TransactionScriptInputPairArray,
-            TransactionSummary,
-            Word,
-            WebClient,
-            MockWebClient,
-          } = await import("./index.js");
+          // Import the sdk classes and attach them
+          // to the window object for testing
+          const sdkExports = await import("./index.js");
+          for (const [key, value] of Object.entries(sdkExports)) {
+            window[key] = value;
+          }
           let rpcUrl = `http://localhost:${MIDEN_NODE_PORT}`;
           let proverUrl = remoteProverPort
             ? `http://localhost:${remoteProverPort}`
             : undefined;
-          const client = await WebClient.createClient(rpcUrl, undefined);
+          const client = await window.WebClient.createClient(
+            rpcUrl,
+            undefined,
+            undefined
+          );
+          window.rpcUrl = rpcUrl;
 
           window.client = client;
-          window.Account = Account;
-          window.AccountBuilder = AccountBuilder;
-          window.AccountComponent = AccountComponent;
-          window.AccountDelta = AccountDelta;
-          window.AccountStorageDelta = AccountStorageDelta;
-          window.AccountVaultDelta = AccountVaultDelta;
-          window.AccountHeader = AccountHeader;
-          window.AccountId = AccountId;
-          window.AccountInterface = AccountInterface;
-          window.AccountStorageMode = AccountStorageMode;
-          window.AccountStorageRequirements = AccountStorageRequirements;
-          window.AccountType = AccountType;
-          window.Address = Address;
-          window.AddressInterface = AddressInterface;
-          window.AdviceMap = AdviceMap;
-          window.Assembler = Assembler;
-          window.AssemblerUtils = AssemblerUtils;
-          window.AuthSecretKey = AuthSecretKey;
-          window.BasicFungibleFaucetComponent = BasicFungibleFaucetComponent;
-          window.ConsumableNoteRecord = ConsumableNoteRecord;
-          window.Endpoint = Endpoint;
-          window.Felt = Felt;
-          window.FeltArray = FeltArray;
-          window.ForeignAccount = ForeignAccount;
-          window.FungibleAsset = FungibleAsset;
-          window.FungibleAssetDelta = FungibleAssetDelta;
-          window.Library = Library;
-          window.NetworkId = NetworkId;
-          window.Note = Note;
-          window.NoteAndArgs = NoteAndArgs;
-          window.NoteAndArgsArray = NoteAndArgsArray;
-          window.NoteAssets = NoteAssets;
-          window.NoteConsumability = NoteConsumability;
-          window.NoteExecutionHint = NoteExecutionHint;
-          window.NoteExecutionMode = NoteExecutionMode;
-          window.NoteFilter = NoteFilter;
-          window.NoteFilterTypes = NoteFilterTypes;
-          window.NoteIdAndArgs = NoteIdAndArgs;
-          window.NoteIdAndArgsArray = NoteIdAndArgsArray;
-          window.NoteInputs = NoteInputs;
-          window.NoteMetadata = NoteMetadata;
-          window.NoteRecipient = NoteRecipient;
-          window.NoteScript = NoteScript;
-          window.NoteId = NoteId;
-          window.NoteTag = NoteTag;
-          window.NoteType = NoteType;
-          window.OutputNote = OutputNote;
-          window.OutputNotesArray = OutputNotesArray;
-          window.PublicKey = PublicKey;
-          window.Rpo256 = Rpo256;
-          window.RpcClient = RpcClient;
-          window.SecretKey = SecretKey;
-          window.Signature = Signature;
-          window.SigningInputs = SigningInputs;
-          window.SigningInputsType = SigningInputsType;
-          window.SlotAndKeys = SlotAndKeys;
-          window.SlotAndKeysArray = SlotAndKeysArray;
-          window.StorageMap = StorageMap;
-          window.StorageSlot = StorageSlot;
-          window.TestUtils = TestUtils;
-          window.TokenSymbol = TokenSymbol;
-          window.TransactionFilter = TransactionFilter;
-          window.TransactionKernel = TransactionKernel;
-          window.TransactionProver = TransactionProver;
-          window.TransactionRequest = TransactionRequest;
-          window.TransactionResult = TransactionResult;
-          window.TransactionRequestBuilder = TransactionRequestBuilder;
-          window.TransactionScript = TransactionScript;
-          window.TransactionScriptInputPair = TransactionScriptInputPair;
-          window.TransactionScriptInputPairArray =
-            TransactionScriptInputPairArray;
-          window.TransactionSummary = TransactionSummary;
-          window.WebClient = WebClient;
-          window.Word = Word;
-          window.MockWebClient = MockWebClient;
 
           // Create a namespace for helper functions
           window.helpers = window.helpers || {};
@@ -207,6 +81,31 @@ export const test = base.extend<{ forEachTest: void }>({
             }
           };
 
+          window.helpers.executeAndApplyTransaction = async (
+            accountId,
+            transactionRequest,
+            prover
+          ) => {
+            const client = window.client;
+            const result = await client.executeTransaction(
+              accountId,
+              transactionRequest
+            );
+
+            const useRemoteProver =
+              prover != null && window.remoteProverUrl != null;
+            const proverToUse = useRemoteProver
+              ? window.TransactionProver.newRemoteProver(window.remoteProverUrl)
+              : window.TransactionProver.newLocalProver();
+
+            const proven = await client.proveTransaction(result, proverToUse);
+            const submissionHeight = await client.submitProvenTransaction(
+              proven,
+              result
+            );
+            return await client.applyTransaction(result, submissionHeight);
+          };
+
           window.helpers.waitForBlocks = async (amountOfBlocks) => {
             const client = window.client;
             let currentBlock = await client.getSyncHeight();
@@ -227,7 +126,11 @@ export const test = base.extend<{ forEachTest: void }>({
           };
 
           window.helpers.refreshClient = async (initSeed) => {
-            const client = await WebClient.createClient(rpcUrl, initSeed);
+            const client = await WebClient.createClient(
+              rpcUrl,
+              undefined,
+              initSeed
+            );
             window.client = client;
             await window.client.syncState();
           };

@@ -3,28 +3,22 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
+use async_trait::async_trait;
 use miden_lib::account::interface::AccountInterface;
-use miden_lib::note::well_known_note::WellKnownNote;
+use miden_lib::note::{NoteConsumptionStatus, WellKnownNote};
 use miden_objects::account::{Account, AccountId};
 use miden_objects::note::{Note, NoteId};
-use miden_objects::transaction::InputNote;
 use miden_objects::{AccountError, AssetError};
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::{
-    NoteCheckerError,
-    NoteConsumptionChecker,
-    NoteConsumptionStatus,
-    TransactionExecutor,
-};
+use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
-use tonic::async_trait;
 
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
 
 /// Describes the relevance of a note based on the screening.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -56,6 +50,7 @@ impl fmt::Display for NoteRelevance {
 /// tracked in the provided `store`. This can be derived in a number of ways, such as looking
 /// at the combination of script root and note inputs. For example, a P2ID note is relevant
 /// for a specific account ID if this ID is its first note input.
+#[derive(Clone)]
 pub struct NoteScreener<AUTH> {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
@@ -126,7 +121,7 @@ where
             crate::DebugMode::Disabled,
         )?;
 
-        let tx_args = transaction_request.clone().into_transaction_args(tx_script, vec![]);
+        let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
         let data_store = ClientDataStore::new(self.store.clone());
         let mut transaction_executor = TransactionExecutor::new(&data_store);
@@ -151,11 +146,12 @@ where
                 Some(NoteRelevance::After(block_number.as_u32()))
             },
             NoteConsumptionStatus::Consumable
-            | NoteConsumptionStatus::UnconsumableWithoutAuthorization => Some(NoteRelevance::Now),
-            // NOTE: NoteConsumptionStatus::Unconsumable means that state-related context does not
-            // allow for consumption, so don't keep for now. In the next version, we should be more
-            // careful about this
-            NoteConsumptionStatus::Unconsumable | NoteConsumptionStatus::Incompatible => None,
+            | NoteConsumptionStatus::ConsumableWithAuthorization => Some(NoteRelevance::Now),
+            // NOTE: NoteConsumptionStatus::UnconsumableConditions means that state-related context
+            // does not allow for consumption, so don't keep for now. In the next
+            // version, we should be more careful about this
+            NoteConsumptionStatus::UnconsumableConditions
+            | NoteConsumptionStatus::NeverConsumable(_) => None,
         };
         Ok(result)
     }
@@ -167,6 +163,8 @@ where
         account_id: &AccountId,
     ) -> Result<Option<NoteRelevance>, NoteScreenerError> {
         let note_inputs = note.inputs().values();
+        // TODO: this needs to be removed (see note screener refactor issue)
+
         if note_inputs.len() != 4 {
             return Err(InvalidNoteInputsError::WrongNumInputs(note.id(), 4).into());
         }

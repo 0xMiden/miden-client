@@ -32,6 +32,7 @@ pub mod account_builder;
 pub mod account_code;
 pub mod account_component;
 pub mod account_delta;
+pub mod account_file;
 pub mod account_header;
 pub mod account_id;
 pub mod account_storage;
@@ -41,7 +42,6 @@ pub mod account_type;
 pub mod address;
 pub mod advice_inputs;
 pub mod advice_map;
-pub mod assembler;
 pub mod asset_vault;
 pub mod auth_secret_key;
 pub mod basic_fungible_faucet_component;
@@ -63,6 +63,7 @@ pub mod note_assets;
 pub mod note_details;
 pub mod note_execution_hint;
 pub mod note_execution_mode;
+pub mod note_file;
 pub mod note_filter;
 pub mod note_header;
 pub mod note_id;
@@ -76,10 +77,13 @@ pub mod note_tag;
 pub mod note_type;
 pub mod output_note;
 pub mod output_notes;
+pub mod package;
 pub mod partial_note;
+pub mod proven_transaction;
 pub mod provers;
 pub mod public_key;
 pub mod rpo256;
+pub mod script_builder;
 pub mod secret_key;
 pub mod signature;
 pub mod signing_inputs;
@@ -90,12 +94,27 @@ pub mod token_symbol;
 pub mod transaction_args;
 pub mod transaction_filter;
 pub mod transaction_id;
-pub mod transaction_kernel;
 pub mod transaction_record;
 pub mod transaction_request;
 pub mod transaction_result;
 pub mod transaction_script;
 pub mod transaction_script_inputs;
 pub mod transaction_status;
+pub mod transaction_store_update;
 pub mod transaction_summary;
 pub mod word;
+
+declare_js_miden_arrays! {
+    (crate::models::account::Account) -> AccountArray,
+    (crate::models::account_id::AccountId) -> AccountIdArray,
+    (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
+    (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
+    (crate::models::output_note::OutputNote) -> OutputNoteArray,
+    (crate::models::storage_slot::StorageSlot) -> StorageSlotArray,
+    (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
+    (crate::models::felt::Felt) -> FeltArray,
+    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
+    (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
+    (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
+    (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray
+}

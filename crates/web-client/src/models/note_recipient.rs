@@ -1,5 +1,5 @@
-use miden_objects::Word as NativeWord;
-use miden_objects::note::{
+use miden_client::Word as NativeWord;
+use miden_client::note::{
     NoteInputs as NativeNoteInputs,
     NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,
@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 use super::note_inputs::NoteInputs;
 use super::note_script::NoteScript;
 use super::word::Word;
+use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -72,37 +73,8 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
     }
 }
 
-// RECIPIENT ARRAY
-// ================================================================================================
-
-#[derive(Clone)]
-#[wasm_bindgen]
-pub struct RecipientArray(Vec<NoteRecipient>);
-
-#[wasm_bindgen]
-impl RecipientArray {
-    #[wasm_bindgen(constructor)]
-    pub fn new(recipient_array: Option<Vec<NoteRecipient>>) -> RecipientArray {
-        let recipients = recipient_array.unwrap_or_default();
-        RecipientArray(recipients)
-    }
-
-    pub fn push(&mut self, recipient: &NoteRecipient) {
-        self.0.push(recipient.clone());
-    }
-}
-
-// CONVERSIONS
-// ================================================================================================
-
-impl From<Vec<NativeNoteRecipient>> for RecipientArray {
-    fn from(recipients: Vec<NativeNoteRecipient>) -> Self {
-        RecipientArray(recipients.into_iter().map(NoteRecipient::from).collect())
-    }
-}
-
 impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
     fn from(recipient_array: &RecipientArray) -> Self {
-        recipient_array.0.iter().map(NativeNoteRecipient::from).collect()
+        recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
     }
 }

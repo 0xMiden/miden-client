@@ -1,30 +1,33 @@
-use miden_lib::account::auth::AuthRpoFalcon512 as NativeRpoFalcon512;
-use miden_objects::account::{
-    AccountComponent as NativeAccountComponent,
-    StorageSlot as NativeStorageSlot,
-};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::account::StorageSlot as NativeStorageSlot;
+use miden_client::account::component::AccountComponent as NativeAccountComponent;
+use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
+use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::vm::Package as NativePackage;
+use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
-use crate::models::assembler::Assembler;
+use crate::models::miden_arrays::StorageSlotArray;
+use crate::models::package::Package;
+use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]
 impl AccountComponent {
     pub fn compile(
         account_code: &str,
-        assembler: &Assembler,
+        builder: &ScriptBuilder,
         storage_slots: Vec<StorageSlot>,
     ) -> Result<AccountComponent, JsValue> {
         let native_slots: Vec<NativeStorageSlot> =
             storage_slots.into_iter().map(Into::into).collect();
 
-        NativeAccountComponent::compile(account_code, assembler.into(), native_slots)
+        NativeAccountComponent::compile(account_code, builder.clone_assembler(), native_slots)
             .map(AccountComponent)
             .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
@@ -67,9 +70,31 @@ impl AccountComponent {
     #[wasm_bindgen(js_name = "createAuthComponent")]
     pub fn create_auth_component(secret_key: &SecretKey) -> AccountComponent {
         let native_secret_key: NativeSecretKey = secret_key.into();
-        let native_auth_component: NativeAccountComponent =
-            NativeRpoFalcon512::new(native_secret_key.public_key()).into();
+        let native_auth_component: NativeAccountComponent = NativeRpoFalcon512::new(
+            PublicKeyCommitment::from(native_secret_key.public_key().to_commitment()),
+        )
+        .into();
         AccountComponent(native_auth_component)
+    }
+
+    #[wasm_bindgen(js_name = "fromPackage")]
+    pub fn from_package(
+        package: &Package,
+        storage_slots: &StorageSlotArray,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_package: NativePackage = package.into();
+        let native_library = native_package.unwrap_library().as_ref().clone();
+        let native_slots: Vec<NativeStorageSlot> = storage_slots
+            .__inner
+            .iter()
+            .map(|storage_slot| storage_slot.clone().into())
+            .collect();
+
+        NativeAccountComponent::new(native_library, native_slots)
+            .map(AccountComponent)
+            .map_err(|e| {
+                js_error_with_context(e, "Failed to create account component from package")
+            })
     }
 }
 

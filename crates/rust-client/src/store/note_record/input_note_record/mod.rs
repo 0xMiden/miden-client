@@ -7,6 +7,7 @@ use miden_objects::note::{
     Note,
     NoteAssets,
     NoteDetails,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -81,6 +82,11 @@ impl InputNoteRecord {
     /// Returns the note's recipient.
     pub fn recipient(&self) -> Word {
         self.details.recipient().digest()
+    }
+
+    /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
+    pub fn commitment(&self) -> Option<Word> {
+        self.metadata().map(|m| NoteHeader::new(self.id(), *m).commitment())
     }
 
     /// Returns the note's assets.
@@ -204,7 +210,7 @@ impl InputNoteRecord {
     pub(crate) fn consumed_externally(
         &mut self,
         nullifier: Nullifier,
-        nullifier_block_height: u32,
+        nullifier_block_height: BlockNumber,
     ) -> Result<bool, NoteRecordError> {
         if self.nullifier() != nullifier {
             return Err(NoteRecordError::StateTransitionError(
@@ -247,7 +253,7 @@ impl InputNoteRecord {
     pub(crate) fn transaction_committed(
         &mut self,
         transaction_id: TransactionId,
-        block_height: u32,
+        block_height: BlockNumber,
     ) -> Result<bool, NoteRecordError> {
         let new_state = self.state.transaction_committed(transaction_id, block_height)?;
         if let Some(new_state) = new_state {
@@ -282,6 +288,7 @@ impl Deserializable for InputNoteRecord {
 
 // CONVERSION
 // ================================================================================================
+
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
         let metadata = *value.metadata();

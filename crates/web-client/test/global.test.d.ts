@@ -2,6 +2,7 @@ import { Page } from "puppeteer";
 import { WebClient as WasmWebClient } from "../dist/crates/miden_client_web";
 import {
   Account,
+  AccountFile,
   AccountBuilder,
   AccountComponent,
   AccountDelta,
@@ -14,8 +15,6 @@ import {
   Address,
   AddressInterface,
   AdviceMap,
-  Assembler,
-  AssemblerUtils,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   ConsumableNoteRecord,
@@ -33,6 +32,7 @@ import {
   NoteExecutionHint,
   NoteExecutionMode,
   NoteFilter,
+  NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
@@ -44,6 +44,7 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  Package,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -61,15 +62,17 @@ import {
   TransactionKernel,
   TransactionProver,
   TransactionRequest,
-  TransactionResult,
+  TransactionStoreUpdate,
   TransactionRequestBuilder,
   TransactionScript,
   TransactionScriptInputPair,
   TransactionScriptInputPairArray,
-  TransactionSummary,
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  MidenArrays,
+  ScriptBuilder,
+  ScriptBuilderMode,
 } from "../dist/index";
 import { MockWebClient, WebClient } from "../js";
 
@@ -80,6 +83,7 @@ declare global {
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
+    AccountFile: typeof AccountFile;
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
@@ -96,8 +100,6 @@ declare global {
     Address: typeof Address;
     AddressInterface: typeof AddressInterface;
     AdviceMap: typeof AdviceMap;
-    Assembler: typeof Assembler;
-    AssemblerUtils: typeof AssemblerUtils;
     AuthSecretKey: typeof AuthSecretKey;
     BasicFungibleFaucetComponent: typeof BasicFungibleFaucetComponent;
     ConsumableNoteRecord: typeof ConsumableNoteRecord;
@@ -118,6 +120,7 @@ declare global {
     NoteExecutionHint: typeof NoteExecutionHint;
     NoteExecutionMode: typeof NoteExecutionMode;
     NoteFilter: typeof NoteFilter;
+    NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
     NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
@@ -130,6 +133,7 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
@@ -146,16 +150,18 @@ declare global {
     TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
-    TransactionResult: typeof TransactionResult;
+    TransactionStoreUpdate: typeof TransactionStoreUpdate;
     TransactionRequestBuilder: typeof TransactionRequestBuilder;
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
-    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    MidenArrays: typeof MidenArrays;
+    ScriptBuilder: typeof ScriptBuilder;
+    ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;
 
     // Add the helpers namespace

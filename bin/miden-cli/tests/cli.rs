@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::address::AddressInterface;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -20,8 +22,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
-use miden_client::rpc::{Endpoint, TonicRpcClient};
-use miden_client::store::sqlite_store::SqliteStore;
+use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
     ACCOUNT_ID_REGULAR,
@@ -32,9 +33,16 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
-use miden_client::{self, Client, ExecutionOptions, Felt};
+use miden_client::{
+    self,
+    Client,
+    ExecutionOptions,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+};
 use miden_client_cli::CliKeyStore;
-use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
 
@@ -62,7 +70,7 @@ fn init_without_params() {
     let temp_dir = init_cli().1;
 
     // Trying to init twice should result in an error
-    let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args(["init"]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
@@ -84,9 +92,66 @@ fn init_with_params() {
     assert!(config_file_str.contains("devnet"));
 
     // Trying to init twice should result in an error
-    let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args(["init", "--network", "devnet", "--store-path", store_path.to_str().unwrap()]);
     init_cmd.current_dir(&temp_dir).assert().failure();
+}
+
+#[test]
+fn silent_initialization_uses_default_values() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Run any command to trigger silent initialization
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Read and verify the config file contents
+    let config_path = temp_dir.join("miden-client.toml");
+    let config_content = std::fs::read_to_string(&config_path).unwrap();
+
+    // Verify default values are used
+    assert!(config_content.contains("testnet"), "Should use testnet as default network");
+    assert!(config_content.contains("store.sqlite3"), "Should use default store path");
+    assert!(config_content.contains("keystore"), "Should use default keystore directory");
+}
+
+#[test]
+fn silent_initialization_does_not_override_existing_config() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Manual configuration file
+    let config_path = temp_dir.join("miden-client.toml");
+    let custom_config = r#"
+    store_filepath = "custom-store.sqlite3"
+    secret_keys_directory = "custom-keystore"
+    token_symbol_map_filepath = "custom-tokens.toml"
+    component_template_directory = "custom-templates"
+    package_directory = "packages"
+
+    [rpc]
+    endpoint = "https://custom-endpoint.com"
+    timeout_ms = 5000
+    "#;
+    std::fs::write(&config_path, custom_config).unwrap();
+
+    // Run command without explicitly initializing
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Verify original config remains unchanged
+    let config_content = std::fs::read_to_string(&config_path).unwrap();
+    assert!(
+        config_content.contains("custom-endpoint.com"),
+        "Config should not be overwritten"
+    );
+    assert!(
+        config_content.contains("custom-store.sqlite3"),
+        "Config should not be overwritten"
+    );
 }
 
 // TX TESTS
@@ -130,7 +195,7 @@ async fn token_symbol_mapping() -> Result<()> {
 
     sync_cli(&temp_dir);
 
-    let mut mint_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
         "mint",
         "--target",
@@ -196,7 +261,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
     for filename in GENESIS_ACCOUNTS_FILENAMES {
         args.push(filename);
     }
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     import_cmd.args(&args);
     import_cmd.current_dir(&temp_dir).assert().success();
 
@@ -216,7 +281,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
 
     // Ensure they've been importing by showing them
     let args = vec!["account", "--show", &fungible_faucet_account_id];
-    let mut show_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut show_cmd = cargo_bin_cmd!("miden-client");
     show_cmd.args(&args);
     show_cmd.current_dir(&temp_dir).assert().success();
 
@@ -258,12 +323,12 @@ async fn cli_export_import_note() -> Result<()> {
         mint_cli(&temp_dir_1, &first_basic_account_id, &fungible_faucet_account_id);
 
     // Export without type fails
-    let mut export_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut export_cmd = cargo_bin_cmd!("miden-client");
     export_cmd.args(["export", &note_to_export_id, "--filename", NOTE_FILENAME]);
     export_cmd.current_dir(&temp_dir_1).assert().failure().code(1); // Code returned when the CLI handles an error
 
     // Export the note
-    let mut export_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut export_cmd = cargo_bin_cmd!("miden-client");
     export_cmd.args([
         "export",
         &note_to_export_id,
@@ -282,7 +347,7 @@ async fn cli_export_import_note() -> Result<()> {
     std::fs::copy(client_1_note_file_path, client_2_note_file_path).unwrap();
 
     // Import Note on second client
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     import_cmd.args(["import", NOTE_FILENAME]);
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
@@ -319,10 +384,10 @@ async fn cli_export_import_account() -> Result<()> {
     let wallet_id = new_wallet_cli(&temp_dir_1, AccountStorageMode::Private);
 
     // Export the accounts
-    let mut export_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut export_cmd = cargo_bin_cmd!("miden-client");
     export_cmd.args(["export", &faucet_id, "--account", "--filename", FAUCET_FILENAME]);
     export_cmd.current_dir(&temp_dir_1).assert().success();
-    let mut export_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut export_cmd = cargo_bin_cmd!("miden-client");
     export_cmd.args(["export", &wallet_id, "--account", "--filename", WALLET_FILENAME]);
     export_cmd.current_dir(&temp_dir_1).assert().success();
 
@@ -336,10 +401,10 @@ async fn cli_export_import_account() -> Result<()> {
     }
 
     // Import the account from the second client
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     import_cmd.args(["import", FAUCET_FILENAME]);
     import_cmd.current_dir(&temp_dir_2).assert().success();
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     import_cmd.args(["import", WALLET_FILENAME]);
     import_cmd.current_dir(&temp_dir_2).assert().success();
 
@@ -364,21 +429,21 @@ async fn cli_export_import_account() -> Result<()> {
 fn cli_empty_commands() {
     let temp_dir = init_cli().1;
 
-    let mut create_faucet_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_faucet_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(
         create_faucet_cmd.args(["new-account"]).current_dir(&temp_dir),
     );
 
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(import_cmd.args(["export"]).current_dir(&temp_dir));
 
-    let mut mint_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(mint_cmd.args(["mint"]).current_dir(&temp_dir));
 
-    let mut send_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut send_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(send_cmd.args(["send"]).current_dir(&temp_dir));
 
-    let mut swam_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut swam_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
 }
 
@@ -503,7 +568,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     file.write_all(&note_file.to_bytes()).unwrap();
 
     // Import the note
-    let mut import_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut import_cmd = cargo_bin_cmd!("miden-client");
     import_cmd.args(["import", note_path.to_str().unwrap()]);
     import_cmd.current_dir(&temp_dir).assert().success();
 
@@ -513,7 +578,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
 
     // Consume the note and check the output
-    let mut consume_note_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut consume_note_cmd = cargo_bin_cmd!("miden-client");
     let note_id = note.id().to_hex();
     let mut cli_args = vec!["consume-notes", "--account", &wallet_account_id, "--force"];
     cli_args.extend_from_slice(vec![note_id.as_str()].as_slice());
@@ -523,6 +588,115 @@ async fn debug_mode_outputs_logs() -> Result<()> {
         .assert()
         .success()
         .stdout(contains("Stack state"));
+
+    Ok(())
+}
+
+// ADDRESSES TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn list_addresses_add() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+
+    let mut list_addresses_cmd = cargo_bin_cmd!("miden-client");
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
+
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert!(formatted_output.contains("Unspecified"));
+    assert!(!formatted_output.contains("BasicWallet"));
+
+    // Add a basic wallet address to the account
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    let custom_note_tag_len = "10";
+    add_address_cmd.args([
+        "address",
+        "add",
+        &basic_account_id,
+        &AddressInterface::BasicWallet.to_string(),
+        custom_note_tag_len,
+    ]);
+    let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain a BasicWallet address
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
+    assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
+
+    // Add another basic wallet address to the account
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    let custom_note_tag_len = "5";
+    add_address_cmd.args([
+        "address",
+        "add",
+        &basic_account_id,
+        &AddressInterface::BasicWallet.to_string(),
+        custom_note_tag_len,
+    ]);
+    let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain two BasicWallet addresses
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
+    assert_eq!(formatted_output.matches("BasicWallet").count(), 2);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn list_addresses_remove() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+
+    // List of addresses for created account should contain an Unspecified address
+    let mut list_addresses_cmd = cargo_bin_cmd!("miden-client");
+    list_addresses_cmd.args(["address", "list", &basic_account_id]);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches("Unspecified").count(), 1);
+
+    // Remove the Unspecified wallet from the account
+    let mut remove_address_cmd = cargo_bin_cmd!("miden-client");
+    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+        .unwrap()
+        .find(&formatted_output)
+        .unwrap()
+        .as_str();
+    remove_address_cmd.args(["address", "remove", &basic_account_id, unspecified_wallet_address]);
+    let output = remove_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+
+    // List of addresses for created account should now contain one BasicWallet address
+    sync_cli(&temp_dir);
+    let output = list_addresses_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(output.status.success());
+    let formatted_output = String::from_utf8(output.stdout).unwrap();
+    assert!(formatted_output.contains(&basic_account_id));
+    assert_eq!(formatted_output.matches("Unspecified").count(), 0);
 
     Ok(())
 }
@@ -551,7 +725,7 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     // Init and create basic wallet on second client
-    let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args([
         "init",
         "--network",
@@ -569,7 +743,7 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
 // timeout set). It returns the number of updated notes after the sync.
 fn sync_cli(cli_path: &Path) -> u64 {
     loop {
-        let mut sync_cmd = Command::cargo_bin("miden-client").unwrap();
+        let mut sync_cmd = cargo_bin_cmd!("miden-client");
         sync_cmd.args(["sync"]);
 
         let output = sync_cmd.current_dir(cli_path).output().unwrap();
@@ -596,7 +770,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 /// Mints 100 units of the corresponding faucet using the cli and checks that the command runs
 /// successfully given account using the CLI given by `cli_path`.
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
-    let mut mint_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
         "mint",
         "--target",
@@ -623,7 +797,7 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
 /// Shows note details using the cli and checks that the command runs
 /// successfully given account using the CLI given by `cli_path`.
 fn show_note_cli(cli_path: &Path, note_id: &str, should_fail: bool) {
-    let mut show_note_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut show_note_cmd = cargo_bin_cmd!("miden-client");
     show_note_cmd.args(["notes", "--show", note_id]);
 
     if should_fail {
@@ -636,7 +810,7 @@ fn show_note_cli(cli_path: &Path, note_id: &str, should_fail: bool) {
 /// Sends 25 units of the corresponding faucet and checks that the command runs successfully given
 /// account using the CLI given by `cli_path`.
 fn send_cli(cli_path: &Path, from_account_id: &str, to_account_id: &str, faucet_id: &str) {
-    let mut send_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut send_cmd = cargo_bin_cmd!("miden-client");
     send_cmd.args([
         "send",
         "--sender",
@@ -661,7 +835,7 @@ fn sync_until_committed_note(cli_path: &Path) {
 
 /// Consumes a series of notes with a given account using the CLI given by `cli_path`.
 fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
-    let mut consume_note_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut consume_note_cmd = cargo_bin_cmd!("miden-client");
     let mut cli_args = vec!["consume-notes", "--account", &account_id, "--force"];
     cli_args.extend_from_slice(note_ids);
     consume_note_cmd.args(&cli_args);
@@ -671,7 +845,7 @@ fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
 /// Creates a new faucet account using the CLI given by `cli_path`.
 fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
     const INIT_DATA_FILENAME: &str = "init_data.toml";
-    let mut create_faucet_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_faucet_cmd = cargo_bin_cmd!("miden-client");
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
@@ -688,7 +862,7 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         storage_mode.to_string().as_str(),
         "--account-type",
         "fungible-faucet",
-        "-c",
+        "-p",
         "basic-fungible-faucet",
         "-i",
         INIT_DATA_FILENAME,
@@ -709,13 +883,18 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
 /// Creates a new wallet account using the CLI given by `cli_path`.
 fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
-    let mut create_wallet_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
     create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "Failed to create wallet {}",
+        String::from_utf8(output.stderr)
+            .map(|err_msg| format!("with error: {err_msg}"))
+            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+    );
 
-    //println!("stoud {}", String::from_utf8(output.stdout.clone()).unwrap());
     std::str::from_utf8(&output.stdout)
         .unwrap()
         .split_whitespace()
@@ -746,7 +925,7 @@ async fn create_rust_client_with_store_path(
 
     Ok((
         TestClient::new(
-            Arc::new(TonicRpcClient::new(&endpoint, 10_000)),
+            Arc::new(GrpcClient::new(&endpoint, 10_000)),
             rng,
             store,
             Some(std::sync::Arc::new(keystore.clone())),
@@ -756,6 +935,7 @@ async fn create_rust_client_with_store_path(
                 false,
                 true,
             )?,
+            None,
             None,
             None,
         )
@@ -789,7 +969,7 @@ fn exec_parse() {
     let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
 
     sync_cli(&temp_dir);
-    let mut success_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut success_cmd = cargo_bin_cmd!("miden-client");
     success_cmd.args([
         "exec",
         "-s",
@@ -802,7 +982,7 @@ fn exec_parse() {
 
     success_cmd.current_dir(&temp_dir).assert().success();
 
-    let mut failure_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut failure_cmd = cargo_bin_cmd!("miden-client");
     failure_cmd.args([
         "exec",
         "-s",

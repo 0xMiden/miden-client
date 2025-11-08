@@ -1,4 +1,5 @@
 use miden_objects::Word;
+use miden_objects::block::BlockNumber;
 use miden_objects::note::Nullifier;
 
 use crate::rpc::domain::MissingFieldHelper;
@@ -14,7 +15,7 @@ pub struct NullifierUpdate {
     /// The nullifier of the consumed note.
     pub nullifier: Nullifier,
     /// The number of the block in which the note consumption was registered.
-    pub block_num: u32,
+    pub block_num: BlockNumber,
 }
 
 // CONVERSIONS
@@ -29,20 +30,20 @@ impl TryFrom<proto::primitives::Digest> for Nullifier {
     }
 }
 
-impl TryFrom<&proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate>
-    for NullifierUpdate
-{
+impl TryFrom<&proto::rpc_store::sync_nullifiers_response::NullifierUpdate> for NullifierUpdate {
     type Error = RpcConversionError;
 
     fn try_from(
-        value: &proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate,
+        value: &proto::rpc_store::sync_nullifiers_response::NullifierUpdate,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             nullifier: value
                 .nullifier
-                .ok_or(proto::rpc_store::check_nullifiers_by_prefix_response::NullifierUpdate::missing_field(stringify!(nullifier)))?
+                .ok_or(proto::rpc_store::sync_nullifiers_response::NullifierUpdate::missing_field(
+                    stringify!(nullifier),
+                ))?
                 .try_into()?,
-            block_num: value.block_num,
+            block_num: value.block_num.into(),
         })
     }
 }

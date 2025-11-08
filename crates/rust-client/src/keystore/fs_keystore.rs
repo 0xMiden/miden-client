@@ -5,10 +5,9 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
-use std::vec::Vec;
 
-use miden_objects::account::AuthSecretKey;
-use miden_objects::{Felt, Word};
+use miden_objects::Word;
+use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
 use miden_tx::utils::{Deserializable, Serializable};
@@ -47,7 +46,9 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     /// Adds a secret key to the keystore.
     pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         let pub_key = match key {
-            AuthSecretKey::RpoFalcon512(k) => Word::from(k.public_key()),
+            AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment(),
+            AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment(),
+            other_key => other_key.public_key().to_commitment().into(),
         };
 
         let filename = hash_pub_key(pub_key);
@@ -125,21 +126,27 @@ impl<R: Rng + Send + Sync> TransactionAuthenticator for FilesystemKeyStore<R> {
     /// returned.
     async fn get_signature(
         &self,
-        pub_key: Word,
+        pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
-    ) -> Result<Vec<Felt>, AuthenticationError> {
+    ) -> Result<Signature, AuthenticationError> {
         let mut rng = self.rng.write().expect("poisoned lock");
 
         let message = signing_info.to_commitment();
 
         let secret_key = self
-            .get_key(pub_key)
+            .get_key(pub_key.into())
             .map_err(|err| AuthenticationError::other(err.to_string()))?;
 
-        let AuthSecretKey::RpoFalcon512(k) =
-            secret_key.ok_or(AuthenticationError::UnknownPublicKey(pub_key.to_hex()))?;
+        let signature = match secret_key {
+            Some(AuthSecretKey::RpoFalcon512(k)) => {
+                Signature::RpoFalcon512(k.sign_with_rng(message, &mut rng))
+            },
+            Some(AuthSecretKey::EcdsaK256Keccak(k)) => Signature::EcdsaK256Keccak(k.sign(message)),
+            Some(other_k) => other_k.sign(message),
+            None => return Err(AuthenticationError::other("missing secret key".to_string())),
+        };
 
-        miden_tx::auth::signatures::get_falcon_signature(&k, message, &mut *rng)
+        Ok(signature)
     }
 }
 

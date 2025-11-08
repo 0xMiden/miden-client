@@ -32,12 +32,12 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2).await?;
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
+    let (btc_faucet_account, _) =
         insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
             .await?;
 
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
+    let (eth_faucet_account, _) =
         insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
             .await?;
 
@@ -211,11 +211,11 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         insert_new_wallet(&mut client2, AccountStorageMode::Private, &authenticator_2).await?;
 
     // Create client with faucets BTC faucet (note: it's not real BTC)
-    let (btc_faucet_account, ..) =
+    let (btc_faucet_account, _) =
         insert_new_fungible_faucet(&mut client1, AccountStorageMode::Private, &authenticator_1)
             .await?;
     // Create client with faucets ETH faucet (note: it's not real ETH)
-    let (eth_faucet_account, ..) =
+    let (eth_faucet_account, _) =
         insert_new_fungible_faucet(&mut client2, AccountStorageMode::Private, &authenticator_2)
             .await?;
 

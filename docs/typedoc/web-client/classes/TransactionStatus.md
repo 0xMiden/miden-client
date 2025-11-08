@@ -1,0 +1,123 @@
+[**@demox-labs/miden-sdk**](../README.md)
+
+***
+
+[@demox-labs/miden-sdk](../README.md) / TransactionStatus
+
+# Class: TransactionStatus
+
+## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### free()
+
+> **free**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### getBlockNum()
+
+> **getBlockNum**(): `number`
+
+#### Returns
+
+`number`
+
+***
+
+### getCommitTimestamp()
+
+> **getCommitTimestamp**(): `bigint`
+
+#### Returns
+
+`bigint`
+
+***
+
+### isCommitted()
+
+> **isCommitted**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isDiscarded()
+
+> **isDiscarded**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isPending()
+
+> **isPending**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### committed()
+
+> `static` **committed**(`block_num`, `commit_timestamp`): `TransactionStatus`
+
+#### Parameters
+
+##### block\_num
+
+`number`
+
+##### commit\_timestamp
+
+`bigint`
+
+#### Returns
+
+`TransactionStatus`
+
+***
+
+### discarded()
+
+> `static` **discarded**(`cause`): `TransactionStatus`
+
+#### Parameters
+
+##### cause
+
+`string`
+
+#### Returns
+
+`TransactionStatus`
+
+***
+
+### pending()
+
+> `static` **pending**(): `TransactionStatus`
+
+#### Returns
+
+`TransactionStatus`

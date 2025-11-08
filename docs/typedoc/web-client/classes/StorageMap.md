@@ -1,0 +1,57 @@
+[**@demox-labs/miden-sdk**](../README.md)
+
+***
+
+[@demox-labs/miden-sdk](../README.md) / StorageMap
+
+# Class: StorageMap
+
+## Constructors
+
+### Constructor
+
+> **new StorageMap**(): `StorageMap`
+
+#### Returns
+
+`StorageMap`
+
+## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### free()
+
+> **free**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
+### insert()
+
+> **insert**(`key`, `value`): [`Word`](Word.md)
+
+#### Parameters
+
+##### key
+
+[`Word`](Word.md)
+
+##### value
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)

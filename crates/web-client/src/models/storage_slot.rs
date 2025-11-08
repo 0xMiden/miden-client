@@ -1,10 +1,11 @@
-use miden_objects::account::StorageSlot as NativeStorageSlot;
+use miden_client::account::StorageSlot as NativeStorageSlot;
 use wasm_bindgen::prelude::*;
 
 use crate::models::storage_map::StorageMap;
 use crate::models::word::Word;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct StorageSlot(NativeStorageSlot);
 
 #[wasm_bindgen]

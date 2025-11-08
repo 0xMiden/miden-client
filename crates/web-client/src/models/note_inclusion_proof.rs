@@ -1,5 +1,5 @@
 use miden_client::crypto::MerklePath as NativeMerklePath;
-use miden_objects::note::NoteInclusionProof as NativeNoteInclusionProof;
+use miden_client::note::NoteInclusionProof as NativeNoteInclusionProof;
 use wasm_bindgen::prelude::*;
 
 use super::merkle_path::MerklePath;
@@ -33,5 +33,10 @@ impl From<NativeNoteInclusionProof> for NoteInclusionProof {
 impl From<&NativeNoteInclusionProof> for NoteInclusionProof {
     fn from(native_proof: &NativeNoteInclusionProof) -> Self {
         NoteInclusionProof(native_proof.clone())
+    }
+}
+impl From<NoteInclusionProof> for NativeNoteInclusionProof {
+    fn from(proof: NoteInclusionProof) -> Self {
+        proof.0
     }
 }

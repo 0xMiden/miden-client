@@ -1,6 +1,6 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.11.11",
+  "version": "0.12.0-next.34",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden",
@@ -18,21 +18,18 @@
     "../LICENSE.md"
   ],
   "scripts": {
-    "build-rust-client-js": "cd ../rust-client/src/store/web_store && yarn && yarn build",
+    "build-rust-client-js": "cd ../idxdb-store/src/ && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "test": "yarn playwright install --with-deps && yarn playwright test",
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
-    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test"
+    "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
-    "@types/chai": "^4.3.17",
-    "@types/chai-as-promised": "^8.0.0",
-    "@types/mocha": "^10.0.7",
-    "@types/node": "^22.4.1",
+    "@types/node": "^24.9.2",
     "@wasm-tool/rollup-plugin-rust": "^3.0.3",
     "chai": "^5.1.1",
     "cpr": "^3.0.1",
@@ -50,7 +47,7 @@
     "typescript": "^5.5.4"
   },
   "dependencies": {
-    "chai-as-promised": "^8.0.0",
+    "@rollup/plugin-typescript": "^12.3.0",
     "dexie": "^4.0.1",
     "glob": "^11.0.0"
   }

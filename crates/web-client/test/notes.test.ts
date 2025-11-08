@@ -10,6 +10,7 @@ import {
   setupConsumedNote,
   getInputNotes,
   setupMintedNote,
+  setupPublicConsumedNote,
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
 import {
@@ -23,7 +24,10 @@ const getConsumableNotes = async (
 ): Promise<
   {
     noteId: string;
-    consumability: { accountId: string; consumableAfterBlock: boolean }[];
+    consumability: {
+      accountId: string;
+      consumableAfterBlock: number | undefined;
+    }[];
   }[]
 > => {
   return await testingPage.evaluate(async (_accountId?: string) => {
@@ -63,8 +67,7 @@ test.describe("get_input_note", () => {
 
     // Test RpcClient.getNotesById
     const rpcResult = await page.evaluate(async (_consumedNoteId: string) => {
-      // NOTE: this assumes the node is running on localhost
-      const endpoint = new window.Endpoint("http://localhost:57291");
+      const endpoint = new window.Endpoint(window.rpcUrl);
       const rpcClient = new window.RpcClient(endpoint);
 
       const noteId = window.NoteId.fromHex(_consumedNoteId);
@@ -83,6 +86,52 @@ test.describe("get_input_note", () => {
     expect(rpcResult[0].noteId).toEqual(consumedNoteId);
     expect(rpcResult[0].hasMetadata).toBe(true);
     expect(rpcResult[0].hasInputNote).toBe(false); // Private notes don't include input_note
+  });
+
+  test("get note script by root", async ({ page }) => {
+    await setupWalletAndFaucet(page);
+
+    // First, we need to get a note script root from an existing note
+    const { consumedNoteId } = await setupConsumedNote(page, true);
+
+    // Get the note to extract its script root
+    const noteData = await page.evaluate(async (_consumedNoteId: string) => {
+      const endpoint = new window.Endpoint(window.rpcUrl);
+      const rpcClient = new window.RpcClient(endpoint);
+
+      const noteId = window.NoteId.fromHex(_consumedNoteId);
+      const fetchedNotes = await rpcClient.getNotesById([noteId]);
+
+      if (fetchedNotes.length > 0 && fetchedNotes[0].inputNote) {
+        const scriptRoot = fetchedNotes[0].inputNote.note().script().root();
+        return {
+          scriptRoot: scriptRoot.toHex(),
+          hasScript: true,
+        };
+      }
+
+      return { scriptRoot: "", hasScript: false };
+    }, consumedNoteId);
+
+    // Test GetNoteScriptByRoot endpoint
+    const retrievedScript = await page.evaluate(
+      async (scriptRootHex: string) => {
+        const endpoint = new window.Endpoint(window.rpcUrl);
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const scriptRoot = window.Word.fromHex(scriptRootHex);
+        const noteScript = await rpcClient.getNoteScriptByRoot(scriptRoot);
+
+        return {
+          hasScript: !!noteScript,
+          scriptRoot: noteScript ? noteScript.root().toHex() : null,
+        };
+      },
+      noteData.scriptRoot
+    );
+
+    expect(retrievedScript.hasScript).toBe(true);
+    expect(retrievedScript.scriptRoot).toEqual(noteData.scriptRoot);
   });
 });
 
@@ -203,22 +252,23 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
-        let transactionResult = await client.newTransaction(
+        let transactionUpdate = await window.helpers.executeAndApplyTransaction(
           senderAccountId,
           transactionRequest
         );
 
-        await client.submitTransaction(transactionResult);
-
         await window.helpers.waitForTransaction(
-          transactionResult.executedTransaction().id().toHex()
+          transactionUpdate.executedTransaction().id().toHex()
         );
 
-        let createdNoteId = transactionResult
-          .createdNotes()
+        let createdNoteId = transactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -227,15 +277,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionResult = await client.newTransaction(
-          targetAccountId,
-          consumeTransactionRequest
-        );
-
-        await client.submitTransaction(consumeTransactionResult);
+        let consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccountId,
+            consumeTransactionRequest
+          );
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
 
         let senderAccountBalance = (await client.getAccount(senderAccountId))
@@ -306,22 +355,23 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdeNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
-        let transactionResult = await client.newTransaction(
+        let transactionUpdate = await window.helpers.executeAndApplyTransaction(
           senderAccountId,
           transactionRequest
         );
 
-        await client.submitTransaction(transactionResult);
-
         await window.helpers.waitForTransaction(
-          transactionResult.executedTransaction().id().toHex()
+          transactionUpdate.executedTransaction().id().toHex()
         );
 
-        let createdNoteId = transactionResult
-          .createdNotes()
+        let createdNoteId = transactionUpdate
+          .executedTransaction()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -330,15 +380,14 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           createdNoteId,
         ]);
 
-        let consumeTransactionResult = await client.newTransaction(
-          targetAccountId,
-          consumeTransactionRequest
-        );
-
-        await client.submitTransaction(consumeTransactionResult);
+        let consumeTransactionUpdate =
+          await window.helpers.executeAndApplyTransaction(
+            targetAccountId,
+            consumeTransactionRequest
+          );
 
         await window.helpers.waitForTransaction(
-          consumeTransactionResult.executedTransaction().id().toHex()
+          consumeTransactionUpdate.executedTransaction().id().toHex()
         );
 
         let senderAccountBalance = (await client.getAccount(senderAccountId))

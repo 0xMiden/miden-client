@@ -22,18 +22,35 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_objects::account::{
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountIdPrefix,
+    AccountStorage,
+    StorageMapWitness,
+    StorageSlot,
+};
+use miden_objects::address::Address;
+use miden_objects::asset::{Asset, AssetVault, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
-use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks};
-use miden_objects::note::{NoteId, NoteTag, Nullifier};
+use miden_objects::crypto::merkle::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
+use miden_objects::{AccountError, Word};
 
+use crate::note_transport::{
+    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
+    NoteTransportCursor,
+    NoteTransportUpdate,
+};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
-use crate::transaction::{TransactionRecord, TransactionStoreUpdate};
+use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
@@ -45,15 +62,6 @@ pub(crate) mod data_store;
 
 mod errors;
 pub use errors::*;
-
-#[cfg(all(feature = "sqlite", feature = "idxdb"))]
-compile_error!("features `sqlite` and `idxdb` are mutually exclusive");
-
-#[cfg(feature = "sqlite")]
-pub mod sqlite_store;
-
-#[cfg(feature = "idxdb")]
-pub mod web_store;
 
 mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
@@ -141,6 +149,13 @@ pub trait Store: Send + Sync {
     /// Inserts the provided input notes into the database. If a note with the same ID already
     /// exists, it will be replaced.
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError>;
+
+    /// Returns the note script associated with the given root.
+    async fn get_note_script(&self, script_root: Word) -> Result<NoteScript, StoreError>;
+
+    /// Inserts the provided note scripts into the database. If a script with the same root already
+    /// exists, it will be replaced.
+    async fn upsert_note_scripts(&self, note_scripts: &[NoteScript]) -> Result<(), StoreError>;
 
     // CHAIN DATA
     // --------------------------------------------------------------------------------------------
@@ -248,11 +263,17 @@ pub trait Store: Send + Sync {
     async fn get_account(&self, account_id: AccountId)
     -> Result<Option<AccountRecord>, StoreError>;
 
-    /// Inserts an [`Account`] along with the seed used to create it.
+    /// Inserts an [`Account`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the account. This address
+    /// will be tracked for incoming notes and its derived note tag will be monitored.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is new and does not contain a seed
     async fn insert_account(
         &self,
         account: &Account,
-        account_seed: Option<Word>,
+        initial_address: Address,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -269,12 +290,47 @@ pub trait Store: Send + Sync {
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError>;
 
+    /// Retrieves all [`Address`] objects that correspond to the provided account ID.
+    async fn get_addresses_by_account_id(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<Address>, StoreError>;
+
     /// Updates an existing [`Account`] with a new state.
     ///
     /// # Errors
     ///
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
+
+    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    async fn insert_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
+    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
+    async fn remove_address(
+        &self,
+        address: Address,
+        account_id: AccountId,
+    ) -> Result<(), StoreError>;
+
+    // SETTINGS
+    // --------------------------------------------------------------------------------------------
+
+    /// Adds a value to the `settings` table.
+    async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError>;
+
+    /// Retrieves a value from the `settings` table.
+    async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
+
+    /// Deletes a value from the `settings` table.
+    async fn remove_setting(&self, key: String) -> Result<(), StoreError>;
+
+    /// Returns all the keys from the `settings` table.
+    async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
@@ -314,6 +370,145 @@ pub trait Store: Send + Sync {
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+
+    // TRANSPORT
+    // --------------------------------------------------------------------------------------------
+
+    /// Gets the note transport cursor.
+    ///
+    /// This is used to reduce the number of fetched notes from the note transport network.
+    async fn get_note_transport_cursor(&self) -> Result<NoteTransportCursor, StoreError> {
+        let cursor_bytes = self
+            .get_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into())
+            .await?
+            .ok_or(StoreError::NoteTransportCursorNotFound)?;
+        let array: [u8; 8] = cursor_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|e: core::array::TryFromSliceError| StoreError::ParsingError(e.to_string()))?;
+        let cursor = u64::from_be_bytes(array);
+        Ok(cursor.into())
+    }
+
+    /// Updates the note transport cursor.
+    ///
+    /// This is used to track the last cursor position when fetching notes from the note transport
+    /// network.
+    async fn update_note_transport_cursor(
+        &self,
+        cursor: NoteTransportCursor,
+    ) -> Result<(), StoreError> {
+        let cursor_bytes = cursor.value().to_be_bytes().to_vec();
+        self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
+            .await?;
+        Ok(())
+    }
+
+    /// Applies a note transport update
+    ///
+    /// An update involves:
+    /// - Insert fetched notes;
+    /// - Update pagination cursor used in note fetching.
+    async fn apply_note_transport_update(
+        &self,
+        note_transport_update: NoteTransportUpdate,
+    ) -> Result<(), StoreError> {
+        self.update_note_transport_cursor(note_transport_update.cursor).await?;
+        self.upsert_input_notes(&note_transport_update.note_updates).await?;
+        Ok(())
+    }
+
+    // PARTIAL MMR
+    // --------------------------------------------------------------------------------------------
+
+    /// Builds the current view of the chain's [`PartialMmr`]. Because we want to add all new
+    /// authentication nodes that could come from applying the MMR updates, we need to track all
+    /// known leaves thus far.
+    ///
+    /// The default implementation is based on [`Store::get_partial_blockchain_nodes`],
+    /// [`Store::get_partial_blockchain_peaks_by_block_num`] and [`Store::get_block_header_by_num`]
+    async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
+        let current_block_num = self.get_sync_height().await?;
+
+        let tracked_nodes = self.get_partial_blockchain_nodes(PartialBlockchainFilter::All).await?;
+        let current_peaks =
+            self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
+
+        // FIXME: Because each block stores the peaks for the MMR for the leaf of pos `block_num-1`,
+        // we can get an MMR based on those peaks, add the current block number and align it with
+        // the set of all nodes in the store.
+        // Otherwise, by doing `PartialMmr::from_parts` we would effectively have more nodes than
+        // we need for the passed peaks. The alternative here is to truncate the set of all nodes
+        // before calling `from_parts`
+        //
+        // This is a bit hacky but it works. One alternative would be to _just_ get nodes required
+        // for tracked blocks in the MMR. This would however block us from the convenience of
+        // just getting all nodes from the store.
+
+        let (current_block, has_client_notes) = self
+            .get_block_header_by_num(current_block_num)
+            .await?
+            .expect("Current block should be in the store");
+
+        let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
+        let has_client_notes = has_client_notes.into();
+        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+
+        let current_partial_mmr =
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, has_client_notes);
+
+        Ok(current_partial_mmr)
+    }
+
+    // ACCOUNT VAULT AND STORE
+    // --------------------------------------------------------------------------------------------
+
+    /// Retrieves the asset vault for a specific account.
+    async fn get_account_vault(&self, account_id: AccountId) -> Result<AssetVault, StoreError>;
+
+    /// Retrieves a specific asset from the account's vault along with its Merkle witness.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_vault`].
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        faucet_id_prefix: AccountIdPrefix,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        let vault = self.get_account_vault(account_id).await?;
+        let Some(asset) = vault.assets().find(|a| a.faucet_id_prefix() == faucet_id_prefix) else {
+            return Ok(None);
+        };
+
+        let witness = AssetWitness::new(vault.open(asset.vault_key()).into())?;
+
+        Ok(Some((asset, witness)))
+    }
+
+    /// Retrieves the storage for a specific account.
+    async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, StoreError>;
+
+    /// Retrieves a specific item from the account's storage map along with its Merkle proof.
+    ///
+    /// The default implementation of this method uses [`Store::get_account_storage`].
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        index: u8,
+        key: Word,
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
+        let storage = self.get_account_storage(account_id).await?;
+        let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
+            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
+        };
+
+        let value = map.get(&key);
+        let witness = map.open(&key);
+
+        Ok((value, witness))
+    }
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
@@ -348,6 +543,37 @@ pub enum TransactionFilter {
     /// A transaction is considered expired if is uncommitted and the transaction's block number
     /// is less than the provided block number.
     ExpiredBefore(BlockNumber),
+}
+
+// TRANSACTIONS FILTER HELPERS
+// ================================================================================================
+
+impl TransactionFilter {
+    /// Returns a [String] containing the query for this Filter.
+    pub fn to_query(&self) -> String {
+        const QUERY: &str = "SELECT tx.id, script.script, tx.details, tx.status \
+            FROM transactions AS tx LEFT JOIN transaction_scripts AS script ON tx.script_root = script.script_root";
+        match self {
+            TransactionFilter::All => QUERY.to_string(),
+            TransactionFilter::Uncommitted => format!(
+                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                TransactionStatusVariant::Pending as u8,
+                TransactionStatusVariant::Discarded as u8
+            ),
+            TransactionFilter::Ids(_) => {
+                // Use SQLite's array parameter binding
+                format!("{QUERY} WHERE tx.id IN rarray(?)")
+            },
+            TransactionFilter::ExpiredBefore(block_num) => {
+                format!(
+                    "{QUERY} WHERE tx.block_num < {} AND tx.status_variant != {} AND tx.status_variant != {}",
+                    block_num.as_u32(),
+                    TransactionStatusVariant::Discarded as u8,
+                    TransactionStatusVariant::Committed as u8
+                )
+            },
+        }
+    }
 }
 
 // NOTE FILTER

@@ -22,7 +22,8 @@ use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_objects::account::{Account, AccountFile, AuthSecretKey};
+use miden_objects::account::auth::AuthSecretKey;
+use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
 use miden_objects::block::FeeParameters;
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
@@ -313,13 +314,13 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NetworkTransactionBuilder {
+                NetworkTransactionBuilder::new(
                     store_url,
                     block_producer_url,
-                    tx_prover_url: None,
-                    ticker_interval: Duration::from_millis(200),
-                    bp_checkpoint: production_checkpoint,
-                }
+                    None,
+                    Duration::from_millis(200),
+                    production_checkpoint,
+                )
                 .serve_new()
                 .await
                 .context("failed while serving ntx builder component")
@@ -361,13 +362,13 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
     let secret = SecretKey::with_rng(&mut get_rpo_random_coin(&mut rng));
 
-    let (account, account_seed) = create_basic_fungible_faucet(
+    let account = create_basic_fungible_faucet(
         rng.random(),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
         Felt::from(1_000_000u32),
         miden_objects::account::AccountStorageMode::Public,
-        AuthScheme::RpoFalcon512 { pub_key: secret.public_key() },
+        AuthScheme::RpoFalcon512 { pub_key: secret.public_key().into() },
     )?;
 
     // Force the account nonce to 1.
@@ -378,14 +379,10 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     //
     // The genesis block is special in that accounts are "deployed" without transactions and
     // therefore we need bump the nonce manually to uphold this invariant.
-    let (id, vault, storage, code, _) = account.into_parts();
-    let updated_account = Account::from_parts(id, vault, storage, code, ONE);
+    let (id, vault, storage, code, ..) = account.into_parts();
+    let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
 
-    Ok(AccountFile::new(
-        updated_account,
-        Some(account_seed),
-        vec![AuthSecretKey::RpoFalcon512(secret)],
-    ))
+    Ok(AccountFile::new(updated_account, vec![AuthSecretKey::RpoFalcon512(secret)]))
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {

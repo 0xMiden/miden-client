@@ -1,6 +1,6 @@
+use miden_client::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
+use miden_client::note::NoteScript as NativeNoteScript;
 use miden_client::transaction::TransactionScript as NativeTransactionScript;
-use miden_objects::assembly::{Assembler as NativeAssembler, Library as NativeLibrary};
-use miden_objects::note::NoteScript as NativeNoteScript;
 use wasm_bindgen::prelude::*;
 
 use crate::models::library::Library;
@@ -8,6 +8,7 @@ use crate::models::note_script::NoteScript;
 use crate::models::transaction_script::TransactionScript;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Assembler(NativeAssembler);
 
 #[wasm_bindgen]

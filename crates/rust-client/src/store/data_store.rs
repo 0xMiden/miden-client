@@ -1,26 +1,33 @@
-use alloc::collections::BTreeSet;
+use alloc::boxed::Box;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId};
+use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
+use miden_objects::asset::{AssetVaultKey, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
-use miden_objects::transaction::PartialBlockchain;
+use miden_objects::note::NoteScript;
+use miden_objects::transaction::{AccountInputs, PartialBlockchain};
+use miden_objects::vm::FutureMaybeSend;
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
 use crate::store::StoreError;
+use crate::utils::RwLock;
 
 // DATA STORE
 // ================================================================================================
 
 /// Wrapper structure that implements [`DataStore`] over any [`Store`].
-pub(crate) struct ClientDataStore {
+pub struct ClientDataStore {
     /// Local database containing information about the accounts managed by this client.
     store: alloc::sync::Arc<dyn Store>,
     /// Store used to provide MAST nodes to the transaction executor.
     transaction_mast_store: Arc<TransactionMastStore>,
+    /// Cache of foreign account inputs that should be returned to the executor on demand.
+    foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
 }
 
 impl ClientDataStore {
@@ -28,11 +35,26 @@ impl ClientDataStore {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
+            foreign_account_inputs: RwLock::new(BTreeMap::new()),
         }
     }
 
     pub fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.transaction_mast_store.clone()
+    }
+
+    /// Stores the provided foreign account inputs so they can be served to the executor upon
+    /// request.
+    pub fn register_foreign_account_inputs(
+        &self,
+        foreign_accounts: impl IntoIterator<Item = AccountInputs>,
+    ) {
+        let mut cache = self.foreign_account_inputs.write();
+        cache.clear();
+
+        for account_inputs in foreign_accounts {
+            cache.insert(account_inputs.id(), account_inputs);
+        }
     }
 }
 
@@ -41,19 +63,20 @@ impl DataStore for ClientDataStore {
         &self,
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
-    ) -> Result<(Account, Option<Word>, BlockHeader, PartialBlockchain), DataStoreError> {
+    ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
-        // Construct Account
+        //TODO: Only retrieve partial account. This should be done in the `tomyrd-partial-accounts`
+        // branch (and future PR). Construct Account
         let account_record = self
             .store
             .get_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
 
-        let seed = account_record.seed().copied();
         let account: Account = account_record.into();
+        let partial_account = PartialAccount::from(&account);
 
         // Get header data
         let (block_header, _had_notes) = self
@@ -80,7 +103,89 @@ impl DataStore for ClientDataStore {
                     err,
                 )
             })?;
-        Ok((account, seed, block_header, partial_blockchain))
+        Ok((partial_account, block_header, partial_blockchain))
+    }
+
+    async fn get_vault_asset_witness(
+        &self,
+        account_id: AccountId,
+        vault_root: Word,
+        vault_key: AssetVaultKey,
+    ) -> Result<AssetWitness, DataStoreError> {
+        //TODO: Refactor `get_account_asset` for this.
+        let vault = self.store.get_account_vault(account_id).await?;
+
+        if vault.root() != vault_root {
+            return Err(DataStoreError::Other {
+                error_msg: "Vault root mismatch".into(),
+                source: None,
+            });
+        }
+
+        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
+            error_msg: "Failed to open vault asset tree".into(),
+            source: Some(Box::new(err)),
+        })
+    }
+
+    async fn get_storage_map_witness(
+        &self,
+        account_id: AccountId,
+        map_root: Word,
+        map_key: Word,
+    ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
+        // TODO: Refactor the store call to be able to retrieve by map root.
+        let account_storage = self.store.get_account_storage(account_id).await?;
+
+        for slot in account_storage.slots() {
+            if let StorageSlot::Map(map) = slot
+                && map.root() == map_root
+            {
+                let witness = map.open(&map_key);
+                return Ok(witness);
+            }
+        }
+
+        Err(DataStoreError::Other {
+            error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                .into(),
+            source: None,
+        })
+    }
+
+    async fn get_foreign_account_inputs(
+        &self,
+        foreign_account_id: AccountId,
+        _ref_block: BlockNumber,
+    ) -> Result<AccountInputs, DataStoreError> {
+        let cache = self.foreign_account_inputs.read();
+
+        let inputs = cache
+            .get(&foreign_account_id)
+            .cloned()
+            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))?;
+
+        Ok(inputs)
+    }
+
+    fn get_note_script(
+        &self,
+        script_root: Word,
+    ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
+        let store = self.store.clone();
+
+        async move {
+            if let Ok(note_script) = store.get_note_script(script_root).await {
+                Ok(note_script)
+            } else {
+                // If no matching note found, return an error
+                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
+                // found https://github.com/0xMiden/miden-client/issues/1410
+                Err(DataStoreError::other(
+                    format!("Note script with root {script_root} not found",),
+                ))
+            }
+        }
     }
 }
 

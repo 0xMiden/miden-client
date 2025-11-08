@@ -1,4 +1,4 @@
-use miden_objects::note::NoteExecutionHint as NativeNoteExecutionHint;
+use miden_client::note::NoteExecutionHint as NativeNoteExecutionHint;
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Copy)]

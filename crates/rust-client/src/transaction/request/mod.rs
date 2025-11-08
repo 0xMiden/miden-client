@@ -10,15 +10,17 @@ use miden_lib::utils::{ScriptBuilder, ScriptBuilderError};
 use miden_objects::account::AccountId;
 use miden_objects::crypto::merkle::{MerkleError, MerkleStore};
 use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
-use miden_objects::transaction::{
-    AccountInputs,
-    InputNote,
-    InputNotes,
-    TransactionArgs,
-    TransactionScript,
-};
+use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_objects::vm::AdviceMap;
-use miden_objects::{AccountError, NoteError, TransactionInputError, TransactionScriptError, Word};
+use miden_objects::{
+    AccountError,
+    AssetVaultError,
+    NoteError,
+    StorageMapError,
+    TransactionInputError,
+    TransactionScriptError,
+    Word,
+};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
 
@@ -281,11 +283,7 @@ impl TransactionRequest {
 
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(crate) fn into_transaction_args(
-        self,
-        tx_script: TransactionScript,
-        foreign_account_inputs: Vec<AccountInputs>,
-    ) -> TransactionArgs {
+    pub(crate) fn into_transaction_args(self, tx_script: TransactionScript) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
             expected_output_recipients,
@@ -294,8 +292,7 @@ impl TransactionRequest {
             ..
         } = self;
 
-        let mut tx_args =
-            TransactionArgs::new(advice_map, foreign_account_inputs).with_note_args(note_args);
+        let mut tx_args = TransactionArgs::new(advice_map).with_note_args(note_args);
 
         tx_args = if let Some(argument) = self.script_arg {
             tx_args.with_tx_script_and_args(tx_script, argument)
@@ -453,7 +450,7 @@ pub enum TransactionRequestError {
     #[error("specified authenticated input note with id {0} is missing")]
     MissingAuthenticatedInputNote(NoteId),
     #[error("a transaction without output notes must have at least one input note")]
-    NoInputNotes,
+    NoInputNotesNorAccountChange,
     #[error("note not found: {0}")]
     NoteNotFound(String),
     #[error("note creation error")]
@@ -468,6 +465,10 @@ pub enum TransactionRequestError {
     StorageSlotNotFound(u8, AccountId),
     #[error("error while building the input notes: {0}")]
     TransactionInputError(#[from] TransactionInputError),
+    #[error("storage map error")]
+    StorageMapError(#[from] StorageMapError),
+    #[error("asset vault error")]
+    AssetVaultError(#[from] AssetVaultError),
 }
 
 // TESTS
@@ -480,9 +481,9 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
+    use miden_objects::account::auth::PublicKeyCommitment;
     use miden_objects::account::{AccountBuilder, AccountId, AccountType};
     use miden_objects::asset::FungibleAsset;
-    use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
     use miden_objects::testing::account_id::{
@@ -527,7 +528,7 @@ mod tests {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
-            .with_auth_component(AuthRpoFalcon512::new(PublicKey::new(EMPTY_WORD)))
+            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()
@@ -549,7 +550,7 @@ mod tests {
                     AccountStorageRequirements::new([(5u8, &[Word::default()])]),
                 )
                 .unwrap(),
-                ForeignAccount::private(account).unwrap(),
+                ForeignAccount::private(&account).unwrap(),
             ])
             .own_output_notes(vec![
                 OutputNote::Full(notes.pop().unwrap()),

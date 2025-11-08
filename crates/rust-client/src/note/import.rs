@@ -182,10 +182,10 @@ where
             let mut note_changed =
                 note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
-            if block_height < current_block_num {
+            if block_height <= current_block_num {
                 // If the note is committed in the past we need to manually fetch the block
                 // header and MMR proof to verify the inclusion proof.
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
 
                 let block_header = self
                     .get_and_store_authenticated_block(block_height, &mut current_partial_mmr)
@@ -229,7 +229,7 @@ where
 
         match committed_note_data {
             Some((metadata, inclusion_proof)) => {
-                let mut current_partial_mmr = self.build_current_partial_mmr().await?;
+                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                 let block_header = self
                     .get_and_store_authenticated_block(
                         inclusion_proof.location().block_num(),
@@ -272,10 +272,12 @@ where
                 return Ok(None);
             }
 
-            let sync_notes =
-                self.rpc_api.sync_notes(request_block_num, &[tag].into_iter().collect()).await?;
+            let sync_notes = self
+                .rpc_api
+                .sync_notes(request_block_num, None, &[tag].into_iter().collect())
+                .await?;
 
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip.into() {
+            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
                 return Ok(None);
             }
 

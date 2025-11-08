@@ -2,6 +2,7 @@ use miden_client::auth::SigningInputs as NativeSigningInputs;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use super::miden_arrays::FeltArray;
 use crate::models::felt::Felt;
 use crate::models::transaction_summary::TransactionSummary;
 use crate::models::word::Word;
@@ -16,6 +17,7 @@ pub enum SigningInputsType {
 }
 
 #[wasm_bindgen]
+#[derive(Clone, Debug)]
 pub struct SigningInputs {
     inner: NativeSigningInputs,
 }
@@ -57,10 +59,10 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "arbitraryPayload")]
-    pub fn arbitrary_payload(&self) -> Result<Box<[Felt]>, JsValue> {
+    pub fn arbitrary_payload(&self) -> Result<FeltArray, JsValue> {
         match &self.inner {
             NativeSigningInputs::Arbitrary(felts) => {
-                Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into_boxed_slice())
+                Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into())
             },
             _ => Err(JsValue::from_str(&format!(
                 "arbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
@@ -95,8 +97,8 @@ impl SigningInputs {
     }
 
     #[wasm_bindgen(js_name = "toElements")]
-    pub fn to_elements(&self) -> Vec<Felt> {
-        self.inner.to_elements().into_iter().map(Into::into).collect()
+    pub fn to_elements(&self) -> FeltArray {
+        self.inner.to_elements().into_iter().map(Into::into).collect::<Vec<_>>().into()
     }
 
     pub fn serialize(&self) -> Uint8Array {
@@ -105,6 +107,33 @@ impl SigningInputs {
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<SigningInputs, JsValue> {
         let native_signing_inputs = deserialize_from_uint8array::<NativeSigningInputs>(bytes)?;
-        Ok(SigningInputs { inner: native_signing_inputs })
+        Ok(native_signing_inputs.into())
+    }
+}
+
+// CONVERSIONS
+// ================================================================================================
+
+impl From<NativeSigningInputs> for SigningInputs {
+    fn from(native_signing_inputs: NativeSigningInputs) -> Self {
+        SigningInputs { inner: native_signing_inputs }
+    }
+}
+
+impl From<&NativeSigningInputs> for SigningInputs {
+    fn from(native_signing_inputs: &NativeSigningInputs) -> Self {
+        SigningInputs { inner: native_signing_inputs.clone() }
+    }
+}
+
+impl From<SigningInputs> for NativeSigningInputs {
+    fn from(signing_inputs: SigningInputs) -> Self {
+        signing_inputs.inner
+    }
+}
+
+impl From<&SigningInputs> for NativeSigningInputs {
+    fn from(signing_inputs: &SigningInputs) -> Self {
+        signing_inputs.inner.clone()
     }
 }

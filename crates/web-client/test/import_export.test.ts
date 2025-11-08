@@ -8,6 +8,9 @@ import {
   createNewWallet,
   fundAccountFromFaucet,
   getAccountBalance,
+  getInputNote,
+  setupConsumedNote,
+  setupMintedNote,
   setupWalletAndFaucet,
   StorageMode,
 } from "./webClientTestUtils";
@@ -44,16 +47,17 @@ const exportAccount = async (testingPage: Page, accountId: string) => {
   return await testingPage.evaluate(async (_accountId) => {
     const client = window.client;
     const accountId = window.AccountId.fromHex(_accountId);
-    const accountBytes = client.exportAccountFile(accountId);
-    return accountBytes;
+    const accountFile = await client.exportAccountFile(accountId);
+    return Array.from(accountFile.serialize());
   }, accountId);
 };
 
-const importAccount = async (testingPage: Page, accountBytes: any) => {
+const importAccount = async (testingPage: Page, accountBytes: number[]) => {
   return await testingPage.evaluate(async (_accountBytes) => {
     const client = window.client;
-    await client.importAccountFile(_accountBytes);
-    return;
+    const bytes = new Uint8Array(_accountBytes);
+    const accountFile = window.AccountFile.deserialize(bytes);
+    await client.importAccountFile(accountFile);
   }, accountBytes);
 };
 
@@ -114,5 +118,148 @@ test.describe("export and import account", () => {
 
     expect(restoredCommitment).toEqual(initialCommitment);
     expect(restoredBalance.toString()).toEqual(initialBalance);
+  });
+});
+
+test.describe("export and import note", () => {
+  const exportTypes = [
+    ["Id", "NoteId"],
+    ["Full", "NoteWithProof"],
+    ["Details", "NoteDetails"],
+  ];
+
+  const exportNote = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        return noteFile.noteType();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const exportNoteSerialized = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const noteFile = await window.client.exportNoteFile(noteId, exportType);
+        return noteFile.serialize();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const importSerializedNote = async (
+    testingPage: Page,
+    serializedNote: Uint8Array
+  ) => {
+    return await testingPage.evaluate(
+      async ({ serializedNote }) => {
+        const noteFile = window.NoteFile.deserialize(serializedNote);
+        const importedNoteId = await window.client.importNoteFile(noteFile);
+        return importedNoteId.toString();
+      },
+      { serializedNote }
+    );
+  };
+
+  exportTypes.forEach(([exportType, expectedNoteType]) => {
+    test(`export note as note file -- export type: ${exportType}`, async ({
+      page,
+    }) => {
+      const { createdNoteId: noteId } = await setupMintedNote(page);
+
+      await expect(exportNote(page, noteId, exportType)).resolves.toBe(
+        expectedNoteType
+      );
+    });
+  });
+
+  test(`exporting non-existing note fails`, async ({ page }) => {
+    // Random note id taken from testnet
+    const noteId =
+      "0x60b06dbb6c7435ab1d439df972e483bca43bc21654dce2611de98ec3896beaed";
+    await expect(exportNote(page, noteId, "Full")).rejects.toThrowError(
+      "No output note found"
+    );
+  });
+
+  test(`exporting and then importing note`, async ({ page }) => {
+    const { createdNoteId: noteId } = await setupMintedNote(page);
+
+    const serializedNoteFile = await exportNoteSerialized(page, noteId, "Full");
+
+    // Clear store and assert that the output note cannot be found
+    await clearStore(page);
+    await expect(async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          return await window.client.getOutputNote(noteId);
+        },
+        { noteId }
+      );
+    }).rejects.toThrow("Note not found");
+
+    await expect(importSerializedNote(page, serializedNoteFile)).resolves.toBe(
+      noteId
+    );
+  });
+
+  test(`export input note`, async ({ page }) => {
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const inputNoteRecord = await client.getInputNote(noteId);
+          return window.NoteFile.fromInputNote(
+            inputNoteRecord.toInputNote()
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
+
+    await expect(exportInputNote()).resolves.toBe("NoteWithProof");
+  });
+
+  test(`export output note`, async ({ page }) => {
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const account1 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true
+          );
+          const account2 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true
+          );
+
+          const p2IdNote = window.Note.createP2IDNote(
+            account1.id(),
+            account2.id(),
+            new window.NoteAssets([]),
+            window.NoteType.Public,
+            new window.Felt(0n)
+          );
+          return window.NoteFile.fromOutputNote(
+            window.OutputNote.full(p2IdNote)
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
+
+    await expect(exportInputNote()).resolves.toBe("NoteDetails");
   });
 });

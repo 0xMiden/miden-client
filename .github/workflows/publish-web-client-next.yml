@@ -1,28 +1,34 @@
-# This workflow publishes the 'web-client' package to npm if the version number in the 
-# 'web-client' package.json file has changed.
+# This workflow publishes the 'web-client' package to npm if a patch release label is applied to the PR and 
+# the 'web-client' package.json file has been updated.
 
 name: Publish Web Client SDK to NPM on Next
 
 on:
-  push:
+  pull_request:
     branches:
       - next
+    types:
+      - closed
 
 permissions:
   contents: read
 
 jobs:
   publish:
+    if: >
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'patch release')
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: next
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
@@ -30,33 +36,25 @@ jobs:
       - name: Set up Rust and wasm target
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           profile: minimal
           override: true
           target: wasm32-unknown-unknown
-          components: rust-src 
+          components: rust-src
+
+      - name: Verify version bump against next
+        id: check_version
+        run: ./scripts/check-web-client-version-pr.sh "${{ github.event.pull_request.base.sha }}"
 
       - name: Install & build web-client
+        if: steps.check_version.outputs.should_publish == 'true'
         run: |
           cd crates/web-client
           yarn install --frozen-lockfile
           yarn build
 
-      - name: Did version bump?
-        id: check_version
-        run: |
-          # Fetch two commits so we can diff
-          git fetch origin ${{ github.ref }} --depth=2
-
-          # Count if package.json changed
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
-            | grep -c '^crates/web-client/package.json$' || true)
-
-          echo "version_changed=$([ "$CHANGED" -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
-
       - name: Publish to npm
-        if: steps.check_version.outputs.version_changed == 'true'
-        continue-on-error: true
+        if: steps.check_version.outputs.should_publish == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
@@ -64,5 +62,19 @@ jobs:
           npm publish --tag next
 
       - name: Done
-        run: echo "✅ Build complete; publish only attempted if package.json changed."
+        if: steps.check_version.outputs.should_publish == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+        run: echo "✅ Build complete; published version $CURRENT_VERSION."
+
+      - name: Skipped publish
+        if: steps.check_version.outputs.should_publish != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ steps.check_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_version.outputs.current_version }}
+        run: |
+          echo "ℹ️ Publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
 

@@ -102,6 +102,12 @@ We use [semver](https://semver.org/) naming convention.
 
 If a PR introduces anything a downstream user might notice - a new feature, a behaviour change, a bug-fix, a deprecation, or a breaking API change - add a bullet to [CHANGELOG.md](./CHANGELOG.md) under the last existing heading (corresponds to the unreleased version when working on the `next` branch). The convention is to write a past-tense summary (e.g. "* [BREAKING] Renamed foo() to bar() in `Client` {#PR number link}"). Internal refactors or smaller tweaks that don’t affect public behaviour can be left out.
 
+### Docs
+
+The documentation in the `docs/external` folder is built using Docusaurus and is automatically absorbed into the main [miden-docs](https://github.com/0xMiden/miden-docs) repository for the main documentation website. Changes to the `next` branch trigger an automated deployment workflow. The docs folder requires npm packages to be installed before building.
+
+The documentation inside of the `docs/typedoc` folder is auto generated using `typedoc` and is not integrated into the main Miden docs.
+
 ## Write bug reports with detail, background, and sample code
 
 **Great Bug Reports** tend to have:
