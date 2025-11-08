@@ -450,7 +450,7 @@ pub enum TransactionRequestError {
     #[error("specified authenticated input note with id {0} is missing")]
     MissingAuthenticatedInputNote(NoteId),
     #[error("a transaction without output notes must have at least one input note")]
-    NoInputNotes,
+    NoInputNotesNorAccountChange,
     #[error("note not found: {0}")]
     NoteNotFound(String),
     #[error("note creation error")]
