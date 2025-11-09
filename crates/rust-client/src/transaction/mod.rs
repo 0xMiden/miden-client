@@ -83,12 +83,7 @@ use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteRecord,
-    StoreError,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -97,10 +92,7 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause,
-    TransactionDetails,
-    TransactionRecord,
-    TransactionStatus,
+    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -109,14 +101,8 @@ pub use store_update::TransactionStoreUpdate;
 
 mod request;
 pub use request::{
-    ForeignAccount,
-    NoteArgs,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionScriptTemplate,
+    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
+    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
 };
 
 mod result;
@@ -125,25 +111,13 @@ mod result;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    InputNotes,
-    OutputNote,
-    OutputNotes,
-    ProvenTransaction,
-    TransactionArgs,
-    TransactionId,
-    TransactionInputs,
-    TransactionScript,
-    TransactionSummary,
+    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
+    TransactionArgs, TransactionId, TransactionInputs, TransactionScript, TransactionSummary,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError,
-    LocalTransactionProver,
-    ProvingOptions,
-    TransactionExecutorError,
+    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
     TransactionProverError,
 };
 pub use result::TransactionResult;
@@ -252,7 +226,7 @@ where
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::with_rpc(self.store.clone(), self.rpc_api.clone());
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
@@ -440,7 +414,7 @@ where
 
         let account: Account = account_record.into();
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::with_rpc(self.store.clone(), self.rpc_api.clone());
 
         data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
 
@@ -490,7 +464,11 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::with_rpc(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        );
 
         for note in notes_from_output(executed_tx.output_notes()) {
             // TODO: check_relevance() should have the option to take multiple notes
@@ -720,7 +698,7 @@ where
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
-            let data_store = ClientDataStore::new(self.store.clone());
+            let data_store = ClientDataStore::with_rpc(self.store.clone(), self.rpc_api.clone());
 
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
