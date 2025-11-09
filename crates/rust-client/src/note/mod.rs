@@ -78,32 +78,14 @@ pub use miden_lib::note::{WellKnownNote, create_p2id_note, create_p2ide_note, cr
 pub use miden_objects::NoteError;
 pub use miden_objects::block::BlockNumber;
 pub use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteDetails,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteHeader,
-    NoteId,
-    NoteInclusionProof,
-    NoteInputs,
-    NoteLocation,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    NoteTag,
-    NoteType,
-    Nullifier,
-    PartialNote,
+    Note, NoteAssets, NoteDetails, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteHeader,
+    NoteId, NoteInclusionProof, NoteInputs, NoteLocation, NoteMetadata, NoteRecipient, NoteScript,
+    NoteTag, NoteType, Nullifier, PartialNote,
 };
 pub use miden_objects::transaction::ToInputNoteCommitments;
 pub use note_screener::{NoteConsumability, NoteRelevance, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
-    InputNoteUpdate,
-    NoteUpdateTracker,
-    NoteUpdateType,
-    OutputNoteUpdate,
+    InputNoteUpdate, NoteUpdateTracker, NoteUpdateType, OutputNoteUpdate,
 };
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
@@ -139,7 +121,11 @@ where
     ) -> Result<Vec<(InputNoteRecord, Vec<NoteConsumability>)>, ClientError> {
         let committed_notes = self.store.get_input_notes(NoteFilter::Committed).await?;
 
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::with_rpc(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        );
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
@@ -169,7 +155,11 @@ where
         &self,
         note: InputNoteRecord,
     ) -> Result<Vec<NoteConsumability>, ClientError> {
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::with_rpc(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        );
         note_screener
             .check_relevance(&note.clone().try_into()?)
             .await
