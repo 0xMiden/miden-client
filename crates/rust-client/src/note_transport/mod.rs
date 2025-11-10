@@ -4,6 +4,7 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -14,6 +15,8 @@ use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
+use crate::rpc::NodeRpcClient;
+use crate::store::input_note_states::UnverifiedNoteState;
 use crate::store::{InputNoteRecord, Store};
 use crate::{Client, ClientError};
 
@@ -62,14 +65,17 @@ impl<AUTH> Client<AUTH> {
     /// To fetch the full history of private notes for the tracked tags, use
     /// [`Client::fetch_all_private_notes`].
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        let api = self.get_note_transport_api()?;
+        let transport_api = self.get_note_transport_api()?;
+        let node_api = self.rpc_api.clone();
 
         // Unique tags
         let note_tags = self.store.get_unique_note_tags().await?;
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = NoteTransport::new(api).fetch_notes(cursor, note_tags).await?;
+        let update = NoteTransport::new(transport_api, node_api)
+            .fetch_notes(cursor, note_tags)
+            .await?;
 
         self.store.apply_note_transport_update(update).await?;
 
@@ -82,11 +88,12 @@ impl<AUTH> Client<AUTH> {
     /// fetching all notes stored in the note transport network for the tracked tags.
     /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
-        let api = self.get_note_transport_api()?;
+        let transport_api = self.get_note_transport_api()?;
+        let node_api = self.rpc_api.clone();
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = NoteTransport::new(api)
+        let update = NoteTransport::new(transport_api, node_api)
             .fetch_notes(NoteTransportCursor::init(), note_tags)
             .await?;
 
@@ -115,7 +122,8 @@ pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<
 
 /// Note Transport methods
 pub struct NoteTransport {
-    api: Arc<dyn NoteTransportClient>,
+    transport_api: Arc<dyn NoteTransportClient>,
+    node_api: Arc<dyn NodeRpcClient>,
 }
 
 /// Note transport cursor
@@ -134,8 +142,11 @@ pub struct NoteTransportUpdate {
 }
 
 impl NoteTransport {
-    pub fn new(api: Arc<dyn NoteTransportClient>) -> Self {
-        Self { api }
+    pub fn new(
+        transport_api: Arc<dyn NoteTransportClient>,
+        node_api: Arc<dyn NodeRpcClient>,
+    ) -> Self {
+        Self { transport_api, node_api }
     }
 
     /// Fetch notes for provided note tags with pagination
@@ -149,17 +160,42 @@ impl NoteTransport {
     where
         I: IntoIterator<Item = NoteTag>,
     {
-        let mut note_updates = vec![];
+        let mut tnotes = BTreeMap::new();
         // Fetch notes
-        let (note_infos, rcursor) =
-            self.api.fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor).await?;
+        let (note_infos, rcursor) = self
+            .transport_api
+            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
+            .await?;
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
-            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            let input_note = InputNoteRecord::from(note);
-            note_updates.push(input_note);
+            let tnote = rejoin_note(&note_info.header, &note_info.details_bytes)?;
+            tnotes.insert(tnote.id(), tnote);
+        }
+
+        // Retrieve inclusion proofs from the Miden node
+        let ids = tnotes.keys().copied().collect::<Vec<_>>();
+        let nnotes = self.node_api.get_notes_by_id(&ids).await?;
+
+        // Create `NoteInputRecord`s of the transport-fetched notes and the node-retrieved proofs
+        let mut note_updates = Vec::with_capacity(tnotes.len());
+        for nnote in nnotes {
+            let state = UnverifiedNoteState {
+                metadata: *nnote.metadata(),
+                inclusion_proof: nnote.inclusion_proof().clone(),
+            }
+            .into();
+            if let Some(tnote) = tnotes.remove(&nnote.id()) {
+                let input_note_record = InputNoteRecord::new(tnote.into(), None, state);
+                note_updates.push(input_note_record);
+            }
+        }
+
+        // Keep also the remaining transport notes which inclusion proofs were not retrieved
+        for (_id, tnote) in tnotes {
+            let input_note_record = InputNoteRecord::from(tnote);
+            note_updates.push(input_note_record);
         }
 
         let update = NoteTransportUpdate { note_updates, cursor: rcursor };

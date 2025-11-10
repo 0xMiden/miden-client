@@ -127,8 +127,10 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
-        let note_transport =
-            self.note_transport_api.as_ref().map(|api| NoteTransport::new(api.clone()));
+        let note_transport = self
+            .note_transport_api
+            .as_ref()
+            .map(|api| NoteTransport::new(api.clone(), self.rpc_api.clone()));
 
         // Get current state of the client
         let accounts = self
