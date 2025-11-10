@@ -73,9 +73,6 @@ impl Provider for CliConfig {
 
 impl Default for CliConfig {
     fn default() -> Self {
-        const STORE_FILENAME: &str = "store.sqlite3";
-        const KEYSTORE_DIRECTORY: &str = "keystore";
-
         // Create paths relative to the config file location (which is in .miden directory)
         // These will be resolved relative to the .miden directory when the config is loaded
         Self {
