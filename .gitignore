@@ -51,3 +51,7 @@ crates/web-client/playwright-report
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# JS metadata generated from idxdb-store TypeScript build
+crates/idxdb-store/src/js/**/*.d.ts
+crates/idxdb-store/src/js/**/*.js.map
