@@ -180,7 +180,7 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
-	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
+	CODEGEN=1 cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:

@@ -8,6 +8,12 @@ name                   = "miden-idxdb-store"
 repository.workspace   = true
 rust-version.workspace = true
 version.workspace      = true
+include = [
+    "Cargo.toml",
+    "README.md",
+    "build.rs",
+    "src/**",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
