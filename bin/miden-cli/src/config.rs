@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use figment::value::{Dict, Map};
@@ -82,7 +82,7 @@ impl Default for CliConfig {
             rpc: RpcConfig::default(),
             store_filepath: PathBuf::from(STORE_FILENAME),
             secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
-            token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILEPATH),
+            token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILENAME),
             remote_prover_endpoint: None,
             package_directory: PathBuf::from(DEFAULT_PACKAGES_DIR),
             max_block_number_delta: None,

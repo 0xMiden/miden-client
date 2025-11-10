@@ -181,7 +181,7 @@ impl InitCmd {
         })?;
 
         // Create new config for target directory
-        let mut cli_config = CliConfig::for_directory(&target_miden_dir);
+        let mut cli_config = CliConfig::default();
 
         if let Some(network) = &self.network {
             cli_config.rpc.endpoint = CliEndpoint::try_from(network.clone())?;
