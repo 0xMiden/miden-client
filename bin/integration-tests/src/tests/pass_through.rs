@@ -161,7 +161,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
         .with_allow_unauthorized_input_notes(true)
         .with_allow_unauthorized_output_notes(true);
 
-    let auth_component = AuthRpoFalcon512Acl::new(pub_key.clone().into(), acl_config).unwrap();
+    let auth_component = AuthRpoFalcon512Acl::new(pub_key.into(), acl_config).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
