@@ -377,6 +377,7 @@ where
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         rng: Box<dyn FeltRng>,
@@ -388,9 +389,8 @@ where
         note_transport_api: Option<Arc<dyn NoteTransportClient>>,
         tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
     ) -> Result<Self, ClientError> {
-        let tx_prover: Arc<dyn TransactionProver + Send + Sync> = tx_prover.unwrap_or_else(|| {
-            Arc::new(LocalTransactionProver::default()) as Arc<dyn TransactionProver + Send + Sync>
-        });
+        let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
+            tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             // Set the genesis commitment in the RPC API client for future requests.
