@@ -304,32 +304,6 @@ fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, Cli
     }
 }
 
-/// Checks if an `AccountComponent` is an authentication component by inspecting its procedures.
-///
-/// An auth component is identified by having exactly one procedure that starts with "auth_".
-/// This follows the convention used in miden-base.
-///
-/// Returns an error if more than one auth procedure is found.
-fn is_auth_component(component: &AccountComponent) -> Result<bool, CliError> {
-    let mut auth_procedure_count = 0;
-
-    for module in component.library().module_infos() {
-        for (_proc_index, procedure_info) in module.procedures() {
-            if procedure_info.name.starts_with("auth_") {
-                auth_procedure_count += 1;
-
-                if auth_procedure_count > 1 {
-                    return Err(CliError::InvalidArgument(
-                        "Component has multiple auth procedures. Only one auth procedure is allowed per component.".to_string()
-                    ));
-                }
-            }
-        }
-    }
-
-    Ok(auth_procedure_count == 1)
-}
-
 /// Separates account components into auth and regular components.
 ///
 /// Returns a tuple of (`auth_component`, `regular_components`).
@@ -341,15 +315,24 @@ fn separate_auth_components(
     let mut regular_components = Vec::new();
 
     for component in components {
-        if is_auth_component(&component)? {
-            if auth_component.is_some() {
+        let auth_proc_count =
+            component.get_procedures().into_iter().filter(|(_, is_auth)| *is_auth).count();
+
+        match auth_proc_count {
+            0 => regular_components.push(component),
+            1 => {
+                if auth_component.is_some() {
+                    return Err(CliError::InvalidArgument(
+                        "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
+                    ));
+                }
+                auth_component = Some(component);
+            },
+            _ => {
                 return Err(CliError::InvalidArgument(
-                    "Multiple auth components found in packages. Only one auth component is allowed per account.".to_string()
+                    "Component has multiple auth procedures. Only one auth procedure is allowed per component.".to_string()
                 ));
-            }
-            auth_component = Some(component);
-        } else {
-            regular_components.push(component);
+            },
         }
     }
 
