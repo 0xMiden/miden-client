@@ -5,11 +5,11 @@ edition.workspace      = true
 keywords               = ["miden", "node", "protobuf", "rpc", "testing"]
 license.workspace      = true
 name                   = "node-builder"
+publish                = false
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
 version.workspace      = true
-publish                = false
 
 [[bin]]
 name = "testing-node-builder"
