@@ -1,18 +1,15 @@
-import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, addresses, foreignAccountCode, storageMapEntries, } from "./schema.js";
+import { accountCodes, accountStorages, accountAssets, accountAuths, accounts, addresses, foreignAccountCode, storageMapEntries, trackedAccounts, } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 // GET FUNCTIONS
 export async function getAccountIds() {
     try {
-        const allIds = new Set(); // Use a Set to ensure uniqueness
-        // Iterate over each account entry
-        await accounts.each((account) => {
-            allIds.add(account.id); // Assuming 'account' has an 'id' property
-        });
-        return Array.from(allIds); // Convert back to array to return a list of unique IDs
+        const tracked = await trackedAccounts.toArray();
+        return tracked.map((entry) => entry.id);
     }
     catch (error) {
         logWebStoreError(error, "Error while fetching account IDs");
     }
+    return [];
 }
 export async function getAllAccountHeaders() {
     try {
@@ -315,6 +312,7 @@ export async function upsertAccountRecord(accountId, codeRoot, storageRoot, vaul
             locked: false,
         };
         await accounts.put(data);
+        await trackedAccounts.put({ id: accountId });
     }
     catch (error) {
         logWebStoreError(error, `Error inserting account: ${accountId}`);
@@ -346,6 +344,15 @@ export async function insertAccountAddress(address, accountId) {
     }
     catch (error) {
         logWebStoreError(error, `Error inserting address with value: ${String(address)} for the account ID ${accountId}`);
+    }
+}
+export async function removeAccountAddress(address) {
+    try {
+        // Perform the delete using Dexie
+        await addresses.where("address").equals(address).delete();
+    }
+    catch (error) {
+        logWebStoreError(error, `Error removing address with value: ${String(address)}`);
     }
 }
 export async function upsertForeignAccountCode(accountId, code, codeRoot) {

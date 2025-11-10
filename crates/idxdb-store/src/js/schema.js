@@ -33,6 +33,7 @@ var Table;
     Table["Tags"] = "tags";
     Table["ForeignAccountCode"] = "foreignAccountCode";
     Table["Settings"] = "settings";
+    Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
@@ -41,9 +42,9 @@ db.version(1).stores({
     [Table.StorageMapEntries]: indexes("[root+key]", "root"),
     [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
     [Table.AccountAuth]: indexes("pubKey"),
-    [Table.Accounts]: indexes("&accountCommitment", "id", "codeRoot", "storageRoot", "vaultRoot"),
-    [Table.Addresses]: indexes("id"),
-    [Table.Transactions]: indexes("id"),
+    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+    [Table.Addresses]: indexes("address", "id"),
+    [Table.Transactions]: indexes("id", "statusVariant"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
     [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
     [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
@@ -54,6 +55,7 @@ db.version(1).stores({
     [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
     [Table.ForeignAccountCode]: indexes("accountId"),
     [Table.Settings]: indexes("key"),
+    [Table.TrackedAccounts]: indexes("&id"),
 });
 function indexes(...items) {
     return items.join(",");
@@ -82,5 +84,6 @@ const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
 const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+const trackedAccounts = db.table(Table.TrackedAccounts);
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
 //# sourceMappingURL=schema.js.map

@@ -1,6 +1,6 @@
 import { IStorageMapEntry } from "./schema.js";
 import { JsStorageMapEntry, JsStorageSlot, JsVaultAsset } from "./sync.js";
-export declare function getAccountIds(): Promise<unknown[] | undefined>;
+export declare function getAccountIds(): Promise<string[]>;
 export declare function getAllAccountHeaders(): Promise<{
     id: string;
     nonce: string;
@@ -54,6 +54,7 @@ export declare function upsertVaultAssets(assets: JsVaultAsset[]): Promise<void>
 export declare function upsertAccountRecord(accountId: string, codeRoot: string, storageRoot: string, vaultRoot: string, nonce: string, committed: boolean, commitment: string, accountSeed: Uint8Array | undefined): Promise<void>;
 export declare function insertAccountAuth(pubKey: string, secretKey: string): Promise<void>;
 export declare function insertAccountAddress(address: Uint8Array, accountId: string): Promise<void>;
+export declare function removeAccountAddress(address: Uint8Array): Promise<void>;
 export declare function upsertForeignAccountCode(accountId: string, code: Uint8Array, codeRoot: string): Promise<void>;
 export declare function getForeignAccountCode(accountIds: string[]): Promise<{
     accountId: string;

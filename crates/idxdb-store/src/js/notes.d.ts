@@ -44,5 +44,7 @@ export declare function getOutputNotesFromIds(noteIds: string[]): Promise<{
     state: string;
 }[] | undefined>;
 export declare function getUnspentInputNoteNullifiers(): Promise<string[] | undefined>;
+export declare function getNoteScript(scriptRoot: string): Promise<import("./schema.js").INotesScript | undefined>;
 export declare function upsertInputNote(noteId: string, assets: Uint8Array, serialNumber: Uint8Array, inputs: Uint8Array, scriptRoot: string, serializedNoteScript: Uint8Array, nullifier: string, serializedCreatedAt: string, stateDiscriminant: number, state: Uint8Array): Promise<void>;
 export declare function upsertOutputNote(noteId: string, assets: Uint8Array, recipientDigest: string, metadata: Uint8Array, nullifier: string | undefined, expectedHeight: number, stateDiscriminant: number, state: Uint8Array): Promise<void>;
+export declare function upsertNoteScript(scriptRoot: string, serializedNoteScript: Uint8Array): Promise<void>;

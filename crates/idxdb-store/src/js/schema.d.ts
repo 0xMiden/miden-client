@@ -105,6 +105,9 @@ export interface ISetting {
     key: string;
     value: Uint8Array;
 }
+export interface ITrackedAccount {
+    id: string;
+}
 declare const db: Dexie & {
     accountCodes: Dexie.Table<IAccountCode, string>;
     accountStorages: Dexie.Table<IAccountStorage, string>;
@@ -124,6 +127,7 @@ declare const db: Dexie & {
     tags: Dexie.Table<ITag, number>;
     foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
     settings: Dexie.Table<ISetting, string>;
+    trackedAccounts: Dexie.Table<ITrackedAccount, string>;
 };
 declare const accountCodes: import("dexie").Table<IAccountCode, string, IAccountCode>;
 declare const accountStorages: import("dexie").Table<IAccountStorage, string, IAccountStorage>;
@@ -143,4 +147,5 @@ declare const partialBlockchainNodes: import("dexie").Table<IPartialBlockchainNo
 declare const tags: import("dexie").Table<ITag, number, ITag>;
 declare const foreignAccountCode: import("dexie").Table<IForeignAccountCode, string, IForeignAccountCode>;
 declare const settings: import("dexie").Table<ISetting, string, ISetting>;
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, };
+declare const trackedAccounts: import("dexie").Table<ITrackedAccount, string, ITrackedAccount>;
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };

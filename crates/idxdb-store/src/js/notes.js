@@ -80,6 +80,18 @@ export async function getUnspentInputNoteNullifiers() {
         logWebStoreError(err, "Failed to get unspent input note nullifiers");
     }
 }
+export async function getNoteScript(scriptRoot) {
+    try {
+        const noteScript = await notesScripts
+            .where("scriptRoot")
+            .equals(scriptRoot)
+            .first();
+        return noteScript;
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to get note script from root");
+    }
+}
 export async function upsertInputNote(noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
     return db.transaction("rw", inputNotes, notesScripts, async (tx) => {
         try {
@@ -162,5 +174,19 @@ async function processOutputNotes(notes) {
             state: stateBase64,
         };
     }));
+}
+export async function upsertNoteScript(scriptRoot, serializedNoteScript) {
+    return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+        try {
+            const noteScriptData = {
+                scriptRoot,
+                serializedNoteScript,
+            };
+            await tx.notesScripts.put(noteScriptData);
+        }
+        catch (error) {
+            logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
+        }
+    });
 }
 //# sourceMappingURL=notes.js.map
