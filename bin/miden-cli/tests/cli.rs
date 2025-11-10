@@ -11,35 +11,19 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteFile,
-    NoteId,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteFile, NoteId, NoteInputs, NoteMetadata, NoteRecipient,
+    NoteTag, NoteType,
 };
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    TestClientKeyStore,
-    create_test_store_path,
-    execute_tx_and_sync,
+    ACCOUNT_ID_REGULAR, TestClientKeyStore, create_test_store_path, execute_tx_and_sync,
     insert_new_wallet,
 };
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{
-    self,
-    Client,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
+    self, Client, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES,
 };
 use miden_client_cli::CliKeyStore;
 use miden_client_sqlite_store::SqliteStore;

@@ -12,12 +12,7 @@ use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
-    Client,
-    ClientError,
-    ErrorHint,
-    ExecutionOptions,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
+    Client, ClientError, ErrorHint, ExecutionOptions, Felt, MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
 use models::script_builder::ScriptBuilder;

@@ -16,28 +16,15 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use miden_client::Word;
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    Address,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorage, Address,
 };
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
-    AccountRecord,
-    AccountStatus,
-    BlockRelevance,
-    InputNoteRecord,
-    NoteFilter,
-    OutputNoteRecord,
-    PartialBlockchainFilter,
-    Store,
-    StoreError,
-    TransactionFilter,
+    AccountRecord, AccountStatus, BlockRelevance, InputNoteRecord, NoteFilter, OutputNoteRecord,
+    PartialBlockchainFilter, Store, StoreError, TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
@@ -57,18 +44,10 @@ pub mod settings;
 pub mod sync;
 pub mod transaction;
 
-#[wasm_bindgen(module = "/src/js/utils.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = logWebStoreError)]
-    fn log_web_store_error(error: JsValue, error_context: alloc::string::String);
-}
+include!(concat!(env!("OUT_DIR"), "/generated_js_bindings/utils_js_bindings.rs"));
 
 // Initialize IndexedDB
-#[wasm_bindgen(module = "/src/js/schema.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = openDatabase)]
-    fn setup_indexed_db() -> js_sys::Promise;
-}
+include!(concat!(env!("OUT_DIR"), "/generated_js_bindings/schema_js_bindings.rs"));
 
 pub struct WebStore {}
 

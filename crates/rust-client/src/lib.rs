@@ -161,12 +161,7 @@ pub mod assembly {
     pub use miden_objects::assembly::diagnostics::Report;
     pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_objects::assembly::{
-        Assembler,
-        DefaultSourceManager,
-        Library,
-        LibraryPath,
-        Module,
-        ModuleKind,
+        Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind,
     };
 }
 
@@ -174,19 +169,11 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
-        AccountStorageDelta,
-        AccountVaultDelta,
-        FungibleAssetDelta,
-        NonFungibleAssetDelta,
+        AccountStorageDelta, AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
     pub use miden_objects::asset::{
-        Asset,
-        AssetVault,
-        AssetWitness,
-        FungibleAsset,
-        NonFungibleAsset,
-        NonFungibleAssetDetails,
+        Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -216,19 +203,8 @@ pub mod crypto {
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
-        Forest,
-        InOrderIndex,
-        LeafIndex,
-        MerklePath,
-        MerkleStore,
-        MerkleTree,
-        MmrDelta,
-        MmrPeaks,
-        MmrProof,
-        NodeIndex,
-        SMT_DEPTH,
-        SmtLeaf,
-        SmtProof,
+        Forest, InOrderIndex, LeafIndex, MerklePath, MerkleStore, MerkleTree, MmrDelta, MmrPeaks,
+        MmrProof, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
@@ -236,27 +212,15 @@ pub mod crypto {
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
     pub use miden_objects::address::{
-        Address,
-        AddressId,
-        AddressInterface,
-        NetworkId,
-        RoutingParameters,
+        Address, AddressId, AddressInterface, NetworkId, RoutingParameters,
     };
 }
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
     pub use miden_objects::vm::{
-        AdviceInputs,
-        AdviceMap,
-        AttributeSet,
-        MastArtifact,
-        Package,
-        PackageExport,
-        PackageManifest,
-        QualifiedProcedureName,
-        Section,
-        SectionId,
+        AdviceInputs, AdviceMap, AttributeSet, MastArtifact, Package, PackageExport,
+        PackageManifest, QualifiedProcedureName, Section, SectionId,
     };
 }
 
@@ -264,15 +228,8 @@ pub use async_trait::async_trait;
 pub use errors::*;
 use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_objects::{
-    EMPTY_WORD,
-    Felt,
-    MAX_TX_EXECUTION_CYCLES,
-    MIN_TX_EXECUTION_CYCLES,
-    ONE,
-    PrettyPrint,
-    StarkField,
-    Word,
-    ZERO,
+    EMPTY_WORD, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, ONE, PrettyPrint,
+    StarkField, Word, ZERO,
 };
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;

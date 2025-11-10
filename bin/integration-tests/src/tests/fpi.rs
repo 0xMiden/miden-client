@@ -1,12 +1,7 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
 use miden_client::account::{
-    Account,
-    AccountBuilder,
-    AccountStorageMode,
-    PartialAccount,
-    PartialStorage,
-    StorageMap,
+    Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap,
     StorageSlot,
 };
 use miden_client::auth::AuthSecretKey;
@@ -14,10 +9,7 @@ use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    AdviceInputs,
-    ForeignAccount,
-    TransactionKernel,
-    TransactionRequestBuilder,
+    AdviceInputs, ForeignAccount, TransactionKernel, TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
 

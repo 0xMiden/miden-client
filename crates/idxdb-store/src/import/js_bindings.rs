@@ -1,9 +1,4 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
 
-#[wasm_bindgen(module = "/src/js/import.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = forceImportStore)]
-    pub fn idxdb_force_import_store(store_dump: JsValue) -> js_sys::Promise;
-
-}
+include!(concat!(env!("OUT_DIR"), "/generated_js_bindings/import_js_bindings.rs"));

@@ -3,21 +3,13 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use miden_client::account::component::{
-    AccountComponentMetadata,
-    MIDEN_PACKAGE_EXTENSION,
-    basic_fungible_faucet_library,
-    basic_wallet_library,
-    rpo_falcon_512_library,
+    AccountComponentMetadata, MIDEN_PACKAGE_EXTENSION, basic_fungible_faucet_library,
+    basic_wallet_library, rpo_falcon_512_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
 use miden_client::vm::{
-    MastArtifact,
-    Package,
-    PackageExport,
-    PackageManifest,
-    QualifiedProcedureName,
-    Section,
+    MastArtifact, Package, PackageExport, PackageManifest, QualifiedProcedureName, Section,
     SectionId,
 };
 

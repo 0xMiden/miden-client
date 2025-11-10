@@ -4,12 +4,7 @@ use miden_client::account::AddressError;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::ScriptBuilderError;
 use miden_client::{
-    AccountError,
-    AccountIdError,
-    AssetError,
-    ClientError,
-    ErrorHint,
-    NetworkIdError,
+    AccountError, AccountIdError, AssetError, ClientError, ErrorHint, NetworkIdError,
 };
 use miette::Diagnostic;
 use thiserror::Error;

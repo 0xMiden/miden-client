@@ -43,27 +43,11 @@ use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
-    AccountIdError,
-    AddressError,
-    NetworkIdError,
+    AccountIdError, AddressError, NetworkIdError,
     account::{
-        Account,
-        AccountBuilder,
-        AccountCode,
-        AccountDelta,
-        AccountFile,
-        AccountHeader,
-        AccountId,
-        AccountIdPrefix,
-        AccountStorage,
-        AccountStorageMode,
-        AccountType,
-        PartialAccount,
-        PartialStorage,
-        PartialStorageMap,
-        StorageMap,
-        StorageSlot,
-        StorageSlotType,
+        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
+        AccountIdPrefix, AccountStorage, AccountStorageMode, AccountType, PartialAccount,
+        PartialStorage, PartialStorageMap, StorageMap, StorageSlot, StorageSlotType,
     },
     address::{Address, AddressInterface, AddressType, NetworkId},
 };
@@ -79,21 +63,13 @@ pub mod component {
 
     pub use miden_lib::account::auth::*;
     pub use miden_lib::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        rpo_falcon_512_library,
+        basic_fungible_faucet_library, basic_wallet_library, rpo_falcon_512_library,
     };
     pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        FeltRepresentation,
-        InitStorageData,
-        StorageEntry,
-        StorageValueName,
-        TemplateType,
-        WordRepresentation,
+        AccountComponent, AccountComponentMetadata, FeltRepresentation, InitStorageData,
+        StorageEntry, StorageValueName, TemplateType, WordRepresentation,
     };
 }
 

@@ -32,13 +32,8 @@ pub use output_note_record::{NoteExportType, OutputNoteRecord, OutputNoteState};
 /// Contains structures that model all states in which an input note can be.
 pub mod input_note_states {
     pub use super::input_note_record::{
-        CommittedNoteState,
-        ConsumedAuthenticatedLocalNoteState,
-        ExpectedNoteState,
-        InputNoteState,
-        InvalidNoteState,
-        ProcessingAuthenticatedNoteState,
-        ProcessingUnauthenticatedNoteState,
+        CommittedNoteState, ConsumedAuthenticatedLocalNoteState, ExpectedNoteState, InputNoteState,
+        InvalidNoteState, ProcessingAuthenticatedNoteState, ProcessingUnauthenticatedNoteState,
         UnverifiedNoteState,
     };
 }

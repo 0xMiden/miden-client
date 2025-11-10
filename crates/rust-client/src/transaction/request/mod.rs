@@ -13,13 +13,8 @@ use miden_objects::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, Par
 use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_objects::vm::AdviceMap;
 use miden_objects::{
-    AccountError,
-    AssetVaultError,
-    NoteError,
-    StorageMapError,
-    TransactionInputError,
-    TransactionScriptError,
-    Word,
+    AccountError, AssetVaultError, NoteError, StorageMapError, TransactionInputError,
+    TransactionScriptError, Word,
 };
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 use thiserror::Error;
@@ -487,8 +482,7 @@ mod tests {
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
     use miden_objects::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_objects::transaction::OutputNote;

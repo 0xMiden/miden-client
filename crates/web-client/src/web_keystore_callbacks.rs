@@ -1,7 +1,5 @@
 use miden_client::auth::{
-    AuthSecretKey,
-    Signature as NativeSignature,
-    SigningInputs as NativeSigningInputs,
+    AuthSecretKey, Signature as NativeSignature, SigningInputs as NativeSigningInputs,
 };
 use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::keystore::KeyStoreError;

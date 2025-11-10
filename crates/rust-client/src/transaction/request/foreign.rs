@@ -4,11 +4,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use miden_objects::account::{
-    AccountId,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
+    AccountId, PartialAccount, PartialStorage, PartialStorageMap, StorageMap,
 };
 use miden_objects::asset::{AssetVault, PartialVault};
 use miden_objects::transaction::AccountInputs;

@@ -7,19 +7,14 @@ use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::Word;
 use miden_objects::account::{
-    AccountBuilder,
-    AccountComponent,
-    AccountStorageMode,
-    StorageMap,
-    StorageSlot,
+    AccountBuilder, AccountComponent, AccountStorageMode, StorageMap, StorageSlot,
 };
 use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::note::NoteType;
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 
