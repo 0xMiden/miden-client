@@ -136,7 +136,7 @@ fn miden_directory_structure_creation() {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     // Run init command to create .miden directory structure
-    let mut init_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args(["init"]);
     init_cmd.current_dir(&temp_dir).assert().success();
 
@@ -205,7 +205,7 @@ fn miden_directory_structure_creation() {
     assert!(!token_map_file.exists(), "token symbol map should not exist until first use");
 
     // Test that running any command after init creates keystore directory on-demand
-    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
