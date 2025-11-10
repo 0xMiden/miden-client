@@ -93,19 +93,10 @@ pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
     // Resolve relative paths in the config relative to the .miden directory
     let config_dir = config_path.parent().unwrap();
 
-    if cli_config.store_filepath.is_relative() {
-        cli_config.store_filepath = config_dir.join(&cli_config.store_filepath);
-    }
-    if cli_config.secret_keys_directory.is_relative() {
-        cli_config.secret_keys_directory = config_dir.join(&cli_config.secret_keys_directory);
-    }
-    if cli_config.token_symbol_map_filepath.is_relative() {
-        cli_config.token_symbol_map_filepath =
-            config_dir.join(&cli_config.token_symbol_map_filepath);
-    }
-    if cli_config.package_directory.is_relative() {
-        cli_config.package_directory = config_dir.join(&cli_config.package_directory);
-    }
+    resolve_relative_path(&mut cli_config.store_filepath, config_dir);
+    resolve_relative_path(&mut cli_config.secret_keys_directory, config_dir);
+    resolve_relative_path(&mut cli_config.token_symbol_map_filepath, config_dir);
+    resolve_relative_path(&mut cli_config.package_directory, config_dir);
 
     Ok((cli_config, config_path))
 }
@@ -121,4 +112,12 @@ fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
     let (config, _) = load_config_file()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
+}
+
+/// Resolves a relative path against a base directory.
+/// If the path is already absolute, it remains unchanged.
+fn resolve_relative_path(path: &mut PathBuf, base_dir: &Path) {
+    if path.is_relative() {
+        *path = base_dir.join(&*path);
+    }
 }
