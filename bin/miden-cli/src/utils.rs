@@ -81,12 +81,31 @@ pub(crate) async fn parse_account_id<AUTH>(
 ///
 /// This function will look for the configuration file at the .miden/miden-client.toml path.
 /// If the path is relative, searches in parent directories all the way to the root as well.
+///
+/// Note: Relative paths in the config are resolved relative to the .miden directory.
 pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
     let mut config_path = std::env::current_dir()?;
     config_path.push(MIDEN_DIR);
     config_path.push(CLIENT_CONFIG_FILE_NAME);
 
-    let cli_config = load_config(config_path.as_path())?;
+    let mut cli_config = load_config(config_path.as_path())?;
+
+    // Resolve relative paths in the config relative to the .miden directory
+    let config_dir = config_path.parent().unwrap();
+
+    if cli_config.store_filepath.is_relative() {
+        cli_config.store_filepath = config_dir.join(&cli_config.store_filepath);
+    }
+    if cli_config.secret_keys_directory.is_relative() {
+        cli_config.secret_keys_directory = config_dir.join(&cli_config.secret_keys_directory);
+    }
+    if cli_config.token_symbol_map_filepath.is_relative() {
+        cli_config.token_symbol_map_filepath =
+            config_dir.join(&cli_config.token_symbol_map_filepath);
+    }
+    if cli_config.package_directory.is_relative() {
+        cli_config.package_directory = config_dir.join(&cli_config.package_directory);
+    }
 
     Ok((cli_config, config_path))
 }

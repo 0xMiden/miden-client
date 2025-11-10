@@ -121,7 +121,14 @@ impl InitCmd {
             CliError::Config("failed to create config file".to_string().into(), err.to_string())
         })?;
 
-        write_packages_files(&cli_config)?;
+        // Resolve package directory relative to .miden directory before writing files
+        let config_dir = config_file_path.parent().unwrap();
+        let resolved_package_dir = if cli_config.package_directory.is_relative() {
+            config_dir.join(&cli_config.package_directory)
+        } else {
+            cli_config.package_directory.clone()
+        };
+        write_packages_files(&resolved_package_dir)?;
 
         file_handle.write(config_as_toml_string.as_bytes()).map_err(|err| {
             CliError::Config("failed to write config file".to_string().into(), err.to_string())
@@ -133,10 +140,8 @@ impl InitCmd {
     }
 }
 
-/// Creates the directory specified by `cli_config.package_directory`
-/// and writes the ``DEFAULT_INCLUDED_PACKAGES``.
-fn write_packages_files(cli_config: &CliConfig) -> Result<(), CliError> {
-    let packages_dir = &cli_config.package_directory;
+/// Creates the directory specified by `packages_dir` and writes the `DEFAULT_INCLUDED_PACKAGES`.
+fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
     fs::create_dir_all(packages_dir).map_err(|err| {
         CliError::Config(
             Box::new(err),

@@ -114,12 +114,18 @@ fn silent_initialization_uses_default_values() {
     // Verify default values are used
     assert!(config_content.contains("testnet"), "Should use testnet as default network");
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
-        "Should use default store path in {MIDEN_DIR}"
+        config_content.contains("store.sqlite3"),
+        "Should use default store path (relative to config file)"
     );
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/keystore")),
-        "Should use default keystore directory in {MIDEN_DIR}"
+        config_content.contains("keystore"),
+        "Should use default keystore directory (relative to config file)"
+    );
+    // Verify that the paths don't have the .miden prefix in the config
+    // (they're relative to the config file location now)
+    assert!(
+        !config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
+        "Paths should be relative to config file, not include {MIDEN_DIR}/ prefix"
     );
 }
 
@@ -159,23 +165,28 @@ fn miden_directory_structure_creation() {
     let basic_faucet_package = packages_dir.join("basic-fungible-faucet.masp");
     assert!(basic_faucet_package.exists(), "basic-fungible-faucet package should be created");
 
-    // Verify config file contains correct paths relative to .miden directory
+    // Verify config file contains correct paths relative to config file location
     let config_content = std::fs::read_to_string(&config_file).unwrap();
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
-        "Config should reference store in .miden directory"
+        config_content.contains("store.sqlite3"),
+        "Config should reference store path relative to config file"
     );
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/keystore")),
-        "Config should reference keystore in .miden directory"
+        config_content.contains("keystore"),
+        "Config should reference keystore path relative to config file"
     );
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/packages")),
-        "Config should reference packages in .miden directory"
+        config_content.contains("packages"),
+        "Config should reference packages path relative to config file"
     );
     assert!(
-        config_content.contains(&format!("{MIDEN_DIR}/token_symbol_map.toml")),
-        "Config should reference token symbol map in .miden directory"
+        config_content.contains("token_symbol_map.toml"),
+        "Config should reference token symbol map path relative to config file"
+    );
+    // Verify that the paths don't have the .miden prefix (they're relative to config file now)
+    assert!(
+        !config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
+        "Paths should be relative to config file, not include {MIDEN_DIR}/ prefix"
     );
 
     // Verify default RPC endpoint is set

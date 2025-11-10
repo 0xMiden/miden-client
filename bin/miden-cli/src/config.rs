@@ -60,16 +60,15 @@ impl Default for CliConfig {
         const STORE_FILENAME: &str = "store.sqlite3";
         const KEYSTORE_DIRECTORY: &str = "keystore";
 
-        // Create paths relative to the .miden directory
-        let miden_dir = PathBuf::from(MIDEN_DIR);
-
+        // Create paths relative to the config file location (which is in .miden directory)
+        // These will be resolved relative to the .miden directory when the config is loaded
         Self {
             rpc: RpcConfig::default(),
-            store_filepath: miden_dir.join(STORE_FILENAME),
-            secret_keys_directory: miden_dir.join(KEYSTORE_DIRECTORY),
-            token_symbol_map_filepath: miden_dir.join(TOKEN_SYMBOL_MAP_FILEPATH),
+            store_filepath: PathBuf::from(STORE_FILENAME),
+            secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
+            token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILEPATH),
             remote_prover_endpoint: None,
-            package_directory: miden_dir.join(DEFAULT_PACKAGES_DIR),
+            package_directory: PathBuf::from(DEFAULT_PACKAGES_DIR),
             max_block_number_delta: None,
             note_transport: None,
         }
