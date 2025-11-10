@@ -29,10 +29,10 @@ cargo publish --workspace --exclude miden-client-web --exclude miden-idxdb-store
 # These should use wasm32-unknown-unknown as target (specified in .cargo/config.toml files for
 # these crates, but publishing from the workspace root does not take it into account). So we
 # publish them from the web-client and idxdb-store directories.
-echo "Publishing miden-client-web..."
-cd crates/web-client
-cargo publish
-
 echo "Publishing miden-idxdb-store..."
 cd crates/idxdb-store
+cargo publish
+
+echo "Publishing miden-client-web..."
+cd ../web-client
 cargo publish
