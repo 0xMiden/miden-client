@@ -16,7 +16,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
-use commands::clear::ClearCmd;
+use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
@@ -137,7 +137,7 @@ pub enum Command {
     Import(ImportCmd),
     Export(ExportCmd),
     Init(InitCmd),
-    Clear(ClearCmd),
+    ClearConfig(ClearConfigCmd),
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
@@ -162,8 +162,8 @@ impl Cli {
                 init_cmd.execute()?;
                 return Ok(());
             },
-            Command::Clear(clear_cmd) => {
-                clear_cmd.execute()?;
+            Command::ClearConfig(clear_config_cmd) => {
+                clear_config_cmd.execute()?;
                 return Ok(());
             },
             _ => {},
@@ -218,7 +218,7 @@ impl Cli {
                 Box::pin(new_account.execute(client, keystore)).await
             },
             Command::Import(import) => import.execute(client, keystore).await,
-            Command::Init(_) | Command::Clear(_) => Ok(()), // Already handled earlier
+            Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,

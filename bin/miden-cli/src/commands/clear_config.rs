@@ -1,5 +1,5 @@
-use std::fs;
 use std::path::PathBuf;
+use std::{fs, io};
 
 use clap::Parser;
 
@@ -14,13 +14,13 @@ use crate::errors::CliError;
     about = "Clear miden client configuration. By default removes local config if present, otherwise removes global config. \
 Use --global to specifically target global config."
 )]
-pub struct ClearCmd {
+pub struct ClearConfigCmd {
     /// Force removal of global configuration, even if local config exists
     #[clap(long)]
     global: bool,
 }
 
-impl ClearCmd {
+impl ClearConfigCmd {
     pub fn execute(&self) -> Result<(), CliError> {
         if self.global {
             // Clear global config specifically
@@ -39,7 +39,18 @@ impl ClearCmd {
             return Ok(());
         }
 
-        // Fallback to global config
+        // Fallback to global config - prompt for confirmation
+        println!(
+            "\nNo local configuration found. Do you want to clear the global configuration instead? (y/N)"
+        );
+        let mut proceed_str: String = String::new();
+        io::stdin().read_line(&mut proceed_str).expect("Should read line");
+
+        if proceed_str.trim().to_lowercase() != "y" {
+            println!("Operation cancelled.");
+            return Ok(());
+        }
+
         Self::clear_global_config()?;
         Ok(())
     }

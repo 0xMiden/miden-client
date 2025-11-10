@@ -118,11 +118,11 @@ Key states the CLI surfaces:
 - **Issue**: Unclear which configuration is being used (local vs global)
 - **Check**: Run commands from different directories to see if behavior changes
 - **Local priority**: If `./.miden/miden-client.toml` exists, it overrides `~/.miden/miden-client.toml`
-- **Fix**: Use `miden-client clear` to remove unwanted configurations, or `miden-client clear --global` to remove only global config. Note: Running this command only deletes one .miden folder at a time. If you have a local .miden folder, the command will just delete this one but not touch the global one.
+- **Fix**: Use `miden-client clear-config` to remove unwanted configurations, or `miden-client clear-config --global` to remove only global config. Note: Running `miden-client clear-config` without flags follows priority: if a local .miden folder exists, it removes only that one; if no local folder exists, it removes the global one. Use `--global` to specifically target the global configuration regardless of local config presence.
 
 #### Clean configuration reset
-- **Complete reset**: Use `miden-client clear` to remove the active configuration (follows priority: local first, then global)
-- **Selective reset**: Use `miden-client clear --global` to remove only global configuration while preserving local
+- **Complete reset**: Use `miden-client clear-config` to remove the active configuration (follows priority: local first, then global)
+- **Selective reset**: Use `miden-client clear-config --global` to remove only global configuration while preserving local
 - **Fresh start**: After clearing, run `miden-client init` (global) or `miden-client init --local` (local) to recreate
 
 ### Recovery flow
@@ -131,7 +131,7 @@ Key states the CLI surfaces:
 2. Verify `rpc.endpoint` connectivity and timeouts.
 3. Run `miden-client sync` to refresh local headers/notes.
 4. If local DB is inconsistent for development purposes, delete the store file (`.miden/store.sqlite3` in local config or `~/.miden/store.sqlite3` in global config) and retry.
-5. For configuration issues, use `miden-client clear` to reset config and `miden-client init` to recreate.
+5. For configuration issues, use `miden-client clear-config` to reset config and `miden-client init` to recreate.
 6. Adjust `max_block_number_delta` if strict recency checks block validation.
 7. If proving errors persist with a remote prover, confirm `remote_prover_endpoint` and consider running locally to isolate the issue.
 
