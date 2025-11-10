@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use clap::Parser;
 use tracing::info;
 
-use crate::CLIENT_CONFIG_FILE_NAME;
 use crate::config::{CliConfig, CliEndpoint, Network, NoteTransportConfig};
 use crate::errors::CliError;
 
@@ -74,7 +73,8 @@ impl InitCmd {
             return Err(CliError::Config(
                 "Error with the configuration file".to_string().into(),
                 format!(
-                    "The file \"{CLIENT_CONFIG_FILE_NAME}\" already exists in the .miden directory. Please try using another directory or removing the file.",
+                    "The file \"{:?}\" already exists in the working directory. Please try using another directory or removing the file.",
+                    config_file_path.display(),
                 ),
             ));
         }
