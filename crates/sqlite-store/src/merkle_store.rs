@@ -3,6 +3,7 @@ use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
+use miden_objects::asset::AssetVaultKey;
 use miden_objects::crypto::merkle::Smt;
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
@@ -15,7 +16,8 @@ pub fn get_asset_proof(
         .get_path(vault_root, get_node_index(asset.vault_key())?)?
         .path
         .try_into()?;
-    let leaf = SmtLeaf::new_single(asset.vault_key(), (*asset).into());
+    let vault_key: Word = asset.vault_key().into();
+    let leaf = SmtLeaf::new_single(vault_key, (*asset).into());
 
     Ok(SmtProof::new(path, leaf)?)
 }
@@ -45,7 +47,8 @@ pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
     // we don't have direct access to the vault's SMT nodes.
     // Safe unwrap as we are sure that the vault's SMT nodes are valid.
     let smt =
-        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key(), asset.into()))).unwrap();
+        Smt::with_entries(vault.assets().map(|asset| (asset.vault_key().into(), asset.into())))
+            .unwrap();
     merkle_store.extend(smt.inner_nodes());
 }
 
@@ -55,7 +58,7 @@ pub fn get_storage_map_item_proof(
     map_root: Word,
     key: Word,
 ) -> Result<(Word, MerklePath), StoreError> {
-    let hashed_key = StorageMap::hash_key(key);
+    let hashed_key = AssetVaultKey::new_unchecked(StorageMap::hash_key(key));
     let vp = merkle_store.get_path(map_root, get_node_index(hashed_key)?)?;
     Ok((vp.value, vp.path))
 }
@@ -67,7 +70,7 @@ pub fn update_storage_map_nodes(
     entries: impl Iterator<Item = (Word, Word)>,
 ) -> Result<Word, StoreError> {
     for (key, value) in entries {
-        let hashed_key = StorageMap::hash_key(key);
+        let hashed_key = AssetVaultKey::new_unchecked(StorageMap::hash_key(key));
         root = merkle_store
             .set_node(root, get_node_index(hashed_key)?, get_node_value(hashed_key, value))?
             .root;
@@ -100,8 +103,9 @@ pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &Accoun
 /// It has a set depth and uses the third felt as the position. The reason we want to copy the smt's
 /// internal structure is so that merkle paths and roots match. For more information, see the
 /// [`miden_objects::crypto::merkle::Smt`] documentation and implementation.
-fn get_node_index(key: Word) -> Result<NodeIndex, StoreError> {
-    Ok(NodeIndex::new(SMT_DEPTH, key[3].as_int())?)
+fn get_node_index(key: AssetVaultKey) -> Result<NodeIndex, StoreError> {
+    let vault_key_word: Word = key.into();
+    Ok(NodeIndex::new(SMT_DEPTH, vault_key_word[3].as_int())?)
 }
 
 /// Builds the merkle node value for the given key and value.
@@ -109,6 +113,7 @@ fn get_node_index(key: Word) -> Result<NodeIndex, StoreError> {
 /// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] generates the values for
 /// its internal merkle tree. It generates an [`SmtLeaf`] from the key and value, and then hashes it
 /// to produce the node value.
-fn get_node_value(key: Word, value: Word) -> Word {
-    SmtLeaf::Single((key, value)).hash()
+fn get_node_value(key: AssetVaultKey, value: Word) -> Word {
+    let vault_key_word: Word = key.into();
+    SmtLeaf::Single((vault_key_word, value)).hash()
 }

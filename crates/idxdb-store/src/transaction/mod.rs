@@ -97,7 +97,12 @@ impl WebStore {
             .ok_or(StoreError::AccountDataNotFound(delta.id()))?
             .into();
 
-        account.apply_delta(delta)?;
+        if delta.is_full_state() {
+            account =
+                delta.try_into().expect("casting account from full state delta should not fail");
+        } else {
+            account.apply_delta(delta)?;
+        }
 
         update_account(&account).await.map_err(|err| {
             StoreError::DatabaseError(format!("failed to update account: {err:?}"))

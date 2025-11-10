@@ -334,7 +334,7 @@ impl NodeRpcClient for GrpcClient {
 
             let request = proto::rpc_store::AccountProofRequest {
                 account_id: Some(account_id.into()),
-                block_num: block_num.as_u32(),
+                block_num: Some(block_num.into()),
                 details: account_details,
             };
 
@@ -606,7 +606,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
-        let endpoint_str: &str = &self.endpoint.to_string();
+        let endpoint_str: &str = &self.endpoint.clone();
         let endpoint: Endpoint =
             Endpoint::try_from(endpoint_str).map_err(RpcError::InvalidNodeEndpoint)?;
         Ok(endpoint.to_network_id())

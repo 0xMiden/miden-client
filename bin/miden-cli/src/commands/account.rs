@@ -1,7 +1,7 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::account::{Account, AccountId, AccountType, StorageSlot};
-use miden_client::address::{AccountIdAddress, Address, AddressInterface};
+use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
@@ -178,7 +178,7 @@ pub async fn show_account<AUTH>(
                     )
                 },
             };
-            table.add_row(vec![asset_type, &faucet, &amount.to_string()]);
+            table.add_row(vec![asset_type, &faucet, &amount.clone()]);
         }
 
         println!("{table}\n");
@@ -317,16 +317,19 @@ async fn account_bech_32<AUTH>(
 
     let account_interface: AccountInterface = account_record.account().into();
 
-    let interface = if account_interface
+    let mut address = Address::new(account_id);
+    if account_interface
         .components()
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
     {
-        AddressInterface::BasicWallet
-    } else {
-        AddressInterface::Unspecified
-    };
+        address = address
+            .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
+            .map_err(|err| {
+                CliError::Address(err, "Failed to set routing parameters".to_string())
+            })?;
+    }
 
-    let address = AccountIdAddress::new(account_id, interface);
-    Ok(Address::from(address).to_bech32(cli_config.rpc.endpoint.0.to_network_id()))
+    let encoded = address.encode(cli_config.rpc.endpoint.0.to_network_id());
+    Ok(encoded)
 }

@@ -160,11 +160,11 @@ try {
     const transactionRequest = webClient.newSendTransactionRequest(
         senderAccountId,  // Account sending tokens
         targetAccountId,  // Account receiving tokens
-        faucetId,        // Faucet account ID
+        faucetId,         // Faucet account ID
         NoteType.Private, // Note type
-        100,             // Amount to send
-        100,             // Optional recall height
-        90               // Optional timelock height
+        100,              // Amount to send
+        100,              // Optional recall height
+        90                // Optional timelock height
     );
 
     const result = await webClient.executeTransaction(
@@ -252,17 +252,17 @@ For a complete example of a custom transaction implementation, including input n
 Here's a simplified example of creating a custom transaction:
 
 ```typescript
-import { 
-    Felt, 
+import {
+    Felt,
     FeltArray,
     FungibleAsset,
     NotesArray,
     NoteAssets,
     NoteExecutionHint,
     NoteExecutionMode,
-    NoteMetadata, 
+    NoteMetadata,
     NoteTag,
-    NoteType, 
+    NoteType,
     OutputNotesArray,
     TransactionProver,
     TransactionRequestBuilder,
@@ -334,7 +334,7 @@ try {
         result,
         submissionHeight
     );
-    
+
     // Access transaction details
     console.log("Block number:", transactionUpdate.blockNum());
     console.log("Created notes:", transactionUpdate.executedTransaction().outputNotes());
@@ -371,4 +371,4 @@ For more detailed information about transaction functionality, refer to the foll
 - [OutputNotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/OutputNotesArray.md) - Class for working with arrays of output notes
 - [NotesArray](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NotesArray.md) - Class for working with arrays of notes
 
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md). 
+For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

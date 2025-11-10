@@ -3,10 +3,10 @@ use std::str::FromStr;
 use miden_client::Felt as NativeFelt;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
-    AccountIdAddress,
     Address,
     AddressInterface as NativeAccountInterface,
     NetworkId as NativeNetworkId,
+    RoutingParameters,
 };
 use wasm_bindgen::prelude::*;
 
@@ -28,8 +28,7 @@ pub enum NetworkId {
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum AccountInterface {
-    Unspecified = 0,
-    BasicWallet = 1,
+    BasicWallet = 0,
 }
 
 #[wasm_bindgen]
@@ -68,8 +67,11 @@ impl AccountId {
     ) -> Result<String, JsValue> {
         let network_id: NativeNetworkId = network_id.into();
 
-        let address: Address = AccountIdAddress::new(self.0, account_interface.into()).into();
-        Ok(address.to_bech32(network_id))
+        let routing_params = RoutingParameters::new(account_interface.into());
+        let address = Address::new(self.0)
+            .with_routing_parameters(routing_params)
+            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
+        Ok(address.encode(network_id))
     }
 
     /// Turn this Account ID into its bech32 string representation. This method accepts a custom
@@ -83,8 +85,11 @@ impl AccountId {
         let network_id = NativeNetworkId::from_str(custom_network_id)
             .map_err(|err| js_error_with_context(err, "given network id is not valid"))?;
 
-        let address: Address = AccountIdAddress::new(self.0, account_interface.into()).into();
-        Ok(address.to_bech32(network_id))
+        let routing_params = RoutingParameters::new(account_interface.into());
+        let address = Address::new(self.0)
+            .with_routing_parameters(routing_params)
+            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
+        Ok(address.encode(network_id))
     }
 
     pub fn prefix(&self) -> Felt {
@@ -139,7 +144,6 @@ impl From<AccountInterface> for NativeAccountInterface {
     fn from(account_interface: AccountInterface) -> Self {
         match account_interface {
             AccountInterface::BasicWallet => NativeAccountInterface::BasicWallet,
-            AccountInterface::Unspecified => NativeAccountInterface::Unspecified,
         }
     }
 }

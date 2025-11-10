@@ -2,9 +2,9 @@
 
 ***
 
-[@demox-labs/miden-sdk](../README.md) / Signature
+[@demox-labs/miden-sdk](../README.md) / Package
 
-# Class: Signature
+# Class: Package
 
 ## Methods
 
@@ -38,19 +38,9 @@
 
 ***
 
-### toPreparedSignature()
-
-> **toPreparedSignature**(): [`Felt`](Felt.md)[]
-
-#### Returns
-
-[`Felt`](Felt.md)[]
-
-***
-
 ### deserialize()
 
-> `static` **deserialize**(`bytes`): `Signature`
+> `static` **deserialize**(`bytes`): `Package`
 
 #### Parameters
 
@@ -60,4 +50,4 @@
 
 #### Returns
 
-`Signature`
+`Package`

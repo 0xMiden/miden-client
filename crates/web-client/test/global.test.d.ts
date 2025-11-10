@@ -44,6 +44,7 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  Package,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -132,6 +133,7 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;

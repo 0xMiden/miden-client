@@ -26,6 +26,7 @@ use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
+use miden_objects::asset::AssetVaultKey;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -456,8 +457,8 @@ impl SqliteStore {
 
         // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
         // fungible and non-fungible.
-        let mut updated_assets: BTreeMap<Word, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<Word> = Vec::new();
+        let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
+        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
 
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
@@ -512,7 +513,10 @@ impl SqliteStore {
                 Rc::new(
                     removed_vault_keys
                         .into_iter()
-                        .map(|k| Value::from(k.to_hex()))
+                        .map(|k| {
+                            let k_word: Word = k.into();
+                            Value::from(k_word.to_hex())
+                        })
                         .collect::<Vec<Value>>(),
                 ),
             ],
@@ -871,13 +875,14 @@ impl SqliteStore {
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
         for asset in assets {
+            let vault_key_word: Word = asset.vault_key().into();
             const QUERY: &str =
                 insert_sql!(account_assets { root, vault_key, faucet_id_prefix, asset } | REPLACE);
             tx.execute(
                 QUERY,
                 params![
                     root.to_hex(),
-                    asset.vault_key().to_hex(),
+                    vault_key_word.to_hex(),
                     asset.faucet_id_prefix().to_hex(),
                     Word::from(asset).to_hex(),
                 ],
@@ -1141,10 +1146,8 @@ mod tests {
         AccountDelta,
         AccountHeader,
         AccountId,
-        AccountIdAddress,
         AccountType,
         Address,
-        AddressInterface,
         StorageMap,
         StorageSlot,
     };
@@ -1166,7 +1169,7 @@ mod tests {
     use miden_client::{EMPTY_WORD, ONE, ZERO};
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::account::components::basic_wallet_library;
-    use miden_objects::account::PublicKeyCommitment;
+    use miden_objects::account::auth::PublicKeyCommitment;
 
     use crate::SqliteStore;
     use crate::sql_error::SqlResultExt;
@@ -1241,8 +1244,7 @@ mod tests {
             .with_component(dummy_component)
             .build()?;
 
-        let default_address =
-            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        let default_address = Address::new(account.id());
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
@@ -1331,8 +1333,7 @@ mod tests {
             .with_component(dummy_component)
             .with_assets(assets.clone())
             .build_existing()?;
-        let default_address =
-            Address::AccountId(AccountIdAddress::new(account.id(), AddressInterface::Unspecified));
+        let default_address = Address::new(account.id());
         store.insert_account(&account, default_address).await?;
 
         let mut storage_delta = AccountStorageDelta::new();
