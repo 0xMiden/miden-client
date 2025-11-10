@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 #[cfg(windows)]
 fn run_yarn(args: &[&str]) -> Result<(), String> {
@@ -28,7 +28,19 @@ fn run_yarn(args: &[&str]) -> Result<(), String> {
 }
 
 fn main() -> miette::Result<(), String> {
-    println!("cargo::rerun-if-changed=src");
+    println!("cargo::rerun-if-changed=src/ts");
+    println!("cargo::rerun-if-changed=src/package.json");
+    println!("cargo::rerun-if-changed=src/tsconfig.json");
+
+    // Check if JS files already exist (e.g., during cargo package verification)
+    let js_dir = Path::new("src/js");
+    if js_dir.exists() && js_dir.is_dir() {
+        // Check if at least one expected JS file exists
+        if Path::new("src/js/accounts.js").exists() {
+            println!("cargo::warning=JS files already exist, skipping TypeScript compilation");
+            return Ok(());
+        }
+    }
 
     // Install deps
     run_yarn(&[]).map_err(|e| format!("could not install ts dependencies: {e}"))?;
