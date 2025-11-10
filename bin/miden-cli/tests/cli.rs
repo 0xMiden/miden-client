@@ -1111,7 +1111,7 @@ fn exec_parse() {
 fn create_account_with_no_auth() {
     let temp_dir = init_cli().1;
 
-    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
         "-s",
@@ -1157,7 +1157,7 @@ fn create_account_with_multisig_auth() {
     let file_path = temp_dir.join("multisig_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
 
-    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
         "-s",
@@ -1202,7 +1202,7 @@ fn create_account_with_acl_auth() {
     let file_path = temp_dir.join("acl_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
 
-    let mut create_account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
         "-s",
