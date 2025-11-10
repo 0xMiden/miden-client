@@ -152,7 +152,7 @@ impl TryFrom<AccountProof> for AccountInputs {
                 storage_map_proofs.push(partial_storage);
             }
 
-            let vault: AssetVault = AssetVault::new(&vault_details.assets).unwrap();
+            let vault = AssetVault::new(&vault_details.assets)?;
             return Ok(AccountInputs::new(
                 PartialAccount::new(
                     account_header.id(),

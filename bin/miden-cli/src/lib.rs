@@ -11,7 +11,7 @@ use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, DebugMode, IdPrefixFetchError};
+use miden_client::{Client, ClientError, DebugMode, IdPrefixFetchError};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
@@ -196,7 +196,7 @@ impl Cli {
             let client =
                 GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
                     .await
-                    .map_err(|e| CliError::Client(e.into()))?;
+                    .map_err(|e| CliError::from(ClientError::from(e)))?;
             builder = builder.note_transport(Arc::new(client));
         }
 

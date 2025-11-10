@@ -282,11 +282,11 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand                       | Description                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------- |
-| `list <ID>`                      | List all addresses or only for the specified account ID (default command)             |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for specified account ID with optional tag length    |
-| `remove <ID> <INTERFACE>`        | Remove an address for an interface for specified account ID                           |
+| Subcommand                       | Description                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------|
+| `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
+| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
+| `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 

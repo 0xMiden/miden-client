@@ -344,7 +344,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
         .map_err(|e| CliError::Input(format!("note not found: {e}")))?;
     let note: Note = note_record
         .try_into()
-        .map_err(|e| CliError::Client(ClientError::NoteRecordConversionError(e)))?;
+        .map_err(|e| CliError::from(ClientError::NoteRecordConversionError(e)))?;
     let (_netid, address) = Address::decode(address).map_err(|e| CliError::Input(e.to_string()))?;
 
     client.send_private_note(note, &address).await?;

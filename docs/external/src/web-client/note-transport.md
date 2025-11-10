@@ -17,11 +17,11 @@ import { WebClient } from "@demox-labs/miden-sdk";
 try {
     // Initialize the web client with note transport endpoint
     const webClient = await WebClient.createClient(
-        null,  // Miden node endpoint (optional, defaults to testnet)
+        null,                      // Miden node endpoint (optional, defaults to testnet)
         "http://localhost:57292",  // Miden Note Transport node
-        null   // seed (optional)
+        null                       // seed (optional)
     );
-    
+
     console.log("Client initialized with note transport");
 } catch (error) {
     console.error("Failed to initialize client:", error.message);
@@ -44,7 +44,7 @@ try {
 
     // Send the private note
     await webClient.sendPrivateNote(note, address);
-    
+
     console.log("Private note sent successfully");
 } catch (error) {
     console.error("Failed to send private note:", error.message);
@@ -68,11 +68,11 @@ try {
     // Alternatively, fetch all private notes without pagination.
     // Reserve this for special cases like initial setup or troubleshooting.
     // await webClient.fetchAllPrivateNotes();
-    
+
     // Retrieve the fetched notes
     const filter = new NoteFilter(NoteFilterTypes.All);
     const notes = await webClient.getInputNotes(filter);
-    
+
     console.log(`Fetched ${notes.length} private notes`);
 } catch (error) {
     console.error("Failed to fetch private notes:", error.message);
@@ -90,4 +90,3 @@ For more detailed information about note transport functionality, refer to the f
 - [NoteFilterTypes](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/enumerations/NoteFilterTypes.md) - Enumeration for note filter types
 
 For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).
-

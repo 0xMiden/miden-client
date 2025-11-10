@@ -126,4 +126,3 @@ Key states the CLI surfaces:
 - CLI debug flag and environment variable are documented in `CLI` and `Config` docs.
 - Common error enums originate from the client and RPC layers.
 - Protocol lifecycle: [Miden book — Transaction lifecycle](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html#transaction-lifecycle)
-
