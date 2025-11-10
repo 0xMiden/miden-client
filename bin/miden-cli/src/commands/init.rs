@@ -82,7 +82,10 @@ impl InitCmd {
         // Create the .miden directory if it doesn't exist
         if let Some(parent_dir) = config_file_path.parent() {
             fs::create_dir_all(parent_dir).map_err(|err| {
-                CliError::Config(Box::new(err), "failed to create .miden directory".into())
+                CliError::Config(
+                    Box::new(err),
+                    format!("failed to create .miden directory in {}", parent_dir.display()),
+                )
             })?;
         }
 
