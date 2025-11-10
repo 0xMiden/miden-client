@@ -1190,8 +1190,12 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
+        proc_roots = [
+        { key = "0x0000000000000000000000000000000000000000000000000000000000000000", value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
+        ]
+
         falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
-        acl_config.num_tracked_procs=0
+        acl_config.num_tracked_procs=1
         acl_config.allow_unauthorized_output_notes=0
         acl_config.allow_unauthorized_input_notes=0
         "#;
