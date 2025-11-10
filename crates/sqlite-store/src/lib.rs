@@ -28,6 +28,7 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    PartialAccount,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
@@ -41,6 +42,7 @@ use miden_client::store::{
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
+    PartialAccountRecord,
     PartialBlockchainFilter,
     Store,
     StoreError,
@@ -474,6 +476,35 @@ impl Store for SqliteStore {
     ) -> Result<(), StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::remove_address(conn, &address, account_id)
+        })
+        .await
+    }
+
+    async fn insert_partial_account(
+        &self,
+        partial_account: &PartialAccount,
+        initial_address: Address,
+    ) -> Result<(), StoreError> {
+        let cloned_partial_account = partial_account.clone();
+        let merkle_store = self.merkle_store.clone();
+
+        self.interact_with_connection(move |conn| {
+            SqliteStore::insert_partial_account(
+                conn,
+                &merkle_store,
+                &cloned_partial_account,
+                &initial_address,
+            )
+        })
+        .await
+    }
+
+    async fn get_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_partial_account(conn, account_id)
         })
         .await
     }

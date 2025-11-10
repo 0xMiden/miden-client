@@ -33,6 +33,7 @@ use miden_objects::account::{
     AccountId,
     AccountIdPrefix,
     AccountStorage,
+    PartialAccount,
     StorageMapWitness,
     StorageSlot,
 };
@@ -64,7 +65,7 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountStatus, AccountUpdates};
+pub use account::{AccountRecord, AccountStatus, AccountUpdates, PartialAccountRecord};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -517,6 +518,22 @@ pub trait Store: Send + Sync {
             _ => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index))),
         }
     }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    // TODO: docs
+    async fn insert_partial_account(
+        &self,
+        partial_account: &PartialAccount,
+        initial_address: Address,
+    ) -> Result<(), StoreError>;
+
+    // TODO: docs
+    async fn get_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccountRecord>, StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

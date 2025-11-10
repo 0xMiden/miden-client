@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::Display;
 
 use miden_objects::Word;
-use miden_objects::account::{Account, AccountId};
+use miden_objects::account::{Account, AccountId, PartialAccount};
 use miden_objects::address::Address;
 
 /// Represents a stored account state along with its status.
@@ -58,6 +58,58 @@ impl AccountRecord {
 impl From<AccountRecord> for Account {
     fn from(record: AccountRecord) -> Self {
         record.account
+    }
+}
+
+/// Represents a stored partial account state along with its status.
+///
+/// The partial account should be stored in the database with its parts normalized. Meaning that the
+/// account header, vault, storage and code are stored separately. This is done to avoid data
+/// duplication as the header can reference the same elements if they have equal roots.
+#[derive(Debug)]
+pub struct PartialAccountRecord {
+    /// Full partial account object.
+    partial_account: PartialAccount,
+    /// Status of the tracked account.
+    status: AccountStatus,
+    /// Addresses by which this account can be referenced.
+    addresses: Vec<Address>,
+}
+
+impl PartialAccountRecord {
+    pub fn new(
+        partial_account: PartialAccount,
+        status: AccountStatus,
+        addresses: Vec<Address>,
+    ) -> Self {
+        // TODO: remove this?
+        #[cfg(debug_assertions)]
+        {
+            let account_seed = partial_account.seed();
+            debug_assert_eq!(account_seed, status.seed().copied(), "partial account seed mismatch");
+        }
+
+        Self { partial_account, status, addresses }
+    }
+
+    pub fn partial_account(&self) -> &PartialAccount {
+        &self.partial_account
+    }
+
+    pub fn status(&self) -> &AccountStatus {
+        &self.status
+    }
+
+    pub fn is_locked(&self) -> bool {
+        self.status.is_locked()
+    }
+
+    pub fn seed(&self) -> Option<Word> {
+        self.partial_account.seed()
+    }
+
+    pub fn addresses(&self) -> &Vec<Address> {
+        &self.addresses
     }
 }
 
