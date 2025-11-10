@@ -1,6 +1,5 @@
 [package]
 authors.workspace      = true
-build                  = "build.rs"
 description            = "IndexedDB-backed Store implementation for miden-client (WASM)"
 edition.workspace      = true
 license.workspace      = true
