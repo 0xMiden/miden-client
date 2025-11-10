@@ -290,7 +290,7 @@ fn miden_directory_structure_creation() {
     assert!(!token_map_file.exists(), "token symbol map should not exist until first use");
 
     // Test that running any command after init creates keystore directory on-demand
-    let mut account_cmd = Command::cargo_bin("miden-client").unwrap();
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
