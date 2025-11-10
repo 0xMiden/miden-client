@@ -2650,6 +2650,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasmbind-js-file-macro",
  "web-sys",
 ]
 
@@ -6228,6 +6229,17 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "wasmbind-js-file-macro"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b895bdece3b926b188fbb76773375fc6b6f4058499cbe9f32491b0e264b27f71"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.109",
 ]
 
 [[package]]

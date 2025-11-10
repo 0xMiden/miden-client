@@ -7,8 +7,8 @@
     "typescript": "^5.9.2"
   },
   "scripts": {
-    "build": "yarn tsc --build --force ./tsconfig.json",
-    "build:bundler": "yarn tsc --build --force ./tsconfig.bundler.json",
+    "build": "./node_modules/typescript/bin/tsc --build --force ./tsconfig.json",
+    "build:bundler": "./node_modules/typescript/bin/tsc --build --force ./tsconfig.bundler.json",
     "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts"
   },
   "devDependencies": {

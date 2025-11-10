@@ -3,9 +3,10 @@ use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // ChainData IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/chainData.js")]
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/chainData.js")]
 extern "C" {
     // GETS
     // ================================================================================================

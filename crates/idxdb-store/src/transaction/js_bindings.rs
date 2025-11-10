@@ -3,10 +3,10 @@ use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // Transactions IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/transactions.js")]
-
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/transactions.js")]
 extern "C" {
     // GETS
     // ================================================================================================

@@ -3,6 +3,7 @@ use serde_wasm_bindgen::from_value;
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen_futures::{JsFuture, js_sys};
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // WEB KEYSTORE HELPER
 // ================================================================================================
@@ -16,7 +17,7 @@ pub struct AccountAuthIdxdbObject {
     pub secret_key: String,
 }
 
-#[wasm_bindgen(module = "/src/js/accounts.js")]
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/accounts.js")]
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
     pub fn idxdb_insert_account_auth(pub_key: String, secret_key: String) -> js_sys::Promise;

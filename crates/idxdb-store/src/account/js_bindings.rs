@@ -7,12 +7,13 @@ use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // INDEXED DB BINDINGS
 // ================================================================================================
 
 // Account IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/accounts.js")]
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/sync.js")]
 extern "C" {
     // GETS
     // --------------------------------------------------------------------------------------------

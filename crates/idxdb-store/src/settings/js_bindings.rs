@@ -3,9 +3,10 @@ use alloc::vec::Vec;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // Settings IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/settings.js")]
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/settings.js")]
 extern "C" {
     #[wasm_bindgen(js_name = getSetting)]
     pub fn idxdb_get_setting(key: String) -> js_sys::Promise;

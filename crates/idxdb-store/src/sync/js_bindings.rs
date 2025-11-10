@@ -11,9 +11,10 @@ use super::flattened_vec::FlattenedU8Vec;
 use crate::account::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use crate::note::utils::{SerializedInputNoteData, SerializedOutputNoteData};
 use crate::transaction::utils::SerializedTransactionData;
+use wasmbind_js_file_macro::wasmbind_dump_js_file_as_inline;
 
 // Sync IndexedDB Operations
-#[wasm_bindgen(module = "/src/js/sync.js")]
+#[wasmbind_dump_js_file_as_inline(path = "${outDir}/src/js/sync.js")]
 extern "C" {
     // GETS
     // --------------------------------------------------------------------------------------------
