@@ -41,11 +41,7 @@ fn main() {
         Some("auth"),
     );
 
-    build_package(
-        &PathBuf::from("templates/no-auth.toml"),
-        no_auth_library(),
-        Some("auth"),
-    );
+    build_package(&PathBuf::from("templates/no-auth.toml"), no_auth_library(), Some("auth"));
 
     build_package(
         &PathBuf::from("templates/multisig-auth.toml"),

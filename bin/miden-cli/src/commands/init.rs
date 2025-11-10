@@ -181,7 +181,7 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
 
     for package in DEFAULT_INCLUDED_PACKAGES {
         let package_path = packages_dir.join(package.0);
-        
+
         // Create parent directory if it doesn't exist (for subdirectories like auth/)
         if let Some(parent) = package_path.parent() {
             fs::create_dir_all(parent).map_err(|err| {
@@ -191,7 +191,7 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
                 )
             })?;
         }
-        
+
         let mut lib_file = File::create(&package_path).map_err(|err| {
             CliError::Config(
                 Box::new(err),
