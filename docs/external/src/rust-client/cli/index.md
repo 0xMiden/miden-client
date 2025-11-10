@@ -282,11 +282,11 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand                       | Description                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------- |
-| `list <ID>`                      | List all addresses or only for the specified account ID (default command)             |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for specified account ID with optional tag length    |
-| `remove <ID> <INTERFACE>`        | Remove an address for an interface for specified account ID                           |
+| Subcommand                       | Description                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------|
+| `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
+| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
+| `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
@@ -294,9 +294,10 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, these values can be:
-- `Unspecified`: The default interface.
+`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
 - `BasicWallet`: The basic wallet interface.
+
+Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
 
 ```sh
 miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
@@ -394,4 +395,3 @@ inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000
 ### `note-transport`
 
 Send and fetch private notes using the transport layer.
-

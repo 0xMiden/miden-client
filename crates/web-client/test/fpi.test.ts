@@ -27,7 +27,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 push.15.15.15.15
                 # item index
                 push.0
-                exec.::miden::account::get_map_item
+                exec.::miden::active_account::get_map_item
                 swapw dropw
             end
         `;
@@ -119,7 +119,9 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let txRequest2 = new window.TransactionRequestBuilder()
       .withCustomScript(compiledTxScript)
-      .withForeignAccounts([foreignAccount])
+      .withForeignAccounts(
+        new window.MidenArrays.ForeignAccountArray([foreignAccount])
+      )
       .build();
 
     let txResult2 = await window.helpers.executeAndApplyTransaction(

@@ -14,6 +14,7 @@ use miden_objects::transaction::{InputNote, InputNotes, TransactionArgs, Transac
 use miden_objects::vm::AdviceMap;
 use miden_objects::{
     AccountError,
+    AssetVaultError,
     NoteError,
     StorageMapError,
     TransactionInputError,
@@ -449,7 +450,7 @@ pub enum TransactionRequestError {
     #[error("specified authenticated input note with id {0} is missing")]
     MissingAuthenticatedInputNote(NoteId),
     #[error("a transaction without output notes must have at least one input note")]
-    NoInputNotes,
+    NoInputNotesNorAccountChange,
     #[error("note not found: {0}")]
     NoteNotFound(String),
     #[error("note creation error")]
@@ -466,6 +467,8 @@ pub enum TransactionRequestError {
     TransactionInputError(#[from] TransactionInputError),
     #[error("storage map error")]
     StorageMapError(#[from] StorageMapError),
+    #[error("asset vault error")]
+    AssetVaultError(#[from] AssetVaultError),
 }
 
 // TESTS
@@ -478,7 +481,8 @@ mod tests {
     use miden_lib::account::auth::AuthRpoFalcon512;
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
-    use miden_objects::account::{AccountBuilder, AccountId, AccountType, PublicKeyCommitment};
+    use miden_objects::account::auth::PublicKeyCommitment;
+    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
     use miden_objects::asset::FungibleAsset;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};

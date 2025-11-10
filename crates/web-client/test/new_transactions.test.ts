@@ -375,8 +375,11 @@ export const customTransaction = async (
       let felt8 = new window.Felt(BigInt(9));
 
       let noteArgs = [felt1, felt2, felt3, felt4, felt5, felt6, felt7, felt8];
-      let feltArray = new window.FeltArray();
-      noteArgs.forEach((felt) => feltArray.append(felt));
+      let feltArray = new window.MidenArrays.FeltArray();
+
+      noteArgs.forEach((felt) => {
+        feltArray.push(felt);
+      });
 
       let noteAssets = new window.NoteAssets([
         new window.FungibleAsset(faucetAccount.id(), BigInt(10)),
@@ -395,6 +398,7 @@ export const customTransaction = async (
       let memAddress2 = "1004";
       let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
       let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+
       let noteScript = `
             # Custom P2ID note script
             #
@@ -405,7 +409,7 @@ export const customTransaction = async (
             # This note script is based off of the P2ID note script because notes currently need to have
             # assets, otherwise it could have been boiled down to the assert.
 
-            use.miden::account
+            use.miden::native_account
             use.miden::active_note
             use.miden::contracts::wallets::basic->wallet
             use.std::mem
@@ -425,11 +429,11 @@ export const customTransaction = async (
                 # => [target_mem_addr']
                 dropw
                 # => []
-                
+
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -438,7 +442,7 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw
+                mem_loadw_be
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
@@ -456,7 +460,7 @@ export const customTransaction = async (
                 mem_load
                 # => [target_account_id_prefix]
 
-                exec.account::get_id swap drop
+                exec.native_account::get_id swap drop
                 # => [account_id_prefix, target_account_id_prefix, ...]
 
                 # ensure account_id = target_account_id, fails otherwise
@@ -471,7 +475,7 @@ export const customTransaction = async (
       let builder = client.createScriptBuilder();
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
+        new window.MidenArrays.FeltArray([
           walletAccount.id().prefix(),
           walletAccount.id().suffix(),
         ])
@@ -480,6 +484,7 @@ export const customTransaction = async (
       const serialNum = new window.Word(
         new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
       );
+
       let noteRecipient = new window.NoteRecipient(
         serialNum,
         compiledNoteScript,
@@ -494,9 +499,11 @@ export const customTransaction = async (
           : undefined;
 
       // Creating First Custom Transaction Request to Mint the Custom Note
+
+      const outputNote = window.OutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
         .withOwnOutputNotes(
-          new window.OutputNotesArray([window.OutputNote.full(note)])
+          new window.MidenArrays.OutputNoteArray([outputNote])
         )
         .build();
 
@@ -528,10 +535,13 @@ export const customTransaction = async (
       // with Invalid/Valid Transaction Script
       let transactionScript = await builder.compileTxScript(txScript);
       let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
+
       let adviceMap = new window.AdviceMap();
       let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
       let transactionRequest2 = new window.TransactionRequestBuilder()
@@ -604,12 +614,12 @@ const customTxWithMultipleNotes = async (
 
       const p2idScript = window.NoteScript.p2id();
 
-      let noteInputs = new window.NoteInputs(
-        new window.FeltArray([
-          targetAccount.id().suffix(),
-          targetAccount.id().prefix(),
-        ])
-      );
+      const inputNotes = new window.MidenArrays.FeltArray([
+        targetAccount.id().suffix(),
+        targetAccount.id().prefix(),
+      ]);
+
+      let noteInputs = new window.NoteInputs(inputNotes);
 
       let noteRecipient1 = new window.NoteRecipient(
         serialNum1,
@@ -625,13 +635,15 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
+      const notes = [
+        window.OutputNote.full(note1),
+        window.OutputNote.full(note2),
+      ];
+
+      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
+
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.OutputNotesArray([
-            window.OutputNote.full(note1),
-            window.OutputNote.full(note2),
-          ])
-        )
+        .withOwnOutputNotes(outputNotes)
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -703,18 +715,19 @@ export const customAccountComponent = async (
 ): Promise<void> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # Inputs: [KEY, VALUE]
         # Outputs: []
         export.write_to_map
             # The storage map is in storage slot 1
-            push.1
+            push.0
             # => [index, KEY, VALUE]
 
             # Setting the key value pair in the map
-            exec.account::set_map_item
+            exec.native_account::set_map_item
             # => [OLD_MAP_ROOT, OLD_MAP_VALUE]
 
             dropw dropw dropw dropw
@@ -725,10 +738,10 @@ export const customAccountComponent = async (
         # Outputs: [VALUE]
         export.get_value_in_map
             # The storage map is in storage slot 1
-            push.1
+            push.0
             # => [index, KEY]
 
-            exec.account::get_map_item
+            exec.active_account::get_map_item
             # => [VALUE]
         end
 
@@ -736,7 +749,7 @@ export const customAccountComponent = async (
         # Outputs: [CURRENT_ROOT]
         export.get_current_map_root
             # Getting the current root from slot 1
-            push.1 exec.account::get_item
+            push.0 exec.active_account::get_item
             # => [CURRENT_ROOT]
 
             exec.sys::truncate_stack
@@ -772,14 +785,13 @@ export const customAccountComponent = async (
       `;
     const client = window.client;
     let builder = client.createScriptBuilder();
-    let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();
     let storageSlotMap = window.StorageSlot.map(storageMap);
 
     let mappingAccountComponent = window.AccountComponent.compile(
       accountCode,
       builder,
-      [emptyStorageSlot, storageSlotMap]
+      [storageSlotMap]
     ).withSupportsAllTypes();
 
     const walletSeed = new Uint8Array(32);
@@ -827,8 +839,7 @@ export const customAccountComponent = async (
 
     // Read a map value from storage slot 1 with key 0x0
     const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-    // NOTE: the map slot is in index 2 because the auth component takes one slot
-    const retrieveMapKey = updated?.storage().getMapItem(2, keyZero);
+    const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
 
     const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
 
@@ -1041,13 +1052,14 @@ export const counterAccountComponent = async (
 ): Promise<string | undefined> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
-        use.miden::account
+        use.miden::active_account
+        use.miden::native_account
         use.std::sys
 
         # => []
         export.get_count
             push.0
-            exec.account::get_item
+            exec.active_account::get_item
             exec.sys::truncate_stack
         end
 
@@ -1055,13 +1067,13 @@ export const counterAccountComponent = async (
         export.increment_count
             push.0
             # => [index]
-            exec.account::get_item
+            exec.active_account::get_item
             # => [count]
             push.1 add
             # => [count+1]
             push.0
             # [index, count+1]
-            exec.account::set_item
+            exec.native_account::set_item
             # => []
             exec.sys::truncate_stack
             # => []
@@ -1127,12 +1139,16 @@ export const counterAccountComponent = async (
     // Create transaction with network note
     let compiledNoteScript = await builder.compileNoteScript(scriptCode);
 
-    let noteInputs = new window.NoteInputs(new window.FeltArray([]));
+    let noteInputs = new window.NoteInputs(
+      new window.MidenArrays.FeltArray([])
+    );
 
     const randomInts = Array.from({ length: 4 }, () =>
       Math.floor(Math.random() * 100000)
     );
+
     let serialNum = new window.Word(new BigUint64Array(randomInts.map(BigInt)));
+
     let noteRecipient = new window.NoteRecipient(
       serialNum,
       compiledNoteScript,
@@ -1153,7 +1169,7 @@ export const counterAccountComponent = async (
 
     let transactionRequest = new window.TransactionRequestBuilder()
       .withOwnOutputNotes(
-        new window.OutputNotesArray([window.OutputNote.full(note)])
+        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
       )
       .build();
 
@@ -1217,12 +1233,12 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                     # item index
                     push.0
                     # => [index, KEY]
-                    exec.::miden::account::get_map_item
+                    exec.::miden::active_account::get_map_item
                     add.1
                     push.1.1.1.1 # Map key
                     push.0
                     # => [index, KEY, BUMPED_VALUE]
-                    exec.::miden::account::set_map_item
+                    exec.::miden::native_account::set_map_item
                     # => [OLD_MAP_ROOT, OLD_VALUE]
                     dropw dropw
                 end

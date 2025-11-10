@@ -18,6 +18,16 @@
 
 ## Methods
 
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+#### Returns
+
+`void`
+
+***
+
 ### addAccountSecretKeyToWebStore()
 
 > **addAccountSecretKeyToWebStore**(`secret_key`): `Promise`\<`void`\>

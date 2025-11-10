@@ -1,8 +1,10 @@
 extern crate alloc;
 use alloc::sync::Arc;
+use core::error::Error;
 use core::fmt::Write;
 
 use idxdb_store::WebStore;
+use js_sys::{Function, Reflect};
 use miden_client::crypto::RpoRandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
@@ -11,6 +13,8 @@ use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{
     Client,
+    ClientError,
+    ErrorHint,
     ExecutionOptions,
     Felt,
     MAX_TX_EXECUTION_CYCLES,
@@ -20,12 +24,13 @@ use models::script_builder::ScriptBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Function;
 
 pub mod account;
 pub mod export;
 pub mod helpers;
 pub mod import;
+#[macro_use]
+pub(crate) mod miden_array;
 pub mod mock;
 pub mod models;
 pub mod new_account;
@@ -211,13 +216,29 @@ impl WebClient {
 
 fn js_error_with_context<T>(err: T, context: &str) -> JsValue
 where
-    T: core::error::Error,
+    T: Error + 'static,
 {
     let mut error_string = context.to_string();
-    let mut source = Some(&err as &dyn core::error::Error);
+    let mut source = Some(&err as &dyn Error);
     while let Some(err) = source {
-        write!(error_string, ": {err}").expect("writing to string should always succeeds");
+        write!(error_string, ": {err}").expect("writing to string should always succeed");
         source = err.source();
     }
-    JsValue::from(error_string)
+
+    let help = hint_from_error(&err);
+    let js_error: JsValue = JsError::new(&error_string).into();
+
+    if let Some(help) = help {
+        let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    }
+
+    js_error
+}
+
+fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {
+    if let Some(client_error) = err.downcast_ref::<ClientError>() {
+        return Option::<ErrorHint>::from(client_error).map(ErrorHint::into_help_message);
+    }
+
+    err.source().and_then(hint_from_error)
 }

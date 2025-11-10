@@ -44,6 +44,7 @@ import {
   NoteType,
   OutputNote,
   OutputNotesArray,
+  Package,
   PublicKey,
   Rpo256,
   RpcClient,
@@ -69,6 +70,7 @@ import {
   Word,
   NoteAndArgs,
   NoteAndArgsArray,
+  MidenArrays,
   ScriptBuilder,
   ScriptBuilderMode,
 } from "../dist/index";
@@ -131,6 +133,7 @@ declare global {
     NoteType: typeof NoteType;
     OutputNote: typeof OutputNote;
     OutputNotesArray: typeof OutputNotesArray;
+    Package: typeof Package;
     PublicKey: typeof PublicKey;
     Rpo256: typeof Rpo256;
     SecretKey: typeof SecretKey;
@@ -156,6 +159,7 @@ declare global {
     WebClient: typeof WebClient;
     Word: typeof Word;
     Address: typeof Address;
+    MidenArrays: typeof MidenArrays;
     ScriptBuilder: typeof ScriptBuilder;
     ScriptBuilderMode: typeof ScriptBuilderMode;
     createClient: () => Promise<void>;

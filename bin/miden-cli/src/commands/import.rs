@@ -95,7 +95,7 @@ fn read_note_file(filename: PathBuf) -> Result<NoteFile, CliError> {
     let mut _file = File::open(filename).and_then(|mut f| f.read_to_end(&mut contents))?;
 
     NoteFile::read_from_bytes(&contents)
-        .map_err(|err| CliError::Client(ClientError::DataDeserializationError(err)))
+        .map_err(|err| ClientError::DataDeserializationError(err).into())
 }
 
 // HELPERS

@@ -6,6 +6,6 @@
 
 # Type Alias: AddressInterface
 
-> **AddressInterface** = `"Unspecified"` \| `"BasicWallet"`
+> **AddressInterface** = `"BasicWallet"`
 
 Specifies which procedures an account accepts, and by extension which notes it can consume.

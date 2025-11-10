@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use miden_client::account::{AccountIdAddress, AccountStorageMode, Address, AddressInterface};
+use miden_client::account::AccountStorageMode;
+use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
@@ -139,10 +140,9 @@ async fn run_flow(
             .context("failed to insert faucet in sender")?;
 
     // Build recipient address
-    let recipient_address = Address::AccountId(AccountIdAddress::new(
-        recipient_account.id(),
-        AddressInterface::BasicWallet,
-    ));
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
+        .context("failed to build recipient address")?;
 
     // Ensure recipient has no input notes
     recipient.sync_state().await.context("recipient initial sync")?;

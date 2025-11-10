@@ -67,8 +67,7 @@ test.describe("get_input_note", () => {
 
     // Test RpcClient.getNotesById
     const rpcResult = await page.evaluate(async (_consumedNoteId: string) => {
-      // NOTE: this assumes the node is running on localhost
-      const endpoint = new window.Endpoint("http://localhost:57291");
+      const endpoint = new window.Endpoint(window.rpcUrl);
       const rpcClient = new window.RpcClient(endpoint);
 
       const noteId = window.NoteId.fromHex(_consumedNoteId);
@@ -97,7 +96,7 @@ test.describe("get_input_note", () => {
 
     // Get the note to extract its script root
     const noteData = await page.evaluate(async (_consumedNoteId: string) => {
-      const endpoint = new window.Endpoint("http://localhost:57291");
+      const endpoint = new window.Endpoint(window.rpcUrl);
       const rpcClient = new window.RpcClient(endpoint);
 
       const noteId = window.NoteId.fromHex(_consumedNoteId);
@@ -117,7 +116,7 @@ test.describe("get_input_note", () => {
     // Test GetNoteScriptByRoot endpoint
     const retrievedScript = await page.evaluate(
       async (scriptRootHex: string) => {
-        const endpoint = new window.Endpoint("http://localhost:57291");
+        const endpoint = new window.Endpoint(window.rpcUrl);
         const rpcClient = new window.RpcClient(endpoint);
 
         const scriptRoot = window.Word.fromHex(scriptRootHex);
@@ -253,7 +252,9 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -354,7 +355,9 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         let outputNote = window.OutputNote.full(p2IdeNote);
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.OutputNotesArray([outputNote]))
+          .withOwnOutputNotes(
+            new window.MidenArrays.OutputNoteArray([outputNote])
+          )
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(

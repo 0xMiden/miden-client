@@ -197,7 +197,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
              push.{num_leaves} push.4000 mem_store
 
              # merkle root -> mem[4004]
-             push.{} push.4004 mem_storew dropw
+             push.{} push.4004 mem_storew_be dropw
         ",
         merkle_root.to_hex()
     );
