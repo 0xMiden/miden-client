@@ -81,9 +81,14 @@ pub mod component {
     pub use miden_lib::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
+        network_fungible_faucet_library,
         rpo_falcon_512_library,
     };
-    pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
+    pub use miden_lib::account::faucets::{
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
+    };
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
         AccountComponent,
