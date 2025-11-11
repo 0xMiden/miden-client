@@ -90,8 +90,9 @@ jobs:
           cd ./crates/idxdb-store/src/
           yarn
           yarn tsc --outDir ci_test_folder
-          shopt -s extglob
-          cd ci_test_folder && find . -type f ! -name "*.js" -delete
+          pushd ci_test_folder
+          find . -type f ! -name "*.js" -delete
+          popd
           diff -bur js ci_test_folder
 
       - name: Restore cache - dist folder
