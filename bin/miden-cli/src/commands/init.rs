@@ -118,9 +118,7 @@ impl InitCmd {
             return Err(CliError::Config(
                 "Local configuration already exists".to_string().into(),
                 format!(
-                    "The file \"{:?}\" already exists in the working directory. Please try using another directory or removing the file.",
-                    config_file_path.display(),
-                    "Cannot copy to local directory: {} already exists. Remove it first.",
+                    "Cannot copy to local directory: \"{:?}\" already exists. Remove it first.",
                     local_miden_dir.display()
                 ),
             ));
