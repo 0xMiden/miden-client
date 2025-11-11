@@ -3,7 +3,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
+use miden_objects::account::{AccountId, PartialAccount, StorageSlot};
 use miden_objects::asset::{AssetVaultKey, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
@@ -67,16 +67,23 @@ impl DataStore for ClientDataStore {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
-        //TODO: Only retrieve partial account. This should be done in the `tomyrd-partial-accounts`
-        // branch (and future PR). Construct Account
-        let account_record = self
+        // //TODO: Only retrieve partial account. This should be done in the
+        // `tomyrd-partial-accounts` // branch (and future PR). Construct Account
+        // let account_record = self
+        //     .store
+        //     .get_account(account_id)
+        //     .await?
+        //     .ok_or(DataStoreError::AccountNotFound(account_id))?;
+
+        // let account: Account = account_record.into();
+        // let partial_account = PartialAccount::from(&account);
+
+        let partial_account_record = self
             .store
-            .get_account(account_id)
+            .get_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
-
-        let account: Account = account_record.into();
-        let partial_account = PartialAccount::from(&account);
+        let partial_account: PartialAccount = partial_account_record.into();
 
         // Get header data
         let (block_header, _had_notes) = self

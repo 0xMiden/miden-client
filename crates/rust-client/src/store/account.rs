@@ -113,6 +113,12 @@ impl PartialAccountRecord {
     }
 }
 
+impl From<PartialAccountRecord> for PartialAccount {
+    fn from(record: PartialAccountRecord) -> Self {
+        record.partial_account
+    }
+}
+
 // ACCOUNT STATUS
 // ================================================================================================
 
