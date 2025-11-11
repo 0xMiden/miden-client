@@ -1,5 +1,5 @@
 name = "multisig_auth"
-description = "Multisig authentication component based on RPO Falcon512 signatures. Enforces a threshold of approver signatures for every transaction. Storage layout: Slot 0 - threshold/count, Slot 1 - approvers map, Slot 2 - executed transactions map, Slot 3 - procedure thresholds map"
+description = "Multisig authentication component based on RPO Falcon512 signatures. Enforces a threshold of approver signatures for every transaction."
 version = "0.1.0"
 supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
 

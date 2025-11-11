@@ -15,8 +15,8 @@ description = "ACL configuration: [num_tracked_procs, allow_unauthorized_output_
 slot = 1
 value = [
     { name = "num_tracked_procs", type = "u32", description = "Number of procedures tracked for authentication" },
-    { name = "allow_unauthorized_output_notes", type = "u32", description = "Whether unauthorized output notes are allowed (0=false, 1=true)" },
-    { name = "allow_unauthorized_input_notes", type = "u32", description = "Whether unauthorized input notes are allowed (0=false, 1=true)" },
+    { name = "allow_unauthorized_output_notes", type = "u8", description = "Whether unauthorized output notes are allowed (0=false, 1=true)" },
+    { name = "allow_unauthorized_input_notes", type = "u8", description = "Whether unauthorized input notes are allowed (0=false, 1=true)" },
     { value = "0" },
 ]
 
@@ -25,8 +25,3 @@ name = "proc_roots"
 description = "Map with trigger procedure roots that require authentication"
 slot = 2
 type = "map"
-
-
-
-
-
