@@ -91,7 +91,7 @@ jobs:
           yarn
           yarn tsc --outDir ci_test_folder
           shopt -s extglob
-          cd ci_test_folder && rm ^*.js(.)
+          cd ci_test_folder && find . -type f ! -name "*.js" -delete
           diff -bur js ci_test_folder
 
       - name: Restore cache - dist folder
