@@ -325,7 +325,7 @@ impl SqliteStore {
                 &tx,
                 partial_account.storage().commitment(),
                 index,
-                slot_type,
+                *slot_type,
                 value,
             )?;
 
@@ -337,7 +337,7 @@ impl SqliteStore {
                             StoreError::AccountError(AccountError::StorageMapRootNotFound(*value)),
                         )?;
 
-                    let entries = map.entries().map(|(key, value)| (key.clone(), value.clone()));
+                    let entries = map.entries().map(|(key, value)| (*key, *value));
                     SqliteStore::insert_storage_map_entries(&tx, map.root(), entries)?;
                 },
             }
@@ -1054,7 +1054,7 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         commitment: Word,
         index: usize,
-        slot_type: &StorageSlotType,
+        slot_type: StorageSlotType,
         value: &Word,
     ) -> Result<(), StoreError> {
         const QUERY: &str = insert_sql!(
