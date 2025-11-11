@@ -503,8 +503,10 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
     ) -> Result<Option<PartialAccountRecord>, StoreError> {
+        let merkle_store = self.merkle_store.clone();
+
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_partial_account(conn, account_id)
+            SqliteStore::get_partial_account(conn, &merkle_store, account_id)
         })
         .await
     }

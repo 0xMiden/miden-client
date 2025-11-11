@@ -198,17 +198,3 @@ CREATE INDEX idx_addresses_account_id ON addresses(account_id);
 CREATE TABLE tracked_accounts (
     id TEXT NOT NULL PRIMARY KEY
 );
-
--- Create partial_storage table
-CREATE TABLE partial_storage(
-    storage_commitment TEXT NOT NULL, -- Commitment to the partial_storage
-    storage BLOB NOT NULL, -- Serialized partial storage
-    PRIMARY KEY (storage_commitment),
-);
-
--- Create partial_vault table
-CREATE TABLE partial_vault(
-    root TEXT NOT NULL,     -- root of the partial vault
-    vault BLOB NOT NULL,    -- serialized partial vault
-    PRIMARY KEY (root)
-);

@@ -10,6 +10,7 @@ use miden_objects::{
     AddressError,
     AssetError,
     AssetVaultError,
+    // PartialAssetVaultError, // TODO: export this in miden-objects
     NoteError,
     StorageMapError,
     TransactionScriptError,
@@ -90,6 +91,10 @@ pub enum StoreError {
     VaultDataNotFound(Word),
     #[error("failed to parse word: {0}")]
     WordError(#[from] WordError),
+    #[error("failed to add partial asset vault: {0}")]
+    PartialAssetVaultError(String),
+    // PartialAssetVaultError(#[from] PartialAssetVaultError), // TODO: use this after exporting
+    // PartialAssetVaultError in miden-objects
 }
 
 impl From<StoreError> for DataStoreError {

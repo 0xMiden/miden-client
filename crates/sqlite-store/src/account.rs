@@ -17,6 +17,7 @@ use miden_client::account::{
     Address,
     PartialAccount,
     PartialStorage,
+    PartialStorageMap,
     StorageMap,
     StorageSlot,
     StorageSlotType,
@@ -33,7 +34,7 @@ use miden_client::store::{
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::StorageMapWitness;
+use miden_objects::account::{AccountStorageHeader, StorageMapWitness};
 use miden_objects::asset::{AssetVaultKey, PartialVault};
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
@@ -196,26 +197,59 @@ impl SqliteStore {
 
     pub(crate) fn get_partial_account(
         conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
     ) -> Result<Option<PartialAccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
             return Ok(None);
         };
 
-        let partial_vault =
-            query_partial_vault(conn, "root = ?", params![header.vault_root().to_hex()])?
-                .first()
-                .cloned()
-                .ok_or(StoreError::AccountDataNotFound(account_id))?;
+        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
+        let mut partial_vault = PartialVault::default();
+        for asset in query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])? {
+            let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+            partial_vault
+                .add(AssetWitness::new(proof).map_err(StoreError::AssetError)?)
+                .map_err(|e| StoreError::PartialAssetVaultError(e.to_string()))?; // TODO: replace String with Err itself
+        }
 
-        let partial_storage = query_partial_storage(
+        let storage_values = query_storage_values(
             conn,
-            "storage_commitment = ?",
+            "commitment = ?",
             params![header.storage_commitment().to_hex()],
-        )?
-        .first()
-        .cloned()
-        .ok_or(StoreError::AccountDataNotFound(account_id))?;
+        )?;
+
+        let possible_roots: Vec<Value> =
+            storage_values.values().map(|(_, value)| Value::from(value.to_hex())).collect();
+
+        let mut maps = vec![];
+        let mut storage_header = vec![];
+        let mut storage_maps =
+            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
+
+        for (slot_type, value) in storage_values.into_values() {
+            match slot_type {
+                StorageSlotType::Value => storage_header.push((StorageSlotType::Value, value)),
+                StorageSlotType::Map => {
+                    //TODO: This might not work as inteded, this map may calculate the root based
+                    // on the returned entries and not on the original partial storage map root.
+                    let map = storage_maps
+                        .remove(&value)
+                        .ok_or(AccountError::StorageMapRootNotFound(value))
+                        .unwrap();
+
+                    storage_header.push((StorageSlotType::Map, value));
+
+                    let entries: Vec<(Word, Word)> = map.entries().map(|(k, v)| (*k, *v)).collect();
+                    let storage_map = StorageMap::with_entries(entries)?;
+                    let partial_storage_map = PartialStorageMap::new_full(storage_map);
+                    maps.push(partial_storage_map);
+                },
+            }
+        }
+
+        let partial_storage =
+            PartialStorage::new(AccountStorageHeader::new(storage_header), maps).unwrap();
 
         let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
             return Ok(None);
@@ -229,7 +263,6 @@ impl SqliteStore {
             partial_vault,
             status.seed().copied(),
         )?;
-
         let addresses = query_account_addresses(conn, header.id())?;
         Ok(Some(PartialAccountRecord::new(partial_account, status, addresses)))
     }
@@ -274,13 +307,48 @@ impl SqliteStore {
 
         Self::insert_account_code(&tx, partial_account.code())?;
 
-        Self::insert_partial_storage(
+        // storage slot values can be inserted with `insert_storage_slots`, map values
+        // need a different procedure
+        let mut slots = vec![];
+        for (slot_type, value) in partial_account.storage().header().slots() {
+            match slot_type {
+                StorageSlotType::Map => {
+                    let map =
+                        partial_account.storage().maps().find(|map| map.root() == *value).ok_or(
+                            StoreError::AccountError(AccountError::StorageMapRootNotFound(*value)),
+                        )?;
+
+                    SqliteStore::insert_storage_map_entries(
+                        &tx,
+                        map.root(),
+                        map.entries().map(|(key, val)| (*key, *val)),
+                    )?;
+                },
+                StorageSlotType::Value => {
+                    slots.push(StorageSlot::Value(*value));
+                },
+            }
+        }
+        Self::insert_storage_slots(
             &tx,
             partial_account.storage().commitment(),
-            partial_account.storage(),
+            slots.iter().enumerate(),
         )?;
 
-        Self::insert_partial_vault(&tx, partial_account.vault().root(), partial_account.vault())?;
+        let mut assets = vec![];
+        for leaf in partial_account.vault().leaves() {
+            match leaf {
+                SmtLeaf::Single((_, value)) => assets.push(Asset::try_from(value)?),
+                SmtLeaf::Multiple(items) => {
+                    for (_, value) in items {
+                        assets.push(Asset::try_from(value)?);
+                    }
+                },
+                SmtLeaf::Empty(_) => {},
+            }
+        }
+        Self::insert_assets(&tx, partial_account.vault().root(), assets.into_iter())?;
+
         Self::insert_account_header(&tx, &partial_account.into(), partial_account.seed())?;
 
         Self::insert_address(&tx, initial_address, partial_account.id())?;
@@ -959,15 +1027,16 @@ impl SqliteStore {
         Ok(())
     }
 
-    fn insert_partial_storage(
+    fn insert_storage_map_entries(
         tx: &Transaction<'_>,
-        commitment: Word,
-        partial_storage: &PartialStorage,
+        root: Word,
+        entries: impl Iterator<Item = (Word, Word)>,
     ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(partial_storage { commitment, storages } | REPLACE);
-        tx.execute(QUERY, params![commitment.to_hex(), partial_storage.to_bytes()])
-            .into_store_error()?;
-
+        const QUERY: &str = insert_sql!(storage_map_entries { root, key, value } | REPLACE);
+        for (key, value) in entries {
+            tx.execute(QUERY, params![root.to_hex(), key.to_hex(), value.to_hex()])
+                .into_store_error()?;
+        }
         Ok(())
     }
 
@@ -991,18 +1060,6 @@ impl SqliteStore {
             )
             .into_store_error()?;
         }
-
-        Ok(())
-    }
-
-    fn insert_partial_vault(
-        tx: &Transaction<'_>,
-        root: Word,
-        partial_vault: &PartialVault,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(partial_vault { root, vault } | REPLACE);
-        tx.execute(QUERY, params![root.to_hex(), partial_vault.to_bytes()])
-            .into_store_error()?;
 
         Ok(())
     }
@@ -1144,6 +1201,30 @@ fn query_storage_maps(
     Ok(maps)
 }
 
+fn query_storage_values(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<BTreeMap<u8, (StorageSlotType, Word)>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value, slot_type FROM account_storage";
+
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map(params, |row| {
+            let index: u8 = row.get(0)?;
+            let value: String = row.get(1)?;
+            let slot_type: Vec<u8> = row.get(2)?;
+            Ok((index, value, slot_type))
+        })
+        .into_store_error()?
+        .map(|result| {
+            let (index, value, slot_type) = result.into_store_error()?;
+            Ok((index, (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?)))
+        })
+        .collect()
+}
+
 fn query_vault_assets(
     conn: &Connection,
     where_clause: &str,
@@ -1244,52 +1325,6 @@ fn query_account_addresses(
             Ok(address)
         })
         .collect::<Result<Vec<Address>, StoreError>>()
-}
-
-fn query_partial_vault(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<Vec<PartialVault>, StoreError> {
-    const PARTIAL_VAULT_QUERY: &str = "SELECT vault FROM partial_vault";
-
-    let query = format!("{PARTIAL_VAULT_QUERY} WHERE {where_clause}");
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let vault: Vec<u8> = row.get(0)?;
-            Ok(vault)
-        })
-        .into_store_error()?
-        .map(|result| {
-            let serialized_vault = result.into_store_error()?;
-            let vault = PartialVault::read_from_bytes(&serialized_vault)?;
-            Ok(vault)
-        })
-        .collect::<Result<Vec<PartialVault>, StoreError>>()
-}
-
-fn query_partial_storage(
-    conn: &Connection,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<Vec<PartialStorage>, StoreError> {
-    const PARTIAL_STORAGE_QUERY: &str = "SELECT vault FROM partial_storage";
-
-    let query = format!("{PARTIAL_STORAGE_QUERY} WHERE {where_clause}");
-    conn.prepare(&query)
-        .into_store_error()?
-        .query_map(params, |row| {
-            let storage: Vec<u8> = row.get(0)?;
-            Ok(storage)
-        })
-        .into_store_error()?
-        .map(|result| {
-            let serialized_storage = result.into_store_error()?;
-            let vault = PartialStorage::read_from_bytes(&serialized_storage)?;
-            Ok(vault)
-        })
-        .collect::<Result<Vec<PartialStorage>, StoreError>>()
 }
 
 #[cfg(test)]
