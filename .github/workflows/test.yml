@@ -90,7 +90,8 @@ jobs:
           cd ./crates/idxdb-store/src/
           yarn
           yarn tsc --outDir ci_test_folder
-          cd ci_test_folder && rm -rf *.!(js)
+          setopt EXTENDED_GLOB
+          cd ci_test_folder && rm ^*.js(.)
           diff -bur js ci_test_folder
 
       - name: Restore cache - dist folder
