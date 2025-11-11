@@ -1,0 +1,58 @@
+import { settings } from "./schema.js";
+import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
+export async function getSetting(key) {
+    try {
+        // Fetch all records matching the given key
+        const allMatchingRecords = await settings
+            .where("key")
+            .equals(key)
+            .toArray();
+        if (allMatchingRecords.length === 0) {
+            console.log("No setting record found for given key.");
+            return null;
+        }
+        // There should be only one match
+        const matchingRecord = allMatchingRecords[0];
+        // Convert the setting value to base64
+        const valueBase64 = uint8ArrayToBase64(matchingRecord.value);
+        return {
+            key: matchingRecord.key,
+            value: valueBase64,
+        };
+    }
+    catch (error) {
+        logWebStoreError(error, `Error while fetching setting key: ${key}`);
+    }
+}
+export async function insertSetting(key, value) {
+    try {
+        const setting = {
+            key,
+            value,
+        };
+        await settings.put(setting);
+    }
+    catch (error) {
+        logWebStoreError(error, `Error inserting setting with key: ${key} and value(base64): ${uint8ArrayToBase64(value)}`);
+    }
+}
+export async function removeSetting(key) {
+    try {
+        await settings.where("key").equals(key).delete();
+    }
+    catch (error) {
+        logWebStoreError(error, `Error deleting setting with key: ${key}`);
+    }
+}
+export async function listSettingKeys() {
+    try {
+        const keys = await settings
+            .toArray()
+            .then((settings) => settings.map((setting) => setting.key));
+        return keys;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error listing setting keys`);
+    }
+}
+//# sourceMappingURL=settings.js.map
