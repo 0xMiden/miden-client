@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use clap::Parser;
 use tracing::info;
 
-use crate::CLIENT_CONFIG_FILE_NAME;
 use crate::config::{CliConfig, CliEndpoint, Network, NoteTransportConfig};
 use crate::errors::CliError;
 
@@ -37,11 +36,8 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 // ================================================================================================
 
 #[derive(Debug, Clone, Parser, Default)]
-#[command(
-    about = "Initialize the client. It will create a file named `miden-client.toml` that holds \
-the CLI and client configurations, and will be placed by default in the current working \
-directory"
-)]
+#[command(about = "Initialize the client. It will create a `.miden` directory with a \
+`miden-client.toml` file that holds the CLI and client configurations")]
 pub struct InitCmd {
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
@@ -77,9 +73,20 @@ impl InitCmd {
             return Err(CliError::Config(
                 "Error with the configuration file".to_string().into(),
                 format!(
-                    "The file \"{CLIENT_CONFIG_FILE_NAME}\" already exists in the working directory. Please try using another directory or removing the file.",
+                    "The file \"{:?}\" already exists in the working directory. Please try using another directory or removing the file.",
+                    config_file_path.display(),
                 ),
             ));
+        }
+
+        // Create the .miden directory if it doesn't exist
+        if let Some(parent_dir) = config_file_path.parent() {
+            fs::create_dir_all(parent_dir).map_err(|err| {
+                CliError::Config(
+                    Box::new(err),
+                    format!("failed to create .miden directory in {}", parent_dir.display()),
+                )
+            })?;
         }
 
         let mut cli_config = CliConfig::default();
@@ -117,7 +124,14 @@ impl InitCmd {
             CliError::Config("failed to create config file".to_string().into(), err.to_string())
         })?;
 
-        write_packages_files(&cli_config)?;
+        // Resolve package directory relative to .miden directory before writing files
+        let config_dir = config_file_path.parent().unwrap();
+        let resolved_package_dir = if cli_config.package_directory.is_relative() {
+            config_dir.join(&cli_config.package_directory)
+        } else {
+            cli_config.package_directory.clone()
+        };
+        write_packages_files(&resolved_package_dir)?;
 
         file_handle.write(config_as_toml_string.as_bytes()).map_err(|err| {
             CliError::Config("failed to write config file".to_string().into(), err.to_string())
@@ -129,10 +143,8 @@ impl InitCmd {
     }
 }
 
-/// Creates the directory specified by `cli_config.package_directory`
-/// and writes the ``DEFAULT_INCLUDED_PACKAGES``.
-fn write_packages_files(cli_config: &CliConfig) -> Result<(), CliError> {
-    let packages_dir = &cli_config.package_directory;
+/// Creates the directory specified by `packages_dir` and writes the `DEFAULT_INCLUDED_PACKAGES`.
+fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
     fs::create_dir_all(packages_dir).map_err(|err| {
         CliError::Config(
             Box::new(err),

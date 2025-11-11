@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use figment::value::{Dict, Map};
@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::CliError;
 
+pub const MIDEN_DIR: &str = ".miden";
 const TOKEN_SYMBOL_MAP_FILEPATH: &str = "token_symbol_map.toml";
-const DEFAULT_PACKAGES_DIR: &str = "./packages";
+const DEFAULT_PACKAGES_DIR: &str = "packages";
 
 // CLI CONFIG
 // ================================================================================================
@@ -59,16 +60,15 @@ impl Default for CliConfig {
         const STORE_FILENAME: &str = "store.sqlite3";
         const KEYSTORE_DIRECTORY: &str = "keystore";
 
-        // Get current directory
-        let exec_dir = PathBuf::new();
-
+        // Create paths relative to the config file location (which is in .miden directory)
+        // These will be resolved relative to the .miden directory when the config is loaded
         Self {
             rpc: RpcConfig::default(),
-            store_filepath: exec_dir.join(STORE_FILENAME),
-            secret_keys_directory: exec_dir.join(KEYSTORE_DIRECTORY),
-            token_symbol_map_filepath: Path::new(TOKEN_SYMBOL_MAP_FILEPATH).to_path_buf(),
+            store_filepath: PathBuf::from(STORE_FILENAME),
+            secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
+            token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILEPATH),
             remote_prover_endpoint: None,
-            package_directory: Path::new(DEFAULT_PACKAGES_DIR).to_path_buf(),
+            package_directory: PathBuf::from(DEFAULT_PACKAGES_DIR),
             max_block_number_delta: None,
             note_transport: None,
         }
