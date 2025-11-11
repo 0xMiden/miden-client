@@ -422,4 +422,3 @@ export async function undoAccountStates(accountCommitments) {
         logWebStoreError(error, `Error undoing account states: ${accountCommitments.join(",")}`);
     }
 }
-//# sourceMappingURL=accounts.js.map

@@ -36,4 +36,3 @@ export const uint8ArrayToBase64 = (bytes) => {
     const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), "");
     return btoa(binary);
 };
-//# sourceMappingURL=utils.js.map

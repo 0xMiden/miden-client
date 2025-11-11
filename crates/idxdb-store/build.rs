@@ -1,5 +1,21 @@
 use std::process::Command;
 
+fn main() -> Result<(), String> {
+    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed=CODEGEN");
+
+    if let Ok(code_gen_env_var) = std::env::var("CODEGEN")
+        && code_gen_env_var == "1"
+    {
+        // Install deps
+        run_yarn(&[]).map_err(|e| format!("could not install ts dependencies: {e}"))?;
+
+        // Build TS
+        run_yarn(&["build"]).map_err(|e| format!("failed to build typescript: {e}"))?;
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 fn run_yarn(args: &[&str]) -> Result<(), String> {
     let status = Command::new("cmd")
@@ -23,32 +39,6 @@ fn run_yarn(args: &[&str]) -> Result<(), String> {
         .map_err(|err| format!("could not run yarn: {err}"))?;
     if !status.success() {
         return Err(format!("yarn exited with status {status}"));
-    }
-    Ok(())
-}
-
-fn main() -> Result<(), String> {
-    println!("cargo::rerun-if-changed=build.rs");
-
-    if let Ok(code_gen_env_var) = std::env::var("CODEGEN")
-        && code_gen_env_var == "1"
-    {
-        // Install deps
-        run_yarn(&[]).map_err(|e| format!("could not install ts dependencies: {e}"))?;
-
-        // Build TS
-        run_yarn(&["build"]).map_err(|e| format!("failed to build typescript: {e}"))?;
-
-        // Remove files that don't have js extension.
-        // This could be simpler, but clippy suggested this way.
-        for artifact in std::fs::read_dir("./src/js").expect("js folder should exist") {
-            if !std::path::Path::new(&artifact.as_ref().unwrap().file_name().into_string().unwrap())
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("js"))
-            {
-                std::fs::remove_file(artifact.unwrap().path()).expect("could not delete artifact");
-            }
-        }
     }
     Ok(())
 }
