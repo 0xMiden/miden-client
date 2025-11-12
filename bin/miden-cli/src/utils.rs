@@ -82,8 +82,9 @@ pub(crate) async fn parse_account_id<AUTH>(
 ///
 /// This function will look for the configuration file at the .miden/miden-client.toml path in the
 /// following order:
-/// 1. Local miden directory in current working directory
-/// 2. Global miden directory in home directory
+///   - Local miden directory in current working directory
+///   - Global miden directory in home directory
+///
 /// Note: Relative paths in the config are resolved relative to the .miden directory.
 pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
     let local_miden_dir = get_local_miden_dir()?;
