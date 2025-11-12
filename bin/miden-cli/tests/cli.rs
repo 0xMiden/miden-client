@@ -160,7 +160,7 @@ fn miden_directory_structure_creation() {
     let basic_wallet_package = packages_dir.join("basic-wallet.masp");
     assert!(basic_wallet_package.exists(), "basic-wallet package should be created");
 
-    let basic_auth_package = packages_dir.join("basic-auth.masp");
+    let basic_auth_package = packages_dir.join("auth/basic-auth.masp");
     assert!(basic_auth_package.exists(), "basic-auth package should be created");
 
     let basic_faucet_package = packages_dir.join("basic-fungible-faucet.masp");
