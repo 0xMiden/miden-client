@@ -518,9 +518,34 @@ async fn import_note_validation() {
     // generate test client
     let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
 
-    // generate test data
-    let expected_note = rpc_api.get_available_notes()[0].clone();
-    let consumed_note = rpc_api.get_available_notes()[1].clone();
+    // generate deterministic test data
+    let available_notes = rpc_api.get_available_notes();
+    let mut expected_note = None;
+    let mut consumed_note = None;
+
+    for note in &available_notes {
+        let Some(public_note) = note.note() else { continue };
+        let nullifier_consumed = rpc_api
+            .get_nullifier_commit_height(
+                &public_note.nullifier(),
+                note.inclusion_proof().location().block_num(),
+            )
+            .await
+            .unwrap();
+
+        if nullifier_consumed.is_some() {
+            consumed_note = Some(note.clone());
+        } else if expected_note.is_none() {
+            expected_note = Some(note.clone());
+        }
+
+        if consumed_note.is_some() && expected_note.is_some() {
+            break;
+        }
+    }
+
+    let expected_note = expected_note.expect("expected to find at least one unconsumed note");
+    let consumed_note = consumed_note.expect("expected to find at least one consumed note");
 
     client
         .import_note(NoteFile::NoteWithProof(
