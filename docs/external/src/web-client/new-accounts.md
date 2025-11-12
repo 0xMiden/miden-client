@@ -28,7 +28,9 @@ try {
     // Access account properties
     console.log(account.id().toString());      // The account's unique identifier (hex string)
     console.log(account.nonce().toString());   // Current account nonce (starts at 0)
-    console.log(account.isPublic());           // Whether the account is public (false for private storage)
+    console.log(account.isPublic());           // Whether the account is public
+    console.log(account.isPrivate());          // Whether the account is private
+    console.log(account.isNetwork());          // Whether the account is network
     console.log(account.isUpdatable());        // Whether the account code can be updated (true if mutable)
     console.log(account.isFaucet());           // Whether the account is a faucet (false for regular wallets)
     console.log(account.isRegularAccount());   // Whether it's a regular account (true for wallets)
@@ -68,6 +70,8 @@ try {
     console.log(faucet.id().toString());     // The faucet's unique identifier
     console.log(faucet.nonce().toString());  // Current faucet nonce (starts at 0)
     console.log(faucet.isPublic());          // Whether the faucet is public (typically true)
+    console.log(faucet.isPrivate());         // Whether the faucet is private
+    console.log(faucet.isNetwork());         // Whether the faucet is network
     console.log(faucet.isUpdatable());       // Whether the faucet code can be updated (always false)
     console.log(faucet.isFaucet());          // Whether the account is a faucet (true)
     console.log(faucet.isRegularAccount());  // Whether it's a regular account (false for faucets)

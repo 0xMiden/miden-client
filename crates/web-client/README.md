@@ -110,6 +110,8 @@ const account = await webClient.newWallet(accountStorageMode, mutable);
 
 console.log(account.id().toString()); // account id as hex
 console.log(account.isPublic()); // false
+console.log(account.isPrivate()); // true
+console.log(account.isNetwork()); // false
 console.log(account.isFaucet()); // false
 ```
 

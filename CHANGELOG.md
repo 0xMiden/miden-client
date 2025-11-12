@@ -3,6 +3,7 @@
 ## 0.12.1 (unreleased)
 
 * Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
+* Added `AccountStorageMode` getters for `Account` and `AccountId`. [(#1509)](https://github.com/0xMiden/miden-client/pull/1509).
 * Allowed `new-account` command to create accounts with non-Falcon auth components ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
 * Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464)).
   
