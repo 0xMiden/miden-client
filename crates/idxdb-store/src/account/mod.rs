@@ -15,7 +15,13 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::store::{AccountRecord, AccountStatus, AccountStorageFilter, StoreError};
+use miden_client::store::{
+    AccountRecord,
+    AccountStatus,
+    AccountStorageFilter,
+    PartialAccountRecord,
+    StoreError,
+};
 use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
 
@@ -179,6 +185,36 @@ impl WebStore {
         let addresses = self.get_account_addresses(account_id).await?;
 
         Ok(Some(AccountRecord::new(account, status, addresses)))
+    }
+
+    pub(crate) async fn get_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+        let (account_header, status) = match self.get_account_header(account_id).await? {
+            None => return Ok(None),
+            Some((account_header, status)) => (account_header, status),
+        };
+        let account_code = self.get_account_code(account_header.code_commitment()).await?;
+
+        let account_storage = self
+            .get_storage(account_header.storage_commitment(), AccountStorageFilter::All)
+            .await?;
+        let assets = self.get_vault_assets(account_header.vault_root()).await?;
+        let account_vault = AssetVault::new(&assets)?;
+
+        let account = Account::new(
+            account_header.id(),
+            account_vault,
+            account_storage,
+            account_code,
+            account_header.nonce(),
+            status.seed().copied(),
+        )?;
+
+        let addresses = self.get_account_addresses(account_id).await?;
+
+        Ok(Some(PartialAccountRecord::new((&account).into(), status, addresses)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {

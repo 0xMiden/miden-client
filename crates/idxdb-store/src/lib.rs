@@ -259,7 +259,7 @@ impl Store for WebStore {
         &self,
         account_id: AccountId,
     ) -> Result<Option<PartialAccountRecord>, StoreError> {
-        unimplemented!()
+        self.get_partial_account(account_id).await
     }
 
     async fn upsert_foreign_account_code(
