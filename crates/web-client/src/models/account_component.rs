@@ -1,8 +1,7 @@
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{
-    AuthRpoFalcon512 as NativeRpoFalcon512,
-    AuthSecretKey as NativeSecretKey,
+    AuthRpoFalcon512 as NativeRpoFalcon512, AuthSecretKey as NativeSecretKey,
 };
 use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
@@ -70,11 +69,11 @@ impl AccountComponent {
     }
 
     #[wasm_bindgen(js_name = "createAuthComponent")]
-    pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, String> {
+    pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
         match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => {
-                Err("building auth component from an ecdsa key is not yet soported".to_owned())
+                Err("building auth component from an ecdsa key is not yet soported".into())
             },
             NativeSecretKey::RpoFalcon512(_) => {
                 let commitment = native_secret_key.public_key().to_commitment();
