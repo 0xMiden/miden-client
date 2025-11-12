@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.1 (unreleased)
+## 0.12.2 (2025-11-12)
 
 * Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
 * Added `AccountStorageMode` getters for `Account` and `AccountId`. [(#1509)](https://github.com/0xMiden/miden-client/pull/1509).
