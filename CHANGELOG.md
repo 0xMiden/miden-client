@@ -3,6 +3,7 @@
 ## 0.12.1 (unreleased)
 
 * Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
+* Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
 
 ## 0.12.0 (2025-11-10)
 
