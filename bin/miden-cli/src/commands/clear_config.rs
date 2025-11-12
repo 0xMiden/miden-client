@@ -27,21 +27,33 @@ impl ClearConfigCmd {
             Self::clear_global_config()
         } else {
             // Priority logic: local first, then global
-            Self::clear_with_priority()
+            Self::try_clear_local_config()
         }
     }
 
-    fn clear_with_priority() -> Result<(), CliError> {
+    /// Try to clear the local config if it exists, and if not, try to clear the global config.
+    /// This function will first try to clear the local config if it exists, and if not, it will
+    /// clear the global config.
+    /// For both cases, it will prompt the user for confirmation to clear the config.
+    fn try_clear_local_config() -> Result<(), CliError> {
         // Try local config first
         let local_miden_dir = get_local_miden_dir()?;
         if local_miden_dir.exists() {
+            println!("Local config found. Are you sure you want to clear it? (y/N)");
+            let mut proceed_str: String = String::new();
+            io::stdin().read_line(&mut proceed_str).expect("Should read line");
+            if proceed_str.trim().to_lowercase() != "y" {
+                println!("Operation cancelled.");
+                return Ok(());
+            }
+
             Self::remove_directory(&local_miden_dir, "local")?;
             return Ok(());
         }
 
-        // Fallback to global config - prompt for confirmation
+        // Clear global config if no local config exists
         println!(
-            "\nNo local configuration found. Do you want to clear the global configuration instead? (y/N)"
+            "\nNo local configuration found. Do you want to clear the global configuration? (y/N)"
         );
         let mut proceed_str: String = String::new();
         io::stdin().read_line(&mut proceed_str).expect("Should read line");
