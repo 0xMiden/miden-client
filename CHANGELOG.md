@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.1 (unreleased)
+## 0.12.2 (2025-11-12)
 
 * Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
 * Added `AccountStorageMode` getters for `Account` and `AccountId`. [(#1509)](https://github.com/0xMiden/miden-client/pull/1509).
@@ -33,6 +33,7 @@
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 * Added ability to create `AccountComponent` from a `Package` and `StorageSlot` array in the Web Client ([#1469](https://github.com/0xMiden/miden-client/pull/1469)).
+* Added new global default .miden directory in HOME path at the client CLI ([#1465](https://github.com/0xMiden/miden-client/pull/1465))
 
 ### Changes
 
