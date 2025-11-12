@@ -1729,9 +1729,9 @@ checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "hyper"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb3aa54a13a0dfe7fbe3a59e0c76093041720fdc77b110cc0fc260fafb4dc51e"
+checksum = "1744436df46f0bde35af3eda22aeaba453aada65d8f1c171cd8a5f59030bd69f"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -2165,9 +2165,9 @@ dependencies = [
 
 [[package]]
 name = "libz-ng-sys"
-version = "1.1.22"
+version = "1.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7118c2c2a3c7b6edc279a8b19507672b9c4d716f95e671172dfa4e23f9fd824"
+checksum = "7bf914b7dd154ca9193afec311d8e39345c1bd93b48b3faa77329f0db8f553c0"
 dependencies = [
  "cmake",
  "libc",
@@ -2412,9 +2412,9 @@ dependencies = [
 
 [[package]]
 name = "miden-block-prover"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b2f53a1c58ced1659a622b784daa5773f70b2aa7f9c4ad1c19b6d74baf2aeb3"
+checksum = "ac5f55d7f81fbe584b95c95951502c69fcbf1e657bb4befa56395142577a773e"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -2655,9 +2655,9 @@ dependencies = [
 
 [[package]]
 name = "miden-lib"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44abeb7f67252547fa54605e61e89256fa546e2f25de382ccac78a1ced07ff88"
+checksum = "f2af7e35b52afadba83d50b614cbc2493b7ca1ad9a876033d0706c09a75a78cb"
 dependencies = [
  "Inflector",
  "fs-err",
@@ -2926,9 +2926,9 @@ dependencies = [
 
 [[package]]
 name = "miden-objects"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ef49472012d00be68f68dcbb13b4f28867fb6271c76c014bc555ef6e8e0958a"
+checksum = "97ec6ccdb9b1276635efa2ed74bc663eddeae01e31f9155c8af584188a260f3b"
 dependencies = [
  "bech32",
  "getrandom 0.3.4",
@@ -2938,6 +2938,7 @@ dependencies = [
  "miden-crypto",
  "miden-mast-package",
  "miden-processor",
+ "miden-stdlib",
  "miden-utils-sync",
  "miden-verifier",
  "rand 0.9.2",
@@ -3066,9 +3067,9 @@ dependencies = [
 
 [[package]]
 name = "miden-testing"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e64b086dfad33bc235d847cde20959d7b88d46d1da50d48ad2192321dbc2bcf"
+checksum = "3f05865766cbce5f780d44452f8557ff801ded2466e54b14e0056bb88e9a09e4"
 dependencies = [
  "anyhow",
  "itertools",
@@ -3086,9 +3087,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8d0ddcbaaa1002b954525212ebfa7ee097e6af9d26847b3d977b3ffa9f3edeb"
+checksum = "7aa5a43b436e6f518af15692faeab82108ae572c67e05cb0a6758e55ca835229"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -3102,9 +3103,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx-batch-prover"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aab74fe8a2227aede2513f8a9dcde5268d3ae4debd5a904cf05992418bbd62d"
+checksum = "838d42f047770031200b89054436e979a9ddb6a106851b30dbf42d4a7b74c2ad"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -5114,9 +5115,9 @@ dependencies = [
 
 [[package]]
 name = "sqlite-wasm-rs"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54e4348c16a3d2e2a45437eff67efc5462b60443de76f61b5d0ed9111c626d9d"
+checksum = "35c6d746902bca4ddf16592357eacf0473631ea26b36072f0dd0b31fa5ccd1f4"
 dependencies = [
  "js-sys",
  "once_cell",

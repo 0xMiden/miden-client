@@ -123,6 +123,10 @@ pub fn get_public_keys_from_account(account: &Account) -> Vec<Word> {
             AuthScheme::RpoFalcon512Multisig { pub_keys, .. } => {
                 words.extend(pub_keys.iter().map(|k| Word::from(*k)));
             },
+            AuthScheme::EcdsaK256Keccak { pub_key } => words.push(Word::from(*pub_key)),
+            AuthScheme::EcdsaK256KeccakMultisig { pub_keys, .. } => {
+                words.extend(pub_keys.iter().map(|k| Word::from(*k)));
+            },
         }
     }
 
