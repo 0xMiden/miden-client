@@ -189,6 +189,7 @@ impl WebClient {
                 None,
                 None,
                 note_transport_client,
+                None,
             )
             .await
             .map_err(|err| js_error_with_context(err, "Failed to create client"))?,

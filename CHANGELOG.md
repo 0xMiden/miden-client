@@ -1,10 +1,13 @@
 # Changelog
 
-## 0.12.0 (2025-11-08)
+## 0.12.1 (unreleased)
+
+* Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
+
+## 0.12.0 (2025-11-10)
 
 ### Features
 
-* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 * Implemented functions for lazy loading on webstore [(#1184)](https://github.com/0xMiden/miden-client/pull/1184).
 * Separated `migrations` and `settings` tables [(#1287)](https://github.com/0xMiden/miden-client/pull/1287).
@@ -25,6 +28,7 @@
 * Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
+* Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464))
 * Added ability to create `AccountComponent` from a `Package` and `StorageSlot` array in the Web Client ([#1469](https://github.com/0xMiden/miden-client/pull/1469)).
 
 ### Changes
