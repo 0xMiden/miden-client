@@ -78,9 +78,29 @@
 
 ***
 
+### isNetwork()
+
+> **isNetwork**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
 ### isNew()
 
 > **isNew**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isPrivate()
+
+> **isPrivate**(): `boolean`
 
 #### Returns
 

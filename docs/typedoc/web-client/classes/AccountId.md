@@ -38,6 +38,36 @@
 
 ***
 
+### isNetwork()
+
+> **isNetwork**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isPrivate()
+
+> **isPrivate**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
+### isPublic()
+
+> **isPublic**(): `boolean`
+
+#### Returns
+
+`boolean`
+
+***
+
 ### isRegularAccount()
 
 > **isRegularAccount**(): `boolean`

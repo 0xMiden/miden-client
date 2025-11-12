@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -462,7 +463,8 @@ fn process_packages(
     let mut account_components = Vec::with_capacity(packages.len());
 
     for package in packages {
-        let mut init_storage_data = init_storage_data.placeholders().clone();
+        let mut placeholders = init_storage_data.placeholders().clone();
+        let mut map_entries = BTreeMap::new();
 
         let Some(component_metadata_section) = package.sections.iter().find(|section| {
             section.id.as_str() == (SectionId::ACCOUNT_COMPONENT_METADATA).as_str()
@@ -485,13 +487,18 @@ fn process_packages(
 
         for (placeholder_key, placeholder_type) in component_metadata.get_placeholder_requirements()
         {
-            if init_storage_data.contains_key(&placeholder_key) {
+            if placeholders.contains_key(&placeholder_key) {
                 // The use provided it through the TOML file, so we can skip it
                 continue;
             }
 
+            if let Some(entries) = init_storage_data.map_entries(&placeholder_key) {
+                map_entries.insert(placeholder_key.clone(), entries.clone());
+                continue;
+            }
+
             let description = placeholder_type.description.unwrap_or("[No description]".into());
-            print!(
+            println!(
                 "Enter value for '{placeholder_key}' - {description} (type: {}): ",
                 placeholder_type.r#type
             );
@@ -500,12 +507,12 @@ fn process_packages(
             let mut input_value = String::new();
             std::io::stdin().read_line(&mut input_value)?;
             let input_value = input_value.trim();
-            init_storage_data.insert(placeholder_key, input_value.to_string());
+            placeholders.insert(placeholder_key, input_value.to_string());
         }
 
         let account_component = AccountComponent::from_package_with_init_data(
             &package,
-            &InitStorageData::new(init_storage_data, vec![]),
+            &InitStorageData::new(placeholders, map_entries),
         )
         .map_err(|e| {
             CliError::Account(

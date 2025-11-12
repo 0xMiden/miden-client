@@ -7,7 +7,10 @@ use miden_client::account::component::{
     MIDEN_PACKAGE_EXTENSION,
     basic_fungible_faucet_library,
     basic_wallet_library,
+    no_auth_library,
+    rpo_falcon_512_acl_library,
     rpo_falcon_512_library,
+    rpo_falcon_512_multisig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
@@ -24,18 +27,38 @@ use miden_client::vm::{
 const PACKAGE_DIR: &str = "packages";
 
 fn main() {
-    build_package(&PathBuf::from("templates/basic-wallet.toml"), basic_wallet_library());
+    build_package(&PathBuf::from("templates/basic-wallet.toml"), basic_wallet_library(), None);
 
     build_package(
         &PathBuf::from("templates/basic-fungible-faucet.toml"),
         basic_fungible_faucet_library(),
+        None,
     );
 
-    build_package(&PathBuf::from("templates/basic-auth.toml"), rpo_falcon_512_library());
+    build_package(
+        &PathBuf::from("templates/basic-auth.toml"),
+        rpo_falcon_512_library(),
+        Some("auth"),
+    );
+
+    build_package(&PathBuf::from("templates/no-auth.toml"), no_auth_library(), Some("auth"));
+
+    build_package(
+        &PathBuf::from("templates/multisig-auth.toml"),
+        rpo_falcon_512_multisig_library(),
+        Some("auth"),
+    );
+
+    build_package(
+        &PathBuf::from("templates/acl-auth.toml"),
+        rpo_falcon_512_acl_library(),
+        Some("auth"),
+    );
 }
 
-/// Builds a package and stores it under `{OUT_DIR}/{PACKAGE_DIR}`.
-pub fn build_package(metadata_path: &Path, library: Library) {
+/// Builds a package and stores it under `{OUT_DIR}/{PACKAGE_DIR}` or
+/// `{OUT_DIR}/{PACKAGE_DIR}/{subdirectory}` if a subdirectory is provided.
+pub fn build_package(metadata_path: &Path, library: Library, subdirectory: Option<&str>) {
     let toml_string = fs::read_to_string(metadata_path)
         .unwrap_or_else(|_| panic!("Failed to read file {}", metadata_path.display()));
 
@@ -78,7 +101,10 @@ pub fn build_package(metadata_path: &Path, library: Library) {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
 
     // Write the file
-    let packages_out_dir = PathBuf::from(&out_dir).join(PACKAGE_DIR);
+    let mut packages_out_dir = PathBuf::from(&out_dir).join(PACKAGE_DIR);
+    if let Some(subdir) = subdirectory {
+        packages_out_dir = packages_out_dir.join(subdir);
+    }
     fs::create_dir_all(&packages_out_dir).expect("Failed to packages directory in OUT_DIR");
 
     let mut output_filename = metadata_path
