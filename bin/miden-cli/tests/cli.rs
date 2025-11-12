@@ -1105,8 +1105,6 @@ fn exec_parse() {
 // ================================================================================================
 
 /// Tests creating an account with the no-auth component.
-/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
-/// instead of the "multiple auth components" error.
 #[test]
 fn create_account_with_no_auth() {
     let temp_dir = init_cli().1;
@@ -1124,18 +1122,10 @@ fn create_account_with_no_auth() {
         "auth/no-auth",
     ]);
 
-    // TODO: Change this to .success() once #1442 is resolved
-    // Currently expected to fail with multiple auth components error
-    create_account_cmd
-        .current_dir(&temp_dir)
-        .assert()
-        .failure()
-        .stderr(contains("account code contains multiple auth components"));
+    create_account_cmd.current_dir(&temp_dir).assert().success();
 }
 
 /// Tests creating an account with the multisig-auth component.
-/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
-/// instead of the "multiple auth components" error.
 #[test]
 fn create_account_with_multisig_auth() {
     let temp_dir = init_cli().1;
@@ -1172,18 +1162,10 @@ fn create_account_with_multisig_auth() {
         "multisig_init_data.toml",
     ]);
 
-    // TODO: Change this to .success() once #1442 is resolved
-    // Currently expected to fail with multiple auth components error
-    create_account_cmd
-        .current_dir(&temp_dir)
-        .assert()
-        .failure()
-        .stderr(contains("account code contains multiple auth components"));
+    create_account_cmd.current_dir(&temp_dir).assert().success();
 }
 
 /// Tests creating an account with the acl-auth component.
-/// TODO: Once issue #1442 is resolved, this test should be updated to expect success
-/// instead of the "multiple auth components" error.
 #[test]
 fn create_account_with_acl_auth() {
     let temp_dir = init_cli().1;
@@ -1217,11 +1199,5 @@ fn create_account_with_acl_auth() {
         "acl_init_data.toml",
     ]);
 
-    // TODO: Change this to .success() once #1442 is resolved
-    // Currently expected to fail with multiple auth components error
-    create_account_cmd
-        .current_dir(&temp_dir)
-        .assert()
-        .failure()
-        .stderr(contains("account code contains multiple auth components"));
+    create_account_cmd.current_dir(&temp_dir).assert().success();
 }
