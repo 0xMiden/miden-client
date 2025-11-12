@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::felt::Felt;
+use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[wasm_bindgen]
@@ -21,8 +22,12 @@ impl Signature {
     }
 
     #[wasm_bindgen(js_name = "toPreparedSignature")]
-    pub fn to_prepared_signature(&self) -> Vec<Felt> {
-        self.0.to_prepared_signature().into_iter().map(Into::into).collect()
+    pub fn to_prepared_signature(&self, message: Word) -> Vec<Felt> {
+        self.0
+            .to_prepared_signature(message.into())
+            .into_iter()
+            .map(Into::into)
+            .collect()
     }
 }
 
