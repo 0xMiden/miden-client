@@ -3,9 +3,7 @@ use std::str::FromStr;
 use miden_client::Felt as NativeFelt;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
-    Address,
-    AddressInterface as NativeAccountInterface,
-    NetworkId as NativeNetworkId,
+    Address, AddressInterface as NativeAccountInterface, NetworkId as NativeNetworkId,
     RoutingParameters,
 };
 use wasm_bindgen::prelude::*;
@@ -47,6 +45,21 @@ impl AccountId {
     #[wasm_bindgen(js_name = "isRegularAccount")]
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
+    }
+
+    #[wasm_bindgen(js_name = "isPublic")]
+    pub fn is_public(&self) -> bool {
+        self.0.is_public()
+    }
+
+    #[wasm_bindgen(js_name = "isPrivate")]
+    pub fn is_private(&self) -> bool {
+        self.0.is_private()
+    }
+
+    #[wasm_bindgen(js_name = "isNetwork")]
+    pub fn is_network(&self) -> bool {
+        self.0.is_network()
     }
 
     #[wasm_bindgen(js_name = "toString")]

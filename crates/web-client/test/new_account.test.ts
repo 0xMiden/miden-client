@@ -73,6 +73,9 @@ test.describe("new_wallet tests", () => {
       expect(result.isPublic).toEqual(expected.isPublic);
       expect(result.isPrivate).toEqual(expected.isPrivate);
       expect(result.isNetwork).toEqual(expected.isNetwork);
+      expect(result.isIdPublic).toEqual(expected.isPublic);
+      expect(result.isIdPrivate).toEqual(expected.isPrivate);
+      expect(result.isIdNetwork).toEqual(expected.isNetwork);
       expect(result.isNew).toEqual(true);
     });
   });
@@ -178,6 +181,9 @@ test.describe("new_faucet tests", () => {
         expect(result.isPublic).toEqual(expected.isPublic);
         expect(result.isPrivate).toEqual(expected.isPrivate);
         expect(result.isNetwork).toEqual(expected.isNetwork);
+        expect(result.isIdPublic).toEqual(expected.isPublic);
+        expect(result.isIdPrivate).toEqual(expected.isPrivate);
+        expect(result.isIdNetwork).toEqual(expected.isNetwork);
         expect(result.isNew).toEqual(true);
       });
     }

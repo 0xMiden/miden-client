@@ -466,6 +466,9 @@ export interface NewAccountTestResult {
   isPublic: boolean;
   isPrivate: boolean;
   isNetwork: boolean;
+  isIdPublic: boolean;
+  isIdPrivate: boolean;
+  isIdNetwork: boolean;
   isNew: boolean;
 }
 interface createNewWalletParams {
@@ -535,6 +538,9 @@ export const createNewWallet = async (
         isPublic: newWallet.isPublic(),
         isPrivate: newWallet.isPrivate(),
         isNetwork: newWallet.isNetwork(),
+        isIdPublic: newWallet.id().isPublic(),
+        isIdPrivate: newWallet.id().isPrivate(),
+        isIdNetwork: newWallet.id().isNetwork(),
         isNew: newWallet.isNew(),
       };
     },
@@ -580,6 +586,9 @@ export const createNewFaucet = async (
         isPublic: newFaucet.isPublic(),
         isPrivate: newFaucet.isPrivate(),
         isNetwork: newFaucet.isNetwork(),
+        isIdPublic: newFaucet.id().isPublic(),
+        isIdPrivate: newFaucet.id().isPrivate(),
+        isIdNetwork: newFaucet.id().isNetwork(),
         isNew: newFaucet.isNew(),
       };
     },
