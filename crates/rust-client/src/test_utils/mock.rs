@@ -475,7 +475,10 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns the node's tracked notes that match the provided note IDs.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+    async fn get_notes_by_id_inner(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError> {
         // assume all public notes for now
         let notes = self.mock_chain.read().committed_notes().clone();
 
@@ -639,7 +642,10 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns proofs for all the provided nullifiers.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
+    async fn check_nullifiers_inner(
+        &self,
+        nullifiers: &[Nullifier],
+    ) -> Result<Vec<SmtProof>, RpcError> {
         Ok(nullifiers
             .iter()
             .map(|nullifier| self.mock_chain.read().nullifier_tree().open(nullifier).into_proof())

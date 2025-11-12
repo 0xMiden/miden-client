@@ -85,6 +85,13 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+// TODO: We need a better structured way of getting limits as defined by the node (#1139)
+pub const NOTE_IDS_LIMIT: usize = 500;
+pub const NULLIFIER_PREFIXES_LIMIT: usize = 500;
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -136,7 +143,21 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
+    ///
+    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id_inner`].
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+        let mut notes = Vec::with_capacity(note_ids.len());
+        for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
+            notes.extend(self.get_notes_by_id_inner(chunk).await?);
+        }
+        Ok(notes)
+    }
+
+    /// Inner implementation of `get_notes_by_id` that performs the actual RPC call.
+    async fn get_notes_by_id_inner(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
@@ -191,7 +212,22 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
     /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
+    ///
+    /// The default implementation of this method uses [`NodeRpcClient::check_nullifiers_inner`].
+    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
+        let mut proofs = Vec::with_capacity(nullifiers.len());
+        for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
+            proofs.extend(self.check_nullifiers_inner(chunk).await?);
+        }
+        Ok(proofs)
+    }
+
+    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
+    /// `/CheckNullifiers` RPC endpoint.
+    async fn check_nullifiers_inner(
+        &self,
+        nullifiers: &[Nullifier],
+    ) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
     /// specified foreign accounts, using the `GetAccountProofs` endpoint.
@@ -239,21 +275,18 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let mut public_notes = Vec::with_capacity(note_ids.len());
-        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
-        for chunk in note_ids.chunks(1_000) {
-            let note_details = self.get_notes_by_id(chunk).await?;
+        let note_details = self.get_notes_by_id(note_ids).await?;
 
-            for detail in note_details {
-                if let FetchedNote::Public(note, inclusion_proof) = detail {
-                    let state = UnverifiedNoteState {
-                        metadata: *note.metadata(),
-                        inclusion_proof,
-                    }
-                    .into();
-                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                    public_notes.push(note);
+        for detail in note_details {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
+                let state = UnverifiedNoteState {
+                    metadata: *note.metadata(),
+                    inclusion_proof,
                 }
+                .into();
+                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                public_notes.push(note);
             }
         }
 
