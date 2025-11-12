@@ -3,12 +3,22 @@ use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
+use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     BlockNumber,
+    Note,
+    NoteAssets,
+    NoteError,
+    NoteExecutionHint,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
     NoteType as MidenNoteType,
+    WellKnownNote,
     build_swap_tag,
+    create_mint_note,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
@@ -21,7 +31,7 @@ use miden_client::transaction::{
     TransactionRequest,
     TransactionRequestBuilder,
 };
-use miden_client::{Client, RemoteTransactionProver};
+use miden_client::{Client, Felt, RemoteTransactionProver, Word};
 use tracing::info;
 
 use crate::create_dynamic_table;
@@ -52,16 +62,41 @@ impl From<&NoteType> for MidenNoteType {
 /// Mint tokens from a fungible faucet to a wallet.
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
-    /// Target account ID or its hex prefix.
+    /// Amount to be minted.
+    #[arg(short = 'a', long = "amount")]
+    amount: u64,
+
+    /// Target account ID or its hex prefix for the minted tokens.If none is provided, the default
+    /// account's ID is used instead.
     #[arg(short = 't', long = "target")]
-    target_account_id: String,
+    target_account_id: Option<String>,
 
-    /// Asset to be minted.
-    #[arg(short, long, help=format!("Asset to be minted.\n{SHARED_TOKEN_DOCUMENTATION}"))]
-    asset: String,
+    /// Faucet account ID or its hex prefix. This flag is only used if the `new_faucet` flag is not
+    /// set.
+    #[arg(
+        short = 'f',
+        long = "faucet",
+        help = "Network Faucet account ID to mint the tokens from. Has to be set when new-faucet flag is not set."
+    )]
+    faucet_account_id: Option<String>,
 
+    /// Asset to be minted. This flag has to be set when using the `new_faucet` flag.
+    #[arg(long = "asset", help=format!("Asset to be minted. Has to be set when minting from a new faucet.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    asset: Option<String>,
+
+    /// Note type to be used for the P2ID note (both network and new faucet mint flows). If not
+    /// set, the default note type is a private note.
     #[arg(short, long, value_enum)]
-    note_type: NoteType,
+    note_type: Option<NoteType>,
+
+    /// Flag to create a new faucet account to mint the tokens from.
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Flag to create a new faucet account to mint the tokens from if not intending to use an existing network faucet."
+    )]
+    new_faucet: bool,
+
     /// Flag to submit the executed transaction without asking for confirmation.
     #[arg(long, default_value_t = false)]
     force: bool,
@@ -77,17 +112,168 @@ impl MintCmd {
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
         let force = self.force;
+        let note_type = self.note_type.unwrap_or(NoteType::Private);
+        let target_account_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.target_account_id.clone()).await?;
+
+        if self.new_faucet {
+            self.mint_using_new_faucet(force, target_account_id, note_type, &mut client)
+                .await
+        } else {
+            self.mint_using_network_faucet(force, target_account_id, note_type, &mut client)
+                .await
+        }
+    }
+
+    /// Generates a P2ID note - Pay-to-ID note with an exact serial number
+    fn create_p2id_note_exact(
+        sender: AccountId,
+        target: AccountId,
+        assets: Vec<Asset>,
+        note_type: MidenNoteType,
+        aux: Felt,
+        serial_num: Word,
+    ) -> Result<Note, NoteError> {
+        let note_script = WellKnownNote::P2ID.script();
+        let note_inputs = NoteInputs::new(vec![target.suffix(), target.prefix().as_felt()])?;
+        let recipient = NoteRecipient::new(serial_num, note_script, note_inputs);
+
+        let tag = NoteTag::from_account_id(target);
+
+        let metadata = NoteMetadata::new(sender, note_type, tag, NoteExecutionHint::always(), aux)?;
+        let vault = NoteAssets::new(assets)?;
+
+        Ok(Note::new(vault, metadata, recipient))
+    }
+
+    async fn mint_using_network_faucet<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        force: bool,
+        target_account_id: AccountId,
+        note_type: NoteType,
+        mut client: &mut Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let faucet_account_id = self.faucet_account_id.as_ref().ok_or(CliError::Input(
+            "Faucet account ID is required when not using --new-faucet flag".to_string(),
+        ))?;
+        let faucet_account_id = parse_account_id(&client, faucet_account_id).await?;
+
+        let faucet = client.get_account(faucet_account_id).await.unwrap().unwrap();
+        let stored_owner_word = faucet.account().storage().get_item(2).unwrap();
+        let stored_owner_id =
+            AccountId::new_unchecked([stored_owner_word[3], stored_owner_word[2]]);
+
+        // Compute the output P2ID note
+        let amount = self.amount;
+        let mint_asset = FungibleAsset::new(faucet_account_id, amount.into()).unwrap().into();
+        let aux = Felt::new(27);
+        let serial_num = Word::default();
+
+        let output_note_tag = NoteTag::from_account_id(target_account_id);
+        let p2id_mint_output_note = Self::create_p2id_note_exact(
+            faucet_account_id,
+            target_account_id,
+            vec![mint_asset],
+            (&note_type).into(),
+            aux,
+            serial_num,
+        )
+        .map_err(|err| {
+            CliError::Transaction(err.into(), "Failed to create P2ID note".to_string())
+        })?;
+        let recipient = p2id_mint_output_note.recipient().digest();
+
+        let mint_note = create_mint_note(
+            faucet_account_id,
+            stored_owner_id.into(),
+            recipient,
+            output_note_tag.into(),
+            Felt::new(amount),
+            aux,
+            aux,
+            client.rng(),
+        )
+        .map_err(|err| {
+            CliError::Transaction(err.into(), "Failed to create mint note".to_string())
+        })?;
+
+        let mint_transaction_request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![OutputNote::Full(mint_note)])
+            .build()
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
+            })?;
+
+        println!("Publishing mint transaction request...");
+
+        // Execute the mint transaction
+        execute_transaction(
+            &mut client,
+            target_account_id,
+            mint_transaction_request,
+            force,
+            self.delegate_proving,
+        )
+        .await?;
+
+        println!(
+            "Mint transaction request published, waiting for network transaction to be processed..."
+        );
+
+        // wait for 15 seconds in order for the network TX to be processed
+        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+
+        // Craft transaction to consume the newly created P2ID note
+        let consume_p2id_note_transaction_request = TransactionRequestBuilder::new()
+            .unauthenticated_input_notes(vec![(p2id_mint_output_note, None)])
+            .build()
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build consume P2ID note transaction".to_string(),
+                )
+            })?;
+
+        println!("Publishing consume P2ID note transaction request...");
+
+        // Execute the consume P2ID note transaction
+        execute_transaction(
+            &mut client,
+            target_account_id,
+            consume_p2id_note_transaction_request,
+            force,
+            self.delegate_proving,
+        )
+        .await?;
+
+        println!(
+            "Consumed P2ID note. {:?} tokens have been added to your wallet!",
+            amount.to_string()
+        );
+
+        Ok(())
+    }
+
+    async fn mint_using_new_faucet<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        force: bool,
+        target_account_id: AccountId,
+        note_type: NoteType,
+        mut client: &mut Client<AUTH>,
+    ) -> Result<(), CliError> {
         let faucet_details_map = load_faucet_details_map()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
-
-        let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
+        let asset = self
+            .asset
+            .as_ref()
+            .ok_or(CliError::Input("Asset is required when using --new-faucet flag".to_string()))?;
+        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, asset).await?;
 
         let transaction_request = TransactionRequestBuilder::new()
             .build_mint_fungible_asset(
                 fungible_asset,
                 target_account_id,
-                (&self.note_type).into(),
+                (&note_type).into(),
                 client.rng(),
             )
             .map_err(|err| {

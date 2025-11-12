@@ -295,7 +295,7 @@ async fn mint_with_untracked_account() -> Result<()> {
     sync_cli(&temp_dir);
 
     // Let's try and mint
-    mint_cli(
+    mint_cli_using_new_faucet(
         &temp_dir,
         &AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex(),
         &fungible_faucet_account_id,
@@ -413,7 +413,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
     show_cmd.current_dir(&temp_dir).assert().success();
 
     // Let's try and mint
-    mint_cli(
+    mint_cli_using_new_faucet(
         &temp_dir,
         &AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap().to_hex(),
         &fungible_faucet_account_id,
@@ -446,8 +446,11 @@ async fn cli_export_import_note() -> Result<()> {
     sync_cli(&temp_dir_1);
 
     // Let's try and mint
-    let note_to_export_id =
-        mint_cli(&temp_dir_1, &first_basic_account_id, &fungible_faucet_account_id);
+    let note_to_export_id = mint_cli_using_new_faucet(
+        &temp_dir_1,
+        &first_basic_account_id,
+        &fungible_faucet_account_id,
+    );
 
     // Export without type fails
     let mut export_cmd = cargo_bin_cmd!("miden-client");
@@ -542,7 +545,7 @@ async fn cli_export_import_account() -> Result<()> {
 
     sync_cli(&temp_dir_2);
 
-    let note_id = mint_cli(&temp_dir_2, &wallet_id, &faucet_id);
+    let note_id = mint_cli_using_new_faucet(&temp_dir_2, &wallet_id, &faucet_id);
 
     // Wait until the note is committed on the node
     sync_until_committed_note(&temp_dir_2);
@@ -587,7 +590,8 @@ async fn consume_unauthenticated_note() -> Result<()> {
     sync_cli(&temp_dir);
 
     // Mint
-    let note_id = mint_cli(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
+    let note_id =
+        mint_cli_using_new_faucet(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
 
     // Consume the note, internally this checks that the note was consumed correctly
     consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
@@ -920,12 +924,14 @@ fn sync_cli(cli_path: &Path) -> u64 {
 
 /// Mints 100 units of the corresponding faucet using the cli and checks that the command runs
 /// successfully given account using the CLI given by `cli_path`.
-fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
+fn mint_cli_using_new_faucet(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
         "mint",
         "--target",
         target_account_id,
+        "--new-faucet",
+        "true",
         "--asset",
         &format!("100::{faucet_id}"),
         "-n",
