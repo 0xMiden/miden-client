@@ -57,7 +57,7 @@ impl ClearConfigCmd {
         })?;
 
         if global_miden_dir.exists() {
-            self.remove_directory(&global_miden_dir, "global")?
+            self.remove_directory(&global_miden_dir, "global")?;
         } else {
             println!("No global miden configuration found to clear.");
         }

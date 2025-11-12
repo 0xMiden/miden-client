@@ -98,9 +98,7 @@ pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
         if !config_path.exists() {
             return Err(CliError::Config(
                 "No configuration file found".to_string().into(),
-                format!(
-                    "Neither local nor global config file exists. Run 'miden-client init' to create one."
-                ),
+                    "Neither local nor global config file exists. Run 'miden-client init' to create one.".to_string()
             ));
         }
     }
