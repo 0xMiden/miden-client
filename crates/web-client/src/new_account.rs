@@ -127,10 +127,7 @@ impl WebClient {
         secret_key: &SecretKey,
     ) -> Result<(), JsValue> {
         let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
-        keystore
-            .add_key(&AuthSecretKey::RpoFalcon512(secret_key.into()))
-            .await
-            .map_err(|err| err.to_string())?;
+        keystore.add_key(secret_key.into()).await.map_err(|err| err.to_string())?;
         Ok(())
     }
 }

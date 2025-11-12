@@ -1,7 +1,9 @@
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
-use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::auth::{
+    AuthRpoFalcon512 as NativeRpoFalcon512,
+    AuthSecretKey as NativeSecretKey,
+};
 use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
@@ -68,13 +70,24 @@ impl AccountComponent {
     }
 
     #[wasm_bindgen(js_name = "createAuthComponent")]
-    pub fn create_auth_component(secret_key: &SecretKey) -> AccountComponent {
+    pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, String> {
         let native_secret_key: NativeSecretKey = secret_key.into();
-        let native_auth_component: NativeAccountComponent = NativeRpoFalcon512::new(
-            PublicKeyCommitment::from(native_secret_key.public_key().to_commitment()),
-        )
-        .into();
-        AccountComponent(native_auth_component)
+        match native_secret_key {
+            NativeSecretKey::EcdsaK256Keccak(_) => {
+                Err("building auth component from an ecdsa key is not yet soported".to_owned())
+            },
+            NativeSecretKey::RpoFalcon512(_) => {
+                let commitment = native_secret_key.public_key().to_commitment();
+                let auth = NativeRpoFalcon512::new(commitment);
+                Ok(AccountComponent(auth.into()))
+            },
+            // This is because the definition of NativeSecretKey has the
+            // '#[non_exhaustive]' attribute, without this catch-all clause,
+            // this is a compiler error.
+            _unimplemented => {
+                Err("building auth component for this auth scheme is not supported yet".to_owned())
+            },
+        }
     }
 
     #[wasm_bindgen(js_name = "fromPackage")]

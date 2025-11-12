@@ -1,9 +1,9 @@
 use miden_client::auth::{
     AuthSecretKey,
+    PublicKey as NativePublicKey,
     Signature as NativeSignature,
     SigningInputs as NativeSigningInputs,
 };
-use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::Deserializable;
 use miden_client::{AuthenticationError, Word as NativeWord};
@@ -62,7 +62,7 @@ pub(crate) struct InsertKeyCallback(pub(crate) Function);
 impl InsertKeyCallback {
     pub(crate) async fn insert_key(&self, secret_key: &SecretKey) -> Result<(), KeyStoreError> {
         let pub_key: NativePublicKey = secret_key.public_key().into();
-        let pub_key_commitment = pub_key.to_commitment();
+        let pub_key_commitment: NativeWord = pub_key.to_commitment().into();
         let result = self
             .0
             .call2(

@@ -77,7 +77,7 @@ use crate::sync::NoteTagRecord;
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
-    pub use miden_lib::account::auth::*;
+    pub use miden_lib::account::auth::{AuthRpoFalcon512, *};
     pub use miden_lib::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,

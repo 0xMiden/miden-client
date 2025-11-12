@@ -197,7 +197,12 @@ pub mod asset {
 pub mod auth {
     pub use miden_lib::AuthScheme;
     pub use miden_lib::account::auth::{AuthRpoFalcon512, NoAuth};
-    pub use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment, Signature};
+    pub use miden_objects::account::auth::{
+        AuthSecretKey,
+        PublicKey,
+        PublicKeyCommitment,
+        Signature,
+    };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 }
 
