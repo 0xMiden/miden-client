@@ -28,7 +28,7 @@ use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
-use self::utils::load_config_file;
+use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
@@ -170,8 +170,7 @@ impl Cli {
         }
 
         // Check if Client is not yet initialized => silently initialize the client
-        // This uses the priority-based config loading: checks local first, then global
-        if load_config_file().is_err() {
+        if !config_file_exists()? {
             let init_cmd = InitCmd::default();
             init_cmd.execute()?;
         }

@@ -115,6 +115,20 @@ pub(super) fn load_config_file() -> Result<(CliConfig, PathBuf), CliError> {
     Ok((cli_config, config_path))
 }
 
+/// Checks if either local or global configuration file exists.
+pub(super) fn config_file_exists() -> Result<bool, CliError> {
+    let local_miden_dir = get_local_miden_dir()?;
+    if local_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists() {
+        return Ok(true);
+    }
+
+    let global_miden_dir = get_global_miden_dir().map_err(|e| {
+        CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
+    })?;
+
+    Ok(global_miden_dir.join(CLIENT_CONFIG_FILE_NAME).exists())
+}
+
 /// Loads the client configuration.
 fn load_config(config_file: &Path) -> Result<CliConfig, CliError> {
     Figment::from(Toml::file(config_file)).extract().map_err(|err| {

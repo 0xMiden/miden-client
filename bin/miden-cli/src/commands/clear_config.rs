@@ -18,16 +18,19 @@ pub struct ClearConfigCmd {
     /// Force removal of global configuration, even if local config exists
     #[clap(long)]
     global: bool,
+    /// Do not prompt for confirmation before deleting configuration directories
+    #[clap(long)]
+    force: bool,
 }
 
 impl ClearConfigCmd {
     pub fn execute(&self) -> Result<(), CliError> {
         if self.global {
             // Clear global config specifically
-            Self::clear_global_config()
+            self.clear_global_config()
         } else {
             // Priority logic: local first, then global
-            Self::try_clear_local_config()
+            self.try_clear_local_config()
         }
     }
 
@@ -35,45 +38,26 @@ impl ClearConfigCmd {
     /// This function will first try to clear the local config if it exists, and if not, it will
     /// clear the global config.
     /// For both cases, it will prompt the user for confirmation to clear the config.
-    fn try_clear_local_config() -> Result<(), CliError> {
+    fn try_clear_local_config(&self) -> Result<(), CliError> {
         // Try local config first
         let local_miden_dir = get_local_miden_dir()?;
         if local_miden_dir.exists() {
-            println!("Local config found. Are you sure you want to clear it? (y/N)");
-            let mut proceed_str: String = String::new();
-            io::stdin().read_line(&mut proceed_str).expect("Should read line");
-            if proceed_str.trim().to_lowercase() != "y" {
-                println!("Operation cancelled.");
-                return Ok(());
-            }
-
-            Self::remove_directory(&local_miden_dir, "local")?;
+            self.remove_directory(&local_miden_dir, "local")?;
             return Ok(());
         }
 
         // Clear global config if no local config exists
-        println!(
-            "\nNo local configuration found. Do you want to clear the global configuration? (y/N)"
-        );
-        let mut proceed_str: String = String::new();
-        io::stdin().read_line(&mut proceed_str).expect("Should read line");
-
-        if proceed_str.trim().to_lowercase() != "y" {
-            println!("Operation cancelled.");
-            return Ok(());
-        }
-
-        Self::clear_global_config()?;
-        Ok(())
+        println!("No local configuration found. Attempting to clear global configuration.");
+        self.clear_global_config()
     }
 
-    fn clear_global_config() -> Result<(), CliError> {
+    fn clear_global_config(&self) -> Result<(), CliError> {
         let global_miden_dir = get_global_miden_dir().map_err(|e| {
             CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
         })?;
 
         if global_miden_dir.exists() {
-            Self::remove_directory(&global_miden_dir, "global")?;
+            self.remove_directory(&global_miden_dir, "global")?
         } else {
             println!("No global miden configuration found to clear.");
         }
@@ -81,8 +65,25 @@ impl ClearConfigCmd {
         Ok(())
     }
 
-    fn remove_directory(dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
-        println!("Removing {config_type} Miden configuration at: {}", dir_path.display());
+    fn remove_directory(&self, dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
+        if !dir_path.exists() {
+            println!("No {config_type} miden configuration found to clear.");
+            return Ok(());
+        }
+
+        println!("Found {config_type} Miden configuration at: {}", dir_path.display());
+
+        if !self.force {
+            println!("Are you sure you want to remove it? (y/N)");
+            let mut proceed_str: String = String::new();
+            io::stdin().read_line(&mut proceed_str)?;
+            if proceed_str.trim().to_lowercase() != "y" {
+                println!("Operation cancelled.");
+                return Ok(());
+            }
+        }
+
+        println!("Removing {config_type} Miden configuration...");
 
         fs::remove_dir_all(dir_path).map_err(|err| {
             CliError::Config(
