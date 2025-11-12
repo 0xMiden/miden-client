@@ -59,7 +59,7 @@ impl ClearConfigCmd {
         if global_miden_dir.exists() {
             self.remove_directory(&global_miden_dir, "global")?;
         } else {
-            println!("No global miden configuration found to clear.");
+            println!("No global Miden configuration found to clear.");
         }
 
         Ok(())
@@ -67,7 +67,7 @@ impl ClearConfigCmd {
 
     fn remove_directory(&self, dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
         if !dir_path.exists() {
-            println!("No {config_type} miden configuration found to clear.");
+            println!("No {config_type} Miden configuration found to clear.");
             return Ok(());
         }
 
