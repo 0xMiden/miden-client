@@ -151,12 +151,12 @@ impl MintCmd {
         force: bool,
         target_account_id: AccountId,
         note_type: NoteType,
-        mut client: &mut Client<AUTH>,
+        client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
         let faucet_account_id = self.faucet_account_id.as_ref().ok_or(CliError::Input(
             "Faucet account ID is required when not using --new-faucet flag".to_string(),
         ))?;
-        let faucet_account_id = parse_account_id(&client, faucet_account_id).await?;
+        let faucet_account_id = parse_account_id(client, faucet_account_id).await?;
 
         let faucet = client.get_account(faucet_account_id).await.unwrap().unwrap();
         let stored_owner_word = faucet.account().storage().get_item(2).unwrap();
@@ -165,7 +165,7 @@ impl MintCmd {
 
         // Compute the output P2ID note
         let amount = self.amount;
-        let mint_asset = FungibleAsset::new(faucet_account_id, amount.into()).unwrap().into();
+        let mint_asset = FungibleAsset::new(faucet_account_id, amount).unwrap().into();
         let aux = Felt::new(27);
         let serial_num = Word::default();
 
@@ -185,7 +185,7 @@ impl MintCmd {
 
         let mint_note = create_mint_note(
             faucet_account_id,
-            stored_owner_id.into(),
+            stored_owner_id,
             recipient,
             output_note_tag.into(),
             Felt::new(amount),
@@ -208,7 +208,7 @@ impl MintCmd {
 
         // Execute the mint transaction
         execute_transaction(
-            &mut client,
+            client,
             target_account_id,
             mint_transaction_request,
             force,
@@ -238,7 +238,7 @@ impl MintCmd {
 
         // Execute the consume P2ID note transaction
         execute_transaction(
-            &mut client,
+            client,
             target_account_id,
             consume_p2id_note_transaction_request,
             force,
@@ -259,7 +259,7 @@ impl MintCmd {
         force: bool,
         target_account_id: AccountId,
         note_type: NoteType,
-        mut client: &mut Client<AUTH>,
+        client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
         let faucet_details_map = load_faucet_details_map()?;
 
@@ -267,7 +267,7 @@ impl MintCmd {
             .asset
             .as_ref()
             .ok_or(CliError::Input("Asset is required when using --new-faucet flag".to_string()))?;
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, asset).await?;
+        let fungible_asset = faucet_details_map.parse_fungible_asset(client, asset).await?;
 
         let transaction_request = TransactionRequestBuilder::new()
             .build_mint_fungible_asset(
@@ -281,7 +281,7 @@ impl MintCmd {
             })?;
 
         execute_transaction(
-            &mut client,
+            client,
             fungible_asset.faucet_id(),
             transaction_request,
             force,
