@@ -51,9 +51,6 @@ miden-client init
 
 # Create local configuration in current directory
 miden-client init --local
-
-# Copy existing global configuration to local directory
-miden-client init --copy-global
 ```
 
 The global configuration approach reduces per-project setup overhead while still allowing project-specific customization when needed.

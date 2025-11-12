@@ -47,17 +47,12 @@ const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
 #[derive(Debug, Clone, Parser, Default)]
 #[command(
     about = "Initialize the client. By default creates a global `.miden` directory in the home directory. \
-Use --local to create a local `.miden` directory in the current working directory. \
-Use --copy-global to copy the entire global configuration to the local directory."
+Use --local to create a local `.miden` directory in the current working directory."
 )]
 pub struct InitCmd {
     /// Create configuration in the local working directory instead of the global home directory
     #[clap(long)]
     local: bool,
-
-    /// Copy existing global configuration to local directory
-    #[clap(long)]
-    copy_global: bool,
 
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
@@ -89,54 +84,6 @@ pub struct InitCmd {
 
 impl InitCmd {
     pub fn execute(&self) -> Result<(), CliError> {
-        if self.copy_global {
-            // Copy global config to local - always targets local directory
-            Self::copy_global_to_local()
-        } else {
-            // Create new config in target directory (local or global)
-            self.create_new_config()
-        }
-    }
-
-    fn copy_global_to_local() -> Result<(), CliError> {
-        let global_miden_dir = get_global_miden_dir().map_err(|e| {
-            CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
-        })?;
-
-        let local_miden_dir = get_local_miden_dir()?;
-
-        // Check if global config exists
-        if !global_miden_dir.exists() {
-            return Err(CliError::Config(
-                "Global configuration not found".to_string().into(),
-                format!("Cannot copy global config: {} does not exist", global_miden_dir.display()),
-            ));
-        }
-
-        // Check if local config already exists
-        if local_miden_dir.exists() {
-            return Err(CliError::Config(
-                "Local configuration already exists".to_string().into(),
-                format!(
-                    "Cannot copy to local directory: \"{:?}\" already exists. Remove it first.",
-                    local_miden_dir.display()
-                ),
-            ));
-        }
-
-        // Copy entire global miden directory to local
-        copy_dir_all(&global_miden_dir, &local_miden_dir)?;
-
-        println!(
-            "Successfully copied global configuration from {} to {}",
-            global_miden_dir.display(),
-            local_miden_dir.display()
-        );
-
-        Ok(())
-    }
-
-    fn create_new_config(&self) -> Result<(), CliError> {
         // Determine target directory based on flags
         let (target_miden_dir, config_type) = if self.local {
             (get_local_miden_dir()?, "local")
