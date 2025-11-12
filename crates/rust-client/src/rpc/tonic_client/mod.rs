@@ -189,7 +189,10 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_header, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+    async fn get_notes_by_id_inner(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError> {
         let request = proto::note::NoteIdList {
             ids: note_ids.iter().map(|id| (*id).into()).collect(),
         };
@@ -473,7 +476,10 @@ impl NodeRpcClient for GrpcClient {
         ))
     }
 
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
+    async fn check_nullifiers_inner(
+        &self,
+        nullifiers: &[Nullifier],
+    ) -> Result<Vec<SmtProof>, RpcError> {
         let request = proto::rpc_store::NullifierList {
             nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
         };

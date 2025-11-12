@@ -3,6 +3,7 @@
 ## 0.13.0 (TBD)
 
 * Changed `blockNum` type from `string` to `number` in WebClient transaction interfaces for better type safety and consistency ([#1528](https://github.com/0xMiden/miden-client/pull/1528)).
+* Added `get_notes_by_id_inner` and `check_nullifiers_inner` to comply with RPC limits ([#1511](https://github.com/0xMiden/miden-client/pull/1511)).
 
 ## 0.12.4 (TBD)
 
