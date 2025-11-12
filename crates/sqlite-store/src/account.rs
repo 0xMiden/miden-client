@@ -226,39 +226,31 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex()],
         )?;
 
-        let possible_roots: Vec<Value> =
-            storage_values.values().map(|(_, value)| Value::from(value.to_hex())).collect();
-
-        let mut storage_maps =
-            query_storage_maps(conn, "root IN rarray(?)", [Rc::new(possible_roots)])?;
-
         for (slot_type, value) in storage_values.into_values() {
-            match slot_type {
-                StorageSlotType::Value => storage_header.push((StorageSlotType::Value, value)),
-                StorageSlotType::Map => {
-                    //TODO: This might not work as inteded, this map may calculate the root based
-                    // on the returned entries and not on the original partial storage map root.
-                    let map = storage_maps
-                        .remove(&value)
-                        .ok_or(AccountError::StorageMapRootNotFound(value))
-                        .unwrap();
+            storage_header.push((slot_type, value));
+            if slot_type == StorageSlotType::Map {
+                // TODO: This might not work as inteded, this map may calculate the root based
+                // on the returned entries and not on the original partial storage map root.
+                // TODO: querying the database for a single map is not performant
+                // consider retrieving all storage maps in a single transaction.
+                let storage_map_root = value;
+                let mut query = query_storage_maps(conn, "root = ?", [storage_map_root.to_hex()])?;
+                let map = query
+                    .remove(&value)
+                    .ok_or(AccountError::StorageMapRootNotFound(storage_map_root))?;
 
-                    storage_header.push((StorageSlotType::Map, value));
+                let mut partial_storage_map = PartialStorageMap::new(value);
 
-                    let mut partial_storage_map = PartialStorageMap::new(value);
+                for (k, v) in map.entries() {
+                    let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k).unwrap();
+                    let path = SparseMerklePath::try_from(path).unwrap(); // TOOD: handle unwrap
+                    let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
+                    let proof = SmtProof::new(path, leaf).unwrap(); // TODO: handle unwrap
 
-                    for (k, v) in map.entries() {
-                        let (_, path) =
-                            get_storage_map_item_proof(&merkle_store, value, *k).unwrap();
-                        let path = SparseMerklePath::try_from(path).unwrap(); // TOOD: handle unwrap
-                        let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
-                        let proof = SmtProof::new(path, leaf).unwrap(); // TODO: handle unwrap
-
-                        let witness = StorageMapWitness::new(proof, vec![*k]).unwrap();
-                        partial_storage_map.add(witness).unwrap();
-                    }
-                    maps.push(partial_storage_map);
-                },
+                    let witness = StorageMapWitness::new(proof, vec![*k]).unwrap();
+                    partial_storage_map.add(witness).unwrap();
+                }
+                maps.push(partial_storage_map);
             }
         }
         let partial_storage =
