@@ -82,7 +82,7 @@ impl ClearConfigCmd {
     }
 
     fn remove_directory(dir_path: &PathBuf, config_type: &str) -> Result<(), CliError> {
-        println!("Removing {config_type} miden configuration at: {}", dir_path.display());
+        println!("Removing {config_type} Miden configuration at: {}", dir_path.display());
 
         fs::remove_dir_all(dir_path).map_err(|err| {
             CliError::Config(
