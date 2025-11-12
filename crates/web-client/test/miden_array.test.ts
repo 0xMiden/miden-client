@@ -212,8 +212,8 @@ test.describe("Specific array tests (using AccountIdArray)", () => {
 
 test.describe("Generic array tests (using each exposed array type)", () => {
   test("Instance empty arrays", async ({ page, exposedMidenArrayTypes }) => {
-    exposedMidenArrayTypes.forEach(async (arrayTypeToInstance) => {
-      test.step(`Empty array ${arrayTypeToInstance}`, async () => {
+    for (const arrayTypeToInstance of exposedMidenArrayTypes) {
+      await test.step(`Empty array ${arrayTypeToInstance}`, async () => {
         await expect(
           instanceEmptyArray({
             page,
@@ -221,20 +221,20 @@ test.describe("Generic array tests (using each exposed array type)", () => {
           })
         ).resolves.toBe(true);
       });
-    });
+    }
   });
 
   test("Building array of mixed types fails", async ({
     page,
     exposedMidenArrayTypes,
   }) => {
-    exposedMidenArrayTypes.forEach(async (arrayTypeToInstance) => {
-      test.step(`Mixed typed array of ${arrayTypeToInstance} fails`, async () => {
+    for (const arrayTypeToInstance of exposedMidenArrayTypes) {
+      await test.step(`Mixed typed array of ${arrayTypeToInstance} fails`, async () => {
         await expect(
           instanceMixedArray({ page, arrayTypeToInstance }),
           `Should not be able to build array of type ${arrayTypeToInstance} with mixed types`
         ).rejects.toThrow();
       });
-    });
+    }
   });
 });

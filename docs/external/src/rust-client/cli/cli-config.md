@@ -14,15 +14,15 @@ Run `miden-client --help` for information on `miden` commands.
 
 ## Client Configuration
 
-We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]). The file gets created when running `miden-client init`. It can also be edited to use a different configuration for the client. Running this command is optional, but can be done if you want to have more fine-grained control over the configuration of the `miden-client`.
+We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]). The file gets created when running `miden-client init`, which creates a `.miden` directory structure to organize all client-related files. It can also be edited to use a different configuration for the client. Running this command is optional, but can be done if you want to have more fine-grain control over the configuration of the miden-client.
 
 ```sh
-store_filepath = "store.sqlite3"
-secret_keys_directory = "keystore"
+store_filepath = ".miden/store.sqlite3"
+secret_keys_directory = ".miden/keystore"
 default_account_id = "0x012345678"
-token_symbol_map_filepath = "token_symbol_map.toml"
+token_symbol_map_filepath = ".miden/token_symbol_map.toml"
 remote_prover_endpoint = "http://localhost:8080"
-package_directory         = "./packages"
+package_directory = ".miden/packages"
 max_block_number_delta = 256
 
 [rpc]
@@ -34,7 +34,7 @@ endpoint = "http://localhost:57292"
 timeout_ms = 10000
 ```
 
-The TOML file should reside in same the directory from which you run the CLI.
+The TOML file resides in the `.miden` directory, which is created in the current working directory when you run `miden-client init`. This directory structure keeps all client-related files organized in one place.
 
 ### RPC
 
@@ -55,7 +55,7 @@ This field can be set with the `--network` flag when running the `miden-client i
 
 ### Store and keystore
 
-The `store_filepath` field is used to configure the path to the SQLite database file used by the client. The `secret_keys_directory` field is used to configure the path to the directory where the keystore files are stored. The default values are `store.sqlite3` and `keystore`, respectively.
+The `store_filepath` field is used to configure the path to the SQLite database file used by the client. The `secret_keys_directory` field is used to configure the path to the directory where the keystore files are stored. The default values are `.miden/store.sqlite3` and `.miden/keystore`, respectively, organizing these files within the `.miden` directory structure.
 
 The store filepath can be set when running the `miden-client init` command with the `--store-path` flag.
 
@@ -82,7 +82,7 @@ miden-client account --default
 
 ### Token symbol map
 
-The `token_symbol_map_filepath` field is used to configure the path to the TOML file that contains the token symbol map. The token symbol map stores the faucet details for different token symbols. The default value is `token_symbol_map.toml`.
+The `token_symbol_map_filepath` field is used to configure the path to the TOML file that contains the token symbol map. The token symbol map stores the faucet details for different token symbols. The default value is `.miden/token_symbol_map.toml`.
 
 This file must be updated manually with known token symbol mappings. A sample token symbol map file looks like this:
 
@@ -110,7 +110,7 @@ The `remote_prover_endpoint` field is used to configure the usage of a remote pr
 `Packages` are Miden's native packaging format.
 This structure contains the outputs of a compiled project, with all of its corresponding metadata. Specifically, a `Package` may contain the compiled MAST for an `Account Component` in the form of a `Library`.
 
-The `package_directory` field is used to configure the path to the directory where the account components are stored in package (`.masp`) form. The default value is `./packages`.
+The `package_directory` field is used to configure the path to the directory where the account components are stored in package (`.masp`) form. The default value is `.miden/packages`.
 
 In this directory you can place the packages used to create the account components. These define the interface of the account that will be created.
 

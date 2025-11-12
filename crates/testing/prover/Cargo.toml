@@ -3,6 +3,7 @@ authors.workspace      = true
 edition.workspace      = true
 license.workspace      = true
 name                   = "testing-remote-prover"
+publish                = false
 repository.workspace   = true
 rust-version.workspace = true
 version.workspace      = true

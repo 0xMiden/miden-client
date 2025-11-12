@@ -109,6 +109,7 @@
 //!     tx_graceful_blocks,
 //!     max_block_number_delta,
 //!     Some(Arc::new(note_transport_api)),
+//!     None, // or Some(Arc::new(prover)) for a custom prover
 //! )
 //! .await
 //! .unwrap();
@@ -322,9 +323,9 @@ pub struct Client<AUTH> {
     /// An instance of [`NodeRpcClient`] which provides a way for the client to connect to the
     /// Miden node.
     rpc_api: Arc<dyn NodeRpcClient>,
-    /// An instance of a [`LocalTransactionProver`] which will be the default prover for the
+    /// An instance of a [`TransactionProver`] which will be the default prover for the
     /// client.
-    tx_prover: Arc<LocalTransactionProver>,
+    tx_prover: Arc<dyn TransactionProver + Send + Sync>,
     /// An instance of a [`TransactionAuthenticator`] which will be used by the transaction
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<AUTH>>,
@@ -370,10 +371,13 @@ where
     ///   behind the network for transactions and account proofs to be considered valid.
     /// - `note_transport_api`: An instance of [`NoteTransportClient`] which provides a way for the
     ///   client to connect to the Miden Note Transport network.
+    /// - `tx_prover`: An optional instance of [`TransactionProver`] which will be used as the
+    ///   default prover for the client. If not provided, a default local prover will be created.
     ///
     /// # Errors
     ///
     /// Returns an error if the client couldn't be instantiated.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
         rng: Box<dyn FeltRng>,
@@ -383,8 +387,10 @@ where
         tx_graceful_blocks: Option<u32>,
         max_block_number_delta: Option<u32>,
         note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+        tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
     ) -> Result<Self, ClientError> {
-        let tx_prover = Arc::new(LocalTransactionProver::default());
+        let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
+            tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             // Set the genesis commitment in the RPC API client for future requests.
