@@ -26,6 +26,8 @@ pub struct FetchNotesRequest {
     pub tags: ::prost::alloc::vec::Vec<u32>,
     #[prost(fixed64, tag = "2")]
     pub cursor: u64,
+    #[prost(fixed32, optional, tag = "3")]
+    pub limit: ::core::option::Option<u32>,
 }
 /// API response for fetching notes
 #[derive(Clone, PartialEq, ::prost::Message)]

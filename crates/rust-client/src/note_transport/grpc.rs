@@ -111,9 +111,14 @@ impl GrpcNoteTransportClient {
         &self,
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
         let tags_int = tags.iter().map(NoteTag::as_u32).collect();
-        let request = FetchNotesRequest { tags: tags_int, cursor: cursor.value() };
+        let request = FetchNotesRequest {
+            tags: tags_int,
+            cursor: cursor.value(),
+            limit,
+        };
 
         let response = self
             .api()
@@ -199,8 +204,9 @@ impl super::NoteTransportClient for GrpcNoteTransportClient {
         &self,
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
-        self.fetch_notes(tags, cursor).await
+        self.fetch_notes(tags, cursor, limit).await
     }
 
     async fn stream_notes(

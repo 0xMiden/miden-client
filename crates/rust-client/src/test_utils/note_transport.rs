@@ -45,33 +45,35 @@ impl MockNoteTransportNode {
         &self,
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> (Vec<NoteInfo>, NoteTransportCursor) {
-        let mut notes = vec![];
-        let mut rcursor = NoteTransportCursor::init();
+        let mut notesc_unlimited = Vec::new();
+
         for tag in tags {
             // Assumes stored notes are ordered by cursor
-            let tnotes = self
-                .notes
-                .get(tag)
-                .map(|pg_notes| {
-                    // Find first element after cursor
-                    if let Some(pos) = pg_notes.iter().position(|(_, tcursor)| *tcursor > cursor) {
-                        &pg_notes[pos..]
-                    } else {
-                        &[]
+            if let Some(tag_notes) = self.notes.get(tag) {
+                // Find first element after cursor
+                if let Some(pos) = tag_notes.iter().position(|(_, tcursor)| *tcursor > cursor) {
+                    for (note, note_cursor) in &tag_notes[pos..] {
+                        notesc_unlimited.push((note.clone(), *note_cursor));
                     }
-                })
-                .map(Vec::from)
-                .unwrap_or_default();
-            rcursor = rcursor.max(
-                tnotes
-                    .iter()
-                    .map(|(_, cursor)| *cursor)
-                    .max()
-                    .unwrap_or(NoteTransportCursor::init()),
-            );
-            notes.extend(tnotes.into_iter().map(|(note, _)| note).collect::<Vec<_>>());
+                }
+            }
         }
+
+        // Sort mixed-tagged notes by cursor
+        notesc_unlimited.sort_by_key(|(_, cursor)| *cursor);
+
+        // Apply limit if specified
+        let limit_usize = limit.map(|l| l as usize);
+        let notesc_limited: Vec<_> =
+            notesc_unlimited.iter().take(limit_usize.unwrap_or(usize::MAX)).collect();
+
+        let rcursor = notesc_limited.last().map(|(_, cursor)| *cursor).unwrap_or(cursor);
+
+        // Extract notes
+        let notes: Vec<NoteInfo> = notesc_limited.iter().map(|(note, _)| note.clone()).collect();
+
         (notes, rcursor)
     }
 }
@@ -105,8 +107,9 @@ impl MockNoteTransportApi {
         &self,
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> (Vec<NoteInfo>, NoteTransportCursor) {
-        self.mock_node.read().get_notes(tags, cursor)
+        self.mock_node.read().get_notes(tags, cursor, limit)
     }
 }
 
@@ -136,8 +139,9 @@ impl NoteTransportClient for MockNoteTransportApi {
         &self,
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
-        Ok(self.fetch_notes(tags, cursor))
+        Ok(self.fetch_notes(tags, cursor, limit))
     }
 
     async fn stream_notes(

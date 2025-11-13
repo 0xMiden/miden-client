@@ -41,7 +41,7 @@ miden-node-proto-build           = { default-features = false, version = "0.12" 
 miden-node-rpc                   = { version = "0.12" }
 miden-node-store                 = { version = "0.12" }
 miden-node-utils                 = { version = "0.12" }
-miden-note-transport-proto-build = { default-features = false, version = "0.1" }
+miden-note-transport-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-note-transport", branch = "ev/fetch-limit" }
 miden-remote-prover              = { features = ["concurrent"], version = "0.12" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.12" }
 
