@@ -49,7 +49,7 @@ impl PublicKey {
                 Ok(NativePublicKey::RpoFalcon512(public_key).into())
             },
             NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
-                "recovering a public key from an EcdsaK256Keccak signature is not supported yet",
+                "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",
             )),
         }
     }

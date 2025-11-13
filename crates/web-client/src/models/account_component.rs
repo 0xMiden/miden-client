@@ -110,7 +110,7 @@ impl AccountComponent {
         let native_secret_key: NativeSecretKey = secret_key.into();
         match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => Err(JsValue::from_str(
-                "building auth component from an ecdsa key is not yet soported",
+                "Building auth component from an ecdsa key is not yet soported",
             )),
             NativeSecretKey::RpoFalcon512(_) => {
                 let commitment = native_secret_key.public_key().to_commitment();
@@ -121,7 +121,7 @@ impl AccountComponent {
             // '#[non_exhaustive]' attribute, without this catch-all clause,
             // this is a compiler error.
             _unimplemented => Err(JsValue::from_str(
-                "building auth component for this auth scheme is not supported yet",
+                "Building auth component for this auth scheme is not supported yet",
             )),
         }
     }
