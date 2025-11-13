@@ -69,7 +69,6 @@ use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::note::NoteScreener;
-use crate::note_transport::NoteTransport;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
@@ -127,11 +126,6 @@ where
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
-        let note_transport = self
-            .note_transport_api
-            .as_ref()
-            .map(|api| NoteTransport::new(api.clone(), self.rpc_api.clone()));
-
         // Get current state of the client
         let accounts = self
             .store
@@ -166,9 +160,9 @@ where
 
         // Note Transport update
         // TODO We can run both sync_state, fetch_notes futures in parallel
-        let note_transport_update = if let Some(mut note_transport) = note_transport {
+        let note_transport_update = if self.is_note_transport_enabled() {
             let cursor = self.store.get_note_transport_cursor().await?;
-            Some(note_transport.fetch_notes(cursor, note_tags).await?)
+            Some(self.fetch_notes(cursor, note_tags).await?)
         } else {
             None
         };

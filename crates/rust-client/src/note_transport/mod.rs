@@ -12,11 +12,10 @@ use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
 use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
-use crate::rpc::NodeRpcClient;
-use crate::store::input_note_states::UnverifiedNoteState;
 use crate::store::{InputNoteRecord, Store};
 use crate::{Client, ClientError};
 
@@ -28,6 +27,13 @@ impl<AUTH> Client<AUTH> {
     /// Check if note transport connection is configured
     pub fn is_note_transport_enabled(&self) -> bool {
         self.note_transport_api.is_some()
+    }
+
+    /// Returns the Note Transport client, if configured
+    pub(crate) fn get_note_transport_api(
+        &self,
+    ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
+        self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
     }
 
     /// Send a note through the note transport network.
@@ -51,7 +57,12 @@ impl<AUTH> Client<AUTH> {
 
         Ok(())
     }
+}
 
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync + 'static,
+{
     /// Fetch notes for tracked note tags.
     ///
     /// The client will query the configured note transport node for all tracked note tags.
@@ -65,17 +76,12 @@ impl<AUTH> Client<AUTH> {
     /// To fetch the full history of private notes for the tracked tags, use
     /// [`Client::fetch_all_private_notes`].
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        let transport_api = self.get_note_transport_api()?;
-        let node_api = self.rpc_api.clone();
-
         // Unique tags
         let note_tags = self.store.get_unique_note_tags().await?;
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = NoteTransport::new(transport_api, node_api)
-            .fetch_notes(cursor, note_tags)
-            .await?;
+        let update = self.fetch_notes(cursor, note_tags).await?;
 
         self.store.apply_note_transport_update(update).await?;
 
@@ -88,65 +94,13 @@ impl<AUTH> Client<AUTH> {
     /// fetching all notes stored in the note transport network for the tracked tags.
     /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
-        let transport_api = self.get_note_transport_api()?;
-        let node_api = self.rpc_api.clone();
-
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = NoteTransport::new(transport_api, node_api)
-            .fetch_notes(NoteTransportCursor::init(), note_tags)
-            .await?;
+        let update = self.fetch_notes(NoteTransportCursor::init(), note_tags).await?;
 
         self.store.apply_note_transport_update(update).await?;
 
         Ok(())
-    }
-
-    /// Returns the Note Transport client, if configured
-    pub(crate) fn get_note_transport_api(
-        &self,
-    ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
-        self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
-    }
-}
-
-/// Populates the note transport cursor setting with 0, if it is not setup
-pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<(), ClientError> {
-    let setting = NOTE_TRANSPORT_CURSOR_STORE_SETTING;
-    if store.get_setting(setting.into()).await?.is_none() {
-        let initial_cursor = 0u64.to_be_bytes().to_vec();
-        store.set_setting(setting.into(), initial_cursor).await?;
-    }
-    Ok(())
-}
-
-/// Note Transport methods
-pub struct NoteTransport {
-    transport_api: Arc<dyn NoteTransportClient>,
-    node_api: Arc<dyn NodeRpcClient>,
-}
-
-/// Note transport cursor
-///
-/// Pagination integer used to reduce the number of fetched notes from the note transport network,
-/// avoiding duplicate downloads.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
-pub struct NoteTransportCursor(u64);
-
-/// Note Transport update
-pub struct NoteTransportUpdate {
-    /// Pagination cursor for next fetch
-    pub cursor: NoteTransportCursor,
-    /// Fetched notes
-    pub note_updates: Vec<InputNoteRecord>,
-}
-
-impl NoteTransport {
-    pub fn new(
-        transport_api: Arc<dyn NoteTransportClient>,
-        node_api: Arc<dyn NodeRpcClient>,
-    ) -> Self {
-        Self { transport_api, node_api }
     }
 
     /// Fetch notes for provided note tags with pagination
@@ -163,7 +117,7 @@ impl NoteTransport {
         let mut tnotes = BTreeMap::new();
         // Fetch notes
         let (note_infos, rcursor) = self
-            .transport_api
+            .get_note_transport_api()?
             .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
             .await?;
         for note_info in &note_infos {
@@ -176,19 +130,25 @@ impl NoteTransport {
 
         // Retrieve inclusion proofs from the Miden node
         let ids = tnotes.keys().copied().collect::<Vec<_>>();
-        let nnotes = self.node_api.get_notes_by_id(&ids).await?;
+        let nnotes = self.rpc_api.get_notes_by_id(&ids).await?;
 
         // Create `NoteInputRecord`s of the transport-fetched notes and the node-retrieved proofs
         let mut note_updates = Vec::with_capacity(tnotes.len());
         for nnote in nnotes {
-            let state = UnverifiedNoteState {
-                metadata: *nnote.metadata(),
-                inclusion_proof: nnote.inclusion_proof().clone(),
-            }
-            .into();
             if let Some(tnote) = tnotes.remove(&nnote.id()) {
-                let input_note_record = InputNoteRecord::new(tnote.into(), None, state);
-                note_updates.push(input_note_record);
+                // Update existing note, if it exists
+                let previous_note = self.get_input_note(nnote.id()).await?;
+                // Build note record from the transport-fetch note and node-retrieved proof
+                let opt_input_note_record = self
+                    .import_note_record_by_proof(
+                        previous_note,
+                        tnote,
+                        nnote.inclusion_proof().clone(),
+                    )
+                    .await?;
+                if let Some(input_note_record) = opt_input_note_record {
+                    note_updates.push(input_note_record);
+                }
             }
         }
 
@@ -202,6 +162,31 @@ impl NoteTransport {
 
         Ok(update)
     }
+}
+
+/// Populates the note transport cursor setting with 0, if it is not setup
+pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<(), ClientError> {
+    let setting = NOTE_TRANSPORT_CURSOR_STORE_SETTING;
+    if store.get_setting(setting.into()).await?.is_none() {
+        let initial_cursor = 0u64.to_be_bytes().to_vec();
+        store.set_setting(setting.into(), initial_cursor).await?;
+    }
+    Ok(())
+}
+
+/// Note transport cursor
+///
+/// Pagination integer used to reduce the number of fetched notes from the note transport network,
+/// avoiding duplicate downloads.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord)]
+pub struct NoteTransportCursor(u64);
+
+/// Note Transport update
+pub struct NoteTransportUpdate {
+    /// Pagination cursor for next fetch
+    pub cursor: NoteTransportCursor,
+    /// Fetched notes
+    pub note_updates: Vec<InputNoteRecord>,
 }
 
 impl NoteTransportCursor {
