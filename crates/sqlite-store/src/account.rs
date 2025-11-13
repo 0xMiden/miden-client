@@ -229,8 +229,6 @@ impl SqliteStore {
         for (slot_type, value) in storage_values.into_values() {
             storage_header.push((slot_type, value));
             if slot_type == StorageSlotType::Map {
-                // TODO: This might not work as inteded, this map may calculate the root based
-                // on the returned entries and not on the original partial storage map root.
                 // TODO: querying the database for a single map is not performant
                 // consider retrieving all storage maps in a single transaction.
                 let storage_map_root = value;
@@ -239,21 +237,22 @@ impl SqliteStore {
                     let mut partial_storage_map = PartialStorageMap::new(value);
 
                     for (k, v) in map.entries() {
-                        let (_, path) =
-                            get_storage_map_item_proof(&merkle_store, value, *k).unwrap();
-                        let path = SparseMerklePath::try_from(path).unwrap(); // TOOD: handle unwrap
+                        let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
+                        let path = SparseMerklePath::try_from(path)
+                            .map_err(StoreError::MerkleStoreError)?;
                         let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
-                        let proof = SmtProof::new(path, leaf).unwrap(); // TODO: handle unwrap
+                        let proof = SmtProof::new(path, leaf).map_err(StoreError::SmtProofError)?;
 
-                        let witness = StorageMapWitness::new(proof, vec![*k]).unwrap();
-                        partial_storage_map.add(witness).unwrap();
+                        let witness = StorageMapWitness::new(proof, vec![*k])
+                            .map_err(StoreError::StorageMapError)?;
+                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
                     }
                     maps.push(partial_storage_map);
                 }
             }
         }
-        let partial_storage =
-            PartialStorage::new(AccountStorageHeader::new(storage_header), maps).unwrap();
+        let partial_storage = PartialStorage::new(AccountStorageHeader::new(storage_header), maps)
+            .map_err(StoreError::AccountError)?;
 
         let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
             return Ok(None);
