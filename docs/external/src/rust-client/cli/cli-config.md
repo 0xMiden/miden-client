@@ -14,7 +14,7 @@ Run `miden-client --help` for information on `miden` commands.
 
 ## Client Configuration
 
-We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]). The file gets created when running `miden-client init`, which creates a `.miden` directory structure to organize all client-related files. It can also be edited to use a different configuration for the client. Running this command is optional, but can be done if you want to have more fine-grain control over the configuration of the miden-client.
+We configure the client using a [TOML](https://en.wikipedia.org/wiki/TOML) file ([`miden-client.toml`]). The file gets created when running `miden-client init`, which creates a `.miden` directory structure to organize all client-related files. By default, this directory is located in the HOME path, i.e. at `~/.miden`. Running this command is optional, but can be done if you want to have more fine-grained control over the configuration of the `miden-client`. The TOML file can also be edited to use a different configuration for the client.
 
 ```sh
 store_filepath = ".miden/store.sqlite3"
@@ -34,7 +34,47 @@ endpoint = "http://localhost:57292"
 timeout_ms = 10000
 ```
 
-The TOML file resides in the `.miden` directory, which is created in the current working directory when you run `miden-client init`. This directory structure keeps all client-related files organized in one place.
+### Configuration Location and Priority
+
+The client supports both **global** and **local** configuration with intelligent priority handling:
+
+1. **Global Configuration** (default): Located at `~/.miden/miden-client.toml` in your home directory
+2. **Local Configuration** (project-specific): Located at `./.miden/miden-client.toml` in your current working directory
+
+**Priority Order**: Local configuration takes precedence over global configuration. If both exist, the client will use the local configuration and ignore the global one.
+
+### Initialization Options
+
+```bash
+# Create global configuration (default behavior)
+miden-client init
+
+# Create local configuration in current directory
+miden-client init --local
+```
+
+The global configuration approach reduces per-project setup overhead while still allowing project-specific customization when needed.
+
+### Configuration Management
+
+#### Clear Command
+
+The `clear` command helps manage configuration by removing existing setups:
+
+```bash
+# Remove local config if present, otherwise remove global config
+miden-client clear
+
+# Force removal of global configuration only
+miden-client clear --global
+```
+
+**Priority Behavior**: The clear command follows the same priority logic as config loading - it will remove the local configuration first if it exists, and only remove the global configuration if no local configuration is found. This ensures you don't accidentally lose both configurations at once.
+
+**Use Cases**:
+- Resetting configuration between releases when changes require clean state
+- Switching from local to global configuration (or vice versa)
+- Troubleshooting configuration-related issues
 
 ### RPC
 

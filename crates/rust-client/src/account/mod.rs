@@ -82,7 +82,10 @@ pub mod component {
         basic_fungible_faucet_library,
         basic_wallet_library,
         network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
         rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
     pub use miden_lib::account::faucets::{
         BasicFungibleFaucet,

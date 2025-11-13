@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.12.1 (unreleased)
+## 0.12.2 (2025-11-12)
 
 * Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
+* Added `AccountStorageMode` getters for `Account` and `AccountId`. [(#1509)](https://github.com/0xMiden/miden-client/pull/1509).
+* Allowed `new-account` command to create accounts with non-Falcon auth components ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
+* Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464)).
+* Exposed all auth packages from `miden-base`: `no-auth`, `multisig-auth`, and `acl-auth` components are now available in the CLI under `packages/auth/` subdirectory ([#1132](https://github.com/0xMiden/miden-client/issues/1132)).
 * Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
 
 ## 0.12.0 (2025-11-10)
@@ -29,8 +33,8 @@
 * Started allowing for note ID prefixes in CLI `notes --send` ([#1433](https://github.com/0xMiden/miden-client/pull/1433)).
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
-* Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464))
 * Added ability to create `AccountComponent` from a `Package` and `StorageSlot` array in the Web Client ([#1469](https://github.com/0xMiden/miden-client/pull/1469)).
+* Added new global default .miden directory in HOME path at the client CLI ([#1465](https://github.com/0xMiden/miden-client/pull/1465))
 
 ### Changes
 
@@ -54,7 +58,7 @@
 * [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 * Updated Dexie indexes and SQL schema; fixed sync-related transaction state bug ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 * Started syncing output note nullifiers by default, to track when they are consumed ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
-* Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)). 
+* Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)).
 
 ## 0.11.11 (2025-10-16)
 

@@ -16,25 +16,45 @@ test.describe("new_wallet tests", () => {
       description: "creates a new private, immutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: false,
-      expected: { isPublic: false, isUpdatable: false },
+      expected: {
+        isPublic: false,
+        isPrivate: true,
+        isNetwork: false,
+        isUpdatable: false,
+      },
     },
     {
       description: "creates a new public, immutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: false,
-      expected: { isPublic: true, isUpdatable: false },
+      expected: {
+        isPublic: true,
+        isPrivate: false,
+        isNetwork: false,
+        isUpdatable: false,
+      },
     },
     {
       description: "creates a new private, mutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: true,
-      expected: { isPublic: false, isUpdatable: true },
+      expected: {
+        isPublic: false,
+        isPrivate: true,
+        isNetwork: false,
+        isUpdatable: true,
+      },
     },
     {
       description: "creates a new public, mutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: true,
-      expected: { isPublic: true, isUpdatable: true },
+      expected: {
+        isPublic: true,
+        isPrivate: false,
+        isNetwork: false,
+        isUpdatable: true,
+      },
     },
   ];
 
@@ -51,6 +71,11 @@ test.describe("new_wallet tests", () => {
       expect(result.isRegularAccount).toEqual(true);
       expect(result.isUpdatable).toEqual(expected.isUpdatable);
       expect(result.isPublic).toEqual(expected.isPublic);
+      expect(result.isPrivate).toEqual(expected.isPrivate);
+      expect(result.isNetwork).toEqual(expected.isNetwork);
+      expect(result.isIdPublic).toEqual(expected.isPublic);
+      expect(result.isIdPrivate).toEqual(expected.isPrivate);
+      expect(result.isIdNetwork).toEqual(expected.isNetwork);
       expect(result.isNew).toEqual(true);
     });
   });
@@ -100,6 +125,8 @@ test.describe("new_faucet tests", () => {
       maxSupply: BigInt(10000000),
       expected: {
         isPublic: false,
+        isPrivate: true,
+        isNetwork: false,
         isUpdatable: false,
         isRegularAccount: false,
         isFaucet: true,
@@ -114,6 +141,8 @@ test.describe("new_faucet tests", () => {
       maxSupply: BigInt(10000000),
       expected: {
         isPublic: true,
+        isPrivate: false,
+        isNetwork: false,
         isUpdatable: false,
         isRegularAccount: false,
         isFaucet: true,
@@ -150,6 +179,11 @@ test.describe("new_faucet tests", () => {
         expect(result.isRegularAccount).toEqual(false);
         expect(result.isUpdatable).toEqual(false);
         expect(result.isPublic).toEqual(expected.isPublic);
+        expect(result.isPrivate).toEqual(expected.isPrivate);
+        expect(result.isNetwork).toEqual(expected.isNetwork);
+        expect(result.isIdPublic).toEqual(expected.isPublic);
+        expect(result.isIdPrivate).toEqual(expected.isPrivate);
+        expect(result.isIdNetwork).toEqual(expected.isNetwork);
         expect(result.isNew).toEqual(true);
       });
     }

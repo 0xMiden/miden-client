@@ -5,40 +5,33 @@ use std::path::PathBuf;
 use clap::Parser;
 use tracing::info;
 
-use crate::config::{CliConfig, CliEndpoint, Network, NoteTransportConfig};
+use crate::CLIENT_CONFIG_FILE_NAME;
+use crate::config::{
+    CliConfig,
+    CliEndpoint,
+    MIDEN_DIR,
+    Network,
+    NoteTransportConfig,
+    get_global_miden_dir,
+    get_local_miden_dir,
+};
 use crate::errors::CliError;
 
-/// Contains the account component template file generated on build.rs, corresponding to the basic
-/// wallet component.
-const BASIC_WALLET_PACKAGE: (&str, &[u8]) = (
-    "basic-wallet.masp",
-    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-wallet.masp")),
-);
-
-/// Contains the account component template file generated on build.rs, corresponding to the
-/// fungible faucet component.
-const FAUCET_PACKAGE: (&str, &[u8]) = (
-    "basic-fungible-faucet.masp",
-    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-fungible-faucet.masp")),
-);
-
-/// Contains the account component template file generated on build.rs, corresponding to the basic
-/// auth component.
-const BASIC_AUTH_PACKAGE: (&str, &[u8]) = (
-    "basic-auth.masp",
-    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-auth.masp")),
-);
-
-const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 3] =
-    [BASIC_WALLET_PACKAGE, FAUCET_PACKAGE, BASIC_AUTH_PACKAGE];
+const PACKAGES_DIR: &str = "packages";
 
 // INIT COMMAND
 // ================================================================================================
 
 #[derive(Debug, Clone, Parser, Default)]
-#[command(about = "Initialize the client. It will create a `.miden` directory with a \
-`miden-client.toml` file that holds the CLI and client configurations")]
+#[command(
+    about = "Initialize the client. By default creates a global `.miden` directory in the home directory. \
+Use --local to create a local `.miden` directory in the current working directory."
+)]
 pub struct InitCmd {
+    /// Create configuration in the local working directory instead of the global home directory
+    #[clap(long)]
+    local: bool,
+
     /// Network configuration to use. Options are `devnet`, `testnet`, `localhost` or a custom RPC
     /// endpoint. By default, the command uses the Testnet network.
     #[clap(long, short)]
@@ -68,27 +61,49 @@ pub struct InitCmd {
 }
 
 impl InitCmd {
-    pub fn execute(&self, config_file_path: &PathBuf) -> Result<(), CliError> {
+    pub fn execute(&self) -> Result<(), CliError> {
+        // Determine target directory based on flags
+        let (target_miden_dir, config_type) = if self.local {
+            (get_local_miden_dir()?, "local")
+        } else {
+            (
+                get_global_miden_dir().map_err(|e| {
+                    CliError::Config(Box::new(e), "Failed to determine home directory".to_string())
+                })?,
+                "global",
+            )
+        };
+
+        let config_file_path = target_miden_dir.join(CLIENT_CONFIG_FILE_NAME);
+
+        // Check if config already exists
         if config_file_path.exists() {
             return Err(CliError::Config(
                 "Error with the configuration file".to_string().into(),
                 format!(
-                    "The file \"{:?}\" already exists in the working directory. Please try using another directory or removing the file.",
-                    config_file_path.display(),
+                    "The file \"{}\" already exists in the {} {} directory ({}). Please remove it first or use a different location.",
+                    CLIENT_CONFIG_FILE_NAME,
+                    config_type,
+                    MIDEN_DIR,
+                    target_miden_dir.display()
                 ),
             ));
         }
 
-        // Create the .miden directory if it doesn't exist
-        if let Some(parent_dir) = config_file_path.parent() {
-            fs::create_dir_all(parent_dir).map_err(|err| {
-                CliError::Config(
-                    Box::new(err),
-                    format!("failed to create .miden directory in {}", parent_dir.display()),
-                )
-            })?;
-        }
+        // Create the miden directory if not existent
+        fs::create_dir_all(&target_miden_dir).map_err(|err| {
+            CliError::Config(
+                Box::new(err),
+                format!(
+                    "failed to create {} {} directory in {}",
+                    config_type,
+                    MIDEN_DIR,
+                    target_miden_dir.display()
+                ),
+            )
+        })?;
 
+        // Create new config for target directory
         let mut cli_config = CliConfig::default();
 
         if let Some(network) = &self.network {
@@ -119,10 +134,10 @@ impl InitCmd {
         let mut file_handle = File::options()
             .write(true)
             .create_new(true)
-            .open(config_file_path)
+            .open(&config_file_path)
             .map_err(|err| {
-            CliError::Config("failed to create config file".to_string().into(), err.to_string())
-        })?;
+                CliError::Config("failed to create config file".to_string().into(), err.to_string())
+            })?;
 
         // Resolve package directory relative to .miden directory before writing files
         let config_dir = config_file_path.parent().unwrap();
@@ -133,11 +148,15 @@ impl InitCmd {
         };
         write_packages_files(&resolved_package_dir)?;
 
-        file_handle.write(config_as_toml_string.as_bytes()).map_err(|err| {
+        file_handle.write_all(config_as_toml_string.as_bytes()).map_err(|err| {
             CliError::Config("failed to write config file".to_string().into(), err.to_string())
         })?;
 
-        println!("Config file successfully created at: {}", config_file_path.display());
+        println!(
+            "Config file successfully created at: {} ({})",
+            config_file_path.display(),
+            config_type
+        );
 
         Ok(())
     }
@@ -152,20 +171,35 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
         )
     })?;
 
-    for package in DEFAULT_INCLUDED_PACKAGES {
-        let package_path = packages_dir.join(package.0);
+    let build_packages_dir = PathBuf::from(env!("OUT_DIR")).join(PACKAGES_DIR);
+
+    let packages = collect_packages(&build_packages_dir)?;
+
+    // Write each package file to the destination directory
+    for (relative_path, contents) in packages {
+        let package_path = packages_dir.join(&relative_path);
+
+        if let Some(parent) = package_path.parent() {
+            fs::create_dir_all(parent).map_err(|err| {
+                CliError::Config(
+                    Box::new(err),
+                    format!("Failed to create directory {}", parent.display()),
+                )
+            })?;
+        }
+
         let mut lib_file = File::create(&package_path).map_err(|err| {
             CliError::Config(
                 Box::new(err),
                 format!("Failed to create file at {}", package_path.display()),
             )
         })?;
-        lib_file.write_all(package.1).map_err(|err| {
+        lib_file.write_all(&contents).map_err(|err| {
             CliError::Config(
                 Box::new(err),
                 format!(
                     "Failed to write package {} into file {}",
-                    package.0,
+                    relative_path.display(),
                     package_path.display()
                 ),
             )
@@ -175,4 +209,44 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
     info!("Packages files successfully created in: {:?}", packages_dir);
 
     Ok(())
+}
+
+fn visit_dir(
+    dir: &PathBuf,
+    base_dir: &PathBuf,
+    packages: &mut Vec<(PathBuf, Vec<u8>)>,
+) -> Result<(), CliError> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            visit_dir(&path, base_dir, packages)?;
+        } else if path.extension().and_then(|s| s.to_str()) == Some("masp") {
+            let contents = fs::read(&path)?;
+
+            let relative_path = path
+                .strip_prefix(base_dir)
+                .expect("Path should be under base directory")
+                .to_path_buf();
+
+            packages.push((relative_path, contents));
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively collects all .masp files from the packages directory built during build.rs.
+/// Returns a vector of tuples containing the relative path and file contents.
+fn collect_packages(packages_dir: &PathBuf) -> Result<Vec<(PathBuf, Vec<u8>)>, CliError> {
+    let mut packages = Vec::new();
+
+    visit_dir(packages_dir, packages_dir, &mut packages)?;
+
+    Ok(packages)
 }
