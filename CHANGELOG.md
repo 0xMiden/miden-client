@@ -3,7 +3,7 @@
 ## 0.12.3 (2025-11-13)
 
 * Added `recoverFrom()` function to WASM `PublicKey` and added back `TransactionSummary` back to `index.d.ts` ([#1513](https://github.com/0xMiden/miden-client/pull/1513)).
-* Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the web client ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
+* Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the WebClient ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
 
 ## 0.12.2 (2025-11-12)
 
