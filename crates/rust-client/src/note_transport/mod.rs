@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
-use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteId, NoteInclusionProof, NoteTag};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
@@ -83,7 +83,7 @@ where
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = self.fetch_notes(cursor, note_tags).await?;
+        let update = self.fetch_note_transport_update(cursor, note_tags).await?;
 
         self.store.apply_note_transport_update(update).await?;
 
@@ -98,17 +98,19 @@ where
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = self.fetch_notes(NoteTransportCursor::init(), note_tags).await?;
+        let update =
+            self.fetch_note_transport_update(NoteTransportCursor::init(), note_tags).await?;
 
         self.store.apply_note_transport_update(update).await?;
 
         Ok(())
     }
 
-    /// Fetch notes for provided note tags with pagination
+    /// Fetch notes from the note transport network for provided note tags
     ///
-    /// Only notes after the provided cursor are requested.
-    pub(crate) async fn fetch_notes<I>(
+    /// A [`NoteTransportUpdate`] is created containing the downloaded notes.
+    /// Pagination is employed, where only notes after the provided cursor are requested.
+    pub(crate) async fn fetch_note_transport_update<I>(
         &mut self,
         cursor: NoteTransportCursor,
         tags: I,
@@ -137,24 +139,23 @@ where
         // Create `NoteInputRecord`s of the transport-fetched notes and the node-retrieved proofs
         let mut note_updates = Vec::with_capacity(tnotes.len());
         for nnote in nnotes {
-            if let Some(tnote) = tnotes.remove(&nnote.id()) {
-                // Update existing note, if it exists
-                let previous_note = self.get_input_note(nnote.id()).await?;
-                // Build note record from the transport-fetch note and node-retrieved proof
+            if let Some(tnote) = tnotes.get(&nnote.id()) {
+                // Try to combine the transport-fetched note with the node-retrieved proof
                 let opt_input_note_record = self
-                    .import_note_record_by_proof(
-                        previous_note,
-                        tnote,
+                    .combine_transport_note_and_proof(
+                        tnote.clone(),
+                        nnote.id(),
                         nnote.inclusion_proof().clone(),
                     )
-                    .await?;
+                    .await;
                 if let Some(input_note_record) = opt_input_note_record {
+                    tnotes.remove(&nnote.id());
                     note_updates.push(input_note_record);
                 }
             }
         }
 
-        // Keep also the remaining transport notes which inclusion proofs were not retrieved
+        // Keep the remaining transport notes which inclusion proofs were not retrieved
         for (_id, tnote) in tnotes {
             let input_note_record = InputNoteRecord::from(tnote);
             note_updates.push(input_note_record);
@@ -163,6 +164,21 @@ where
         let update = NoteTransportUpdate { note_updates, cursor: rcursor };
 
         Ok(update)
+    }
+
+    /// Combines a transport-fetched note with a node-retrieved proof into a note record
+    async fn combine_transport_note_and_proof(
+        &self,
+        tnote: Note,
+        note_id: NoteId,
+        inclusion_proof: NoteInclusionProof,
+    ) -> Option<InputNoteRecord> {
+        // Update existing note, if it exists
+        let previous_note = self.get_input_note(note_id).await.ok()?;
+        // Build note record from the transport-fetch note and node-retrieved proof
+        self.import_note_record_by_proof(previous_note, tnote, inclusion_proof)
+            .await
+            .ok()?
     }
 }
 
