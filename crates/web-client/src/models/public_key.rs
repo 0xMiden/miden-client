@@ -1,4 +1,4 @@
-use miden_client::Deserializable;
+use miden_client::{Deserializable, Word as NativeWord};
 use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
@@ -28,6 +28,27 @@ impl PublicKey {
 
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
         self.verify_data(&SigningInputs::new_blind(message), signature)
+    }
+
+    #[wasm_bindgen(js_name = "toCommitment")]
+    pub fn to_commitment(&self) -> Word {
+        self.0.to_commitment().into()
+    }
+
+    #[wasm_bindgen(js_name = "recoverFrom")]
+    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
+        let native_message: NativeWord = message.into();
+        let native_signature: NativeSignature = signature.into();
+
+        match native_signature {
+            NativeSignature::RpoFalcon512(falcon_signature) => {
+                let public_key = NativePublicKey::recover_from(native_message, &falcon_signature);
+                Ok(PublicKey(public_key))
+            },
+            NativeSignature::EcdsaK256Keccak(_) => {
+                Err(JsValue::from_str("EcdsaK256Keccak signatures are not supported yet")) // TODO: handle this case
+            },
+        }
     }
 
     #[wasm_bindgen(js_name = "verifyData")]

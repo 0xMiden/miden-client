@@ -1049,7 +1049,10 @@ test.describe("discarded_transaction tests", () => {
 
 export const counterAccountComponent = async (
   testingPage: Page
-): Promise<string | undefined> => {
+): Promise<{
+  finalCounter?: string;
+  hasCounterComponent: boolean;
+}> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
         use.miden::active_account
@@ -1186,8 +1189,19 @@ export const counterAccountComponent = async (
 
     let account = await client.getAccount(accountBuilderResult.account.id());
     let counter = account?.storage().getItem(0)?.toHex();
+    let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
 
-    return counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+    let code = account?.code();
+    let hasCounterComponent = code
+      ? counterAccountComponent
+          .getProcedures()
+          .every((procedure) => code.hasProcedure(procedure.digest))
+      : false;
+
+    return {
+      finalCounter,
+      hasCounterComponent,
+    };
   });
 };
 
@@ -1196,8 +1210,10 @@ test.describe("counter account component tests", () => {
     page,
   }) => {
     page.on("console", (msg) => console.log(msg));
-    let finalCounter = await counterAccountComponent(page);
+    let { finalCounter, hasCounterComponent } =
+      await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
+    expect(hasCounterComponent).toBe(true);
   });
 });
 
