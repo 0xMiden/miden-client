@@ -15,7 +15,6 @@ use miden_objects::account::{
 };
 use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::note::NoteType;
 use miden_objects::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -38,9 +37,9 @@ async fn transaction_creates_two_notes() {
             .unwrap()
             .into();
 
-    let secret_key = SecretKey::new();
+    let secret_key = AuthSecretKey::new_rpo_falcon512();
     let pub_key = secret_key.public_key();
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
+    keystore.add_key(&secret_key).unwrap();
 
     let wallet_component = AccountComponent::compile(
         "
@@ -55,7 +54,7 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(wallet_component)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();

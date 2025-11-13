@@ -4,7 +4,7 @@ import { expect } from "@playwright/test";
 test.describe("signature", () => {
   [
     ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "Ecdsa Scheme"],
+    ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should produce a valid signature: ${signatureScheme}`, async ({
       page,
@@ -24,6 +24,7 @@ test.describe("signature", () => {
 
       expect(isValid).toEqual(true);
     });
+
     test(`should not verify the wrong message: ${signatureScheme}`, async ({
       page,
     }) => {
@@ -92,7 +93,7 @@ test.describe("signature", () => {
 test.describe("public key", () => {
   [
     ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "Ecdsa Scheme"],
+    ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should be able to serialize and deserialize a public key: ${signatureScheme}`, async ({
       page,
@@ -121,7 +122,7 @@ test.describe("public key", () => {
 test.describe("signing inputs", () => {
   [
     ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "Ecdsa Scheme"],
+    ["ecdsaWithRNG", "ECDSA Scheme"],
   ].forEach(([signatureFunction, signatureScheme]) => {
     test(`should be able to sign and verify an arbitrary array of felts: ${signatureScheme}`, async ({
       page,

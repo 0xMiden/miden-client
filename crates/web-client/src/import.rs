@@ -1,5 +1,4 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
-use miden_client::auth::AuthSecretKey;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
@@ -61,7 +60,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+            .add_key(&key_pair)
             .await
             .map_err(|err| err.to_string())?;
 
