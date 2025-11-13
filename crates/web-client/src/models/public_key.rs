@@ -33,7 +33,7 @@ impl PublicKey {
 
     #[wasm_bindgen(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
-        NativeWord::from(self.0.to_commitment()).into()
+        self.0.to_commitment().into()
     }
 
     #[wasm_bindgen(js_name = "recoverFrom")]
