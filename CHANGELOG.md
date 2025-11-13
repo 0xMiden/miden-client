@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.12.3 (TBD)
+* Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the web client ([#1514](https://github.com/0xMiden/miden-client/pull/1514)).
+
 ## 0.12.0 (2025-11-08)
 
 ### Features

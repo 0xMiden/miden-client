@@ -1,3 +1,4 @@
+use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{AuthRpoFalcon512 as NativeRpoFalcon512, PublicKeyCommitment};
@@ -12,6 +13,36 @@ use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
 use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
+use crate::models::word::Word;
+
+#[derive(Clone)]
+#[wasm_bindgen]
+pub struct GetProceduresResultItem {
+    digest: Word,
+    is_auth: bool,
+}
+
+#[wasm_bindgen]
+impl GetProceduresResultItem {
+    #[wasm_bindgen(getter)]
+    pub fn digest(&self) -> Word {
+        self.digest.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "isAuth")]
+    pub fn is_auth(&self) -> bool {
+        self.is_auth
+    }
+}
+
+impl From<&(NativeWord, bool)> for GetProceduresResultItem {
+    fn from(native_get_procedures_result_item: &(NativeWord, bool)) -> Self {
+        Self {
+            digest: native_get_procedures_result_item.0.into(),
+            is_auth: native_get_procedures_result_item.1,
+        }
+    }
+}
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -65,6 +96,11 @@ impl AccountComponent {
             .to_hex();
 
         Ok(digest_hex)
+    }
+
+    #[wasm_bindgen(js_name = "getProcedures")]
+    pub fn get_procedures(&self) -> Vec<GetProceduresResultItem> {
+        self.0.get_procedures().iter().map(Into::into).collect()
     }
 
     #[wasm_bindgen(js_name = "createAuthComponent")]
