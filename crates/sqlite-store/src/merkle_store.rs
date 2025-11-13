@@ -52,7 +52,7 @@ pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
     merkle_store.extend(smt.inner_nodes());
 }
 
-/// Inserts the parsial asset vault SMT nodes to the merkle store.
+/// Inserts the partial asset vault SMT nodes to the merkle store.
 pub fn insert_partial_asset_nodes(merkle_store: &mut MerkleStore, vault: &PartialVault) {
     merkle_store.extend(vault.inner_nodes());
 }

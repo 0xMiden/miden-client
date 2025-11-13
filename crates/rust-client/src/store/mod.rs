@@ -522,14 +522,21 @@ pub trait Store: Send + Sync {
     // PARTIAL ACCOUNTS
     // --------------------------------------------------------------------------------------------
 
-    // TODO: docs
+    /// Inserts a [`PartialAccount`] to the store.
+    /// Receives an [`Address`] as the initial address to associate with the partial account. This
+    /// address will be tracked for incoming notes and its derived note tag will be monitored.
+    ///
+    /// # Errors
+    ///
+    /// - If the account is new and does not contain a seed
     async fn insert_partial_account(
         &self,
         partial_account: &PartialAccount,
         initial_address: Address,
     ) -> Result<(), StoreError>;
 
-    // TODO: docs
+    /// Retrieves a [`PartialAccountRecord`] object, this contains the account's latest partial
+    /// state along with its status. Returns `None` if the partial account is not found.
     async fn get_partial_account(
         &self,
         account_id: AccountId,

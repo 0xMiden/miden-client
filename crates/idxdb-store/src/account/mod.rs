@@ -187,6 +187,9 @@ impl WebStore {
         Ok(Some(AccountRecord::new(account, status, addresses)))
     }
 
+    // TODO: current implementation is a copy of `get_account`,
+    // refactor for correct implementation.
+    // https://github.com/0xMiden/miden-client/issues/1515
     pub(crate) async fn get_partial_account(
         &self,
         account_id: AccountId,

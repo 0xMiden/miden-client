@@ -220,9 +220,11 @@ impl Store for WebStore {
 
     async fn insert_partial_account(
         &self,
-        partial_account: &PartialAccount,
-        initial_address: Address,
+        _partial_account: &PartialAccount,
+        _initial_address: Address,
     ) -> Result<(), StoreError> {
+        // TODO: implement partial account insertion
+        // https://github.com/0xMiden/miden-client/issues/1515
         unimplemented!()
     }
 
