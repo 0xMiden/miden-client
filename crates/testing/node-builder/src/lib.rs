@@ -22,7 +22,7 @@ use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment};
+use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
 use miden_objects::block::FeeParameters;

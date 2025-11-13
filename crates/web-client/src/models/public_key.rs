@@ -1,5 +1,6 @@
+use miden_client::auth::Signature as NativeSignature;
+use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
 use miden_client::{Deserializable, Word as NativeWord};
-use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -32,7 +33,7 @@ impl PublicKey {
 
     #[wasm_bindgen(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
-        self.0.to_commitment().into()
+        NativeWord::from(self.0.to_commitment()).into()
     }
 
     #[wasm_bindgen(js_name = "recoverFrom")]
@@ -54,9 +55,11 @@ impl PublicKey {
     #[wasm_bindgen(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
-        let signature: NativeSignature = signature.clone().into();
         let message = signing_inputs.to_commitment().into();
-        native_public_key.verify(message, signature)
+        match signature.clone().into() {
+            NativeSignature::RpoFalcon512(sig) => native_public_key.verify(message, &sig),
+            NativeSignature::EcdsaK256Keccak(_) => false,
+        }
     }
 }
 

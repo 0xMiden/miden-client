@@ -12,6 +12,7 @@ use anyhow::{Context, Result};
 use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountId, AccountStorageMode};
 use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::note::{NoteId, NoteType};
 use miden_objects::transaction::{OutputNote, TransactionId};
 use miden_objects::{Felt, FieldElement};
@@ -65,7 +66,7 @@ pub async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-) -> Result<(Account, AuthSecretKey), ClientError> {
+) -> Result<(Account, SecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -78,16 +79,16 @@ pub async fn insert_new_wallet_with_seed(
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
-) -> Result<(Account, AuthSecretKey), ClientError> {
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+) -> Result<(Account, SecretKey), ClientError> {
+    let key_pair = miden_objects::crypto::dsa::rpo_falcon512::SecretKey::new();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
         .with_component(BasicWallet)
         .build()
         .unwrap();

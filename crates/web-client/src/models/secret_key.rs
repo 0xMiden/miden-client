@@ -43,7 +43,13 @@ impl SecretKey {
 
     #[wasm_bindgen(js_name = "publicKey")]
     pub fn public_key(&self) -> PublicKey {
-        self.0.public_key().into()
+        match &self.0 {
+            NativeSecretKey::RpoFalcon512(secret_key) => secret_key.public_key().into(),
+            NativeSecretKey::EcdsaK256Keccak(_) => {
+                todo!("ECDSA public keys are not supported yet")
+            },
+            _ => todo!("variant not yet supported"),
+        }
     }
 
     pub fn sign(&self, message: &Word) -> Signature {
