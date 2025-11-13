@@ -155,6 +155,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
