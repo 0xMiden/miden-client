@@ -1,7 +1,6 @@
-use miden_client::Deserializable;
-use miden_client::Word as NativeWord;
 use miden_client::auth::Signature as NativeSignature;
 use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
+use miden_client::{Deserializable, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -38,10 +37,7 @@ impl PublicKey {
     }
 
     #[wasm_bindgen(js_name = "recoverFrom")]
-    pub fn recover_from(
-        message: &Word,
-        signature: &Signature,
-    ) -> Result<PublicKey, JsValue> {
+    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
         let native_message: NativeWord = message.into();
         let native_signature: NativeSignature = signature.into();
 
