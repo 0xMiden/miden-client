@@ -2,8 +2,7 @@ use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, PublicKeyCommitment};
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
 use rand::RngCore;
 use wasm_bindgen::prelude::*;
 
@@ -33,7 +32,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+                .add_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -58,7 +57,7 @@ impl WebClient {
 
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let key_pair = NativeSecretKey::with_rng(client.rng());
+            let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
             let pub_key = key_pair.public_key();
 
             let mut init_seed = [0u8; 32];
@@ -72,9 +71,7 @@ impl WebClient {
             let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
-                .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(
-                    pub_key.to_commitment(),
-                )))
+                .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
                 .with_component(
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
@@ -90,7 +87,7 @@ impl WebClient {
 
             keystore
                 .expect("KeyStore should be initialized")
-                .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+                .add_key(&key_pair)
                 .await
                 .map_err(|err| err.to_string())?;
 
@@ -127,10 +124,7 @@ impl WebClient {
         secret_key: &SecretKey,
     ) -> Result<(), JsValue> {
         let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
-        keystore
-            .add_key(&AuthSecretKey::RpoFalcon512(secret_key.into()))
-            .await
-            .map_err(|err| err.to_string())?;
+        keystore.add_key(secret_key.into()).await.map_err(|err| err.to_string())?;
         Ok(())
     }
 }

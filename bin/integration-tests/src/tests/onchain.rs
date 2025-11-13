@@ -168,7 +168,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    keystore_2.add_key(&AuthSecretKey::RpoFalcon512(secret_key))?;
+    keystore_2.add_key(&secret_key)?;
     client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token

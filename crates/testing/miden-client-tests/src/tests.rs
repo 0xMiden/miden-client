@@ -68,7 +68,6 @@ use miden_objects::account::{
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
     Note,
@@ -1934,10 +1933,10 @@ async fn empty_storage_map() {
     .unwrap()
     .with_supports_all_types();
 
-    let key_pair = SecretKey::new();
+    let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -1945,7 +1944,7 @@ async fn empty_storage_map() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(component)
         .build()
@@ -2023,10 +2022,10 @@ async fn storage_and_vault_proofs() {
         )
         .unwrap();
 
-    let key_pair = SecretKey::new();
+    let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -2034,7 +2033,7 @@ async fn storage_and_vault_proofs() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -2374,10 +2373,10 @@ async fn insert_new_wallet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<Account, ClientError> {
-    let key_pair = SecretKey::with_rng(&mut client.rng());
+    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -2385,7 +2384,7 @@ async fn insert_new_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2400,10 +2399,10 @@ async fn insert_new_fungible_faucet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<Account, ClientError> {
-    let key_pair = SecretKey::with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2416,7 +2415,7 @@ async fn insert_new_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();

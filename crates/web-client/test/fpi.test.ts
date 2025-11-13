@@ -39,7 +39,8 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.withRng(walletSeed);
+    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
+
     let authComponent = window.AccountComponent.createAuthComponent(secretKey);
 
     let getItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
@@ -94,6 +95,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 push.9.12.18.30 assert_eqw
             end
         `;
+
     txScript = txScript
       .replace("{proc_root}", getFpiMapItemProcedureHash)
       .replace("{account_id_suffix}", foreignAccountId.suffix().toString())

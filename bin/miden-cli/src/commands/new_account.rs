@@ -14,7 +14,6 @@ use miden_client::account::component::{
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};
-use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
@@ -388,8 +387,9 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         None
     } else {
         debug!("Adding default Falcon auth component");
-        let kp = SecretKey::with_rng(client.rng());
-        builder = builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().into()));
+        let kp = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
+        builder =
+            builder.with_auth_component(AuthRpoFalcon512::new(kp.public_key().to_commitment()));
         Some(kp)
     };
 
@@ -404,9 +404,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
-        keystore
-            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
-            .map_err(CliError::KeyStore)?;
+        keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");

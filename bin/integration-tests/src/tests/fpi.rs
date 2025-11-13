@@ -10,7 +10,6 @@ use miden_client::account::{
     StorageSlot,
 };
 use miden_client::auth::AuthSecretKey;
-use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
@@ -354,11 +353,11 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 /// - `Account` - The constructed foreign account.
 /// - `Word` - The seed used to initialize the account.
 /// - `Word` - The procedure root of the custom component's procedure.
-/// - `SecretKey` - The secret key used for authentication.
+/// - `AuthSecretKey` - The secret key used for authentication.
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
-) -> Result<(Account, Word, SecretKey)> {
+) -> Result<(Account, Word, AuthSecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
     storage_map.insert(MAP_KEY.into(), FPI_STORAGE_VALUE.into())?;
@@ -371,8 +370,8 @@ fn foreign_account_with_code(
     .context("failed to compile foreign account component")?
     .with_supports_all_types();
 
-    let secret_key = SecretKey::new();
-    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment().into());
+    let secret_key = AuthSecretKey::new_rpo_falcon512();
+    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment());
 
     let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
@@ -406,9 +405,7 @@ async fn deploy_foreign_account(
     let (foreign_account, proc_root, secret_key) = foreign_account_with_code(storage_mode, code)?;
     let foreign_account_id = foreign_account.id();
 
-    keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(secret_key))
-        .with_context(|| "failed to add key to keystore")?;
+    keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
     println!("Deploying foreign account");
