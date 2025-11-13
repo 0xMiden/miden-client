@@ -4,6 +4,7 @@
 
 * Added `recoverFrom()` function to WASM `PublicKey` and added back `TransactionSummary` back to `index.d.ts` ([#1513](https://github.com/0xMiden/miden-client/pull/1513)).
 * Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the WebClient ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
+* Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
 
 ## 0.12.2 (2025-11-12)
 
@@ -12,7 +13,6 @@
 * Allowed `new-account` command to create accounts with non-Falcon auth components ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
 * Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464)).
 * Exposed all auth packages from `miden-base`: `no-auth`, `multisig-auth`, and `acl-auth` components are now available in the CLI under `packages/auth/` subdirectory ([#1132](https://github.com/0xMiden/miden-client/issues/1132)).
-* Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
 
 ## 0.12.0 (2025-11-10)
 
