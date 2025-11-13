@@ -29,7 +29,9 @@ impl<AUTH> Client<AUTH> {
         self.note_transport_api.is_some()
     }
 
-    /// Returns the Note Transport client, if configured
+    /// Returns the Note Transport client
+    ///
+    /// Errors if the note transport is not configured.
     pub(crate) fn get_note_transport_api(
         &self,
     ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
