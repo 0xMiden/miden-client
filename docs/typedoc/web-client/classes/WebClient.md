@@ -771,7 +771,7 @@ Returns all the existing setting keys from the store.
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `auth_scheme_id` `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `auth_scheme_id`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
