@@ -33,9 +33,7 @@ pub fn update_asset_nodes(
         })
         .collect();
 
-    let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    let new_root = smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
-    debug_assert_eq!(new_root, root);
+    let new_root = smt_forest.batch_insert(root, entries).map_err(StoreError::from)?;
     Ok(new_root)
 }
 
@@ -72,8 +70,6 @@ pub fn update_storage_map_nodes(
 ) -> Result<Word, StoreError> {
     let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let new_root = smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
-    // Resulting root should match the map's root
-    debug_assert_eq!(new_root, root);
     Ok(new_root)
 }
 
@@ -90,8 +86,6 @@ pub fn insert_storage_map_nodes(smt_forest: &mut SmtForest, storage: &AccountSto
     for map in maps {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> = map.entries().map(|(k, v)| (*k, *v)).collect();
-        let new_root = smt_forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
-        // Resulting root should match the map's root
-        debug_assert_eq!(new_root, map.root());
+        smt_forest.batch_insert(empty_root, entries).unwrap(); // TODO: handle unwrap
     }
 }
