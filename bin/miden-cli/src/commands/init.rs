@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use clap::Parser;
 use tracing::info;
@@ -103,6 +104,10 @@ pub struct InitCmd {
     #[arg(long)]
     remote_prover_endpoint: Option<String>,
 
+    /// Timeout for the remote prover requests, in seconds.
+    #[arg(long)]
+    remote_prover_timeout: Option<u64>,
+
     /// RPC endpoint for the note transport node. Required to use the note transport network to
     /// exchange private notes.
     /// The endpoint must be in the form of "{protocol}://{hostname}:{port}", being the protocol
@@ -173,6 +178,10 @@ impl InitCmd {
             Some(rpc) => CliEndpoint::try_from(rpc.as_str()).ok(),
             None => None,
         };
+
+        if let Some(timeout) = self.remote_prover_timeout {
+            cli_config.remote_prover_timeout = Duration::from_secs(timeout);
+        }
 
         cli_config.note_transport =
             self.note_transport_endpoint.as_ref().map(|rpc| NoteTransportConfig {
