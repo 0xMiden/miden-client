@@ -31,7 +31,7 @@ use miden_client::account::{
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,

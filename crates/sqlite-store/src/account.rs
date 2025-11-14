@@ -20,7 +20,7 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
-use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
+use miden_client::crypto::{SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
