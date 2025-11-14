@@ -44,12 +44,13 @@ let processing = false; // Flag to ensure one message is processed at a time.
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
   [MethodName.NEW_WALLET]: async (args) => {
-    const [walletStorageModeStr, mutable, seed] = args;
+    const [walletStorageModeStr, mutable, authSchemeId, seed] = args;
     const walletStorageMode =
       wasm.AccountStorageMode.tryFromStr(walletStorageModeStr);
     const wallet = await wasmWebClient.newWallet(
       walletStorageMode,
       mutable,
+      authSchemeId,
       seed
     );
     const serializedWallet = wallet.serialize();
@@ -62,6 +63,7 @@ const methodHandlers = {
       tokenSymbol,
       decimals,
       maxSupplyStr,
+      authSchemeId,
     ] = args;
     const faucetStorageMode =
       wasm.AccountStorageMode.tryFromStr(faucetStorageModeStr);
@@ -71,7 +73,8 @@ const methodHandlers = {
       nonFungible,
       tokenSymbol,
       decimals,
-      maxSupply
+      maxSupply,
+      authSchemeId,
     );
     const serializedFaucet = faucet.serialize();
     return serializedFaucet.buffer;

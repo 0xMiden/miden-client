@@ -21,10 +21,10 @@ try {
     // Set up account parameters
     const accountStorageMode = AccountStorageMode.private(); // Can be private() or public()
     const mutable = true; // Whether the account code can be updated later
-    const authSchemeId = 0; // RpoFalcon512 by default
+    const authSchemeId = 0; // Authentication scheme can be either 0 (Rpo Falcon 512) or 1 (ECDSA K256 Keccak)
 
     // Create new wallet account
-    const account = await webClient.newWallet(accountStorageMode, mutable);
+    const account = await webClient.newWallet(accountStorageMode, mutable, authSchemeId);
 
     // Access account properties
     console.log(account.id().toString());      // The account's unique identifier (hex string)

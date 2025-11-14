@@ -17,7 +17,8 @@ const mockChainTest = async (testingPage: Page) => {
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      0
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(

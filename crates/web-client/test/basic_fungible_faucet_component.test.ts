@@ -1,5 +1,4 @@
 import test from "./playwright.global.setup";
-import { TokenSymbol } from "../dist/crates/miden_client_web";
 import { create } from "domain";
 import { createNewFaucet, createNewWallet } from "./webClientTestUtils";
 import { StorageMode } from "./webClientTestUtils";
@@ -20,7 +19,8 @@ export const getBasicFungibleFaucet = async (
   nonFungible: boolean = false,
   tokenSymbol: string = "DAG",
   decimals: number = 8,
-  maxSupply: bigint = BigInt(10000000)
+  maxSupply: bigint = BigInt(10000000),
+  authSchemeId: number = 0,
 ): Promise<basicFungibleFaucetResult> => {
   return await page.evaluate(
     async ({
@@ -29,6 +29,7 @@ export const getBasicFungibleFaucet = async (
       _tokenSymbol,
       _decimals,
       _maxSupply,
+      _authSchemeId,
     }) => {
       const client = window.client;
 
@@ -40,7 +41,8 @@ export const getBasicFungibleFaucet = async (
         _nonFungible,
         _tokenSymbol,
         _decimals,
-        _maxSupply
+        _maxSupply,
+        _authSchemeId
       );
 
       const basicFungibleFaucet =
@@ -59,6 +61,7 @@ export const getBasicFungibleFaucet = async (
       _tokenSymbol: tokenSymbol,
       _decimals: decimals,
       _maxSupply: maxSupply,
+      _authSchemeId: authSchemeId,
     }
   );
 };

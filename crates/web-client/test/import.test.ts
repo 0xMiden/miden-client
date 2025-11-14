@@ -124,7 +124,9 @@ test.describe("import public account by id", () => {
       authSchemeId,
       walletSeed,
     });
+
     const faucet = await createNewFaucet(page);
+    
     const { targetAccountBalance: initialBalance } =
       await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
     const { commitment: initialCommitment } = await getAccount(
