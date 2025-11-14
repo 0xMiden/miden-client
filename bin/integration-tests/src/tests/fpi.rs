@@ -1,22 +1,16 @@
 use anyhow::{Context, Result};
-use miden_client::account::component::{AccountComponent, AuthRpoFalcon512};
+use miden_client::account::component::AccountComponent;
 use miden_client::account::{
-    Account,
-    AccountBuilder,
-    AccountStorageMode,
-    PartialAccount,
-    PartialStorage,
-    StorageMap,
+    Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap,
     StorageSlot,
 };
-use miden_client::auth::AuthSecretKey;
+use miden_client::auth::{
+    AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey, RPO_FALCON_SCHEME_ID,
+};
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    AdviceInputs,
-    ForeignAccount,
-    TransactionKernel,
-    TransactionRequestBuilder,
+    AdviceInputs, ForeignAccount, TransactionKernel, TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
 
@@ -30,11 +24,11 @@ const FPI_STORAGE_VALUE: [Felt; 4] =
     [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
 
 pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
-    standard_fpi(AccountStorageMode::Public, client_config).await
+    standard_fpi(AccountStorageMode::Public, client_config, RPO_FALCON_SCHEME_ID).await
 }
 
 pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
-    standard_fpi(AccountStorageMode::Private, client_config).await
+    standard_fpi(AccountStorageMode::Private, client_config, RPO_FALCON_SCHEME_ID).await
 }
 
 pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
@@ -57,6 +51,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             end",
             map_key = Word::from(MAP_KEY)
         ),
+        RPO_FALCON_SCHEME_ID,
     )
     .await?;
     let foreign_account_id = foreign_account.id();
@@ -94,8 +89,13 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             .into_client()
             .await?;
 
-    let (wallet, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Private, &keystore2).await?;
+    let (wallet, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Private,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     let output_stack = client2
         .execute_program(
@@ -135,6 +135,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
             end",
             map_key = Word::from(MAP_KEY)
         ),
+        RPO_FALCON_SCHEME_ID,
     )
     .await?;
     let inner_foreign_account_id = inner_foreign_account.id();
@@ -163,6 +164,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
             account_id_prefix = inner_foreign_account_id.prefix().as_u64(),
             account_id_suffix = inner_foreign_account_id.suffix(),
         ),
+        RPO_FALCON_SCHEME_ID,
     )
     .await?;
     let outer_foreign_account_id = outer_foreign_account.id();
@@ -217,8 +219,13 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
             .into_client()
             .await?;
 
-    let (native_account, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
+    let (native_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Public,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
@@ -234,7 +241,11 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 /// storage. It then deploys the foreign account and creates a native account to execute a
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
-async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientConfig) -> Result<()> {
+async fn standard_fpi(
+    storage_mode: AccountStorageMode,
+    client_config: ClientConfig,
+    auth_scheme_id: u8,
+) -> Result<()> {
     let (mut client, mut keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -253,6 +264,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             end",
             map_key = Word::from(MAP_KEY)
         ),
+        auth_scheme_id,
     )
     .await?;
 
@@ -331,8 +343,13 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
             .into_client()
             .await?;
 
-    let (native_account, ..) =
-        insert_new_wallet(&mut client2, AccountStorageMode::Public, &keystore2).await?;
+    let (native_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Public,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
@@ -357,6 +374,7 @@ async fn standard_fpi(storage_mode: AccountStorageMode, client_config: ClientCon
 fn foreign_account_with_code(
     storage_mode: AccountStorageMode,
     code: String,
+    auth_scheme_id: u8,
 ) -> Result<(Account, Word, AuthSecretKey)> {
     // store our expected value on map from slot 0 (map key 15)
     let mut storage_map = StorageMap::new();
@@ -370,8 +388,23 @@ fn foreign_account_with_code(
     .context("failed to compile foreign account component")?
     .with_supports_all_types();
 
-    let secret_key = AuthSecretKey::new_rpo_falcon512();
-    let auth_component = AuthRpoFalcon512::new(secret_key.public_key().to_commitment());
+    let (key_pair, auth_component) = match auth_scheme_id {
+        0 => {
+            let key_pair = AuthSecretKey::new_rpo_falcon512();
+            let auth_component: AccountComponent =
+                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+            (key_pair, auth_component)
+        },
+        1 => {
+            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
+            let auth_component: AccountComponent =
+                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            (key_pair, auth_component)
+        },
+        _ => {
+            return Err(anyhow::anyhow!("Unsupported auth scheme ID"));
+        },
+    };
 
     let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
@@ -385,7 +418,7 @@ fn foreign_account_with_code(
         .procedure_digests()
         .next()
         .context("failed to get procedure root from component MAST forest")?;
-    Ok((account, proc_root, secret_key))
+    Ok((account, proc_root, key_pair))
 }
 
 /// Deploys a foreign account to the network with the specified code and storage mode. The account
@@ -401,8 +434,10 @@ async fn deploy_foreign_account(
     keystore: &mut TestClientKeyStore,
     storage_mode: AccountStorageMode,
     code: String,
+    auth_scheme_id: u8,
 ) -> Result<(Account, Word)> {
-    let (foreign_account, proc_root, secret_key) = foreign_account_with_code(storage_mode, code)?;
+    let (foreign_account, proc_root, secret_key) =
+        foreign_account_with_code(storage_mode, code, auth_scheme_id)?;
     let foreign_account_id = foreign_account.id();
 
     keystore.add_key(&secret_key).with_context(|| "failed to add key to keystore")?;

@@ -3,24 +3,14 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use miden_client::account::component::{
-    AccountComponentMetadata,
-    MIDEN_PACKAGE_EXTENSION,
-    basic_fungible_faucet_library,
-    basic_wallet_library,
-    no_auth_library,
-    rpo_falcon_512_acl_library,
-    rpo_falcon_512_library,
-    rpo_falcon_512_multisig_library,
+    AccountComponentMetadata, MIDEN_PACKAGE_EXTENSION, basic_fungible_faucet_library,
+    basic_wallet_library, ecdsa_k256_keccak_library, no_auth_library, rpo_falcon_512_acl_library,
+    rpo_falcon_512_library, rpo_falcon_512_multisig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
 use miden_client::vm::{
-    MastArtifact,
-    Package,
-    PackageExport,
-    PackageManifest,
-    QualifiedProcedureName,
-    Section,
+    MastArtifact, Package, PackageExport, PackageManifest, QualifiedProcedureName, Section,
     SectionId,
 };
 
@@ -38,6 +28,12 @@ fn main() {
     build_package(
         &PathBuf::from("templates/basic-auth.toml"),
         rpo_falcon_512_library(),
+        Some("auth"),
+    );
+
+    build_package(
+        &PathBuf::from("templates/ecdsa-auth.toml"),
+        ecdsa_k256_keccak_library(),
         Some("auth"),
     );
 

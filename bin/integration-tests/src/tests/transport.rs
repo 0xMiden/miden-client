@@ -4,18 +4,15 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::{
-    TestClient,
-    TestClientKeyStore,
-    execute_tx_and_sync,
-    insert_new_fungible_faucet,
-    insert_new_wallet,
-    wait_for_node,
+    TestClient, TestClientKeyStore, execute_tx_and_sync, insert_new_fungible_faucet,
+    insert_new_wallet, wait_for_node,
 };
 use miden_client::transaction::TransactionRequestBuilder;
 
@@ -44,7 +41,15 @@ pub async fn test_note_transport_flow(client_config: ClientConfig) -> Result<()>
         .context("failed to get recipient builder")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
-    run_flow(sender, &sender_keystore, recipient, &recipient_keystore, true).await
+    run_flow(
+        sender,
+        &sender_keystore,
+        recipient,
+        &recipient_keystore,
+        true,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
 }
 
 /// Sender has transport; recipient does NOT. Recipient should not receive private notes.
@@ -72,7 +77,15 @@ pub async fn test_note_transport_sender_only(client_config: ClientConfig) -> Res
         .context("failed to get recipient builder without transport")?;
     let recipient = recipient_builder.build().await.context("failed to build recipient client")?;
 
-    run_flow(sender, &sender_keystore, recipient, &recipient_keystore, false).await
+    run_flow(
+        sender,
+        &sender_keystore,
+        recipient,
+        &recipient_keystore,
+        false,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
 }
 
 async fn builder_with_transport(
@@ -123,21 +136,30 @@ async fn run_flow(
     mut recipient: TestClient,
     recipient_keystore: &TestClientKeyStore,
     recipient_should_receive: bool,
+    auth_scheme_id: u8,
 ) -> Result<()> {
     // Ensure node is up
     wait_for_node(&mut sender).await;
 
     // Create accounts
-    let (recipient_account, _sk2) =
-        insert_new_wallet(&mut recipient, AccountStorageMode::Private, recipient_keystore)
-            .await
-            .context("failed to insert recipient wallet")?;
+    let (recipient_account, _sk2) = insert_new_wallet(
+        &mut recipient,
+        AccountStorageMode::Private,
+        recipient_keystore,
+        auth_scheme_id,
+    )
+    .await
+    .context("failed to insert recipient wallet")?;
 
     // Create a faucet in sender
-    let (faucet_account, _faucet_sk) =
-        insert_new_fungible_faucet(&mut sender, AccountStorageMode::Private, sender_keystore)
-            .await
-            .context("failed to insert faucet in sender")?;
+    let (faucet_account, _faucet_sk) = insert_new_fungible_faucet(
+        &mut sender,
+        AccountStorageMode::Private,
+        sender_keystore,
+        auth_scheme_id,
+    )
+    .await
+    .context("failed to insert faucet in sender")?;
 
     // Build recipient address
     let recipient_address = Address::new(recipient_account.id())

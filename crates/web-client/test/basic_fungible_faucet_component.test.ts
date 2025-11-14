@@ -71,6 +71,7 @@ export const createWallet = async (
     const account = await client.newWallet(
       window.AccountStorageMode.tryFromStr("PUBLIC"),
       false,
+      0,
       undefined
     );
     const basicFungibleFaucet =

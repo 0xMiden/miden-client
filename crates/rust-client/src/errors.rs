@@ -8,11 +8,7 @@ use miden_objects::crypto::merkle::MerkleError;
 use miden_objects::note::{NoteId, NoteTag};
 pub use miden_objects::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_objects::{
-    NoteError,
-    PartialBlockchainError,
-    TransactionInputError,
-    TransactionScriptError,
-    Word,
+    NoteError, PartialBlockchainError, TransactionInputError, TransactionScriptError, Word,
 };
 // RE-EXPORTS
 // ================================================================================================
@@ -133,6 +129,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("unsupported authentication scheme ID: {0}")]
+    UnsupportedAuthSchemeId(u8),
 }
 
 // CONVERSIONS

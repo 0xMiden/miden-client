@@ -1,5 +1,5 @@
-use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
-use miden_client::crypto::rpo_falcon512::PublicKey as NativeFalconPublicKey;
+use miden_client::auth::Signature as NativeSignature;
+use miden_client::auth::PublicKey as NativePublicKey;
 use miden_client::{Deserializable, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
@@ -37,28 +37,11 @@ impl PublicKey {
         native_word.into()
     }
 
-    #[wasm_bindgen(js_name = "recoverFrom")]
-    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
-        let native_message: NativeWord = message.into();
-        let native_signature: NativeSignature = signature.into();
-
-        match native_signature {
-            NativeSignature::RpoFalcon512(falcon_signature) => {
-                let public_key =
-                    NativeFalconPublicKey::recover_from(native_message, &falcon_signature);
-                Ok(NativePublicKey::RpoFalcon512(public_key).into())
-            },
-            NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
-                "recovering a public key from an EcdsaK256Keccak signature is not supported yet",
-            )),
-        }
-    }
-
     #[wasm_bindgen(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
-        let message: NativeWord = signing_inputs.to_commitment().into();
-        let native_signature: NativeSignature = signature.into();
+        let message = signing_inputs.to_commitment().into();
+        let native_signature: NativeSignature = signature.clone().into();
         native_public_key.verify(message, native_signature)
     }
 }

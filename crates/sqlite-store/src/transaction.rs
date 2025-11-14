@@ -10,10 +10,7 @@ use miden_client::crypto::MerkleStore;
 use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
-    TransactionDetails,
-    TransactionRecord,
-    TransactionScript,
-    TransactionStatus,
+    TransactionDetails, TransactionRecord, TransactionScript, TransactionStatus,
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};

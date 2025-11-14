@@ -36,6 +36,32 @@ impl AuthSecretKey {
 
         secret_key_as_native_felts.into_iter().map(Into::into).collect()
     }
+
+    #[wasm_bindgen(js_name = "getEcdsaK256KeccakPublicKeyAsWord")]
+    pub fn get_ecdsa_k256_keccak_public_key_as_word(&self) -> Word {
+        let public_key = match &self.0 {
+            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key(),
+            _ => todo!(), // TODO: what to do with other cases
+        };
+        let public_key_as_native_word: NativeWord = public_key.to_commitment();
+        public_key_as_native_word.into()
+    }
+
+    #[wasm_bindgen(js_name = "getEcdsaK256KeccakSecretKeyAsFelts")]
+    pub fn get_ecdsa_k256_keccak_secret_key_as_felts(&self) -> Vec<Felt> {
+        let secret_key_as_bytes = match &self.0 {
+            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.to_bytes(),
+            _ => todo!(), // TODO: what to do with other cases
+        };
+
+        let secret_key_as_native_felts = secret_key_as_bytes
+            .iter()
+            .map(|a| NativeFelt::new(u64::from(*a)))
+            .collect::<Vec<NativeFelt>>();
+
+        secret_key_as_native_felts.into_iter().map(Into::into).collect()
+    }
+
 }
 
 // CONVERSIONS

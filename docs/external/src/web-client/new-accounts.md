@@ -21,6 +21,7 @@ try {
     // Set up account parameters
     const accountStorageMode = AccountStorageMode.private(); // Can be private() or public()
     const mutable = true; // Whether the account code can be updated later
+    const authSchemeId = 0; // RpoFalcon512 by default
 
     // Create new wallet account
     const account = await webClient.newWallet(accountStorageMode, mutable);
@@ -56,6 +57,7 @@ try {
     const tokenSymbol = "TEST";                            // The token symbol (e.g., "TEST", "BTC", etc.)
     const decimals = 8;                                    // Number of decimal places for the token
     const maxSupply = BigInt(10000000);                    // Maximum supply of tokens that can be minted
+    const authSchemeId = 0;                                // RPO Falcon 512 Auth Scheme by Default
 
     // Create new faucet account
     const faucet = await webClient.newFaucet(
@@ -63,7 +65,8 @@ try {
         nonFungible,
         tokenSymbol,
         decimals,
-        maxSupply
+        maxSupply,
+        authSchemeId,
     );
 
     // Access faucet properties

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::auth::{AuthSecretKey, PublicKeyCommitment};
+use miden_client::auth::{AuthSecretKey, PublicKeyCommitment, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
@@ -17,31 +17,15 @@ use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, Transacti
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    create_test_store_path,
-    execute_failing_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
+    consume_notes, create_test_store_path, execute_failing_tx, mint_and_consume, mint_note,
+    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionExecutorError,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
+    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
@@ -55,37 +39,19 @@ use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
 use miden_objects::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageSlot,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
+    AccountStorageMode, AccountType, StorageMap, StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
+    NoteRecipient, NoteTag, NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -873,9 +839,14 @@ async fn p2id_transfer() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -985,9 +956,14 @@ async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1029,9 +1005,14 @@ async fn p2ide_transfer_consumed_by_target() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1158,9 +1139,14 @@ async fn p2ide_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1265,9 +1251,14 @@ async fn p2ide_timelocked() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1340,9 +1331,14 @@ async fn get_consumable_notes() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1441,10 +1437,14 @@ async fn get_consumable_notes() {
 async fn get_output_notes() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
     let _ = client.sync_state().await.unwrap();
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let from_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1510,10 +1510,14 @@ async fn account_rollback() {
 
     client.sync_state().await.unwrap();
 
-    let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1605,10 +1609,14 @@ async fn account_rollback() {
 async fn subsequent_discarded_transactions() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
+    let (regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1743,10 +1751,14 @@ async fn missing_recipient_digest() {
 async fn input_note_checks() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
-    let (wallet, faucet) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let mut mint_notes = vec![];
 
@@ -1844,10 +1856,14 @@ async fn swap_chain_test() {
     // Generate a few account pairs with a fungible asset that can be used for swaps.
     let mut account_pairs = vec![];
     for _ in 0..3 {
-        let (wallet, faucet) =
-            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-                .await
-                .unwrap();
+        let (wallet, faucet) = setup_wallet_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &keystore,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
         mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
@@ -2188,10 +2204,14 @@ async fn account_add_address_after_creation() {
 async fn consume_note_with_custom_script() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (sender_account, receiver_account, faucet_account) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let (sender_account, receiver_account, faucet_account) = setup_two_wallets_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let sender_id = sender_account.id();
     let receiver_id = receiver_account.id();

@@ -9,7 +9,8 @@ const mockChainTest = async (testingPage: Page) => {
 
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),

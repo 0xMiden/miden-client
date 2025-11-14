@@ -5,22 +5,12 @@ use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, StorageSlot};
 use miden_client::assembly::{DefaultSourceManager, Library, LibraryPath, Module, ModuleKind};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType,
 };
 use miden_client::testing::common::{
-    TestClient,
-    execute_tx_and_sync,
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_tx,
+    TestClient, execute_tx_and_sync, insert_new_wallet, wait_for_blocks, wait_for_tx,
 };
 use miden_client::transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, ScriptBuilder, Word, ZERO};
@@ -149,7 +139,8 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     );
 
     let (native_account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?;
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let mut network_notes = vec![];
 
@@ -186,7 +177,11 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
     let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
     let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
-    let wallet = insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore).await?.0;
+
+    let wallet =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?
+            .0;
 
     let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
     // Prepare both transactions

@@ -27,14 +27,8 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountStorage,
-    StorageMapWitness,
-    StorageSlot,
+    Account, AccountCode, AccountHeader, AccountId, AccountIdPrefix, AccountStorage,
+    StorageMapWitness, StorageSlot,
 };
 use miden_objects::address::Address;
 use miden_objects::asset::{Asset, AssetVault, AssetWitness};
@@ -45,9 +39,7 @@ use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
 use crate::note_transport::{
-    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
-    NoteTransportCursor,
-    NoteTransportUpdate,
+    NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor, NoteTransportUpdate,
 };
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
@@ -67,13 +59,8 @@ mod account;
 pub use account::{AccountRecord, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteExportType,
-    NoteRecordError,
-    OutputNoteRecord,
-    OutputNoteState,
-    input_note_states,
+    InputNoteRecord, InputNoteState, NoteExportType, NoteRecordError, OutputNoteRecord,
+    OutputNoteState, input_note_states,
 };
 
 // STORE TRAIT

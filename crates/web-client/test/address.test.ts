@@ -19,7 +19,8 @@ const instanceAddress = async ({
       } else {
         const newAccount = await client.newWallet(
           window.AccountStorageMode.private(),
-          true
+          true,
+          0
         );
         _accountId = newAccount.id();
       }
@@ -36,7 +37,8 @@ const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
     const parsedNetworkId = window.helpers.parseNetworkId(bech32Prefix);
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -62,7 +64,8 @@ const instanceAddressTestNoteTag = async (page: Page) => {
     const client = window.client;
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -153,7 +156,8 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     const client = window.client;
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     console.log("newAccount ID:", newAccount.id());
 

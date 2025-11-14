@@ -631,7 +631,7 @@ Returns all the existing setting keys from the store.
 
 ### newFaucet()
 
-> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`): `Promise`\<[`Account`](Account.md)\>
+> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`, `auth_scheme_id`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -771,7 +771,7 @@ Returns all the existing setting keys from the store.
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `auth_scheme_id` `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 

@@ -235,7 +235,8 @@ test.describe("AccountStorage.getMapEntries tests", () => {
       // Create a new wallet with private storage
       const account = await client.newWallet(
         window.AccountStorageMode.private(),
-        true
+        true,
+        0
       );
 
       // Get the account to access its storage
