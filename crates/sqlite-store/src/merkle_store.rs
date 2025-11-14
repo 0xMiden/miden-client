@@ -1,7 +1,7 @@
 use miden_client::Word;
 use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::crypto::{MerklePath, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+use miden_client::crypto::{MerklePath, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
 use miden_objects::asset::AssetVaultKey;
 use miden_objects::crypto::merkle::{EmptySubtreeRoots, Smt, SmtForest};
@@ -34,7 +34,9 @@ pub fn update_asset_nodes(
         .collect();
 
     let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)
+    let new_root = smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
+    debug_assert_eq!(new_root, root);
+    Ok(new_root)
 }
 
 /// Inserts the asset vault SMT nodes to the merkle store.
@@ -92,28 +94,4 @@ pub fn insert_storage_map_nodes(smt_forest: &mut SmtForest, storage: &AccountSto
         // Resulting root should match the map's root
         debug_assert_eq!(new_root, map.root());
     }
-}
-
-// HELPERS
-// ================================================================================================
-
-/// Builds the merkle node index for the given key.
-///
-/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] is structured internally.
-/// It has a set depth and uses the third felt as the position. The reason we want to copy the smt's
-/// internal structure is so that merkle paths and roots match. For more information, see the
-/// [`miden_objects::crypto::merkle::Smt`] documentation and implementation.
-fn get_node_index(key: AssetVaultKey) -> Result<NodeIndex, StoreError> {
-    let vault_key_word: Word = key.into();
-    Ok(NodeIndex::new(SMT_DEPTH, vault_key_word[3].as_int())?)
-}
-
-/// Builds the merkle node value for the given key and value.
-///
-/// This logic is based on the way [`miden_objects::crypto::merkle::Smt`] generates the values for
-/// its internal merkle tree. It generates an [`SmtLeaf`] from the key and value, and then hashes it
-/// to produce the node value.
-fn get_node_value(key: AssetVaultKey, value: Word) -> Word {
-    let vault_key_word: Word = key.into();
-    SmtLeaf::Single((vault_key_word, value)).hash()
 }
