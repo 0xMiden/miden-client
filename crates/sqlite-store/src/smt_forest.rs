@@ -68,8 +68,7 @@ pub fn update_storage_map_nodes(
     root: Word,
     entries: impl Iterator<Item = (Word, Word)> + Clone,
 ) -> Result<Word, StoreError> {
-    let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-    let new_root = smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
+    let new_root = smt_forest.batch_insert(root, entries).map_err(StoreError::from)?;
     Ok(new_root)
 }
 

@@ -53,13 +53,13 @@ use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::merkle_store::{insert_asset_nodes, insert_storage_map_nodes};
+use crate::smt_forest::{insert_asset_nodes, insert_storage_map_nodes};
 
 mod account;
 mod builder;
 mod chain_data;
 mod db_management;
-mod merkle_store;
+mod smt_forest;
 mod note;
 mod sql_error;
 mod sync;

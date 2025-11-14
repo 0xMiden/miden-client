@@ -32,7 +32,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
 use super::{SqliteStore, column_value_as_u64, u64_to_value};
-use crate::merkle_store::{
+use crate::smt_forest::{
     get_asset_proof,
     get_storage_map_item_proof,
     insert_asset_nodes,
@@ -692,13 +692,6 @@ impl SqliteStore {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Update previously-existing account after a transaction execution. Apart from updating the
-    /// `SQLite` database, this function also updates the [`MerkleStore`] by adding the vault and
-    /// storage SMT's nodes.
-    ///
-    /// Because the Client retrieves the account by account ID before applying the delta, we don't
-    /// need to check that it exists here. This inserts a new row into the accounts table.
-    /// We can later identify the proper account state by looking at the nonce.
     pub(super) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut SmtForest,
