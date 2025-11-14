@@ -31,7 +31,7 @@ use miden_client::account::{
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
-use miden_client::crypto::{InOrderIndex, MerkleStore, MmrPeaks};
+use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
@@ -48,6 +48,7 @@ use miden_client::store::{
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_objects::account::StorageMapWitness;
+use miden_objects::crypto::merkle::SmtForest;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
@@ -75,7 +76,7 @@ pub use builder::ClientBuilderSqliteExt;
 /// Current table definitions can be found at `store.sql` migration file.
 pub struct SqliteStore {
     pub(crate) pool: Pool,
-    merkle_store: Arc<RwLock<MerkleStore>>,
+    smt_forest: Arc<RwLock<SmtForest>>,
 }
 
 impl SqliteStore {
@@ -98,7 +99,7 @@ impl SqliteStore {
 
         let store = SqliteStore {
             pool,
-            merkle_store: Arc::new(RwLock::new(MerkleStore::new())),
+            smt_forest: Arc::new(RwLock::new(SmtForest::new())),
         };
 
         // Initialize merkle store
@@ -106,10 +107,9 @@ impl SqliteStore {
             let vault = store.get_account_vault(id).await?;
             let storage = store.get_account_storage(id).await?;
 
-            let mut merkle_store =
-                store.merkle_store.write().expect("merkle_store write lock not poisoned");
-            insert_asset_nodes(&mut merkle_store, &vault);
-            insert_storage_map_nodes(&mut merkle_store, &storage);
+            let mut smt_forest = store.smt_forest.write().expect("smt write lock not poisoned");
+            insert_asset_nodes(&mut smt_forest, &vault);
+            insert_storage_map_nodes(&mut smt_forest, &storage);
         }
 
         Ok(store)
@@ -169,9 +169,9 @@ impl Store for SqliteStore {
     }
 
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
-        let merkle_store = self.merkle_store.clone();
+        let smt_forest = self.smt_forest.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_state_sync(conn, &merkle_store, state_sync_update)
+            SqliteStore::apply_state_sync(conn, &smt_forest, state_sync_update)
         })
         .await
     }
@@ -187,9 +187,9 @@ impl Store for SqliteStore {
     }
 
     async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError> {
-        let merkle_store = self.merkle_store.clone();
+        let smt_forest = self.smt_forest.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::apply_transaction(conn, &merkle_store, &tx_update)
+            SqliteStore::apply_transaction(conn, &smt_forest, &tx_update)
         })
         .await
     }
@@ -304,17 +304,17 @@ impl Store for SqliteStore {
         initial_address: Address,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
-        let merkle_store = self.merkle_store.clone();
+        let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &merkle_store, &cloned_account, &initial_address)
+            SqliteStore::insert_account(conn, &smt_forest, &cloned_account, &initial_address)
         })
         .await
     }
 
     async fn update_account(&self, account: &Account) -> Result<(), StoreError> {
         let cloned_account = account.clone();
-        let merkle_store = self.merkle_store.clone();
+        let merkle_store = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
             SqliteStore::update_account(conn, &merkle_store, &cloned_account)
@@ -411,9 +411,9 @@ impl Store for SqliteStore {
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
-        let merkle_store = self.merkle_store.clone();
+        let smt_forest = self.smt_forest.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_asset(conn, &merkle_store, account_id, faucet_id_prefix)
+            SqliteStore::get_account_asset(conn, &smt_forest, account_id, faucet_id_prefix)
         })
         .await
     }
@@ -434,10 +434,10 @@ impl Store for SqliteStore {
         index: u8,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        let merkle_store = self.merkle_store.clone();
+        let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_map_item(conn, &merkle_store, account_id, index, key)
+            SqliteStore::get_account_map_item(conn, &smt_forest, account_id, index, key)
         })
         .await
     }

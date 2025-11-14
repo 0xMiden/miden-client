@@ -20,13 +20,14 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
-use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
+use miden_client::crypto::{SmtLeaf, SmtProof};
 use miden_client::store::{AccountRecord, AccountStatus, StoreError};
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_objects::account::StorageMapWitness;
 use miden_objects::asset::AssetVaultKey;
+use miden_objects::crypto::merkle::SmtForest;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -186,7 +187,7 @@ impl SqliteStore {
 
     pub(crate) fn insert_account(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         account: &Account,
         initial_address: &Address,
     ) -> Result<(), StoreError> {
@@ -207,16 +208,16 @@ impl SqliteStore {
 
         tx.commit().into_store_error()?;
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
-        insert_storage_map_nodes(&mut merkle_store, account.storage());
-        insert_asset_nodes(&mut merkle_store, account.vault());
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+        insert_storage_map_nodes(&mut smt_forest, account.storage());
+        insert_asset_nodes(&mut smt_forest, account.vault());
 
         Ok(())
     }
 
     pub(crate) fn update_account(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
         const QUERY: &str = "SELECT id FROM accounts WHERE id = ?";
@@ -242,9 +243,9 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         let tx = conn.transaction().into_store_error()?;
-        Self::update_account_state(&tx, &mut merkle_store, new_account_state)?;
+        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
         tx.commit().into_store_error()
     }
 
@@ -330,10 +331,10 @@ impl SqliteStore {
     }
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
-    /// vault. The Merkle proof is also retrieved from the [`MerkleStore`].
+    /// vault. The Merkle proof is also retrieved from the [`SmtForest`].
     pub(crate) fn get_account_asset(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         account_id: AccountId,
         faucet_id_prefix: AccountIdPrefix,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
@@ -351,9 +352,9 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
+        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
 
-        let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
+        let proof = get_asset_proof(&smt_forest, header.vault_root(), &asset)?;
         let witness = AssetWitness::new(proof)?;
 
         Ok(Some((asset, witness)))
@@ -363,7 +364,7 @@ impl SqliteStore {
     /// The Merkle proof is also retrieved from the [`MerkleStore`].
     pub(crate) fn get_account_map_item(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         account_id: AccountId,
         index: u8,
         key: Word,
@@ -384,10 +385,10 @@ impl SqliteStore {
         };
 
         let item = map.get(&key);
-        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
+        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
 
         // TODO: change the api of get_storage_map_item_proof
-        let path = get_storage_map_item_proof(&merkle_store, map.root(), key)?.1.try_into()?;
+        let path = get_storage_map_item_proof(&smt_forest, map.root(), key)?.1.try_into()?;
         let leaf = SmtLeaf::new_single(StorageMap::hash_key(key), item);
         let proof = SmtProof::new(path, leaf)?;
 
@@ -444,7 +445,7 @@ impl SqliteStore {
     /// `updated_fungible_assets` and `updated_storage_maps` parameters.
     pub(super) fn apply_account_delta(
         tx: &Transaction<'_>,
-        merkle_store: &mut MerkleStore,
+        smt_forest: &mut SmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
         mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
@@ -524,7 +525,7 @@ impl SqliteStore {
         .into_store_error()?;
 
         update_asset_nodes(
-            merkle_store,
+            smt_forest,
             init_account_state.vault_root(),
             updated_assets.values().copied(),
         )?;
@@ -546,7 +547,7 @@ impl SqliteStore {
             let mut map = updated_storage_maps.remove(index).unwrap_or_default();
 
             update_storage_map_nodes(
-                merkle_store,
+                smt_forest,
                 map.root(),
                 map_delta.entries().iter().map(|(key, value)| ((*key).into(), *value)),
             )?;
@@ -700,16 +701,16 @@ impl SqliteStore {
     /// We can later identify the proper account state by looking at the nonce.
     pub(super) fn update_account_state(
         tx: &Transaction<'_>,
-        merkle_store: &mut MerkleStore,
+        smt_forest: &mut SmtForest,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        insert_storage_map_nodes(merkle_store, new_account_state.storage());
+        insert_storage_map_nodes(smt_forest, new_account_state.storage());
         Self::insert_storage_slots(
             tx,
             new_account_state.storage().commitment(),
             new_account_state.storage().slots().iter().enumerate(),
         )?;
-        insert_asset_nodes(merkle_store, new_account_state.vault());
+        insert_asset_nodes(smt_forest, new_account_state.vault());
         Self::insert_assets(
             tx,
             new_account_state.vault().root(),
@@ -1271,16 +1272,16 @@ mod tests {
 
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
-        let merkle_store = store.merkle_store.clone();
+        let smt_forest = store.smt_forest.clone();
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store =
-                    merkle_store.write().expect("merkle_store write lock not poisoned");
+                let mut smt_forest =
+                    smt_forest.write().expect("smt_forest write lock not poisoned");
 
                 SqliteStore::apply_account_delta(
                     &tx,
-                    &mut merkle_store,
+                    &mut smt_forest,
                     &account.into(),
                     &final_state,
                     BTreeMap::default(),
@@ -1350,7 +1351,7 @@ mod tests {
         let account_id = account.id();
         let final_state: AccountHeader = (&account_after_delta).into();
 
-        let merkle_store = store.merkle_store.clone();
+        let smt_forest = store.smt_forest.clone();
         store
             .interact_with_connection(move |conn| {
                 let fungible_assets = SqliteStore::get_account_fungible_assets_for_delta(
@@ -1364,12 +1365,12 @@ mod tests {
                     &delta,
                 )?;
                 let tx = conn.transaction().into_store_error()?;
-                let mut merkle_store =
-                    merkle_store.write().expect("merkle_store write lock not poisoned");
+                let mut smt_forest =
+                    smt_forest.write().expect("smt_forest write lock not poisoned");
 
                 SqliteStore::apply_account_delta(
                     &tx,
-                    &mut merkle_store,
+                    &mut smt_forest,
                     &account.into(),
                     &final_state,
                     fungible_assets,
