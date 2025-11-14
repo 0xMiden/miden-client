@@ -69,7 +69,7 @@ impl<AUTH> Client<AUTH> {
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = NoteTransport::new(api).fetch_notes(cursor, note_tags).await?;
+        let update = NoteTransport::new(api).fetch_notes(note_tags, cursor, None).await?;
 
         self.store.apply_note_transport_update(update).await?;
 
@@ -87,7 +87,7 @@ impl<AUTH> Client<AUTH> {
         let note_tags = self.store.get_unique_note_tags().await?;
 
         let update = NoteTransport::new(api)
-            .fetch_notes(NoteTransportCursor::init(), note_tags)
+            .fetch_notes(note_tags, NoteTransportCursor::init(), None)
             .await?;
 
         self.store.apply_note_transport_update(update).await?;
@@ -141,18 +141,22 @@ impl NoteTransport {
     /// Fetch notes for provided note tags with pagination
     ///
     /// Only notes after the provided cursor are requested.
+    /// If a limit is provided, then only a number of notes up to that limit will be downloaded.
     pub(crate) async fn fetch_notes<I>(
         &mut self,
-        cursor: NoteTransportCursor,
         tags: I,
+        cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> Result<NoteTransportUpdate, ClientError>
     where
         I: IntoIterator<Item = NoteTag>,
     {
         let mut note_updates = vec![];
         // Fetch notes
-        let (note_infos, rcursor) =
-            self.api.fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor).await?;
+        let (note_infos, rcursor) = self
+            .api
+            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor, limit)
+            .await?;
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
@@ -207,6 +211,7 @@ pub trait NoteTransportClient: Send + Sync {
         &self,
         tag: &[NoteTag],
         cursor: NoteTransportCursor,
+        limit: Option<u32>,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError>;
 
     /// Stream notes for a given tag

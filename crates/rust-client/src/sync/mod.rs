@@ -166,7 +166,7 @@ where
         // TODO We can run both sync_state, fetch_notes futures in parallel
         let note_transport_update = if let Some(mut note_transport) = note_transport {
             let cursor = self.store.get_note_transport_cursor().await?;
-            Some(note_transport.fetch_notes(cursor, note_tags).await?)
+            Some(note_transport.fetch_notes(note_tags, cursor, None).await?)
         } else {
             None
         };
