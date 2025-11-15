@@ -5,7 +5,10 @@ use miden_client::Word;
 use miden_client::note::{BlockNumber, ToInputNoteCommitments};
 use miden_client::store::StoreError;
 use miden_client::transaction::{
-    ExecutedTransaction, TransactionDetails, TransactionRecord, TransactionScript,
+    ExecutedTransaction,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionScript,
     TransactionStatus,
 };
 use miden_client::utils::Serializable;
