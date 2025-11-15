@@ -1,14 +1,11 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use miden_client::Word;
 use miden_client::note::{BlockNumber, ToInputNoteCommitments};
 use miden_client::store::StoreError;
 use miden_client::transaction::{
-    ExecutedTransaction,
-    TransactionDetails,
-    TransactionRecord,
-    TransactionScript,
+    ExecutedTransaction, TransactionDetails, TransactionRecord, TransactionScript,
     TransactionStatus,
 };
 use miden_client::utils::Serializable;
@@ -30,7 +27,7 @@ pub struct SerializedTransactionData {
     #[wasm_bindgen(js_name = "txScript")]
     pub tx_script: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "blockNum")]
-    pub block_num: String,
+    pub block_num: u32,
     #[wasm_bindgen(js_name = "statusVariant")]
     pub status_variant: u8,
     pub status: Vec<u8>,
@@ -91,7 +88,7 @@ pub(crate) fn serialize_transaction_record(
         script_root,
         tx_script,
         details: transaction_record.details.to_bytes(),
-        block_num: transaction_record.details.block_num.as_u32().to_string(),
+        block_num: transaction_record.details.block_num.as_u32(),
         status_variant: transaction_record.status.variant() as u8,
         status: transaction_record.status.to_bytes(),
     }

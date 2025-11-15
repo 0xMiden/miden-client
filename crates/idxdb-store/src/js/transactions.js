@@ -71,7 +71,7 @@ export async function getTransactions(filter) {
                 details: detailsBase64,
                 scriptRoot: transactionRecord.scriptRoot,
                 txScript: txScriptBase64,
-                blockNum: transactionRecord.blockNum.toString(),
+                blockNum: transactionRecord.blockNum,
                 statusVariant: transactionRecord.statusVariant,
                 status: statusBase64,
             };
@@ -103,7 +103,7 @@ export async function upsertTransactionRecord(transactionId, details, blockNum, 
             id: transactionId,
             details,
             scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
-            blockNum: parseInt(blockNum, 10),
+            blockNum,
             statusVariant,
             status,
         };
