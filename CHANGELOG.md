@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.3 (2025-11-13)
+## 0.12.3 (2025-11-16)
 
 * Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the WebClient ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
 * Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).

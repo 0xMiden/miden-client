@@ -37,6 +37,23 @@ impl PublicKey {
         native_word.into()
     }
 
+    #[wasm_bindgen(js_name = "recoverFrom")]
+    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
+        let native_message: NativeWord = message.into();
+        let native_signature: NativeSignature = signature.into();
+
+        match native_signature {
+            NativeSignature::RpoFalcon512(falcon_signature) => {
+                let public_key =
+                    NativeFalconPublicKey::recover_from(native_message, &falcon_signature);
+                Ok(NativePublicKey::RpoFalcon512(public_key).into())
+            },
+            NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
+                "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",
+            )),
+        }
+    }
+
     #[wasm_bindgen(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();

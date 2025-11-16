@@ -123,7 +123,7 @@ impl AccountComponent {
             // '#[non_exhaustive]' attribute, without this catch-all clause,
             // this is a compiler error.
             _unimplemented => Err(JsValue::from_str(
-                "building auth component for this auth scheme is not supported yet",
+                "Building auth component for this auth scheme is not supported yet",
             )),
         }
     }

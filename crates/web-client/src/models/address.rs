@@ -41,7 +41,7 @@ impl Address {
             },
             Some(other_interface) => {
                 return Err(JsValue::from_str(&format!(
-                    "failed to build address from account id, wrong interface value given: {other_interface}"
+                    "Failed to build address from account id, wrong interface value given: {other_interface}"
                 )));
             },
         };
@@ -60,7 +60,7 @@ impl Address {
     pub fn interface(&self) -> Result<AddressInterface, JsValue> {
         match self.0.interface() {
             Some(interface) => interface.try_into(),
-            None => Err(JsValue::from_str("address has no specified interface")),
+            None => Err(JsValue::from_str("Address has no specified interface")),
         }
     }
 
