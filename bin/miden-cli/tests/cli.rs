@@ -1255,7 +1255,6 @@ fn create_account_with_ecdsa_auth() {
     let temp_dir = init_cli().1;
 
     // Create init storage data file for ecdsa-auth with a test public key
-    // To do!: Fix falcon_key naming to ecsda_key after this issue is fixed: https://github.com/0xMiden/miden-client/issues/1519
     let init_storage_data_toml = r#"
         ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
         "#;
