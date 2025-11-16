@@ -83,7 +83,12 @@ use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteRecord, StoreError, TransactionFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteRecord,
+    StoreError,
+    TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
 
@@ -92,7 +97,10 @@ pub use prover::TransactionProver;
 
 mod record;
 pub use record::{
-    DiscardCause, TransactionDetails, TransactionRecord, TransactionStatus,
+    DiscardCause,
+    TransactionDetails,
+    TransactionRecord,
+    TransactionStatus,
     TransactionStatusVariant,
 };
 
@@ -101,8 +109,14 @@ pub use store_update::TransactionStoreUpdate;
 
 mod request;
 pub use request::{
-    ForeignAccount, NoteArgs, PaymentNoteDescription, SwapTransactionData, TransactionRequest,
-    TransactionRequestBuilder, TransactionRequestError, TransactionScriptTemplate,
+    ForeignAccount,
+    NoteArgs,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionScriptTemplate,
 };
 
 mod result;
@@ -111,13 +125,25 @@ mod result;
 pub use miden_lib::account::interface::{AccountComponentInterface, AccountInterface};
 pub use miden_lib::transaction::TransactionKernel;
 pub use miden_objects::transaction::{
-    ExecutedTransaction, InputNote, InputNotes, OutputNote, OutputNotes, ProvenTransaction,
-    TransactionArgs, TransactionId, TransactionInputs, TransactionScript, TransactionSummary,
+    ExecutedTransaction,
+    InputNote,
+    InputNotes,
+    OutputNote,
+    OutputNotes,
+    ProvenTransaction,
+    TransactionArgs,
+    TransactionId,
+    TransactionInputs,
+    TransactionScript,
+    TransactionSummary,
 };
 pub use miden_objects::vm::{AdviceInputs, AdviceMap};
 pub use miden_tx::auth::TransactionAuthenticator;
 pub use miden_tx::{
-    DataStoreError, LocalTransactionProver, ProvingOptions, TransactionExecutorError,
+    DataStoreError,
+    LocalTransactionProver,
+    ProvingOptions,
+    TransactionExecutorError,
     TransactionProverError,
 };
 pub use result::TransactionResult;

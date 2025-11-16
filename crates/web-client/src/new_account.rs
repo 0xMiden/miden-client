@@ -1,10 +1,9 @@
-use idxdb_store::auth;
 use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
-use miden_client::account::{AccountBuilder, AccountType,AccountComponent};
+use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
-use rand::{RngCore, SeedableRng};
+use rand::SeedableRng;
 use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
 
@@ -65,7 +64,6 @@ impl WebClient {
 
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-
             let (key_pair, auth_component) = match auth_scheme_id {
                 0 => {
                     let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);

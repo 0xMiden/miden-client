@@ -4,7 +4,12 @@ use miden_client::account::AddressError;
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::ScriptBuilderError;
 use miden_client::{
-    AccountError, AccountIdError, AssetError, ClientError, ErrorHint, NetworkIdError,
+    AccountError,
+    AccountIdError,
+    AssetError,
+    ClientError,
+    ErrorHint,
+    NetworkIdError,
 };
 use miette::Diagnostic;
 use thiserror::Error;
@@ -29,7 +34,7 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error: {error}")]
+    #[error("client error")]
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]

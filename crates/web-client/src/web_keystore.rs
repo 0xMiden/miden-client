@@ -3,7 +3,11 @@ use alloc::sync::Arc;
 
 use idxdb_store::auth::{get_account_auth_by_pub_key, insert_account_auth};
 use miden_client::auth::{
-    AuthSecretKey, PublicKeyCommitment, Signature, SigningInputs, TransactionAuthenticator,
+    AuthSecretKey,
+    PublicKeyCommitment,
+    Signature,
+    SigningInputs,
+    TransactionAuthenticator,
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::{RwLock, Serializable};
@@ -13,7 +17,10 @@ use wasm_bindgen_futures::js_sys::Function;
 
 use crate::models::secret_key::SecretKey;
 use crate::web_keystore_callbacks::{
-    GetKeyCallback, InsertKeyCallback, SignCallback, decode_secret_key_from_bytes,
+    GetKeyCallback,
+    InsertKeyCallback,
+    SignCallback,
+    decode_secret_key_from_bytes,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)

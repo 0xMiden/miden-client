@@ -19,7 +19,11 @@ use {
 
 use super::generated::miden_note_transport::miden_note_transport_client::MidenNoteTransportClient;
 use super::generated::miden_note_transport::{
-    FetchNotesRequest, SendNoteRequest, StreamNotesRequest, StreamNotesUpdate, TransportNote,
+    FetchNotesRequest,
+    SendNoteRequest,
+    StreamNotesRequest,
+    StreamNotesUpdate,
+    TransportNote,
 };
 use super::{NoteInfo, NoteStream, NoteTransportCursor, NoteTransportError};
 

@@ -386,7 +386,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     // Import the public account by id
     let built_wallet_id = build_wallet_id(
         user_seed,
-        secret_key.public_key(),
+        &secret_key.public_key(),
         AccountStorageMode::Public,
         false,
         RPO_FALCON_SCHEME_ID,

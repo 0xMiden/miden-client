@@ -282,7 +282,12 @@ export class WebClient {
   async newWallet(storageMode, mutable, authSchemeId, seed) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.newWallet(storageMode, mutable, authSchemeId, seed);
+        return await this.wasmWebClient.newWallet(
+          storageMode,
+          mutable,
+          authSchemeId,
+          seed
+        );
       }
       const serializedStorageMode = storageMode.asStr();
       const serializedAccountBytes = await this.callMethodWithWorker(
@@ -299,7 +304,14 @@ export class WebClient {
     }
   }
 
-  async newFaucet(storageMode, nonFungible, tokenSymbol, decimals, maxSupply, authSchemeId) {
+  async newFaucet(
+    storageMode,
+    nonFungible,
+    tokenSymbol,
+    decimals,
+    maxSupply,
+    authSchemeId
+  ) {
     try {
       if (!this.worker) {
         return await this.wasmWebClient.newFaucet(

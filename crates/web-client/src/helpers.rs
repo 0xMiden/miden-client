@@ -1,4 +1,3 @@
-use idxdb_store::auth;
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
 use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};

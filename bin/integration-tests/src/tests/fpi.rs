@@ -1,16 +1,27 @@
 use anyhow::{Context, Result};
 use miden_client::account::component::AccountComponent;
 use miden_client::account::{
-    Account, AccountBuilder, AccountStorageMode, PartialAccount, PartialStorage, StorageMap,
+    Account,
+    AccountBuilder,
+    AccountStorageMode,
+    PartialAccount,
+    PartialStorage,
+    StorageMap,
     StorageSlot,
 };
 use miden_client::auth::{
-    AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey, RPO_FALCON_SCHEME_ID,
+    AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
+    AuthSecretKey,
+    RPO_FALCON_SCHEME_ID,
 };
 use miden_client::rpc::domain::account::{AccountStorageRequirements, StorageMapKey};
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    AdviceInputs, ForeignAccount, TransactionKernel, TransactionRequestBuilder,
+    AdviceInputs,
+    ForeignAccount,
+    TransactionKernel,
+    TransactionRequestBuilder,
 };
 use miden_client::{Felt, ScriptBuilder, Word};
 

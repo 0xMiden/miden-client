@@ -1,5 +1,7 @@
 use miden_client::auth::{
-    AuthSecretKey, Signature as NativeSignature, SigningInputs as NativeSigningInputs,
+    AuthSecretKey,
+    Signature as NativeSignature,
+    SigningInputs as NativeSigningInputs,
 };
 use miden_client::keystore::KeyStoreError;
 use miden_client::utils::Deserializable;

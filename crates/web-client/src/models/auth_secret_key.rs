@@ -61,7 +61,6 @@ impl AuthSecretKey {
 
         secret_key_as_native_felts.into_iter().map(Into::into).collect()
     }
-
 }
 
 // CONVERSIONS

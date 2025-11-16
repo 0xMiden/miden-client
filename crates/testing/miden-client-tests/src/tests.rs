@@ -7,7 +7,12 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::auth::{AuthEcdsaK256Keccak, AuthSecretKey, PublicKeyCommitment, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{
+    AuthEcdsaK256Keccak,
+    AuthSecretKey,
+    PublicKeyCommitment,
+    RPO_FALCON_SCHEME_ID,
+};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
@@ -17,15 +22,31 @@ use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, Transacti
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
-    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
-    consume_notes, create_test_store_path, execute_failing_tx, mint_and_consume, mint_note,
-    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    TestClientKeyStore,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    create_test_store_path,
+    execute_failing_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
-    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
@@ -39,19 +60,37 @@ use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
 use miden_objects::account::{
-    Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
-    AccountStorageMode, AccountType, StorageMap, StorageSlot,
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountHeader,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
-    NoteRecipient, NoteTag, NoteType,
+    Note,
+    NoteAssets,
+    NoteExecutionHint,
+    NoteExecutionMode,
+    NoteFile,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -197,7 +236,6 @@ async fn insert_ecdsa_account() {
     // Validate seed matches
     assert_eq!(account.seed(), fetched_account_seed);
 }
-
 
 #[tokio::test]
 async fn insert_faucet_account() {
@@ -1065,6 +1103,7 @@ async fn p2id_transfer_failing_not_enough_balance() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn p2ide_transfer_consumed_by_target() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
@@ -1158,13 +1197,11 @@ async fn p2ide_transfer_consumed_by_target() {
     client.sync_state().await.unwrap();
 
     // Check that note is committed for the second account to consume
-    println!("Fetching Committed Notes...");
     let notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(!notes.is_empty());
 
     // Make the `to_account_id` consume P2IDE note
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-    println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
     Box::pin(client.submit_new_transaction(to_account_id, tx_request))
         .await

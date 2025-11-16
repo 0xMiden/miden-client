@@ -43,11 +43,28 @@ use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_objects::{
-    AccountIdError, AddressError, NetworkIdError,
+    AccountIdError,
+    AddressError,
+    NetworkIdError,
     account::{
-        Account, AccountBuilder, AccountCode, AccountDelta, AccountFile, AccountHeader, AccountId,
-        AccountIdPrefix, AccountStorage, AccountStorageMode, AccountType, PartialAccount,
-        PartialStorage, PartialStorageMap, StorageMap, StorageSlot, StorageSlotType, AccountComponent
+        Account,
+        AccountBuilder,
+        AccountCode,
+        AccountComponent,
+        AccountDelta,
+        AccountFile,
+        AccountHeader,
+        AccountId,
+        AccountIdPrefix,
+        AccountStorage,
+        AccountStorageMode,
+        AccountType,
+        PartialAccount,
+        PartialStorage,
+        PartialStorageMap,
+        StorageMap,
+        StorageSlot,
+        StorageSlotType,
     },
     address::{Address, AddressInterface, AddressType, NetworkId},
 };
@@ -63,17 +80,30 @@ pub mod component {
 
     pub use miden_lib::account::auth::*;
     pub use miden_lib::account::components::{
-        basic_fungible_faucet_library, basic_wallet_library, ecdsa_k256_keccak_library,
-        network_fungible_faucet_library, no_auth_library, rpo_falcon_512_acl_library,
-        rpo_falcon_512_library, rpo_falcon_512_multisig_library,
+        basic_fungible_faucet_library,
+        basic_wallet_library,
+        ecdsa_k256_keccak_library,
+        network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
+        rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
     pub use miden_lib::account::faucets::{
-        BasicFungibleFaucet, FungibleFaucetExt, NetworkFungibleFaucet,
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
     };
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
-        AccountComponent, AccountComponentMetadata, FeltRepresentation, InitStorageData,
-        StorageEntry, StorageValueName, TemplateType, WordRepresentation,
+        AccountComponent,
+        AccountComponentMetadata,
+        FeltRepresentation,
+        InitStorageData,
+        StorageEntry,
+        StorageValueName,
+        TemplateType,
+        WordRepresentation,
     };
 }
 
@@ -335,7 +365,7 @@ impl<AUTH> Client<AUTH> {
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
-    public_key: PublicKey,
+    public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
     auth_scheme_id: u8,

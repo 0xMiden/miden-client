@@ -7,7 +7,6 @@ use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
 use crate::models::address::Address;
 use crate::models::auth_secret_key::AuthSecretKey;
-use crate::models::secret_key::SecretKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
 

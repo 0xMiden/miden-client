@@ -527,7 +527,7 @@ export const createNewWallet = async (
         accountStorageMode,
         mutable,
         authSchemeId,
-        _walletSeed,
+        _walletSeed
       );
 
       return {
@@ -568,7 +568,14 @@ export const createNewFaucet = async (
   authSchemeId: number
 ): Promise<NewAccountTestResult> => {
   return await testingPage.evaluate(
-    async ({ storageMode, nonFungible, tokenSymbol, decimals, maxSupply, authSchemeId }) => {
+    async ({
+      storageMode,
+      nonFungible,
+      tokenSymbol,
+      decimals,
+      maxSupply,
+      authSchemeId,
+    }) => {
       const client = window.client;
       const accountStorageMode =
         window.AccountStorageMode.tryFromStr(storageMode);
@@ -604,7 +611,7 @@ export const createNewFaucet = async (
       tokenSymbol,
       decimals,
       maxSupply,
-      authSchemeId
+      authSchemeId,
     }
   );
 };
@@ -870,7 +877,7 @@ export const setupWalletAndFaucet = async (
       false,
       "DAG",
       8,
-      BigInt(10000000),
+      BigInt(10000000)
     );
 
     return {

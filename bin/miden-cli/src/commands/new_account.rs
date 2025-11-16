@@ -7,7 +7,10 @@ use std::path::PathBuf;
 use clap::{Parser, ValueEnum};
 use miden_client::Client;
 use miden_client::account::component::{
-    AccountComponent, AccountComponentMetadata, InitStorageData, MIDEN_PACKAGE_EXTENSION,
+    AccountComponent,
+    AccountComponentMetadata,
+    InitStorageData,
+    MIDEN_PACKAGE_EXTENSION,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
 use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey, TransactionAuthenticator};

@@ -74,7 +74,7 @@ const methodHandlers = {
       tokenSymbol,
       decimals,
       maxSupply,
-      authSchemeId,
+      authSchemeId
     );
     const serializedFaucet = faucet.serialize();
     return serializedFaucet.buffer;

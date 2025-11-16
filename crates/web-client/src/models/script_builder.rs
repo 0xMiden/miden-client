@@ -2,7 +2,13 @@ use alloc::sync::Arc;
 
 use miden_client::ScriptBuilder as NativeScriptBuilder;
 use miden_client::assembly::{
-    Assembler, Library as NativeLibrary, LibraryPath, Module, ModuleKind, PrintDiagnostic, Report,
+    Assembler,
+    Library as NativeLibrary,
+    LibraryPath,
+    Module,
+    ModuleKind,
+    PrintDiagnostic,
+    Report,
     SourceManagerSync,
 };
 use miden_client::transaction::TransactionKernel;

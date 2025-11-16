@@ -1,5 +1,4 @@
-use miden_client::auth::Signature as NativeSignature;
-use miden_client::auth::PublicKey as NativePublicKey;
+use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
 use miden_client::{Deserializable, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
@@ -44,8 +43,10 @@ impl PublicKey {
 
         match native_signature {
             NativeSignature::RpoFalcon512(falcon_signature) => {
-                let public_key =
-                    NativeFalconPublicKey::recover_from(native_message, &falcon_signature);
+                let public_key = miden_client::crypto::rpo_falcon512::PublicKey::recover_from(
+                    native_message,
+                    &falcon_signature,
+                );
                 Ok(NativePublicKey::RpoFalcon512(public_key).into())
             },
             NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(

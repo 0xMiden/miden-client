@@ -64,7 +64,11 @@ test.describe("new_wallet tests", () => {
 
   testCases.forEach(({ description, storageMode, mutable, expected }) => {
     test(description, async ({ page }) => {
-      const result = await createNewWallet(page, { storageMode, mutable, authSchemeId: 0 });
+      const result = await createNewWallet(page, {
+        storageMode,
+        mutable,
+        authSchemeId: 0,
+      });
 
       isValidAddress(result.id);
       expect(result.nonce).toEqual("0");

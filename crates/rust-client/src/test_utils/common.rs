@@ -20,7 +20,11 @@ use rand::rngs::StdRng;
 use uuid::Uuid;
 
 use crate::account::component::{
-    AccountComponent, AuthEcdsaK256Keccak, AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet,
+    AccountComponent,
+    AuthEcdsaK256Keccak,
+    AuthRpoFalcon512,
+    BasicFungibleFaucet,
+    BasicWallet,
 };
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::crypto::FeltRng;
@@ -31,8 +35,12 @@ use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
-    NoteArgs, TransactionKernel, TransactionRequest, TransactionRequestBuilder,
-    TransactionRequestError, TransactionStatus,
+    NoteArgs,
+    TransactionKernel,
+    TransactionRequest,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use crate::{Client, ClientError};
 

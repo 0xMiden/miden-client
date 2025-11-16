@@ -20,7 +20,7 @@ export const getBasicFungibleFaucet = async (
   tokenSymbol: string = "DAG",
   decimals: number = 8,
   maxSupply: bigint = BigInt(10000000),
-  authSchemeId: number = 0,
+  authSchemeId: number = 0
 ): Promise<basicFungibleFaucetResult> => {
   return await page.evaluate(
     async ({

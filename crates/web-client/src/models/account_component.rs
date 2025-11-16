@@ -2,8 +2,9 @@ use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{
-    AuthRpoFalcon512 as NativeRpoFalcon512, AuthSecretKey as NativeSecretKey,
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
+    AuthRpoFalcon512 as NativeRpoFalcon512,
+    AuthSecretKey as NativeSecretKey,
 };
 use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
@@ -113,7 +114,7 @@ impl AccountComponent {
                 let commitment = native_secret_key.public_key().to_commitment();
                 let auth = NativeEcdsaK256Keccak::new(commitment);
                 Ok(AccountComponent(auth.into()))
-            }
+            },
             NativeSecretKey::RpoFalcon512(_) => {
                 let commitment = native_secret_key.public_key().to_commitment();
                 let auth = NativeRpoFalcon512::new(commitment);
