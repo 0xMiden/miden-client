@@ -1257,7 +1257,7 @@ fn create_account_with_ecdsa_auth() {
     // Create init storage data file for ecdsa-auth with a test public key
     // To do!: Fix falcon_key naming to ecsda_key after this issue is fixed: https://github.com/0xMiden/miden-client/issues/1519
     let init_storage_data_toml = r#"
-        falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
