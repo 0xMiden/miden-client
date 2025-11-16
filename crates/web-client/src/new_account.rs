@@ -3,8 +3,8 @@ use miden_client::account::component::BasicFungibleFaucet;
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 use wasm_bindgen::prelude::*;
 
 use super::models::account::Account;
@@ -59,20 +59,22 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let init_seed = [0u8; 32];
-        let mut rng = StdRng::from_seed(init_seed);
-
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
+            let mut seed = [0u8; 32];
+            client.rng().fill_bytes(&mut seed);
+            // TODO: we need a way to pass the client's rng instead of having to use an stdrng
+            let mut faucet_rng = StdRng::from_seed(seed);
+
             let (key_pair, auth_component) = match auth_scheme_id {
                 0 => {
-                    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
+                    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut faucet_rng);
                     let auth_component: AccountComponent =
                         AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
                 },
                 1 => {
-                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
+                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
                     let auth_component: AccountComponent =
                         AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
@@ -86,6 +88,9 @@ impl WebClient {
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
             let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
+
+            let mut init_seed = [0u8; 32];
+            faucet_rng.fill_bytes(&mut init_seed);
 
             let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
