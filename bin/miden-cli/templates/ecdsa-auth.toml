@@ -5,6 +5,6 @@ supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode",
 
 [[storage]]
 name = "ecdsa_pubkey"
-description = "Falcon public key"
+description = "ECDSA K256 Keccak public key"
 slot = 0
 type = "auth::ecdsa_k256_keccak::pub_key"
