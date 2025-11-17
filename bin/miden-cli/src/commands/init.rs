@@ -17,7 +17,62 @@ use crate::config::{
 };
 use crate::errors::CliError;
 
-const PACKAGES_DIR: &str = "packages";
+// COMPONENT PACKAGES
+// ================================================================================================
+
+/// Contains the account component template file generated on build.rs, corresponding to the basic
+/// wallet component.
+const BASIC_WALLET_PACKAGE: (&str, &[u8]) = (
+    "basic-wallet.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-wallet.masp")),
+);
+
+/// Contains the account component template file generated on build.rs, corresponding to the
+/// fungible faucet component.
+const FAUCET_PACKAGE: (&str, &[u8]) = (
+    "basic-fungible-faucet.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/", "basic-fungible-faucet.masp")),
+);
+
+// AUTH COMPONENT PACKAGES
+// ================================================================================================
+
+/// Contains the account component template file generated on build.rs, corresponding to the basic
+/// auth component.
+const BASIC_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/basic-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "basic-auth.masp")),
+);
+
+const ECDSA_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/ecdsa-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "ecdsa-auth.masp")),
+);
+
+const ACL_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/acl-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "acl-auth.masp")),
+);
+
+const NO_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/no-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "no-auth.masp")),
+);
+
+const MULTISIG_AUTH_PACKAGE: (&str, &[u8]) = (
+    "auth/multisig-auth.masp",
+    include_bytes!(concat!(env!("OUT_DIR"), "/packages/auth/", "multisig-auth.masp")),
+);
+
+const DEFAULT_INCLUDED_PACKAGES: [(&str, &[u8]); 7] = [
+    BASIC_WALLET_PACKAGE,
+    FAUCET_PACKAGE,
+    BASIC_AUTH_PACKAGE,
+    ECDSA_AUTH_PACKAGE,
+    NO_AUTH_PACKAGE,
+    MULTISIG_AUTH_PACKAGE,
+    ACL_AUTH_PACKAGE,
+];
 
 // INIT COMMAND
 // ================================================================================================
@@ -171,14 +226,10 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
         )
     })?;
 
-    let build_packages_dir = PathBuf::from(env!("OUT_DIR")).join(PACKAGES_DIR);
+    for package in DEFAULT_INCLUDED_PACKAGES {
+        let package_path = packages_dir.join(package.0);
 
-    let packages = collect_packages(&build_packages_dir)?;
-
-    // Write each package file to the destination directory
-    for (relative_path, contents) in packages {
-        let package_path = packages_dir.join(&relative_path);
-
+        // Create parent directory if it doesn't exist (for subdirectories like auth/)
         if let Some(parent) = package_path.parent() {
             fs::create_dir_all(parent).map_err(|err| {
                 CliError::Config(
@@ -194,12 +245,12 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
                 format!("Failed to create file at {}", package_path.display()),
             )
         })?;
-        lib_file.write_all(&contents).map_err(|err| {
+        lib_file.write_all(package.1).map_err(|err| {
             CliError::Config(
                 Box::new(err),
                 format!(
                     "Failed to write package {} into file {}",
-                    relative_path.display(),
+                    package.0,
                     package_path.display()
                 ),
             )
@@ -209,44 +260,4 @@ fn write_packages_files(packages_dir: &PathBuf) -> Result<(), CliError> {
     info!("Packages files successfully created in: {:?}", packages_dir);
 
     Ok(())
-}
-
-fn visit_dir(
-    dir: &PathBuf,
-    base_dir: &PathBuf,
-    packages: &mut Vec<(PathBuf, Vec<u8>)>,
-) -> Result<(), CliError> {
-    if !dir.exists() {
-        return Ok(());
-    }
-
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_dir() {
-            visit_dir(&path, base_dir, packages)?;
-        } else if path.extension().and_then(|s| s.to_str()) == Some("masp") {
-            let contents = fs::read(&path)?;
-
-            let relative_path = path
-                .strip_prefix(base_dir)
-                .expect("Path should be under base directory")
-                .to_path_buf();
-
-            packages.push((relative_path, contents));
-        }
-    }
-
-    Ok(())
-}
-
-/// Recursively collects all .masp files from the packages directory built during build.rs.
-/// Returns a vector of tuples containing the relative path and file contents.
-fn collect_packages(packages_dir: &PathBuf) -> Result<Vec<(PathBuf, Vec<u8>)>, CliError> {
-    let mut packages = Vec::new();
-
-    visit_dir(packages_dir, packages_dir, &mut packages)?;
-
-    Ok(packages)
 }

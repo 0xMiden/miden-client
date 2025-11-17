@@ -153,7 +153,8 @@ impl NewWalletCmd {
 /// automatically.
 ///
 /// Each account can only have one authentication component. If multiple packages contain
-/// authentication components, an error will be returned.
+/// authentication components, an error will be returned. By default, authentication-related
+/// packages are located in the `auth` subdir in your packages directory.
 ///
 /// # Examples
 ///
@@ -164,7 +165,7 @@ impl NewWalletCmd {
 ///
 /// Create an account with a custom auth component (e.g., NoAuth):
 /// ```bash
-/// miden-client new-account --account-type regular-account-immutable-code -p no-auth -p basic-wallet
+/// miden-client new-account --account-type regular-account-immutable-code -p auth/no-auth -p basic-wallet
 /// ```
 #[derive(Debug, Parser, Clone)]
 pub struct NewAccountCmd {
