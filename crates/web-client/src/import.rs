@@ -45,12 +45,18 @@ impl WebClient {
         &mut self,
         init_seed: Vec<u8>,
         mutable: bool,
+        auth_scheme_id: u8,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, key_pair) =
-            generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed)).await?;
+        let (generated_acct, key_pair) = generate_wallet(
+            &AccountStorageMode::public(),
+            mutable,
+            Some(init_seed),
+            auth_scheme_id,
+        )
+        .await?;
 
         let native_id = generated_acct.id();
         client

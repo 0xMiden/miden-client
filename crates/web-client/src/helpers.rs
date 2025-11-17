@@ -1,6 +1,6 @@
-use miden_client::account::component::BasicWallet;
+use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
+use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;
@@ -21,6 +21,7 @@ pub(crate) async fn generate_wallet(
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
+    auth_scheme_id: u8,
 ) -> Result<(Account, AuthSecretKey), JsValue> {
     let mut rng = match seed {
         Some(seed_bytes) => {
@@ -32,7 +33,25 @@ pub(crate) async fn generate_wallet(
         },
         None => StdRng::from_os_rng(),
     };
-    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
+
+    let (key_pair, auth_component) = match auth_scheme_id {
+        0 => {
+            let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
+            let auth_component: AccountComponent =
+                AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+            (key_pair, auth_component)
+        },
+        1 => {
+            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
+            let auth_component: AccountComponent =
+                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+            (key_pair, auth_component)
+        },
+        _ => {
+            return Err(JsValue::from_str("Unsupported auth scheme ID"));
+        },
+    };
+
     let account_type = if mutable {
         AccountType::RegularAccountUpdatableCode
     } else {
@@ -44,7 +63,7 @@ pub(crate) async fn generate_wallet(
     let new_account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode.into())
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().to_commitment()))
+        .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;

@@ -474,6 +474,7 @@ export interface NewAccountTestResult {
 interface createNewWalletParams {
   storageMode: StorageMode;
   mutable: boolean;
+  authSchemeId: number;
   clientSeed?: Uint8Array;
   isolatedClient?: boolean;
   walletSeed?: Uint8Array;
@@ -485,6 +486,7 @@ export const createNewWallet = async (
   {
     storageMode,
     mutable,
+    authSchemeId,
     clientSeed,
     isolatedClient,
     walletSeed,
@@ -498,6 +500,7 @@ export const createNewWallet = async (
     async ({
       storageMode,
       mutable,
+      authSchemeId,
       _serializedWalletSeed,
       _serializedClientSeed,
       isolatedClient,
@@ -523,6 +526,7 @@ export const createNewWallet = async (
       const newWallet = await client.newWallet(
         accountStorageMode,
         mutable,
+        authSchemeId,
         _walletSeed
       );
 
@@ -560,10 +564,18 @@ export const createNewFaucet = async (
   nonFungible: boolean = false,
   tokenSymbol: string = "DAG",
   decimals: number = 8,
-  maxSupply: bigint = BigInt(10000000)
+  maxSupply: bigint = BigInt(10000000),
+  authSchemeId: number
 ): Promise<NewAccountTestResult> => {
   return await testingPage.evaluate(
-    async ({ storageMode, nonFungible, tokenSymbol, decimals, maxSupply }) => {
+    async ({
+      storageMode,
+      nonFungible,
+      tokenSymbol,
+      decimals,
+      maxSupply,
+      authSchemeId,
+    }) => {
       const client = window.client;
       const accountStorageMode =
         window.AccountStorageMode.tryFromStr(storageMode);
@@ -572,7 +584,8 @@ export const createNewFaucet = async (
         nonFungible,
         tokenSymbol,
         decimals,
-        maxSupply
+        maxSupply,
+        authSchemeId
       );
       return {
         id: newFaucet.id().toString(),
@@ -598,6 +611,7 @@ export const createNewFaucet = async (
       tokenSymbol,
       decimals,
       maxSupply,
+      authSchemeId,
     }
   );
 };
@@ -855,7 +869,8 @@ export const setupWalletAndFaucet = async (
     const client = window.client;
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),

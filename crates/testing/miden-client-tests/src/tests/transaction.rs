@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use miden_client::ClientError;
-use miden_client::auth::AuthSecretKey;
+use miden_client::auth::{AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
@@ -90,9 +90,14 @@ async fn transaction_creates_two_notes() {
 #[tokio::test]
 async fn transaction_error_reports_source_line() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _) = setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (wallet, _) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let failing_script = client
         .script_builder()

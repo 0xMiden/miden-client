@@ -133,6 +133,8 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
+    #[error("unsupported authentication scheme ID: {0}")]
+    UnsupportedAuthSchemeId(u8),
 }
 
 // CONVERSIONS

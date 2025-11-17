@@ -9,6 +9,7 @@ use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -183,6 +184,9 @@ fn miden_directory_structure_creation() {
 
     let basic_auth_package = packages_dir.join("auth/basic-auth.masp");
     assert!(basic_auth_package.exists(), "basic-auth package should be created");
+
+    let ecdsa_auth_package = packages_dir.join("auth/ecdsa-auth.masp");
+    assert!(ecdsa_auth_package.exists(), "ecdsa-auth package should be created");
 
     let basic_faucet_package = packages_dir.join("basic-fungible-faucet.masp");
     assert!(basic_faucet_package.exists(), "basic-fungible-faucet package should be created");
@@ -645,8 +649,13 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
         create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let (account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (account, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
@@ -1235,6 +1244,36 @@ fn create_account_with_acl_auth() {
         "auth/acl-auth",
         "-i",
         "acl_init_data.toml",
+    ]);
+
+    create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+// Tests creating an account with the acl-auth component.
+#[test]
+fn create_account_with_ecdsa_auth() {
+    let temp_dir = init_cli().1;
+
+    // Create init storage data file for ecdsa-auth with a test public key
+    let init_storage_data_toml = r#"
+        ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "#;
+    let file_path = temp_dir.join("ecdsa_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
+
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/ecdsa-auth",
+        "-i",
+        "ecdsa_init_data.toml",
     ]);
 
     create_account_cmd.current_dir(&temp_dir).assert().success();

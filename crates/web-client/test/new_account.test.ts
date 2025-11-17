@@ -16,6 +16,7 @@ test.describe("new_wallet tests", () => {
       description: "creates a new private, immutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: false,
+      authSchemeId: 0,
       expected: {
         isPublic: false,
         isPrivate: true,
@@ -27,6 +28,7 @@ test.describe("new_wallet tests", () => {
       description: "creates a new public, immutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: false,
+      authSchemeId: 0,
       expected: {
         isPublic: true,
         isPrivate: false,
@@ -38,6 +40,7 @@ test.describe("new_wallet tests", () => {
       description: "creates a new private, mutable wallet",
       storageMode: StorageMode.PRIVATE,
       mutable: true,
+      authSchemeId: 0,
       expected: {
         isPublic: false,
         isPrivate: true,
@@ -49,6 +52,7 @@ test.describe("new_wallet tests", () => {
       description: "creates a new public, mutable wallet",
       storageMode: StorageMode.PUBLIC,
       mutable: true,
+      authSchemeId: 0,
       expected: {
         isPublic: true,
         isPrivate: false,
@@ -60,7 +64,11 @@ test.describe("new_wallet tests", () => {
 
   testCases.forEach(({ description, storageMode, mutable, expected }) => {
     test(description, async ({ page }) => {
-      const result = await createNewWallet(page, { storageMode, mutable });
+      const result = await createNewWallet(page, {
+        storageMode,
+        mutable,
+        authSchemeId: 0,
+      });
 
       isValidAddress(result.id);
       expect(result.nonce).toEqual("0");
@@ -94,6 +102,7 @@ test.describe("new_wallet tests", () => {
     await createNewWallet(page, {
       storageMode: StorageMode.PUBLIC,
       mutable: false,
+      authSchemeId: 0,
       clientSeed: clientSeed1,
       isolatedClient: true,
       walletSeed: walletSeed,
@@ -104,6 +113,7 @@ test.describe("new_wallet tests", () => {
       await createNewWallet(page, {
         storageMode: StorageMode.PUBLIC,
         mutable: false,
+        authSchemeId: 0,
         clientSeed: clientSeed2,
         isolatedClient: true,
         walletSeed: walletSeed,
@@ -123,6 +133,7 @@ test.describe("new_faucet tests", () => {
       tokenSymbol: "DAG",
       decimals: 8,
       maxSupply: BigInt(10000000),
+      authSchemeId: 0,
       expected: {
         isPublic: false,
         isPrivate: true,
@@ -139,6 +150,7 @@ test.describe("new_faucet tests", () => {
       tokenSymbol: "DAG",
       decimals: 8,
       maxSupply: BigInt(10000000),
+      authSchemeId: 0,
       expected: {
         isPublic: true,
         isPrivate: false,
@@ -158,6 +170,7 @@ test.describe("new_faucet tests", () => {
       tokenSymbol,
       decimals,
       maxSupply,
+      authSchemeId,
       expected,
     }) => {
       test(description, async ({ page }) => {
@@ -167,7 +180,8 @@ test.describe("new_faucet tests", () => {
           nonFungible,
           tokenSymbol,
           decimals,
-          maxSupply
+          maxSupply,
+          authSchemeId
         );
 
         isValidAddress(result.id);
@@ -199,7 +213,8 @@ test.describe("new_faucet tests", () => {
         true,
         "DAG",
         8,
-        BigInt(10000000)
+        BigInt(10000000),
+        0
       )
     ).rejects.toThrowError("Non-fungible faucets are not supported yet");
   });
@@ -214,7 +229,8 @@ test.describe("new_faucet tests", () => {
         false,
         "INVALID_TOKEN",
         8,
-        BigInt(10000000)
+        BigInt(10000000),
+        0
       )
     ).rejects.toThrow(
       `token symbol should have length between 1 and 6 characters, but 13 was provided`
@@ -235,7 +251,8 @@ test.describe("AccountStorage.getMapEntries tests", () => {
       // Create a new wallet with private storage
       const account = await client.newWallet(
         window.AccountStorageMode.private(),
-        true
+        true,
+        0
       );
 
       // Get the account to access its storage

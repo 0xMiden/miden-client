@@ -348,14 +348,16 @@ export const customTransaction = async (
 
       const walletAccount = await client.newWallet(
         window.AccountStorageMode.private(),
-        false
+        false,
+        0
       );
       const faucetAccount = await client.newFaucet(
         window.AccountStorageMode.private(),
         false,
         "DAG",
         8,
-        BigInt(10000000)
+        BigInt(10000000),
+        0
       );
       await client.syncState();
 
@@ -580,7 +582,8 @@ const customTxWithMultipleNotes = async (
       const amount = BigInt(10);
       const targetAccount = await client.newWallet(
         window.AccountStorageMode.private(),
-        true
+        true,
+        0
       );
       const targetAccountId = targetAccount.id();
       const senderAccountId = window.AccountId.fromHex(_senderAccountId);
@@ -877,10 +880,12 @@ export const discardedTransaction = async (
 
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const targetAccount = await client.newWallet(
       window.AccountStorageMode.private(),
+      0,
       true
     );
     const faucetAccount = await client.newFaucet(
@@ -888,7 +893,8 @@ export const discardedTransaction = async (
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      0
     );
     await client.syncState();
 
@@ -1114,7 +1120,8 @@ export const counterAccountComponent = async (
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      false
+      false,
+      0
     );
 
     await client.syncState();

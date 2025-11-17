@@ -2,6 +2,7 @@ use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{
+    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
     AuthSecretKey as NativeSecretKey,
 };
@@ -109,9 +110,11 @@ impl AccountComponent {
     pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
         match native_secret_key {
-            NativeSecretKey::EcdsaK256Keccak(_) => Err(JsValue::from_str(
-                "Building auth component from an ecdsa key is not yet soported",
-            )),
+            NativeSecretKey::EcdsaK256Keccak(_) => {
+                let commitment = native_secret_key.public_key().to_commitment();
+                let auth = NativeEcdsaK256Keccak::new(commitment);
+                Ok(AccountComponent(auth.into()))
+            },
             NativeSecretKey::RpoFalcon512(_) => {
                 let commitment = native_secret_key.public_key().to_commitment();
                 let auth = NativeRpoFalcon512::new(commitment);

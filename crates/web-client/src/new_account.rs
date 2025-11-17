@@ -1,9 +1,10 @@
 use miden_client::Felt;
 use miden_client::account::component::BasicFungibleFaucet;
-use miden_client::account::{AccountBuilder, AccountType};
+use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{AuthRpoFalcon512, AuthSecretKey};
-use rand::RngCore;
+use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 use wasm_bindgen::prelude::*;
 
 use super::models::account::Account;
@@ -19,11 +20,13 @@ impl WebClient {
         &mut self,
         storage_mode: &AccountStorageMode,
         mutable: bool,
+        auth_scheme_id: u8,
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let (new_account, key_pair) = generate_wallet(storage_mode, mutable, init_seed).await?;
+            let (new_account, key_pair) =
+                generate_wallet(storage_mode, mutable, init_seed, auth_scheme_id).await?;
 
             client
                 .add_account(&new_account, false)
@@ -50,6 +53,7 @@ impl WebClient {
         token_symbol: &str,
         decimals: u8,
         max_supply: u64,
+        auth_scheme_id: u8,
     ) -> Result<Account, JsValue> {
         if non_fungible {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
@@ -57,21 +61,41 @@ impl WebClient {
 
         let keystore = self.keystore.clone();
         if let Some(client) = self.get_mut_inner() {
-            let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
-            let pub_key = key_pair.public_key();
+            let mut seed = [0u8; 32];
+            client.rng().fill_bytes(&mut seed);
+            // TODO: we need a way to pass the client's rng instead of having to use an stdrng
+            let mut faucet_rng = StdRng::from_seed(seed);
 
-            let mut init_seed = [0u8; 32];
-            client.rng().fill_bytes(&mut init_seed);
+            let (key_pair, auth_component) = match auth_scheme_id {
+                0 => {
+                    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut faucet_rng);
+                    let auth_component: AccountComponent =
+                        AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
+                    (key_pair, auth_component)
+                },
+                1 => {
+                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
+                    let auth_component: AccountComponent =
+                        AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
+                    (key_pair, auth_component)
+                },
+                _ => {
+                    return Err(JsValue::from_str("Unsupported auth scheme ID"));
+                },
+            };
 
             let symbol =
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
             let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
                 .expect("u64 can be safely converted to a field element");
 
+            let mut init_seed = [0u8; 32];
+            faucet_rng.fill_bytes(&mut init_seed);
+
             let new_account = match AccountBuilder::new(init_seed)
                 .account_type(AccountType::FungibleFaucet)
                 .storage_mode(storage_mode.into())
-                .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+                .with_auth_component(auth_component)
                 .with_component(
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
