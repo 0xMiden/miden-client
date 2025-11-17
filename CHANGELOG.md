@@ -1,5 +1,9 @@
 # Changelog
 
+## Miden Client CLI - 0.12.4 (2025-11-17)
+
+* Fixed CLI install process to statically include account component package files ([#1530](https://github.com/0xMiden/miden-client/pull/1530)).
+
 ## 0.12.3 (2025-11-16)
 
 * Added `recoverFrom()` function to WASM `PublicKey` and added back `TransactionSummary` back to `index.d.ts` ([#1513](https://github.com/0xMiden/miden-client/pull/1513)).
