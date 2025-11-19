@@ -12,6 +12,11 @@ impl AccountCode {
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
+
+    #[wasm_bindgen(js_name = "hasProcedure")]
+    pub fn has_procedure(&self, mast_root: Word) -> bool {
+        self.0.has_procedure(mast_root.into())
+    }
 }
 
 // CONVERSIONS

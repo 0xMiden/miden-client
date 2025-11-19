@@ -26,7 +26,6 @@ use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
 use miden_objects::block::FeeParameters;
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_objects::{Felt, ONE};
 use rand_chacha::ChaCha20Rng;
@@ -360,7 +359,7 @@ impl NodeHandle {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = SecretKey::with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let account = create_basic_fungible_faucet(
         rng.random(),
@@ -368,7 +367,9 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         12,
         Felt::from(1_000_000u32),
         miden_objects::account::AccountStorageMode::Public,
-        AuthScheme::RpoFalcon512 { pub_key: secret.public_key().into() },
+        AuthScheme::RpoFalcon512 {
+            pub_key: secret.public_key().to_commitment(),
+        },
     )?;
 
     // Force the account nonce to 1.
@@ -382,7 +383,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let (id, vault, storage, code, ..) = account.into_parts();
     let updated_account = Account::new_unchecked(id, vault, storage, code, ONE, None);
 
-    Ok(AccountFile::new(updated_account, vec![AuthSecretKey::RpoFalcon512(secret)]))
+    Ok(AccountFile::new(updated_account, vec![secret]))
 }
 
 async fn available_socket_addr() -> Result<SocketAddr> {

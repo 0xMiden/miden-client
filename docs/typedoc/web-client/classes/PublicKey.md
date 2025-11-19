@@ -38,6 +38,16 @@
 
 ***
 
+### toCommitment()
+
+> **toCommitment**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### verify()
 
 > **verify**(`message`, `signature`): `boolean`
@@ -87,6 +97,26 @@
 ##### bytes
 
 `Uint8Array`
+
+#### Returns
+
+`PublicKey`
+
+***
+
+### recoverFrom()
+
+> `static` **recoverFrom**(`message`, `signature`): `PublicKey`
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
+
+##### signature
+
+[`Signature`](Signature.md)
 
 #### Returns
 

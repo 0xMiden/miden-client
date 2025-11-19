@@ -61,6 +61,16 @@ impl Account {
         self.0.is_public()
     }
 
+    #[wasm_bindgen(js_name = "isPrivate")]
+    pub fn is_private(&self) -> bool {
+        self.0.is_private()
+    }
+
+    #[wasm_bindgen(js_name = "isNetwork")]
+    pub fn is_network(&self) -> bool {
+        self.0.is_network()
+    }
+
     #[wasm_bindgen(js_name = "isNew")]
     pub fn is_new(&self) -> bool {
         self.0.is_new()

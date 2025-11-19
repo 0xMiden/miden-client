@@ -76,11 +76,8 @@ impl<R: Rng> WebKeyStore<R> {
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
-            let secret_key = match key {
-                AuthSecretKey::RpoFalcon512(k) => SecretKey::from(k.clone()),
-                _ => todo!(), // TODO: how to handle other cases
-            };
-            insert_key_cb.insert_key(&secret_key).await?;
+            let sk = SecretKey::from(key.clone());
+            insert_key_cb.insert_key(&sk).await?;
             return Ok(());
         }
         let pub_key = match key {
