@@ -332,12 +332,12 @@ export async function insertAccountAuth(pubKey, secretKey) {
         logWebStoreError(error, `Error inserting account auth for pubKey: ${pubKey}`);
     }
 }
-export async function insertAccountAddress(address, accountId) {
+export async function insertAccountAddress(accountId, address) {
     try {
         // Prepare the data object to insert
         const data = {
-            address,
             id: accountId,
+            address,
         };
         // Perform the insert using Dexie
         await addresses.put(data);
