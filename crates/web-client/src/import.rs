@@ -6,9 +6,11 @@ use crate::models::account::Account;
 use crate::models::account_file::AccountFile;
 use crate::models::account_id::AccountId as JsAccountId;
 use crate::models::account_storage_mode::AccountStorageMode;
+use crate::models::auth::AuthScheme;
 use crate::models::note_file::NoteFile;
 use crate::models::note_id::NoteId;
-use crate::{WebClient, js_error_with_context};
+use crate::js_error_with_context;
+use crate::WebClient;
 
 #[wasm_bindgen]
 impl WebClient {
@@ -45,18 +47,14 @@ impl WebClient {
         &mut self,
         init_seed: Vec<u8>,
         mutable: bool,
-        auth_scheme_id: u8,
+        auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, key_pair) = generate_wallet(
-            &AccountStorageMode::public(),
-            mutable,
-            Some(init_seed),
-            auth_scheme_id,
-        )
-        .await?;
+        let (generated_acct, key_pair) =
+            generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed), auth_scheme)
+                .await?;
 
         let native_id = generated_acct.id();
         client
