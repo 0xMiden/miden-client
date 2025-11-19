@@ -12,6 +12,7 @@ use crate::keystore::FilesystemKeyStore;
 use crate::note_transport::NoteTransportClient;
 use crate::rpc::NodeRpcClient;
 use crate::store::{Store, StoreError};
+use crate::transaction::TransactionProver;
 use crate::{Client, ClientError, DebugMode};
 
 // CONSTANTS
@@ -79,6 +80,8 @@ pub struct ClientBuilder<AUTH> {
     max_block_number_delta: Option<u32>,
     /// An optional custom note transport client.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// An optional custom transaction prover.
+    tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -92,6 +95,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             tx_graceful_blocks: Some(TX_GRACEFUL_BLOCKS),
             max_block_number_delta: None,
             note_transport_api: None,
+            tx_prover: None,
         }
     }
 }
@@ -184,6 +188,13 @@ where
         self
     }
 
+    /// Sets a custom transaction prover.
+    #[must_use]
+    pub fn prover(mut self, prover: Arc<dyn TransactionProver + Send + Sync>) -> Self {
+        self.tx_prover = Some(prover);
+        self
+    }
+
     /// Build and return the `Client`.
     ///
     /// # Errors
@@ -250,6 +261,7 @@ where
             self.tx_graceful_blocks,
             self.max_block_number_delta,
             self.note_transport_api,
+            self.tx_prover,
         )
         .await
     }

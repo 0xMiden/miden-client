@@ -1,5 +1,4 @@
 use miden_client::account::Account as NativeAccount;
-use miden_client::auth::AuthSecretKey as NativeAuthSecretKey;
 use miden_client::store::AccountRecord;
 use wasm_bindgen::prelude::*;
 
@@ -7,7 +6,7 @@ use crate::models::account::Account;
 use crate::models::account_header::AccountHeader;
 use crate::models::account_id::AccountId;
 use crate::models::address::Address;
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::word::Word;
 use crate::{WebClient, js_error_with_context};
 
@@ -49,7 +48,7 @@ impl WebClient {
     pub async fn get_account_secret_key_by_pub_key(
         &mut self,
         pub_key: &Word,
-    ) -> Result<SecretKey, JsValue> {
+    ) -> Result<AuthSecretKey, JsValue> {
         let keystore = self.keystore.clone().expect("Keystore not initialized");
 
         let auth_secret_key = keystore
@@ -58,11 +57,7 @@ impl WebClient {
             .map_err(|err| js_error_with_context(err, "failed to get public key for account"))?
             .ok_or(JsValue::from_str("Auth not found for account"))?;
 
-        let NativeAuthSecretKey::RpoFalcon512(secret_key) = auth_secret_key else {
-            todo!() // TODO: what to do with other types of signatures?
-        };
-
-        Ok(secret_key.into())
+        Ok(auth_secret_key.into())
     }
 
     #[wasm_bindgen(js_name = "insertAccountAddress")]

@@ -9,14 +9,16 @@ const mockChainTest = async (testingPage: Page) => {
 
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      0
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(

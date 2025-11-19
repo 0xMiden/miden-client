@@ -51,6 +51,7 @@
 - [FungibleAsset](classes/FungibleAsset.md)
 - [FungibleAssetDelta](classes/FungibleAssetDelta.md)
 - [FungibleAssetDeltaItem](classes/FungibleAssetDeltaItem.md)
+- [GetProceduresResultItem](classes/GetProceduresResultItem.md)
 - [InputNote](classes/InputNote.md)
 - [InputNoteRecord](classes/InputNoteRecord.md)
 - [InputNotes](classes/InputNotes.md)

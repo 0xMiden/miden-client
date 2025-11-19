@@ -1,6 +1,5 @@
-use miden_client::Deserializable;
-use miden_client::auth::Signature as NativeSignature;
-use miden_client::crypto::rpo_falcon512::PublicKey as NativePublicKey;
+use miden_client::auth::{PublicKey as NativePublicKey, Signature as NativeSignature};
+use miden_client::{Deserializable, Word as NativeWord};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -17,8 +16,7 @@ pub struct PublicKey(NativePublicKey);
 #[wasm_bindgen]
 impl PublicKey {
     pub fn serialize(&self) -> Uint8Array {
-        let native_public_key = &self.0;
-        serialize_to_uint8array(&native_public_key)
+        serialize_to_uint8array(&self.0)
     }
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
@@ -31,17 +29,38 @@ impl PublicKey {
         self.verify_data(&SigningInputs::new_blind(message), signature)
     }
 
+    #[wasm_bindgen(js_name = "toCommitment")]
+    pub fn to_commitment(&self) -> Word {
+        let commitment = self.0.to_commitment();
+        let native_word: NativeWord = commitment.into();
+        native_word.into()
+    }
+
+    #[wasm_bindgen(js_name = "recoverFrom")]
+    pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
+        let native_message: NativeWord = message.into();
+        let native_signature: NativeSignature = signature.into();
+
+        match native_signature {
+            NativeSignature::RpoFalcon512(falcon_signature) => {
+                let public_key = miden_client::crypto::rpo_falcon512::PublicKey::recover_from(
+                    native_message,
+                    &falcon_signature,
+                );
+                Ok(NativePublicKey::RpoFalcon512(public_key).into())
+            },
+            NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
+                "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",
+            )),
+        }
+    }
+
     #[wasm_bindgen(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();
-        let native_signature = signature.into();
-        match native_signature {
-            NativeSignature::RpoFalcon512(falcon_signature) => {
-                let message = signing_inputs.to_commitment().into();
-                native_public_key.verify(message, &falcon_signature)
-            },
-            NativeSignature::EcdsaK256Keccak(_) => todo!(), // TODO: how to handle this case
-        }
+        let message = signing_inputs.to_commitment().into();
+        let native_signature: NativeSignature = signature.clone().into();
+        native_public_key.verify(message, native_signature)
     }
 }
 

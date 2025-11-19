@@ -279,16 +279,22 @@ export class WebClient {
 
   // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
-  async newWallet(storageMode, mutable, seed) {
+  async newWallet(storageMode, mutable, authSchemeId, seed) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.newWallet(storageMode, mutable, seed);
+        return await this.wasmWebClient.newWallet(
+          storageMode,
+          mutable,
+          authSchemeId,
+          seed
+        );
       }
       const serializedStorageMode = storageMode.asStr();
       const serializedAccountBytes = await this.callMethodWithWorker(
         MethodName.NEW_WALLET,
         serializedStorageMode,
         mutable,
+        authSchemeId,
         seed
       );
       return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
@@ -298,7 +304,14 @@ export class WebClient {
     }
   }
 
-  async newFaucet(storageMode, nonFungible, tokenSymbol, decimals, maxSupply) {
+  async newFaucet(
+    storageMode,
+    nonFungible,
+    tokenSymbol,
+    decimals,
+    maxSupply,
+    authSchemeId
+  ) {
     try {
       if (!this.worker) {
         return await this.wasmWebClient.newFaucet(
@@ -306,7 +319,8 @@ export class WebClient {
           nonFungible,
           tokenSymbol,
           decimals,
-          maxSupply
+          maxSupply,
+          authSchemeId
         );
       }
       const serializedStorageMode = storageMode.asStr();
@@ -317,7 +331,8 @@ export class WebClient {
         nonFungible,
         tokenSymbol,
         decimals,
-        serializedMaxSupply
+        serializedMaxSupply,
+        authSchemeId
       );
 
       return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
