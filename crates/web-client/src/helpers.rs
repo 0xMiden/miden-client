@@ -7,6 +7,7 @@ use wasm_bindgen::JsValue;
 
 use crate::js_error_with_context;
 use crate::models::account_storage_mode::AccountStorageMode;
+use crate::models::auth::AuthScheme;
 
 // HELPERS
 // ================================================================================================
@@ -21,7 +22,7 @@ pub(crate) async fn generate_wallet(
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
-    auth_scheme_id: u8,
+    auth_scheme: AuthScheme,
 ) -> Result<(Account, AuthSecretKey), JsValue> {
     let mut rng = match seed {
         Some(seed_bytes) => {
@@ -34,21 +35,18 @@ pub(crate) async fn generate_wallet(
         None => StdRng::from_os_rng(),
     };
 
-    let (key_pair, auth_component) = match auth_scheme_id {
-        0 => {
+    let (key_pair, auth_component) = match auth_scheme {
+        AuthScheme::AuthRpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        1 => {
+        AuthScheme::AuthEcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
-        },
-        _ => {
-            return Err(JsValue::from_str("Unsupported auth scheme ID"));
         },
     };
 
