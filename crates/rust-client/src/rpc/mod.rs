@@ -125,12 +125,17 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
-    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
+    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
+    /// RPC endpoint.
     ///
-    /// For any [`miden_objects::note::NoteType::Private`] note, the return data includes the
-    /// [`miden_objects::note::NoteMetadata`] and [`miden_objects::note::NoteInclusionProof`],
-    /// whereas for [`miden_objects::note::NoteType::Public`] notes, the return data includes
-    /// all note details.
+    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
+    /// [`miden_objects::note::NoteMetadata`].
+    ///
+    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
+    /// (recipient, assets, script, etc.).
+    ///
+    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
+    /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
