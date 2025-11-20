@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::models::input_note::InputNote;
 use crate::models::note_id::NoteId;
+use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::models::note_metadata::NoteMetadata;
 use crate::models::note_type::NoteType;
 
@@ -11,19 +12,21 @@ use crate::models::note_type::NoteType;
 pub struct FetchedNote {
     note_id: NoteId,
     metadata: NoteMetadata,
+    inclusion_proof: Option<NoteInclusionProof>,
     input_note: Option<InputNote>,
 }
 
 #[wasm_bindgen]
 impl FetchedNote {
-    /// Create a note with an optional `InputNote`.
+    /// Create a note with an optional `InputNote` and optional `NoteInclusionProof`.
     #[wasm_bindgen(constructor)]
     pub fn new(
         note_id: NoteId,
         metadata: NoteMetadata,
+        inclusion_proof: Option<NoteInclusionProof>,
         input_note: Option<InputNote>,
     ) -> FetchedNote {
-        FetchedNote { note_id, metadata, input_note }
+        FetchedNote { note_id, metadata, inclusion_proof, input_note }
     }
 
     /// The unique identifier of the note.
@@ -38,6 +41,16 @@ impl FetchedNote {
     #[wasm_bindgen(getter)]
     pub fn metadata(&self) -> NoteMetadata {
         self.metadata
+    }
+
+    /// The note's inclusion proof.
+    ///
+    /// Returns the inclusion proof either directly (for private notes) or via the input_note
+    /// (for public notes).
+    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "inclusionProof")]
+    pub fn inclusion_proof(&self) -> Option<NoteInclusionProof> {
+        self.inclusion_proof.clone().or_else(|| self.input_note.as_ref()?.proof())
     }
 
     /// The full [`InputNote`] with inclusion proof.
