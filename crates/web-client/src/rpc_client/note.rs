@@ -26,7 +26,12 @@ impl FetchedNote {
         inclusion_proof: Option<NoteInclusionProof>,
         input_note: Option<InputNote>,
     ) -> FetchedNote {
-        FetchedNote { note_id, metadata, inclusion_proof, input_note }
+        FetchedNote {
+            note_id,
+            metadata,
+            inclusion_proof,
+            input_note,
+        }
     }
 
     /// The unique identifier of the note.
@@ -45,7 +50,7 @@ impl FetchedNote {
 
     /// The note's inclusion proof.
     ///
-    /// Returns the inclusion proof either directly (for private notes) or via the input_note
+    /// Returns the inclusion proof either directly (for private notes) or via the `input_note`
     /// (for public notes).
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "inclusionProof")]
