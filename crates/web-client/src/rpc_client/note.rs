@@ -61,7 +61,7 @@ impl FetchedNote {
     /// The full [`InputNote`] with inclusion proof.
     ///
     /// For public notes, it contains the complete note data and inclusion proof.
-    /// For private notes, it will be ``None`.
+    /// For private notes, it will be `None`.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "inputNote")]
     pub fn input_note(&self) -> Option<InputNote> {
