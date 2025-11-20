@@ -128,8 +128,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
     ///
     /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
-    /// [`miden_objects::note::NoteMetadata`], whereas for [`miden_objects::note::NoteType::Public`]
-    /// notes, the return data includes all details.
+    /// [`miden_objects::note::NoteHeader`] (which contains the [`miden_objects::note::NoteId`]
+    /// and [`miden_objects::note::NoteMetadata`]), whereas for
+    /// [`miden_objects::note::NoteType::Public`] notes, the return data includes all details.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
