@@ -59,6 +59,7 @@ export {
   PublicKey,
   Rpo256,
   RpcClient,
+  ScriptBuilder,
   SecretKey,
   ProvenTransaction,
   SerializedAccountHeader,
