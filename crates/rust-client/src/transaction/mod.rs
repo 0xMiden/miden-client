@@ -235,6 +235,7 @@ where
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
+        let unknown_recipient_digests = transaction_request.unknown_output_recipients();
 
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
@@ -293,7 +294,11 @@ where
             .execute_transaction(account_id, block_num, notes, tx_args)
             .await?;
 
-        validate_executed_transaction(&executed_transaction, &output_recipients)?;
+        validate_executed_transaction(
+            &executed_transaction,
+            &output_recipients,
+            &unknown_recipient_digests
+        )?;
 
         TransactionResult::new(executed_transaction, future_notes)
     }
@@ -907,6 +912,7 @@ pub fn notes_from_output(output_notes: &OutputNotes) -> impl Iterator<Item = &No
 fn validate_executed_transaction(
     executed_transaction: &ExecutedTransaction,
     expected_output_recipients: &[NoteRecipient],
+    unknown_output_recipients: &[Word],
 ) -> Result<(), ClientError> {
     let tx_output_recipient_digests = executed_transaction
         .output_notes()
@@ -919,6 +925,9 @@ fn validate_executed_transaction(
         .filter_map(|recipient| {
             (!tx_output_recipient_digests.contains(&recipient.digest()))
                 .then_some(recipient.digest())
+        })
+        .filter(|digest| {
+            !unknown_output_recipients.contains(digest)
         })
         .collect();
 
