@@ -54,7 +54,7 @@ export {
   NoteTag,
   NoteType,
   OutputNote,
-  OutputNotesArray,
+  OutputNoteArray,
   Package,
   PublicKey,
   Rpo256,
