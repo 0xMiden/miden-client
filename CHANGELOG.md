@@ -3,6 +3,7 @@
 ## 0.12.4 (TBD)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
+* Added `inclusion_proof` field to web-client `FetchedNote` to preserve note inclusion proofs for private notes ([#1521](https://github.com/0xMiden/miden-client/issues/1521)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 

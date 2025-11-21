@@ -66,9 +66,10 @@ impl RpcClient {
         let web_notes: Vec<FetchedNote> = fetched_notes
             .into_iter()
             .map(|native_note| match native_note {
-                NativeFetchedNote::Private(id, metadata, _inclusion_proof) => FetchedNote::new(
+                NativeFetchedNote::Private(id, metadata, inclusion_proof) => FetchedNote::new(
                     id.into(),
                     metadata.into(),
+                    Some(inclusion_proof.into()),
                     None, // Private notes don't include the full note
                 ),
                 NativeFetchedNote::Public(note, inclusion_proof) => {
@@ -77,6 +78,7 @@ impl RpcClient {
                     FetchedNote::new(
                         note.id().into(),
                         (*note.metadata()).into(),
+                        None, // Public notes have the proof via input_note
                         Some(input_note.into()),
                     )
                 },
