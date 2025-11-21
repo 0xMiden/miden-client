@@ -1,8 +1,11 @@
 # Changelog
 
-## Miden Client CLI - 0.12.5 (2025-11-21)
+## Miden Web Client - 0.12.4 (2025-11-21)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
+
+## Miden Client CLI - 0.12.5 (2025-11-21)
+
 * Added the `--remote-prover-timeout` configuration to the CLI ([#1524](https://github.com/0xMiden/miden-client/pull/1524)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
