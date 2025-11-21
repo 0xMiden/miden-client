@@ -156,6 +156,9 @@ impl TransactionRequest {
         match &self.script_template {
             Some(TransactionScriptTemplate::SendNotes(notes)) => notes
                 .iter()
+                .filter(|partial| !
+                    self.unknown_output_recipients.contains(&partial.recipient_digest())
+                )
                 .map(|partial| {
                     Note::new(
                         partial.assets().clone(),
