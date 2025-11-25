@@ -72,10 +72,13 @@ rust-client-ts-lint:
 # --- Documentation -------------------------------------------------------------------------------
 
 .PHONY: doc
-doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
+doc: ## Generate & check rust documentation. Ensure you have the nightly toolchain installed.
 	@cd crates/rust-client && \
-	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
-	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release
+
+doc-open: ## Generate & open rust documentation in browser. Ensure you have the nightly toolchain installed.
+	@cd crates/rust-client && \
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release --open
 
 .PHONY: serve-docs
 serve-docs: ## Serves the docs
