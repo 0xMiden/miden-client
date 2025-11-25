@@ -1,10 +1,35 @@
 # Changelog
 
-## 0.12.0 (2025-11-08)
+## 0.12.4 (TBD)
+
+* Changed `blockNum` type from `string` to `number` in WebClient transaction interfaces for better type safety and consistency ([#1528](https://github.com/0xMiden/miden-client/pull/1528)).
+* Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
+
+## Miden Client CLI - 0.12.4 (2025-11-17)
+
+* Fixed CLI install process to statically include account component package files ([#1530](https://github.com/0xMiden/miden-client/pull/1530)).
+
+## 0.12.3 (2025-11-16)
+
+* Added `recoverFrom()` function to WASM `PublicKey` and added back `TransactionSummary` back to `index.d.ts` ([#1513](https://github.com/0xMiden/miden-client/pull/1513)).
+* Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the WebClient ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
+* Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
+* Added ECDSA auth component to the rust-client & web-client ([#1527](https://github.com/0xMiden/miden-client/pull/1527))
+
+
+## 0.12.2 (2025-11-12)
+
+* Added `prover()` setter to `ClientBuilder` to allow configuring custom transaction provers ([#1499](https://github.com/0xMiden/miden-client/pull/1499)).
+* Added `AccountStorageMode` getters for `Account` and `AccountId`. [(#1509)](https://github.com/0xMiden/miden-client/pull/1509).
+* Allowed `new-account` command to create accounts with non-Falcon auth components ([#1443](https://github.com/0xMiden/miden-client/pull/1443)).
+* Added new `.miden` directory for configuration files at the client CLI ([#1464](https://github.com/0xMiden/miden-client/pull/1464)).
+* Added bindings for the new ECDSA auth scheme [(#1478)](https://github.com/0xMiden/miden-client/pull/1478).
+* Exposed all auth packages from `miden-base`: `no-auth`, `multisig-auth`, and `acl-auth` components are now available in the CLI under `packages/auth/` subdirectory ([#1132](https://github.com/0xMiden/miden-client/issues/1132)).
+
+## 0.12.0 (2025-11-10)
 
 ### Features
 
-* Added `serialize` and `deserialize` methods for `NoteScript` [(#1117)](https://github.com/0xMiden/miden-client/pull/1117).
 * Added support for getting specific vault and storage elements from `Store` along with their proofs ([#1164](https://github.com/0xMiden/miden-client/pull/1164)).
 * Implemented functions for lazy loading on webstore [(#1184)](https://github.com/0xMiden/miden-client/pull/1184).
 * Separated `migrations` and `settings` tables [(#1287)](https://github.com/0xMiden/miden-client/pull/1287).
@@ -26,6 +51,7 @@
 * Refactored note scripts to be pre-loaded into the store instead of providing them through advice inputs ([#1426](https://github.com/0xMiden/miden-client/pull/1426)).
 * [BREAKING] Refactored client transaction APIs and the new `TransactionResult` type ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 * Added ability to create `AccountComponent` from a `Package` and `StorageSlot` array in the Web Client ([#1469](https://github.com/0xMiden/miden-client/pull/1469)).
+* Added new global default .miden directory in HOME path at the client CLI ([#1465](https://github.com/0xMiden/miden-client/pull/1465))
 
 ### Changes
 
@@ -49,7 +75,7 @@
 * [BREAKING] Refactored transaction APIs to support more granular updates in the transaction lifecycle ([#1407](https://github.com/0xMiden/miden-client/pull/1407)).
 * Updated Dexie indexes and SQL schema; fixed sync-related transaction state bug ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
 * Started syncing output note nullifiers by default, to track when they are consumed ([#1452](https://github.com/0xMiden/miden-client/pull/1452)).
-* Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)). 
+* Expanded some `ClientError` variants to contain explanations and hints about the errors ([#1462](https://github.com/0xMiden/miden-client/pull/1462)).
 
 ## 0.11.11 (2025-10-16)
 

@@ -113,4 +113,3 @@ export async function upsertTransactionRecord(transactionId, details, blockNum, 
         logWebStoreError(err, "Failed to insert proven transaction data");
     }
 }
-//# sourceMappingURL=transactions.js.map

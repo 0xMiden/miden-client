@@ -85,6 +85,16 @@ jobs:
           cd ./crates/web-client
           yarn install
 
+      - name: Check TSC output equals commited JS
+        run: |
+          cd ./crates/idxdb-store/src/
+          yarn
+          yarn tsc --outDir ci_test_folder
+          pushd ci_test_folder
+          find . -type f ! -name "*.js" -delete
+          popd
+          diff -bur js ci_test_folder
+
       - name: Restore cache - dist folder
         id: dist-cache
         uses: actions/cache/restore@v4

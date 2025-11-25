@@ -348,14 +348,16 @@ export const customTransaction = async (
 
       const walletAccount = await client.newWallet(
         window.AccountStorageMode.private(),
-        false
+        false,
+        0
       );
       const faucetAccount = await client.newFaucet(
         window.AccountStorageMode.private(),
         false,
         "DAG",
         8,
-        BigInt(10000000)
+        BigInt(10000000),
+        0
       );
       await client.syncState();
 
@@ -580,7 +582,8 @@ const customTxWithMultipleNotes = async (
       const amount = BigInt(10);
       const targetAccount = await client.newWallet(
         window.AccountStorageMode.private(),
-        true
+        true,
+        0
       );
       const targetAccountId = targetAccount.id();
       const senderAccountId = window.AccountId.fromHex(_senderAccountId);
@@ -797,7 +800,7 @@ export const customAccountComponent = async (
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.withRng(walletSeed);
+    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
     let authComponent = window.AccountComponent.createAuthComponent(secretKey);
 
     let accountBuilderResult = new window.AccountBuilder(walletSeed)
@@ -877,10 +880,12 @@ export const discardedTransaction = async (
 
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const targetAccount = await client.newWallet(
       window.AccountStorageMode.private(),
+      0,
       true
     );
     const faucetAccount = await client.newFaucet(
@@ -888,7 +893,8 @@ export const discardedTransaction = async (
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      0
     );
     await client.syncState();
 
@@ -1049,7 +1055,10 @@ test.describe("discarded_transaction tests", () => {
 
 export const counterAccountComponent = async (
   testingPage: Page
-): Promise<string | undefined> => {
+): Promise<{
+  finalCounter?: string;
+  hasCounterComponent: boolean;
+}> => {
   return await testingPage.evaluate(async () => {
     const accountCode = `
         use.miden::active_account
@@ -1111,7 +1120,8 @@ export const counterAccountComponent = async (
 
     const nativeAccount = await client.newWallet(
       window.AccountStorageMode.private(),
-      false
+      false,
+      0
     );
 
     await client.syncState();
@@ -1186,8 +1196,19 @@ export const counterAccountComponent = async (
 
     let account = await client.getAccount(accountBuilderResult.account.id());
     let counter = account?.storage().getItem(0)?.toHex();
+    let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
 
-    return counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+    let code = account?.code();
+    let hasCounterComponent = code
+      ? counterAccountComponent
+          .getProcedures()
+          .every((procedure) => code.hasProcedure(procedure.digest))
+      : false;
+
+    return {
+      finalCounter,
+      hasCounterComponent,
+    };
   });
 };
 
@@ -1196,8 +1217,10 @@ test.describe("counter account component tests", () => {
     page,
   }) => {
     page.on("console", (msg) => console.log(msg));
-    let finalCounter = await counterAccountComponent(page);
+    let { finalCounter, hasCounterComponent } =
+      await counterAccountComponent(page);
     expect(finalCounter).toEqual("2");
+    expect(hasCounterComponent).toBe(true);
   });
 });
 
@@ -1254,7 +1277,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.withRng(walletSeed);
+    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
     let authComponent = window.AccountComponent.createAuthComponent(secretKey);
 
     let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)

@@ -36,9 +36,9 @@
 
 use alloc::vec::Vec;
 
-use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512};
 use miden_lib::account::wallets::BasicWallet;
-use miden_objects::crypto::dsa::rpo_falcon512::PublicKey;
+use miden_objects::account::auth::PublicKey;
 use miden_objects::note::NoteTag;
 // RE-EXPORTS
 // ================================================================================================
@@ -50,6 +50,7 @@ pub use miden_objects::{
         Account,
         AccountBuilder,
         AccountCode,
+        AccountComponent,
         AccountDelta,
         AccountFile,
         AccountHeader,
@@ -81,9 +82,18 @@ pub mod component {
     pub use miden_lib::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
+        ecdsa_k256_keccak_library,
+        network_fungible_faucet_library,
+        no_auth_library,
+        rpo_falcon_512_acl_library,
         rpo_falcon_512_library,
+        rpo_falcon_512_multisig_library,
     };
-    pub use miden_lib::account::faucets::{BasicFungibleFaucet, FungibleFaucetExt};
+    pub use miden_lib::account::faucets::{
+        BasicFungibleFaucet,
+        FungibleFaucetExt,
+        NetworkFungibleFaucet,
+    };
     pub use miden_lib::account::wallets::BasicWallet;
     pub use miden_objects::account::{
         AccountComponent,
@@ -355,9 +365,10 @@ impl<AUTH> Client<AUTH> {
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
-    public_key: PublicKey,
+    public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
+    auth_scheme_id: u8,
 ) -> Result<AccountId, ClientError> {
     let account_type = if is_mutable {
         AccountType::RegularAccountUpdatableCode
@@ -365,10 +376,26 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
+    let auth_component = match auth_scheme_id {
+        0 => {
+            let auth_component: AccountComponent =
+                AuthRpoFalcon512::new(public_key.to_commitment()).into();
+            auth_component
+        },
+        1 => {
+            let auth_component: AccountComponent =
+                AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
+            auth_component
+        },
+        _ => {
+            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme_id));
+        },
+    };
+
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(public_key.into()))
+        .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build()?;
 
