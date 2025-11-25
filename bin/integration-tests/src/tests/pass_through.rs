@@ -55,15 +55,15 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     // Create Client basic wallet (We'll call it accountA)
     let (sender, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator_1).await?;
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator_1, 0).await?;
     let (target, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2).await?;
+        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2, 0).await?;
 
     let pass_through_account = create_pass_through_account(&mut client).await?;
 
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator_1)
+        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator_1, 0)
             .await?;
 
     // mint 1000 BTC for accountA
@@ -106,9 +106,43 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         .expected_output_recipients(vec![pass_through_note_details_1.recipient().clone()])
         .build_consume_notes(vec![pass_through_note_1.id()])
         .unwrap();
+
     let tx_id = client
         .submit_new_transaction(pass_through_account.id(), tx_request.clone())
         .await?;
+
+    wait_for_tx(&mut client, tx_id).await?;
+    //wait_for_blocks(&mut client, 7).await;
+
+    let tx_record = client
+        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+        .await?
+        .pop()
+        .unwrap();
+
+    assert_eq!(
+        tx_record.details.output_notes.get_note(0).metadata().sender(),
+        pass_through_account.id()
+    );
+
+    let pass_through_before_second_tx = client
+        .get_account(pass_through_account.id())
+        .await?
+        .expect("pass-through account should exist");
+
+    // Storing commitment to check later that (final_acc.commitment == initial_acc.commitment)
+    let commitment_before_second_tx = pass_through_before_second_tx.account().commitment();
+
+    // now try another transaction against the pass-through account
+    let tx_request = TransactionRequestBuilder::new()
+        .expected_output_recipients(vec![pass_through_note_details_2.recipient().clone()])
+        .build_consume_notes(vec![pass_through_note_2.id()])
+        .unwrap();
+
+    let tx_id = client
+        .submit_new_transaction(pass_through_account.id(), tx_request.clone())
+        .await?;
+
     wait_for_tx(&mut client, tx_id).await?;
 
     let tx_record = client
@@ -122,25 +156,15 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         pass_through_account.id()
     );
 
-    // now try another transaction against the pass-through account
-    let tx_request = TransactionRequestBuilder::new()
-        .expected_output_recipients(vec![pass_through_note_details_2.recipient().clone()])
-        .build_consume_notes(vec![pass_through_note_2.id()])
-        .unwrap();
-    let tx_id = client
-        .submit_new_transaction(pass_through_account.id(), tx_request.clone())
-        .await?;
-    wait_for_tx(&mut client, tx_id).await?;
-
-    let tx_record = client
-        .get_transactions(TransactionFilter::Ids(vec![tx_id]))
+    let pass_through_after_second_tx = client
+        .get_account(pass_through_account.id())
         .await?
-        .pop()
-        .unwrap();
+        .expect("pass-through account should exist");
 
     assert_eq!(
-        tx_record.details.output_notes.get_note(0).metadata().sender(),
-        pass_through_account.id()
+        pass_through_after_second_tx.account().commitment(),
+        commitment_before_second_tx,
+        "pass-through transaction should not change account commitment"
     );
 
     Ok(())
@@ -148,6 +172,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
 // HELPERS
 // ================================================================================================
+
 async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     client: &mut Client<AUTH>,
 ) -> Result<Account> {

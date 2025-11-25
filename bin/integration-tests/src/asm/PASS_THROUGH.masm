@@ -38,13 +38,13 @@ begin
     # => [inputs_ptr]
 
     # load ASSET
-    mem_loadw
+    mem_loadw_be
     # => [ASSET]
 
-    padw mem_loadw.4
+    padw mem_loadw_be.4
     # => [RECIPIENT, ASSET]
 
-    padw mem_loadw.8
+    padw mem_loadw_be.8
     # => [tag, aux, note_type, execution_hint, RECIPIENT, ASSET]
     debug.stack
 
