@@ -9,8 +9,7 @@ use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::auth::AuthScheme;
 use crate::models::note_file::NoteFile;
 use crate::models::note_id::NoteId;
-use crate::js_error_with_context;
-use crate::WebClient;
+use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
 impl WebClient {

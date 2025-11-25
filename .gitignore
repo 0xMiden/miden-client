@@ -55,3 +55,6 @@ crates/web-client/playwright-report
 # JS metadata generated from idxdb-store TypeScript build
 crates/idxdb-store/src/js/**/*.d.ts
 crates/idxdb-store/src/js/**/*.js.map
+
+# Developer-local agent instructions
+AGENTS.md

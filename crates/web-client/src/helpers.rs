@@ -1,13 +1,14 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
 use miden_client::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, AuthSecretKey};
+use miden_objects::account::auth::AuthScheme as NativeAuthScheme;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;
 
 use crate::js_error_with_context;
 use crate::models::account_storage_mode::AccountStorageMode;
-use crate::models::auth::AuthScheme;
+use crate::models::auth::AuthScheme as JsAuthScheme;
 
 // HELPERS
 // ================================================================================================
@@ -22,7 +23,7 @@ pub(crate) async fn generate_wallet(
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
-    auth_scheme: AuthScheme,
+    auth_scheme: JsAuthScheme,
 ) -> Result<(Account, AuthSecretKey), JsValue> {
     let mut rng = match seed {
         Some(seed_bytes) => {
@@ -35,14 +36,15 @@ pub(crate) async fn generate_wallet(
         None => StdRng::from_os_rng(),
     };
 
-    let (key_pair, auth_component) = match auth_scheme {
-        AuthScheme::AuthRpoFalcon512 => {
+    let native_scheme: NativeAuthScheme = auth_scheme.into();
+    let (key_pair, auth_component) = match native_scheme {
+        NativeAuthScheme::RpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        AuthScheme::AuthEcdsaK256Keccak => {
+        NativeAuthScheme::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
