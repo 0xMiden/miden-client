@@ -49,6 +49,21 @@ impl AccountId {
         self.0.is_regular_account()
     }
 
+    #[wasm_bindgen(js_name = "isPublic")]
+    pub fn is_public(&self) -> bool {
+        self.0.is_public()
+    }
+
+    #[wasm_bindgen(js_name = "isPrivate")]
+    pub fn is_private(&self) -> bool {
+        self.0.is_private()
+    }
+
+    #[wasm_bindgen(js_name = "isNetwork")]
+    pub fn is_network(&self) -> bool {
+        self.0.is_network()
+    }
+
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {

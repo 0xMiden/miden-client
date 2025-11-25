@@ -52,6 +52,7 @@ test.describe("remote keystore", () => {
       await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 
@@ -97,6 +98,7 @@ test.describe("remote keystore", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 
@@ -169,6 +171,7 @@ test.describe("remote keystore", () => {
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
+        0,
         undefined
       );
 

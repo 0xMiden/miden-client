@@ -1,0 +1,27 @@
+name = "acl_auth"
+description = "Access Control List (ACL) authentication component using RPO Falcon512. Provides fine-grained authentication control based on procedure calls and note operations. Storage layout: Slot 0 - public key, Slot 1 - ACL config, Slot 2 - trigger procedures map"
+version = "0.1.0"
+supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
+
+[[storage]]
+name = "falcon_pubkey"
+description = "Falcon public key"
+slot = 0
+type = "auth::rpo_falcon512::pub_key"
+
+[[storage]]
+name = "acl_config"
+description = "ACL configuration: [num_tracked_procs, allow_unauthorized_output_notes, allow_unauthorized_input_notes, 0]"
+slot = 1
+value = [
+    { name = "num_tracked_procs", type = "u32", description = "Number of procedures tracked for authentication" },
+    { name = "allow_unauthorized_output_notes", type = "u8", description = "Whether unauthorized output notes are allowed (0=false, 1=true)" },
+    { name = "allow_unauthorized_input_notes", type = "u8", description = "Whether unauthorized input notes are allowed (0=false, 1=true)" },
+    { value = "0" },
+]
+
+[[storage]]
+name = "proc_roots"
+description = "Map with trigger procedure roots that require authentication"
+slot = 2
+type = "map"

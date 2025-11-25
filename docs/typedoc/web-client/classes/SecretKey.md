@@ -96,9 +96,25 @@
 
 ***
 
-### withRng()
+### ecdsaWithRNG()
 
-> `static` **withRng**(`seed?`): `SecretKey`
+> `static` **ecdsaWithRNG**(`seed?`): `SecretKey`
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+#### Returns
+
+`SecretKey`
+
+***
+
+### rpoFalconWithRNG()
+
+> `static` **rpoFalconWithRNG**(`seed?`): `SecretKey`
 
 #### Parameters
 

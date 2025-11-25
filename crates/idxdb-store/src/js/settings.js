@@ -55,4 +55,3 @@ export async function listSettingKeys() {
         logWebStoreError(error, `Error listing setting keys`);
     }
 }
-//# sourceMappingURL=settings.js.map

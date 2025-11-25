@@ -21,14 +21,17 @@ try {
     // Set up account parameters
     const accountStorageMode = AccountStorageMode.private(); // Can be private() or public()
     const mutable = true; // Whether the account code can be updated later
+    const authSchemeId = 0; // Authentication scheme can be either 0 (Rpo Falcon 512) or 1 (ECDSA K256 Keccak)
 
     // Create new wallet account
-    const account = await webClient.newWallet(accountStorageMode, mutable);
+    const account = await webClient.newWallet(accountStorageMode, mutable, authSchemeId);
 
     // Access account properties
     console.log(account.id().toString());      // The account's unique identifier (hex string)
     console.log(account.nonce().toString());   // Current account nonce (starts at 0)
-    console.log(account.isPublic());           // Whether the account is public (false for private storage)
+    console.log(account.isPublic());           // Whether the account is public
+    console.log(account.isPrivate());          // Whether the account is private
+    console.log(account.isNetwork());          // Whether the account is network
     console.log(account.isUpdatable());        // Whether the account code can be updated (true if mutable)
     console.log(account.isFaucet());           // Whether the account is a faucet (false for regular wallets)
     console.log(account.isRegularAccount());   // Whether it's a regular account (true for wallets)
@@ -54,6 +57,7 @@ try {
     const tokenSymbol = "TEST";                            // The token symbol (e.g., "TEST", "BTC", etc.)
     const decimals = 8;                                    // Number of decimal places for the token
     const maxSupply = BigInt(10000000);                    // Maximum supply of tokens that can be minted
+    const authSchemeId = 0;                                // RPO Falcon 512 Auth Scheme by Default
 
     // Create new faucet account
     const faucet = await webClient.newFaucet(
@@ -61,13 +65,16 @@ try {
         nonFungible,
         tokenSymbol,
         decimals,
-        maxSupply
+        maxSupply,
+        authSchemeId,
     );
 
     // Access faucet properties
     console.log(faucet.id().toString());     // The faucet's unique identifier
     console.log(faucet.nonce().toString());  // Current faucet nonce (starts at 0)
     console.log(faucet.isPublic());          // Whether the faucet is public (typically true)
+    console.log(faucet.isPrivate());         // Whether the faucet is private
+    console.log(faucet.isNetwork());         // Whether the faucet is network
     console.log(faucet.isUpdatable());       // Whether the faucet code can be updated (always false)
     console.log(faucet.isFaucet());          // Whether the account is a faucet (true)
     console.log(faucet.isRegularAccount());  // Whether it's a regular account (false for faucets)
