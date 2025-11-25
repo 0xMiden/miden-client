@@ -53,4 +53,31 @@ impl TestUtils {
 
         Uint8Array::from(bytes.as_slice())
     }
+
+    #[wasm_bindgen(js_name = "createMockSerializedProgramPackage")]
+    pub fn create_mock_serialized_program_package() -> Uint8Array {
+        pub const CODE: &str = "
+            begin
+                # This code computes 1001st Fibonacci number
+                repeat.1000
+                    swap dup.1 add
+                end
+            end
+        ";
+
+        let program = NativeAssembler::default().assemble_program(CODE).unwrap();
+
+        let package_without_metadata = NativePackage {
+            name: "test_program_package_no_metadata".to_string(),
+            mast: NativeMastArtifact::Executable(Arc::new(program)),
+            manifest: NativePackageManifest::new(None),
+            sections: vec![], // No metadata section
+            version: Default::default(),
+            description: None,
+        };
+
+        let bytes: Vec<u8> = package_without_metadata.to_bytes();
+
+        Uint8Array::from(bytes.as_slice())
+    }
 }
