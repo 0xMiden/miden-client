@@ -40,6 +40,16 @@ module.exports = [
           functions: "never",
         },
       ],
+      "eol-last": ["error", "always"],
+      "space-before-blocks": ["error", "always"],
+      "no-multiple-empty-lines": [
+        "error",
+        {
+          max: 1,
+          maxBOF: 0,
+          maxEOF: 0,
+        },
+      ],
     },
   },
   {
@@ -72,6 +82,16 @@ module.exports = [
           imports: "always-multiline",
           exports: "always-multiline",
           functions: "never",
+        },
+      ],
+      "eol-last": ["error", "always"],
+      "space-before-blocks": ["error", "always"],
+      "no-multiple-empty-lines": [
+        "error",
+        {
+          max: 1,
+          maxBOF: 0,
+          maxEOF: 0,
         },
       ],
     },
