@@ -3,6 +3,7 @@
 ## 0.12.4 (TBD)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
+* Changed the note script pre-loading step to include all expected scripts based on specified recipients ([#1539](https://github.com/0xMiden/miden-client/pull/1539)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
