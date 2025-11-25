@@ -82,6 +82,7 @@ impl WebClient {
                         AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
                 },
+                _ => unreachable!("unsupported auth scheme: {native_scheme:?}"),
             };
 
             let symbol =

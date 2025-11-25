@@ -6,11 +6,14 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[wasm_bindgen]
 pub enum AuthScheme {
-    #[wasm_bindgen(js_name = "AuthRpoFalcon512")]
-    AuthRpoFalcon512 = NativeAuthScheme::RpoFalcon512 as u8,
-    #[wasm_bindgen(js_name = "AuthEcdsaK256Keccak")]
-    AuthEcdsaK256Keccak = NativeAuthScheme::EcdsaK256Keccak as u8,
+    AuthRpoFalcon512 = 0,
+    AuthEcdsaK256Keccak = 1,
 }
+
+const _: () = {
+    assert!(NativeAuthScheme::RpoFalcon512 as u8 == AuthScheme::AuthRpoFalcon512 as u8);
+    assert!(NativeAuthScheme::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
+};
 
 impl From<AuthScheme> for NativeAuthScheme {
     fn from(value: AuthScheme) -> Self {
@@ -26,6 +29,7 @@ impl From<NativeAuthScheme> for AuthScheme {
         match value {
             NativeAuthScheme::RpoFalcon512 => AuthScheme::AuthRpoFalcon512,
             NativeAuthScheme::EcdsaK256Keccak => AuthScheme::AuthEcdsaK256Keccak,
+            _ => unreachable!("unsupported auth scheme: {value:?}"),
         }
     }
 }
