@@ -1,9 +1,11 @@
 use miden_client::PrettyPrint;
 use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
+use miden_client::vm::Package as NativePackage;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::word::Word;
+use crate::models::package::Package;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
@@ -41,6 +43,20 @@ impl NoteScript {
 
     pub fn root(&self) -> Word {
         self.0.root().into()
+    }
+
+    /// Builds a `NoteScript` from a `Package`.
+    #[wasm_bindgen(js_name = "fromPackage")]
+    pub fn from_package(package: Package) -> Result<NoteScript, JsValue> {
+        let native_package: NativePackage = package.into();
+
+        if !native_package.is_program() {
+            return Err(JsValue::from_str("Package is not a program"));
+        }
+
+        let program = native_package.unwrap_program();
+        let native_note_script = NativeNoteScript::new((*program).clone());
+        Ok(native_note_script.into())
     }
 }
 // CONVERSIONS
