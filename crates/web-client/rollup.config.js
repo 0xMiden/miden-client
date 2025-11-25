@@ -77,7 +77,7 @@ export default [
         experimental: {
           typescriptDeclarationDir: "dist/crates",
         },
-        optimize: { release: true, rustc: !devMode  },
+        optimize: { release: true, rustc: !devMode },
       }),
       resolve(),
       commonjs(),
