@@ -2,6 +2,8 @@ use miden_client::vm::Package as NativePackage;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
+use crate::models::library::Library;
+use crate::models::program::Program;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
@@ -16,6 +18,30 @@ impl Package {
 
     pub fn deserialize(bytes: &Uint8Array) -> Result<Package, JsValue> {
         deserialize_from_uint8array::<NativePackage>(bytes).map(Package)
+    }
+
+    /// Returns the underlying library of a `Package`.
+    /// Fails if the package is not a library.
+    #[wasm_bindgen(js_name = "library")]
+    pub fn library(&self) -> Result<Library, JsValue> {
+        if !self.0.is_library() {
+            return Err(JsValue::from_str("Package is not a library"));
+        }
+
+        let native_library = self.0.unwrap_library();
+        Ok((*native_library).clone().into())
+    }
+
+    /// Returns the underlying program of a `Package`.
+    /// Fails if the package is not a program.
+    #[wasm_bindgen(js_name = "program")]
+    pub fn program(&self) -> Result<Program, JsValue> {
+        if !self.0.is_program() {
+            return Err(JsValue::from_str("Package is not a program"));
+        }
+
+        let native_program = self.0.unwrap_program();
+        Ok((*native_program).clone().into())
     }
 }
 
