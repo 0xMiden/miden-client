@@ -16,6 +16,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::rngs::StdRng;
 mod commands;
 use commands::account::AccountCmd;
+use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
 use commands::import::ImportCmd;
@@ -27,7 +28,7 @@ use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
 use commands::transactions::TransactionCmd;
 
-use self::utils::load_config_file;
+use self::utils::{config_file_exists, load_config_file};
 use crate::commands::address::AddressCmd;
 
 pub type CliKeyStore = FilesystemKeyStore<StdRng>;
@@ -37,6 +38,9 @@ mod errors;
 mod faucet_details_map;
 mod info;
 mod utils;
+
+/// Re-export `MIDEN_DIR` for use in tests
+pub use config::MIDEN_DIR;
 
 /// Config file name.
 const CLIENT_CONFIG_FILE_NAME: &str = "miden-client.toml";
@@ -133,6 +137,7 @@ pub enum Command {
     Import(ImportCmd),
     Export(ExportCmd),
     Init(InitCmd),
+    ClearConfig(ClearConfigCmd),
     Notes(NotesCmd),
     Sync(SyncCmd),
     /// View a summary of the current client state.
@@ -151,21 +156,23 @@ pub enum Command {
 /// CLI entry point.
 impl Cli {
     pub async fn execute(&self) -> Result<(), CliError> {
-        let mut current_dir = std::env::current_dir()?;
-        current_dir.push(CLIENT_CONFIG_FILE_NAME);
-
-        // Check if it's an init command before anything else. When we run the init command for
-        // the first time we won't have a config file and thus creating the store would not be
-        // possible.
-        if let Command::Init(init_cmd) = &self.action {
-            init_cmd.execute(&current_dir)?;
-            return Ok(());
+        // Handle commands that don't require client initialization
+        match &self.action {
+            Command::Init(init_cmd) => {
+                init_cmd.execute()?;
+                return Ok(());
+            },
+            Command::ClearConfig(clear_config_cmd) => {
+                clear_config_cmd.execute()?;
+                return Ok(());
+            },
+            _ => {},
         }
 
         // Check if Client is not yet initialized => silently initialize the client
-        if !current_dir.exists() {
+        if !config_file_exists()? {
             let init_cmd = InitCmd::default();
-            init_cmd.execute(&current_dir)?;
+            init_cmd.execute()?;
         }
 
         // Define whether we want to use the executor's debug mode based on the env var and
@@ -210,7 +217,7 @@ impl Cli {
                 Box::pin(new_account.execute(client, keystore)).await
             },
             Command::Import(import) => import.execute(client, keystore).await,
-            Command::Init(_) => Ok(()),
+            Command::Init(_) | Command::ClearConfig(_) => Ok(()), // Already handled earlier
             Command::Info => info::print_client_info(&client).await,
             Command::Notes(notes) => Box::pin(notes.execute(client)).await,
             Command::Sync(sync) => sync.execute(client).await,

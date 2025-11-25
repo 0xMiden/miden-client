@@ -9,6 +9,7 @@ use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -41,7 +42,7 @@ use miden_client::{
     MAX_TX_EXECUTION_CYCLES,
     MIN_TX_EXECUTION_CYCLES,
 };
-use miden_client_cli::CliKeyStore;
+use miden_client_cli::{CliKeyStore, MIDEN_DIR};
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -71,7 +72,7 @@ fn init_without_params() {
 
     // Trying to init twice should result in an error
     let mut init_cmd = cargo_bin_cmd!("miden-client");
-    init_cmd.args(["init"]);
+    init_cmd.args(["init", "--local"]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
@@ -83,6 +84,7 @@ fn init_with_params() {
 
     // Assert the config file contains the specified contents
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();
@@ -93,28 +95,149 @@ fn init_with_params() {
 
     // Trying to init twice should result in an error
     let mut init_cmd = cargo_bin_cmd!("miden-client");
-    init_cmd.args(["init", "--network", "devnet", "--store-path", store_path.to_str().unwrap()]);
+    init_cmd.args([
+        "init",
+        "--local",
+        "--network",
+        "devnet",
+        "--store-path",
+        store_path.to_str().unwrap(),
+    ]);
     init_cmd.current_dir(&temp_dir).assert().failure();
 }
 
 #[test]
+#[serial_test::serial(global_config)]
 fn silent_initialization_uses_default_values() {
+    // Clean up any existing global config first
+    cleanup_global_config();
+
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
-    // Run any command to trigger silent initialization
+    // Run any command to trigger silent initialization (should create global config)
     let mut account_cmd = cargo_bin_cmd!("miden-client");
     account_cmd.args(["account"]);
     account_cmd.current_dir(&temp_dir).assert().success();
 
-    // Read and verify the config file contents
-    let config_path = temp_dir.join("miden-client.toml");
-    let config_content = std::fs::read_to_string(&config_path).unwrap();
+    // Read and verify the global config file contents
+    let global_config_path = dirs::home_dir().unwrap().join(MIDEN_DIR).join("miden-client.toml");
+    let config_content = std::fs::read_to_string(&global_config_path).unwrap();
 
     // Verify default values are used
     assert!(config_content.contains("testnet"), "Should use testnet as default network");
-    assert!(config_content.contains("store.sqlite3"), "Should use default store path");
-    assert!(config_content.contains("keystore"), "Should use default keystore directory");
+    assert!(
+        config_content.contains("store.sqlite3"),
+        "Should use default store path (relative to config file)"
+    );
+    assert!(
+        config_content.contains("keystore"),
+        "Should use default keystore directory (relative to config file)"
+    );
+    // Verify that the paths don't have the .miden prefix in the config
+    // (they're relative to the config file location now)
+    assert!(
+        !config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
+        "Paths should be relative to config file, not include {MIDEN_DIR}/ prefix"
+    );
+
+    // Verify no local config was created
+    let local_config_path = temp_dir.join(MIDEN_DIR).join("miden-client.toml");
+    assert!(
+        !local_config_path.exists(),
+        "Should not create local config during silent initialization"
+    );
+
+    // Clean up
+    cleanup_global_config();
+}
+
+#[test]
+fn miden_directory_structure_creation() {
+    let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    // Run init command to create .miden directory structure
+    let mut init_cmd = cargo_bin_cmd!("miden-client");
+    init_cmd.args(["init", "--local"]);
+    init_cmd.current_dir(&temp_dir).assert().success();
+
+    let miden_dir = temp_dir.join(MIDEN_DIR);
+
+    // Verify .miden directory exists
+    assert!(miden_dir.exists(), ".miden directory should be created");
+    assert!(miden_dir.is_dir(), ".miden should be a directory");
+
+    // Verify expected files that are created during init
+    let config_file = miden_dir.join("miden-client.toml");
+    assert!(config_file.exists(), "config file should be created");
+    assert!(config_file.is_file(), "config should be a file");
+
+    // Verify packages directory is created with template files
+    let packages_dir = miden_dir.join("packages");
+    assert!(packages_dir.exists(), "packages directory should be created");
+    assert!(packages_dir.is_dir(), "packages should be a directory");
+
+    // Check that expected package files exist
+    let basic_wallet_package = packages_dir.join("basic-wallet.masp");
+    assert!(basic_wallet_package.exists(), "basic-wallet package should be created");
+
+    let basic_auth_package = packages_dir.join("auth/basic-auth.masp");
+    assert!(basic_auth_package.exists(), "basic-auth package should be created");
+
+    let ecdsa_auth_package = packages_dir.join("auth/ecdsa-auth.masp");
+    assert!(ecdsa_auth_package.exists(), "ecdsa-auth package should be created");
+
+    let basic_faucet_package = packages_dir.join("basic-fungible-faucet.masp");
+    assert!(basic_faucet_package.exists(), "basic-fungible-faucet package should be created");
+
+    // Verify config file contains correct paths relative to config file location
+    let config_content = std::fs::read_to_string(&config_file).unwrap();
+    assert!(
+        config_content.contains("store.sqlite3"),
+        "Config should reference store path relative to config file"
+    );
+    assert!(
+        config_content.contains("keystore"),
+        "Config should reference keystore path relative to config file"
+    );
+    assert!(
+        config_content.contains("packages"),
+        "Config should reference packages path relative to config file"
+    );
+    assert!(
+        config_content.contains("token_symbol_map.toml"),
+        "Config should reference token symbol map path relative to config file"
+    );
+    // Verify that the paths don't have the .miden prefix (they're relative to config file now)
+    assert!(
+        !config_content.contains(&format!("{MIDEN_DIR}/store.sqlite3")),
+        "Paths should be relative to config file, not include {MIDEN_DIR}/ prefix"
+    );
+
+    // Verify default RPC endpoint is set
+    assert!(
+        config_content.contains("https://rpc.testnet.miden.io"),
+        "Config should have default testnet RPC endpoint"
+    );
+
+    // Test that keystore directory doesn't exist initially (created on demand)
+    let keystore_dir = miden_dir.join("keystore");
+    assert!(!keystore_dir.exists(), "keystore directory should not exist until first use");
+
+    // Test that token symbol map file doesn't exist initially (created on demand)
+    let token_map_file = miden_dir.join("token_symbol_map.toml");
+    assert!(!token_map_file.exists(), "token symbol map should not exist until first use");
+
+    // Test that running any command after init creates keystore directory on-demand
+    let mut account_cmd = cargo_bin_cmd!("miden-client");
+    account_cmd.args(["account"]);
+    account_cmd.current_dir(&temp_dir).assert().success();
+
+    // Now keystore directory should exist
+    let keystore_dir = miden_dir.join("keystore");
+    assert!(keystore_dir.exists(), "keystore directory should be created on first use");
+    assert!(keystore_dir.is_dir(), "keystore should be a directory");
 }
 
 #[test]
@@ -122,19 +245,23 @@ fn silent_initialization_does_not_override_existing_config() {
     let temp_dir = temp_dir().join(format!("cli-test-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir).unwrap();
 
+    // Create the MIDEN_DIR directory and manual configuration file
+    let miden_dir = temp_dir.join(MIDEN_DIR);
+    std::fs::create_dir_all(&miden_dir).unwrap();
+    let config_path = miden_dir.join("miden-client.toml");
     // Manual configuration file
-    let config_path = temp_dir.join("miden-client.toml");
-    let custom_config = r#"
-    store_filepath = "custom-store.sqlite3"
-    secret_keys_directory = "custom-keystore"
-    token_symbol_map_filepath = "custom-tokens.toml"
-    component_template_directory = "custom-templates"
-    package_directory = "packages"
+    let custom_config = format!(
+        r#"
+        store_filepath = "{MIDEN_DIR}/custom-store.sqlite3"
+        secret_keys_directory = "{MIDEN_DIR}/custom-keystore"
+        token_symbol_map_filepath = "{MIDEN_DIR}/custom-tokens.toml"
+        package_directory = "{MIDEN_DIR}/custom-templates"
 
-    [rpc]
-    endpoint = "https://custom-endpoint.com"
-    timeout_ms = 5000
-    "#;
+        [rpc]
+        endpoint = "https://custom-endpoint.com"
+        timeout_ms = 5000
+        "#
+    );
     std::fs::write(&config_path, custom_config).unwrap();
 
     // Run command without explicitly initializing
@@ -187,8 +314,8 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create faucet account
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
 
-    // Create a token symbol mapping file
-    let token_symbol_map_path = temp_dir.join("token_symbol_map.toml");
+    // Create a token symbol mapping file in the MIDEN_DIR directory
+    let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
     let token_symbol_map_content =
         format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
@@ -478,6 +605,7 @@ async fn init_with_devnet() -> Result<()> {
 
     // Check in the config file that the network is devnet
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();
@@ -495,6 +623,7 @@ async fn init_with_testnet() -> Result<()> {
 
     // Check in the config file that the network is testnet
     let mut config_path = temp_dir.clone();
+    config_path.push(MIDEN_DIR);
     config_path.push("miden-client.toml");
     let mut config_file = File::open(config_path).unwrap();
     let mut config_file_str = String::new();
@@ -520,8 +649,13 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
         create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let (account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (account, ..) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
@@ -728,6 +862,7 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     let mut init_cmd = cargo_bin_cmd!("miden-client");
     init_cmd.args([
         "init",
+        "--local", // Use local mode to maintain test isolation
         "--network",
         endpoint.to_string().as_str(),
         "--store-path",
@@ -736,6 +871,22 @@ fn init_cli_with_store_path(store_path: &Path, endpoint: &Endpoint) -> PathBuf {
     init_cmd.current_dir(&temp_dir).assert().success();
 
     temp_dir
+}
+
+/// Helper function to clean up global config for testing
+fn cleanup_global_config() {
+    if let Some(home_dir) = dirs::home_dir() {
+        let global_miden_dir = home_dir.join(MIDEN_DIR);
+        if global_miden_dir.exists() {
+            // Try multiple times in case of file locks
+            for _ in 0..3 {
+                if std::fs::remove_dir_all(&global_miden_dir).is_ok() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
 }
 
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
@@ -938,6 +1089,7 @@ async fn create_rust_client_with_store_path(
             None,
             None,
             None,
+            None,
         )
         .await?,
         keystore,
@@ -994,4 +1146,135 @@ fn exec_parse() {
     ]);
 
     failure_cmd.current_dir(&temp_dir).assert().failure();
+}
+
+// AUTH COMPONENT TESTS
+// ================================================================================================
+
+/// Tests creating an account with the no-auth component.
+#[test]
+fn create_account_with_no_auth() {
+    let temp_dir = init_cli().1;
+
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/no-auth",
+    ]);
+
+    create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests creating an account with the multisig-auth component.
+#[test]
+fn create_account_with_multisig_auth() {
+    let temp_dir = init_cli().1;
+
+    // Create init storage data file for multisig
+    let init_storage_data_toml = r#"
+        approvers = [
+        { key = "0x0000000000000000000000000000000000000000000000000000000000000001", value = "0x0000000000000000000000000000000000000000000000000000000000000001" }
+        ]
+
+        proc_thresholds = [
+        { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "0x00000000000000000000000000000000000000000000000000000000000001" }
+        ]
+
+        [threshold_and_count]
+        threshold=2
+        num_approvers=3
+        "#;
+    let file_path = temp_dir.join("multisig_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
+
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/multisig-auth",
+        "-i",
+        "multisig_init_data.toml",
+    ]);
+
+    create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests creating an account with the acl-auth component.
+#[test]
+fn create_account_with_acl_auth() {
+    let temp_dir = init_cli().1;
+
+    // Create init storage data file for acl-auth with a test public key
+    let init_storage_data_toml = r#"
+        proc_roots = [
+        { key = "0x0000000000000000000000000000000000000000000000000000000000000000", value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
+        ]
+
+        falcon_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        acl_config.num_tracked_procs=1
+        acl_config.allow_unauthorized_output_notes=0
+        acl_config.allow_unauthorized_input_notes=0
+        "#;
+    let file_path = temp_dir.join("acl_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
+
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/acl-auth",
+        "-i",
+        "acl_init_data.toml",
+    ]);
+
+    create_account_cmd.current_dir(&temp_dir).assert().success();
+}
+
+// Tests creating an account with the acl-auth component.
+#[test]
+fn create_account_with_ecdsa_auth() {
+    let temp_dir = init_cli().1;
+
+    // Create init storage data file for ecdsa-auth with a test public key
+    let init_storage_data_toml = r#"
+        ecdsa_pubkey="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "#;
+    let file_path = temp_dir.join("ecdsa_init_data.toml");
+    fs::write(&file_path, init_storage_data_toml).unwrap();
+
+    let mut create_account_cmd = cargo_bin_cmd!("miden-client");
+    create_account_cmd.args([
+        "new-account",
+        "-s",
+        "private",
+        "--account-type",
+        "regular-account-updatable-code",
+        "-p",
+        "basic-wallet",
+        "-p",
+        "auth/ecdsa-auth",
+        "-i",
+        "ecdsa_init_data.toml",
+    ]);
+
+    create_account_cmd.current_dir(&temp_dir).assert().success();
 }

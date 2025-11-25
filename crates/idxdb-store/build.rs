@@ -1,5 +1,21 @@
 use std::process::Command;
 
+fn main() -> Result<(), String> {
+    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed=CODEGEN");
+
+    if let Ok(code_gen_env_var) = std::env::var("CODEGEN")
+        && code_gen_env_var == "1"
+    {
+        // Install deps
+        run_yarn(&[]).map_err(|e| format!("could not install ts dependencies: {e}"))?;
+
+        // Build TS
+        run_yarn(&["build"]).map_err(|e| format!("failed to build typescript: {e}"))?;
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 fn run_yarn(args: &[&str]) -> Result<(), String> {
     let status = Command::new("cmd")
@@ -24,17 +40,5 @@ fn run_yarn(args: &[&str]) -> Result<(), String> {
     if !status.success() {
         return Err(format!("yarn exited with status {status}"));
     }
-    Ok(())
-}
-
-fn main() -> miette::Result<(), String> {
-    println!("cargo::rerun-if-changed=src");
-
-    // Install deps
-    run_yarn(&[]).map_err(|e| format!("could not install ts dependencies: {e}"))?;
-
-    // Build TS
-    run_yarn(&["build"]).map_err(|e| format!("failed to build typescript: {e}"))?;
-
     Ok(())
 }

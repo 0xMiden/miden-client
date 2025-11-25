@@ -40,7 +40,13 @@
 
 ### toPreparedSignature()
 
-> **toPreparedSignature**(): [`Felt`](Felt.md)[]
+> **toPreparedSignature**(`message`): [`Felt`](Felt.md)[]
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
 
 #### Returns
 

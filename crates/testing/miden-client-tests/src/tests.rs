@@ -7,7 +7,12 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::auth::{AuthSecretKey, PublicKeyCommitment};
+use miden_client::auth::{
+    AuthEcdsaK256Keccak,
+    AuthSecretKey,
+    PublicKeyCommitment,
+    RPO_FALCON_SCHEME_ID,
+};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
@@ -68,7 +73,6 @@ use miden_objects::account::{
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
     Note,
@@ -95,7 +99,7 @@ use miden_objects::vm::AdviceInputs;
 use miden_objects::{EMPTY_WORD, Felt, ONE, Word, ZERO};
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
-use rand::{Rng, RngCore};
+use rand::{Rng, RngCore, SeedableRng};
 
 pub mod store;
 mod transaction;
@@ -203,6 +207,37 @@ async fn insert_basic_account() {
 }
 
 #[tokio::test]
+async fn insert_ecdsa_account() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Insert Account
+    let account_insert_result =
+        insert_new_ecdsa_wallet(&mut client, AccountStorageMode::Private, &keystore).await;
+    assert!(account_insert_result.is_ok());
+
+    let account = account_insert_result.unwrap();
+
+    // Fetch Account
+    let fetched_account_data = client.get_account(account.id()).await;
+    assert!(fetched_account_data.is_ok());
+
+    let fetched_account = fetched_account_data.unwrap().unwrap();
+    let fetched_account_seed = fetched_account.seed();
+    let fetched_account: Account = fetched_account.into();
+
+    // Validate header has matching data
+    assert_eq!(account.id(), fetched_account.id());
+    assert_eq!(account.nonce(), fetched_account.nonce());
+    assert_eq!(account.vault(), fetched_account.vault());
+    assert_eq!(account.storage().commitment(), fetched_account.storage().commitment());
+    assert_eq!(account.code().commitment(), fetched_account.code().commitment());
+
+    // Validate seed matches
+    assert_eq!(account.seed(), fetched_account_seed);
+}
+
+#[tokio::test]
 async fn insert_faucet_account() {
     // generate test client with a random store name
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
@@ -210,6 +245,38 @@ async fn insert_faucet_account() {
     // Insert Account
     let account_insert_result =
         insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
+    assert!(account_insert_result.is_ok());
+
+    let account = account_insert_result.unwrap();
+    let account_seed = account.seed().expect("newly built account should always contain a seed");
+
+    // Fetch Account
+    let fetched_account_data = client.get_account(account.id()).await;
+    assert!(fetched_account_data.is_ok());
+
+    let fetched_account = fetched_account_data.unwrap().unwrap();
+    let fetched_account_seed = fetched_account.seed();
+    let fetched_account: Account = fetched_account.into();
+
+    // Validate header has matching data
+    assert_eq!(account.id(), fetched_account.id());
+    assert_eq!(account.nonce(), fetched_account.nonce());
+    assert_eq!(account.vault(), fetched_account.vault());
+    assert_eq!(account.storage(), fetched_account.storage());
+    assert_eq!(account.code().commitment(), fetched_account.code().commitment());
+
+    // Validate seed matches
+    assert_eq!(account_seed, fetched_account_seed.unwrap());
+}
+
+#[tokio::test]
+async fn insert_ecdsa_faucet_account() {
+    // generate test client with a random store name
+    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Insert Account
+    let account_insert_result =
+        insert_new_ecdsa_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore).await;
     assert!(account_insert_result.is_ok());
 
     let account = account_insert_result.unwrap();
@@ -518,9 +585,34 @@ async fn import_note_validation() {
     // generate test client
     let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
 
-    // generate test data
-    let expected_note = rpc_api.get_available_notes()[0].clone();
-    let consumed_note = rpc_api.get_available_notes()[1].clone();
+    // generate deterministic test data
+    let available_notes = rpc_api.get_available_notes();
+    let mut expected_note = None;
+    let mut consumed_note = None;
+
+    for note in &available_notes {
+        let Some(public_note) = note.note() else { continue };
+        let nullifier_consumed = rpc_api
+            .get_nullifier_commit_height(
+                &public_note.nullifier(),
+                note.inclusion_proof().location().block_num(),
+            )
+            .await
+            .unwrap();
+
+        if nullifier_consumed.is_some() {
+            consumed_note = Some(note.clone());
+        } else if expected_note.is_none() {
+            expected_note = Some(note.clone());
+        }
+
+        if consumed_note.is_some() && expected_note.is_some() {
+            break;
+        }
+    }
+
+    let expected_note = expected_note.expect("expected to find at least one unconsumed note");
+    let consumed_note = consumed_note.expect("expected to find at least one consumed note");
 
     client
         .import_note(NoteFile::NoteWithProof(
@@ -849,9 +941,14 @@ async fn p2id_transfer() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -961,9 +1058,14 @@ async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1001,13 +1103,19 @@ async fn p2id_transfer_failing_not_enough_balance() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn p2ide_transfer_consumed_by_target() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1089,13 +1197,11 @@ async fn p2ide_transfer_consumed_by_target() {
     client.sync_state().await.unwrap();
 
     // Check that note is committed for the second account to consume
-    println!("Fetching Committed Notes...");
     let notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(!notes.is_empty());
 
     // Make the `to_account_id` consume P2IDE note
     let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
-    println!("Consuming Note...");
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note_id]).unwrap();
     Box::pin(client.submit_new_transaction(to_account_id, tx_request))
         .await
@@ -1134,9 +1240,14 @@ async fn p2ide_transfer_consumed_by_sender() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1241,9 +1352,14 @@ async fn p2ide_timelocked() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1316,9 +1432,14 @@ async fn get_consumable_notes() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (first_regular_account, second_regular_account, faucet_account_header) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
 
     let from_account_id = first_regular_account.id();
     let to_account_id = second_regular_account.id();
@@ -1417,10 +1538,14 @@ async fn get_consumable_notes() {
 async fn get_output_notes() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
     let _ = client.sync_state().await.unwrap();
-    let (first_regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (first_regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let from_account_id = first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1486,10 +1611,14 @@ async fn account_rollback() {
 
     client.sync_state().await.unwrap();
 
-    let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1581,10 +1710,14 @@ async fn account_rollback() {
 async fn subsequent_discarded_transactions() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (regular_account, faucet_account_header) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Public, &keystore)
-            .await
-            .unwrap();
+    let (regular_account, faucet_account_header) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let account_id = regular_account.id();
     let faucet_account_id = faucet_account_header.id();
@@ -1719,10 +1852,14 @@ async fn missing_recipient_digest() {
 async fn input_note_checks() {
     let (mut client, mock_rpc_api, authenticator) = create_test_client().await;
 
-    let (wallet, faucet) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await
-            .unwrap();
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let mut mint_notes = vec![];
 
@@ -1820,10 +1957,14 @@ async fn swap_chain_test() {
     // Generate a few account pairs with a fungible asset that can be used for swaps.
     let mut account_pairs = vec![];
     for _ in 0..3 {
-        let (wallet, faucet) =
-            setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-                .await
-                .unwrap();
+        let (wallet, faucet) = setup_wallet_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &keystore,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
         mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Private).await;
         mock_rpc_api.prove_block();
         client.sync_state().await.unwrap();
@@ -1909,10 +2050,10 @@ async fn empty_storage_map() {
     .unwrap()
     .with_supports_all_types();
 
-    let key_pair = SecretKey::new();
+    let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -1920,7 +2061,7 @@ async fn empty_storage_map() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(component)
         .build()
@@ -1998,10 +2139,10 @@ async fn storage_and_vault_proofs() {
         )
         .unwrap();
 
-    let key_pair = SecretKey::new();
+    let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone())).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -2009,7 +2150,7 @@ async fn storage_and_vault_proofs() {
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build()
@@ -2164,10 +2305,14 @@ async fn account_add_address_after_creation() {
 async fn consume_note_with_custom_script() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (sender_account, receiver_account, faucet_account) =
-        setup_two_wallets_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-            .await
-            .unwrap();
+    let (sender_account, receiver_account, faucet_account) = setup_two_wallets_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let sender_id = sender_account.id();
     let receiver_id = receiver_account.id();
@@ -2349,10 +2494,10 @@ async fn insert_new_wallet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<Account, ClientError> {
-    let key_pair = SecretKey::with_rng(&mut client.rng());
+    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -2360,7 +2505,33 @@ async fn insert_new_wallet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
+        .with_component(BasicWallet)
+        .build()
+        .unwrap();
+
+    client.add_account(&account, false).await?;
+
+    Ok(account)
+}
+
+async fn insert_new_ecdsa_wallet(
+    client: &mut TestClient,
+    storage_mode: AccountStorageMode,
+    keystore: &FilesystemKeyStore<StdRng>,
+) -> Result<Account, ClientError> {
+    let init_seed = [0u8; 32];
+    let mut rng = StdRng::from_seed(init_seed);
+
+    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&key_pair).unwrap();
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -2375,10 +2546,10 @@ async fn insert_new_fungible_faucet(
     storage_mode: AccountStorageMode,
     keystore: &FilesystemKeyStore<StdRng>,
 ) -> Result<Account, ClientError> {
-    let key_pair = SecretKey::with_rng(client.rng());
+    let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(key_pair)).unwrap();
+    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2391,11 +2562,163 @@ async fn insert_new_fungible_faucet(
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
+}
+
+async fn insert_new_ecdsa_fungible_faucet(
+    client: &mut TestClient,
+    storage_mode: AccountStorageMode,
+    keystore: &FilesystemKeyStore<StdRng>,
+) -> Result<Account, ClientError> {
+    let init_seed = [0u8; 32];
+    let mut rng = StdRng::from_seed(init_seed);
+
+    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&key_pair).unwrap();
+
+    // we need to use an initial seed to create the wallet account
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("TEST").unwrap();
+    let max_supply = Felt::try_from(9_999_999_u64.to_le_bytes().as_slice())
+        .expect("u64 can be safely converted to a field element");
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(storage_mode)
+        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
+        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .build()
+        .unwrap();
+
+    client.add_account(&account, false).await?;
+    Ok(account)
+}
+
+#[tokio::test]
+async fn storage_and_vault_proofs_ecdsa() {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    // Create an account that will accept assets (basic wallet) but also that has a storage map that
+    // can be updated.
+    let mut storage_map = StorageMap::new();
+    storage_map
+        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
+        .unwrap();
+
+    let bump_item_component = AccountComponent::compile(
+        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        TransactionKernel::assembler(),
+        vec![StorageSlot::Map(storage_map)],
+    )
+    .unwrap()
+    .with_supports_all_types();
+
+    // Build script that bumps the storage map item and adds a new one each time.
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            LibraryPath::new("external_contract::bump_item_contract").unwrap(),
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+            &source_manager,
+        )
+        .unwrap();
+    let library = assembler.clone().assemble_library([module]).unwrap();
+    let tx_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_tx_script(
+            "use.external_contract::bump_item_contract
+            begin
+                call.bump_item_contract::bump_map_item
+            end",
+        )
+        .unwrap();
+
+    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
+    let pub_key = key_pair.public_key();
+
+    keystore.add_key(&key_pair).unwrap();
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let account = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthEcdsaK256Keccak::new(pub_key.to_commitment()))
+        .with_component(BasicWallet)
+        .with_component(bump_item_component)
+        .build()
+        .unwrap();
+
+    client.add_account(&account, false).await.unwrap();
+
+    let account_id = account.id();
+
+    // Add assets and modify storage map multiple times
+    for _ in 0..5 {
+        let faucet_account =
+            insert_new_ecdsa_fungible_faucet(&mut client, AccountStorageMode::Public, &keystore)
+                .await
+                .unwrap();
+
+        let faucet_account_id = faucet_account.id();
+
+        mint_and_consume(&mut client, account_id, faucet_account_id, NoteType::Private).await;
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        let tx_request = TransactionRequestBuilder::new()
+            .custom_script(tx_script.clone())
+            .build()
+            .unwrap();
+        Box::pin(client.submit_new_transaction(account_id, tx_request)).await.unwrap();
+        mock_rpc_api.prove_block();
+        client.sync_state().await.unwrap();
+
+        // Check that retrieved vault and storage match with the account.
+        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+
+        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let vault = client.test_store().get_account_vault(account_id).await.unwrap();
+
+        assert_eq!(account.storage().commitment(), storage.commitment());
+        assert_eq!(account.vault().root(), vault.root());
+
+        // Check that specific asset proof matches the one in the vault
+        let (asset, witness) = client
+            .test_store()
+            .get_account_asset(account_id, faucet_account_id.prefix())
+            .await
+            .unwrap()
+            .unwrap();
+
+        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
+        assert_eq!(witness, expected_witness);
+
+        // Check that specific map item proof matches the one in the storage
+        let (value, proof) = client
+            .test_store()
+            .get_account_map_item(account_id, 1, MAP_KEY.into())
+            .await
+            .unwrap();
+
+        let StorageSlot::Map(map) = storage.slots().get(1).unwrap() else {
+            panic!("Expected a map storage slot");
+        };
+
+        assert_eq!(value, map.get(&MAP_KEY.into()));
+        assert_eq!(proof, map.open(&MAP_KEY.into()));
+    }
 }

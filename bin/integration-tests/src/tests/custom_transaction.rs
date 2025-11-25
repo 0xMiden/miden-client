@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::FungibleAsset;
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, RpoRandomCoin};
 use miden_client::note::{
     Note,
@@ -59,12 +60,21 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (regular_account, _) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (fungible_faucet, _) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await?;
+    let (fungible_faucet, _) = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     // Execute mint transaction in order to create custom note
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await?;
@@ -156,13 +166,21 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator).await?;
+    let (regular_account, _) = insert_new_wallet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
-    let (fungible_faucet, _) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator)
-            .await?;
-
+    let (fungible_faucet, _) = insert_new_fungible_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     // Execute mint transaction in order to increase nonce
     let note = mint_custom_note(&mut client, fungible_faucet.id(), regular_account.id()).await?;
     client.sync_state().await?;
@@ -251,10 +269,20 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     wait_for_node(&mut client_3).await;
 
     // Create accounts
-    let (basic_account_1, ..) =
-        insert_new_wallet(&mut client_1, AccountStorageMode::Private, &keystore_1).await?;
-
-    insert_new_wallet(&mut client_2, AccountStorageMode::Private, &keystore_2).await?;
+    let (basic_account_1, ..) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Private,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    insert_new_wallet(
+        &mut client_2,
+        AccountStorageMode::Private,
+        &keystore_2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
 
     client_1.sync_state().await?;
     client_2.sync_state().await?;

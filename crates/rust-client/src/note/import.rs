@@ -144,7 +144,7 @@ where
     ///
     /// If the note isn't consumed and it was committed in the past relative to the client, then
     /// the MMR for the relevant block is fetched from the node and stored.
-    async fn import_note_record_by_proof(
+    pub(crate) async fn import_note_record_by_proof(
         &self,
         previous_note: Option<InputNoteRecord>,
         note: Note,

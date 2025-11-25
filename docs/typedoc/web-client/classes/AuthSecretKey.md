@@ -28,6 +28,26 @@
 
 ***
 
+### getEcdsaK256KeccakPublicKeyAsWord()
+
+> **getEcdsaK256KeccakPublicKeyAsWord**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### getEcdsaK256KeccakSecretKeyAsFelts()
+
+> **getEcdsaK256KeccakSecretKeyAsFelts**(): [`Felt`](Felt.md)[]
+
+#### Returns
+
+[`Felt`](Felt.md)[]
+
+***
+
 ### getRpoFalcon512PublicKeyAsWord()
 
 > **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word.md)
