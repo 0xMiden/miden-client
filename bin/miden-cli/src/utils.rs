@@ -2,9 +2,22 @@ use std::path::{Path, PathBuf};
 
 use figment::Figment;
 use figment::providers::{Format, Toml};
-use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
+use miden_client::asset::Asset;
+use miden_client::note::{
+    Note,
+    NoteAssets,
+    NoteError,
+    NoteExecutionHint,
+    NoteInputs,
+    NoteMetadata,
+    NoteRecipient,
+    NoteTag,
+    NoteType as MidenNoteType,
+    WellKnownNote,
+};
+use miden_client::{Client, Felt, Word};
 
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
@@ -147,4 +160,26 @@ fn resolve_relative_path(path: &mut PathBuf, base_dir: &Path) {
     if path.is_relative() {
         *path = base_dir.join(&*path);
     }
+}
+
+/// Creates a P2ID note with an exact serial number.
+/// This is needed when minting from a network faucet, as the produced P2ID note is private.
+pub fn create_p2id_note_exact(
+    sender: AccountId,
+    target: AccountId,
+    assets: Vec<Asset>,
+    note_type: MidenNoteType,
+    aux: Felt,
+    serial_num: Word,
+) -> Result<Note, NoteError> {
+    let note_script = WellKnownNote::P2ID.script();
+    let note_inputs = NoteInputs::new(vec![target.suffix(), target.prefix().as_felt()])?;
+    let recipient = NoteRecipient::new(serial_num, note_script, note_inputs);
+
+    let tag = NoteTag::from_account_id(target);
+
+    let metadata = NoteMetadata::new(sender, note_type, tag, NoteExecutionHint::always(), aux)?;
+    let vault = NoteAssets::new(assets)?;
+
+    Ok(Note::new(vault, metadata, recipient))
 }

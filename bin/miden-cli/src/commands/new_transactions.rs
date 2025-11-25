@@ -1,43 +1,40 @@
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 
 use clap::{Parser, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
+use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
+use miden_client::crypto::FeltRng;
 use miden_client::note::{
     BlockNumber,
-    Note,
-    NoteAssets,
-    NoteError,
-    NoteExecutionHint,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
     NoteTag,
     NoteType as MidenNoteType,
-    WellKnownNote,
     build_swap_tag,
     create_mint_note,
     get_input_note_with_id_prefix,
 };
-use miden_client::store::NoteRecordError;
+use miden_client::store::{NoteRecordError, TransactionFilter};
 use miden_client::transaction::{
     ExecutedTransaction,
     InputNote,
     OutputNote,
     PaymentNoteDescription,
     SwapTransactionData,
+    TransactionId,
     TransactionRequest,
     TransactionRequestBuilder,
+    TransactionStatus,
 };
-use miden_client::{Client, Felt, RemoteTransactionProver, Word};
+use miden_client::{Client, Felt, RemoteTransactionProver};
 use tracing::info;
 
 use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
+    create_p2id_note_exact,
     get_input_acc_id_by_prefix_or_default,
     load_config_file,
     load_faucet_details_map,
@@ -59,6 +56,11 @@ impl From<&NoteType> for MidenNoteType {
     }
 }
 
+// Storage slot index used by faucet accounts to store the owner word.
+const FAUCET_OWNER_STORAGE_SLOT: u8 = 2;
+/// Arbitrary aux field value for faucet-mint note metadata to keep creation deterministic.
+const NETWORK_FAUCET_AUX_VALUE: u64 = 27;
+
 /// Mint tokens from a fungible faucet to a wallet.
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
@@ -66,7 +68,7 @@ pub struct MintCmd {
     #[arg(short = 'a', long = "amount")]
     amount: u64,
 
-    /// Target account ID or its hex prefix for the minted tokens.If none is provided, the default
+    /// Target account ID or its hex prefix for the minted tokens. If none is provided, the default
     /// account's ID is used instead.
     #[arg(short = 't', long = "target")]
     target_account_id: Option<String>,
@@ -76,12 +78,19 @@ pub struct MintCmd {
     #[arg(
         short = 'f',
         long = "faucet",
-        help = "Network Faucet account ID to mint the tokens from. Has to be set when new-faucet flag is not set."
+        help = "Network Faucet account ID to mint the tokens from. Has to be set when new-faucet flag is not set.",
+        conflicts_with_all = ["new_faucet", "asset"],
+        required_unless_present = "new_faucet"
     )]
     faucet_account_id: Option<String>,
 
     /// Asset to be minted. This flag has to be set when using the `new_faucet` flag.
-    #[arg(long = "asset", help=format!("Asset to be minted. Has to be set when minting from a new faucet.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    #[arg(
+        long = "asset",
+        help = format!("Asset to be minted. Has to be set when minting from a new faucet.\n{SHARED_TOKEN_DOCUMENTATION}"),
+        conflicts_with = "faucet_account_id",
+        requires = "new_faucet"
+    )]
     asset: Option<String>,
 
     /// Note type to be used for the P2ID note (both network and new faucet mint flows). If not
@@ -120,37 +129,15 @@ impl MintCmd {
             self.mint_using_new_faucet(force, target_account_id, note_type, &mut client)
                 .await
         } else {
-            self.mint_using_network_faucet(force, target_account_id, note_type, &mut client)
-                .await
+            self.mint_using_network_faucet(force, target_account_id, &mut client).await
         }
-    }
-
-    /// Generates a P2ID note - Pay-to-ID note with an exact serial number
-    fn create_p2id_note_exact(
-        sender: AccountId,
-        target: AccountId,
-        assets: Vec<Asset>,
-        note_type: MidenNoteType,
-        aux: Felt,
-        serial_num: Word,
-    ) -> Result<Note, NoteError> {
-        let note_script = WellKnownNote::P2ID.script();
-        let note_inputs = NoteInputs::new(vec![target.suffix(), target.prefix().as_felt()])?;
-        let recipient = NoteRecipient::new(serial_num, note_script, note_inputs);
-
-        let tag = NoteTag::from_account_id(target);
-
-        let metadata = NoteMetadata::new(sender, note_type, tag, NoteExecutionHint::always(), aux)?;
-        let vault = NoteAssets::new(assets)?;
-
-        Ok(Note::new(vault, metadata, recipient))
     }
 
     async fn mint_using_network_faucet<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         force: bool,
         target_account_id: AccountId,
-        note_type: NoteType,
+        // note_type: NoteType,
         client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
         let faucet_account_id = self.faucet_account_id.as_ref().ok_or(CliError::Input(
@@ -158,23 +145,39 @@ impl MintCmd {
         ))?;
         let faucet_account_id = parse_account_id(client, faucet_account_id).await?;
 
-        let faucet = client.get_account(faucet_account_id).await.unwrap().unwrap();
-        let stored_owner_word = faucet.account().storage().get_item(2).unwrap();
+        let faucet = client
+            .get_account(faucet_account_id)
+            .await
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to fetch faucet account".to_string())
+            })?
+            .ok_or_else(|| {
+                CliError::Input(format!("Faucet account {faucet_account_id} was not found"))
+            })?;
+        let stored_owner_word =
+            faucet.account().storage().get_item(FAUCET_OWNER_STORAGE_SLOT).map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to read faucet owner from storage".to_string(),
+                )
+            })?;
         let stored_owner_id =
             AccountId::new_unchecked([stored_owner_word[3], stored_owner_word[2]]);
 
         // Compute the output P2ID note
         let amount = self.amount;
-        let mint_asset = FungibleAsset::new(faucet_account_id, amount).unwrap().into();
-        let aux = Felt::new(27);
-        let serial_num = Word::default();
+        let mint_asset =
+            FungibleAsset::new(faucet_account_id, amount).map_err(CliError::Asset)?.into();
+        let aux = Felt::new(NETWORK_FAUCET_AUX_VALUE);
+        let serial_num = client.rng().draw_word();
 
         let output_note_tag = NoteTag::from_account_id(target_account_id);
-        let p2id_mint_output_note = Self::create_p2id_note_exact(
+        let p2id_mint_output_note = create_p2id_note_exact(
             faucet_account_id,
             target_account_id,
             vec![mint_asset],
-            (&note_type).into(),
+            MidenNoteType::Private, /* TODO: implement note type flag here once public notes are
+                                     * supported for network faucets */
             aux,
             serial_num,
         )
@@ -207,7 +210,7 @@ impl MintCmd {
         println!("Publishing mint transaction request...");
 
         // Execute the mint transaction
-        execute_transaction(
+        let mint_transaction_id = execute_transaction(
             client,
             target_account_id,
             mint_transaction_request,
@@ -220,8 +223,7 @@ impl MintCmd {
             "Mint transaction request published, waiting for network transaction to be processed..."
         );
 
-        // wait for 15 seconds in order for the network TX to be processed
-        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+        wait_for_transaction(client, mint_transaction_id).await?;
 
         // Craft transaction to consume the newly created P2ID note
         let consume_p2id_note_transaction_request = TransactionRequestBuilder::new()
@@ -237,7 +239,7 @@ impl MintCmd {
         println!("Publishing consume P2ID note transaction request...");
 
         // Execute the consume P2ID note transaction
-        execute_transaction(
+        let _consume_p2id_transaction_id = execute_transaction(
             client,
             target_account_id,
             consume_p2id_note_transaction_request,
@@ -288,6 +290,7 @@ impl MintCmd {
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
 }
 
@@ -374,6 +377,7 @@ impl SendCmd {
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
 }
 
@@ -452,7 +456,8 @@ impl SwapCmd {
             force,
             self.delegate_proving,
         )
-        .await?;
+        .await
+        .map(|_| ())?;
 
         let payback_note_tag: u32 = build_swap_tag(
             (&self.note_type).into(),
@@ -555,6 +560,7 @@ impl ConsumeNotesCmd {
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
 }
 
@@ -567,7 +573,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     transaction_request: TransactionRequest,
     force: bool,
     delegated_proving: bool,
-) -> Result<(), CliError> {
+) -> Result<TransactionId, CliError> {
     println!("Executing transaction...");
     let transaction_result = client.execute_transaction(account_id, transaction_request).await?;
 
@@ -584,7 +590,11 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
 
         if proceed_str.trim().to_lowercase() != "y" {
             println!("Transaction was cancelled.");
-            return Ok(());
+            return Err(CliError::Transaction(
+                std::io::Error::new(std::io::ErrorKind::Interrupted, "transaction cancelled")
+                    .into(),
+                "Transaction was cancelled by user".to_string(),
+            ));
         }
     }
 
@@ -632,7 +642,53 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         }
     }
 
-    Ok(())
+    Ok(transaction_id)
+}
+
+/// Waits for a transaction to be committed by the network.
+async fn wait_for_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
+    transaction_id: TransactionId,
+) -> Result<(), CliError> {
+    loop {
+        client.sync_state().await?;
+
+        let tracked_transaction = client
+            .get_transactions(TransactionFilter::Ids(vec![transaction_id]))
+            .await
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to fetch transaction status while waiting for commitment".to_string(),
+                )
+            })?
+            .pop()
+            .ok_or_else(|| {
+                CliError::Input(format!(
+                    "Transaction with ID {transaction_id} not found while waiting for commitment"
+                ))
+            })?;
+
+        match tracked_transaction.status {
+            TransactionStatus::Committed { block_number, .. } => {
+                println!("Transaction committed at block {block_number}.");
+                return Ok(());
+            },
+            TransactionStatus::Pending => {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            },
+            TransactionStatus::Discarded(cause) => {
+                return Err(CliError::Transaction(
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Transaction was discarded with cause: {cause:?}"),
+                    )
+                    .into(),
+                    "Transaction was discarded while waiting for commitment".to_string(),
+                ));
+            },
+        }
+    }
 }
 
 fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
