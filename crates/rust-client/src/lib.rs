@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //! A no_std-compatible client library for interacting with the Miden network.
 //!
 //! This crate provides a lightweight client that handles connections to the Miden node, manages
