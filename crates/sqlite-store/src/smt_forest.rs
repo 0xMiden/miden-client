@@ -70,11 +70,9 @@ pub fn update_storage_map_nodes(
     root: Word,
     entries: impl Iterator<Item = (Word, Word)> + Clone,
 ) -> Result<Word, StoreError> {
-    println!("In update storage map nodes");
     smt_forest.pop_smts([root]);
     let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
     let new_root = smt_forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
-    println!("Funciono!");
     Ok(new_root)
 }
 
