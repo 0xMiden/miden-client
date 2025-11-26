@@ -226,5 +226,8 @@ async fn run_flow(
         assert!(notes.is_empty(), "recipient should still have 0 input notes");
     }
 
+    let consumable_notes = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
+    assert_eq!(consumable_notes.len(), 1, "recipient should have 1 consumable note");
+
     Ok(())
 }
