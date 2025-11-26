@@ -28,9 +28,21 @@
 
 ***
 
+### getPublicKeyAsWord()
+
+> **getPublicKeyAsWord**(): [`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
 ### getEcdsaK256KeccakPublicKeyAsWord()
 
 > **getEcdsaK256KeccakPublicKeyAsWord**(): [`Word`](Word.md)
+
+> _Deprecated_: Use `getPublicKeyAsWord()` instead.
 
 #### Returns
 
@@ -51,6 +63,8 @@
 ### getRpoFalcon512PublicKeyAsWord()
 
 > **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word.md)
+
+> _Deprecated_: Use `getPublicKeyAsWord()` instead.
 
 #### Returns
 

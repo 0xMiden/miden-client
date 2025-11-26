@@ -12,14 +12,21 @@ pub struct AuthSecretKey(NativeAuthSecretKey);
 
 #[wasm_bindgen]
 impl AuthSecretKey {
+    fn public_key_commitment(&self) -> NativeWord {
+        match &self.0 {
+            NativeAuthSecretKey::RpoFalcon512(key) => key.public_key().to_commitment(),
+            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key().to_commitment(),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "getPublicKeyAsWord")]
+    pub fn get_public_key_as_word(&self) -> Word {
+        self.public_key_commitment().into()
+    }
+
     #[wasm_bindgen(js_name = "getRpoFalcon512PublicKeyAsWord")]
     pub fn get_rpo_falcon_512_public_key_as_word(&self) -> Word {
-        let public_key = match &self.0 {
-            NativeAuthSecretKey::RpoFalcon512(key) => key.public_key(),
-            _ => todo!(), // TODO: what to do with other cases
-        };
-        let public_key_as_native_word: NativeWord = public_key.to_commitment();
-        public_key_as_native_word.into()
+        self.get_public_key_as_word()
     }
 
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
@@ -39,12 +46,7 @@ impl AuthSecretKey {
 
     #[wasm_bindgen(js_name = "getEcdsaK256KeccakPublicKeyAsWord")]
     pub fn get_ecdsa_k256_keccak_public_key_as_word(&self) -> Word {
-        let public_key = match &self.0 {
-            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key(),
-            _ => todo!(), // TODO: what to do with other cases
-        };
-        let public_key_as_native_word: NativeWord = public_key.to_commitment();
-        public_key_as_native_word.into()
+        self.get_public_key_as_word()
     }
 
     #[wasm_bindgen(js_name = "getEcdsaK256KeccakSecretKeyAsFelts")]
