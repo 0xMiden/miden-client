@@ -1,9 +1,12 @@
 # Changelog
 
+## 0.13.0 (TBD)
+
+* [BREAKING] Typed the `auth_scheme` plumbing across the Rust client ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
+
 ## 0.12.4 (TBD)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
-* Updated the web client's AuthScheme bindings to mirror the enum defined in `miden-base` while keeping the current JS API stable ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
