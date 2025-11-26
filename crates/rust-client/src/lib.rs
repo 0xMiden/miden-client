@@ -195,17 +195,19 @@ pub mod asset {
 /// Provides authentication-related types and functionalities for the Miden
 /// network.
 pub mod auth {
-    pub const RPO_FALCON_SCHEME_ID: u8 = 0;
-    pub const ECDSA_K256_KECCAK_SCHEME_ID: u8 = 1;
     pub use miden_lib::AuthScheme;
     pub use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
     pub use miden_objects::account::auth::{
+        AuthScheme as AuthSchemeId,
         AuthSecretKey,
         PublicKey,
         PublicKeyCommitment,
         Signature,
     };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
+    pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
 /// Provides types for working with blocks within the Miden network.
