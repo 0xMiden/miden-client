@@ -73,6 +73,35 @@ impl FaucetDetailsMap {
         self.get_token_symbol(faucet_id).unwrap_or("Unknown".to_string())
     }
 
+    /// Returns the faucet ID and decimals for a given token symbol.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token symbol is not found in the map.
+    pub fn get_faucet_details(&self, symbol: &str) -> Result<(&str, u8), CliError> {
+        let details = self.0.get(symbol).ok_or(CliError::Config(
+            "Token symbol not found in the map file".to_string().into(),
+            symbol.to_string(),
+        ))?;
+        Ok((details.id.as_str(), details.decimals))
+    }
+
+    /// Returns the faucet account ID for a given token symbol.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The token symbol is not found in the map.
+    /// - The faucet ID cannot be parsed.
+    pub async fn get_faucet_id<AUTH>(
+        &self,
+        client: &Client<AUTH>,
+        symbol: &str,
+    ) -> Result<AccountId, CliError> {
+        let (id, _) = self.get_faucet_details(symbol)?;
+        parse_account_id(client, id).await
+    }
+
     /// Parses a string representing a [`FungibleAsset`]. There are two accepted formats for the
     /// string:
     /// - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units and `<FAUCET_ID>` is

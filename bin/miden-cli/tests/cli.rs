@@ -325,16 +325,20 @@ async fn token_symbol_mapping() -> Result<()> {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
         "mint",
+        "--new-faucet",
         "--target",
         AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex().as_str(),
-        "--asset",
-        "0.00001::BTC",
+        "--symbol",
+        "BTC",
+        "--amount",
+        "100000",
         "-n",
         "private",
         "--force",
     ]);
 
     let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    println!("Mint output: {:?}", output);
     assert!(output.status.success());
 
     let note_id = String::from_utf8(output.stdout)
@@ -928,18 +932,20 @@ fn mint_cli_using_new_faucet(cli_path: &Path, target_account_id: &str, faucet_id
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
         "mint",
+        "--new-faucet",
         "--target",
         target_account_id,
-        "--new-faucet",
-        "true",
-        "--asset",
-        &format!("100::{faucet_id}"),
+        "--amount",
+        "100000",
+        "--faucet",
+        faucet_id,
         "-n",
         "private",
         "--force",
     ]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
+    println!("Mint output: {:?}", output);
     assert!(output.status.success());
 
     String::from_utf8(output.stdout)

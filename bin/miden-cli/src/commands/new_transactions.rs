@@ -65,7 +65,7 @@ const NETWORK_FAUCET_AUX_VALUE: u64 = 27;
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
     /// Amount to be minted.
-    #[arg(short = 'a', long = "amount")]
+    #[arg(short = 'a', long = "amount", help = "Amount to be minted from the faucet.")]
     amount: u64,
 
     /// Target account ID or its hex prefix for the minted tokens. If none is provided, the default
@@ -73,29 +73,27 @@ pub struct MintCmd {
     #[arg(short = 't', long = "target")]
     target_account_id: Option<String>,
 
-    /// Faucet account ID or its hex prefix. This flag is only used if the `new_faucet` flag is not
-    /// set.
+    /// Faucet account ID or its hex prefix. This flag is required when minting from a network
+    /// faucet. When using --new-faucet, either this or --symbol must be provided.
     #[arg(
         short = 'f',
         long = "faucet",
-        help = "Network Faucet account ID to mint the tokens from. Has to be set when new-faucet flag is not set.",
-        conflicts_with_all = ["new_faucet", "asset"],
-        required_unless_present = "new_faucet"
+        help = "Faucet account ID to mint the tokens from. Required when not using --new-faucet or when using --new-faucet without --symbol.",
+        conflicts_with = "symbol"
     )]
     faucet_account_id: Option<String>,
 
-    /// Asset to be minted. This flag has to be set when using the `new_faucet` flag.
+    /// Asset symbol to look up faucet details. Can only be used with --new-faucet flag.
     #[arg(
-        long = "asset",
-        help = format!("Asset to be minted. Has to be set when minting from a new faucet.\n{SHARED_TOKEN_DOCUMENTATION}"),
-        conflicts_with = "faucet_account_id",
-        requires = "new_faucet"
+        long = "symbol",
+        help = format!("Symbol to be used to look up faucet ID from the token symbol map. Can only be used with --new-faucet.\n{SHARED_TOKEN_DOCUMENTATION}"),
+        conflicts_with = "faucet_account_id"
     )]
-    asset: Option<String>,
+    symbol: Option<String>,
 
     /// Note type to be used for the P2ID note (both network and new faucet mint flows). If not
     /// set, the default note type is a private note.
-    #[arg(short, long, value_enum)]
+    #[arg(short = 'n', long, value_enum)]
     note_type: Option<NoteType>,
 
     /// Flag to create a new faucet account to mint the tokens from.
@@ -120,6 +118,21 @@ impl MintCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
+        // Validate input combinations
+        if !self.new_faucet && self.faucet_account_id.is_none() {
+            return Err(CliError::Input(
+                "When not using --new-faucet, --faucet must be provided".to_string(),
+            ));
+        }
+        if !self.new_faucet && self.symbol.is_some() {
+            return Err(CliError::Input("--symbol can only be used with --new-faucet".to_string()));
+        }
+        if self.new_faucet && self.symbol.is_none() && self.faucet_account_id.is_none() {
+            return Err(CliError::Input(
+                "When using --new-faucet, either --symbol or --faucet must be provided".to_string(),
+            ));
+        }
+
         let force = self.force;
         let note_type = self.note_type.unwrap_or(NoteType::Private);
         let target_account_id =
@@ -137,6 +150,7 @@ impl MintCmd {
         &self,
         force: bool,
         target_account_id: AccountId,
+        // TODO: implement note type flag here once public notes are supported for network faucets
         // note_type: NoteType,
         client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -176,8 +190,9 @@ impl MintCmd {
             faucet_account_id,
             target_account_id,
             vec![mint_asset],
-            MidenNoteType::Private, /* TODO: implement note type flag here once public notes are
-                                     * supported for network faucets */
+            // TODO: implement note type flag here once public notes are supported for network
+            // faucets
+            MidenNoteType::Private,
             aux,
             serial_num,
         )
@@ -207,23 +222,24 @@ impl MintCmd {
                 CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
             })?;
 
-        println!("Publishing mint transaction request...");
+        println!("Publishing mint transaction to network...");
 
         // Execute the mint transaction
         let mint_transaction_id = execute_transaction(
             client,
-            target_account_id,
+            stored_owner_id,
             mint_transaction_request,
             force,
             self.delegate_proving,
         )
         .await?;
 
-        println!(
-            "Mint transaction request published, waiting for network transaction to be processed..."
-        );
+        println!("Mint transaction published, waiting for transaction to be processed...");
 
+        // Wait for MINT network transaction to be processed
         wait_for_transaction(client, mint_transaction_id).await?;
+
+        println!("Mint transaction processed, consuming P2ID note...");
 
         // Craft transaction to consume the newly created P2ID note
         let consume_p2id_note_transaction_request = TransactionRequestBuilder::new()
@@ -236,10 +252,10 @@ impl MintCmd {
                 )
             })?;
 
-        println!("Publishing consume P2ID note transaction request...");
+        println!("Publishing consume P2ID note consumption transaction...");
 
         // Execute the consume P2ID note transaction
-        let _consume_p2id_transaction_id = execute_transaction(
+        let consume_p2id_note_transaction_id = execute_transaction(
             client,
             target_account_id,
             consume_p2id_note_transaction_request,
@@ -249,9 +265,20 @@ impl MintCmd {
         .await?;
 
         println!(
-            "Consumed P2ID note. {:?} tokens have been added to your wallet!",
-            amount.to_string()
+            "Consume P2ID note consumption transaction published, waiting for transaction to be processed..."
         );
+
+        // Wait for CONSUME P2ID note consumption transaction to be processed
+        wait_for_transaction(client, consume_p2id_note_transaction_id).await?;
+
+        // Get updated asset balance
+        client.sync_state().await?;
+        let target_account = client.get_account(target_account_id).await?.ok_or_else(|| {
+            CliError::Input(format!("Target account {target_account_id} was not found"))
+        })?;
+        let asset_balance = target_account.account().vault().get_balance(faucet_account_id);
+
+        println!("Tokens have been minted successfully. New token balance: {:?}", asset_balance);
 
         Ok(())
     }
@@ -263,13 +290,22 @@ impl MintCmd {
         note_type: NoteType,
         client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
-        let faucet_details_map = load_faucet_details_map()?;
+        // Determine the faucet account ID either from symbol or direct faucet ID
+        let faucet_account_id = if let Some(symbol) = &self.symbol {
+            // Use symbol to look up the faucet ID from the map
+            let faucet_details_map = load_faucet_details_map()?;
+            faucet_details_map.get_faucet_id(client, symbol).await?
+        } else if let Some(faucet_id_str) = &self.faucet_account_id {
+            // Directly parse the provided faucet account ID
+            parse_account_id(client, faucet_id_str).await?
+        } else {
+            return Err(CliError::Input(
+                "Either --symbol or --faucet must be provided when using --new-faucet".to_string(),
+            ));
+        };
 
-        let asset = self
-            .asset
-            .as_ref()
-            .ok_or(CliError::Input("Asset is required when using --new-faucet flag".to_string()))?;
-        let fungible_asset = faucet_details_map.parse_fungible_asset(client, asset).await?;
+        let fungible_asset =
+            FungibleAsset::new(faucet_account_id, self.amount).map_err(CliError::Asset)?;
 
         let transaction_request = TransactionRequestBuilder::new()
             .build_mint_fungible_asset(
