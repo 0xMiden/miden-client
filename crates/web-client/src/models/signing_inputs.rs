@@ -52,7 +52,7 @@ impl SigningInputs {
                 Ok(TransactionSummary::from((**ts).clone()))
             },
             _ => Err(JsValue::from_str(&format!(
-                "transactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
+                "TransactionSummaryPayload requires SigningInputs::TransactionSummary (found {:?})",
                 self.variant_type()
             ))),
         }
@@ -65,7 +65,7 @@ impl SigningInputs {
                 Ok(felts.iter().copied().map(Felt::from).collect::<Vec<_>>().into())
             },
             _ => Err(JsValue::from_str(&format!(
-                "arbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
+                "ArbitraryPayload requires SigningInputs::Arbitrary (found {:?})",
                 self.variant_type()
             ))),
         }
@@ -76,7 +76,7 @@ impl SigningInputs {
         match &self.inner {
             NativeSigningInputs::Blind(word) => Ok(Word::from(*word)),
             _ => Err(JsValue::from_str(&format!(
-                "blindPayload requires SigningInputs::Blind (found {:?})",
+                "BlindPayload requires SigningInputs::Blind (found {:?})",
                 self.variant_type()
             ))),
         }

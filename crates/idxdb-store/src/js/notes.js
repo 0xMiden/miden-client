@@ -189,4 +189,3 @@ export async function upsertNoteScript(scriptRoot, serializedNoteScript) {
         }
     });
 }
-//# sourceMappingURL=notes.js.map

@@ -13,11 +13,13 @@ test("transport basic", async ({ page }) => {
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
+      0,
       senderSeed
     );
     const recipientAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
+      0,
       recipientSeed
     );
 

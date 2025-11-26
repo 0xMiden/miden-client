@@ -35,3 +35,19 @@
 #### Returns
 
 `void`
+
+***
+
+### hasProcedure()
+
+> **hasProcedure**(`mast_root`): `boolean`
+
+#### Parameters
+
+##### mast\_root
+
+[`Word`](Word.md)
+
+#### Returns
+
+`boolean`

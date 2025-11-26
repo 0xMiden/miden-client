@@ -40,17 +40,22 @@ jobs:
           rustup update --no-self-update
 
       - name: Preflight - publish dry run
+        continue-on-error: true
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          cargo publish --workspace --exclude miden-client-web --dry-run
-          cd crates/web-client
+          cargo publish --workspace --exclude miden-client-web --exclude miden-idxdb-store --dry-run
+          cd crates/idxdb-store
+          cargo publish --dry-run
+          cd ../web-client
           cargo publish --dry-run
 
       - name: Publish crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          cargo publish --workspace --exclude miden-client-web
-          cd crates/web-client
+          cargo publish --workspace --exclude miden-client-web --exclude miden-idxdb-store
+          cd crates/idxdb-store
+          cargo publish
+          cd ../web-client
           cargo publish

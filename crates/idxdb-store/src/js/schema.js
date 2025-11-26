@@ -86,4 +86,3 @@ const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
 const trackedAccounts = db.table(Table.TrackedAccounts);
 export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
-//# sourceMappingURL=schema.js.map

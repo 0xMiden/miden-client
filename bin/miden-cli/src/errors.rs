@@ -34,7 +34,7 @@ pub enum CliError {
     #[error("asset error")]
     #[diagnostic(code(cli::asset_error))]
     Asset(#[source] AssetError),
-    #[error("client error: {error}")]
+    #[error("client error")]
     #[diagnostic(code(cli::client_error))]
     Client {
         #[source]
