@@ -11,7 +11,7 @@
 
 ## Miden Client Web - 0.12.4 (2025-11-17)
 
-* Added methods to `Package` exposing inner `Progam`/`Library`. Also implemented `fromPackage` methods for `NoteScript` & `TransactionScript` ([#1550](https://github.com/0xMiden/miden-client/pull/1550)).
+* Added methods to `Package` exposing inner `Program`/`Library`. Also implemented `fromPackage` methods for `NoteScript` & `TransactionScript` ([#1550](https://github.com/0xMiden/miden-client/pull/1550)).
 
 ## 0.12.3 (2025-11-16)
 
