@@ -35,15 +35,15 @@ miden-testing = { default-features = false, version = "0.12" }
 miden-tx      = { default-features = false, version = "0.12" }
 
 # Miden node dependencies
-miden-node-block-producer        = { version = "0.12" }
-miden-node-ntx-builder           = { version = "0.12" }
-miden-node-proto-build           = { default-features = false, version = "0.12" }
-miden-node-rpc                   = { version = "0.12" }
-miden-node-store                 = { version = "0.12" }
-miden-node-utils                 = { version = "0.12" }
+miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node", branch = "main" }
+miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node", branch = "main"  }
+miden-node-proto-build           = { default-features = false,  git = "https://github.com/0xMiden/miden-node", branch = "main"   }
+miden-node-rpc                   = {  git = "https://github.com/0xMiden/miden-node", branch = "main"  }
+miden-node-store                 = {  git = "https://github.com/0xMiden/miden-node", branch = "main"  }
+miden-node-utils                 = {  git = "https://github.com/0xMiden/miden-node", branch = "main"  }
 miden-note-transport-proto-build = { default-features = false, version = "0.1" }
-miden-remote-prover              = { features = ["concurrent"], version = "0.12" }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.12" }
+miden-remote-prover              = { features = ["concurrent"],  git = "https://github.com/0xMiden/miden-node", branch = "main"  }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"],  git = "https://github.com/0xMiden/miden-node", branch = "main"  }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
