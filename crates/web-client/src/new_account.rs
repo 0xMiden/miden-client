@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 
 use super::models::account::Account;
 use super::models::account_storage_mode::AccountStorageMode;
-use super::models::auth::AuthScheme as JsAuthScheme;
+use super::models::auth::AuthScheme;
 use super::models::secret_key::SecretKey;
 use crate::helpers::generate_wallet;
 use crate::{WebClient, js_error_with_context};
@@ -22,7 +22,7 @@ impl WebClient {
         &mut self,
         storage_mode: &AccountStorageMode,
         mutable: bool,
-        auth_scheme: JsAuthScheme,
+        auth_scheme: AuthScheme,
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
@@ -55,7 +55,7 @@ impl WebClient {
         token_symbol: &str,
         decimals: u8,
         max_supply: u64,
-        auth_scheme: JsAuthScheme,
+        auth_scheme: AuthScheme,
     ) -> Result<Account, JsValue> {
         if non_fungible {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
@@ -68,7 +68,7 @@ impl WebClient {
             // TODO: we need a way to pass the client's rng instead of having to use an stdrng
             let mut faucet_rng = StdRng::from_seed(seed);
 
-            let native_scheme: NativeAuthScheme = auth_scheme.into();
+            let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
             let (key_pair, auth_component) = match native_scheme {
                 NativeAuthScheme::RpoFalcon512 => {
                     let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut faucet_rng);
@@ -82,7 +82,10 @@ impl WebClient {
                         AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
                     (key_pair, auth_component)
                 },
-                _ => unreachable!("unsupported auth scheme: {native_scheme:?}"),
+                _ => {
+                    let message = format!("unsupported auth scheme: {native_scheme:?}");
+                    return Err(JsValue::from_str(&message));
+                },
             };
 
             let symbol =
