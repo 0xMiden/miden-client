@@ -8,7 +8,7 @@ use wasm_bindgen::JsValue;
 
 use crate::js_error_with_context;
 use crate::models::account_storage_mode::AccountStorageMode;
-use crate::models::auth::AuthScheme as JsAuthScheme;
+use crate::models::auth::AuthScheme;
 
 // HELPERS
 // ================================================================================================
@@ -23,7 +23,7 @@ pub(crate) async fn generate_wallet(
     storage_mode: &AccountStorageMode,
     mutable: bool,
     seed: Option<Vec<u8>>,
-    auth_scheme: JsAuthScheme,
+    auth_scheme: AuthScheme,
 ) -> Result<(Account, AuthSecretKey), JsValue> {
     let mut rng = match seed {
         Some(seed_bytes) => {
@@ -36,7 +36,7 @@ pub(crate) async fn generate_wallet(
         None => StdRng::from_os_rng(),
     };
 
-    let native_scheme: NativeAuthScheme = auth_scheme.into();
+    let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
     let (key_pair, auth_component) = match native_scheme {
         NativeAuthScheme::RpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(&mut rng);
@@ -50,7 +50,10 @@ pub(crate) async fn generate_wallet(
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        _ => unreachable!("unsupported auth scheme: {native_scheme:?}"),
+        _ => {
+            let message = format!("unsupported auth scheme: {native_scheme:?}");
+            return Err(JsValue::from_str(&message));
+        },
     };
 
     let account_type = if mutable {
