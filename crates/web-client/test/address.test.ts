@@ -154,6 +154,7 @@ test.describe("Note tag tests", () => {
 const instanceAddressRemoveThenInsert = async (page: Page) => {
   return await page.evaluate(async () => {
     const client = window.client;
+    const parsedNetworkId = window.helpers.parseNetworkId("mtst");
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
@@ -171,14 +172,16 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     const store = await client.exportStore();
     const parsedStore = JSON.parse(store);
     const retrievedAddressRecord = parsedStore.addresses[0];
-    const retrievedAddress = retrievedAddressRecord.address;
+    const retrievedAddress = window.Address.deserialize(
+      retrievedAddressRecord.address
+    );
     const retrievedId = retrievedAddressRecord.id;
 
     return {
       accountId: accountId,
-      address: address,
+      address: address.toBech32(parsedNetworkId),
       retrievedAccountId: retrievedId,
-      retrievedAddress: retrievedAddress,
+      retrievedAddress: retrievedAddress.toBech32(parsedNetworkId),
     };
   });
 };
@@ -188,6 +191,6 @@ test.describe("Address insertion & deletion tests", () => {
     const { accountId, address, retrievedAccountId, retrievedAddress } =
       await instanceAddressRemoveThenInsert(page);
     expect(retrievedAccountId).toBe(accountId);
-    // expect(address).toBe(retrievedAddress);
+    expect(address).toBe(retrievedAddress);
   });
 });
