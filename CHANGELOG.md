@@ -2,7 +2,7 @@
 
 ## 0.13.0 (TBD)
 
-* [BREAKING] Typed the `auth_scheme` plumbing across the Rust client ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
+* [BREAKING] Typed the `auth_scheme` plumbing across the Rust WebClient ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
 
 ## 0.12.4 (TBD)
 
