@@ -4,6 +4,7 @@
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
+* Updated `SqliteStore`: replaced `MerkleStore` with `SmtForest` ([#1526](https://github.com/0xMiden/miden-client/pull/1526)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
