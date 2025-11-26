@@ -35,21 +35,3 @@
 #### Returns
 
 [`Word`](Word.md)
-
-***
-
-### fromPackage()
-
-> `static` **fromPackage**(`_package`): `TransactionScript`
-
-Builds a `TransactionScript` from a `Package`.
-
-#### Parameters
-
-##### \_package
-
-[`Package`](Package.md)
-
-#### Returns
-
-`TransactionScript`

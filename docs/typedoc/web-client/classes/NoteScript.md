@@ -76,24 +76,6 @@ Print the MAST source for this script.
 
 ***
 
-### fromPackage()
-
-> `static` **fromPackage**(`_package`): `NoteScript`
-
-Builds a `NoteScript` from a `Package`.
-
-#### Parameters
-
-##### \_package
-
-[`Package`](Package.md)
-
-#### Returns
-
-`NoteScript`
-
-***
-
 ### p2id()
 
 > `static` **p2id**(): `NoteScript`
