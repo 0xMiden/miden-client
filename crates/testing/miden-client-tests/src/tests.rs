@@ -1,4 +1,5 @@
 use core::future::Future;
+use core::pin::Pin;
 use std::boxed::Box;
 use std::collections::BTreeSet;
 use std::env::temp_dir;
@@ -176,10 +177,16 @@ async fn get_input_note() {
     assert_eq!(recorded_note.id(), retrieved_note.id());
 }
 
-async fn assert_account_insertion<F, Fut, AssertFn>(insert_fn: F, additional_assertions: AssertFn)
+type InsertAccountFuture<'client> =
+    Pin<Box<dyn Future<Output = Result<Account, ClientError>> + 'client>>;
+
+async fn assert_account_insertion<F, AssertFn>(insert_fn: F, additional_assertions: AssertFn)
 where
-    F: FnOnce(&mut TestClient, AccountStorageMode, &FilesystemKeyStore<StdRng>) -> Fut,
-    Fut: Future<Output = Result<Account, ClientError>>,
+    F: for<'client> FnOnce(
+        &'client mut TestClient,
+        AccountStorageMode,
+        &'client FilesystemKeyStore<StdRng>,
+    ) -> InsertAccountFuture<'client>,
     AssertFn: Fn(&Account, &Account),
 {
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
@@ -204,10 +211,13 @@ where
     additional_assertions(&account, &fetched_account);
 }
 
-async fn assert_wallet_insertion<F, Fut>(insert_fn: F)
+async fn assert_wallet_insertion<F>(insert_fn: F)
 where
-    F: FnOnce(&mut TestClient, AccountStorageMode, &FilesystemKeyStore<StdRng>) -> Fut,
-    Fut: Future<Output = Result<Account, ClientError>>,
+    F: for<'client> FnOnce(
+        &'client mut TestClient,
+        AccountStorageMode,
+        &'client FilesystemKeyStore<StdRng>,
+    ) -> InsertAccountFuture<'client>,
 {
     assert_account_insertion(insert_fn, |account, fetched_account| {
         assert_eq!(account.storage().commitment(), fetched_account.storage().commitment());
@@ -215,10 +225,13 @@ where
     .await;
 }
 
-async fn assert_faucet_insertion<F, Fut>(insert_fn: F)
+async fn assert_faucet_insertion<F>(insert_fn: F)
 where
-    F: FnOnce(&mut TestClient, AccountStorageMode, &FilesystemKeyStore<StdRng>) -> Fut,
-    Fut: Future<Output = Result<Account, ClientError>>,
+    F: for<'client> FnOnce(
+        &'client mut TestClient,
+        AccountStorageMode,
+        &'client FilesystemKeyStore<StdRng>,
+    ) -> InsertAccountFuture<'client>,
 {
     assert_account_insertion(insert_fn, |account, fetched_account| {
         assert_eq!(account.storage(), fetched_account.storage());
@@ -228,22 +241,34 @@ where
 
 #[tokio::test]
 async fn insert_basic_account() {
-    assert_wallet_insertion(insert_new_wallet).await;
+    assert_wallet_insertion(|client, storage_mode, keystore| {
+        Box::pin(insert_new_wallet(client, storage_mode, keystore))
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn insert_ecdsa_account() {
-    assert_wallet_insertion(insert_new_ecdsa_wallet).await;
+    assert_wallet_insertion(|client, storage_mode, keystore| {
+        Box::pin(insert_new_ecdsa_wallet(client, storage_mode, keystore))
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn insert_faucet_account() {
-    assert_faucet_insertion(insert_new_fungible_faucet).await;
+    assert_faucet_insertion(|client, storage_mode, keystore| {
+        Box::pin(insert_new_fungible_faucet(client, storage_mode, keystore))
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn insert_ecdsa_faucet_account() {
-    assert_faucet_insertion(insert_new_ecdsa_fungible_faucet).await;
+    assert_faucet_insertion(|client, storage_mode, keystore| {
+        Box::pin(insert_new_ecdsa_fungible_faucet(client, storage_mode, keystore))
+    })
+    .await;
 }
 
 #[tokio::test]
