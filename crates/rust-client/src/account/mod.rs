@@ -70,6 +70,7 @@ pub use miden_objects::{
 };
 
 use super::Client;
+use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
@@ -368,7 +369,7 @@ pub fn build_wallet_id(
     public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<AccountId, ClientError> {
     let account_type = if is_mutable {
         AccountType::RegularAccountUpdatableCode
@@ -376,19 +377,19 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let auth_component = match auth_scheme_id {
-        0 => {
+    let auth_component = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(public_key.to_commitment()).into();
             auth_component
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
             auth_component
         },
-        _ => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme_id));
+        auth_scheme => {
+            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
         },
     };
 
