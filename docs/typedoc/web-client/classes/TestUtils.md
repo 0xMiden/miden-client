@@ -45,3 +45,13 @@
 #### Returns
 
 `Uint8Array`
+
+***
+
+### createMockSerializedProgramPackage()
+
+> `static` **createMockSerializedProgramPackage**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`

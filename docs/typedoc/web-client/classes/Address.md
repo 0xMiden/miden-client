@@ -98,24 +98,6 @@ Return stringified version of self.
 
 ***
 
-### deserialize()
-
-> `static` **deserialize**(`bytes`): `Address`
-
-Deserializes a byte array into an `Address`
-
-#### Parameters
-
-##### bytes
-
-`Uint8Array`
-
-#### Returns
-
-`Address`
-
-***
-
 ### fromAccountId()
 
 > `static` **fromAccountId**(`account_id`, `_interface?`): `Address`

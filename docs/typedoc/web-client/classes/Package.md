@@ -28,6 +28,32 @@
 
 ***
 
+### library()
+
+> **library**(): [`Library`](Library.md)
+
+Returns the underlying library of a `Package`.
+Fails if the package is not a library.
+
+#### Returns
+
+[`Library`](Library.md)
+
+***
+
+### program()
+
+> **program**(): [`Program`](Program.md)
+
+Returns the underlying program of a `Package`.
+Fails if the package is not a program.
+
+#### Returns
+
+[`Program`](Program.md)
+
+***
+
 ### serialize()
 
 > **serialize**(): `Uint8Array`
