@@ -45,9 +45,9 @@ impl NoteScript {
     }
 
     /// Builds a `NoteScript` from a `Package`.
-    #[wasm_bindgen(js_name = "fromPackage")]
-    pub fn from_package(package: &Package) -> Result<NoteScript, JsValue> {
-        let program = package.program()?;
+    #[wasm_bindgen(js_name = "tryFromPackage")]
+    pub fn try_from_package(package: &Package) -> Result<NoteScript, JsValue> {
+        let program = package.try_as_program()?;
         let native_note_script = NativeNoteScript::new(program.into());
         Ok(native_note_script.into())
     }

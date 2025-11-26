@@ -38,9 +38,9 @@
 
 ***
 
-### fromPackage()
+### tryFromPackage()
 
-> `static` **fromPackage**(`_package`): `TransactionScript`
+> `static` **tryFromPackage**(`_package`): `TransactionScript`
 
 Builds a `TransactionScript` from a `Package`.
 

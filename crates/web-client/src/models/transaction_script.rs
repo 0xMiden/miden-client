@@ -15,9 +15,9 @@ impl TransactionScript {
     }
 
     /// Builds a `TransactionScript` from a `Package`.
-    #[wasm_bindgen(js_name = "fromPackage")]
-    pub fn from_package(package: &Package) -> Result<TransactionScript, JsValue> {
-        let program = package.program()?;
+    #[wasm_bindgen(js_name = "tryFromPackage")]
+    pub fn try_from_package(package: &Package) -> Result<TransactionScript, JsValue> {
+        let program = package.try_as_program()?;
         let native_transaction_script = NativeTransactionScript::new(program.into());
         Ok(native_transaction_script.into())
     }

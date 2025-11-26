@@ -40,7 +40,7 @@ export const createNoteScriptFromPackage = async (
       window.TestUtils.createMockSerializedProgramPackage();
     const deserializedPackage = window.Package.deserialize(testPackageBytes);
 
-    window.NoteScript.fromPackage(deserializedPackage);
+    window.NoteScript.tryFromPackage(deserializedPackage);
   });
 };
 
