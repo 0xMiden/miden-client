@@ -52,7 +52,10 @@ export const test = base.extend<{ forEachTest: void }>({
           window.remoteProverUrl = proverUrl;
           if (window.remoteProverUrl) {
             window.remoteProverInstance =
-              window.TransactionProver.newRemoteProver(window.remoteProverUrl);
+              window.TransactionProver.newRemoteProver(
+                window.remoteProverUrl,
+                null
+              );
           }
 
           window.helpers.waitForTransaction = async (
@@ -95,7 +98,10 @@ export const test = base.extend<{ forEachTest: void }>({
             const useRemoteProver =
               prover != null && window.remoteProverUrl != null;
             const proverToUse = useRemoteProver
-              ? window.TransactionProver.newRemoteProver(window.remoteProverUrl)
+              ? window.TransactionProver.newRemoteProver(
+                  window.remoteProverUrl,
+                  null
+                )
               : window.TransactionProver.newLocalProver();
 
             const proven = await client.proveTransaction(result, proverToUse);
