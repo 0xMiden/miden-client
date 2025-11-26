@@ -26,8 +26,8 @@ impl TestUtils {
         native_account_id.into()
     }
 
-    #[wasm_bindgen(js_name = "createMockSerializedPackage")]
-    pub fn create_mock_serialized_package() -> Uint8Array {
+    #[wasm_bindgen(js_name = "createMockSerializedLibraryPackage")]
+    pub fn create_mock_serialized_library_package() -> Uint8Array {
         pub const CODE: &str = "
             export.foo
                 push.1.2 mul

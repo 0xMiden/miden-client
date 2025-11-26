@@ -5,7 +5,8 @@ export const deserializePackageFromBytes = async (
   testingPage: Page
 ): Promise<void> => {
   await testingPage.evaluate(async () => {
-    const testPackageBytes = window.TestUtils.createMockSerializedPackage();
+    const testPackageBytes =
+      window.TestUtils.createMockSerializedLibraryPackage();
     window.Package.deserialize(testPackageBytes);
   });
 };
@@ -14,7 +15,8 @@ export const createAccountComponentFromPackage = async (
   testingPage: Page
 ): Promise<void> => {
   return await testingPage.evaluate(async () => {
-    const testPackageBytes = window.TestUtils.createMockSerializedPackage();
+    const testPackageBytes =
+      window.TestUtils.createMockSerializedLibraryPackage();
     const deserializedPackage = window.Package.deserialize(testPackageBytes);
     let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();

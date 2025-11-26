@@ -38,9 +38,9 @@
 
 ***
 
-### createMockSerializedPackage()
+### createMockSerializedLibraryPackage()
 
-> `static` **createMockSerializedPackage**(): `Uint8Array`
+> `static` **createMockSerializedLibraryPackage**(): `Uint8Array`
 
 #### Returns
 
