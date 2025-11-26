@@ -149,17 +149,20 @@ impl StateSync {
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
 
-        loop {
-            info!("Performing sync state step.");
+        while let Some(step) = self
+            .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
+            .await?
+        {
+            let sync_block_num = step.block_header.block_num();
 
-            let step = self
-                .sync_state_step(state_sync_update.block_num, &account_ids, note_tags.clone())
-                .await?;
-            let Some(step) = step else {
-                break;
-            };
-            state_sync_update.block_num = step.block_header.block_num();
+            let reached_tip = step.chain_tip == sync_block_num;
+
+            state_sync_update.block_num = sync_block_num;
             state_sync_steps.push(step);
+
+            if reached_tip {
+                break;
+            }
         }
 
         // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
@@ -243,8 +246,9 @@ impl StateSync {
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
-        note_tags: Arc<BTreeSet<NoteTag>>,
+        note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<StateSyncInfo>, ClientError> {
+        info!("Performing sync state step.");
         let response = self
             .rpc_api
             .sync_state(current_block_num, account_ids, note_tags.as_ref())

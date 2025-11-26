@@ -71,7 +71,7 @@ pub struct NotesCmd {
 }
 
 impl NotesCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync>(
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -344,7 +344,7 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
         .map_err(|e| CliError::Input(format!("note not found: {e}")))?;
     let note: Note = note_record
         .try_into()
-        .map_err(|e| CliError::Client(ClientError::NoteRecordConversionError(e)))?;
+        .map_err(|e| CliError::from(ClientError::NoteRecordConversionError(e)))?;
     let (_netid, address) = Address::decode(address).map_err(|e| CliError::Input(e.to_string()))?;
 
     client.send_private_note(note, &address).await?;
@@ -358,7 +358,10 @@ async fn send<AUTH: TransactionAuthenticator + Sync>(
 /// Retrieve notes for all tracked tags
 ///
 /// Fetched notes are stored in the store.
-async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError> {
+async fn fetch<AUTH>(client: &mut Client<AUTH>) -> Result<(), CliError>
+where
+    AUTH: TransactionAuthenticator + Sync + 'static,
+{
     client.fetch_private_notes().await?;
 
     Ok(())

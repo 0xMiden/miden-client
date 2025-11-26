@@ -46,6 +46,7 @@ let client:Client = Client::new(
     None, // Set to Some to enable stale transactions after an amount of blocks.
     None, // Set to Some to enable recency checks when executing transactions.
     Some(Arc::new(nt_client)),
+    None, // or Some(Arc::new(prover)) for a custom prover
 );
 ```
 

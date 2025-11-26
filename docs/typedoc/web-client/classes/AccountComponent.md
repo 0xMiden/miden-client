@@ -44,6 +44,16 @@
 
 ***
 
+### getProcedures()
+
+> **getProcedures**(): [`GetProceduresResultItem`](GetProceduresResultItem.md)[]
+
+#### Returns
+
+[`GetProceduresResultItem`](GetProceduresResultItem.md)[]
+
+***
+
 ### withSupportsAllTypes()
 
 > **withSupportsAllTypes**(): `AccountComponent`

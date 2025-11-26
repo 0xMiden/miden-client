@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use miden_client::ClientError;
-use miden_client::auth::AuthSecretKey;
+use miden_client::auth::{AuthSecretKey, RPO_FALCON_SCHEME_ID};
 use miden_client::transaction::{TransactionExecutorError, TransactionRequestBuilder};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
@@ -15,7 +15,6 @@ use miden_objects::account::{
 };
 use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
-use miden_objects::crypto::dsa::rpo_falcon512::SecretKey;
 use miden_objects::note::NoteType;
 use miden_objects::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -38,9 +37,9 @@ async fn transaction_creates_two_notes() {
             .unwrap()
             .into();
 
-    let secret_key = SecretKey::new();
+    let secret_key = AuthSecretKey::new_rpo_falcon512();
     let pub_key = secret_key.public_key();
-    keystore.add_key(&AuthSecretKey::RpoFalcon512(secret_key)).unwrap();
+    keystore.add_key(&secret_key).unwrap();
 
     let wallet_component = AccountComponent::compile(
         "
@@ -55,7 +54,7 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(wallet_component)
-        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment().into()))
+        .with_auth_component(AuthRpoFalcon512::new(pub_key.to_commitment()))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
@@ -91,9 +90,14 @@ async fn transaction_creates_two_notes() {
 #[tokio::test]
 async fn transaction_error_reports_source_line() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _) = setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let (wallet, _) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
 
     let failing_script = client
         .script_builder()

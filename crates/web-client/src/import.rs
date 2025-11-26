@@ -1,5 +1,4 @@
 use miden_client::account::{AccountFile as NativeAccountFile, AccountId as NativeAccountId};
-use miden_client::auth::AuthSecretKey;
 use wasm_bindgen::prelude::*;
 
 use crate::helpers::generate_wallet;
@@ -46,12 +45,18 @@ impl WebClient {
         &mut self,
         init_seed: Vec<u8>,
         mutable: bool,
+        auth_scheme_id: u8,
     ) -> Result<Account, JsValue> {
         let keystore = self.keystore.clone();
         let client = self.get_mut_inner().ok_or(JsValue::from_str("Client not initialized"))?;
 
-        let (generated_acct, key_pair) =
-            generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed)).await?;
+        let (generated_acct, key_pair) = generate_wallet(
+            &AccountStorageMode::public(),
+            mutable,
+            Some(init_seed),
+            auth_scheme_id,
+        )
+        .await?;
 
         let native_id = generated_acct.id();
         client
@@ -61,7 +66,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+            .add_key(&key_pair)
             .await
             .map_err(|err| err.to_string())?;
 
