@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.4 (TBD)
+## 0.12.5 (2025-11-27)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Changed the note script pre-loading step to include all expected scripts based on specified recipients ([#1539](https://github.com/0xMiden/miden-client/pull/1539)).
@@ -10,10 +10,6 @@
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
 * Fixed CLI install process to statically include account component package files ([#1530](https://github.com/0xMiden/miden-client/pull/1530)).
-
-## Miden Client Web - 0.12.4 (2025-11-17)
-
-* Added methods to `Package` exposing inner `Program`/`Library`. Also implemented `fromPackage` methods for `NoteScript` & `TransactionScript` ([#1550](https://github.com/0xMiden/miden-client/pull/1550)).
 
 ## 0.12.3 (2025-11-16)
 
