@@ -76,6 +76,25 @@ Print the MAST source for this script.
 
 ***
 
+### from\_package()
+
+> `static` **from\_package**(`_package`): `NoteScript`
+
+Creates a `NoteScript` from the given `Package`.
+Throws if the package is invalid.
+
+#### Parameters
+
+##### \_package
+
+[`Package`](Package.md)
+
+#### Returns
+
+`NoteScript`
+
+***
+
 ### p2id()
 
 > `static` **p2id**(): `NoteScript`
@@ -99,24 +118,6 @@ Print the MAST source for this script.
 ### swap()
 
 > `static` **swap**(): `NoteScript`
-
-#### Returns
-
-`NoteScript`
-
-***
-
-### tryFromPackage()
-
-> `static` **tryFromPackage**(`_package`): `NoteScript`
-
-Builds a `NoteScript` from a `Package`.
-
-#### Parameters
-
-##### \_package
-
-[`Package`](Package.md)
 
 #### Returns
 

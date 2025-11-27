@@ -22,8 +22,8 @@ impl Package {
 
     /// Returns the underlying library of a `Package`.
     /// Fails if the package is not a library.
-    #[wasm_bindgen(js_name = "tryAsLibrary")]
-    pub fn try_as_library(&self) -> Result<Library, JsValue> {
+    #[wasm_bindgen(js_name = "asLibrary")]
+    pub fn as_library(&self) -> Result<Library, JsValue> {
         if !self.0.is_library() {
             return Err(JsValue::from_str("Package does not contain a library"));
         }
@@ -34,8 +34,8 @@ impl Package {
 
     /// Returns the underlying program of a `Package`.
     /// Fails if the package is not a program.
-    #[wasm_bindgen(js_name = "tryAsProgram")]
-    pub fn try_as_program(&self) -> Result<Program, JsValue> {
+    #[wasm_bindgen(js_name = "asProgram")]
+    pub fn as_program(&self) -> Result<Program, JsValue> {
         if !self.0.is_program() {
             return Err(JsValue::from_str("Package does not contain a program"));
         }

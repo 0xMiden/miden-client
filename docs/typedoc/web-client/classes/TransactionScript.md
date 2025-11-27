@@ -38,11 +38,12 @@
 
 ***
 
-### tryFromPackage()
+### fromPackage()
 
-> `static` **tryFromPackage**(`_package`): `TransactionScript`
+> `static` **fromPackage**(`_package`): `TransactionScript`
 
-Builds a `TransactionScript` from a `Package`.
+Creates a `NoteScript` from the given `Package`.
+Throws if the package is invalid.
 
 #### Parameters
 

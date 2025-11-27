@@ -18,6 +18,32 @@
 
 ***
 
+### asLibrary()
+
+> **asLibrary**(): [`Library`](Library.md)
+
+Returns the underlying library of a `Package`.
+Fails if the package is not a library.
+
+#### Returns
+
+[`Library`](Library.md)
+
+***
+
+### asProgram()
+
+> **asProgram**(): [`Program`](Program.md)
+
+Returns the underlying program of a `Package`.
+Fails if the package is not a program.
+
+#### Returns
+
+[`Program`](Program.md)
+
+***
+
 ### free()
 
 > **free**(): `void`
@@ -35,32 +61,6 @@
 #### Returns
 
 `Uint8Array`
-
-***
-
-### tryAsLibrary()
-
-> **tryAsLibrary**(): [`Library`](Library.md)
-
-Returns the underlying library of a `Package`.
-Fails if the package is not a library.
-
-#### Returns
-
-[`Library`](Library.md)
-
-***
-
-### tryAsProgram()
-
-> **tryAsProgram**(): [`Program`](Program.md)
-
-Returns the underlying program of a `Package`.
-Fails if the package is not a program.
-
-#### Returns
-
-[`Program`](Program.md)
 
 ***
 

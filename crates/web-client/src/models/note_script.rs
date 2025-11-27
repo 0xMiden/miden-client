@@ -44,10 +44,10 @@ impl NoteScript {
         self.0.root().into()
     }
 
-    /// Builds a `NoteScript` from a `Package`.
-    #[wasm_bindgen(js_name = "tryFromPackage")]
-    pub fn try_from_package(package: &Package) -> Result<NoteScript, JsValue> {
-        let program = package.try_as_program()?;
+    /// Creates a `NoteScript` from the given `Package`.
+    /// Throws if the package is invalid.
+    pub fn from_package(package: &Package) -> Result<NoteScript, JsValue> {
+        let program = package.as_program()?;
         let native_note_script = NativeNoteScript::new(program.into());
         Ok(native_note_script.into())
     }
