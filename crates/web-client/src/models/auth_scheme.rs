@@ -13,6 +13,12 @@ pub enum AuthScheme {
     AuthEcdsaK256Keccak = 1,
 }
 
+// Compile-time check to ensure both enums stay aligned.
+const _: () = {
+    assert!(NativeAuthScheme::RpoFalcon512 as u8 == AuthScheme::AuthRpoFalcon512 as u8);
+    assert!(NativeAuthScheme::EcdsaK256Keccak as u8 == AuthScheme::AuthEcdsaK256Keccak as u8);
+};
+
 impl TryFrom<AuthScheme> for NativeAuthScheme {
     type Error = JsValue;
 
