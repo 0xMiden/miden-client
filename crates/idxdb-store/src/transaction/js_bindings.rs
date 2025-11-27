@@ -24,7 +24,7 @@ extern "C" {
     pub fn idxdb_upsert_transaction_record(
         transaction_id: String,
         details: Vec<u8>,
-        block_num: String,
+        block_num: u32,
         statusVariant: u8,
         status: Vec<u8>,
         scriptRoot: Option<Vec<u8>>,

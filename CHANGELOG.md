@@ -2,6 +2,7 @@
 
 ## 0.13.0 (TBD)
 
+* Changed `blockNum` type from `string` to `number` in WebClient transaction interfaces for better type safety and consistency ([#1528](https://github.com/0xMiden/miden-client/pull/1528)).
 * Consolidated `FetchedNote` fields into `NoteHeader` ([#1536](https://github.com/0xMiden/miden-client/pull/1536)).
 
 ## 0.12.4 (TBD)
