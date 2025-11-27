@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0 (TBD)
+
+* Consolidated `FetchedNote` fields into `NoteHeader` ([#1536](https://github.com/0xMiden/miden-client/pull/1536)).
+
 ## 0.12.4 (TBD)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
