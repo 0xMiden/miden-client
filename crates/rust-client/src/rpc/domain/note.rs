@@ -233,8 +233,9 @@ impl FetchedNote {
     /// Returns the note's inclusion details.
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         match self {
-            FetchedNote::Private(_, inclusion_proof)
-            | FetchedNote::Public(_, inclusion_proof) => inclusion_proof,
+            FetchedNote::Private(_, inclusion_proof) | FetchedNote::Public(_, inclusion_proof) => {
+                inclusion_proof
+            },
         }
     }
 

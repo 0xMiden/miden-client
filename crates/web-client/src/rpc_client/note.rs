@@ -70,11 +70,8 @@ impl FetchedNote {
 }
 
 impl FetchedNote {
-    /// Create a FetchedNote from a native NoteHeader (internal use).
+    /// Create a `FetchedNote` from a native `NoteHeader` (internal use).
     pub(super) fn from_header(header: NativeNoteHeader, input_note: Option<InputNote>) -> Self {
-        FetchedNote {
-            header: header.into(),
-            input_note,
-        }
+        FetchedNote { header: header.into(), input_note }
     }
 }
