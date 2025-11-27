@@ -138,19 +138,27 @@ test.describe("mint transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      // This test was added in #995 to reproduce an issue in the web wallet.
-      // It is useful because most tests consume the note right on the latest client block,
-      // but this test mints 3 notes and consumes them after the fact. This ensures the
-      // MMR data for old blocks is available and valid so that the notes can be consumed.
-      const { faucetId, accountId } = await setupWalletAndFaucet(page);
-      const result = await multipleMintsTest(page, accountId, faucetId, flag);
+    [
+      { authScheme: "ECDSA", schemeID: 1 },
+      { authScheme: "Falcon", schemeID: 0 },
+    ].forEach(({ authScheme, schemeID }) => {
+      test(description + ` (${authScheme})`, async ({ page }) => {
+        // This test was added in #995 to reproduce an issue in the web wallet.
+        // It is useful because most tests consume the note right on the latest client block,
+        // but this test mints 3 notes and consumes them after the fact. This ensures the
+        // MMR data for old blocks is available and valid so that the notes can be consumed.
+        const { faucetId, accountId } = await setupWalletAndFaucet(
+          page,
+          schemeID
+        );
+        const result = await multipleMintsTest(page, accountId, faucetId, flag);
 
-      expect(result.transactionIds.length).toEqual(3);
-      expect(result.numOutputNotesCreated).toEqual(3);
-      expect(result.nonce).toEqual("3");
-      expect(result.finalBalance).toEqual("3000");
-      expect(result.createdNoteIds.length).toEqual(3);
+        expect(result.transactionIds.length).toEqual(3);
+        expect(result.numOutputNotesCreated).toEqual(3);
+        expect(result.nonce).toEqual("3");
+        expect(result.finalBalance).toEqual("3000");
+        expect(result.createdNoteIds.length).toEqual(3);
+      });
     });
   });
 });
@@ -169,19 +177,27 @@ test.describe("consume transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { faucetId, accountId } = await setupWalletAndFaucet(page);
-      const { consumeResult: result } = await mintAndConsumeTransaction(
-        page,
-        accountId,
-        faucetId,
-        flag
-      );
+    [
+      { authScheme: "ECDSA", schemeID: 1 },
+      { authScheme: "Falcon", schemeID: 0 },
+    ].forEach(({ authScheme, schemeID }) => {
+      test(description + ` (${authScheme})`, async ({ page }) => {
+        const { faucetId, accountId } = await setupWalletAndFaucet(
+          page,
+          schemeID
+        );
+        const { consumeResult: result } = await mintAndConsumeTransaction(
+          page,
+          accountId,
+          faucetId,
+          flag
+        );
 
-      expect(result.transactionId).toHaveLength(66);
-      expect(result.nonce).toEqual("1");
-      expect(result.numConsumedNotes).toEqual(1);
-      expect(result.targetAccountBalance).toEqual("1000");
+        expect(result.transactionId).toHaveLength(66);
+        expect(result.nonce).toEqual("1");
+        expect(result.numConsumedNotes).toEqual(1);
+        expect(result.targetAccountBalance).toEqual("1000");
+      });
     });
   });
 });
@@ -242,35 +258,43 @@ test.describe("send transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: senderAccountId, faucetId } =
-        await setupWalletAndFaucet(page);
-      const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-      const recallHeight = 100;
-      let createdSendNotes = await sendTransaction(
-        page,
-        senderAccountId,
-        targetAccountId,
-        faucetId,
-        recallHeight,
-        flag
-      );
+    [
+      { authScheme: "ECDSA", schemeID: 1 },
+      { authScheme: "Falcon", schemeID: 0 },
+    ].forEach(({ authScheme, schemeID }) => {
+      test(description + ` (${authScheme})`, async ({ page }) => {
+        const { accountId: senderAccountId, faucetId } =
+          await setupWalletAndFaucet(page);
+        const { accountId: targetAccountId } = await setupWalletAndFaucet(
+          page,
+          schemeID
+        );
+        const recallHeight = 100;
+        let createdSendNotes = await sendTransaction(
+          page,
+          senderAccountId,
+          targetAccountId,
+          faucetId,
+          recallHeight,
+          flag
+        );
 
-      await consumeTransaction(
-        page,
-        targetAccountId,
-        faucetId,
-        createdSendNotes[0]
-      );
-      const result = await sendTransactionTest(
-        page,
-        senderAccountId,
-        targetAccountId,
-        faucetId
-      );
+        await consumeTransaction(
+          page,
+          targetAccountId,
+          faucetId,
+          createdSendNotes[0]
+        );
+        const result = await sendTransactionTest(
+          page,
+          senderAccountId,
+          targetAccountId,
+          faucetId
+        );
 
-      expect(result.senderAccountBalance).toEqual("900");
-      expect(result.changedTargetBalance).toEqual("100");
+        expect(result.senderAccountBalance).toEqual("900");
+        expect(result.changedTargetBalance).toEqual("100");
+      });
     });
   });
 });
@@ -288,49 +312,72 @@ test.describe("swap transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    test(description, async ({ page }) => {
-      const { accountId: accountA, faucetId: faucetA } =
-        await setupWalletAndFaucet(page);
-      const { accountId: accountB, faucetId: faucetB } =
-        await setupWalletAndFaucet(page);
+    [
+      { authScheme: "ECDSA", schemeIDs: [1, 1] },
+      { authScheme: "Falcon", schemeIDs: [0, 0] },
+      { authScheme: "Mixed ECDSA/Falcon", schemeIDs: [0, 1] },
+    ].forEach(
+      ({
+        authScheme,
+        schemeIDs: [schemeIDFirstAccount, schemeIDSecondAccount],
+      }) => {
+        test(description + ` (${authScheme})`, async ({ page }) => {
+          const { accountId: accountA, faucetId: faucetA } =
+            await setupWalletAndFaucet(page, schemeIDFirstAccount);
+          const { accountId: accountB, faucetId: faucetB } =
+            await setupWalletAndFaucet(page, schemeIDSecondAccount);
 
-      const assetAAmount = BigInt(1);
-      const assetBAmount = BigInt(25);
+          const assetAAmount = BigInt(1);
+          const assetBAmount = BigInt(25);
 
-      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
+          await mintAndConsumeTransaction(page, accountA, faucetA, flag);
+          await mintAndConsumeTransaction(page, accountB, faucetB, flag);
 
-      const { accountAAssets, accountBAssets } = await swapTransaction(
-        page,
-        accountA,
-        accountB,
-        faucetA,
-        assetAAmount,
-        faucetB,
-        assetBAmount,
-        "private",
-        "private",
-        flag
-      );
+          const { accountAAssets, accountBAssets } = await swapTransaction(
+            page,
+            accountA,
+            accountB,
+            faucetA,
+            assetAAmount,
+            faucetB,
+            assetBAmount,
+            "private",
+            "private",
+            flag
+          );
 
-      // --- assertions for Account A ---
-      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
-      expect(BigInt(aA!.amount)).toEqual(999n);
+          // --- assertions for Account A ---
+          const aA = accountAAssets!.find((a) => a.assetId === faucetA);
+          expect(
+            aA,
+            `Expected to find asset ${faucetA} on Account A`
+          ).toBeTruthy();
+          expect(BigInt(aA!.amount)).toEqual(999n);
 
-      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
-      expect(BigInt(aB!.amount)).toEqual(25n);
+          const aB = accountAAssets!.find((a) => a.assetId === faucetB);
+          expect(
+            aB,
+            `Expected to find asset ${faucetB} on Account A`
+          ).toBeTruthy();
+          expect(BigInt(aB!.amount)).toEqual(25n);
 
-      // --- assertions for Account B ---
-      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
-      expect(BigInt(bA!.amount)).toEqual(1n);
+          // --- assertions for Account B ---
+          const bA = accountBAssets!.find((a) => a.assetId === faucetA);
+          expect(
+            bA,
+            `Expected to find asset ${faucetA} on Account B`
+          ).toBeTruthy();
+          expect(BigInt(bA!.amount)).toEqual(1n);
 
-      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
-      expect(BigInt(bB!.amount)).toEqual(975n);
-    });
+          const bB = accountBAssets!.find((a) => a.assetId === faucetB);
+          expect(
+            bB,
+            `Expected to find asset ${faucetB} on Account B`
+          ).toBeTruthy();
+          expect(BigInt(bB!.amount)).toEqual(975n);
+        });
+      }
+    );
   });
 });
 
@@ -340,16 +387,17 @@ test.describe("swap transaction tests", () => {
 export const customTransaction = async (
   testingPage: Page,
   assertedValue: string,
-  withRemoteProver: boolean
+  withRemoteProver: boolean,
+  authSchemeID: 0 | 1
 ): Promise<void> => {
   return await testingPage.evaluate(
-    async ({ assertedValue, withRemoteProver }) => {
+    async ({ assertedValue, withRemoteProver, authSchemeID }) => {
       const client = window.client;
 
       const walletAccount = await client.newWallet(
         window.AccountStorageMode.private(),
         false,
-        0
+        authSchemeID
       );
       const faucetAccount = await client.newFaucet(
         window.AccountStorageMode.private(),
@@ -357,7 +405,7 @@ export const customTransaction = async (
         "DAG",
         8,
         BigInt(10000000),
-        0
+        authSchemeID
       );
       await client.syncState();
 
@@ -566,6 +614,7 @@ export const customTransaction = async (
     {
       assertedValue,
       withRemoteProver,
+      authSchemeID,
     }
   );
 };
@@ -667,18 +716,34 @@ const customTxWithMultipleNotes = async (
 };
 
 test.describe("custom transaction tests", () => {
-  test("custom transaction completes successfully", async ({ page }) => {
-    await expect(customTransaction(page, "0", false)).resolves.toBeUndefined();
-  });
+  [
+    { authScheme: "ECDSA", schemeID: 1 },
+    { authScheme: "Falcon", schemeID: 0 },
+  ].forEach(({ authScheme, schemeID }) => {
+    test(
+      "custom transaction completes successfully" + ` (${authScheme})`,
+      async ({ page }) => {
+        await expect(
+          customTransaction(page, "0", false, schemeID)
+        ).resolves.toBeUndefined();
+      }
+    );
 
-  test("custom transaction fails", async ({ page }) => {
-    await expect(customTransaction(page, "1", false)).rejects.toThrow();
-  });
+    test("custom transaction fails" + ` (${authScheme})`, async ({ page }) => {
+      await expect(
+        customTransaction(page, "1", false, schemeID)
+      ).rejects.toThrow();
+    });
 
-  test("custom transaction with remote prover completes successfully", async ({
-    page,
-  }) => {
-    await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
+    test(
+      "custom transaction with remote prover completes successfully" +
+        ` (${authScheme})`,
+      async ({ page }) => {
+        await expect(
+          customTransaction(page, "0", true, schemeID)
+        ).resolves.toBeUndefined();
+      }
+    );
   });
 });
 
@@ -1238,33 +1303,37 @@ test.describe("counter account component tests", () => {
   });
 });
 
-export const testStorageMap = async (page: Page): Promise<any> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-    await client.syncState();
+export const testStorageMap = async (
+  page: Page,
+  schemeSecretKeyFunction: String
+): Promise<any> => {
+  return await page.evaluate(
+    async ({ schemeSecretKeyFunction }) => {
+      const client = window.client;
+      await client.syncState();
 
-    const normalizeHexWord = (hex) => {
-      if (!hex) return undefined;
-      const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
-      return normalized;
-    };
+      const normalizeHexWord = (hex) => {
+        if (!hex) return undefined;
+        const normalized = hex.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+        return normalized;
+      };
 
-    // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
-    // --------------------------------------------------------------------------
+      // BUILD ACCOUNT WITH COMPONENT THAT MODIFIES STORAGE MAP
+      // --------------------------------------------------------------------------
 
-    const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
-    const FPI_STORAGE_VALUE = new window.Word(
-      new BigUint64Array([0n, 0n, 0n, 1n])
-    );
+      const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
+      const FPI_STORAGE_VALUE = new window.Word(
+        new BigUint64Array([0n, 0n, 0n, 1n])
+      );
 
-    let storageMap = new window.StorageMap();
-    storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
-    storageMap.insert(
-      new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
-      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
-    );
+      let storageMap = new window.StorageMap();
+      storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
+      storageMap.insert(
+        new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
+        new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+      );
 
-    const accountCode = `export.bump_map_item
+      const accountCode = `export.bump_map_item
                     # map key
                     push.1.1.1.1 # Map key
                     # item index
@@ -1281,116 +1350,128 @@ export const testStorageMap = async (page: Page): Promise<any> => {
                 end
         `;
 
-    let builder = client.createScriptBuilder();
-    let bumpItemComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
-      [window.StorageSlot.map(storageMap)]
-    ).withSupportsAllTypes();
+      let builder = client.createScriptBuilder();
+      let bumpItemComponent = window.AccountComponent.compile(
+        accountCode,
+        builder,
+        [window.StorageSlot.map(storageMap)]
+      ).withSupportsAllTypes();
 
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(walletSeed);
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+      let secretKey = window.SecretKey[schemeSecretKeyFunction](walletSeed);
+      let authComponent =
+        window.AccountComponent.createAuthComponent(secretKey);
 
-    let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
-      .withAuthComponent(authComponent)
-      .withComponent(bumpItemComponent)
-      .storageMode(window.AccountStorageMode.public())
-      .build();
+      let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
+        .withAuthComponent(authComponent)
+        .withComponent(bumpItemComponent)
+        .storageMode(window.AccountStorageMode.public())
+        .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(bumpItemAccountBuilderResult.account, false);
-    await client.syncState();
+      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.newAccount(bumpItemAccountBuilderResult.account, false);
+      await client.syncState();
 
-    let initialMapValue = (
-      await client.getAccount(bumpItemAccountBuilderResult.account.id())
-    )
-      ?.storage()
-      .getMapItem(1, MAP_KEY)
-      ?.toHex();
+      let initialMapValue = (
+        await client.getAccount(bumpItemAccountBuilderResult.account.id())
+      )
+        ?.storage()
+        .getMapItem(1, MAP_KEY)
+        ?.toHex();
 
-    // Deploy counter account
+      // Deploy counter account
 
-    let accountComponentLib = builder.buildLibrary(
-      "external_contract::bump_item_contract",
-      accountCode
-    );
+      let accountComponentLib = builder.buildLibrary(
+        "external_contract::bump_item_contract",
+        accountCode
+      );
 
-    builder.linkDynamicLibrary(accountComponentLib);
+      builder.linkDynamicLibrary(accountComponentLib);
 
-    let txScript = builder.compileTxScript(
-      `use.external_contract::bump_item_contract
+      let txScript = builder.compileTxScript(
+        `use.external_contract::bump_item_contract
       begin
           call.bump_item_contract::bump_map_item
       end`
-    );
-
-    let txIncrementRequest = new window.TransactionRequestBuilder()
-      .withCustomScript(txScript)
-      .build();
-
-    let txResult = await window.helpers.executeAndApplyTransaction(
-      bumpItemAccountBuilderResult.account.id(),
-      txIncrementRequest
-    );
-    await window.helpers.waitForTransaction(
-      txResult.executedTransaction().id().toHex()
-    );
-
-    let finalMapValue = (
-      await client.getAccount(bumpItemAccountBuilderResult.account.id())
-    )
-      ?.storage()
-      .getMapItem(1, MAP_KEY)
-      ?.toHex();
-
-    // Test getMapEntries() functionality
-    let accountStorage = (
-      await client.getAccount(bumpItemAccountBuilderResult.account.id())
-    )?.storage();
-    let mapEntries = accountStorage?.getMapEntries(1);
-
-    // Verify we get the expected entries
-    let expectedKey = MAP_KEY.toHex();
-    let expectedValue = normalizeHexWord(finalMapValue);
-
-    let mapEntriesData = {
-      entriesCount: mapEntries?.length || 0,
-      hasExpectedEntry: false,
-      expectedKey: expectedKey,
-      expectedValue: expectedValue,
-    };
-
-    if (expectedValue && mapEntries && mapEntries.length > 0) {
-      mapEntriesData.hasExpectedEntry = mapEntries.some(
-        (entry) =>
-          entry.key === expectedKey &&
-          normalizeHexWord(entry.value) === expectedValue
       );
-    }
 
-    return {
-      initialMapValue: normalizeHexWord(initialMapValue),
-      finalMapValue: normalizeHexWord(finalMapValue),
-      mapEntries: mapEntriesData,
-    };
-  });
+      let txIncrementRequest = new window.TransactionRequestBuilder()
+        .withCustomScript(txScript)
+        .build();
+
+      let txResult = await window.helpers.executeAndApplyTransaction(
+        bumpItemAccountBuilderResult.account.id(),
+        txIncrementRequest
+      );
+      await window.helpers.waitForTransaction(
+        txResult.executedTransaction().id().toHex()
+      );
+
+      let finalMapValue = (
+        await client.getAccount(bumpItemAccountBuilderResult.account.id())
+      )
+        ?.storage()
+        .getMapItem(1, MAP_KEY)
+        ?.toHex();
+
+      // Test getMapEntries() functionality
+      let accountStorage = (
+        await client.getAccount(bumpItemAccountBuilderResult.account.id())
+      )?.storage();
+      let mapEntries = accountStorage?.getMapEntries(1);
+
+      // Verify we get the expected entries
+      let expectedKey = MAP_KEY.toHex();
+      let expectedValue = normalizeHexWord(finalMapValue);
+
+      let mapEntriesData = {
+        entriesCount: mapEntries?.length || 0,
+        hasExpectedEntry: false,
+        expectedKey: expectedKey,
+        expectedValue: expectedValue,
+      };
+
+      if (expectedValue && mapEntries && mapEntries.length > 0) {
+        mapEntriesData.hasExpectedEntry = mapEntries.some(
+          (entry) =>
+            entry.key === expectedKey &&
+            normalizeHexWord(entry.value) === expectedValue
+        );
+      }
+
+      return {
+        initialMapValue: normalizeHexWord(initialMapValue),
+        finalMapValue: normalizeHexWord(finalMapValue),
+        mapEntries: mapEntriesData,
+      };
+    },
+    { schemeSecretKeyFunction }
+  );
 };
 
 test.describe("storage map test", () => {
-  test.setTimeout(50000);
-  test("storage map is updated correctly in transaction", async ({ page }) => {
-    let { initialMapValue, finalMapValue, mapEntries } =
-      await testStorageMap(page);
-    expect(initialMapValue).toBe("1");
-    expect(finalMapValue).toBe("2");
+  [
+    { authScheme: "ECDSA", schemeSecretKeyFunction: "ecdsaWithRNG" },
+    { authScheme: "Falcon", schemeSecretKeyFunction: "rpoFalconWithRNG" },
+  ].forEach(({ authScheme, schemeSecretKeyFunction }) => {
+    test.setTimeout(50000);
+    test(`storage map is updated correctly in transaction (${authScheme})`, async ({
+      page,
+    }) => {
+      let { initialMapValue, finalMapValue, mapEntries } = await testStorageMap(
+        page,
+        schemeSecretKeyFunction
+      );
+      expect(initialMapValue).toBe("1");
+      expect(finalMapValue).toBe("2");
 
-    // Test getMapEntries() functionality
-    expect(mapEntries.entriesCount).toBeGreaterThan(1);
-    expect(mapEntries.hasExpectedEntry).toBe(true);
-    expect(mapEntries.expectedKey).toBeDefined();
-    expect(mapEntries.expectedValue).toBe("2");
+      // Test getMapEntries() functionality
+      expect(mapEntries.entriesCount).toBeGreaterThan(1);
+      expect(mapEntries.hasExpectedEntry).toBe(true);
+      expect(mapEntries.expectedKey).toBeDefined();
+      expect(mapEntries.expectedValue).toBe("2");
+    });
   });
 });
