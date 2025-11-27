@@ -154,10 +154,15 @@ impl MintCmd {
         // note_type: NoteType,
         client: &mut Client<AUTH>,
     ) -> Result<(), CliError> {
+        client.sync_state().await?;
+
         let faucet_account_id = self.faucet_account_id.as_ref().ok_or(CliError::Input(
             "Faucet account ID is required when not using --new-faucet flag".to_string(),
         ))?;
         let faucet_account_id = parse_account_id(client, faucet_account_id).await?;
+
+        // Import the accounts to the client's store (for fetching owner word and vault assets)
+        client.import_account_by_id(faucet_account_id).await?;
 
         let faucet = client
             .get_account(faucet_account_id)
@@ -177,6 +182,9 @@ impl MintCmd {
             })?;
         let stored_owner_id =
             AccountId::new_unchecked([stored_owner_word[3], stored_owner_word[2]]);
+
+        // Import the owner account to the client's store (for publishing the MINT note transaction)
+        client.import_account_by_id(stored_owner_id).await?;
 
         // Compute the output P2ID note
         let amount = self.amount;
@@ -271,14 +279,7 @@ impl MintCmd {
         // Wait for CONSUME P2ID note consumption transaction to be processed
         wait_for_transaction(client, consume_p2id_note_transaction_id).await?;
 
-        // Get updated asset balance
-        client.sync_state().await?;
-        let target_account = client.get_account(target_account_id).await?.ok_or_else(|| {
-            CliError::Input(format!("Target account {target_account_id} was not found"))
-        })?;
-        let asset_balance = target_account.account().vault().get_balance(faucet_account_id);
-
-        println!("Tokens have been minted successfully. New token balance: {:?}", asset_balance);
+        println!("Tokens have been minted successfully.");
 
         Ok(())
     }
@@ -611,8 +612,10 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     delegated_proving: bool,
 ) -> Result<TransactionId, CliError> {
     println!("Executing transaction...");
+    println!("before executing");
     let transaction_result = client.execute_transaction(account_id, transaction_request).await?;
 
+    println!("after executing");
     let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation

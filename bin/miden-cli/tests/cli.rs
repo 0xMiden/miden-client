@@ -605,6 +605,64 @@ async fn consume_unauthenticated_note() -> Result<()> {
 // DEVNET & TESTNET TESTS
 // ================================================================================================
 
+/// This test is opt-in and exercises the network faucet mint flow against a real testnet endpoint.
+/// Run with: `cargo test -p miden-cli --test cli mint_using_network_faucet_on_testnet -- --ignored`
+#[tokio::test]
+#[ignore = "requires live testnet access and funded faucet"]
+async fn mint_using_network_faucet_on_testnet() -> Result<()> {
+    let endpoint = Endpoint::testnet();
+    let faucet_id = std::env::var("TEST_MIDEN_FAUCET_ID")
+        .unwrap_or_else(|_| "0xe4b4385a7e3295600ca163b5db8a18".to_string());
+    let amount = 1_000u64;
+
+    let store_path = create_test_store_path();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
+    let target_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.args([
+        "mint",
+        "--faucet",
+        &faucet_id,
+        "--target",
+        &target_account_id,
+        "--amount",
+        &amount.to_string(),
+        "--force",
+    ]);
+
+    let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    if !output.status.success() {
+        eprintln!(
+            "mint via network faucet failed\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    assert!(output.status.success());
+
+    // Ensure local store catches up after both network transactions
+    sync_cli(&temp_dir);
+
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let account = client
+        .get_account(AccountId::from_hex(&target_account_id)?)
+        .await?
+        .expect("wallet account should exist after mint");
+
+    let balance = account
+        .account()
+        .vault()
+        .get_balance(AccountId::from_hex(&faucet_id)?)
+        .unwrap_or(0);
+
+    println!("balance: {:?}", balance);
+    println!("amount: {:?}", amount);
+
+    assert_eq!(balance, amount, "minted amount should match requested amount");
+    Ok(())
+}
+
 #[tokio::test]
 async fn init_with_devnet() -> Result<()> {
     let store_path = create_test_store_path();
