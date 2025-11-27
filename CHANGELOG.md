@@ -4,7 +4,7 @@
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Changed the note script pre-loading step to include all expected scripts based on specified recipients ([#1539](https://github.com/0xMiden/miden-client/pull/1539)).
-* Added RPC limit handling for `check_nullifiers` and `get_notes_by_id` ([#1511](https://github.com/0xMiden/miden-client/pull/1511)).
+* Added RPC limit handling for `check_nullifiers` and `get_notes_by_id` ([#1558](https://github.com/0xMiden/miden-client/pull/1558)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
