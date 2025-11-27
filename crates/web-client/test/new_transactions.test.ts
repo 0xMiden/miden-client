@@ -138,27 +138,19 @@ test.describe("mint transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    [
-      { authScheme: "ECDSA", schemeID: 1 },
-      { authScheme: "Falcon", schemeID: 0 },
-    ].forEach(({ authScheme, schemeID }) => {
-      test(description + ` (${authScheme})`, async ({ page }) => {
-        // This test was added in #995 to reproduce an issue in the web wallet.
-        // It is useful because most tests consume the note right on the latest client block,
-        // but this test mints 3 notes and consumes them after the fact. This ensures the
-        // MMR data for old blocks is available and valid so that the notes can be consumed.
-        const { faucetId, accountId } = await setupWalletAndFaucet(
-          page,
-          schemeID
-        );
-        const result = await multipleMintsTest(page, accountId, faucetId, flag);
+    test(description, async ({ page }) => {
+      // This test was added in #995 to reproduce an issue in the web wallet.
+      // It is useful because most tests consume the note right on the latest client block,
+      // but this test mints 3 notes and consumes them after the fact. This ensures the
+      // MMR data for old blocks is available and valid so that the notes can be consumed.
+      const { faucetId, accountId } = await setupWalletAndFaucet(page);
+      const result = await multipleMintsTest(page, accountId, faucetId, flag);
 
-        expect(result.transactionIds.length).toEqual(3);
-        expect(result.numOutputNotesCreated).toEqual(3);
-        expect(result.nonce).toEqual("3");
-        expect(result.finalBalance).toEqual("3000");
-        expect(result.createdNoteIds.length).toEqual(3);
-      });
+      expect(result.transactionIds.length).toEqual(3);
+      expect(result.numOutputNotesCreated).toEqual(3);
+      expect(result.nonce).toEqual("3");
+      expect(result.finalBalance).toEqual("3000");
+      expect(result.createdNoteIds.length).toEqual(3);
     });
   });
 });
@@ -312,72 +304,49 @@ test.describe("swap transaction tests", () => {
   ];
 
   testCases.forEach(({ flag, description }) => {
-    [
-      { authScheme: "ECDSA", schemeIDs: [1, 1] },
-      { authScheme: "Falcon", schemeIDs: [0, 0] },
-      { authScheme: "Mixed ECDSA/Falcon", schemeIDs: [0, 1] },
-    ].forEach(
-      ({
-        authScheme,
-        schemeIDs: [schemeIDFirstAccount, schemeIDSecondAccount],
-      }) => {
-        test(description + ` (${authScheme})`, async ({ page }) => {
-          const { accountId: accountA, faucetId: faucetA } =
-            await setupWalletAndFaucet(page, schemeIDFirstAccount);
-          const { accountId: accountB, faucetId: faucetB } =
-            await setupWalletAndFaucet(page, schemeIDSecondAccount);
+    test(description, async ({ page }) => {
+      const { accountId: accountA, faucetId: faucetA } =
+        await setupWalletAndFaucet(page);
+      const { accountId: accountB, faucetId: faucetB } =
+        await setupWalletAndFaucet(page);
 
-          const assetAAmount = BigInt(1);
-          const assetBAmount = BigInt(25);
+      const assetAAmount = BigInt(1);
+      const assetBAmount = BigInt(25);
 
-          await mintAndConsumeTransaction(page, accountA, faucetA, flag);
-          await mintAndConsumeTransaction(page, accountB, faucetB, flag);
+      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
+      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
 
-          const { accountAAssets, accountBAssets } = await swapTransaction(
-            page,
-            accountA,
-            accountB,
-            faucetA,
-            assetAAmount,
-            faucetB,
-            assetBAmount,
-            "private",
-            "private",
-            flag
-          );
+      const { accountAAssets, accountBAssets } = await swapTransaction(
+        page,
+        accountA,
+        accountB,
+        faucetA,
+        assetAAmount,
+        faucetB,
+        assetBAmount,
+        "private",
+        "private",
+        flag
+      );
 
-          // --- assertions for Account A ---
-          const aA = accountAAssets!.find((a) => a.assetId === faucetA);
-          expect(
-            aA,
-            `Expected to find asset ${faucetA} on Account A`
-          ).toBeTruthy();
-          expect(BigInt(aA!.amount)).toEqual(999n);
+      // --- assertions for Account A ---
+      const aA = accountAAssets!.find((a) => a.assetId === faucetA);
+      expect(aA, `Expected to find asset ${faucetA} on Account A`).toBeTruthy();
+      expect(BigInt(aA!.amount)).toEqual(999n);
 
-          const aB = accountAAssets!.find((a) => a.assetId === faucetB);
-          expect(
-            aB,
-            `Expected to find asset ${faucetB} on Account A`
-          ).toBeTruthy();
-          expect(BigInt(aB!.amount)).toEqual(25n);
+      const aB = accountAAssets!.find((a) => a.assetId === faucetB);
+      expect(aB, `Expected to find asset ${faucetB} on Account A`).toBeTruthy();
+      expect(BigInt(aB!.amount)).toEqual(25n);
 
-          // --- assertions for Account B ---
-          const bA = accountBAssets!.find((a) => a.assetId === faucetA);
-          expect(
-            bA,
-            `Expected to find asset ${faucetA} on Account B`
-          ).toBeTruthy();
-          expect(BigInt(bA!.amount)).toEqual(1n);
+      // --- assertions for Account B ---
+      const bA = accountBAssets!.find((a) => a.assetId === faucetA);
+      expect(bA, `Expected to find asset ${faucetA} on Account B`).toBeTruthy();
+      expect(BigInt(bA!.amount)).toEqual(1n);
 
-          const bB = accountBAssets!.find((a) => a.assetId === faucetB);
-          expect(
-            bB,
-            `Expected to find asset ${faucetB} on Account B`
-          ).toBeTruthy();
-          expect(BigInt(bB!.amount)).toEqual(975n);
-        });
-      }
-    );
+      const bB = accountBAssets!.find((a) => a.assetId === faucetB);
+      expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
+      expect(BigInt(bB!.amount)).toEqual(975n);
+    });
   });
 });
 
