@@ -16,6 +16,7 @@ impl AuthSecretKey {
         match &self.0 {
             NativeAuthSecretKey::RpoFalcon512(key) => key.public_key().to_commitment(),
             NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key().to_commitment(),
+            _ => todo!(),
         }
     }
 
