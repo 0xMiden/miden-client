@@ -36,6 +36,14 @@ Create a note with an optional `InputNote`.
 
 ## Properties
 
+### header
+
+> `readonly` **header**: [`NoteHeader`](NoteHeader.md)
+
+The note's header, containing the ID and metadata.
+
+***
+
 ### inputNote
 
 > `readonly` **inputNote**: [`InputNote`](InputNote.md)
