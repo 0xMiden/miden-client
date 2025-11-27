@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::word::Word;
+use crate::models::package::Package;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
 #[derive(Clone)]
@@ -41,6 +42,15 @@ impl NoteScript {
 
     pub fn root(&self) -> Word {
         self.0.root().into()
+    }
+
+    /// Creates a `NoteScript` from the given `Package`.
+    /// Throws if the package is invalid.
+    #[wasm_bindgen(js_name = "fromPackage")]
+    pub fn from_package(package: &Package) -> Result<NoteScript, JsValue> {
+        let program = package.as_program()?;
+        let native_note_script = NativeNoteScript::new(program.into());
+        Ok(native_note_script.into())
     }
 }
 // CONVERSIONS
