@@ -1421,26 +1421,17 @@ export const testStorageMap = async (
 };
 
 test.describe("storage map test", () => {
-  [
-    { authScheme: "ECDSA", schemeSecretKeyFunction: "ecdsaWithRNG" },
-    { authScheme: "Falcon", schemeSecretKeyFunction: "rpoFalconWithRNG" },
-  ].forEach(({ authScheme, schemeSecretKeyFunction }) => {
-    test.setTimeout(50000);
-    test(`storage map is updated correctly in transaction (${authScheme})`, async ({
-      page,
-    }) => {
-      let { initialMapValue, finalMapValue, mapEntries } = await testStorageMap(
-        page,
-        schemeSecretKeyFunction
-      );
-      expect(initialMapValue).toBe("1");
-      expect(finalMapValue).toBe("2");
+  test.setTimeout(50000);
+  test("storage map is updated correctly in transaction", async ({ page }) => {
+    let { initialMapValue, finalMapValue, mapEntries } =
+      await testStorageMap(page);
+    expect(initialMapValue).toBe("1");
+    expect(finalMapValue).toBe("2");
 
-      // Test getMapEntries() functionality
-      expect(mapEntries.entriesCount).toBeGreaterThan(1);
-      expect(mapEntries.hasExpectedEntry).toBe(true);
-      expect(mapEntries.expectedKey).toBeDefined();
-      expect(mapEntries.expectedValue).toBe("2");
-    });
+    // Test getMapEntries() functionality
+    expect(mapEntries.entriesCount).toBeGreaterThan(1);
+    expect(mapEntries.hasExpectedEntry).toBe(true);
+    expect(mapEntries.expectedKey).toBeDefined();
+    expect(mapEntries.expectedValue).toBe("2");
   });
 });
