@@ -89,7 +89,7 @@ use crate::transaction::ForeignAccount;
 // ================================================================================================
 
 // TODO: We need a better structured way of getting limits as defined by the node (#1139)
-pub const NOTE_IDS_LIMIT: usize = 500;
+pub const NOTE_IDS_LIMIT: usize = 100;
 pub const NULLIFIER_PREFIXES_LIMIT: usize = 500;
 
 // NODE RPC CLIENT TRAIT
