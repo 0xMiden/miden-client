@@ -85,6 +85,13 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+// TODO: We need a better structured way of getting limits as defined by the node (#1139)
+pub const NOTE_IDS_LIMIT: usize = 100;
+pub const NULLIFIER_PREFIXES_LIMIT: usize = 100;
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -239,21 +246,18 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let mut public_notes = Vec::with_capacity(note_ids.len());
-        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
-        for chunk in note_ids.chunks(1_000) {
-            let note_details = self.get_notes_by_id(chunk).await?;
+        let note_details = self.get_notes_by_id(note_ids).await?;
 
-            for detail in note_details {
-                if let FetchedNote::Public(note, inclusion_proof) = detail {
-                    let state = UnverifiedNoteState {
-                        metadata: *note.metadata(),
-                        inclusion_proof,
-                    }
-                    .into();
-                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                    public_notes.push(note);
+        for detail in note_details {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
+                let state = UnverifiedNoteState {
+                    metadata: *note.metadata(),
+                    inclusion_proof,
                 }
+                .into();
+                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                public_notes.push(note);
             }
         }
 
