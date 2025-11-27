@@ -76,9 +76,9 @@ Print the MAST source for this script.
 
 ***
 
-### from\_package()
+### fromPackage()
 
-> `static` **from\_package**(`_package`): `NoteScript`
+> `static` **fromPackage**(`_package`): `NoteScript`
 
 Creates a `NoteScript` from the given `Package`.
 Throws if the package is invalid.
