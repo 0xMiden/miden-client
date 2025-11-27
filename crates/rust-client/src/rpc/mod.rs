@@ -143,23 +143,7 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
-    ///
-    /// The default implementation of this method splits the list of note IDs into smaller batches
-    /// of size `NOTE_IDS_LIMIT`. Each batch is handled by using
-    /// [`NodeRpcClient::get_notes_by_id_inner`].
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let mut notes = Vec::with_capacity(note_ids.len());
-        for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
-            notes.extend(self.get_notes_by_id_inner(chunk).await?);
-        }
-        Ok(notes)
-    }
-
-    /// Inner implementation of `get_notes_by_id` that performs the actual RPC call.
-    async fn get_notes_by_id_inner(
-        &self,
-        note_ids: &[NoteId],
-    ) -> Result<Vec<FetchedNote>, RpcError>;
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
     /// `/SyncState` RPC endpoint.
@@ -214,24 +198,7 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
     /// `/CheckNullifiers` RPC endpoint.
-    ///
-    /// The default implementation of this method splits the list of nullifiers into smaller batches
-    /// of size `NULLIFIER_PREFIXES_LIMIT`. Each batch is handled by using
-    /// [`NodeRpcClient::check_nullifiers_inner`].
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let mut proofs = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
-            proofs.extend(self.check_nullifiers_inner(chunk).await?);
-        }
-        Ok(proofs)
-    }
-
-    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
-    /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers_inner(
-        &self,
-        nullifiers: &[Nullifier],
-    ) -> Result<Vec<SmtProof>, RpcError>;
+    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
     /// specified foreign accounts, using the `GetAccountProofs` endpoint.
