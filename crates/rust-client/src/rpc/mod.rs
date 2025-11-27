@@ -144,7 +144,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
     ///
-    /// The default implementation of this method uses [`NodeRpcClient::get_notes_by_id_inner`].
+    /// The default implementation of this method splits the list of note IDs into smaller batches
+    /// of size `NOTE_IDS_LIMIT`. Each batch is handled by using
+    /// [`NodeRpcClient::get_notes_by_id_inner`].
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
@@ -213,7 +215,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
     /// `/CheckNullifiers` RPC endpoint.
     ///
-    /// The default implementation of this method uses [`NodeRpcClient::check_nullifiers_inner`].
+    /// The default implementation of this method splits the list of nullifiers into smaller batches
+    /// of size `NULLIFIER_PREFIXES_LIMIT`. Each batch is handled by using
+    /// [`NodeRpcClient::check_nullifiers_inner`].
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
         let mut proofs = Vec::with_capacity(nullifiers.len());
         for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
