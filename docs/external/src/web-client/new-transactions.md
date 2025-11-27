@@ -263,7 +263,7 @@ import {
     NoteMetadata,
     NoteTag,
     NoteType,
-    OutputNotesArray,
+    OutputNoteArray,
     TransactionProver,
     TransactionRequestBuilder,
     TransactionScript,
@@ -302,7 +302,7 @@ try {
     const transactionScript = new TransactionScript(noteScript);
 
     // Create output notes array
-    const outputNotes = new OutputNotesArray();
+    const outputNotes = new OutputNoteArray();
     // Add your output notes here
 
     // Create expected notes array
