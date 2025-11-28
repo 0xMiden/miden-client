@@ -2,6 +2,41 @@ import loadWasm from "../../dist/wasm.js";
 const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "../constants.js";
 
+const serializeUnknown = (value) => {
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const serializeError = (error) => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause ? serializeError(error.cause) : undefined,
+      code: error.code,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    return {
+      name: error.name ?? "Error",
+      message: error.message ?? serializeUnknown(error),
+    };
+  }
+
+  return {
+    name: "Error",
+    message: serializeUnknown(error),
+  };
+};
+
 /**
  * Worker for executing WebClient methods in a separate thread.
  *
@@ -245,8 +280,12 @@ async function processMessage(event) {
       throw new Error(`Unsupported action: ${action}`);
     }
   } catch (error) {
-    console.error(`WORKER: Error occurred - ${error}`);
-    self.postMessage({ requestId, error: error });
+    const serializedError = serializeError(error);
+    console.error(
+      `WORKER: Error occurred - ${serializedError.message}`,
+      error
+    );
+    self.postMessage({ requestId, error: serializedError });
   }
 }
 
