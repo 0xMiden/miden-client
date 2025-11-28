@@ -54,7 +54,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                null
+                10_000
               );
           }
 
