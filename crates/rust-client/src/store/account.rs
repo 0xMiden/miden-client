@@ -3,9 +3,17 @@
 use alloc::vec::Vec;
 use core::fmt::Display;
 
-use miden_objects::Word;
-use miden_objects::account::{Account, AccountId};
+use miden_objects::account::{Account, AccountCode, AccountId, PartialAccount};
 use miden_objects::address::Address;
+use miden_objects::{Felt, Word};
+
+use crate::ClientError;
+
+#[derive(Debug)]
+pub enum AccountRecordData {
+    Full(Account),
+    Partial(PartialAccount),
+}
 
 /// Represents a stored account state along with its status.
 ///
@@ -15,7 +23,7 @@ use miden_objects::address::Address;
 #[derive(Debug)]
 pub struct AccountRecord {
     /// Full account object.
-    account: Account,
+    account_data: AccountRecordData,
     /// Status of the tracked account.
     status: AccountStatus,
     /// Addresses by which this account can be referenced.
@@ -23,19 +31,33 @@ pub struct AccountRecord {
 }
 
 impl AccountRecord {
-    pub fn new(account: Account, status: AccountStatus, addresses: Vec<Address>) -> Self {
+    pub fn new(
+        account_data: AccountRecordData,
+        status: AccountStatus,
+        addresses: Vec<Address>,
+    ) -> Self {
         // TODO: remove this?
         #[cfg(debug_assertions)]
         {
-            let account_seed = account.seed();
+            let account_seed = match &account_data {
+                AccountRecordData::Full(acc) => acc.seed(),
+                AccountRecordData::Partial(acc) => acc.seed(),
+            };
             debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
         }
 
-        Self { account, status, addresses }
+        Self { account_data, status, addresses }
     }
 
-    pub fn account(&self) -> &Account {
-        &self.account
+    pub fn id(&self) -> AccountId {
+        match &self.account_data {
+            AccountRecordData::Full(acc) => acc.id(),
+            AccountRecordData::Partial(acc) => acc.id(),
+        }
+    }
+
+    pub fn account_data(&self) -> &AccountRecordData {
+        &self.account_data
     }
 
     pub fn status(&self) -> &AccountStatus {
@@ -47,17 +69,57 @@ impl AccountRecord {
     }
 
     pub fn seed(&self) -> Option<Word> {
-        self.account.seed()
+        match &self.account_data {
+            AccountRecordData::Full(acc) => acc.seed(),
+            AccountRecordData::Partial(acc) => acc.seed(),
+        }
+    }
+
+    pub fn nonce(&self) -> Felt {
+        match &self.account_data {
+            AccountRecordData::Full(acc) => acc.nonce(),
+            AccountRecordData::Partial(acc) => acc.nonce(),
+        }
+    }
+
+    pub fn commitment(&self) -> Felt {
+        match &self.account_data {
+            AccountRecordData::Full(acc) => acc.nonce(),
+            AccountRecordData::Partial(acc) => acc.nonce(),
+        }
     }
 
     pub fn addresses(&self) -> &Vec<Address> {
         &self.addresses
     }
+
+    pub fn code(&self) -> AccountCode {
+        match &self.account_data {
+            AccountRecordData::Full(acc) => acc.code().clone(),
+            AccountRecordData::Partial(acc) => acc.code().clone(),
+        }
+    }
 }
 
-impl From<AccountRecord> for Account {
-    fn from(record: AccountRecord) -> Self {
-        record.account
+impl TryFrom<AccountRecord> for Account {
+    type Error = ClientError;
+
+    fn try_from(value: AccountRecord) -> Result<Self, Self::Error> {
+        match value.account_data {
+            AccountRecordData::Full(acc) => Ok(acc),
+            AccountRecordData::Partial(acc) => Err(ClientError::AccountRecordNotFull(acc.id())),
+        }
+    }
+}
+
+impl TryFrom<AccountRecord> for PartialAccount {
+    type Error = ClientError;
+
+    fn try_from(value: AccountRecord) -> Result<Self, Self::Error> {
+        match value.account_data {
+            AccountRecordData::Partial(acc) => Ok(acc),
+            AccountRecordData::Full(acc) => Err(ClientError::AccountRecordNotPartial(acc.id())),
+        }
     }
 }
 

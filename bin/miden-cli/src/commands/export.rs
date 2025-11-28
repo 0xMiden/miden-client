@@ -89,7 +89,7 @@ async fn export_account<AUTH>(
         .await?
         .ok_or(CliError::Export(format!("Account with ID {account_id} not found")))?;
 
-    let account: Account = account.into();
+    let account: Account = account.try_into()?;
 
     let mut key_pairs = vec![];
 

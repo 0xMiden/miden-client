@@ -30,6 +30,7 @@ use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
     AccountStatus,
+    AccountStorageFilter,
     BlockRelevance,
     InputNoteRecord,
     NoteFilter,
@@ -244,6 +245,13 @@ impl Store for WebStore {
         self.get_account(account_id).await
     }
 
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        self.get_minimal_partial_account(account_id).await
+    }
+
     async fn upsert_foreign_account_code(
         &self,
         account_id: AccountId,
@@ -270,8 +278,9 @@ impl Store for WebStore {
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        self.get_account_storage(account_id).await
+        self.get_account_storage(account_id, filter).await
     }
 
     async fn get_addresses_by_account_id(

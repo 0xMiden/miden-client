@@ -91,6 +91,7 @@ while IFS=$'\t' read -r pkg_id package_name manifest_path rust_version; do
   fi
 
   # Try to verify the MSRV
+  echo "Executing: $msrv_cmd"
   if ! eval "$msrv_cmd" >/dev/null 2>&1; then
     echo "ERROR: MSRV check failed for $package_name"
     failed_packages="$failed_packages $package_name"

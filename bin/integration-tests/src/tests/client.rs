@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::{AccountId, AccountStorageMode, StorageMap, StorageSlot};
+use miden_client::account::{Account, AccountId, AccountStorageMode, StorageMap, StorageSlot};
 use miden_client::assembly::{DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -157,12 +157,14 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
-    let sender_account = client
+    let sender_account: Account = client
         .get_account(from_account_id)
         .await?
-        .context("failed to find sender account after  transactions")?;
+        .context("failed to find sender account after  transactions")?
+        .try_into()
+        .unwrap();
     assert_eq!(
-        sender_account.account().vault().get_balance(faucet_account_id).unwrap(),
+        sender_account.vault().get_balance(faucet_account_id).unwrap(),
         MINT_AMOUNT - (TRANSFER_AMOUNT * 2)
     );
     Ok(())
@@ -1019,7 +1021,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Store the account state before applying the transaction
     let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_before_tx = account_before_tx.account().commitment();
+    let account_hash_before_tx = account_before_tx.commitment();
 
     // Apply the transaction
     let submission_height = client_1.get_sync_height().await.unwrap();
@@ -1030,7 +1032,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_tx = account_after_tx.account().commitment();
+    let account_hash_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_hash_before_tx, account_hash_after_tx,
@@ -1066,7 +1068,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_sync = account_after_sync.account().commitment();
+    let account_hash_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_hash_after_sync, account_hash_after_tx,
@@ -1167,7 +1169,13 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
             .await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    let private_account = client_1.get_account(from_account_id).await.unwrap().unwrap().into();
+    let private_account = client_1
+        .get_account(from_account_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
 
     // Import private account in client 2
     let (mut client_2, _) = ClientConfig::default()
@@ -1195,8 +1203,13 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     assert!(account_record.is_locked());
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
-    let updated_private_account =
-        client_1.get_account(from_account_id).await.unwrap().unwrap().into();
+    let updated_private_account = client_1
+        .get_account(from_account_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
     client_2.add_account(&updated_private_account, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2

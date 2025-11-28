@@ -11,6 +11,7 @@
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
+* Updated `DataStore` implementation to prevent retrieving whole `vault` and `storage` ([#1419](https://github.com/0xMiden/miden-client/pull/1419))
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
@@ -183,6 +184,7 @@
 * [BREAKING] Removed `AccountId` to bech32 conversions and the `get_account_state_delta` RPC endpoint  ([#1177](https://github.com/0xMiden/miden-client/pull/1177)).
 * [BREAKING] Changed `exportNoteFile` to fail fast on invalid export type ([#1198](https://github.com/0xMiden/miden-client/pull/1198)).
 * [BREAKING] Refactored RPC errors ([#1202](https://github.com/0xMiden/miden-client/pull/1202)).
+* Accounts are now retrieved partially when reading transaction inputs ([#1438](https://github.com/0xMiden/miden-client/pull/1438)).
 
 ## 0.10.2 (2025-08-04)
 

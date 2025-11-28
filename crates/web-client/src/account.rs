@@ -1,5 +1,4 @@
 use miden_client::account::Account as NativeAccount;
-use miden_client::store::AccountRecord;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account::Account;
@@ -36,9 +35,16 @@ impl WebClient {
                 .get_account(account_id.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to get account"))?;
-            let account: Option<NativeAccount> = result.map(AccountRecord::into);
 
-            Ok(account.map(miden_client::account::Account::into))
+            if let Some(account_record) = result {
+                // TODO: add partial account support for web client
+                let native_account: NativeAccount = account_record
+                    .try_into()
+                    .map_err(|_| JsValue::from_str("retrieval of partial account unsupported"))?;
+                Ok(Some(native_account.into()))
+            } else {
+                Ok(None)
+            }
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
