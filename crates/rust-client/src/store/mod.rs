@@ -556,9 +556,8 @@ impl TransactionFilter {
         match self {
             TransactionFilter::All => QUERY.to_string(),
             TransactionFilter::Uncommitted => format!(
-                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                "{QUERY} WHERE tx.status_variant IN ({})",
                 TransactionStatusVariant::Pending as u8,
-                TransactionStatusVariant::Discarded as u8
             ),
             TransactionFilter::Ids(_) => {
                 // Use SQLite's array parameter binding

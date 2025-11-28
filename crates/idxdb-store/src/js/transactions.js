@@ -2,6 +2,7 @@ import { transactions, transactionScripts, } from "./schema.js";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 const IDS_FILTER_PREFIX = "Ids:";
 const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
+const STATUS_PENDING_VARIANT = 0;
 const STATUS_COMMITTED_VARIANT = 1;
 const STATUS_DISCARDED_VARIANT = 2;
 export async function getTransactions(filter) {
@@ -9,7 +10,7 @@ export async function getTransactions(filter) {
     try {
         if (filter === "Uncommitted") {
             transactionRecords = await transactions
-                .filter((tx) => tx.statusVariant !== STATUS_COMMITTED_VARIANT)
+                .filter((tx) => tx.statusVariant === STATUS_PENDING_VARIANT)
                 .toArray();
         }
         else if (filter.startsWith(IDS_FILTER_PREFIX)) {

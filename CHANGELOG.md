@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.6 (TBD)
+
+* Fixed account rollback bug by not loading already discarded transaction on sync state ([#1567](https://github.com/0xMiden/miden-client/pull/1567)).
+
 ## 0.12.5 (2025-11-28)
 
 * Fixed a bug where insertions in the `Addresses` table in the IndexedDB Store resulted in the `id` and `address` fields being inverted with each other ([#1532](https://github.com/0xMiden/miden-client/pull/1532)).
@@ -17,7 +21,6 @@
 * Added `hasProcedure` to `AccountCode` and `getProcedures` to `AccountComponent` in the WebClient ([#1517](https://github.com/0xMiden/miden-client/pull/1517)).
 * Retrieve inclusion proofs for fetched notes from the Note Transport layer ([#1495](https://github.com/0xMiden/miden-client/pull/1495)).
 * Added ECDSA auth component to the rust-client & web-client ([#1527](https://github.com/0xMiden/miden-client/pull/1527))
-
 
 ## 0.12.2 (2025-11-12)
 
