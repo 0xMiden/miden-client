@@ -281,10 +281,7 @@ async function processMessage(event) {
     }
   } catch (error) {
     const serializedError = serializeError(error);
-    console.error(
-      `WORKER: Error occurred - ${serializedError.message}`,
-      error
-    );
+    console.error(`WORKER: Error occurred - ${serializedError.message}`, error);
     self.postMessage({ requestId, error: serializedError });
   }
 }
