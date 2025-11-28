@@ -190,7 +190,7 @@ impl WebStore {
     // TODO: current implementation is a copy of `get_account`,
     // refactor for correct implementation.
     // https://github.com/0xMiden/miden-client/issues/1515
-    pub(crate) async fn get_partial_account(
+    pub(crate) async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {

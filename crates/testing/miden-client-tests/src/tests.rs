@@ -5,19 +5,11 @@ use std::println;
 use std::string::ToString;
 use std::sync::Arc;
 
-use miden_client::account::{
-    Address,
-    AddressInterface,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageSlotType,
-};
+use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
 use miden_client::auth::{
     AuthEcdsaK256Keccak,
     AuthSecretKey,
-    NoAuth,
     PublicKeyCommitment,
     RPO_FALCON_SCHEME_ID,
 };
@@ -80,14 +72,13 @@ use miden_objects::account::{
     AccountComponent,
     AccountHeader,
     AccountId,
-    AccountStorageHeader,
     AccountStorageMode,
     AccountType,
     StorageMap,
     StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
-use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, PartialVault, TokenSymbol};
+use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
     Note,
@@ -2151,13 +2142,11 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    let partial_account = PartialAccount::from(&account);
     client
         .test_store()
-        .insert_partial_account(&partial_account, Address::new(account.id()))
+        .insert_account(&account, Address::new(account.id()))
         .await
         .unwrap();
-    // client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 
@@ -2376,121 +2365,6 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-}
-
-#[tokio::test]
-async fn insert_and_retrieve_partial_account() {
-    let (mut client, _mock_rpc_api, _keystore) = create_test_client().await;
-
-    // Build full account
-    let mut storage_map = StorageMap::new();
-    storage_map
-        .insert(MAP_KEY.into(), [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into())
-        .unwrap();
-    storage_map
-        .insert(
-            [Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)].into(),
-            [Felt::new(1), Felt::new(1), Felt::new(1), Felt::new(1)].into(),
-        )
-        .unwrap();
-    storage_map
-        .insert(
-            [Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)].into(),
-            [Felt::new(2), Felt::new(2), Felt::new(2), Felt::new(2)].into(),
-        )
-        .unwrap();
-    storage_map
-        .insert(
-            [Felt::new(3), Felt::new(3), Felt::new(3), Felt::new(3)].into(),
-            [Felt::new(3), Felt::new(3), Felt::new(3), Felt::new(3)].into(),
-        )
-        .unwrap();
-
-    let bump_item_component = AccountComponent::compile(
-        BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-        TransactionKernel::assembler(),
-        vec![StorageSlot::Map(storage_map.clone())],
-    )
-    .unwrap()
-    .with_supports_all_types();
-
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-
-    let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(NoAuth)
-        .with_component(BasicWallet)
-        .with_component(bump_item_component)
-        .with_assets(vec![
-            FungibleAsset::new(
-                AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap(),
-                10,
-            )
-            .unwrap()
-            .into(),
-            FungibleAsset::new(
-                AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2).unwrap(),
-                20,
-            )
-            .unwrap()
-            .into(),
-        ])
-        .build_existing()
-        .unwrap();
-
-    // Build partial account by removing some elements
-    let storage_map_witness = storage_map.open(&MAP_KEY.into());
-    let mut partial_storage_map = PartialStorageMap::new(storage_map.root());
-    partial_storage_map.add(storage_map_witness).unwrap();
-    let partial_storage = PartialStorage::new(
-        AccountStorageHeader::new(vec![(StorageSlotType::Map, storage_map.root())]),
-        vec![partial_storage_map],
-    )
-    .unwrap();
-
-    let asset_witness = account.vault().open(
-        FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap(), 0)
-            .unwrap()
-            .vault_key(),
-    );
-    let mut partial_vault = PartialVault::new(account.vault().root());
-    partial_vault.add(asset_witness).unwrap();
-
-    let partial_account = PartialAccount::new(
-        account.id(),
-        account.nonce(),
-        account.code().clone(),
-        partial_storage,
-        partial_vault,
-        account.seed(),
-    )
-    .unwrap();
-
-    assert!(
-        client
-            .test_store()
-            .insert_partial_account(&partial_account, Address::new(partial_account.id()))
-            .await
-            .is_ok()
-    );
-
-    let partial_account_record = client
-        .test_store()
-        .get_partial_account(partial_account.id())
-        .await
-        .unwrap()
-        .unwrap();
-    let retrieved_partial_account: PartialAccount = partial_account_record.try_into().unwrap();
-
-    // Compare parts separately so we know which one specifically mismatches
-    assert_eq!(retrieved_partial_account.vault(), partial_account.vault());
-    assert_eq!(retrieved_partial_account.storage(), partial_account.storage());
-    assert_eq!(retrieved_partial_account.code(), partial_account.code());
-    assert_eq!(retrieved_partial_account.commitment(), partial_account.commitment());
-
-    assert_eq!(retrieved_partial_account, partial_account);
 }
 
 // HELPERS

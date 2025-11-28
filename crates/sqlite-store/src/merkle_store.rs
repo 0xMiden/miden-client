@@ -1,9 +1,9 @@
 use miden_client::Word;
-use miden_client::account::{AccountStorage, PartialStorage, StorageMap, StorageSlot};
+use miden_client::account::{AccountStorage, StorageMap, StorageSlot};
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::crypto::{MerklePath, MerkleStore, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof};
 use miden_client::store::StoreError;
-use miden_objects::asset::{AssetVaultKey, PartialVault};
+use miden_objects::asset::AssetVaultKey;
 use miden_objects::crypto::merkle::Smt;
 
 /// Retrieves the Merkle proof for a specific asset in the merkle store.
@@ -52,11 +52,6 @@ pub fn insert_asset_nodes(merkle_store: &mut MerkleStore, vault: &AssetVault) {
     merkle_store.extend(smt.inner_nodes());
 }
 
-/// Inserts the partial asset vault SMT nodes to the merkle store.
-pub fn insert_partial_asset_nodes(merkle_store: &mut MerkleStore, vault: &PartialVault) {
-    merkle_store.extend(vault.inner_nodes());
-}
-
 /// Retrieves the Merkle proof for a specific storage map item in the merkle store.
 pub fn get_storage_map_item_proof(
     merkle_store: &MerkleStore,
@@ -99,9 +94,6 @@ pub fn insert_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &Accoun
     }
 }
 
-pub fn insert_partial_storage_map_nodes(merkle_store: &mut MerkleStore, storage: &PartialStorage) {
-    merkle_store.extend(storage.inner_nodes());
-}
 // HELPERS
 // ================================================================================================
 

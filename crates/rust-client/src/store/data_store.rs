@@ -69,7 +69,7 @@ impl DataStore for ClientDataStore {
 
         let partial_account_record = self
             .store
-            .get_partial_account(account_id)
+            .get_minimal_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
         let partial_account: PartialAccount = partial_account_record

@@ -45,8 +45,6 @@ use crate::merkle_store::{
     get_asset_proof,
     get_storage_map_item_proof,
     insert_asset_nodes,
-    insert_partial_asset_nodes,
-    insert_partial_storage_map_nodes,
     insert_storage_map_nodes,
     update_asset_nodes,
     update_storage_map_nodes,
@@ -197,7 +195,7 @@ impl SqliteStore {
         Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
-    pub(crate) fn get_partial_account(
+    pub(crate) fn get_minimal_partial_account(
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
@@ -208,14 +206,7 @@ impl SqliteStore {
 
         // Partial vault retrieval
         let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
-        let mut partial_vault = PartialVault::new(header.vault_root());
-        for asset in query_vault_assets(conn, "root = ?", params![header.vault_root().to_hex()])? {
-            let proof = get_asset_proof(&merkle_store, header.vault_root(), &asset)?;
-            let witness = AssetWitness::new(proof).map_err(StoreError::AssetError)?;
-            partial_vault
-                .add(witness)
-                .map_err(|e| StoreError::PartialAssetVaultError(e.to_string()))?; // TODO: prevent converting err to string
-        }
+        let partial_vault = PartialVault::new(header.vault_root());
 
         // Partial storage retrieval
         let mut storage_header = vec![];
@@ -298,68 +289,6 @@ impl SqliteStore {
         let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
         insert_storage_map_nodes(&mut merkle_store, account.storage());
         insert_asset_nodes(&mut merkle_store, account.vault());
-
-        Ok(())
-    }
-
-    pub(crate) fn insert_partial_account(
-        conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
-        partial_account: &PartialAccount,
-        initial_address: &Address,
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_account_code(&tx, partial_account.code())?;
-
-        for (index, (slot_type, value)) in partial_account.storage().header().slots().enumerate() {
-            SqliteStore::insert_storage_value(
-                &tx,
-                partial_account.storage().commitment(),
-                index,
-                *slot_type,
-                value,
-            )?;
-
-            match slot_type {
-                StorageSlotType::Value => {},
-                StorageSlotType::Map => {
-                    let map =
-                        partial_account.storage().maps().find(|map| map.root() == *value).ok_or(
-                            StoreError::AccountError(AccountError::StorageMapRootNotFound(*value)),
-                        )?;
-
-                    let entries = map.entries().map(|(key, value)| (*key, *value));
-                    SqliteStore::insert_storage_map_entries(&tx, map.root(), entries)?;
-                },
-            }
-        }
-
-        // TODO: This should be exposed from miden_base
-        let mut assets = vec![];
-        for leaf in partial_account.vault().leaves() {
-            match leaf {
-                SmtLeaf::Single((_, value)) => assets.push(Asset::try_from(value)?),
-                SmtLeaf::Multiple(items) => {
-                    for (_, value) in items {
-                        assets.push(Asset::try_from(value)?);
-                    }
-                },
-                SmtLeaf::Empty(_) => {},
-            }
-        }
-
-        Self::insert_assets(&tx, partial_account.vault().root(), assets.into_iter())?;
-
-        Self::insert_account_header(&tx, &partial_account.into(), partial_account.seed())?;
-
-        Self::insert_address(&tx, initial_address, partial_account.id())?;
-
-        tx.commit().into_store_error()?;
-
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
-        insert_partial_storage_map_nodes(&mut merkle_store, partial_account.storage());
-        insert_partial_asset_nodes(&mut merkle_store, partial_account.vault());
 
         Ok(())
     }
@@ -1025,44 +954,6 @@ impl SqliteStore {
                 }
             }
         }
-
-        Ok(())
-    }
-
-    fn insert_storage_map_entries(
-        tx: &Transaction<'_>,
-        root: Word,
-        entries: impl Iterator<Item = (Word, Word)>,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(storage_map_entries { root, key, value } | REPLACE);
-        for (key, value) in entries {
-            tx.execute(QUERY, params![root.to_hex(), key.to_hex(), value.to_hex()])
-                .into_store_error()?;
-        }
-        Ok(())
-    }
-
-    fn insert_storage_value(
-        tx: &Transaction<'_>,
-        commitment: Word,
-        index: usize,
-        slot_type: StorageSlotType,
-        value: &Word,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(
-            account_storage {
-                commitment,
-                slot_index,
-                slot_value,
-                slot_type
-            } | REPLACE
-        );
-
-        tx.execute(
-            QUERY,
-            params![commitment.to_hex(), index, value.to_hex(), slot_type.to_bytes()],
-        )
-        .into_store_error()?;
 
         Ok(())
     }

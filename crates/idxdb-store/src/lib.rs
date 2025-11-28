@@ -22,7 +22,6 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
-    PartialAccount,
 };
 use miden_client::asset::AssetVault;
 use miden_client::block::BlockHeader;
@@ -217,16 +216,6 @@ impl Store for WebStore {
         self.update_account(new_account_state).await
     }
 
-    async fn insert_partial_account(
-        &self,
-        _partial_account: &PartialAccount,
-        _initial_address: Address,
-    ) -> Result<(), StoreError> {
-        // TODO: implement partial account insertion
-        // https://github.com/0xMiden/miden-client/issues/1515
-        unimplemented!()
-    }
-
     async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
         self.get_account_ids().await
     }
@@ -256,11 +245,11 @@ impl Store for WebStore {
         self.get_account(account_id).await
     }
 
-    async fn get_partial_account(
+    async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        self.get_partial_account(account_id).await
+        self.get_minimal_partial_account(account_id).await
     }
 
     async fn upsert_foreign_account_code(
