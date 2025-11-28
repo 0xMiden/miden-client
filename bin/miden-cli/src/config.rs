@@ -38,6 +38,9 @@ pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
 pub struct CliConfig {
     /// Describes settings related to the RPC endpoint.
     pub rpc: RpcConfig,
+    /// Settings related to the faucet API endpoint.
+    #[serde(default)]
+    pub faucet: FaucetConfig,
     /// Path to the `SQLite` store file.
     pub store_filepath: PathBuf,
     /// Path to the directory that contains the secret key files.
@@ -77,6 +80,7 @@ impl Default for CliConfig {
         // These will be resolved relative to the .miden directory when the config is loaded
         Self {
             rpc: RpcConfig::default(),
+            faucet: FaucetConfig::default(),
             store_filepath: PathBuf::from(STORE_FILENAME),
             secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
             token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILENAME),
@@ -126,6 +130,37 @@ impl Default for NoteTransportConfig {
         Self {
             endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
             timeout_ms: 10000,
+        }
+    }
+}
+
+// FAUCET CONFIG
+// ================================================================================================
+
+/// Default timeout for faucet requests in milliseconds.
+///
+/// Note: This must be a module-level function (not a method in an impl block) because
+/// `#[serde(default = "...")]` requires a string path that serde can resolve during macro
+/// expansion. Method paths like `Self::method_name` cannot be used in this context.
+fn default_faucet_timeout_ms() -> u64 {
+    30_000
+}
+
+/// Settings for the faucet API client.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FaucetConfig {
+    /// Base URL of the faucet API (e.g. `https://faucet.testnet.miden.io`).
+    pub endpoint: String,
+    /// Timeout for faucet requests in milliseconds.
+    #[serde(default = "default_faucet_timeout_ms")]
+    pub timeout_ms: u64,
+}
+
+impl Default for FaucetConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: "https://faucet-api.testnet.miden.io".to_string(),
+            timeout_ms: default_faucet_timeout_ms(),
         }
     }
 }

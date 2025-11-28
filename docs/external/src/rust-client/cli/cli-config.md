@@ -93,6 +93,18 @@ This field can be set with the `--network` flag when running the `miden-client i
 - However, the endpoint can point to any remote node.
   :::
 
+### Faucet
+
+The optional `faucet` table provides a base URL for the faucet API and an optional timeout for PoW/token requests. It is used by the `mint` command:
+
+```toml
+[faucet]
+endpoint = "https://faucet.testnet.miden.io"
+timeout_ms = 30000
+```
+
+If omitted, the CLI falls back to the built-in default faucet endpoint.
+
 ### Store and keystore
 
 The `store_filepath` field is used to configure the path to the SQLite database file used by the client. The `secret_keys_directory` field is used to configure the path to the directory where the keystore files are stored. The default values are `.miden/store.sqlite3` and `.miden/keystore`, respectively, organizing these files within the `.miden` directory structure.

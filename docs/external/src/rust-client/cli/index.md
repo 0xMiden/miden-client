@@ -238,9 +238,9 @@ After a transaction gets executed, two entities start being tracked:
 
 #### `mint`
 
-Creates a note that contains a specific amount tokens minted by a faucet, that the target Account ID can consume.
+Requests faucet tokens via the faucet API (with PoW), imports the resulting note, and auto-consumes it into the target account. Defaults to a private note and the default account; uses the faucet URL from the config.
 
-Usage: `miden-client mint --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE>`
+Usage: `miden-client mint --amount <AMOUNT> [--target <TARGET ACCOUNT ID>] [--api-key <KEY>] [--note-path <FILE>]`
 
 #### `consume-notes`
 

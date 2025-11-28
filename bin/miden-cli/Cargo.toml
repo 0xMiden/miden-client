@@ -22,13 +22,18 @@ miden-client              = { features = ["tonic"], path = "../../crates/rust-cl
 miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store", version = "0.12" }
 
 # External dependencies
+base64             = { version = "0.22" }
 clap               = { features = ["derive"], version = "4.5" }
 comfy-table        = { version = "7.1" }
 dirs               = { version = "6.0" }
 figment            = { features = ["env", "toml"], version = "0.10" }
+hex                = { version = "0.4" }
+reqwest            = { default-features = false, features = ["json", "rustls-tls"], version = "0.12" }
 miette             = { workspace = true }
 rand               = { workspace = true }
 serde              = { features = ["derive"], version = "1.0" }
+serde_json         = { version = "1.0" }
+sha2               = { version = "0.10" }
 thiserror          = { workspace = true }
 tokio              = { workspace = true }
 toml               = { version = "0.9" }
