@@ -9,7 +9,6 @@ use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
 use miden_objects::note::NoteScript;
 use miden_objects::transaction::{AccountInputs, PartialBlockchain};
-use miden_objects::vm::FutureMaybeSend;
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
@@ -168,23 +167,19 @@ impl DataStore for ClientDataStore {
         Ok(inputs)
     }
 
-    fn get_note_script(
+    async fn get_note_script(
         &self,
         script_root: Word,
-    ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
+    ) -> Result<Option<NoteScript>, DataStoreError> {
         let store = self.store.clone();
 
-        async move {
-            if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(note_script)
-            } else {
-                // If no matching note found, return an error
-                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
-                // found https://github.com/0xMiden/miden-client/issues/1410
-                Err(DataStoreError::other(
-                    format!("Note script with root {script_root} not found",),
-                ))
-            }
+        if let Ok(note_script) = store.get_note_script(script_root).await {
+            Ok(Some(note_script))
+        } else {
+            // If no matching note found, return an error
+            // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
+            // found https://github.com/0xMiden/miden-client/issues/1410
+            Err(DataStoreError::other(format!("Note script with root {script_root} not found",)))
         }
     }
 }
