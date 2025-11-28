@@ -96,7 +96,9 @@ impl WebClient {
                 .ok_or(JsValue::from_str("No account found"))?;
 
             let keystore = self.keystore.clone().expect("Keystore not initialized");
-            let account = account.into();
+            let account = account
+                .try_into()
+                .map_err(|_| JsValue::from_str("partial accounts are still unsupported"))?;
 
             let mut key_pairs = vec![];
 

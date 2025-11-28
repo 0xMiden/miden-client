@@ -17,9 +17,9 @@ use miden_client::account::{
 use miden_client::asset::{Asset, AssetVault};
 use miden_client::store::{
     AccountRecord,
+    AccountRecordData,
     AccountStatus,
     AccountStorageFilter,
-    PartialAccountRecord,
     StoreError,
 };
 use miden_client::utils::Serializable;
@@ -183,8 +183,8 @@ impl WebStore {
         )?;
 
         let addresses = self.get_account_addresses(account_id).await?;
-
-        Ok(Some(AccountRecord::new(account, status, addresses)))
+        let account_data = AccountRecordData::Full(account);
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
     // TODO: current implementation is a copy of `get_account`,
@@ -193,7 +193,7 @@ impl WebStore {
     pub(crate) async fn get_partial_account(
         &self,
         account_id: AccountId,
-    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+    ) -> Result<Option<AccountRecord>, StoreError> {
         let (account_header, status) = match self.get_account_header(account_id).await? {
             None => return Ok(None),
             Some((account_header, status)) => (account_header, status),
@@ -215,9 +215,9 @@ impl WebStore {
             status.seed().copied(),
         )?;
 
+        let account_data = AccountRecordData::Partial((&account).into());
         let addresses = self.get_account_addresses(account_id).await?;
-
-        Ok(Some(PartialAccountRecord::new((&account).into(), status, addresses)))
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {

@@ -26,9 +26,9 @@ use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFun
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
 use miden_client::store::{
     AccountRecord,
+    AccountRecordData,
     AccountStatus,
     AccountStorageFilter,
-    PartialAccountRecord,
     StoreError,
 };
 use miden_client::sync::NoteTagRecord;
@@ -193,14 +193,15 @@ impl SqliteStore {
         );
 
         let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(AccountRecord::new(account, status, addresses)))
+        let account_data = AccountRecordData::Full(account);
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
     pub(crate) fn get_partial_account(
         conn: &mut Connection,
         merkle_store: &Arc<RwLock<MerkleStore>>,
         account_id: AccountId,
-    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+    ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
             return Ok(None);
         };
@@ -266,8 +267,9 @@ impl SqliteStore {
             partial_vault,
             status.seed().copied(),
         )?;
+        let account_record_data = AccountRecordData::Partial(partial_account);
         let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(PartialAccountRecord::new(partial_account, status, addresses)))
+        Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
     }
 
     pub(crate) fn insert_account(
@@ -1517,7 +1519,7 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
 
@@ -1606,7 +1608,7 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
         assert!(updated_account.vault().is_empty());

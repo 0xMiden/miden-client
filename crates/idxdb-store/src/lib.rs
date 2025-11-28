@@ -36,7 +36,6 @@ use miden_client::store::{
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
-    PartialAccountRecord,
     PartialBlockchainFilter,
     Store,
     StoreError,
@@ -260,7 +259,7 @@ impl Store for WebStore {
     async fn get_partial_account(
         &self,
         account_id: AccountId,
-    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+    ) -> Result<Option<AccountRecord>, StoreError> {
         self.get_partial_account(account_id).await
     }
 

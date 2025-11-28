@@ -72,7 +72,9 @@ impl DataStore for ClientDataStore {
             .get_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
-        let partial_account: PartialAccount = partial_account_record.into();
+        let partial_account: PartialAccount = partial_account_record
+            .try_into()
+            .map_err(|_| DataStoreError::AccountNotFound(account_id))?;
 
         // Get header data
         let (block_header, _had_notes) = self

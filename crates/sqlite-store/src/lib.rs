@@ -42,7 +42,6 @@ use miden_client::store::{
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
-    PartialAccountRecord,
     PartialBlockchainFilter,
     Store,
     StoreError,
@@ -502,7 +501,7 @@ impl Store for SqliteStore {
     async fn get_partial_account(
         &self,
         account_id: AccountId,
-    ) -> Result<Option<PartialAccountRecord>, StoreError> {
+    ) -> Result<Option<AccountRecord>, StoreError> {
         let merkle_store = self.merkle_store.clone();
 
         self.interact_with_connection(move |conn| {

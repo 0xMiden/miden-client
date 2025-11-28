@@ -65,7 +65,7 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountStatus, AccountUpdates, PartialAccountRecord};
+pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -535,12 +535,12 @@ pub trait Store: Send + Sync {
         initial_address: Address,
     ) -> Result<(), StoreError>;
 
-    /// Retrieves a [`PartialAccountRecord`] object, this contains the account's latest partial
+    /// Retrieves a [`PartialAccount`] object, this contains the account's latest partial
     /// state along with its status. Returns `None` if the partial account is not found.
     async fn get_partial_account(
         &self,
         account_id: AccountId,
-    ) -> Result<Option<PartialAccountRecord>, StoreError>;
+    ) -> Result<Option<AccountRecord>, StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
