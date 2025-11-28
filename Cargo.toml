@@ -29,21 +29,21 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden base/protocol dependencies
-miden-lib     = { default-features = false, git = "https://github.com/0xMiden/miden-base", branch = "next" }
-miden-objects = { default-features = false, git = "https://github.com/0xMiden/miden-base", branch = "next" }
-miden-testing = { default-features = false, git = "https://github.com/0xMiden/miden-base", branch = "next" }
-miden-tx      = { default-features = false, git = "https://github.com/0xMiden/miden-base", branch = "next" }
+miden-lib     = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
+miden-objects = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
+miden-testing = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
+miden-tx      = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
 
 # Miden node dependencies
-miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs" }
-miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
-miden-node-proto-build           = { default-features = false,  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs" }
-miden-node-rpc                   = {  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
-miden-node-store                 = {  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
-miden-node-utils                 = {  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
+miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b" }
+miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-node-proto-build           = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b" }
+miden-node-rpc                   = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-node-store                 = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-node-utils                 = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
 miden-note-transport-proto-build = { default-features = false, version = "0.1" }
-miden-remote-prover              = { features = ["concurrent"],  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"],  git = "https://github.com/0xMiden/miden-node", branch = "bernhard-unify-get-details-and-get-proofs"  }
+miden-remote-prover              = { features = ["concurrent"],  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"],  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

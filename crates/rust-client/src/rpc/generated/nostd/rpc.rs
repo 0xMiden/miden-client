@@ -139,38 +139,12 @@ pub mod api_client {
             req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "CheckNullifiers"));
             self.inner.unary(req, path, codec).await
         }
-        /// Returns the latest state of an account with the specified ID.
-        pub async fn get_account_details(
-            &mut self,
-            request: impl tonic::IntoRequest<super::super::account::AccountId>,
-        ) -> core::result::Result<
-            tonic::Response<super::super::account::AccountDetails>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/rpc.Api/GetAccountDetails",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountDetails"));
-            self.inner.unary(req, path, codec).await
-        }
         /// Returns the latest state proof of the specified account.
-        pub async fn get_account_proof(
+        pub async fn get_account(
             &mut self,
-            request: impl tonic::IntoRequest<
-                super::super::rpc_store::AccountProofRequest,
-            >,
+            request: impl tonic::IntoRequest<super::super::rpc_store::AccountRequest>,
         ) -> core::result::Result<
-            tonic::Response<super::super::rpc_store::AccountProofResponse>,
+            tonic::Response<super::super::rpc_store::AccountResponse>,
             tonic::Status,
         > {
             self.inner
@@ -182,9 +156,9 @@ pub mod api_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccountProof");
+            let path = http::uri::PathAndQuery::from_static("/rpc.Api/GetAccount");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccountProof"));
+            req.extensions_mut().insert(GrpcMethod::new("rpc.Api", "GetAccount"));
             self.inner.unary(req, path, codec).await
         }
         /// Returns raw block data for the specified block number.
