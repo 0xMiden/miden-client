@@ -8,6 +8,7 @@
 
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
+- [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
