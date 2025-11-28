@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::convert::TryFrom;
 use core::error::Error;
 
 use miden_objects::account::{Account, AccountCode, AccountId};
@@ -640,14 +641,20 @@ impl RpcError {
     }
 }
 
-impl core::convert::TryFrom<&Status> for AppLevelError {
+impl From<&Status> for GrpcError {
+    fn from(status: &Status) -> Self {
+        GrpcError::from_code(status.code() as i32, Some(status.message().to_string()))
+    }
+}
+
+impl TryFrom<&Status> for AppLevelError {
     type Error = ();
 
     /// Attempts to extract application-level error information from a gRPC Status.
     ///
     /// Application-level errors are returned as `tonic::Status` errors with the error code encoded
     /// in the Status details as a `u8` byte, and the error message in the Status message string.
-    /// <https://github.com/0xMiden/miden-node/pull/1266>
+    /// See: <https://github.com/0xMiden/miden-node/pull/1266>
     fn try_from(status: &Status) -> Result<Self, Self::Error> {
         // The node encodes application-level errors as Status with:
         // - Error code (u8) in Status details: `vec![api_error.api_code()].into()`
@@ -664,12 +671,6 @@ impl core::convert::TryFrom<&Status> for AppLevelError {
         let error_message = status.message().to_string();
 
         Ok(AppLevelError::new(error_code, error_message))
-    }
-}
-
-impl From<&Status> for GrpcError {
-    fn from(status: &Status) -> Self {
-        GrpcError::from_code(status.code() as i32, Some(status.message().to_string()))
     }
 }
 
