@@ -1,6 +1,8 @@
+use miden_client::note::NoteHeader as NativeNoteHeader;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::models::input_note::InputNote;
+use crate::models::note_header::NoteHeader;
 use crate::models::note_id::NoteId;
 use crate::models::note_metadata::NoteMetadata;
 use crate::models::note_type::NoteType;
@@ -9,8 +11,7 @@ use crate::models::note_type::NoteType;
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct FetchedNote {
-    note_id: NoteId,
-    metadata: NoteMetadata,
+    header: NoteHeader,
     input_note: Option<InputNote>,
 }
 
@@ -23,21 +24,32 @@ impl FetchedNote {
         metadata: NoteMetadata,
         input_note: Option<InputNote>,
     ) -> FetchedNote {
-        FetchedNote { note_id, metadata, input_note }
+        // Convert note_id and metadata to NativeNoteHeader, then to web NoteHeader
+        let native_note_id = note_id.into();
+        let native_metadata = metadata.into();
+        let native_header = NativeNoteHeader::new(native_note_id, native_metadata);
+        let header = native_header.into();
+        FetchedNote { header, input_note }
     }
 
     /// The unique identifier of the note.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "noteId")]
     pub fn note_id(&self) -> NoteId {
-        self.note_id
+        self.header.id()
     }
 
     /// The note's metadata, including sender, tag, and other properties.
     /// Available for both private and public notes.
     #[wasm_bindgen(getter)]
     pub fn metadata(&self) -> NoteMetadata {
-        self.metadata
+        self.header.metadata()
+    }
+
+    /// The note's header, containing the ID and metadata.
+    #[wasm_bindgen(getter)]
+    pub fn header(&self) -> NoteHeader {
+        self.header.clone()
     }
 
     /// The full [`InputNote`] with inclusion proof.
@@ -53,6 +65,13 @@ impl FetchedNote {
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
-        self.metadata.note_type()
+        self.header.metadata().note_type()
+    }
+}
+
+impl FetchedNote {
+    /// Create a `FetchedNote` from a native `NoteHeader` (internal use).
+    pub(super) fn from_header(header: NativeNoteHeader, input_note: Option<InputNote>) -> Self {
+        FetchedNote { header: header.into(), input_note }
     }
 }

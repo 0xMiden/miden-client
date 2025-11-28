@@ -1,3 +1,4 @@
+use js_sys::Uint8Array;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::address::{
     Address as NativeAddress,
@@ -12,6 +13,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use super::account_id::{AccountId, NetworkId};
 use super::note_tag::NoteTag;
 use crate::js_error_with_context;
+use crate::utils::deserialize_from_uint8array;
 
 #[wasm_bindgen(inspectable)]
 #[derive(Clone, Debug)]
@@ -25,6 +27,12 @@ pub enum AddressInterface {
 
 #[wasm_bindgen]
 impl Address {
+    /// Deserializes a byte array into an `Address`
+    pub fn deserialize(bytes: &Uint8Array) -> Result<Address, JsValue> {
+        let native_address: NativeAddress = deserialize_from_uint8array(bytes)?;
+        Ok(Self(native_address))
+    }
+
     #[wasm_bindgen(js_name = "fromAccountId")]
     // Can't pass the proper AddressInterface enum here since wasm_bindgen does not derive the ref
     // trait for enum types. But we can still leave its definition since it gets exported as a

@@ -8,7 +8,7 @@ use miden_objects::account::{AccountCode, AccountId, StorageSlot};
 use miden_objects::address::NetworkId;
 use miden_objects::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, Mmr, MmrProof, SmtProof};
-use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_objects::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -484,7 +484,8 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    FetchedNote::Private(*note_id, *note_metadata, note_inclusion_proof.clone())
+                    let note_header = NoteHeader::new(*note_id, *note_metadata);
+                    FetchedNote::Private(note_header, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
                     FetchedNote::Public(note.clone(), note_inclusion_proof.clone())
