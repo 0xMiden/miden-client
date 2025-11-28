@@ -16,9 +16,9 @@
 //! These are all used by the Miden client to provide transaction execution in the correct contexts.
 //!
 //! In addition to the main [`Store`] trait, the module provides types for filtering queries, such
-//! as [`TransactionFilter`], [`NoteFilter`], `StorageFilter` to narrow down the set of returned
-//! transactions or notes. For more advanced usage, see the documentation of individual methods in
-//! the [`Store`] trait.
+//! as [`TransactionFilter`], [`NoteFilter`], [`StorageFilter`] to narrow down the set of returned
+//! transactions, account data, or notes. For more advanced usage, see the documentation of
+//! individual methods in the [`Store`] trait.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
