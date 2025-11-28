@@ -275,12 +275,15 @@ impl NodeBuilder {
             .spawn(async move {
                 let store_url = Url::parse(&format!("http://{store_address}"))
                     .context("Failed to parse URL")?;
+                let validator_url = Url::parse(&format!("http://{store_address}")) // TODO: replace for validator_address
+                    .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,
                     store_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
                     block_prover_url: None,
+                    validator_url,
                     batch_interval,
                     block_interval,
                     max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,

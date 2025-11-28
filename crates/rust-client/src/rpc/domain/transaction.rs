@@ -83,7 +83,7 @@ impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
         let block_num = pagination_info.block_num.into();
 
         let transaction_records = value
-            .transaction_records
+            .transactions
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<TransactionRecord>, RpcError>>()?;
@@ -114,12 +114,11 @@ impl TryFrom<proto::rpc_store::TransactionRecord> for TransactionRecord {
 
     fn try_from(value: proto::rpc_store::TransactionRecord) -> Result<Self, Self::Error> {
         let block_num = value.block_num.into();
-        let transaction_header = value.transaction_header.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
+        let transaction_header =
+            value.header.ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "TransactionRecord",
                 field_name: "transaction_header",
-            },
-        )?;
+            })?;
 
         Ok(Self {
             block_num,
@@ -156,7 +155,7 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
 
         let input_notes = InputNotes::new_unchecked(
             value
-                .input_notes
+                .nullifiers
                 .into_iter()
                 .map(|d| d.try_into().map(Word::into).map(Nullifier::into))
                 .collect::<Result<Vec<_>, _>>()?,
