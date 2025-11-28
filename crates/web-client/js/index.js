@@ -323,7 +323,7 @@ export class WebClient {
       );
       return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
     } catch (error) {
-      console.error("INDEX.JS: Error in newWallet:", error.toString());
+      console.error("INDEX.JS: Error in newWallet:", error);
       throw error;
     }
   }
@@ -361,7 +361,7 @@ export class WebClient {
 
       return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
     } catch (error) {
-      console.error("INDEX.JS: Error in newFaucet:", error.toString());
+      console.error("INDEX.JS: Error in newFaucet:", error);
       throw error;
     }
   }
@@ -388,10 +388,7 @@ export class WebClient {
 
       return transactionResult.id();
     } catch (error) {
-      console.error(
-        "INDEX.JS: Error in submitNewTransaction:",
-        error.toString()
-      );
+      console.error("INDEX.JS: Error in submitNewTransaction:", error);
       throw error;
     }
   }
@@ -416,7 +413,7 @@ export class WebClient {
         new Uint8Array(serializedResultBytes)
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in executeTransaction:", error.toString());
+      console.error("INDEX.JS: Error in executeTransaction:", error);
       throw error;
     }
   }
@@ -460,7 +457,7 @@ export class WebClient {
         submissionHeight
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error.toString());
+      console.error("INDEX.JS: Error in submitTransaction:", error);
       throw error;
     }
   }
@@ -487,7 +484,7 @@ export class WebClient {
         new Uint8Array(serializedProvenBytes)
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in proveTransaction:", error.toString());
+      console.error("INDEX.JS: Error in proveTransaction:", error);
       throw error;
     }
   }
@@ -506,7 +503,7 @@ export class WebClient {
         new Uint8Array(serializedSyncSummaryBytes)
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in syncState:", error.toString());
+      console.error("INDEX.JS: Error in syncState:", error);
       throw error;
     }
   }
@@ -598,7 +595,7 @@ export class MockWebClient extends WebClient {
         new Uint8Array(serializedSyncSummaryBytes)
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in syncState:", error.toString());
+      console.error("INDEX.JS: Error in syncState:", error);
       throw error;
     }
   }
@@ -646,7 +643,7 @@ export class MockWebClient extends WebClient {
         new Uint8Array(result.serializedTransactionUpdate)
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error.toString());
+      console.error("INDEX.JS: Error in submitTransaction:", error);
       throw error;
     }
   }
@@ -693,10 +690,7 @@ export class MockWebClient extends WebClient {
 
       return transactionResult.id();
     } catch (error) {
-      console.error(
-        "INDEX.JS: Error in submitNewTransaction:",
-        error.toString()
-      );
+      console.error("INDEX.JS: Error in submitNewTransaction:", error);
       throw error;
     }
   }
