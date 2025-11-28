@@ -12,6 +12,37 @@ use thiserror::Error;
 
 use super::NodeRpcClientEndpoint;
 
+// APPLICATION-LEVEL ERROR
+// ================================================================================================
+
+/// Application-level error returned by the node in gRPC responses.
+///
+/// These errors represent application-specific failures (e.g., transaction validation failures)
+/// that are distinct from gRPC transport-level errors. The error includes a numeric code and
+/// a human-readable message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppLevelError {
+    /// Numeric error code specific to the application.
+    pub code: u32,
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl AppLevelError {
+    /// Creates a new application-level error.
+    pub fn new(code: u32, message: String) -> Self {
+        Self { code, message }
+    }
+}
+
+impl core::fmt::Display for AppLevelError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Application error (code: {}): {}", self.code, self.message)
+    }
+}
+
+impl Error for AppLevelError {}
+
 // RPC ERROR
 // ================================================================================================
 
@@ -35,6 +66,11 @@ pub enum RpcError {
         error_kind: GrpcError,
         #[source]
         source: Option<Box<dyn Error + Send + Sync + 'static>>,
+    },
+    #[error("application-level error for {endpoint}: {error}")]
+    AppLevelError {
+        endpoint: NodeRpcClientEndpoint,
+        error: AppLevelError,
     },
     #[error("note with id {0} was not found")]
     NoteNotFound(NoteId),

@@ -33,7 +33,7 @@ use super::{
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
-use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
+use crate::rpc::errors::{AcceptHeaderError, AppLevelError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc_store::BlockRange;
 use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
@@ -140,7 +140,8 @@ impl NodeRpcClient for GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
-        Ok(BlockNumber::from(api_response.into_inner().block_height))
+        let response = api_response.into_inner();
+        Ok(BlockNumber::from(response.block_height))
     }
 
     async fn get_block_header_by_number(
@@ -624,6 +625,10 @@ impl RpcError {
             return Self::AcceptHeaderError(accept_error);
         }
 
+        if let Ok(app_error) = AppLevelError::try_from(&status) {
+            return Self::AppLevelError { endpoint, error: app_error };
+        }
+
         let error_kind = GrpcError::from(&status);
         let source = Box::new(status) as Box<dyn Error + Send + Sync + 'static>;
 
@@ -632,6 +637,33 @@ impl RpcError {
             error_kind,
             source: Some(source),
         }
+    }
+}
+
+impl core::convert::TryFrom<&Status> for AppLevelError {
+    type Error = ();
+
+    /// Attempts to extract application-level error information from a gRPC Status.
+    ///
+    /// Application-level errors are returned as `tonic::Status` errors with the error code encoded
+    /// in the Status details as a `u8` byte, and the error message in the Status message string.
+    /// <https://github.com/0xMiden/miden-node/pull/1266>
+    fn try_from(status: &Status) -> Result<Self, Self::Error> {
+        // The node encodes application-level errors as Status with:
+        // - Error code (u8) in Status details: `vec![api_error.api_code()].into()`
+        // - Error message in Status message (or "Internal error" for internal errors)
+        // - Status code (tonic::Code) determined by the error type
+
+        let details = status.details();
+        if details.is_empty() || details.len() != 1 {
+            return Err(());
+        }
+
+        // The error code is encoded as a single u8 byte in the details
+        let error_code = u32::from(details[0]);
+        let error_message = status.message().to_string();
+
+        Ok(AppLevelError::new(error_code, error_message))
     }
 }
 
