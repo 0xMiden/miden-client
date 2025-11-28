@@ -14,6 +14,28 @@ const buildTypedArraysExport = (exportObject) => {
   );
 };
 
+const deserializeError = (errorLike) => {
+  if (!errorLike) {
+    return new Error("Unknown error received from worker");
+  }
+
+  const { name, message, stack, cause, ...rest } = errorLike;
+  const reconstructedError = new Error(message ?? "Unknown worker error");
+  reconstructedError.name = name ?? reconstructedError.name;
+  if (stack) {
+    reconstructedError.stack = stack;
+  }
+  if (cause) {
+    reconstructedError.cause = deserializeError(cause);
+  }
+  Object.entries(rest).forEach(([key, value]) => {
+    if (value !== undefined) {
+      reconstructedError[key] = value;
+    }
+  });
+  return reconstructedError;
+};
+
 export const MidenArrays = buildTypedArraysExport(wasm);
 const { WebClient: WasmWebClient } = wasm;
 /**
@@ -119,11 +141,13 @@ export class WebClient {
           const { resolve, reject } = this.pendingRequests.get(requestId);
           this.pendingRequests.delete(requestId);
           if (error) {
+            const workerError =
+              error instanceof Error ? error : deserializeError(error);
             console.error(
               `WebClient: Error from worker in ${methodName}:`,
-              error
+              workerError
             );
-            reject(new Error(error));
+            reject(workerError);
           } else {
             resolve(result);
           }
