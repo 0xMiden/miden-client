@@ -25,11 +25,6 @@ impl AuthSecretKey {
         self.public_key_commitment().into()
     }
 
-    #[wasm_bindgen(js_name = "getRpoFalcon512PublicKeyAsWord")]
-    pub fn get_rpo_falcon_512_public_key_as_word(&self) -> Word {
-        self.get_public_key_as_word()
-    }
-
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match &self.0 {
@@ -43,11 +38,6 @@ impl AuthSecretKey {
             .collect::<Vec<NativeFelt>>();
 
         secret_key_as_native_felts.into_iter().map(Into::into).collect()
-    }
-
-    #[wasm_bindgen(js_name = "getEcdsaK256KeccakPublicKeyAsWord")]
-    pub fn get_ecdsa_k256_keccak_public_key_as_word(&self) -> Word {
-        self.get_public_key_as_word()
     }
 
     #[wasm_bindgen(js_name = "getEcdsaK256KeccakSecretKeyAsFelts")]
