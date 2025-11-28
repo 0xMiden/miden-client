@@ -89,6 +89,35 @@ yarn test
 
 This runs a suite of integration tests to verify the SDK’s functionality in a web context.
 
+### Building the npm package
+
+Follow the steps below to produce the contents that get published to npm (`dist/` plus the license file). All commands are executed from `crates/web-client`.
+
+1. **Install prerequisites**
+   - Install the Rust toolchain version specified in `rust-toolchain.toml` and add the `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`.
+   - Install Node.js ≥18 and Yarn.
+2. **Install dependencies**
+   ```bash
+   yarn install
+   ```
+   This installs both the JavaScript tooling and the `@wasm-tool/rollup-plugin-rust` dependency that compiles the Rust crate.
+3. **Build the package**
+   ```bash
+   yarn build
+   ```
+   The `build` script (see `package.json`) performs the following:
+   - Removes the previous `dist/` directory (`rimraf dist`).
+   - Runs `npm run build-rust-client-js`, which builds the `idxdb-store` TypeScript helper that the SDK imports.
+   - Invokes Rollup with `RUSTFLAGS="--cfg getrandom_backend=\"wasm_js\""` so the Rust `getrandom` crate targets browser entropy and so that atomics/bulk-memory WebAssembly features are enabled.
+   - Copies the generated TypeScript declarations from `js/types` into `dist/`.
+   - Executes `node clean.js` to strip paths from the generated `.js` files, leaving only the artifacts needed on npm.
+4. **Inspect the artifacts**
+   - `dist/index.js` is the ESM entry point referenced by `"main"`/`"browser"`/`"exports"`.
+   - `dist/index.d.ts` and the rest of the `.d.ts` files provide the TypeScript surface.
+   Use `npm pack` if you want to preview the exact tarball that would be published.
+
+> Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output.
+
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
