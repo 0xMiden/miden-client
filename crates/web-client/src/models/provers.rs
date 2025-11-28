@@ -29,6 +29,11 @@ impl TransactionProver {
         }
     }
 
+    /// Creates a new remote transaction prover.
+    ///
+    /// Arguments:
+    /// - `endpoint`: The URL of the remote prover.
+    /// - `timeout_ms`: The timeout in milliseconds for the remote prover.
     #[wasm_bindgen(js_name = "newRemoteProver")]
     pub fn new_remote_prover(endpoint: &str, timeout_ms: Option<u64>) -> TransactionProver {
         let mut remote_prover = RemoteTransactionProver::new(endpoint);

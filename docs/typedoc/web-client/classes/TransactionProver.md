@@ -86,6 +86,12 @@
 
 > `static` **newRemoteProver**(`endpoint`, `timeout_ms?`): `TransactionProver`
 
+Creates a new remote transaction prover.
+
+Arguments:
+- `endpoint`: The URL of the remote prover.
+- `timeout_ms`: The timeout in milliseconds for the remote prover.
+
 #### Parameters
 
 ##### endpoint

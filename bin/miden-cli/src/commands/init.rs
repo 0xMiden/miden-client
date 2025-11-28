@@ -104,9 +104,9 @@ pub struct InitCmd {
     #[arg(long)]
     remote_prover_endpoint: Option<String>,
 
-    /// Timeout for the remote prover requests, in seconds.
+    /// Timeout for the remote prover requests, in milliseconds.
     #[arg(long)]
-    remote_prover_timeout: Option<u64>,
+    remote_prover_timeout_ms: Option<u64>,
 
     /// RPC endpoint for the note transport node. Required to use the note transport network to
     /// exchange private notes.
@@ -179,8 +179,8 @@ impl InitCmd {
             None => None,
         };
 
-        if let Some(timeout) = self.remote_prover_timeout {
-            cli_config.remote_prover_timeout = Duration::from_secs(timeout);
+        if let Some(timeout) = self.remote_prover_timeout_ms {
+            cli_config.remote_prover_timeout = Duration::from_millis(timeout);
         }
 
         cli_config.note_transport =
