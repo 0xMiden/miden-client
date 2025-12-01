@@ -116,7 +116,7 @@ Follow the steps below to produce the contents that get published to npm (`dist/
    - `dist/index.d.ts` and the rest of the `.d.ts` files provide the TypeScript surface.
    Use `npm pack` if you want to preview the exact tarball that would be published.
 
-> Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output.
+> Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output. This debugging metadata also includes debug symbols for the generated wasm binary
 
 ## Usage
 
