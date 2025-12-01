@@ -274,7 +274,7 @@ async function processMessage(event) {
         throw new Error(`Unsupported method: ${methodName}`);
       }
       const result = await handler(args);
-      self.postMessage({ requestId, result });
+      self.postMessage({ requestId, result, methodName });
       return;
     } else {
       throw new Error(`Unsupported action: ${action}`);
@@ -286,7 +286,7 @@ async function processMessage(event) {
       serializedError.message,
       error
     );
-    self.postMessage({ requestId, error: serializedError });
+    self.postMessage({ requestId, error: serializedError, methodName });
   }
 }
 
