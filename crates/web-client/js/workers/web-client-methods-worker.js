@@ -151,7 +151,7 @@ const methodHandlers = {
         if (!endpoint) {
           throw new Error("Remote prover requires an endpoint");
         }
-        prover = wasm.TransactionProver.newRemoteProver(endpoint);
+        prover = wasm.TransactionProver.newRemoteProver(endpoint, null);
       } else {
         throw new Error("Invalid prover tag received in worker");
       }

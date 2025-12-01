@@ -484,7 +484,7 @@ mod tests {
     use miden_lib::note::create_p2id_note;
     use miden_lib::testing::account_component::MockAccountComponent;
     use miden_objects::account::auth::PublicKeyCommitment;
-    use miden_objects::account::{AccountBuilder, AccountId, AccountType};
+    use miden_objects::account::{AccountBuilder, AccountComponent, AccountId, AccountType};
     use miden_objects::asset::FungibleAsset;
     use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
     use miden_objects::note::{NoteTag, NoteType};
@@ -503,75 +503,22 @@ mod tests {
 
     #[test]
     fn transaction_request_serialization() {
-        let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
-        let target_id =
-            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
-        let mut rng = RpoRandomCoin::new(Word::default());
-
-        let mut notes = vec![];
-        for i in 0..6 {
-            let note = create_p2id_note(
-                sender_id,
-                target_id,
-                vec![FungibleAsset::new(faucet_id, 100 + i).unwrap().into()],
-                NoteType::Private,
-                ZERO,
-                &mut rng,
-            )
-            .unwrap();
-            notes.push(note);
-        }
-
-        let mut advice_vec: Vec<(Word, Vec<Felt>)> = vec![];
-        for i in 0..10 {
-            advice_vec.push((rng.draw_word(), vec![Felt::new(i)]));
-        }
-
-        let account = AccountBuilder::new(Default::default())
-            .with_component(MockAccountComponent::with_empty_slots())
-            .with_auth_component(AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)))
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(miden_objects::account::AccountStorageMode::Private)
-            .build_existing()
-            .unwrap();
-
-        // This transaction request wouldn't be valid in a real scenario, it's intended for testing
-        let tx_request = TransactionRequestBuilder::new()
-            .authenticated_input_notes(vec![(notes.pop().unwrap().id(), None)])
-            .unauthenticated_input_notes(vec![(notes.pop().unwrap(), None)])
-            .expected_output_recipients(vec![notes.pop().unwrap().recipient().clone()])
-            .expected_future_notes(vec![(
-                notes.pop().unwrap().into(),
-                NoteTag::from_account_id(sender_id),
-            )])
-            .extend_advice_map(advice_vec)
-            .foreign_accounts([
-                ForeignAccount::public(
-                    target_id,
-                    AccountStorageRequirements::new([(5u8, &[Word::default()])]),
-                )
-                .unwrap(),
-                ForeignAccount::private(&account).unwrap(),
-            ])
-            .own_output_notes(vec![
-                OutputNote::Full(notes.pop().unwrap()),
-                OutputNote::Partial(notes.pop().unwrap().into()),
-            ])
-            .script_arg(rng.draw_word())
-            .auth_arg(rng.draw_word())
-            .build()
-            .unwrap();
-
-        let mut buffer = Vec::new();
-        tx_request.write_into(&mut buffer);
-
-        let deserialized_tx_request = TransactionRequest::read_from_bytes(&buffer).unwrap();
-        assert_eq!(tx_request, deserialized_tx_request);
+        assert_transaction_request_serialization_with(|| {
+            AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+        });
     }
 
     #[test]
     fn transaction_request_serialization_ecdsa() {
+        assert_transaction_request_serialization_with(|| {
+            AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)).into()
+        });
+    }
+
+    fn assert_transaction_request_serialization_with<F>(auth_component: F)
+    where
+        F: FnOnce() -> AccountComponent,
+    {
         let sender_id = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
         let target_id =
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
@@ -599,7 +546,7 @@ mod tests {
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
-            .with_auth_component(AuthEcdsaK256Keccak::new(PublicKeyCommitment::from(EMPTY_WORD)))
+            .with_auth_component(auth_component())
             .account_type(AccountType::RegularAccountImmutableCode)
             .storage_mode(miden_objects::account::AccountStorageMode::Private)
             .build_existing()

@@ -50,7 +50,7 @@
 
 ### deserialize()
 
-> `static` **deserialize**(`prover_type`, `endpoint?`): `TransactionProver`
+> `static` **deserialize**(`prover_type`, `endpoint?`, `timeout_ms?`): `TransactionProver`
 
 #### Parameters
 
@@ -61,6 +61,10 @@
 ##### endpoint?
 
 `string`
+
+##### timeout\_ms?
+
+`bigint`
 
 #### Returns
 
@@ -80,13 +84,23 @@
 
 ### newRemoteProver()
 
-> `static` **newRemoteProver**(`endpoint`): `TransactionProver`
+> `static` **newRemoteProver**(`endpoint`, `timeout_ms?`): `TransactionProver`
+
+Creates a new remote transaction prover.
+
+Arguments:
+- `endpoint`: The URL of the remote prover.
+- `timeout_ms`: The timeout in milliseconds for the remote prover.
 
 #### Parameters
 
 ##### endpoint
 
 `string`
+
+##### timeout\_ms?
+
+`bigint`
 
 #### Returns
 
