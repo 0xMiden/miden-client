@@ -35,15 +35,17 @@ miden-testing = { branch = "next", default-features = false, git = "https://gith
 miden-tx      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-block-producer = { branch = "santiagopittella-fix-block-prover-client", git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-ntx-builder = { branch = "santiagopittella-fix-block-prover-client", git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-proto-build = { branch = "santiagopittella-fix-block-prover-client", default-features = false, git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-rpc = { branch = "santiagopittella-fix-block-prover-client", git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-store = { branch = "santiagopittella-fix-block-prover-client", git = "https://github.com/0xMiden/miden-node.git" }
+miden-node-utils = { branch = "santiagopittella-fix-block-prover-client", git = "https://github.com/0xMiden/miden-node.git" }
 miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
-miden-remote-prover = { branch = "next", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover = { branch = "santiagopittella-fix-block-prover-client", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node.git" }
+miden-remote-prover-client = { branch = "santiagopittella-fix-block-prover-client", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node.git" }
 
