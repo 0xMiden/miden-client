@@ -211,6 +211,12 @@ check-tools: ## Checks if development tools are installed
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile
 	@echo "Installing development tools..."
+	@rustup show active-toolchain >/dev/null 2>&1 || (echo "Rust toolchain not detected. Install rustup + toolchain first." && exit 1)
+	@echo "Ensuring wasm32-unknown-unknown target is installed..."
+	@rustup target add wasm32-unknown-unknown >/dev/null
+	@RUST_TC=$$(rustup show active-toolchain | awk '{print $$1}'); \
+		echo "Ensuring required Rust components are installed for $$RUST_TC..."; \
+		rustup component add --toolchain $$RUST_TC clippy rust-src rustfmt >/dev/null
 	# Rust-related
 	cargo install mdbook --locked
 	cargo install typos-cli --locked
