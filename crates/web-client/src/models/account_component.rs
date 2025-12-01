@@ -3,9 +3,11 @@ use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak, AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
+    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak, AuthRpoFalcon512 as NativeRpoFalcon512,
     AuthRpoFalcon512 as NativeRpoFalcon512, AuthRpoFalcon512 as NativeRpoFalcon512,
     AuthSecretKey as NativeSecretKey, AuthSecretKey as NativeSecretKey,
-    ECDSA_K256_KECCAK_SCHEME_ID, PublicKeyCommitment, PublicKeyCommitment, RPO_FALCON_SCHEME_ID,
+    AuthSecretKey as NativeSecretKey, ECDSA_K256_KECCAK_SCHEME_ID, PublicKeyCommitment,
+    PublicKeyCommitment, PublicKeyCommitment, RPO_FALCON_SCHEME_ID,
 };
 use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
@@ -134,22 +136,19 @@ impl AccountComponent {
     #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
     pub fn create_auth_component_from_commitment(
         commitment: &Word,
-        auth_scheme_id: u8,
+        auth_scheme: AuthScheme,
     ) -> Result<AccountComponent, JsValue> {
         let native_word: NativeWord = commitment.into();
         let pkc = PublicKeyCommitment::from(native_word);
-        match auth_scheme_id {
-            RPO_FALCON_SCHEME_ID => {
+        match auth_scheme {
+            AuthScheme::AuthRpoFalcon512 => {
                 let auth = NativeRpoFalcon512::new(pkc);
                 Ok(AccountComponent(auth.into()))
             },
-            ECDSA_K256_KECCAK_SCHEME_ID => {
+            AuthScheme::AuthEcdsaK256Keccak => {
                 let auth = NativeEcdsaK256Keccak::new(pkc);
                 Ok(AccountComponent(auth.into()))
             },
-            _unimplemented => Err(JsValue::from_str(
-                "building auth component for this auth scheme is not supported yet",
-            )),
         }
     }
 
