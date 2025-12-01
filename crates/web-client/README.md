@@ -94,7 +94,7 @@ This runs a suite of integration tests to verify the SDK’s functionality in a 
 Follow the steps below to produce the contents that get published to npm (`dist/` plus the license file). All commands are executed from `crates/web-client`.
 
 1. **Install prerequisites**
-   - Install the Rust toolchain version specified in `rust-toolchain.toml` and add the `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`.
+   - Install the Rust toolchain version specified in `rust-toolchain.toml`.
    - Install Node.js ≥18 and Yarn.
 2. **Install dependencies**
    ```bash
