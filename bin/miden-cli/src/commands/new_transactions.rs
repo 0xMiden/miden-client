@@ -64,7 +64,7 @@ impl From<&NoteType> for MidenNoteType {
     }
 }
 
-/// Mint tokens by requesting them from the faucet API (with PoW).
+/// Mint tokens by requesting them from the faucet API (with `PoW`).
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
     /// Amount to be minted.
@@ -171,8 +171,7 @@ impl MintCmd {
             execute_transaction(&mut client, target_account_id, transaction_request, true, false)
                 .await?;
         println!(
-            "View the mint transaction on Midenscan: https://midenscan.com/transaction/{}",
-            transaction_id
+            "View the mint transaction on Midenscan: https://midenscan.com/transaction/{transaction_id}"
         );
 
         Ok(())
@@ -197,7 +196,7 @@ async fn request_pow(
     api_key: Option<&str>,
 ) -> Result<(String, u64), CliError> {
     let pow_url = base_url.join("pow").map_err(|err| {
-        CliError::Faucet(format!("Failed to construct PoW endpoint from {}: {err}", base_url))
+        CliError::Faucet(format!("Failed to construct PoW endpoint from {base_url}: {err}"))
     })?;
 
     let mut request = http_client
@@ -216,7 +215,7 @@ async fn request_pow(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(CliError::Faucet(format!("Faucet PoW request failed ({}): {}", status, body)));
+        return Err(CliError::Faucet(format!("Faucet PoW request failed ({status}): {body}")));
     }
 
     let body = response.text().await.unwrap_or_default();
@@ -243,10 +242,7 @@ async fn request_tokens(
     api_key: Option<&str>,
 ) -> Result<String, CliError> {
     let url = base_url.join("get_tokens").map_err(|err| {
-        CliError::Faucet(format!(
-            "Failed to construct get_tokens endpoint from {}: {err}",
-            base_url
-        ))
+        CliError::Faucet(format!("Failed to construct get_tokens endpoint from {base_url}: {err}"))
     })?;
 
     let mut request = http_client.get(url).query(&[
@@ -270,8 +266,7 @@ async fn request_tokens(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         return Err(CliError::Faucet(format!(
-            "Faucet get_tokens request failed ({}): {}",
-            status, body
+            "Faucet get_tokens request failed ({status}): {body}"
         )));
     }
 
@@ -296,7 +291,7 @@ async fn download_note(
     note_id: &str,
 ) -> Result<Vec<u8>, CliError> {
     let url = base_url.join("get_note").map_err(|err| {
-        CliError::Faucet(format!("Failed to construct get_note endpoint from {}: {err}", base_url))
+        CliError::Faucet(format!("Failed to construct get_note endpoint from {base_url}: {err}"))
     })?;
 
     let response = http_client
@@ -309,10 +304,7 @@ async fn download_note(
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        return Err(CliError::Faucet(format!(
-            "Faucet get_note request failed ({}): {}",
-            status, body
-        )));
+        return Err(CliError::Faucet(format!("Faucet get_note request failed ({status}): {body}")));
     }
 
     let response: NoteResponse = response
@@ -359,8 +351,7 @@ async fn solve_challenge(challenge_hex: String, target: u64) -> Result<u64, CliE
 
 fn input_note_into_note(input_note: InputNote) -> Note {
     match input_note {
-        InputNote::Authenticated { note, .. } => note,
-        InputNote::Unauthenticated { note } => note,
+        InputNote::Authenticated { note, .. } | InputNote::Unauthenticated { note } => note,
     }
 }
 
@@ -407,10 +398,10 @@ async fn build_input_note_for_consumption<AUTH: TransactionAuthenticator + Sync 
         }
 
         // Re-fetch periodically; once committed the faucet exports NoteWithProof.
-        if let Ok(bytes) = download_note(http_client, faucet_url, &note_id.to_hex()).await {
-            if let Ok(fresh_note_file) = NoteFile::read_from_bytes(&bytes) {
-                let _ = client.import_note(fresh_note_file).await;
-            }
+        if let Ok(bytes) = download_note(http_client, faucet_url, &note_id.to_hex()).await
+            && let Ok(fresh_note_file) = NoteFile::read_from_bytes(&bytes)
+        {
+            let _ = client.import_note(fresh_note_file).await;
         }
 
         // Sync and wait before retrying.
@@ -642,7 +633,9 @@ impl ConsumeNotesCmd {
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
                 .await
-                .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
+                .map_err(|_| CliError::Input(format!(
+                    "The provided note ID '{note_id}' could not be found. Please check that you entered a valid full note ID or a known note ID prefix."
+                )))?;
 
             if note_record.is_authenticated() {
                 authenticated_notes.push(note_record.id());

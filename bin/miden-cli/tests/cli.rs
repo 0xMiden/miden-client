@@ -25,7 +25,6 @@ use miden_client::note::{
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
     TestClientKeyStore,
     create_test_store_path,
     execute_tx_and_sync,
@@ -543,8 +542,8 @@ async fn mint_using_testnet_faucet() -> Result<()> {
         .get_balance(AccountId::from_hex(&faucet_id)?)
         .unwrap_or(0);
 
-    println!("balance: {:?}", balance);
-    println!("amount: {:?}", amount);
+    println!("balance: {balance:?}");
+    println!("amount: {amount:?}");
 
     assert_eq!(balance, amount, "minted amount should match requested amount");
     Ok(())
@@ -871,7 +870,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
     }
 }
 
-/// Mints tokens using the faucet API (with PoW) and checks that the command runs
+/// Mints tokens using the faucet API (with `PoW`) and checks that the command runs
 /// successfully given account using the CLI given by `cli_path`.
 /// Note: This uses a hardcoded amount of 100000 base units (= 100 in human-readable format).
 fn mint_cli_using_testnet_faucet(cli_path: &Path, target_account_id: &str) -> String {
@@ -879,7 +878,7 @@ fn mint_cli_using_testnet_faucet(cli_path: &Path, target_account_id: &str) -> St
     mint_cmd.args(["mint", "--target", target_account_id, "--amount", "100000"]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
-    println!("Mint output: {:?}", output);
+    println!("Mint output: {output:?}");
     assert!(output.status.success());
 
     // Parse transaction ID from output. Format: "Transaction ID: 0x..."
