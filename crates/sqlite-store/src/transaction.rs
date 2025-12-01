@@ -6,7 +6,6 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::crypto::MerkleStore;
 use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
@@ -17,6 +16,7 @@ use miden_client::transaction::{
     TransactionStoreUpdate,
 };
 use miden_client::utils::{Deserializable as _, Serializable as _};
+use miden_objects::crypto::merkle::SmtForest;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Transaction, params};
 
@@ -106,7 +106,7 @@ impl SqliteStore {
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
     pub fn apply_transaction(
         conn: &mut Connection,
-        merkle_store: &Arc<RwLock<MerkleStore>>,
+        smt_forest: &Arc<RwLock<SmtForest>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
@@ -157,17 +157,17 @@ impl SqliteStore {
         upsert_transaction_record(&tx, &transaction_record)?;
 
         // Account Data
-        let mut merkle_store = merkle_store.write().expect("merkle_store write lock not poisoned");
+        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         Self::apply_account_delta(
             &tx,
-            &mut merkle_store,
+            &mut smt_forest,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
             updated_storage_maps,
             executed_transaction.account_delta(),
         )?;
-        drop(merkle_store);
+        drop(smt_forest);
 
         // Note Updates
         apply_note_updates_tx(&tx, tx_update.note_updates())?;
