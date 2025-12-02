@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{AuthSchemeId, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
@@ -140,7 +140,7 @@ async fn run_flow(
     mut recipient: TestClient,
     recipient_keystore: &TestClientKeyStore,
     recipient_should_receive: bool,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<()> {
     // Ensure node is up
     wait_for_node(&mut sender).await;
@@ -150,7 +150,7 @@ async fn run_flow(
         &mut recipient,
         AccountStorageMode::Private,
         recipient_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert recipient wallet")?;
@@ -160,7 +160,7 @@ async fn run_flow(
         &mut sender,
         AccountStorageMode::Private,
         sender_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert faucet in sender")?;

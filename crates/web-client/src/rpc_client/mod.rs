@@ -41,9 +41,9 @@ impl RpcClient {
     /// Fetches notes by their IDs from the connected Miden node.
     ///
     /// @param note_ids - Array of [`NoteId`] objects to fetch
-    /// @returns Promise that resolves to  different data depending on the note type:
-    /// - Private notes: Returns only `note_id` and `metadata`. The `input_note` field will be
-    ///   `null`.
+    /// @returns Promise that resolves to different data depending on the note type:
+    /// - Private notes: Returns only `note_id` and `metadata` (from the note header). The
+    ///   `input_note` field will be `null`.
     /// - Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
     ///   ID.
     // TODO: try to remove this allow - conflicts with the above "note_ids" and with what typedoc
@@ -66,19 +66,13 @@ impl RpcClient {
         let web_notes: Vec<FetchedNote> = fetched_notes
             .into_iter()
             .map(|native_note| match native_note {
-                NativeFetchedNote::Private(id, metadata, _inclusion_proof) => FetchedNote::new(
-                    id.into(),
-                    metadata.into(),
-                    None, // Private notes don't include the full note
-                ),
+                NativeFetchedNote::Private(header, _inclusion_proof) => {
+                    FetchedNote::from_header(header, None)
+                },
                 NativeFetchedNote::Public(note, inclusion_proof) => {
                     let input_note = NativeInputNote::authenticated(note.clone(), inclusion_proof);
-
-                    FetchedNote::new(
-                        note.id().into(),
-                        (*note.metadata()).into(),
-                        Some(input_note.into()),
-                    )
+                    let header = miden_client::note::NoteHeader::new(note.id(), *note.metadata());
+                    FetchedNote::from_header(header, Some(input_note.into()))
                 },
             })
             .collect();

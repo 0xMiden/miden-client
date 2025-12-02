@@ -70,6 +70,7 @@ pub use miden_objects::{
 };
 
 use super::Client;
+use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
@@ -351,13 +352,13 @@ impl<AUTH> Client<AUTH> {
 /// `Client::import_account_by_id` to import a public account from the network (provided that the
 /// used seed is known).
 ///
-/// This function will only work for accounts with the [`BasicWallet`] and [`AuthRpoFalcon512`]
-/// components.
+/// This function currently supports accounts composed of the [`BasicWallet`] component and one of
+/// the supported authentication schemes ([`AuthRpoFalcon512`] or [`AuthEcdsaK256Keccak`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
-/// - `public_key`: Public key of the account used in the [`AuthRpoFalcon512`] component.
+/// - `public_key`: Public key of the account used for the authentication component.
 /// - `storage_mode`: Storage mode of the account.
 /// - `is_mutable`: Whether the account is mutable or not.
 ///
@@ -368,7 +369,6 @@ pub fn build_wallet_id(
     public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
-    auth_scheme_id: u8,
 ) -> Result<AccountId, ClientError> {
     let account_type = if is_mutable {
         AccountType::RegularAccountUpdatableCode
@@ -376,19 +376,20 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let auth_component = match auth_scheme_id {
-        0 => {
+    let auth_scheme = public_key.auth_scheme();
+    let auth_component = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(public_key.to_commitment()).into();
             auth_component
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
             auth_component
         },
-        _ => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme_id));
+        auth_scheme => {
+            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
         },
     };
 

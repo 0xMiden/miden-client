@@ -134,14 +134,10 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
     ///
-    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
-    /// [`miden_objects::note::NoteMetadata`].
-    ///
-    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
-    /// (recipient, assets, script, etc.).
-    ///
-    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
-    /// verify that each note is part of the block's note tree.
+    /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
+    /// [`miden_objects::note::NoteHeader`] (which contains the [`miden_objects::note::NoteId`]
+    /// and [`miden_objects::note::NoteMetadata`]), whereas for
+    /// [`miden_objects::note::NoteType::Public`] notes, the return data includes all details.
     ///
     /// The default implementation of this method splits the list of note IDs into smaller batches
     /// of size `NOTE_IDS_LIMIT`. Each batch is handled by using
