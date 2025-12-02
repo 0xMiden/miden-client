@@ -106,7 +106,7 @@
 
 ### createAuthComponentFromCommitment()
 
-> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme_id`): `AccountComponent`
 
 #### Parameters
 
@@ -114,9 +114,9 @@
 
 [`Word`](Word.md)
 
-##### auth\_scheme
+##### auth\_scheme\_id
 
-[`AuthScheme`](../enumerations/AuthScheme.md)
+`number`
 
 #### Returns
 
