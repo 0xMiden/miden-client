@@ -22,6 +22,7 @@ use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
+use miden_node_validator::Validator;
 use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
@@ -133,9 +134,6 @@ impl NodeBuilder {
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
             .context("failed to bind to store RPC gRPC endpoint")?;
-        let validator_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .context("failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
             .context("failed to bind to store ntx-builder gRPC endpoint")?;
@@ -149,9 +147,6 @@ impl NodeBuilder {
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
             .context("failed to retrieve the store's block-producer gRPC address")?;
-        let validator_address = validator_listener
-            .local_addr()
-            .context("failed to retrieve the store's validator gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
             .context("failed to retrieve the store's ntx-builder gRPC address")?;
@@ -159,6 +154,10 @@ impl NodeBuilder {
         let block_producer_address = available_socket_addr()
             .await
             .context("failed to bind to block-producer gRPC endpoint")?;
+
+        let validator_address = available_socket_addr()
+            .await
+            .context("failed to bind to validator gRPC endpoint")?;
 
         // Start components
 
@@ -189,6 +188,20 @@ impl NodeBuilder {
             &mut join_set,
         );
 
+        let validator_id = join_set
+            .spawn({
+                async move {
+                    Validator {
+                        address: validator_address,
+                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    }
+                    .serve()
+                    .await
+                    .context("failed while serving validator component")
+                }
+            })
+            .id();
+
         let rpc_id = join_set
             .spawn(async move {
                 let store_url = Url::parse(&format!("http://{store_rpc_address}"))
@@ -213,6 +226,7 @@ impl NodeBuilder {
         let component_ids = HashMap::from([
             (store_id, "store"),
             (block_producer_id, "block-producer"),
+            (validator_id, "validator"),
             (rpc_id, "rpc"),
             (ntx_builder_id, "ntx-builder"),
         ]);

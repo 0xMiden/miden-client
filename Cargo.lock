@@ -2763,7 +2763,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "futures",
@@ -2791,7 +2791,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "quote",
  "syn 2.0.110",
@@ -2800,7 +2800,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "futures",
@@ -2820,7 +2820,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2842,7 +2842,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "fs-err",
  "miette",
@@ -2853,7 +2853,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "futures",
@@ -2880,7 +2880,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2913,7 +2913,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2938,6 +2938,25 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
+]
+
+[[package]]
+name = "miden-node-validator"
+version = "0.13.0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+dependencies = [
+ "anyhow",
+ "miden-lib",
+ "miden-node-proto",
+ "miden-node-proto-build",
+ "miden-node-utils",
+ "miden-objects",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-reflection",
+ "tower-http",
+ "tracing",
 ]
 
 [[package]]
@@ -3013,7 +3032,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3058,7 +3077,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
 dependencies = [
  "fs-err",
  "getrandom 0.3.4",
@@ -3352,6 +3371,7 @@ dependencies = [
  "miden-node-rpc",
  "miden-node-store",
  "miden-node-utils",
+ "miden-node-validator",
  "miden-objects",
  "rand 0.9.2",
  "rand_chacha 0.9.0",
