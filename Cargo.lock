@@ -2456,7 +2456,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2494,7 +2494,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-cli"
-version = "0.12.4"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2520,7 +2520,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-integration-tests"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2538,7 +2538,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-sqlite-store"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2556,7 +2556,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-unit-tests"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "miden-client",
  "miden-client-sqlite-store",
@@ -2569,7 +2569,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-web"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "console_error_panic_hook",
  "hex",
@@ -2675,7 +2675,7 @@ dependencies = [
 
 [[package]]
 name = "miden-idxdb-store"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -3343,7 +3343,7 @@ dependencies = [
 
 [[package]]
 name = "node-builder"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "miden-lib",
@@ -5421,7 +5421,7 @@ checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "testing-remote-prover"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "miden-node-utils",
