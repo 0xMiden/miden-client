@@ -35,3 +35,22 @@
 #### Returns
 
 [`Word`](Word.md)
+
+***
+
+### fromPackage()
+
+> `static` **fromPackage**(`_package`): `TransactionScript`
+
+Creates a `NoteScript` from the given `Package`.
+Throws if the package is invalid.
+
+#### Parameters
+
+##### \_package
+
+[`Package`](Package.md)
+
+#### Returns
+
+`TransactionScript`

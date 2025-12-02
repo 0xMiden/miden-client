@@ -85,6 +85,13 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+// TODO: We need a better structured way of getting limits as defined by the node (#1139)
+pub const NOTE_IDS_LIMIT: usize = 100;
+pub const NULLIFIER_PREFIXES_LIMIT: usize = 100;
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -125,12 +132,17 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
 
-    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById` rpc endpoint.
+    /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
+    /// RPC endpoint.
     ///
-    /// For any [`miden_objects::note::NoteType::Private`] note, the return data is only the
-    /// [`miden_objects::note::NoteHeader`] (which contains the [`miden_objects::note::NoteId`]
-    /// and [`miden_objects::note::NoteMetadata`]), whereas for
-    /// [`miden_objects::note::NoteType::Public`] notes, the return data includes all details.
+    /// For [`miden_objects::note::NoteType::Private`] notes, the response includes only the
+    /// [`miden_objects::note::NoteMetadata`].
+    ///
+    /// For [`miden_objects::note::NoteType::Public`] notes, the response includes all note details
+    /// (recipient, assets, script, etc.).
+    ///
+    /// In both cases, a [`miden_objects::note::NoteInclusionProof`] is returned so the caller can
+    /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches info from the node necessary to perform a state sync using the
@@ -234,21 +246,18 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let mut public_notes = Vec::with_capacity(note_ids.len());
-        // TODO: We need a better structured way of getting limits as defined by the node (#1139)
-        for chunk in note_ids.chunks(1_000) {
-            let note_details = self.get_notes_by_id(chunk).await?;
+        let note_details = self.get_notes_by_id(note_ids).await?;
 
-            for detail in note_details {
-                if let FetchedNote::Public(note, inclusion_proof) = detail {
-                    let state = UnverifiedNoteState {
-                        metadata: *note.metadata(),
-                        inclusion_proof,
-                    }
-                    .into();
-                    let note = InputNoteRecord::new(note.into(), current_timestamp, state);
-
-                    public_notes.push(note);
+        for detail in note_details {
+            if let FetchedNote::Public(note, inclusion_proof) = detail {
+                let state = UnverifiedNoteState {
+                    metadata: *note.metadata(),
+                    inclusion_proof,
                 }
+                .into();
+                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+
+                public_notes.push(note);
             }
         }
 

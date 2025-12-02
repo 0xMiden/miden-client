@@ -1574,6 +1574,7 @@ async fn get_output_notes() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn account_rollback() {
     let (builder, mock_rpc_api, authenticator) = Box::pin(create_test_client_builder()).await;
 
@@ -1673,6 +1674,72 @@ async fn account_rollback() {
     assert_eq!(
         account_commitment_after_sync, account_commitment_before_tx,
         "Account commitment should be rolled back to the value before the transaction"
+    );
+
+    // Submit a new transaction after the rollback
+
+    // Store the account state before applying the transaction
+    let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_before_tx = account_before_tx.account().commitment();
+
+    // Apply a new transaction
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            NoteType::Public,
+            client.rng(),
+        )
+        .unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
+    let tx_id = transaction_result.id();
+    let submission_height = client.get_sync_height().await.unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
+
+    // Check that the account state has changed after applying the transaction
+    let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_after_tx = account_after_tx.account().commitment();
+
+    assert_ne!(
+        account_commitment_after_tx, account_commitment_before_tx,
+        "Account commitment should have changed after applying the new transaction"
+    );
+
+    // Submit the transaction
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    Box::pin(client.submit_proven_transaction(proven_transaction, &transaction_result))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+
+    mock_rpc_api.advance_blocks(1);
+    client.sync_state().await.unwrap();
+
+    // Verify the transaction is now committed
+    let tx_record = client
+        .get_transactions(TransactionFilter::All)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|tx| tx.id == tx_id)
+        .unwrap();
+
+    assert!(matches!(tx_record.status, TransactionStatus::Committed { .. }));
+
+    // Check that the account state has not been updated
+    let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_after_sync = account_after_sync.account().commitment();
+
+    assert_ne!(
+        account_commitment_after_sync, account_commitment_before_tx,
+        "Account commitment should not have been rolled back after sync"
+    );
+
+    assert_eq!(
+        account_commitment_after_sync, account_commitment_after_tx,
+        "Account commitment should not have changed after sync"
     );
 }
 

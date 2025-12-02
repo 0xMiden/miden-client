@@ -258,14 +258,12 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
+        // Upsert note scripts for later retrieval from the client's DataStore
         let output_note_scripts: Vec<NoteScript> = transaction_request
-            .expected_output_own_notes()
-            .iter()
+            .expected_output_recipients()
             .map(|n| n.script().clone())
             .collect();
         self.store.upsert_note_scripts(&output_note_scripts).await?;
-
-        let tx_args = transaction_request.into_transaction_args(tx_script);
 
         let block_num = if let Some(block_num) = fpi_block_num {
             block_num
@@ -273,6 +271,7 @@ where
             self.store.get_sync_height().await?
         };
 
+        // Load account code into MAST forest store
         // TODO: Refactor this to get account code only?
         let account_record = self
             .store
@@ -281,6 +280,9 @@ where
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.into();
         data_store.mast_store().load_account_code(account.code());
+
+        // Get transaction args
+        let tx_args = transaction_request.into_transaction_args(tx_script);
 
         if ignore_invalid_notes {
             // Remove invalid notes
