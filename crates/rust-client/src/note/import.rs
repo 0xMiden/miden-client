@@ -52,6 +52,8 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn import_note(&mut self, note_file: NoteFile) -> Result<NoteId, ClientError> {
         let id = match &note_file {
             NoteFile::NoteId(id) => *id,
@@ -82,9 +84,7 @@ where
         if let Some(note) = note {
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
-                self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.id()))
-                    .await?;
+                self.insert_note_tag(NoteTagRecord::with_note_source(*tag, note.id())).await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
         }
@@ -195,9 +195,11 @@ where
             } else {
                 // If the note is in the future we import it as unverified. We add the note tag so
                 // that the note is verified naturally in the next sync.
-                self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(metadata.tag(), note_record.id()))
-                    .await?;
+                self.insert_note_tag(NoteTagRecord::with_note_source(
+                    metadata.tag(),
+                    note_record.id(),
+                ))
+                .await?;
             }
 
             if note_changed { Ok(Some(note_record)) } else { Ok(None) }

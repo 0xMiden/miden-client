@@ -85,6 +85,12 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+// RPC ENDPOINT LIMITS
+// ================================================================================================
+
+pub const ACCOUNT_ID_LIMIT: usize = 500;
+pub const NOTE_TAG_LIMIT: usize = 500;
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
