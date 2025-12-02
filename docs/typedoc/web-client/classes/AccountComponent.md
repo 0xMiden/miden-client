@@ -104,6 +104,26 @@
 
 ***
 
+### createAuthComponentFromCommitment()
+
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
+
+#### Parameters
+
+##### commitment
+
+[`Word`](Word.md)
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
 ### fromPackage()
 
 > `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
