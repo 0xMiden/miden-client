@@ -1,4 +1,5 @@
 import Dexie from "dexie";
+import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 const DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
@@ -101,6 +102,21 @@ async function ensureClientVersion(clientVersion) {
     }
     if (storedVersion === clientVersion) {
         return;
+    }
+    const validCurrent = semver.valid(clientVersion);
+    const validStored = semver.valid(storedVersion);
+    if (validCurrent && validStored) {
+        const parsedCurrent = semver.parse(validCurrent);
+        const parsedStored = semver.parse(validStored);
+        const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
+            parsedCurrent?.minor === parsedStored?.minor;
+        if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+            await persistClientVersion(clientVersion);
+            return;
+        }
+    }
+    else {
+        console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
     }
     console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
     db.close();
