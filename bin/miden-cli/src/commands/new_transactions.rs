@@ -419,7 +419,10 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
                 "remote prover endpoint is not set in the configuration file".to_string(),
             ))?;
 
-        Arc::new(RemoteTransactionProver::new(remote_prover_endpoint.to_string()))
+        Arc::new(
+            RemoteTransactionProver::new(remote_prover_endpoint.to_string())
+                .with_timeout(cli_config.remote_prover_timeout),
+        )
     } else {
         client.prover()
     };

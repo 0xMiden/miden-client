@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 
 use figment::value::{Dict, Map};
 use figment::{Metadata, Profile, Provider};
@@ -16,6 +17,7 @@ pub const TOKEN_SYMBOL_MAP_FILENAME: &str = "token_symbol_map.toml";
 pub const DEFAULT_PACKAGES_DIR: &str = "packages";
 pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
+pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Returns the global miden directory path in the user's home directory
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
@@ -53,6 +55,8 @@ pub struct CliConfig {
     pub max_block_number_delta: Option<u32>,
     /// Describes settings related to the note transport endpoint.
     pub note_transport: Option<NoteTransportConfig>,
+    /// Timeout for the remote prover requests.
+    pub remote_prover_timeout: Duration,
 }
 
 // Make `ClientConfig` a provider itself for composability.
@@ -84,6 +88,7 @@ impl Default for CliConfig {
             package_directory: PathBuf::from(DEFAULT_PACKAGES_DIR),
             max_block_number_delta: None,
             note_transport: None,
+            remote_prover_timeout: DEFAULT_REMOTE_PROVER_TIMEOUT,
         }
     }
 }

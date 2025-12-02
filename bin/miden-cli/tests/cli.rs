@@ -260,6 +260,10 @@ fn silent_initialization_does_not_override_existing_config() {
         [rpc]
         endpoint = "https://custom-endpoint.com"
         timeout_ms = 5000
+
+        [remote_prover_timeout]
+        secs = 20
+        nanos = 0
         "#
     );
     std::fs::write(&config_path, custom_config).unwrap();
