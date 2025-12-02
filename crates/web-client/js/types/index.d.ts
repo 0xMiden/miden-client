@@ -1,16 +1,5 @@
 import { WebClient as WasmWebClient } from "./crates/miden_client_web";
-import type {
-  Account,
-  AccountId,
-  AccountStorageMode,
-  ProvenTransaction,
-  SyncSummary,
-  TransactionId,
-  TransactionProver,
-  TransactionRequest,
-  TransactionResult,
-  TransactionStoreUpdate,
-} from "./crates/miden_client_web";
+import type { SyncSummary } from "./crates/miden_client_web";
 
 export {
   Account,
@@ -112,7 +101,6 @@ export type SignCallback = (
   signingInputs: Uint8Array
 ) => Promise<Array<number | string>> | Array<number | string>;
 
-// Extend WASM WebClient but override methods that use workers
 export declare class WebClient extends WasmWebClient {
   /**
    * Factory method to create and initialize a new wrapped WebClient.
@@ -149,64 +137,6 @@ export declare class WebClient extends WasmWebClient {
   ): Promise<WebClient & WasmWebClient>;
 
   /**
-   * Creates a new wallet, optionally leveraging the worker thread for heavy computations.
-   */
-  newWallet(
-    storageMode: AccountStorageMode,
-    mutable: boolean,
-    seed?: Uint8Array
-  ): Promise<Account>;
-
-  /**
-   * Creates a new faucet, optionally leveraging the worker thread for heavy computations.
-   */
-  newFaucet(
-    storageMode: AccountStorageMode,
-    nonFungible: boolean,
-    tokenSymbol: string,
-    decimals: number,
-    maxSupply: bigint
-  ): Promise<Account>;
-
-  /**
-   * Executes, proves, submits a transaction, and applies the resulting update.
-   */
-  submitTransaction(
-    transactionResult: TransactionResult,
-    prover?: TransactionProver | null
-  ): Promise<TransactionStoreUpdate>;
-
-  /**
-   * Executes a transaction request without submitting it to the network.
-   */
-  executeTransaction(
-    accountId: AccountId,
-    transactionRequest: TransactionRequest
-  ): Promise<TransactionResult>;
-
-  /**
-   * Executes, proves, submits, and applies a new transaction request.
-   */
-  submitNewTransaction(
-    accountId: AccountId,
-    transactionRequest: TransactionRequest
-  ): Promise<TransactionId>;
-
-  /**
-   * Generates a transaction proof using a worker (when available).
-   */
-  proveTransaction(
-    transactionResult: TransactionResult,
-    prover?: TransactionProver | null
-  ): Promise<ProvenTransaction>;
-
-  /** Syncs local state with the node (uses worker when possible). */
-  syncState(): Promise<SyncSummary>;
-
-  /** Returns the default transaction prover configured on the client. */
-  defaultTransactionProver(): TransactionProver;
-
-  /**
    * Terminates the underlying worker.
    */
   terminate(): void;
@@ -226,12 +156,6 @@ export declare class MockWebClient extends WebClient {
     serializedMockNoteTransportNode?: ArrayBuffer | Uint8Array,
     seed?: Uint8Array
   ): Promise<MockWebClient & WasmWebClient>;
-  static createClient(
-    rpcUrl?: string,
-    noteTransportUrl?: string,
-    seed?: Uint8Array
-  ): Promise<MockWebClient & WasmWebClient>;
-
   /** Syncs the mock state and returns the resulting summary. */
   syncState(): Promise<SyncSummary>;
 }
