@@ -2763,7 +2763,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "futures",
@@ -2791,7 +2791,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "quote",
  "syn 2.0.110",
@@ -2800,11 +2800,10 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "futures",
- "lru 0.16.2",
  "miden-node-proto",
  "miden-node-utils",
  "miden-objects",
@@ -2821,7 +2820,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2843,7 +2842,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "fs-err",
  "miette",
@@ -2854,7 +2853,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "futures",
@@ -2881,7 +2880,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2914,7 +2913,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2923,6 +2922,7 @@ dependencies = [
  "http",
  "http-body-util",
  "itertools",
+ "lru 0.16.2",
  "miden-objects",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -3013,7 +3013,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3058,7 +3058,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=santiagopittella-fix-block-prover-client#1daed9ca110518478fbad3a1baee61a7b531ccf0"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#56273a2e9a4678d30a8fda83bfb7cf2d2447ba60"
 dependencies = [
  "fs-err",
  "getrandom 0.3.4",

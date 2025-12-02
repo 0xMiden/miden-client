@@ -133,6 +133,9 @@ impl NodeBuilder {
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
             .context("failed to bind to store RPC gRPC endpoint")?;
+        let validator_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .context("failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
             .context("failed to bind to store ntx-builder gRPC endpoint")?;
@@ -146,6 +149,9 @@ impl NodeBuilder {
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
             .context("failed to retrieve the store's block-producer gRPC address")?;
+        let validator_address = validator_listener
+            .local_addr()
+            .context("failed to retrieve the store's validator gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
             .context("failed to retrieve the store's ntx-builder gRPC address")?;
@@ -178,6 +184,7 @@ impl NodeBuilder {
         let block_producer_id = self.start_block_producer(
             block_producer_address,
             store_block_producer_address,
+            validator_address,
             checkpoint,
             &mut join_set,
         );
@@ -266,6 +273,7 @@ impl NodeBuilder {
         &self,
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
+        validator_address: SocketAddr,
         checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
@@ -275,7 +283,7 @@ impl NodeBuilder {
             .spawn(async move {
                 let store_url = Url::parse(&format!("http://{store_address}"))
                     .context("Failed to parse URL")?;
-                let validator_url = Url::parse(&format!("http://{store_address}")) // TODO: replace for validator_address
+                let validator_url = Url::parse(&format!("http://{validator_address}")) // TODO: replace for validator_address
                     .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,
