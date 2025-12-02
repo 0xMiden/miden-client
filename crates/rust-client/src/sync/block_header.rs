@@ -19,7 +19,11 @@ impl<AUTH> Client<AUTH> {
     pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
         let genesis = match self.store.get_block_header_by_num(0.into()).await? {
             Some((block, _)) => block,
-            None => self.retrieve_and_store_genesis().await?,
+            None => {
+                let genesis = self.retrieve_and_store_genesis().await?;
+                self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+                genesis
+            },
         };
 
         Ok(genesis)
