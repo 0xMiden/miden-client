@@ -88,8 +88,8 @@ use crate::transaction::ForeignAccount;
 // RPC ENDPOINT LIMITS
 // ================================================================================================
 
-pub const ACCOUNT_ID_LIMIT: usize = 500;
-pub const NOTE_TAG_LIMIT: usize = 500;
+pub const ACCOUNT_ID_LIMIT: usize = 5000;
+pub const NOTE_TAG_LIMIT: usize = 5000;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
