@@ -1,7 +1,7 @@
 import Dexie from "dexie";
 import { logWebStoreError } from "./utils.js";
 const DATABASE_NAME = "MidenClientDB";
-const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 export async function openDatabase(clientVersion) {
