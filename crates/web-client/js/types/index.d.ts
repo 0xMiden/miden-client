@@ -99,7 +99,7 @@ export type InsertKeyCallback = (
 export type SignCallback = (
   pubKey: Uint8Array,
   signingInputs: Uint8Array
-) => Promise<Array<number | string>> | Array<number | string>;
+) => Promise<Uint8Array> | Uint8Array;
 
 export declare class WebClient extends WasmWebClient {
   /**
