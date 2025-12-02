@@ -4,19 +4,18 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
-use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteId, NoteInclusionProof, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
-use crate::store::{InputNoteRecord, Store};
+use crate::store::Store;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "https://transport.miden.io";
@@ -83,9 +82,7 @@ where
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = self.fetch_note_transport_update(cursor, note_tags).await?;
-
-        self.store.apply_note_transport_update(update).await?;
+        self.fetch_transport_notes(cursor, note_tags).await?;
 
         Ok(())
     }
@@ -98,27 +95,24 @@ where
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update =
-            self.fetch_note_transport_update(NoteTransportCursor::init(), note_tags).await?;
-
-        self.store.apply_note_transport_update(update).await?;
+        self.fetch_transport_notes(NoteTransportCursor::init(), note_tags).await?;
 
         Ok(())
     }
 
     /// Fetch notes from the note transport network for provided note tags
     ///
-    /// A [`NoteTransportUpdate`] is created containing the downloaded notes.
     /// Pagination is employed, where only notes after the provided cursor are requested.
-    pub(crate) async fn fetch_note_transport_update<I>(
+    /// Downloaded notes are imported.
+    pub(crate) async fn fetch_transport_notes<I>(
         &mut self,
         cursor: NoteTransportCursor,
         tags: I,
-    ) -> Result<NoteTransportUpdate, ClientError>
+    ) -> Result<(), ClientError>
     where
         I: IntoIterator<Item = NoteTag>,
     {
-        let mut tnotes = BTreeMap::new();
+        let mut notes = Vec::new();
         // Fetch notes
         let (note_infos, rcursor) = self
             .get_note_transport_api()?
@@ -128,57 +122,26 @@ where
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
-            let tnote = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            tnotes.insert(tnote.id(), tnote);
+            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
+            notes.push(note);
         }
 
-        // Retrieve inclusion proofs from the Miden node
-        let ids = tnotes.keys().copied().collect::<Vec<_>>();
-        let nnotes = self.rpc_api.get_notes_by_id(&ids).await?;
-
-        // Create `NoteInputRecord`s of the transport-fetched notes and the node-retrieved proofs
-        let mut note_updates = Vec::with_capacity(tnotes.len());
-        for nnote in nnotes {
-            if let Some(tnote) = tnotes.get(&nnote.id()) {
-                // Try to combine the transport-fetched note with the node-retrieved proof
-                let opt_input_note_record = self
-                    .combine_transport_note_and_proof(
-                        tnote.clone(),
-                        nnote.id(),
-                        nnote.inclusion_proof().clone(),
-                    )
-                    .await;
-                if let Some(input_note_record) = opt_input_note_record {
-                    tnotes.remove(&nnote.id());
-                    note_updates.push(input_note_record);
-                }
-            }
+        // Import fetched notes
+        let height = self.get_sync_height().await?;
+        for note in notes {
+            let tag = note.metadata().tag();
+            let note_file = NoteFile::NoteDetails {
+                details: note.into(),
+                after_block_num: height,
+                tag: Some(tag),
+            };
+            self.import_note(note_file).await?;
         }
 
-        // Keep the remaining transport notes which inclusion proofs were not retrieved
-        for (_id, tnote) in tnotes {
-            let input_note_record = InputNoteRecord::from(tnote);
-            note_updates.push(input_note_record);
-        }
+        // Update cursor (pagination)
+        self.store.update_note_transport_cursor(rcursor).await?;
 
-        let update = NoteTransportUpdate { note_updates, cursor: rcursor };
-
-        Ok(update)
-    }
-
-    /// Combines a transport-fetched note with a node-retrieved proof into a note record
-    async fn combine_transport_note_and_proof(
-        &self,
-        tnote: Note,
-        note_id: NoteId,
-        inclusion_proof: NoteInclusionProof,
-    ) -> Option<InputNoteRecord> {
-        // Update existing note, if it exists
-        let previous_note = self.get_input_note(note_id).await.ok()?;
-        // Build note record from the transport-fetch note and node-retrieved proof
-        self.import_note_record_by_proof(previous_note, tnote, inclusion_proof)
-            .await
-            .ok()?
+        Ok(())
     }
 }
 
@@ -204,7 +167,7 @@ pub struct NoteTransportUpdate {
     /// Pagination cursor for next fetch
     pub cursor: NoteTransportCursor,
     /// Fetched notes
-    pub note_updates: Vec<InputNoteRecord>,
+    pub notes: Vec<Note>,
 }
 
 impl NoteTransportCursor {
