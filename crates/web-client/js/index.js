@@ -153,13 +153,10 @@ export class WebClient {
               throw new Error(`Callback ${callbackType} not available`);
             }
             const callbackFunction = callbackMapping[callbackType];
-            const callbackResult = callbackFunction.apply(this, args);
-            if ((!callbackResult) instanceof Promise) {
-              throw new Error(
-                `Callback ${callbackType} does not return a Promise`
-              );
+            let result = callbackFunction.apply(this, args);
+            if (result instanceof Promise) {
+              result = await result;
             }
-            const result = await callbackResult;
 
             this.worker.postMessage({
               callbackResult: result,

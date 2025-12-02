@@ -350,19 +350,16 @@ async function processQueue() {
 // Enqueue incoming messages and process them sequentially.
 self.onmessage = (event) => {
   if (
-    event.data.callbackResult ||
-    event.data.callbackError ||
-    event.data.callbackRequestId?.includes(CallbackType.INSERT_KEY)
+    event.data.callbackRequestId &&
+    pendingCallbacks.has(event.data.callbackRequestId)
   ) {
     const { callbackRequestId, callbackResult, callbackError } = event.data;
-    if (pendingCallbacks.has(callbackRequestId)) {
-      const { resolve, reject } = pendingCallbacks.get(callbackRequestId);
-      pendingCallbacks.delete(callbackRequestId);
-      if (!callbackError) {
-        resolve(callbackResult);
-      } else {
-        reject(new Error(callbackError));
-      }
+    const { resolve, reject } = pendingCallbacks.get(callbackRequestId);
+    pendingCallbacks.delete(callbackRequestId);
+    if (!callbackError) {
+      resolve(callbackResult);
+    } else {
+      reject(new Error(callbackError));
     }
     return;
   }

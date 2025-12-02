@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.6 (TBD)
+
+* Enables Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569))
+
 ## 0.12.5 (2025-12-01)
 
 * Removed the top-level await from the web-client JS entry point by lazily loading the WASM module, allowing `@demox-labs/miden-sdk` to be imported normally (including in Next.js SSR builds), and updated the worker bootstrap to match.
