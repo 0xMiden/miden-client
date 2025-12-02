@@ -103,7 +103,7 @@ async function ensureClientVersion(clientVersion) {
         return;
     }
     console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
-    await db.close();
+    db.close();
     await db.delete();
     await db.open();
     await persistClientVersion(clientVersion);
