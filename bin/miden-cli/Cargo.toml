@@ -28,9 +28,9 @@ comfy-table        = { version = "7.1" }
 dirs               = { version = "6.0" }
 figment            = { features = ["env", "toml"], version = "0.10" }
 hex                = { version = "0.4" }
-reqwest            = { default-features = false, features = ["json", "rustls-tls"], version = "0.12" }
 miette             = { workspace = true }
 rand               = { workspace = true }
+reqwest            = { default-features = false, features = ["json", "rustls-tls"], version = "0.12" }
 serde              = { features = ["derive"], version = "1.0" }
 serde_json         = { version = "1.0" }
 sha2               = { version = "0.10" }

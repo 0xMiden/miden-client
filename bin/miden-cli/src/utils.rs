@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use figment::Figment;
 use figment::providers::{Format, Toml};
+use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
-use miden_client::Client;
 
 use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
