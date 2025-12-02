@@ -1,10 +1,14 @@
 import Dexie from "dexie";
 import { logWebStoreError } from "./utils.js";
 const DATABASE_NAME = "MidenClientDB";
-export async function openDatabase() {
-    console.log("Opening database...");
+const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+export async function openDatabase(clientVersion) {
+    console.log(`Opening database for client version ${clientVersion}...`);
     try {
         await db.open();
+        await ensureClientVersion(clientVersion);
         console.log("Database opened successfully");
         return true;
     }
@@ -85,4 +89,36 @@ const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
 const trackedAccounts = db.table(Table.TrackedAccounts);
+async function ensureClientVersion(clientVersion) {
+    if (!clientVersion) {
+        console.warn("openDatabase called without a client version; skipping version enforcement.");
+        return;
+    }
+    const storedVersion = await getStoredClientVersion();
+    if (!storedVersion) {
+        await persistClientVersion(clientVersion);
+        return;
+    }
+    if (storedVersion === clientVersion) {
+        return;
+    }
+    console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
+    await db.close();
+    await db.delete();
+    await db.open();
+    await persistClientVersion(clientVersion);
+}
+async function getStoredClientVersion() {
+    const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
+    if (!record) {
+        return null;
+    }
+    return textDecoder.decode(record.value);
+}
+async function persistClientVersion(clientVersion) {
+    await settings.put({
+        key: CLIENT_VERSION_SETTING_KEY,
+        value: textEncoder.encode(clientVersion),
+    });
+}
 export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
