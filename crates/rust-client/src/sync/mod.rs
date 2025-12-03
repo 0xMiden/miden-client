@@ -158,13 +158,6 @@ where
             )
             .await?;
 
-        // Note Transport update
-        // TODO We can run both sync_state, fetch_transport_notes futures in parallel
-        if self.is_note_transport_enabled() {
-            let cursor = self.store.get_note_transport_cursor().await?;
-            self.fetch_transport_notes(cursor, note_tags).await?;
-        }
-
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
@@ -174,6 +167,13 @@ where
             .apply_state_sync(state_sync_update)
             .await
             .map_err(ClientError::StoreError)?;
+
+        // Note Transport update
+        // TODO We can run both sync_state, fetch_transport_notes futures in parallel
+        if self.is_note_transport_enabled() {
+            let cursor = self.store.get_note_transport_cursor().await?;
+            self.fetch_transport_notes(cursor, note_tags).await?;
+        }
 
         // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;

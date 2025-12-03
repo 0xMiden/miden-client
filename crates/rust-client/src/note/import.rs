@@ -221,6 +221,11 @@ where
             )
         });
 
+        let current_block_num = self.get_sync_height().await?;
+        if after_block_num > current_block_num {
+            return Ok(Some(note_record));
+        }
+
         let committed_note_data = if let Some(tag) = tag {
             self.check_expected_note(after_block_num, tag, note_record.details()).await?
         } else {
@@ -277,10 +282,6 @@ where
                 .sync_notes(request_block_num, None, &[tag].into_iter().collect())
                 .await?;
 
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
-                return Ok(None);
-            }
-
             // This means that notes with that note_tag were found.
             // Therefore, we should check if a note with the same id was found.
             let committed_note =
@@ -303,6 +304,12 @@ where
 
                 return Ok(Some((note.metadata(), note_inclusion_proof)));
             }
+
+            // We might have reached the chain tip without having found the note, bail if so
+            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
+                return Ok(None);
+            }
+
             // This means that a note with the same id was not found.
             // Therefore, we should request again for sync_notes with the same note_tag
             // and with the block_num of the last block header
