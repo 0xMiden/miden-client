@@ -8,7 +8,8 @@ if [ -z "$1" ]; then
 fi;
 
 PACKAGE_NAME="$1"
-BINARY_PATH="${BINARY_PATH:-target/release/$PACKAGE_NAME}"
+BIN_NAME="${BIN_NAME:-$PACKAGE_NAME}"
+BINARY_PATH="${BINARY_PATH:-target/release/$BIN_NAME}"
 
 if [ ! -x "$BINARY_PATH" ]; then
     if ! cargo build --release --package "$PACKAGE_NAME" --locked; then
