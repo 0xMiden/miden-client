@@ -2,7 +2,8 @@ use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlot as NativeStorageSlot;
 use miden_client::account::component::AccountComponent as NativeAccountComponent;
 use miden_client::auth::{
-    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak, AuthRpoFalcon512 as NativeRpoFalcon512,
+    AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
+    AuthRpoFalcon512 as NativeRpoFalcon512,
     AuthSecretKey as NativeSecretKey,
 };
 use miden_client::vm::Package as NativePackage;
