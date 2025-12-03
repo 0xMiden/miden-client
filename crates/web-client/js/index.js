@@ -506,10 +506,7 @@ export class WebClient {
     try {
       if (!this.worker) {
         const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.proveTransaction(
-          transactionResult,
-          prover
-        );
+        return await wasmWebClient.proveTransaction(transactionResult, prover);
       }
 
       const wasm = await getWasmOrThrow();
