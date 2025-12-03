@@ -186,8 +186,24 @@ export class WebClient {
       this.ready = Promise.resolve();
     }
 
-    // Create the underlying WASM WebClient.
-    this.wasmWebClient = new WasmWebClient();
+    // Lazy initialize the underlying WASM WebClient when first requested.
+    this.wasmWebClient = null;
+    this.wasmWebClientPromise = null;
+  }
+
+  async getWasmWebClient() {
+    if (this.wasmWebClient) {
+      return this.wasmWebClient;
+    }
+    if (!this.wasmWebClientPromise) {
+      this.wasmWebClientPromise = (async () => {
+        const wasm = await getWasmOrThrow();
+        const client = new wasm.WebClient();
+        this.wasmWebClient = client;
+        return client;
+      })();
+    }
+    return this.wasmWebClientPromise;
   }
 
   /**
@@ -204,7 +220,8 @@ export class WebClient {
     const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
+    const wasmWebClient = await instance.getWasmWebClient();
+    await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -258,7 +275,8 @@ export class WebClient {
       insertKeyCb,
       signCb
     );
-    await instance.wasmWebClient.createClientWithExternalKeystore(
+    const wasmWebClient = await instance.getWasmWebClient();
+    await wasmWebClient.createClientWithExternalKeystore(
       rpcUrl,
       noteTransportUrl,
       seed,
@@ -315,13 +333,15 @@ export class WebClient {
   async newWallet(storageMode, mutable, authSchemeId, seed) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.newWallet(
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.newWallet(
           storageMode,
           mutable,
           authSchemeId,
           seed
         );
       }
+      const wasm = await getWasmOrThrow();
       const serializedStorageMode = storageMode.asStr();
       const serializedAccountBytes = await this.callMethodWithWorker(
         MethodName.NEW_WALLET,
@@ -347,7 +367,8 @@ export class WebClient {
   ) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.newFaucet(
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.newFaucet(
           storageMode,
           nonFungible,
           tokenSymbol,
@@ -356,6 +377,7 @@ export class WebClient {
           authSchemeId
         );
       }
+      const wasm = await getWasmOrThrow();
       const serializedStorageMode = storageMode.asStr();
       const serializedMaxSupply = maxSupply.toString();
       const serializedAccountBytes = await this.callMethodWithWorker(
@@ -378,12 +400,14 @@ export class WebClient {
   async submitNewTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.submitNewTransaction(
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitNewTransaction(
           accountId,
           transactionRequest
         );
       }
 
+      const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION,
@@ -408,12 +432,14 @@ export class WebClient {
   async executeTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.executeTransaction(
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.executeTransaction(
           accountId,
           transactionRequest
         );
       }
 
+      const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
       const serializedResultBytes = await this.callMethodWithWorker(
         MethodName.EXECUTE_TRANSACTION,
@@ -433,21 +459,22 @@ export class WebClient {
   async submitTransaction(transactionResult, prover) {
     try {
       if (!this.worker) {
-        const proven = await this.wasmWebClient.proveTransaction(
+        const wasmWebClient = await this.getWasmWebClient();
+        const proven = await wasmWebClient.proveTransaction(
           transactionResult,
           prover
         );
-        const submissionHeight =
-          await this.wasmWebClient.submitProvenTransaction(
-            proven,
-            transactionResult
-          );
-        return await this.wasmWebClient.applyTransaction(
+        const submissionHeight = await wasmWebClient.submitProvenTransaction(
+          proven,
+          transactionResult
+        );
+        return await wasmWebClient.applyTransaction(
           transactionResult,
           submissionHeight
         );
       }
 
+      const wasm = await getWasmOrThrow();
       const serializedTransactionResult = transactionResult.serialize();
       const proverPayload = prover ? prover.serialize() : null;
 
@@ -464,7 +491,8 @@ export class WebClient {
         );
       }
 
-      return await this.wasmWebClient.applyTransaction(
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.applyTransaction(
         transactionResult,
         submissionHeight
       );
@@ -477,12 +505,14 @@ export class WebClient {
   async proveTransaction(transactionResult, prover) {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.proveTransaction(
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.proveTransaction(
           transactionResult,
           prover
         );
       }
 
+      const wasm = await getWasmOrThrow();
       const serializedTransactionResult = transactionResult.serialize();
       const proverPayload = prover ? prover.serialize() : null;
 
@@ -504,9 +534,11 @@ export class WebClient {
   async syncState() {
     try {
       if (!this.worker) {
-        return await this.wasmWebClient.syncState();
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.syncState();
       }
 
+      const wasm = await getWasmOrThrow();
       const serializedSyncSummaryBytes = await this.callMethodWithWorker(
         MethodName.SYNC_STATE
       );
