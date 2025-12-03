@@ -160,7 +160,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let sender_account: Account = client
         .get_account(from_account_id)
         .await?
-        .context("failed to find sender account after  transactions")?
+        .context("failed to find sender account after transactions")?
         .try_into()
         .unwrap();
     assert_eq!(
