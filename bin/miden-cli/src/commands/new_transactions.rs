@@ -372,15 +372,15 @@ async fn wait_for_authenticated_note<AUTH: TransactionAuthenticator + Sync + 'st
         let sync_summary = client.sync_state().await?;
 
         if sync_summary.committed_notes.contains(&note_id) {
-            if let Some(note_record) = client.get_input_note(note_id).await? {
-                if note_record.is_authenticated() {
-                    return Ok(note_record.id());
-                }
-            }
-        } else if let Some(note_record) = client.get_input_note(note_id).await? {
-            if note_record.is_authenticated() {
+            if let Some(note_record) = client.get_input_note(note_id).await?
+                && note_record.is_authenticated()
+            {
                 return Ok(note_record.id());
             }
+        } else if let Some(note_record) = client.get_input_note(note_id).await?
+            && note_record.is_authenticated()
+        {
+            return Ok(note_record.id());
         }
 
         if start.elapsed().as_secs() >= NOTE_READY_TIMEOUT_SECS {
@@ -415,7 +415,7 @@ struct NoteResponse {
     data_base64: String,
 }
 
-/// Solve a PoW challenge for the given challenge and target from the faucet API.
+/// Solve a `PoW` challenge for the given challenge and target from the faucet API.
 async fn solve_challenge(challenge_hex: String, target: u64) -> Result<u64, CliError> {
     if target == 0 {
         return Err(CliError::Faucet("Received PoW target of 0 from faucet".to_string()));
