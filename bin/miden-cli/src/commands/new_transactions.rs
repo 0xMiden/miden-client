@@ -10,7 +10,6 @@ use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     BlockNumber,
-    Note,
     NoteFile,
     NoteId,
     NoteType as MidenNoteType,
@@ -36,7 +35,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use tokio::task;
 use tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::info;
 use {hex, serde_json};
 
 use crate::create_dynamic_table;
@@ -275,17 +274,10 @@ impl MintCmd {
             .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))?;
         let imported_note_id = client.import_note(note_file.clone()).await?;
 
-        // Build an unauthenticated consume transaction from the imported note record.
-        let input_note = build_input_note_for_consumption(
-            &mut client,
-            &faucet_client,
-            imported_note_id,
-            note_file,
-        )
-        .await?;
+        let note_id = wait_for_authenticated_note(&mut client, imported_note_id, note_file).await?;
 
         let transaction_request = TransactionRequestBuilder::new()
-            .unauthenticated_input_notes(vec![(input_note_into_note(input_note), None)])
+            .authenticated_input_notes(vec![(note_id, None)])
             .build()
             .map_err(|err| {
                 CliError::Transaction(
@@ -361,6 +353,48 @@ impl MintFaucetCmd {
     }
 }
 
+/// Wait for a faucet note to be authenticated in the local store (or time out).
+async fn wait_for_authenticated_note<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
+    note_id: NoteId,
+    note_file: NoteFile,
+) -> Result<NoteId, CliError> {
+    const NOTE_READY_TIMEOUT_SECS: u64 = 180;
+    const RETRY_DELAY_SECS: u64 = 2;
+
+    if let NoteFile::NoteWithProof(note, proof) = note_file {
+        client.import_note(NoteFile::NoteWithProof(note.clone(), proof)).await?;
+        return Ok(note.id());
+    }
+
+    let start = std::time::Instant::now();
+    loop {
+        let sync_summary = client.sync_state().await?;
+
+        if sync_summary.committed_notes.contains(&note_id) {
+            if let Some(note_record) = client.get_input_note(note_id).await? {
+                if note_record.is_authenticated() {
+                    return Ok(note_record.id());
+                }
+            }
+        } else if let Some(note_record) = client.get_input_note(note_id).await? {
+            if note_record.is_authenticated() {
+                return Ok(note_record.id());
+            }
+        }
+
+        if start.elapsed().as_secs() >= NOTE_READY_TIMEOUT_SECS {
+            return Err(CliError::Transaction(
+                "Imported faucet note is not yet consumable; timed out waiting for metadata/proof"
+                    .into(),
+                "Faucet note not yet consumable".to_string(),
+            ));
+        }
+
+        sleep(Duration::from_secs(RETRY_DELAY_SECS)).await;
+    }
+}
+
 // FAUCET HELPERS
 // ================================================================================================
 
@@ -375,13 +409,13 @@ struct MintResponse {
     note_id: String,
 }
 
-// Response from the faucet API for a private note.
+/// Response from the faucet API for a private note.
 #[derive(Debug, Deserialize)]
 struct NoteResponse {
     data_base64: String,
 }
 
-// Solve a PoW challenge for the given challenge and target from the faucet API.
+/// Solve a PoW challenge for the given challenge and target from the faucet API.
 async fn solve_challenge(challenge_hex: String, target: u64) -> Result<u64, CliError> {
     if target == 0 {
         return Err(CliError::Faucet("Received PoW target of 0 from faucet".to_string()));
@@ -411,78 +445,6 @@ async fn solve_challenge(challenge_hex: String, target: u64) -> Result<u64, CliE
     })
     .await
     .map_err(|err| CliError::Faucet(format!("PoW solving task failed: {err}")))?
-}
-
-fn input_note_into_note(input_note: InputNote) -> Note {
-    match input_note {
-        InputNote::Authenticated { note, .. } | InputNote::Unauthenticated { note } => note,
-    }
-}
-
-// Build an unauthenticated input note from a note file.
-async fn build_input_note_for_consumption<AUTH: TransactionAuthenticator + Sync + 'static>(
-    client: &mut Client<AUTH>,
-    faucet_client: &FaucetHttpClient,
-    note_id: NoteId,
-    note_file: NoteFile,
-) -> Result<InputNote, CliError> {
-    const NOTE_READY_TIMEOUT_SECS: u64 = 180;
-    const RETRY_DELAY_SECS: u64 = 2;
-
-    // Best case: faucet already returns a proof, so we can consume immediately.
-    if let NoteFile::NoteWithProof(note, proof) = note_file {
-        println!("DEBUG: Note with proof found");
-        return Ok(InputNote::authenticated(note, proof));
-    }
-
-    let start = std::time::Instant::now();
-    loop {
-        // Try to build from the stored record first.
-        if let Ok(note_record) =
-            get_input_note_with_id_prefix(client, &note_id.to_hex()).await.map_err(|err| {
-                CliError::Transaction(
-                    err.into(),
-                    "Failed to locate imported faucet note in local store".to_string(),
-                )
-            })
-        {
-            match note_record.try_into() {
-                Ok(input) => return Ok(input),
-                Err(NoteRecordError::ConversionError(_)) => {
-                    // Missing metadata/proof; retry below after waiting for commitment/proof
-                    // export.
-                },
-                Err(err) => {
-                    return Err(CliError::Transaction(
-                        err.into(),
-                        "Failed to prepare faucet note for consumption".to_string(),
-                    ));
-                },
-            }
-        }
-
-        // Re-fetch periodically; once committed the faucet exports NoteWithProof.
-        if let Ok(bytes) = faucet_client.download_note(&note_id.to_hex()).await
-            && let Ok(fresh_note_file) = NoteFile::read_from_bytes(&bytes)
-        {
-            println!("DEBUG: RE FETCH PERIODICALLY");
-            let _ = client.import_note(fresh_note_file).await;
-        }
-
-        // Sync and wait before retrying.
-        client.sync_state().await?;
-        debug!("Waiting for faucet note {} to become consumable", note_id);
-
-        if start.elapsed().as_secs() >= NOTE_READY_TIMEOUT_SECS {
-            return Err(CliError::Transaction(
-                "Imported faucet note is not yet consumable; timed out waiting for metadata/proof"
-                    .into(),
-                "Faucet note not yet consumable".to_string(),
-            ));
-        }
-
-        sleep(Duration::from_secs(RETRY_DELAY_SECS)).await;
-    }
 }
 
 /// Create a pay-to-id transaction.
