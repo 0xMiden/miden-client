@@ -18,7 +18,7 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
-use miden_client::rpc::NodeRpcClient;
+use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
@@ -2407,6 +2407,55 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
+}
+
+#[tokio::test]
+async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // add note tags until the limit is exceeded
+    for i in 0..NOTE_TAG_LIMIT {
+        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+    }
+
+    // try to add a note tag
+    let tag = NoteTag::from(u32::try_from(NOTE_TAG_LIMIT).unwrap());
+    let result = client.add_note_tag(tag).await;
+
+    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT))));
+}
+
+#[tokio::test]
+async fn add_account_fails_if_accounts_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // add accounts until the limit is exceeded
+    for i in 0..ACCOUNT_ID_LIMIT {
+        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
+        client
+            .add_account(
+                &Account::mock(
+                    (i << 8) as u128,
+                    AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                ),
+                false,
+            )
+            .await
+            .unwrap();
+    }
+
+    // try to add an account
+    let result = client
+        .add_account(
+            &Account::mock(
+                (ACCOUNT_ID_LIMIT << 8) as u128,
+                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+            ),
+            false,
+        )
+        .await;
+
+    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT))));
 }
 
 // HELPERS
