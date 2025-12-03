@@ -6,6 +6,8 @@
 
 # Class: AccountCode
 
+Code commitment and metadata for an account.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the code commitment for the account.
 
 #### Returns
 
@@ -41,6 +45,8 @@
 ### hasProcedure()
 
 > **hasProcedure**(`mast_root`): `boolean`
+
+Returns true if the account code exports a procedure with the given MAST root.
 
 #### Parameters
 

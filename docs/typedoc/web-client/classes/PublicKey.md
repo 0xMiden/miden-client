@@ -32,6 +32,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the public key into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -42,6 +44,8 @@
 
 > **toCommitment**(): [`Word`](Word.md)
 
+Returns the commitment corresponding to this public key.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -51,6 +55,8 @@
 ### verify()
 
 > **verify**(`message`, `signature`): `boolean`
+
+Verifies a blind message word against the signature.
 
 #### Parameters
 
@@ -72,6 +78,8 @@
 
 > **verifyData**(`signing_inputs`, `signature`): `boolean`
 
+Verifies a signature over arbitrary signing inputs.
+
 #### Parameters
 
 ##### signing\_inputs
@@ -92,6 +100,8 @@
 
 > `static` **deserialize**(`bytes`): `PublicKey`
 
+Deserializes a public key from bytes.
+
 #### Parameters
 
 ##### bytes
@@ -107,6 +117,8 @@
 ### recoverFrom()
 
 > `static` **recoverFrom**(`message`, `signature`): `PublicKey`
+
+Recovers a public key from a signature (only supported for RpoFalcon512).
 
 #### Parameters
 

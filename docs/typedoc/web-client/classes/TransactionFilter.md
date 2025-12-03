@@ -6,6 +6,8 @@
 
 # Class: TransactionFilter
 
+Filter used when querying stored transactions.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > `static` **all**(): `TransactionFilter`
 
+Matches all transactions.
+
 #### Returns
 
 `TransactionFilter`
@@ -41,6 +45,8 @@
 ### expiredBefore()
 
 > `static` **expiredBefore**(`block_num`): `TransactionFilter`
+
+Matches transactions that expired before the given block number.
 
 #### Parameters
 
@@ -58,6 +64,8 @@
 
 > `static` **ids**(`ids`): `TransactionFilter`
 
+Matches specific transaction IDs.
+
 #### Parameters
 
 ##### ids
@@ -73,6 +81,8 @@
 ### uncommitted()
 
 > `static` **uncommitted**(): `TransactionFilter`
+
+Matches transactions that are not yet committed.
 
 #### Returns
 

@@ -6,6 +6,8 @@
 
 # Class: TransactionScript
 
+Compiled transaction script with its MAST root.
+
 ## Methods
 
 ### \[dispose\]()
@@ -31,6 +33,8 @@
 ### root()
 
 > **root**(): [`Word`](Word.md)
+
+Returns the MAST root commitment of the transaction script.
 
 #### Returns
 

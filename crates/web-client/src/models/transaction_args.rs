@@ -6,22 +6,26 @@ use super::note_id::NoteId;
 use super::transaction_script::TransactionScript;
 use super::word::Word;
 
+/// Arguments supplied to a transaction execution.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionArgs(NativeTransactionArgs);
 
 #[wasm_bindgen]
 impl TransactionArgs {
+    /// Returns the transaction script if provided.
     #[wasm_bindgen(js_name = "txScript")]
     pub fn tx_script(&self) -> Option<TransactionScript> {
         self.0.tx_script().map(Into::into)
     }
 
+    /// Returns note-specific arguments for the given note ID.
     #[wasm_bindgen(js_name = "getNoteArgs")]
     pub fn get_note_args(&self, note_id: &NoteId) -> Option<Word> {
         self.0.get_note_args(note_id.into()).map(Into::into)
     }
 
+    /// Returns advice inputs attached to the transaction.
     #[wasm_bindgen(js_name = "adviceInputs")]
     pub fn advice_inputs(&self) -> AdviceInputs {
         self.0.advice_inputs().into()

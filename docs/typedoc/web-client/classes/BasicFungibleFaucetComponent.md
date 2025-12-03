@@ -6,6 +6,8 @@
 
 # Class: BasicFungibleFaucetComponent
 
+Provides metadata for a basic fungible faucet account component.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### decimals()
 
 > **decimals**(): `number`
+
+Returns the number of decimal places for the token.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **maxSupply**(): [`Felt`](Felt.md)
 
+Returns the maximum token supply.
+
 #### Returns
 
 [`Felt`](Felt.md)
@@ -52,6 +58,8 @@
 
 > **symbol**(): [`TokenSymbol`](TokenSymbol.md)
 
+Returns the faucet's token symbol.
+
 #### Returns
 
 [`TokenSymbol`](TokenSymbol.md)
@@ -61,6 +69,8 @@
 ### fromAccount()
 
 > `static` **fromAccount**(`account`): `BasicFungibleFaucetComponent`
+
+Extracts faucet metadata from an account.
 
 #### Parameters
 

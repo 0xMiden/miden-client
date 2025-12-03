@@ -6,11 +6,15 @@
 
 # Class: TransactionRequestBuilder
 
+Builder for assembling a `TransactionRequest` from inputs, outputs, and scripts.
+
 ## Constructors
 
 ### Constructor
 
 > **new TransactionRequestBuilder**(): `TransactionRequestBuilder`
+
+Creates a new empty transaction request builder.
 
 #### Returns
 
@@ -32,6 +36,8 @@
 
 > **build**(): [`TransactionRequest`](TransactionRequest.md)
 
+Finalizes the builder into a `TransactionRequest`.
+
 #### Returns
 
 [`TransactionRequest`](TransactionRequest.md)
@@ -41,6 +47,8 @@
 ### extendAdviceMap()
 
 > **extendAdviceMap**(`advice_map`): `TransactionRequestBuilder`
+
+Merges an advice map to be available during script execution.
 
 #### Parameters
 
@@ -68,6 +76,8 @@
 
 > **withAuthArg**(`auth_arg`): `TransactionRequestBuilder`
 
+Adds an authentication argument.
+
 #### Parameters
 
 ##### auth\_arg
@@ -83,6 +93,8 @@
 ### withAuthenticatedInputNotes()
 
 > **withAuthenticatedInputNotes**(`notes`): `TransactionRequestBuilder`
+
+Adds authenticated input notes (identified by ID) with optional arguments.
 
 #### Parameters
 
@@ -100,6 +112,8 @@
 
 > **withCustomScript**(`script`): `TransactionRequestBuilder`
 
+Attaches a custom transaction script.
+
 #### Parameters
 
 ##### script
@@ -115,6 +129,8 @@
 ### withExpectedFutureNotes()
 
 > **withExpectedFutureNotes**(`note_details_and_tag`): `TransactionRequestBuilder`
+
+Declares notes expected to be created in follow-up executions.
 
 #### Parameters
 
@@ -132,6 +148,8 @@
 
 > **withExpectedOutputRecipients**(`recipients`): `TransactionRequestBuilder`
 
+Declares expected output recipients (used for verification).
+
 #### Parameters
 
 ##### recipients
@@ -147,6 +165,8 @@
 ### withForeignAccounts()
 
 > **withForeignAccounts**(`foreign_accounts`): `TransactionRequestBuilder`
+
+Registers foreign accounts referenced by the transaction.
 
 #### Parameters
 
@@ -164,6 +184,8 @@
 
 > **withOwnOutputNotes**(`notes`): `TransactionRequestBuilder`
 
+Adds notes created by the sender that should be emitted by the transaction.
+
 #### Parameters
 
 ##### notes
@@ -180,6 +202,8 @@
 
 > **withScriptArg**(`script_arg`): `TransactionRequestBuilder`
 
+Adds a transaction script argument.
+
 #### Parameters
 
 ##### script\_arg
@@ -195,6 +219,8 @@
 ### withUnauthenticatedInputNotes()
 
 > **withUnauthenticatedInputNotes**(`notes`): `TransactionRequestBuilder`
+
+Adds unauthenticated input notes with optional arguments.
 
 #### Parameters
 

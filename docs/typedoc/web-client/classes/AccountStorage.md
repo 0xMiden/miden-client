@@ -6,6 +6,8 @@
 
 # Class: AccountStorage
 
+Storage commitment and slots for an account.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the full account storage.
 
 #### Returns
 
@@ -41,6 +45,8 @@
 ### getItem()
 
 > **getItem**(`index`): [`Word`](Word.md)
+
+Returns the value stored at the given slot index, if any.
 
 #### Parameters
 
@@ -77,6 +83,8 @@ Returns `[]` if the map exists but is empty.
 ### getMapItem()
 
 > **getMapItem**(`index`, `key`): [`Word`](Word.md)
+
+Returns the value for a key in the map stored at the given slot, if any.
 
 #### Parameters
 

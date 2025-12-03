@@ -6,6 +6,8 @@
 
 # Class: ExecutedTransaction
 
+A transaction together with execution results and proofs.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **accountDelta**(): [`AccountDelta`](AccountDelta.md)
 
+Returns the account delta resulting from execution.
+
 #### Returns
 
 [`AccountDelta`](AccountDelta.md)
@@ -31,6 +35,8 @@
 ### accountId()
 
 > **accountId**(): [`AccountId`](AccountId.md)
+
+Returns the account the transaction was executed against.
 
 #### Returns
 
@@ -42,6 +48,8 @@
 
 > **blockHeader**(): [`BlockHeader`](BlockHeader.md)
 
+Returns the block header that included the transaction.
+
 #### Returns
 
 [`BlockHeader`](BlockHeader.md)
@@ -51,6 +59,8 @@
 ### finalAccountHeader()
 
 > **finalAccountHeader**(): [`AccountHeader`](AccountHeader.md)
+
+Returns the final account header after execution.
 
 #### Returns
 
@@ -72,6 +82,8 @@
 
 > **id**(): [`TransactionId`](TransactionId.md)
 
+Returns the transaction ID.
+
 #### Returns
 
 [`TransactionId`](TransactionId.md)
@@ -81,6 +93,8 @@
 ### initialAccountHeader()
 
 > **initialAccountHeader**(): [`AccountHeader`](AccountHeader.md)
+
+Returns the initial account header before execution.
 
 #### Returns
 
@@ -92,6 +106,8 @@
 
 > **inputNotes**(): [`InputNotes`](InputNotes.md)
 
+Returns the input notes consumed by the transaction.
+
 #### Returns
 
 [`InputNotes`](InputNotes.md)
@@ -102,6 +118,8 @@
 
 > **outputNotes**(): [`OutputNotes`](OutputNotes.md)
 
+Returns the output notes produced by the transaction.
+
 #### Returns
 
 [`OutputNotes`](OutputNotes.md)
@@ -111,6 +129,8 @@
 ### txArgs()
 
 > **txArgs**(): [`TransactionArgs`](TransactionArgs.md)
+
+Returns the arguments passed to the transaction script.
 
 #### Returns
 

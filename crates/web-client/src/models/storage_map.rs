@@ -3,17 +3,20 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Map-based storage slot content.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct StorageMap(NativeStorageMap);
 
 #[wasm_bindgen]
 impl StorageMap {
+    /// Creates an empty storage map.
     #[wasm_bindgen(constructor)]
     pub fn new() -> StorageMap {
         StorageMap(NativeStorageMap::new())
     }
 
+    /// Inserts a key/value pair, returning any previous value.
     pub fn insert(&mut self, key: &Word, value: &Word) -> Word {
         self.0.insert(key.into(), value.into()).unwrap_or_default().into()
     }

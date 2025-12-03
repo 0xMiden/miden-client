@@ -6,6 +6,8 @@
 
 # Class: BlockHeader
 
+Public header data for a block.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **accountRoot**(): [`Word`](Word.md)
 
+Returns the account root commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -31,6 +35,8 @@
 ### blockNum()
 
 > **blockNum**(): `number`
+
+Returns the block height.
 
 #### Returns
 
@@ -42,6 +48,8 @@
 
 > **chainCommitment**(): [`Word`](Word.md)
 
+Returns the chain commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -51,6 +59,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the block contents.
 
 #### Returns
 
@@ -72,6 +82,8 @@
 
 > **noteRoot**(): [`Word`](Word.md)
 
+Returns the note commitment root.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -81,6 +93,8 @@
 ### nullifierRoot()
 
 > **nullifierRoot**(): [`Word`](Word.md)
+
+Returns the nullifier root commitment.
 
 #### Returns
 
@@ -92,6 +106,8 @@
 
 > **prevBlockCommitment**(): [`Word`](Word.md)
 
+Returns the commitment of the previous block.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -101,6 +117,8 @@
 ### proofCommitment()
 
 > **proofCommitment**(): [`Word`](Word.md)
+
+Returns the proof commitment.
 
 #### Returns
 
@@ -112,6 +130,8 @@
 
 > **subCommitment**(): [`Word`](Word.md)
 
+Returns the commitment to block metadata.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -121,6 +141,8 @@
 ### timestamp()
 
 > **timestamp**(): `number`
+
+Returns the block timestamp.
 
 #### Returns
 
@@ -132,6 +154,8 @@
 
 > **txCommitment**(): [`Word`](Word.md)
 
+Returns the transaction commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -142,6 +166,8 @@
 
 > **txKernelCommitment**(): [`Word`](Word.md)
 
+Returns the transaction kernel commitment.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -151,6 +177,8 @@
 ### version()
 
 > **version**(): `number`
+
+Returns the header version.
 
 #### Returns
 

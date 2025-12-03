@@ -6,6 +6,8 @@
 
 # Class: TransactionArgs
 
+Arguments supplied to a transaction execution.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### adviceInputs()
 
 > **adviceInputs**(): [`AdviceInputs`](AdviceInputs.md)
+
+Returns advice inputs attached to the transaction.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **getNoteArgs**(`note_id`): [`Word`](Word.md)
 
+Returns note-specific arguments for the given note ID.
+
 #### Parameters
 
 ##### note\_id
@@ -57,6 +63,8 @@
 ### txScript()
 
 > **txScript**(): [`TransactionScript`](TransactionScript.md)
+
+Returns the transaction script if provided.
 
 #### Returns
 

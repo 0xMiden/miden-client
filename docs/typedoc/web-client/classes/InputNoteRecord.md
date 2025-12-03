@@ -6,6 +6,8 @@
 
 # Class: InputNoteRecord
 
+Stored representation of an input note along with its state.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **commitment**(): [`Word`](Word.md)
 
+Returns the note commitment (id + metadata), if available.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -32,6 +36,8 @@
 
 > **consumerTransactionId**(): `string`
 
+Returns the transaction ID that consumed this note, if any.
+
 #### Returns
 
 `string`
@@ -41,6 +47,8 @@
 ### details()
 
 > **details**(): [`NoteDetails`](NoteDetails.md)
+
+Returns the note details, if present.
 
 #### Returns
 
@@ -62,6 +70,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the note ID.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -71,6 +81,8 @@
 ### inclusionProof()
 
 > **inclusionProof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+
+Returns the inclusion proof when the note is authenticated.
 
 #### Returns
 
@@ -82,6 +94,8 @@
 
 > **isAuthenticated**(): `boolean`
 
+Returns true if the record contains authentication data (proof).
+
 #### Returns
 
 `boolean`
@@ -91,6 +105,8 @@
 ### isConsumed()
 
 > **isConsumed**(): `boolean`
+
+Returns true if the note has already been consumed.
 
 #### Returns
 
@@ -102,6 +118,8 @@
 
 > **isProcessing**(): `boolean`
 
+Returns true if the note is currently being processed.
+
 #### Returns
 
 `boolean`
@@ -111,6 +129,8 @@
 ### metadata()
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+
+Returns the note metadata if available.
 
 #### Returns
 
@@ -122,6 +142,8 @@
 
 > **nullifier**(): `string`
 
+Returns the nullifier for this note.
+
 #### Returns
 
 `string`
@@ -132,6 +154,8 @@
 
 > **state**(): [`InputNoteState`](../enumerations/InputNoteState.md)
 
+Returns the current processing state for this note.
+
 #### Returns
 
 [`InputNoteState`](../enumerations/InputNoteState.md)
@@ -141,6 +165,8 @@
 ### toInputNote()
 
 > **toInputNote**(): [`InputNote`](InputNote.md)
+
+Converts the record into an `InputNote` (including proof when available).
 
 #### Returns
 

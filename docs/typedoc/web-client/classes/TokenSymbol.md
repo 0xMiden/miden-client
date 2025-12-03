@@ -6,11 +6,15 @@
 
 # Class: TokenSymbol
 
+Symbol string for fungible tokens (e.g. ticker).
+
 ## Constructors
 
 ### Constructor
 
 > **new TokenSymbol**(`symbol`): `TokenSymbol`
+
+Creates a token symbol from a string.
 
 #### Parameters
 
@@ -47,6 +51,8 @@
 ### toString()
 
 > **toString**(): `string`
+
+Returns the validated symbol string.
 
 #### Returns
 

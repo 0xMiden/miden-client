@@ -19,6 +19,7 @@ use crate::models::library::Library;
 use crate::models::note_script::NoteScript;
 use crate::models::transaction_script::TransactionScript;
 
+/// Utility for linking libraries and compiling transaction/note scripts.
 #[derive(Clone)]
 #[wasm_bindgen(inspectable)]
 pub struct ScriptBuilder {

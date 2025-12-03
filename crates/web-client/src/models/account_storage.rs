@@ -4,21 +4,25 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Storage commitment and slots for an account.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountStorage(NativeAccountStorage);
 
 #[wasm_bindgen]
 impl AccountStorage {
+    /// Returns the commitment to the full account storage.
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
+    /// Returns the value stored at the given slot index, if any.
     #[wasm_bindgen(js_name = "getItem")]
     pub fn get_item(&self, index: u8) -> Option<Word> {
         self.0.get_item(index).ok().map(Into::into)
     }
 
+    /// Returns the value for a key in the map stored at the given slot, if any.
     #[wasm_bindgen(js_name = "getMapItem")]
     pub fn get_map_item(&self, index: u8, key: &Word) -> Option<Word> {
         self.0.get_map_item(index, key.into()).ok().map(Into::into)

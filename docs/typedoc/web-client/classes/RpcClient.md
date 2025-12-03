@@ -88,6 +88,8 @@ Fetches a note script by its root hash from the connected Miden node.
 
 [`Word`](Word.md)
 
+The root hash of the note script to fetch.
+
 #### Returns
 
 `Promise`\<[`NoteScript`](NoteScript.md)\>

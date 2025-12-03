@@ -44,6 +44,7 @@ impl NoteFile {
         Ok(Self { inner: deserialized })
     }
 
+    /// Creates a `NoteFile` from an input note, preserving proof when available.
     #[wasm_bindgen(js_name = fromInputNote)]
     pub fn from_input_note(note: &InputNote) -> Self {
         if let Some(inclusion_proof) = note.proof() {
@@ -58,6 +59,7 @@ impl NoteFile {
         }
     }
 
+    /// Creates a `NoteFile` from an output note, choosing details when present.
     #[wasm_bindgen(js_name = fromOutputNote)]
     pub fn from_output_note(note: &OutputNote) -> Self {
         let native_note = note.note();
@@ -70,11 +72,13 @@ impl NoteFile {
         }
     }
 
+    /// Creates a `NoteFile` from note details.
     #[wasm_bindgen(js_name = fromNoteDetails)]
     pub fn from_note_details(note_details: &NoteDetails) -> Self {
         note_details.into()
     }
 
+    /// Creates a `NoteFile` from a note ID.
     #[wasm_bindgen(js_name = fromNoteId)]
     pub fn from_note_id(note_details: &NoteId) -> Self {
         note_details.into()

@@ -3,12 +3,14 @@ use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 
+/// Symbol string for fungible tokens (e.g. ticker).
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct TokenSymbol(NativeTokenSymbol);
 
 #[wasm_bindgen]
 impl TokenSymbol {
+    /// Creates a token symbol from a string.
     #[wasm_bindgen(constructor)]
     pub fn new(symbol: &str) -> Result<TokenSymbol, JsValue> {
         let native_token_symbol = NativeTokenSymbol::new(symbol)
@@ -16,6 +18,7 @@ impl TokenSymbol {
         Ok(TokenSymbol(native_token_symbol))
     }
 
+    /// Returns the validated symbol string.
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> Result<String, JsValue> {

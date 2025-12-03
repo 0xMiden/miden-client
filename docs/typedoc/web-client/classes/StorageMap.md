@@ -6,11 +6,15 @@
 
 # Class: StorageMap
 
+Map-based storage slot content.
+
 ## Constructors
 
 ### Constructor
 
 > **new StorageMap**(): `StorageMap`
+
+Creates an empty storage map.
 
 #### Returns
 
@@ -41,6 +45,8 @@
 ### insert()
 
 > **insert**(`key`, `value`): [`Word`](Word.md)
+
+Inserts a key/value pair, returning any previous value.
 
 #### Parameters
 

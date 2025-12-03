@@ -3,12 +3,14 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Compiled transaction script with its MAST root.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionScript(NativeTransactionScript);
 
 #[wasm_bindgen]
 impl TransactionScript {
+    /// Returns the MAST root commitment of the transaction script.
     pub fn root(&self) -> Word {
         self.0.root().into()
     }

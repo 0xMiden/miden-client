@@ -17,11 +17,13 @@ pub struct AccountBuilderResult {
 
 #[wasm_bindgen]
 impl AccountBuilderResult {
+    /// Returns the built account.
     #[wasm_bindgen(getter)]
     pub fn account(&self) -> Account {
         self.account.clone()
     }
 
+    /// Returns the seed used to derive the account ID.
     #[wasm_bindgen(getter)]
     pub fn seed(&self) -> Word {
         self.seed.clone()
@@ -34,6 +36,7 @@ pub struct AccountBuilder(NativeAccountBuilder);
 
 #[wasm_bindgen]
 impl AccountBuilder {
+    /// Creates a new account builder from a 32-byte initial seed.
     #[wasm_bindgen(constructor)]
     pub fn new(init_seed: Vec<u8>) -> Result<AccountBuilder, JsValue> {
         let seed_array: [u8; 32] = init_seed
@@ -42,6 +45,7 @@ impl AccountBuilder {
         Ok(AccountBuilder(NativeAccountBuilder::new(seed_array)))
     }
 
+    /// Sets the account type (regular, faucet, etc.).
     #[wasm_bindgen(js_name = "accountType")]
     pub fn account_type(mut self, account_type: AccountType) -> Self {
         self.0 = self.0.account_type(account_type.into());
@@ -49,30 +53,35 @@ impl AccountBuilder {
     }
 
     // TODO: AccountStorageMode as Enum
+    /// Sets the storage mode (public/private) for the account.
     #[wasm_bindgen(js_name = "storageMode")]
     pub fn storage_mode(mut self, storage_mode: &AccountStorageMode) -> Self {
         self.0 = self.0.storage_mode(storage_mode.into());
         self
     }
 
+    /// Adds a component to the account.
     #[wasm_bindgen(js_name = "withComponent")]
     pub fn with_component(mut self, account_component: &AccountComponent) -> Self {
         self.0 = self.0.with_component(account_component);
         self
     }
 
+    /// Adds an authentication component to the account.
     #[wasm_bindgen(js_name = "withAuthComponent")]
     pub fn with_auth_component(mut self, account_component: &AccountComponent) -> Self {
         self.0 = self.0.with_auth_component(account_component);
         self
     }
 
+    /// Adds a no-auth component to the account (for public accounts).
     #[wasm_bindgen(js_name = "withNoAuthComponent")]
     pub fn with_no_auth_component(mut self) -> Self {
         self.0 = self.0.with_auth_component(NoAuth);
         self
     }
 
+    /// Builds the account and returns it together with the derived seed.
     pub fn build(self) -> Result<AccountBuilderResult, JsValue> {
         let account = self
             .0

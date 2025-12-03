@@ -6,6 +6,8 @@
 
 # Class: AccountStorageDelta
 
+Difference to apply to account storage slots.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > **isEmpty**(): `boolean`
 
+Returns true if no storage slots are changed.
+
 #### Returns
 
 `boolean`
@@ -41,6 +45,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the storage delta into bytes.
 
 #### Returns
 
@@ -52,6 +58,8 @@
 
 > **values**(): [`Word`](Word.md)[]
 
+Returns the new values for modified storage slots.
+
 #### Returns
 
 [`Word`](Word.md)[]
@@ -61,6 +69,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `AccountStorageDelta`
+
+Deserializes a storage delta from bytes.
 
 #### Parameters
 

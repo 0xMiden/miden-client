@@ -6,6 +6,8 @@
 
 # Class: TransactionRequest
 
+A fully constructed transaction request ready for submission.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **authArg**(): [`Word`](Word.md)
 
+Returns the authentication argument if present.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -32,6 +36,8 @@
 
 > **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
 
+Returns notes expected to be created in subsequent executions.
+
 #### Returns
 
 [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
@@ -41,6 +47,8 @@
 ### expectedOutputOwnNotes()
 
 > **expectedOutputOwnNotes**(): [`Note`](Note.md)[]
+
+Returns output notes created by the sender account.
 
 #### Returns
 
@@ -62,6 +70,8 @@
 
 > **scriptArg**(): [`Word`](Word.md)
 
+Returns the transaction script argument if present.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -72,6 +82,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the transaction request into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -81,6 +93,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `TransactionRequest`
+
+Deserializes a transaction request from bytes.
 
 #### Parameters
 

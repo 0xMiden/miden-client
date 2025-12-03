@@ -14,20 +14,24 @@ pub mod transaction_request_builder;
 
 use note_details_and_tag::NoteDetailsAndTag;
 
+/// A fully constructed transaction request ready for submission.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionRequest(NativeTransactionRequest);
 
 #[wasm_bindgen]
 impl TransactionRequest {
+    /// Serializes the transaction request into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a transaction request from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionRequest, JsValue> {
         deserialize_from_uint8array::<NativeTransactionRequest>(bytes).map(TransactionRequest)
     }
 
+    /// Returns output notes created by the sender account.
     #[wasm_bindgen(js_name = "expectedOutputOwnNotes")]
     pub fn expected_output_own_notes(&self) -> Result<Vec<Note>, JsValue> {
         let native_notes: Vec<NativeNote> = self.0.expected_output_own_notes();
@@ -35,6 +39,7 @@ impl TransactionRequest {
         Ok(notes)
     }
 
+    /// Returns notes expected to be created in subsequent executions.
     #[wasm_bindgen(js_name = "expectedFutureNotes")]
     pub fn expected_future_notes(&self) -> Result<Vec<NoteDetailsAndTag>, JsValue> {
         self.0
@@ -49,11 +54,13 @@ impl TransactionRequest {
             .collect::<Result<Vec<NoteDetailsAndTag>, _>>()
     }
 
+    /// Returns the transaction script argument if present.
     #[wasm_bindgen(js_name = "scriptArg")]
     pub fn script_arg(&self) -> Option<Word> {
         self.0.script_arg().map(Word::from)
     }
 
+    /// Returns the authentication argument if present.
     #[wasm_bindgen(js_name = "authArg")]
     pub fn auth_arg(&self) -> Option<Word> {
         self.0.auth_arg().map(Word::from)

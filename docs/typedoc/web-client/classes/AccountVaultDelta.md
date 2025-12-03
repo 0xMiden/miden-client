@@ -6,6 +6,8 @@
 
 # Class: AccountVaultDelta
 
+Difference to apply to an account's asset vault.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### addedFungibleAssets()
 
 > **addedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+
+Returns the fungible assets that increased.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **fungible**(): [`FungibleAssetDelta`](FungibleAssetDelta.md)
 
+Returns the fungible portion of the delta.
+
 #### Returns
 
 [`FungibleAssetDelta`](FungibleAssetDelta.md)
@@ -51,6 +57,8 @@
 ### isEmpty()
 
 > **isEmpty**(): `boolean`
+
+Returns true if no assets are changed.
 
 #### Returns
 
@@ -62,6 +70,8 @@
 
 > **removedFungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
 
+Returns the fungible assets that decreased.
+
 #### Returns
 
 [`FungibleAsset`](FungibleAsset.md)[]
@@ -72,6 +82,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the vault delta into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -81,6 +93,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `AccountVaultDelta`
+
+Deserializes a vault delta from bytes.
 
 #### Parameters
 
