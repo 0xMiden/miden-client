@@ -717,11 +717,10 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         io::stdin().read_line(&mut proceed_str).expect("Should read line");
 
         if proceed_str.trim().to_lowercase() != "y" {
-            println!("Transaction was cancelled.");
             return Err(CliError::Transaction(
                 std::io::Error::new(std::io::ErrorKind::Interrupted, "transaction cancelled")
                     .into(),
-                "Transaction was cancelled by user".to_string(),
+                "Transaction was cancelled".to_string(),
             ));
         }
     }
