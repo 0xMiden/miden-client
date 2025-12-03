@@ -553,20 +553,11 @@ export class WebClient {
   }
 
   terminate() {
-    this.worker.terminate();
+    if (this.worker) {
+      this.worker.terminate();
+    }
   }
 }
-
-// This copies static methods from WasmWebClient to WebClient
-Object.getOwnPropertyNames(WasmWebClient).forEach((prop) => {
-  if (
-    typeof WasmWebClient[prop] === "function" &&
-    prop !== "constructor" &&
-    prop !== "prototype"
-  ) {
-    WebClient[prop] = WasmWebClient[prop];
-  }
-});
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
