@@ -6,11 +6,15 @@
 
 # Class: NoteRecipient
 
+Recipient information containing the serial number, script, and inputs that guard a note.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteRecipient**(`serial_num`, `note_script`, `inputs`): `NoteRecipient`
+
+Creates a note recipient from its serial number, script, and inputs.
 
 #### Parameters
 
@@ -46,6 +50,8 @@
 
 > **digest**(): [`Word`](Word.md)
 
+Returns the digest of the recipient data (used in the note commitment).
+
 #### Returns
 
 [`Word`](Word.md)
@@ -66,6 +72,8 @@
 
 > **inputs**(): [`NoteInputs`](NoteInputs.md)
 
+Returns the inputs provided to the script.
+
 #### Returns
 
 [`NoteInputs`](NoteInputs.md)
@@ -76,6 +84,8 @@
 
 > **script**(): [`NoteScript`](NoteScript.md)
 
+Returns the script that controls consumption.
+
 #### Returns
 
 [`NoteScript`](NoteScript.md)
@@ -85,6 +95,8 @@
 ### serialNum()
 
 > **serialNum**(): [`Word`](Word.md)
+
+Returns the serial number that prevents double spends.
 
 #### Returns
 

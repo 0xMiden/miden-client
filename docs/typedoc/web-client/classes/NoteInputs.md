@@ -6,11 +6,15 @@
 
 # Class: NoteInputs
 
+Inputs passed to a note script.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteInputs**(`felt_array`): `NoteInputs`
+
+Creates note inputs from a list of field elements.
 
 #### Parameters
 
@@ -47,6 +51,8 @@
 ### values()
 
 > **values**(): [`Felt`](Felt.md)[]
+
+Returns the raw inputs as an array of field elements.
 
 #### Returns
 

@@ -6,6 +6,8 @@
 
 # Class: NoteScript
 
+Executable script guarding a note.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > **root**(): [`Word`](Word.md)
 
+Returns the MAST root of this script.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -41,6 +45,8 @@
 ### serialize()
 
 > **serialize**(): `Uint8Array`
+
+Serializes the script into bytes.
 
 #### Returns
 
@@ -52,7 +58,7 @@
 
 > **toString**(): `string`
 
-Print the MAST source for this script.
+Pretty-prints the MAST source for this script.
 
 #### Returns
 
@@ -63,6 +69,8 @@ Print the MAST source for this script.
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `NoteScript`
+
+Deserializes a script from bytes.
 
 #### Parameters
 
@@ -80,6 +88,8 @@ Print the MAST source for this script.
 
 > `static` **p2id**(): `NoteScript`
 
+Returns the well-known P2ID script.
+
 #### Returns
 
 `NoteScript`
@@ -90,6 +100,8 @@ Print the MAST source for this script.
 
 > `static` **p2ide**(): `NoteScript`
 
+Returns the well-known P2IDE script (P2ID with execution hint).
+
 #### Returns
 
 `NoteScript`
@@ -99,6 +111,8 @@ Print the MAST source for this script.
 ### swap()
 
 > `static` **swap**(): `NoteScript`
+
+Returns the well-known SWAP script.
 
 #### Returns
 

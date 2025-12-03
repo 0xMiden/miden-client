@@ -6,6 +6,8 @@
 
 # Class: NoteExecutionMode
 
+Specifies whether a note is executable locally or across the network.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > **toString**(): `string`
 
+Returns a human-readable representation of the mode.
+
 #### Returns
 
 `string`
@@ -42,6 +46,8 @@
 
 > `static` **newLocal**(): `NoteExecutionMode`
 
+Creates a note execution mode that targets the local account.
+
 #### Returns
 
 `NoteExecutionMode`
@@ -51,6 +57,8 @@
 ### newNetwork()
 
 > `static` **newNetwork**(): `NoteExecutionMode`
+
+Creates a note execution mode that targets any network account.
 
 #### Returns
 

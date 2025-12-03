@@ -24,12 +24,14 @@ use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
+/// A note with all data required for consumption by the transaction kernel.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Note(NativeNote);
 
 #[wasm_bindgen]
 impl Note {
+    /// Creates a new note from the provided assets, metadata, and recipient.
     #[wasm_bindgen(constructor)]
     pub fn new(
         note_assets: &NoteAssets,
@@ -39,38 +41,47 @@ impl Note {
         Note(NativeNote::new(note_assets.into(), note_metadata.into(), note_recipient.into()))
     }
 
+    /// Serializes the note into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a note from its byte representation.
     pub fn deserialize(bytes: &Uint8Array) -> Result<Note, JsValue> {
         deserialize_from_uint8array::<NativeNote>(bytes).map(Note)
     }
 
+    /// Returns the unique identifier of the note.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
+    /// Returns the commitment to the note ID and metadata.
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
+    /// Returns the public metadata associated with the note.
     pub fn metadata(&self) -> NoteMetadata {
         (*self.0.metadata()).into()
     }
 
+    /// Returns the recipient who can consume this note.
     pub fn recipient(&self) -> NoteRecipient {
         self.0.recipient().clone().into()
     }
 
+    /// Returns the assets locked inside the note.
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().clone().into()
     }
 
+    /// Returns the script that guards the note.
     pub fn script(&self) -> NoteScript {
         self.0.script().clone().into()
     }
 
+    /// Builds a standard P2ID note that targets the specified account.
     #[wasm_bindgen(js_name = "createP2IDNote")]
     pub fn create_p2id_note(
         sender: &AccountId,
@@ -99,6 +110,7 @@ impl Note {
         Ok(native_note.into())
     }
 
+    /// Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
     #[wasm_bindgen(js_name = "createP2IDENote")]
     pub fn create_p2ide_note(
         sender: &AccountId,

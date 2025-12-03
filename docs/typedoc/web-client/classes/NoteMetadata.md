@@ -6,11 +6,15 @@
 
 # Class: NoteMetadata
 
+Public metadata describing a note (sender, type, tag, and execution hint).
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteMetadata**(`sender`, `note_type`, `note_tag`, `note_execution_hint`, `aux?`): `NoteMetadata`
+
+Creates metadata for a note.
 
 #### Parameters
 
@@ -64,6 +68,8 @@
 
 > **noteType**(): [`NoteType`](../enumerations/NoteType.md)
 
+Returns whether the note is private, encrypted, or public.
+
 #### Returns
 
 [`NoteType`](../enumerations/NoteType.md)
@@ -74,6 +80,8 @@
 
 > **sender**(): [`AccountId`](AccountId.md)
 
+Returns the account that created the note.
+
 #### Returns
 
 [`AccountId`](AccountId.md)
@@ -83,6 +91,8 @@
 ### tag()
 
 > **tag**(): [`NoteTag`](NoteTag.md)
+
+Returns the tag associated with the note.
 
 #### Returns
 

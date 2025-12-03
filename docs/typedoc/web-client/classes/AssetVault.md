@@ -6,6 +6,8 @@
 
 # Class: AssetVault
 
+Sparse Merkle tree of assets held by an account.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
 
+Returns the fungible assets contained in this vault.
+
 #### Returns
 
 [`FungibleAsset`](FungibleAsset.md)[]
@@ -41,6 +45,8 @@
 ### getBalance()
 
 > **getBalance**(`faucet_id`): `bigint`
+
+Returns the balance for the given fungible faucet, or zero if absent.
 
 #### Parameters
 
@@ -57,6 +63,8 @@
 ### root()
 
 > **root**(): [`Word`](Word.md)
+
+Returns the root commitment of the asset vault tree.
 
 #### Returns
 

@@ -6,6 +6,8 @@
 
 # Class: PartialNote
 
+Note variant exposing assets and metadata but hiding full recipient details.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### assets()
 
 > **assets**(): [`NoteAssets`](NoteAssets.md)
+
+Returns the assets locked in the note.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the identifier of the partial note.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -52,6 +58,8 @@
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
 
+Returns the metadata attached to the note.
+
 #### Returns
 
 [`NoteMetadata`](NoteMetadata.md)
@@ -61,6 +69,8 @@
 ### recipientDigest()
 
 > **recipientDigest**(): [`Word`](Word.md)
+
+Returns the digest of the recipient information.
 
 #### Returns
 

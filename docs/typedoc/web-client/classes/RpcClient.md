@@ -92,4 +92,4 @@ Fetches a note script by its root hash from the connected Miden node.
 
 `Promise`\<[`NoteScript`](NoteScript.md)\>
 
-Promise that resolves to the `NoteScript`
+Promise that resolves to the `NoteScript`.

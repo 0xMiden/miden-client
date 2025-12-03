@@ -11,12 +11,14 @@ use super::note_script::NoteScript;
 use super::word::Word;
 use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
+/// Recipient information containing the serial number, script, and inputs that guard a note.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteRecipient(NativeNoteRecipient);
 
 #[wasm_bindgen]
 impl NoteRecipient {
+    /// Creates a note recipient from its serial number, script, and inputs.
     #[wasm_bindgen(constructor)]
     pub fn new(serial_num: &Word, note_script: &NoteScript, inputs: &NoteInputs) -> NoteRecipient {
         let native_serial_num: NativeWord = serial_num.into();
@@ -28,19 +30,23 @@ impl NoteRecipient {
         NoteRecipient(native_note_recipient)
     }
 
+    /// Returns the digest of the recipient data (used in the note commitment).
     pub fn digest(&self) -> Word {
         self.0.digest().into()
     }
 
+    /// Returns the serial number that prevents double spends.
     #[wasm_bindgen(js_name = "serialNum")]
     pub fn serial_num(&self) -> Word {
         self.0.serial_num().into()
     }
 
+    /// Returns the script that controls consumption.
     pub fn script(&self) -> NoteScript {
         self.0.script().into()
     }
 
+    /// Returns the inputs provided to the script.
     pub fn inputs(&self) -> NoteInputs {
         self.0.inputs().into()
     }

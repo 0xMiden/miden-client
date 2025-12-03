@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use super::felt::Felt;
 use crate::js_error_with_context;
 
+/// Identifier for an [`Account`](crate::models::account::Account) exposed to JavaScript.
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
@@ -20,50 +21,61 @@ pub struct AccountId(NativeAccountId);
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum NetworkId {
+    /// Main network prefix (`mm`).
     Mainnet = 0,
+    /// Public test network prefix (`mtst`).
     Testnet = 1,
+    /// Developer network prefix (`mdev`).
     Devnet = 2,
 }
 
 #[wasm_bindgen]
 #[repr(u8)]
 pub enum AccountInterface {
+    /// Basic wallet address interface.
     BasicWallet = 0,
 }
 
 #[wasm_bindgen]
 impl AccountId {
+    /// Builds an account ID from its hex string representation.
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> AccountId {
         let native_account_id = NativeAccountId::from_hex(hex).unwrap();
         AccountId(native_account_id)
     }
 
+    /// Returns true if the ID refers to a faucet.
     #[wasm_bindgen(js_name = "isFaucet")]
     pub fn is_faucet(&self) -> bool {
         self.0.is_faucet()
     }
 
+    /// Returns true if the ID refers to a regular account.
     #[wasm_bindgen(js_name = "isRegularAccount")]
     pub fn is_regular_account(&self) -> bool {
         self.0.is_regular_account()
     }
 
+    /// Returns true if the account uses public storage.
     #[wasm_bindgen(js_name = "isPublic")]
     pub fn is_public(&self) -> bool {
         self.0.is_public()
     }
 
+    /// Returns true if the account uses private storage.
     #[wasm_bindgen(js_name = "isPrivate")]
     pub fn is_private(&self) -> bool {
         self.0.is_private()
     }
 
+    /// Returns true if the ID is reserved for network accounts.
     #[wasm_bindgen(js_name = "isNetwork")]
     pub fn is_network(&self) -> bool {
         self.0.is_network()
     }
 
+    /// Returns the canonical hex representation of the account ID.
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
@@ -107,11 +119,13 @@ impl AccountId {
         Ok(address.encode(network_id))
     }
 
+    /// Returns the prefix field element storing metadata about version, type, and storage mode.
     pub fn prefix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.prefix().as_felt();
         native_felt.into()
     }
 
+    /// Returns the suffix field element derived from the account seed.
     pub fn suffix(&self) -> Felt {
         let native_felt: NativeFelt = self.0.suffix();
         native_felt.into()

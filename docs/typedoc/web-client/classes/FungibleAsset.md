@@ -6,11 +6,15 @@
 
 # Class: FungibleAsset
 
+A fungible asset issued by a faucet account.
+
 ## Constructors
 
 ### Constructor
 
 > **new FungibleAsset**(`faucet_id`, `amount`): `FungibleAsset`
+
+Creates a fungible asset for the given faucet and amount.
 
 #### Parameters
 
@@ -42,6 +46,8 @@
 
 > **amount**(): `bigint`
 
+Returns the amount of fungible units.
+
 #### Returns
 
 `bigint`
@@ -51,6 +57,8 @@
 ### faucetId()
 
 > **faucetId**(): [`AccountId`](AccountId.md)
+
+Returns the faucet account that minted this asset.
 
 #### Returns
 
@@ -71,6 +79,8 @@
 ### intoWord()
 
 > **intoWord**(): [`Word`](Word.md)
+
+Encodes this asset into the word layout used in the vault.
 
 #### Returns
 

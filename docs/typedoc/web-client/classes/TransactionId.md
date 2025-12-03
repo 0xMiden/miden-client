@@ -6,6 +6,8 @@
 
 # Class: TransactionId
 
+Identifier of a transaction.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **asBytes**(): `Uint8Array`
 
+Returns the transaction ID as raw bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -31,6 +35,8 @@
 ### asElements()
 
 > **asElements**(): [`Felt`](Felt.md)[]
+
+Returns the transaction ID as field elements.
 
 #### Returns
 
@@ -52,6 +58,8 @@
 
 > **inner**(): [`Word`](Word.md)
 
+Returns the underlying word representation.
+
 #### Returns
 
 [`Word`](Word.md)
@@ -61,6 +69,8 @@
 ### toHex()
 
 > **toHex**(): `string`
+
+Returns the hexadecimal encoding of the transaction ID.
 
 #### Returns
 

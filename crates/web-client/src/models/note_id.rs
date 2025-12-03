@@ -4,17 +4,20 @@ use wasm_bindgen::prelude::*;
 use super::word::Word;
 use crate::js_error_with_context;
 
+/// Unique identifier of a note (commitment to its details).
 #[derive(Clone, Copy)]
 #[wasm_bindgen]
 pub struct NoteId(NativeNoteId);
 
 #[wasm_bindgen]
 impl NoteId {
+    /// Builds a note ID from the recipient and asset commitments.
     #[wasm_bindgen(constructor)]
     pub fn new(recipient_digest: &Word, asset_commitment_digest: &Word) -> NoteId {
         NoteId(NativeNoteId::new(recipient_digest.into(), asset_commitment_digest.into()))
     }
 
+    /// Parses a note ID from its hex encoding.
     #[wasm_bindgen(js_name = "fromHex")]
     pub fn from_hex(hex: &str) -> Result<NoteId, JsValue> {
         let native_note_id = NativeNoteId::try_from_hex(hex)
@@ -22,6 +25,7 @@ impl NoteId {
         Ok(NoteId(native_note_id))
     }
 
+    /// Returns the canonical hex representation of the note ID.
     #[wasm_bindgen(js_name = "toString")]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {

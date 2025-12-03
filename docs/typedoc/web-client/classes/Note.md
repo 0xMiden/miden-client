@@ -6,11 +6,15 @@
 
 # Class: Note
 
+A note with all data required for consumption by the transaction kernel.
+
 ## Constructors
 
 ### Constructor
 
 > **new Note**(`note_assets`, `note_metadata`, `note_recipient`): `Note`
+
+Creates a new note from the provided assets, metadata, and recipient.
 
 #### Parameters
 
@@ -46,6 +50,8 @@
 
 > **assets**(): [`NoteAssets`](NoteAssets.md)
 
+Returns the assets locked inside the note.
+
 #### Returns
 
 [`NoteAssets`](NoteAssets.md)
@@ -55,6 +61,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the note ID and metadata.
 
 #### Returns
 
@@ -76,6 +84,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the unique identifier of the note.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -85,6 +95,8 @@
 ### metadata()
 
 > **metadata**(): [`NoteMetadata`](NoteMetadata.md)
+
+Returns the public metadata associated with the note.
 
 #### Returns
 
@@ -96,6 +108,8 @@
 
 > **recipient**(): [`NoteRecipient`](NoteRecipient.md)
 
+Returns the recipient who can consume this note.
+
 #### Returns
 
 [`NoteRecipient`](NoteRecipient.md)
@@ -105,6 +119,8 @@
 ### script()
 
 > **script**(): [`NoteScript`](NoteScript.md)
+
+Returns the script that guards the note.
 
 #### Returns
 
@@ -116,6 +132,8 @@
 
 > **serialize**(): `Uint8Array`
 
+Serializes the note into bytes.
+
 #### Returns
 
 `Uint8Array`
@@ -125,6 +143,8 @@
 ### createP2IDENote()
 
 > `static` **createP2IDENote**(`sender`, `target`, `assets`, `reclaim_height`, `timelock_height`, `note_type`, `aux`): `Note`
+
+Builds a P2IDE note that can be reclaimed or timelocked based on block heights.
 
 #### Parameters
 
@@ -166,6 +186,8 @@
 
 > `static` **createP2IDNote**(`sender`, `target`, `assets`, `note_type`, `aux`): `Note`
 
+Builds a standard P2ID note that targets the specified account.
+
 #### Parameters
 
 ##### sender
@@ -197,6 +219,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`bytes`): `Note`
+
+Deserializes a note from its byte representation.
 
 #### Parameters
 

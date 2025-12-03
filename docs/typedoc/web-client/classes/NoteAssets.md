@@ -6,11 +6,15 @@
 
 # Class: NoteAssets
 
+Collection of assets stored in a note.
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteAssets**(`assets_array?`): `NoteAssets`
+
+Creates a new asset list for a note.
 
 #### Parameters
 
@@ -48,6 +52,8 @@
 
 > **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
 
+Returns all fungible assets contained in the note.
+
 #### Returns
 
 [`FungibleAsset`](FungibleAsset.md)[]
@@ -57,6 +63,8 @@
 ### push()
 
 > **push**(`asset`): `void`
+
+Adds a fungible asset to the collection.
 
 #### Parameters
 

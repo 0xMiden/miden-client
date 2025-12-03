@@ -6,6 +6,8 @@
 
 # Class: NoteLocation
 
+Location of a note commitment within a block's note tree.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### blockNum()
 
 > **blockNum**(): `number`
+
+Returns the block height containing the note.
 
 #### Returns
 
@@ -41,6 +45,8 @@
 ### nodeIndexInBlock()
 
 > **nodeIndexInBlock**(): `number`
+
+Returns the index of the note leaf within the block's note tree.
 
 #### Returns
 

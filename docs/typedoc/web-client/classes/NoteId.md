@@ -6,11 +6,15 @@
 
 # Class: NoteId
 
+Unique identifier of a note (commitment to its details).
+
 ## Constructors
 
 ### Constructor
 
 > **new NoteId**(`recipient_digest`, `asset_commitment_digest`): `NoteId`
+
+Builds a note ID from the recipient and asset commitments.
 
 #### Parameters
 
@@ -52,6 +56,8 @@
 
 > **toString**(): `string`
 
+Returns the canonical hex representation of the note ID.
+
 #### Returns
 
 `string`
@@ -61,6 +67,8 @@
 ### fromHex()
 
 > `static` **fromHex**(`hex`): `NoteId`
+
+Parses a note ID from its hex encoding.
 
 #### Parameters
 

@@ -6,6 +6,8 @@
 
 # Class: NoteTag
 
+Tag describing how a note should be routed and executed.
+
 ## Methods
 
 ### \[dispose\]()
@@ -22,6 +24,8 @@
 
 > **asU32**(): `number`
 
+Returns the underlying 32-bit representation.
+
 #### Returns
 
 `number`
@@ -31,6 +35,8 @@
 ### executionMode()
 
 > **executionMode**(): [`NoteExecutionMode`](NoteExecutionMode.md)
+
+Returns the execution mode encoded in this tag.
 
 #### Returns
 
@@ -52,6 +58,8 @@
 
 > **isSingleTarget**(): `boolean`
 
+Returns true if the tag targets a single account.
+
 #### Returns
 
 `boolean`
@@ -61,6 +69,8 @@
 ### forLocalUseCase()
 
 > `static` **forLocalUseCase**(`use_case_id`, `payload`): `NoteTag`
+
+Builds a tag for a local-only use case.
 
 #### Parameters
 
@@ -81,6 +91,8 @@
 ### forPublicUseCase()
 
 > `static` **forPublicUseCase**(`use_case_id`, `payload`, `execution`): `NoteTag`
+
+Builds a tag for a public use case with an explicit payload and execution mode.
 
 #### Parameters
 
@@ -105,6 +117,8 @@
 ### fromAccountId()
 
 > `static` **fromAccountId**(`account_id`): `NoteTag`
+
+Builds a single-target tag derived from an account ID.
 
 #### Parameters
 

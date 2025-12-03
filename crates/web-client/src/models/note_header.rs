@@ -5,6 +5,7 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::word::Word;
 
+/// Public portion of a note containing its ID and metadata commitment.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteHeader(NativeNoteHeader);
@@ -13,14 +14,17 @@ pub struct NoteHeader(NativeNoteHeader);
 impl NoteHeader {
     // TODO: new()
 
+    /// Returns the unique identifier for the note.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
+    /// Returns the public metadata attached to the note.
     pub fn metadata(&self) -> NoteMetadata {
         self.0.metadata().into()
     }
 
+    /// Returns a commitment to the note ID and metadata.
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }

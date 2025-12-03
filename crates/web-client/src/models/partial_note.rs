@@ -6,6 +6,7 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::word::Word;
 
+/// Note variant exposing assets and metadata but hiding full recipient details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct PartialNote(NativePartialNote);
@@ -14,19 +15,23 @@ pub struct PartialNote(NativePartialNote);
 impl PartialNote {
     // TODO: new
 
+    /// Returns the identifier of the partial note.
     pub fn id(&self) -> NoteId {
         self.0.id().into()
     }
 
+    /// Returns the metadata attached to the note.
     pub fn metadata(&self) -> NoteMetadata {
         self.0.metadata().into()
     }
 
+    /// Returns the digest of the recipient information.
     #[wasm_bindgen(js_name = "recipientDigest")]
     pub fn recipient_digest(&self) -> Word {
         self.0.recipient_digest().into()
     }
 
+    /// Returns the assets locked in the note.
     pub fn assets(&self) -> NoteAssets {
         self.0.assets().into()
     }
