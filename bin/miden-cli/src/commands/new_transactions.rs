@@ -49,6 +49,148 @@ use crate::utils::{
     parse_account_id,
 };
 
+/// Simple wrapper around the faucet HTTP API to avoid passing HTTP bits around.
+#[derive(Clone)]
+struct FaucetHttpClient {
+    http_client: HttpClient,
+    base_url: Url,
+    api_key: Option<String>,
+}
+
+impl FaucetHttpClient {
+    fn new(endpoint: &str, timeout_ms: u64, api_key: Option<String>) -> Result<Self, CliError> {
+        let base_url = Url::parse(endpoint)
+            .map_err(|err| CliError::Faucet(format!("Invalid faucet URL `{endpoint}`: {err}")))?;
+
+        let http_client = HttpClient::builder()
+            .timeout(Duration::from_millis(timeout_ms))
+            .build()
+            .map_err(|err| CliError::Faucet(format!("Failed to build HTTP client: {err}")))?;
+
+        Ok(Self { http_client, base_url, api_key })
+    }
+
+    async fn request_pow(
+        &self,
+        account_id: &AccountId,
+        amount: u64,
+    ) -> Result<(String, u64), CliError> {
+        let pow_url = self.base_url.join("pow").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct PoW endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let mut request = self
+            .http_client
+            .get(pow_url)
+            .query(&[("account_id", account_id.to_hex()), ("amount", amount.to_string())]);
+
+        if let Some(key) = &self.api_key {
+            request = request.query(&[("api_key", key)]);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("PoW request failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!("Faucet PoW request failed ({status}): {body}")));
+        }
+
+        let body = response.text().await.unwrap_or_default();
+        let response: PowResponse = serde_json::from_str(&body)
+            .map_err(|err| CliError::Faucet(format!("Failed to parse PoW response: {err}")))?;
+
+        Ok((response.challenge, response.target))
+    }
+
+    async fn request_tokens(
+        &self,
+        challenge: &str,
+        nonce: u64,
+        account_id: &AccountId,
+        amount: u64,
+        note_type: NoteType,
+    ) -> Result<String, CliError> {
+        let url = self.base_url.join("get_tokens").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct get_tokens endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let mut request = self.http_client.get(url).query(&[
+            ("account_id", account_id.to_hex()),
+            ("asset_amount", amount.to_string()),
+            ("is_private_note", (note_type == NoteType::Private).to_string()),
+            ("challenge", challenge.to_string()),
+            ("nonce", nonce.to_string()),
+        ]);
+
+        if let Some(key) = &self.api_key {
+            request = request.query(&[("api_key", key)]);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("get_tokens request failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!(
+                "Faucet get_tokens request failed ({status}): {body}"
+            )));
+        }
+
+        let response: MintResponse = response.json().await.map_err(|err| {
+            CliError::Faucet(format!("Failed to parse get_tokens response: {err}"))
+        })?;
+
+        Ok(response.note_id)
+    }
+
+    async fn download_note(&self, note_id: &str) -> Result<Vec<u8>, CliError> {
+        let url = self.base_url.join("get_note").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct get_note endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let response = self
+            .http_client
+            .get(url)
+            .query(&[("note_id", note_id.to_string())])
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("Failed to download note: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!(
+                "Faucet get_note request failed ({status}): {body}"
+            )));
+        }
+
+        let response: NoteResponse = response
+            .json()
+            .await
+            .map_err(|err| CliError::Faucet(format!("Failed to parse get_note response: {err}")))?;
+
+        BASE64_STANDARD
+            .decode(response.data_base64)
+            .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))
+    }
+}
+
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
 pub enum NoteType {
     Public,
@@ -103,42 +245,31 @@ impl MintCmd {
         }
         let faucet_config = cli_config.faucet;
 
-        let faucet_url = Url::parse(&faucet_config.endpoint).map_err(|err| {
-            CliError::Faucet(format!("Invalid faucet URL `{}`: {err}", faucet_config.endpoint))
-        })?;
-
-        let http_client = HttpClient::builder()
-            .timeout(Duration::from_millis(faucet_config.timeout_ms))
-            .build()
-            .map_err(|err| CliError::Faucet(format!("Failed to build HTTP client: {err}")))?;
+        let faucet_client = FaucetHttpClient::new(
+            &faucet_config.endpoint,
+            faucet_config.timeout_ms,
+            self.api_key.clone(),
+        )?;
 
         println!("Requesting tokens from faucet...");
-        let (pow_challenge, pow_target) = request_pow(
-            &http_client,
-            &faucet_url,
-            &target_account_id,
-            self.amount,
-            self.api_key.as_deref(),
-        )
-        .await?;
+        let (pow_challenge, pow_target) =
+            faucet_client.request_pow(&target_account_id, self.amount).await?;
 
         let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
 
-        let note_id_str = request_tokens(
-            &http_client,
-            &faucet_url,
-            &pow_challenge,
-            nonce,
-            &target_account_id,
-            self.amount,
-            NoteType::Private,
-            self.api_key.as_deref(),
-        )
-        .await?;
+        let note_id_str = faucet_client
+            .request_tokens(
+                &pow_challenge,
+                nonce,
+                &target_account_id,
+                self.amount,
+                NoteType::Private,
+            )
+            .await?;
 
         println!("Faucet accepted mint request");
 
-        let note_bytes = download_note(&http_client, &faucet_url, &note_id_str).await?;
+        let note_bytes = faucet_client.download_note(&note_id_str).await?;
 
         let note_file = NoteFile::read_from_bytes(&note_bytes)
             .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))?;
@@ -147,8 +278,7 @@ impl MintCmd {
         // Build an unauthenticated consume transaction from the imported note record.
         let input_note = build_input_note_for_consumption(
             &mut client,
-            &http_client,
-            &faucet_url,
+            &faucet_client,
             imported_note_id,
             note_file,
         )
@@ -240,134 +370,15 @@ struct PowResponse {
     target: u64,
 }
 
-// Request a PoW from the faucet API.
-async fn request_pow(
-    http_client: &HttpClient,
-    base_url: &Url,
-    account_id: &AccountId,
-    amount: u64,
-    api_key: Option<&str>,
-) -> Result<(String, u64), CliError> {
-    let pow_url = base_url.join("pow").map_err(|err| {
-        CliError::Faucet(format!("Failed to construct PoW endpoint from {base_url}: {err}"))
-    })?;
-
-    let mut request = http_client
-        .get(pow_url)
-        .query(&[("account_id", account_id.to_hex()), ("amount", amount.to_string())]);
-
-    if let Some(key) = api_key {
-        request = request.query(&[("api_key", key)]);
-    }
-
-    let response = request
-        .send()
-        .await
-        .map_err(|err| CliError::Faucet(format!("PoW request failed: {err}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(CliError::Faucet(format!("Faucet PoW request failed ({status}): {body}")));
-    }
-
-    let body = response.text().await.unwrap_or_default();
-    let response: PowResponse = serde_json::from_str(&body)
-        .map_err(|err| CliError::Faucet(format!("Failed to parse PoW response: {err}")))?;
-
-    Ok((response.challenge, response.target))
-}
-
 #[derive(Debug, Deserialize)]
 struct MintResponse {
     note_id: String,
-}
-
-// Request tokens from the faucet API.
-async fn request_tokens(
-    http_client: &HttpClient,
-    base_url: &Url,
-    challenge: &str,
-    nonce: u64,
-    account_id: &AccountId,
-    amount: u64,
-    note_type: NoteType,
-    api_key: Option<&str>,
-) -> Result<String, CliError> {
-    let url = base_url.join("get_tokens").map_err(|err| {
-        CliError::Faucet(format!("Failed to construct get_tokens endpoint from {base_url}: {err}"))
-    })?;
-
-    let mut request = http_client.get(url).query(&[
-        ("account_id", account_id.to_hex()),
-        ("asset_amount", amount.to_string()),
-        ("is_private_note", (note_type == NoteType::Private).to_string()),
-        ("challenge", challenge.to_string()),
-        ("nonce", nonce.to_string()),
-    ]);
-
-    if let Some(key) = api_key {
-        request = request.query(&[("api_key", key)]);
-    }
-
-    let response = request
-        .send()
-        .await
-        .map_err(|err| CliError::Faucet(format!("get_tokens request failed: {err}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(CliError::Faucet(format!(
-            "Faucet get_tokens request failed ({status}): {body}"
-        )));
-    }
-
-    let response: MintResponse = response
-        .json()
-        .await
-        .map_err(|err| CliError::Faucet(format!("Failed to parse get_tokens response: {err}")))?;
-
-    Ok(response.note_id)
 }
 
 // Response from the faucet API for a private note.
 #[derive(Debug, Deserialize)]
 struct NoteResponse {
     data_base64: String,
-}
-
-// Download a private note from the faucet API.
-async fn download_note(
-    http_client: &HttpClient,
-    base_url: &Url,
-    note_id: &str,
-) -> Result<Vec<u8>, CliError> {
-    let url = base_url.join("get_note").map_err(|err| {
-        CliError::Faucet(format!("Failed to construct get_note endpoint from {base_url}: {err}"))
-    })?;
-
-    let response = http_client
-        .get(url)
-        .query(&[("note_id", note_id.to_string())])
-        .send()
-        .await
-        .map_err(|err| CliError::Faucet(format!("Failed to download note: {err}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(CliError::Faucet(format!("Faucet get_note request failed ({status}): {body}")));
-    }
-
-    let response: NoteResponse = response
-        .json()
-        .await
-        .map_err(|err| CliError::Faucet(format!("Failed to parse get_note response: {err}")))?;
-
-    BASE64_STANDARD
-        .decode(response.data_base64)
-        .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))
 }
 
 // Solve a PoW challenge for the given challenge and target from the faucet API.
@@ -411,8 +422,7 @@ fn input_note_into_note(input_note: InputNote) -> Note {
 // Build an unauthenticated input note from a note file.
 async fn build_input_note_for_consumption<AUTH: TransactionAuthenticator + Sync + 'static>(
     client: &mut Client<AUTH>,
-    http_client: &HttpClient,
-    faucet_url: &Url,
+    faucet_client: &FaucetHttpClient,
     note_id: NoteId,
     note_file: NoteFile,
 ) -> Result<InputNote, CliError> {
@@ -421,6 +431,7 @@ async fn build_input_note_for_consumption<AUTH: TransactionAuthenticator + Sync 
 
     // Best case: faucet already returns a proof, so we can consume immediately.
     if let NoteFile::NoteWithProof(note, proof) = note_file {
+        println!("DEBUG: Note with proof found");
         return Ok(InputNote::authenticated(note, proof));
     }
 
@@ -451,9 +462,10 @@ async fn build_input_note_for_consumption<AUTH: TransactionAuthenticator + Sync 
         }
 
         // Re-fetch periodically; once committed the faucet exports NoteWithProof.
-        if let Ok(bytes) = download_note(http_client, faucet_url, &note_id.to_hex()).await
+        if let Ok(bytes) = faucet_client.download_note(&note_id.to_hex()).await
             && let Ok(fresh_note_file) = NoteFile::read_from_bytes(&bytes)
         {
+            println!("DEBUG: RE FETCH PERIODICALLY");
             let _ = client.import_note(fresh_note_file).await;
         }
 
