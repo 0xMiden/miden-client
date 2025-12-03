@@ -17,6 +17,7 @@ use miden_client::note::{
     build_swap_tag,
     get_input_note_with_id_prefix,
 };
+use miden_client::rpc::Endpoint;
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     ExecutedTransaction,
@@ -28,7 +29,6 @@ use miden_client::transaction::{
     TransactionRequest,
     TransactionRequestBuilder,
 };
-use miden_client::rpc::Endpoint;
 use miden_client::{Client, Deserializable, RemoteTransactionProver};
 use rand::Rng;
 use reqwest::{Client as HttpClient, Url};
@@ -97,7 +97,7 @@ impl MintCmd {
         let current_endpoint: Endpoint = (&cli_config.rpc.endpoint).into();
         if current_endpoint != Endpoint::testnet() {
             return Err(CliError::Input(
-                "The `mint` command can only be used when the client is configured for testnet"
+                "The `mint` command can only be used when the client is configured for testnet. Use the `mint-faucet` command instead to mint tokens from a local faucet."
                     .to_string(),
             ));
         }
