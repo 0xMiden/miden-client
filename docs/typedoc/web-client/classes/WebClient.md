@@ -36,7 +36,7 @@
 
 ##### secret\_key
 
-[`SecretKey`](SecretKey.md)
+[`AuthSecretKey`](AuthSecretKey.md)
 
 #### Returns
 

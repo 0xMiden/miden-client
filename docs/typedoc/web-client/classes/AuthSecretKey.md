@@ -55,3 +55,103 @@
 #### Returns
 
 [`Felt`](Felt.md)[]
+
+***
+
+### publicKey()
+
+> **publicKey**(): [`PublicKey`](PublicKey.md)
+
+#### Returns
+
+[`PublicKey`](PublicKey.md)
+
+***
+
+### serialize()
+
+> **serialize**(): `Uint8Array`
+
+#### Returns
+
+`Uint8Array`
+
+***
+
+### sign()
+
+> **sign**(`message`): [`Signature`](Signature.md)
+
+#### Parameters
+
+##### message
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Signature`](Signature.md)
+
+***
+
+### signData()
+
+> **signData**(`signing_inputs`): [`Signature`](Signature.md)
+
+#### Parameters
+
+##### signing\_inputs
+
+[`SigningInputs`](SigningInputs.md)
+
+#### Returns
+
+[`Signature`](Signature.md)
+
+***
+
+### deserialize()
+
+> `static` **deserialize**(`bytes`): `AuthSecretKey`
+
+#### Parameters
+
+##### bytes
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`
+
+***
+
+### ecdsaWithRNG()
+
+> `static` **ecdsaWithRNG**(`seed?`): `AuthSecretKey`
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`
+
+***
+
+### rpoFalconWithRNG()
+
+> `static` **rpoFalconWithRNG**(`seed?`): `AuthSecretKey`
+
+#### Parameters
+
+##### seed?
+
+`Uint8Array`
+
+#### Returns
+
+`AuthSecretKey`
