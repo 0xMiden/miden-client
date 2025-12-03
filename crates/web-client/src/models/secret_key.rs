@@ -16,7 +16,7 @@ pub struct SecretKey(NativeSecretKey);
 
 #[wasm_bindgen]
 impl SecretKey {
-    /// Generates an RpoFalcon512 secret key using an optional deterministic seed.
+    /// Generates an `RpoFalcon512` secret key using an optional deterministic seed.
     #[wasm_bindgen(js_name = "rpoFalconWithRNG")]
     pub fn rpo_falcon_with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
         let mut rng = Self::try_rng_from_seed(seed)?;

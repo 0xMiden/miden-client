@@ -27,7 +27,7 @@ impl AuthSecretKey {
         self.public_key_commitment().into()
     }
 
-    /// Returns the RpoFalcon512 secret key bytes encoded as felts.
+    /// Returns the `RpoFalcon512` secret key bytes encoded as felts.
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match &self.0 {

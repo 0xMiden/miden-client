@@ -40,7 +40,7 @@ impl PublicKey {
         native_word.into()
     }
 
-    /// Recovers a public key from a signature (only supported for RpoFalcon512).
+    /// Recovers a public key from a signature (only supported for `RpoFalcon512`).
     #[wasm_bindgen(js_name = "recoverFrom")]
     pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
         let native_message: NativeWord = message.into();

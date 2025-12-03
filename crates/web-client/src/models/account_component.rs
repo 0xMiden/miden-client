@@ -113,7 +113,7 @@ impl AccountComponent {
         self.0.get_procedures().iter().map(Into::into).collect()
     }
 
-    /// Builds an auth component from a secret key (RpoFalcon512 or ECDSA k256 Keccak).
+    /// Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
     #[wasm_bindgen(js_name = "createAuthComponent")]
     pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
