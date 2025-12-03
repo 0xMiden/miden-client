@@ -16,6 +16,7 @@ use miden_client::note::{
     NoteAssets,
     NoteExecutionHint,
     NoteFile,
+    NoteId,
     NoteInputs,
     NoteMetadata,
     NoteRecipient,
@@ -25,6 +26,7 @@ use miden_client::note::{
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
+    ACCOUNT_ID_REGULAR,
     TestClientKeyStore,
     create_test_store_path,
     execute_tx_and_sync,
@@ -279,6 +281,80 @@ fn silent_initialization_does_not_override_existing_config() {
     );
 }
 
+// TX TESTS
+// ================================================================================================
+
+/// This test tries to run a mint TX using the CLI for an account that isn't tracked.
+#[tokio::test]
+async fn mint_with_untracked_account() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create faucet account
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+
+    sync_cli(&temp_dir);
+
+    // Let's try and mint
+    mint_cli(
+        &temp_dir,
+        &AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex(),
+        &fungible_faucet_account_id,
+    );
+
+    // Sleep for a while to ensure the note is committed on the node
+    sync_until_committed_note(&temp_dir);
+    Ok(())
+}
+
+/// This test tries to run a mint TX using the CLI for an account that isn't tracked.
+#[tokio::test]
+async fn token_symbol_mapping() -> Result<()> {
+    let (store_path, temp_dir, endpoint) = init_cli();
+
+    // Create faucet account
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+
+    // Create a token symbol mapping file in the MIDEN_DIR directory
+    let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
+    let token_symbol_map_content =
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+    fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
+
+    sync_cli(&temp_dir);
+
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.args([
+        "mint-faucet",
+        "--target",
+        AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex().as_str(),
+        "--asset",
+        "0.00001::BTC",
+        "-n",
+        "private",
+        "--force",
+    ]);
+
+    let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success());
+
+    let note_id = String::from_utf8(output.stdout)
+        .unwrap()
+        .split_whitespace()
+        .skip_while(|&word| word != "Output")
+        .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string();
+
+    let note = {
+        let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+        client.get_output_note(NoteId::try_from_hex(&note_id)?).await?.unwrap()
+    };
+
+    assert_eq!(note.assets().num_assets(), 1);
+    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    Ok(())
+}
+
 // IMPORT TESTS
 // ================================================================================================
 
@@ -337,9 +413,10 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
     show_cmd.current_dir(&temp_dir).assert().success();
 
     // Let's try and mint
-    mint_cli_using_testnet_faucet(
+    mint_cli(
         &temp_dir,
         &AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap().to_hex(),
+        &fungible_faucet_account_id,
     );
 
     // Wait until the note is committed on the node
@@ -354,7 +431,6 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
 // 3. On client A runs a mint transaction, and exports the output note
 // 4. On client B imports the note and consumes it
 #[tokio::test]
-#[ignore = "requires faucet API-backed mint flow"]
 async fn cli_export_import_note() -> Result<()> {
     const NOTE_FILENAME: &str = "test_note.mno";
 
@@ -370,7 +446,8 @@ async fn cli_export_import_note() -> Result<()> {
     sync_cli(&temp_dir_1);
 
     // Let's try and mint
-    let note_to_export_id = mint_cli_using_testnet_faucet(&temp_dir_1, &first_basic_account_id);
+    let note_to_export_id =
+        mint_cli(&temp_dir_1, &first_basic_account_id, &fungible_faucet_account_id);
 
     // Export without type fails
     let mut export_cmd = cargo_bin_cmd!("miden-client");
@@ -420,7 +497,6 @@ async fn cli_export_import_note() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "requires faucet API-backed mint flow"]
 async fn cli_export_import_account() -> Result<()> {
     const FAUCET_FILENAME: &str = "test_faucet.mac";
     const WALLET_FILENAME: &str = "test_wallet.wal";
@@ -466,7 +542,7 @@ async fn cli_export_import_account() -> Result<()> {
 
     sync_cli(&temp_dir_2);
 
-    let note_id = mint_cli_using_testnet_faucet(&temp_dir_2, &wallet_id);
+    let note_id = mint_cli(&temp_dir_2, &wallet_id, &faucet_id);
 
     // Wait until the note is committed on the node
     sync_until_committed_note(&temp_dir_2);
@@ -498,36 +574,21 @@ fn cli_empty_commands() {
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
 }
 
-// DEVNET & TESTNET TESTS
-// ================================================================================================
-
 /// This test is opt-in and exercises the network faucet mint flow against a real testnet endpoint.
 /// Run with: `cargo test -p miden-cli --test cli mint_using_testnet_faucet -- --ignored`
 #[tokio::test]
 #[ignore = "requires live testnet access and funded faucet"]
 async fn mint_using_testnet_faucet() -> Result<()> {
     let endpoint = Endpoint::testnet();
-    let faucet_id = "0x54bf4e12ef20082070758b022456c7".to_string();
-    let amount = 1_00u64;
+    let amount = 100_000u64;
 
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
     let target_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
 
-    let mut mint_cmd = cargo_bin_cmd!("miden-client");
-    mint_cmd.args(["mint", "--target", &target_account_id, "--amount", &amount.to_string()]);
+    let _ = mint_cli_using_testnet_faucet(&temp_dir, &target_account_id, amount);
 
-    let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
-    if !output.status.success() {
-        eprintln!(
-            "mint via network faucet failed\nstdout: {}\nstderr: {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    assert!(output.status.success());
-
-    // Ensure local store catches up after both network transactions
+    // Ensure local store catches up after the transaction
     sync_cli(&temp_dir);
 
     let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
@@ -536,18 +597,41 @@ async fn mint_using_testnet_faucet() -> Result<()> {
         .await?
         .expect("wallet account should exist after mint");
 
-    let balance = account
+    let vault_asset_amount = account
         .account()
         .vault()
-        .get_balance(AccountId::from_hex(&faucet_id)?)
-        .unwrap_or(0);
+        .get_balance(AccountId::from_hex("0x54bf4e12ef20082070758b022456c7")?)
+        .unwrap();
 
-    println!("balance: {balance:?}");
-    println!("amount: {amount:?}");
-
-    assert_eq!(balance, amount, "minted amount should match requested amount");
+    assert_eq!(
+        vault_asset_amount, amount,
+        "wallet should hold the correct amount of assets after mint"
+    );
     Ok(())
 }
+
+#[tokio::test]
+async fn consume_unauthenticated_note() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    // Create wallet account
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Public);
+
+    // Create faucet account
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Public);
+
+    sync_cli(&temp_dir);
+
+    // Mint
+    let note_id = mint_cli(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
+
+    // Consume the note, internally this checks that the note was consumed correctly
+    consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
+    Ok(())
+}
+
+// DEVNET & TESTNET TESTS
+// ================================================================================================
 
 #[tokio::test]
 async fn init_with_devnet() -> Result<()> {
@@ -870,12 +954,38 @@ fn sync_cli(cli_path: &Path) -> u64 {
     }
 }
 
+/// Mints 100 units of the corresponding faucet using the cli and checks that the command runs
+/// successfully given account using the CLI given by `cli_path`.
+fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.args([
+        "mint-faucet",
+        "--target",
+        target_account_id,
+        "--asset",
+        &format!("100::{faucet_id}"),
+        "-n",
+        "private",
+        "--force",
+    ]);
+
+    let output = mint_cmd.current_dir(cli_path).output().unwrap();
+    assert!(output.status.success());
+
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .split_whitespace()
+        .skip_while(|&word| word != "Output")
+        .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string()
+}
+
 /// Mints tokens using the faucet API (with `PoW`) and checks that the command runs
 /// successfully given account using the CLI given by `cli_path`.
-/// Note: This uses a hardcoded amount of 100000 base units (= 100 in human-readable format).
-fn mint_cli_using_testnet_faucet(cli_path: &Path, target_account_id: &str) -> String {
+fn mint_cli_using_testnet_faucet(cli_path: &Path, target_account_id: &str, amount: u64) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
-    mint_cmd.args(["mint", "--target", target_account_id, "--amount", "100000"]);
+    mint_cmd.args(["mint", "--target", target_account_id, "--amount", &amount.to_string()]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
     println!("Mint output: {output:?}");

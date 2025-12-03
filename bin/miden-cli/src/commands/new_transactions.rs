@@ -1,7 +1,6 @@
-use std::path::PathBuf;
+use std::io;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fs, io};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -29,6 +28,7 @@ use miden_client::transaction::{
     TransactionRequest,
     TransactionRequestBuilder,
 };
+use miden_client::rpc::Endpoint;
 use miden_client::{Client, Deserializable, RemoteTransactionProver};
 use rand::Rng;
 use reqwest::{Client as HttpClient, Url};
@@ -79,10 +79,6 @@ pub struct MintCmd {
     /// Optional faucet API key.
     #[arg(long = "api-key")]
     api_key: Option<String>,
-
-    /// If set, also write the downloaded note file to this path (in addition to importing it).
-    #[arg(long = "note-path")]
-    note_output_path: Option<PathBuf>,
 }
 
 impl MintCmd {
@@ -98,6 +94,13 @@ impl MintCmd {
             get_input_acc_id_by_prefix_or_default(&client, self.target_account_id.clone()).await?;
 
         let (cli_config, _) = load_config_file()?;
+        let current_endpoint: Endpoint = (&cli_config.rpc.endpoint).into();
+        if current_endpoint != Endpoint::testnet() {
+            return Err(CliError::Input(
+                "The `mint` command can only be used when the client is configured for testnet"
+                    .to_string(),
+            ));
+        }
         let faucet_config = cli_config.faucet;
 
         let faucet_url = Url::parse(&faucet_config.endpoint).map_err(|err| {
@@ -137,12 +140,6 @@ impl MintCmd {
 
         let note_bytes = download_note(&http_client, &faucet_url, &note_id_str).await?;
 
-        if let Some(path) = &self.note_output_path {
-            fs::write(path, &note_bytes).map_err(|err| {
-                CliError::Import(format!("Failed to write note to {}: {err}", path.display()))
-            })?;
-        }
-
         let note_file = NoteFile::read_from_bytes(&note_bytes)
             .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))?;
         let imported_note_id = client.import_note(note_file.clone()).await?;
@@ -175,6 +172,62 @@ impl MintCmd {
         );
 
         Ok(())
+    }
+}
+
+/// Mint tokens from an existing faucet account tracked by the client.
+#[derive(Debug, Parser, Clone)]
+pub struct MintFaucetCmd {
+    /// Target account ID or its hex prefix.
+    #[arg(short = 't', long = "target")]
+    target_account_id: String,
+
+    /// Asset to be minted.
+    #[arg(short, long, help = format!("Asset to be minted.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    asset: String,
+
+    #[arg(short, long, value_enum)]
+    note_type: NoteType,
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl MintFaucetCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let faucet_details_map = load_faucet_details_map()?;
+
+        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
+
+        let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
+
+        let transaction_request = TransactionRequestBuilder::new()
+            .build_mint_fungible_asset(
+                fungible_asset,
+                target_account_id,
+                (&self.note_type).into(),
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(err.into(), "Failed to build mint transaction".to_string())
+            })?;
+
+        execute_transaction(
+            &mut client,
+            fungible_asset.faucet_id(),
+            transaction_request,
+            self.force,
+            self.delegate_proving,
+        )
+        .await
+        .map(|_| ())
     }
 }
 

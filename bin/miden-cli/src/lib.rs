@@ -22,7 +22,7 @@ use commands::export::ExportCmd;
 use commands::import::ImportCmd;
 use commands::init::InitCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
-use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::new_transactions::{ConsumeNotesCmd, MintCmd, MintFaucetCmd, SendCmd, SwapCmd};
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
@@ -147,6 +147,9 @@ pub enum Command {
     #[command(name = "tx")]
     Transaction(TransactionCmd),
     Mint(MintCmd),
+    /// Mint tokens from a tracked faucet account using the legacy flow.
+    #[command(name = "mint-faucet")]
+    MintFaucet(MintFaucetCmd),
     Send(SendCmd),
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
@@ -227,6 +230,7 @@ impl Cli {
             Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
+            Command::MintFaucet(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
