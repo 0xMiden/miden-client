@@ -7,6 +7,7 @@
 * [BREAKING] Typed the `auth_scheme` plumbing across the Rust WebClient ID-building helpers and aligned the WebClient bindings with the native enum to avoid passing raw identifiers ([#1546](https://github.com/0xMiden/miden-client/pull/1546)).
 * Changed `blockNum` type from `string` to `number` in WebClient transaction interfaces for better type safety and consistency ([#1528](https://github.com/0xMiden/miden-client/pull/1528)).
 * Consolidated `FetchedNote` fields into `NoteHeader` ([#1536](https://github.com/0xMiden/miden-client/pull/1536)).
+* Tied the web client's IndexedDB schema to the running package version, automatically recreating or wiping stale stores and applying the same guard to `forceImportStore` ([#1576](https://github.com/0xMiden/miden-client/pull/1576)).
 * Added the `--remote-prover-timeout` configuration to the CLI ([#1551](https://github.com/0xMiden/miden-client/pull/1551)).
 * Surface WASM worker errors to the JS wrapper with their original stacks for clearer diagnostics ([#1565](https://github.com/0xMiden/miden-client/issues/1565)).
 
