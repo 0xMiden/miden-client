@@ -581,7 +581,8 @@ export class MockWebClient extends WebClient {
     const instance = new MockWebClient(seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    await instance.wasmWebClient.createMockClient(
+    const wasmWebClient = await instance.getWasmWebClient();
+    await wasmWebClient.createMockClient(
       seed,
       serializedMockChain,
       serializedMockNoteTransportNode
@@ -612,13 +613,16 @@ export class MockWebClient extends WebClient {
 
   async syncState() {
     try {
+      const wasmWebClient = await this.getWasmWebClient();
       if (!this.worker) {
-        return await this.wasmWebClient.syncState();
+        return await wasmWebClient.syncState();
       }
 
-      let serializedMockChain = this.wasmWebClient.serializeMockChain().buffer;
+      let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
       let serializedMockNoteTransportNode =
-        this.wasmWebClient.serializeMockNoteTransportNode().buffer;
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
+
+      const wasm = await getWasmOrThrow();
 
       const serializedSyncSummaryBytes = await this.callMethodWithWorker(
         MethodName.SYNC_STATE_MOCK,
@@ -641,12 +645,13 @@ export class MockWebClient extends WebClient {
         return await super.submitTransaction(transactionResult, prover);
       }
 
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
       const serializedTransactionResult = transactionResult.serialize();
       const proverPayload = prover ? prover.serialize() : null;
-      const serializedMockChain =
-        this.wasmWebClient.serializeMockChain().buffer;
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
       const serializedMockNoteTransportNode =
-        this.wasmWebClient.serializeMockNoteTransportNode().buffer;
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_TRANSACTION_MOCK,
@@ -661,13 +666,14 @@ export class MockWebClient extends WebClient {
         : undefined;
 
       if (!(this instanceof MockWebClient)) {
-        return await this.wasmWebClient.applyTransaction(
+        return await wasmWebClient.applyTransaction(
           transactionResult,
           result.submissionHeight
         );
       }
 
-      this.wasmWebClient = new WasmWebClient();
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
@@ -689,11 +695,12 @@ export class MockWebClient extends WebClient {
         return await super.submitNewTransaction(accountId, transactionRequest);
       }
 
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedMockChain =
-        this.wasmWebClient.serializeMockChain().buffer;
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
       const serializedMockNoteTransportNode =
-        this.wasmWebClient.serializeMockNoteTransportNode().buffer;
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
@@ -716,7 +723,8 @@ export class MockWebClient extends WebClient {
         return transactionResult.id();
       }
 
-      this.wasmWebClient = new WasmWebClient();
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
