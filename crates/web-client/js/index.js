@@ -741,3 +741,18 @@ export class MockWebClient extends WebClient {
     }
   }
 }
+
+function copyWebClientStatics(WasmWebClient) {
+  if (!WasmWebClient) {
+    return;
+  }
+  Object.getOwnPropertyNames(WasmWebClient).forEach((prop) => {
+    if (
+      typeof WasmWebClient[prop] === "function" &&
+      prop !== "constructor" &&
+      prop !== "prototype"
+    ) {
+      WebClient[prop] = WasmWebClient[prop];
+    }
+  });
+}
