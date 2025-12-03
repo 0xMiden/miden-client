@@ -4,8 +4,9 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
+use miden_objects::asset::{Asset, AssetVault};
 
-use miden_objects::account::{Account, AccountCode, AccountId};
+use miden_objects::account::{Account, AccountCode, AccountHeader, AccountId, AccountStorage};
 use miden_objects::address::NetworkId;
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
@@ -15,28 +16,27 @@ use miden_objects::utils::Deserializable;
 use miden_objects::{EMPTY_WORD, Word};
 use miden_tx::utils::Serializable;
 use miden_tx::utils::sync::RwLock;
-use tonic::Status;
+use tonic::{IntoRequest, Status};
 use tracing::info;
 
 use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
+use super::generated::account::AccountId as RPCAccountId;
+use super::generated::rpc_store::SyncAccountVaultRequest;
 use super::{
-    Endpoint,
-    FetchedAccount,
-    NodeRpcClient,
-    NodeRpcClientEndpoint,
-    NoteSyncInfo,
-    RpcError,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
 };
+use crate::StorageMap;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
-use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc_store::account_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc_store::{self, SyncStorageMapsRequest};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -222,7 +222,7 @@ impl NodeRpcClient for GrpcClient {
 
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = proto::rpc_store::SyncStateRequest {
+        let request = rpc_store::SyncStateRequest {
             block_num: block_num.as_u32(),
             account_ids,
             note_tags,
@@ -248,36 +248,145 @@ impl NodeRpcClient for GrpcClient {
     ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let request = proto::account::AccountId { id: account_id.to_bytes() };
+        // FIXME: Before merging, determine if we want to provide more details
+        // with this request. Should this fail if the requested account is private?
+        let request = rpc_store::AccountRequest {
+            account_id: Some(RPCAccountId { id: account_id.to_bytes() }),
+            ..Default::default()
+        };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|status| {
+        let response = rpc_api.get_account(request).await.map_err(|status| {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
         })?;
-        let response = response.into_inner();
-        let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `summary`".to_string(),
-        ))?;
 
-        let commitment =
-            account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have an `account_commitment`"
-                    .to_string(),
-            ))?;
+        let response = response.into_inner();
+
+        // FIXME: Double check it's correct to use the witness
+        let Some(witness) = response.witness else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account without witness".to_owned(),
+            ));
+        };
+
+        let Some(commitment) = witness.commitment else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account witness without commitment".to_owned(),
+            ));
+        };
+
+        let Some(block_number) = response.block_num.map(|bn| bn.block_num) else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account without a matching block number for the witness".to_owned(),
+            ));
+        };
 
         let commitment = commitment.try_into()?;
-
-        let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
+        let update_summary = AccountUpdateSummary::new(commitment, block_number);
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            let account = Account::read_from_bytes(&response.details.ok_or(
-                RpcError::ExpectedDataMissing(
-                    "GetAccountDetails response should have an `account`".to_string(),
-                ),
-            )?)?;
+            // FIXME:
+            // - Double check passing an empty map is OK.
+            // - We probably want to split the steps below into one or more functions
+            let details = response
+                .details
+                .ok_or(RpcError::ExpectedDataMissing(
+                    "GetAccountDetails returned a public account without details".to_owned(),
+                ))
+                .and_then(|details| details.into_domain(&Default::default()))?;
+            let account_id = details.header.id();
+            let nonce = details.header.nonce();
+            let assets: Vec<Asset> = {
+                if details.vault_details.too_many_assets {
+                    let req = SyncAccountVaultRequest {
+                        // FIXME: What should this parameter be?
+                        block_range: None,
+                        account_id: Some(details.header.id().clone().into()),
+                    };
+                    rpc_api
+                        .sync_account_vault(req)
+                        .await
+                        .unwrap()
+                        .into_inner()
+                        .updates
+                        .into_iter()
+                        .map(|update| Asset::try_from(update.asset.unwrap()).unwrap())
+                        .collect()
+                } else {
+                    // FIXME: Remove unwrap
+                    details.vault_details.assets
+                }
+            };
+            let storage = {
+                let slots = details
+                    .storage_details
+                    .header
+                    .slots()
+                    .map(|(_type, value)| Word::from(*value))
+                    .map(crate::account::StorageSlot::Value);
+                let mut new_map_entries = vec![];
+                for entry in details.storage_details.map_details {
+                    // FIXME:
+                    // - Should we specify a BlockRange?.
+                    // - Remove unwraps.
+                    // - Avoid nesting so much.
+                    // - Each entry from the storage details has a
+                    // 'too_many_entries' should this be only a single request?
+                    // - Avoid using 'extend' 2 times.
+                    if entry.too_many_entries {
+                        new_map_entries.extend(
+                            rpc_api
+                            .sync_storage_maps(SyncStorageMapsRequest {
+                                block_range: None,
+                                account_id: Some(account_id.clone().into()),
+                            })
+                            .await
+                            .unwrap()
+                        // FIXME: SyncStorageMapsResponse has 'pagination' field, should we
+                        // do something with it?
+                            .into_inner()
+                            .updates
+                            .into_iter()
+                        // FIXME:
+                        // - Avoid these unwraps
+                        // - Use better names
+                            .map(|u| {
+                                let key: Word = u.key.unwrap().try_into().unwrap();
+                                let value: Word = u.value.unwrap().try_into().unwrap();
+                                (key, value)
+                            }),
+                        )
+                    } else {
+                        new_map_entries.extend(entry.entries.into_iter().map(|e| {
+                            let key: Word = e.key.into();
+                            let value: Word = e.value.into();
+                            (key, value)
+                        }))
+                    }
+                }
 
+                let mut storage = vec![crate::account::StorageSlot::Map(
+                    StorageMap::with_entries(new_map_entries).unwrap(),
+                )];
+
+                storage.extend(slots);
+
+                storage
+            };
+            // FIXME: Is this correct?
+            let seed = None;
+            let account = Account::new(
+                account_id,
+                // FIXME: Remove unwraps
+                AssetVault::new(&assets).unwrap(),
+                AccountStorage::new(storage).unwrap(),
+                details.code,
+                nonce,
+                seed,
+            )
+            .unwrap();
             Ok(FetchedAccount::new_public(account, update_summary))
         }
     }
@@ -321,7 +430,7 @@ impl NodeRpcClient for GrpcClient {
             // Only request details for public accounts; include known code commitment for this
             // account when available
             let account_details = if account_id.is_public() {
-                Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
+                Some(rpc_store::account_request::AccountDetailRequest {
                     code_commitment: Some(EMPTY_WORD.into()),
                     // TODO: implement a way to request asset vaults
                     // https://github.com/0xMiden/miden-client/issues/1412
@@ -332,14 +441,14 @@ impl NodeRpcClient for GrpcClient {
                 None
             };
 
-            let request = proto::rpc_store::AccountProofRequest {
+            let request = rpc_store::AccountRequest {
                 account_id: Some(account_id.into()),
                 block_num: Some(block_num.into()),
                 details: account_details,
             };
 
             let response = rpc_api
-                .get_account_proof(request)
+                .get_account(request)
                 .await
                 .map_err(|status| {
                     RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
@@ -352,7 +461,7 @@ impl NodeRpcClient for GrpcClient {
                 .try_into()?;
 
             // For public accounts, details should be present when requested
-            let headers = if account_witness.id().is_public() {
+            let details = if account_witness.id().is_public() {
                 Some(
                     response
                         .details
@@ -363,7 +472,7 @@ impl NodeRpcClient for GrpcClient {
                 None
             };
 
-            let proof = AccountProof::new(account_witness, headers)
+            let proof = AccountProof::new(account_witness, details)
                 .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
             account_proofs.push(proof);
         }
@@ -386,7 +495,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncNotesRequest { block_range, note_tags };
+        let request = rpc_store::SyncNotesRequest { block_range, note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 
@@ -413,7 +522,7 @@ impl NodeRpcClient for GrpcClient {
         let mut rpc_api = self.ensure_connected().await?;
 
         for _ in 0..MAX_ITERATIONS {
-            let request = proto::rpc_store::SyncNullifiersRequest {
+            let request = rpc_store::SyncNullifiersRequest {
                 nullifiers: prefixes.iter().map(|&x| u32::from(x)).collect(),
                 prefix_len: 16,
                 block_range: Some(BlockRange {
@@ -474,7 +583,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = proto::rpc_store::NullifierList {
+        let request = rpc_store::NullifierList {
             nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
         };
 
@@ -542,7 +651,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncStorageMapsRequest {
+        let request = rpc_store::SyncStorageMapsRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -567,7 +676,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncAccountVaultRequest {
+        let request = rpc_store::SyncAccountVaultRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -594,7 +703,7 @@ impl NodeRpcClient for GrpcClient {
 
         let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
 
-        let request = proto::rpc_store::SyncTransactionsRequest { block_range, account_ids };
+        let request = rpc_store::SyncTransactionsRequest { block_range, account_ids };
 
         let mut rpc_api = self.ensure_connected().await?;
 

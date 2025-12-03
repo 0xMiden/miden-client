@@ -5,12 +5,7 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::Word;
 use miden_objects::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageSlotType,
 };
 use miden_objects::asset::Asset;
 use miden_objects::block::{AccountWitness, BlockNumber};
@@ -28,7 +23,7 @@ use crate::rpc::generated::{self as proto};
 // FETCHED ACCOUNT
 // ================================================================================================
 
-/// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
+/// Describes the possible responses from the `GetAccount` endpoint for an account.
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
     /// shared with the network. The full account state is to be tracked locally.
@@ -224,7 +219,7 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
 // ================================================================================================
 
 #[cfg(feature = "tonic")]
-impl proto::rpc_store::account_proof_response::AccountDetails {
+impl proto::rpc_store::account_response::AccountDetails {
     /// Converts the RPC response into `StateHeaders`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
@@ -241,22 +236,22 @@ impl proto::rpc_store::account_proof_response::AccountDetails {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
-        let proto::rpc_store::account_proof_response::AccountDetails {
+        let proto::rpc_store::account_response::AccountDetails {
             header,
             storage_details,
             code,
             vault_details,
         } = self;
         let header: AccountHeader = header
-            .ok_or(proto::rpc_store::account_proof_response::AccountDetails::missing_field(
-                stringify!(header),
-            ))?
+            .ok_or(proto::rpc_store::account_response::AccountDetails::missing_field(stringify!(
+                header
+            )))?
             .try_into()?;
 
         let storage_details = storage_details
-            .ok_or(proto::rpc_store::account_proof_response::AccountDetails::missing_field(
-                stringify!(storage_details),
-            ))?
+            .ok_or(proto::rpc_store::account_response::AccountDetails::missing_field(stringify!(
+                storage_details
+            )))?
             .try_into()?;
 
         // If an account code was received, it means the previously known account code is no longer
@@ -598,16 +593,14 @@ impl AccountStorageRequirements {
 }
 
 impl From<AccountStorageRequirements>
-    for Vec<
-        proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest,
-    >
+    for Vec<proto::rpc_store::account_request::account_detail_request::StorageMapDetailRequest>
 {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest>
+    ) -> Vec<proto::rpc_store::account_request::account_detail_request::StorageMapDetailRequest>
     {
-        use proto::rpc_store::account_proof_request::account_detail_request;
-        use proto::rpc_store::account_proof_request::account_detail_request::storage_map_detail_request;
+        use proto::rpc_store::account_request::account_detail_request;
+        use proto::rpc_store::account_request::account_detail_request::storage_map_detail_request;
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_index, map_keys) in request_map {

@@ -29,21 +29,22 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden base/protocol dependencies
-miden-lib     = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
-miden-objects = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
-miden-testing = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
-miden-tx      = { default-features = false, git = "https://github.com/0xMiden/miden-base", rev = "8592b036" }
+miden-lib             = { branch = "next", git = "https://github.com/0xMiden/miden-base.git" }
+miden-objects         = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-testing         = { branch = "next", git = "https://github.com/0xMiden/miden-base.git" }
+miden-tx              = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+
 
 # Miden node dependencies
-miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b" }
-miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
-miden-node-proto-build           = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b" }
-miden-node-rpc                   = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
-miden-node-store                 = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
-miden-node-utils                 = {  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-node-block-producer        = { path = "../miden-node/crates/block-producer" }
+miden-node-ntx-builder           = { path = "../miden-node/crates/ntx-builder" }
+miden-node-proto-build           = { path = "../miden-node/proto", package = "miden-node-proto-build", default-features = false }
+miden-node-rpc                   = { path = "../miden-node/crates/rpc"}
+miden-node-store                 = { path = "../miden-node/crates/store" }
+miden-node-utils                 = { path = "../miden-node/crates/utils" }
 miden-note-transport-proto-build = { default-features = false, version = "0.1" }
-miden-remote-prover              = { features = ["concurrent"],  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
-miden-remote-prover-client       = { default-features = false, features = ["tx-prover"],  git = "https://github.com/0xMiden/miden-node", rev = "a99e2414f8d55f58245e017a76a9d5dcdc84666b"  }
+miden-remote-prover              = { features = ["concurrent"],  path = "../miden-node/bin/remote-prover"}
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], path = "../miden-node/crates/remote-prover-client"  }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
