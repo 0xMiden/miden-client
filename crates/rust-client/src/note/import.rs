@@ -221,11 +221,6 @@ where
             )
         });
 
-        let current_block_num = self.get_sync_height().await?;
-        if after_block_num > current_block_num {
-            return Ok(Some(note_record));
-        }
-
         let committed_note_data = if let Some(tag) = tag {
             self.check_expected_note(after_block_num, tag, note_record.details()).await?
         } else {
