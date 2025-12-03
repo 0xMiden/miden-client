@@ -1,7 +1,7 @@
 import loadWasm from "./wasm.js";
-const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "./constants.js";
 export * from "../Cargo.toml";
+
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
     (exports, [exportName, _export]) => {
@@ -14,8 +14,41 @@ const buildTypedArraysExport = (exportObject) => {
   );
 };
 
-export const MidenArrays = buildTypedArraysExport(wasm);
-const { WebClient: WasmWebClient } = wasm;
+export const MidenArrays = {};
+
+let wasmModule = null;
+let wasmLoadPromise = null;
+let webClientStaticsCopied = false;
+
+const ensureWasm = async () => {
+  if (wasmModule) {
+    return wasmModule;
+  }
+  if (!wasmLoadPromise) {
+    wasmLoadPromise = loadWasm().then((module) => {
+      wasmModule = module;
+      if (module) {
+        Object.assign(MidenArrays, buildTypedArraysExport(module));
+        if (!webClientStaticsCopied && module.WebClient) {
+          copyWebClientStatics(module.WebClient);
+          webClientStaticsCopied = true;
+        }
+      }
+      return module;
+    });
+  }
+  return wasmLoadPromise;
+};
+
+const getWasmOrThrow = async () => {
+  const module = await ensureWasm();
+  if (!module) {
+    throw new Error(
+      "Miden WASM bindings are unavailable in this environment (SSR is disabled)."
+    );
+  }
+  return module;
+};
 /**
  * WebClient is a wrapper around the underlying WASM WebClient object.
  *
