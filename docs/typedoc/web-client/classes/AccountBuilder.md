@@ -102,6 +102,16 @@
 
 ***
 
+### withBasicWalletComponent()
+
+> **withBasicWalletComponent**(): `AccountBuilder`
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
 ### withComponent()
 
 > **withComponent**(`account_component`): `AccountBuilder`
