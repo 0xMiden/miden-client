@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 use super::models::account::Account;
 use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
-use super::models::secret_key::SecretKey;
+use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
 use crate::{WebClient, js_error_with_context};
 
@@ -149,7 +149,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
     pub async fn add_account_secret_key_to_web_store(
         &mut self,
-        secret_key: &SecretKey,
+        secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
         let keystore = self.keystore.as_mut().expect("KeyStore should be initialized");
         keystore.add_key(secret_key.into()).await.map_err(|err| err.to_string())?;

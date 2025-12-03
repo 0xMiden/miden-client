@@ -24,7 +24,6 @@ export {
   AccountStorageRequirements,
   AccountType,
   AccountVaultDelta,
-  AuthScheme,
   Address,
   AdviceInputs,
   AdviceMap,

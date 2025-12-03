@@ -13,10 +13,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::auth::AuthScheme;
+use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
-use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
@@ -134,7 +134,7 @@ impl AccountComponent {
     /// Builds an auth component from a secret key, inferring the auth scheme from the key type.
     #[wasm_bindgen(js_name = "createAuthComponentFromSecretKey")]
     pub fn create_auth_component_from_secret_key(
-        secret_key: &SecretKey,
+        secret_key: &AuthSecretKey,
     ) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
         let commitment = native_secret_key.public_key().to_commitment();

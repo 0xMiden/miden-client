@@ -19,6 +19,7 @@
 * [BREAKING] Renamed `NodeRpcClient::get_account_proofs` to `NodeRpcClient::get_account_proof` & added `account_state` parameter (block at which we want to retrieve the proof) ([#1616](https://github.com/0xMiden/miden-client/pull/1616)).
 * [BREAKING] Refactored `NetworkId` to allow custom networks ([#1612](https://github.com/0xMiden/miden-client/pull/1612)).
 * [BREAKING] Removed `toBech32Custom` and implemented custom id conversion for wasm derived class `NetworkId` ([#1612](https://github.com/0xMiden/miden-client/pull/1612)).
+* [BREAKING] Remove `SecretKey` model and consolidated functionality into `AuthSecretKey` ([#1592](https://github.com/0xMiden/miden-client/issues/1380))
 
 ## 0.12.5 (2025-12-01)
 

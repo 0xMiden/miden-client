@@ -802,7 +802,7 @@ export const customAccountComponent = async (
       const walletSeed = new Uint8Array(32);
       crypto.getRandomValues(walletSeed);
 
-      let secretKey = window.SecretKey[schemeSecretKeyFunction](walletSeed);
+      let secretKey = window.AuthSecretKey[schemeSecretKeyFunction](walletSeed);
       let authComponent =
         window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
@@ -1291,7 +1291,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
+    let secretKey = window.AuthSecretKey.rpoFalconWithRNG(walletSeed);
     let authComponent =
       window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 

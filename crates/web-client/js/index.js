@@ -106,9 +106,9 @@ export class WebClient {
    *   parameter is the serialized public key (from `PublicKey.serialize()`). Return the
    *   corresponding secret key as a `Uint8Array`, or `null`/`undefined` if not found. The
    *   return value may be provided synchronously or via a `Promise`.
-   * @param {(pubKey: Uint8Array, secretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
+   * @param {(pubKey: Uint8Array, AuthSecretKey: Uint8Array) => Promise<void> | void} [insertKeyCb]
    *   - Callback to persist a secret key. `pubKey` is the serialized public key, and
-   *   `secretKey` is the serialized secret key (from `SecretKey.serialize()`). May return
+   *   `authSecretKey` is the serialized secret key (from `AuthSecretKey.serialize()`). May return
    *   `void` or a `Promise<void>`.
    * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} [signCb]
    *   - Callback to produce serialized signature bytes for the provided inputs. `pubKey` is the

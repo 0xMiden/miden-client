@@ -39,7 +39,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
+    let secretKey = window.AuthSecretKey.rpoFalconWithRNG(walletSeed);
 
     let authComponent =
       window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
