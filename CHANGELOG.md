@@ -8,6 +8,7 @@
 * Added methods to `Package` exposing inner `Program`/`Library`. Also implemented `fromPackage` methods for `NoteScript` & `TransactionScript` ([#1550](https://github.com/0xMiden/miden-client/pull/1550)).
 * Added RPC limit handling for `check_nullifiers` and `get_notes_by_id` ([#1558](https://github.com/0xMiden/miden-client/pull/1558)).
 * Fixed account rollback bug by not loading already discarded transaction on sync state ([#1567](https://github.com/0xMiden/miden-client/pull/1567)).
+* Added `--version` flag to client CLI ([#1586](https://github.com/0xMiden/miden-client/pull/1586)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 
