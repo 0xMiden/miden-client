@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_futures::js_sys::{Function, Promise, Uint8Array};
 
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::models::signature::Signature;
 use crate::models::signing_inputs::SigningInputs;
 
@@ -59,7 +59,10 @@ impl GetKeyCallback {
 pub(crate) struct InsertKeyCallback(pub(crate) Function);
 
 impl InsertKeyCallback {
-    pub(crate) async fn insert_key(&self, secret_key: &SecretKey) -> Result<(), KeyStoreError> {
+    pub(crate) async fn insert_key(
+        &self,
+        secret_key: &WebAuthSecretKey,
+    ) -> Result<(), KeyStoreError> {
         let pub_key_commitment: NativeWord = secret_key.public_key().to_commitment().into();
         let result = self
             .0

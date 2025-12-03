@@ -15,7 +15,7 @@ use miden_client::{AuthenticationError, Word, Word as NativeWord};
 use rand::Rng;
 use wasm_bindgen_futures::js_sys::Function;
 
-use crate::models::secret_key::SecretKey;
+use crate::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::web_keystore_callbacks::{
     GetKeyCallback,
     InsertKeyCallback,
@@ -76,7 +76,7 @@ impl<R: Rng> WebKeyStore<R> {
 
     pub async fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
         if let Some(insert_key_cb) = &self.callbacks.as_ref().insert_key {
-            let sk = SecretKey::from(key.clone());
+            let sk = WebAuthSecretKey::from(key.clone());
             insert_key_cb.insert_key(&sk).await?;
             return Ok(());
         }

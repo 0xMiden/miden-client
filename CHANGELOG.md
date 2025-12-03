@@ -10,6 +10,7 @@
 * Tied the web client's IndexedDB schema to the running package version, automatically recreating or wiping stale stores and applying the same guard to `forceImportStore` ([#1576](https://github.com/0xMiden/miden-client/pull/1576)).
 * Added the `--remote-prover-timeout` configuration to the CLI ([#1551](https://github.com/0xMiden/miden-client/pull/1551)).
 * Surface WASM worker errors to the JS wrapper with their original stacks for clearer diagnostics ([#1565](https://github.com/0xMiden/miden-client/issues/1565)).
+* [BREAKING] Remove `SecretKey` model and consolidated functionality into `AuthSecretKey` ([#1592](https://github.com/0xMiden/miden-client/issues/1380))
 
 ## 0.12.4 (TBD)
 

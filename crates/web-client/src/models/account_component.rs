@@ -11,10 +11,10 @@ use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
-use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
@@ -107,7 +107,7 @@ impl AccountComponent {
     }
 
     #[wasm_bindgen(js_name = "createAuthComponent")]
-    pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
+    pub fn create_auth_component(secret_key: &AuthSecretKey) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
         match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => {
