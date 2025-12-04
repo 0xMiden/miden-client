@@ -48,7 +48,7 @@ use crate::utils::{
     parse_account_id,
 };
 
-/// HTTP client for interacting with a `miden-faucet` service to request PoW challenges,
+/// HTTP client for interacting with a `miden-faucet` service to request `PoW` challenges,
 /// mint assets, and download notes.
 #[derive(Clone)]
 struct FaucetHttpClient {
@@ -153,8 +153,8 @@ impl FaucetHttpClient {
             CliError::Faucet(format!("Failed to parse get_tokens response: {err}"))
         })?;
 
-        Ok(NoteId::try_from_hex(&response.note_id)
-            .map_err(|err| CliError::Faucet(format!("Failed to parse note ID: {err}")))?)
+        NoteId::try_from_hex(&response.note_id)
+            .map_err(|err| CliError::Faucet(format!("Failed to parse note ID: {err}")))
     }
 
     async fn download_note(&self, note_id: &NoteId) -> Result<NoteFile, CliError> {
@@ -209,9 +209,8 @@ impl FaucetHttpClient {
 
         println!("Solved faucet PoW challenge");
 
-        Ok(self
-            .request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
-            .await?)
+        self.request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
+            .await
     }
 }
 
