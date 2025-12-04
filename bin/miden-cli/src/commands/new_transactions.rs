@@ -206,7 +206,7 @@ impl From<&NoteType> for MidenNoteType {
     }
 }
 
-/// Mint tokens by requesting them from the faucet API (with `PoW`).
+/// Mint tokens by requesting them from the faucet API.
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
     /// Amount to be minted.
@@ -237,7 +237,7 @@ impl MintCmd {
 
         let (cli_config, _) = load_config_file()?;
         let current_endpoint: Endpoint = (&cli_config.rpc.endpoint).into();
-        if current_endpoint != Endpoint::testnet() {
+        if current_endpoint != Endpoint::testnet() && current_endpoint != Endpoint::devnet() {
             return Err(CliError::Input(
                 "The `mint` command can only be used when the client is configured for testnet. Use the `mint-faucet` command instead to mint tokens from a local faucet."
                     .to_string(),
