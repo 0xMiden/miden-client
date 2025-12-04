@@ -56,6 +56,7 @@ serde       = { features = ["derive"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }
 tokio       = { features = ["macros", "rt-multi-thread"], version = "1.48" }
 tracing     = { version = "0.1" }
+base64      = { version = "0.22" }
 
 # Lints are set to warn for development, which are promoted to errors in CI.
 [workspace.lints.clippy]
