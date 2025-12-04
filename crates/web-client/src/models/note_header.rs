@@ -5,7 +5,9 @@ use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
 use super::word::Word;
 
-/// Public portion of a note containing its ID and metadata commitment.
+/// Holds the strictly required, public information of a note.
+///
+/// See [`NoteId`] and [`NoteMetadata`] for additional details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteHeader(NativeNoteHeader);

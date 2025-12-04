@@ -13,7 +13,10 @@ use wasm_bindgen::prelude::*;
 use super::felt::Felt;
 use crate::js_error_with_context;
 
-/// Identifier for an [`Account`](crate::models::account::Account) exposed to JavaScript.
+/// Uniquely identifies a specific account.
+///
+/// A Miden account ID is a 120-bit value derived from the commitments to account code and storage,
+/// and a random user-provided seed.
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);

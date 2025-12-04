@@ -6,7 +6,9 @@
 
 # Class: NoteDetails
 
-Note assets together with the recipient information required for consumption.
+Details of a note consisting of assets, script, inputs, and a serial number.
+
+See [`super::Note`] for more details.
 
 ## Constructors
 

@@ -6,7 +6,7 @@
 
 # Class: TransactionSummary
 
-Summary of a transaction used for signing and verification.
+Represents a transaction summary.
 
 ## Methods
 

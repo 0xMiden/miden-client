@@ -6,7 +6,7 @@
 
 # Class: TransactionRecord
 
-Stored transaction with details and status.
+Describes a transaction that has been executed and is being tracked on the Client.
 
 ## Methods
 

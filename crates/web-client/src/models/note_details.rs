@@ -5,7 +5,9 @@ use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_recipient::NoteRecipient;
 
-/// Note assets together with the recipient information required for consumption.
+/// Details of a note consisting of assets, script, inputs, and a serial number.
+///
+/// See [`super::Note`] for more details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetails(NativeNoteDetails);

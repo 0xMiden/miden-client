@@ -11,7 +11,16 @@ use super::output_notes::OutputNotes;
 use super::transaction_args::TransactionArgs;
 use super::transaction_id::TransactionId;
 
-/// A transaction together with execution results and proofs.
+/// Describes the result of executing a transaction program for the Miden protocol.
+///
+/// Executed transaction serves two primary purposes:
+/// - It contains a complete description of the effects of the transaction. Specifically, it
+///   contains all output notes created as the result of the transaction and describes all the
+///   changes made to the involved account (i.e., the account delta).
+/// - It contains all the information required to re-execute and prove the transaction in a
+///   stateless manner. This includes all public transaction inputs, but also all nondeterministic
+///   inputs that the host provided to Miden VM while executing the transaction (i.e., advice
+///   witness).
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct ExecutedTransaction(NativeExecutedTransaction);

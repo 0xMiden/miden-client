@@ -24,7 +24,24 @@ use super::word::Word;
 use crate::js_error_with_context;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// A note with all data required for consumption by the transaction kernel.
+/// Notes consist of note metadata and details. Note metadata is always public, but details may be
+/// either public, encrypted, or private, depending on the note type. Note details consist of note
+/// assets, script, inputs, and a serial number, the three latter grouped into a recipient object.
+///
+/// Note details can be reduced to two unique identifiers: [`NoteId`] and `Nullifier`. The former is
+/// publicly associated with a note, while the latter is known only to entities which have access to
+/// full note details.
+///
+/// Fungible and non-fungible asset transfers are done by moving assets to the note's assets. The
+/// note's script determines the conditions required for the note consumption, i.e. the target
+/// account of a P2ID or conditions of a SWAP, and the effects of the note. The serial number has a
+/// double duty of preventing double spend, and providing unlikability to the consumer of a note.
+/// The note's inputs allow for customization of its script.
+///
+/// To create a note, the kernel does not require all the information above, a user can create a
+/// note only with the commitment to the script, inputs, the serial number (i.e., the recipient),
+/// and the kernel only verifies the source account has the assets necessary for the note creation.
+/// See [`NoteRecipient`] for more details.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Note(NativeNote);

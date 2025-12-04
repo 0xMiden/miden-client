@@ -3,7 +3,13 @@ use wasm_bindgen::prelude::*;
 
 use super::word::Word;
 
-/// Code commitment and metadata for an account.
+/// A public interface of an account.
+///
+/// Account's public interface consists of a set of callable procedures, each committed to by its
+/// root hash and paired with storage bounds (offset and size).
+///
+/// The full interface commitment hashes every procedure root together with its storage bounds so
+/// that the account code uniquely captures the set of available calls.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountCode(NativeAccountCode);

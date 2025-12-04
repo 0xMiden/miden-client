@@ -8,7 +8,7 @@ use super::output_notes::OutputNotes;
 use super::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// Summary of a transaction used for signing and verification.
+/// Represents a transaction summary.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionSummary(NativeTransactionSummary);

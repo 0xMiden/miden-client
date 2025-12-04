@@ -11,7 +11,24 @@ use crate::models::felt::Felt;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// WASM wrapper around the native [`Account`], exposing its state to JavaScript.
+/// An account which can store assets and define rules for manipulating them.
+///
+/// An account consists of the following components:
+/// - Account ID, which uniquely identifies the account and also defines basic properties of the
+///   account.
+/// - Account vault, which stores assets owned by the account.
+/// - Account storage, which is a key-value map (both keys and values are words) used to store
+///   arbitrary user-defined data.
+/// - Account code, which is a set of Miden VM programs defining the public interface of the
+///   account.
+/// - Account nonce, a value which is incremented whenever account state is updated.
+///
+/// Out of the above components account ID is always immutable (once defined it can never be
+/// changed). Other components may be mutated throughout the lifetime of the account. However,
+/// account state can be changed only by invoking one of account interface methods.
+///
+/// The recommended way to build an account is through an [`AccountBuilder`], which can be
+/// instantiated directly from a 32-byte seed. See the type's documentation for details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct Account(NativeAccount);

@@ -11,7 +11,17 @@ use super::word::Word;
 use crate::js_error_with_context;
 use crate::models::input_note::InputNote;
 
-/// Stored representation of an input note along with its state.
+/// Represents a Note of which the Store can keep track and retrieve.
+///
+/// An [`InputNoteRecord`] contains all the information of a [`NoteDetails`], in addition of
+/// specific information about the note state.
+///
+/// Once a proof is received, the [`InputNoteRecord`] can be transformed into an [`InputNote`] and
+/// used as input for transactions. It is also possible to convert [`Note`] and [`InputNote`] into
+/// [`InputNoteRecord`] (we fill the `metadata` and `inclusion_proof` fields if possible).
+///
+/// Notes can also be consumed as unauthenticated notes, where their existence is verified by the
+/// network.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct InputNoteRecord(NativeInputNoteRecord);

@@ -6,7 +6,8 @@
 
 # Class: OutputNotes
 
-Collection of notes created by a transaction.
+Contains a list of output notes of a transaction. The list can be empty if the transaction does
+not produce any notes.
 
 ## Methods
 

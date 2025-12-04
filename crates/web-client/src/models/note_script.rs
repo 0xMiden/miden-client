@@ -6,7 +6,10 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 use super::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// Executable script guarding a note.
+/// An executable program of a note.
+///
+/// A note's script represents a program which must be executed for a note to be consumed. As such
+/// it defines the rules and side effects of consuming a given note.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteScript(NativeNoteScript);

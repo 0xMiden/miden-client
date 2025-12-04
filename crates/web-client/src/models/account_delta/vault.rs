@@ -10,7 +10,12 @@ use crate::models::account_id::AccountId;
 use crate::models::fungible_asset::FungibleAsset;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// Difference to apply to an account's asset vault.
+/// [`AccountVaultDelta`] stores the difference between the initial and final account vault states.
+///
+/// The difference is represented as follows:
+/// - `fungible`: a binary tree map of fungible asset balance changes in the account vault.
+/// - `non_fungible`: a binary tree map of non-fungible assets that were added to or removed from
+///   the account vault.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountVaultDelta(NativeAccountVaultDelta);

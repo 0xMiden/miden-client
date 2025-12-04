@@ -3,7 +3,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 
-/// Symbol string for fungible tokens (e.g. ticker).
+/// Represents a string token symbol (e.g. "POL", "ETH") as a single [`Felt`] value.
+///
+/// Token Symbols can consists of up to 6 capital Latin characters, e.g. "C", "ETH", "MIDENC".
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct TokenSymbol(NativeTokenSymbol);

@@ -6,7 +6,7 @@
 
 # Class: SyncSummary
 
-Summary of changes observed during a sync step.
+Contains stats about the sync operation.
 
 ## Methods
 

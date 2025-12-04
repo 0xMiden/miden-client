@@ -11,7 +11,15 @@ use super::note_script::NoteScript;
 use super::word::Word;
 use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
-/// Recipient information containing the serial number, script, and inputs that guard a note.
+/// Value that describes under which condition a note can be consumed.
+///
+/// The recipient is not an account address, instead it is a value that describes when a note can be
+/// consumed. Because not all notes have predetermined consumer addresses, e.g. swap notes can be
+/// consumed by anyone, the recipient is defined as the code and its inputs, that when successfully
+/// executed results in the note's consumption.
+///
+/// Recipient is computed as a nested hash of the serial number, the script root, and the inputs
+/// commitment, ensuring the recipient digest binds all three pieces of data together.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteRecipient(NativeNoteRecipient);

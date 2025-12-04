@@ -6,7 +6,9 @@
 
 # Class: NoteHeader
 
-Public portion of a note containing its ID and metadata commitment.
+Holds the strictly required, public information of a note.
+
+See [`NoteId`] and [`NoteMetadata`] for additional details.
 
 ## Methods
 

@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 use super::merkle_path::MerklePath;
 use super::note_location::NoteLocation;
 
-/// Proof that a note commitment exists at a specific position in the note tree.
+/// Contains the data required to prove inclusion of a note in the canonical chain.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteInclusionProof(NativeNoteInclusionProof);

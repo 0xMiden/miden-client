@@ -6,7 +6,8 @@
 
 # Class: TransactionStoreUpdate
 
-Update describing the effects of a stored transaction.
+Represents the changes that need to be applied to the client store as a result of a transaction
+execution.
 
 ## Methods
 

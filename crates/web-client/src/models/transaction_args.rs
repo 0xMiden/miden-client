@@ -6,7 +6,15 @@ use super::note_id::NoteId;
 use super::transaction_script::TransactionScript;
 use super::word::Word;
 
-/// Arguments supplied to a transaction execution.
+/// Optional transaction arguments.
+///
+/// - Transaction script: a program that is executed in a transaction after all input notes scripts
+///   have been executed.
+/// - Note arguments: data put onto the stack right before a note script is executed. These are
+///   different from note inputs, as the user executing the transaction can specify arbitrary note
+///   args.
+/// - Advice inputs: Provides data needed by the runtime, like the details of public output notes.
+/// - Account inputs: Provides account data that will be accessed in the transaction.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionArgs(NativeTransactionArgs);

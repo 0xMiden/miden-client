@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use super::word::Word;
 
-/// Authentication path in a Merkle tree.
+/// Represents a Merkle path.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct MerklePath(NativeMerklePath);

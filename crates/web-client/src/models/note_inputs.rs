@@ -4,7 +4,14 @@ use wasm_bindgen::prelude::*;
 use super::felt::Felt;
 use crate::models::miden_arrays::FeltArray;
 
-/// Inputs passed to a note script.
+/// A container for note inputs.
+///
+/// A note can be associated with up to 128 input values. Each value is represented by a single
+/// field element. Thus, note input values can contain up to ~1 KB of data.
+///
+/// All inputs associated with a note can be reduced to a single commitment which is computed by
+/// first padding the inputs with ZEROs to the next multiple of 8, and then by computing a
+/// sequential hash of the resulting elements.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteInputs(NativeNoteInputs);

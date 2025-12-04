@@ -4,7 +4,8 @@ use wasm_bindgen::prelude::*;
 use super::output_note::OutputNote;
 use super::word::Word;
 
-/// Collection of notes created by a transaction.
+/// Contains a list of output notes of a transaction. The list can be empty if the transaction does
+/// not produce any notes.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct OutputNotes(pub(crate) NativeOutputNotes);

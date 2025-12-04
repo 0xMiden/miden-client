@@ -29,7 +29,10 @@ use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
 
-/// Builder for assembling a `TransactionRequest` from inputs, outputs, and scripts.
+/// A builder for a [`TransactionRequest`].
+///
+/// Use this builder to construct a [`TransactionRequest`] by adding input notes, specifying
+/// scripts, and setting other transaction parameters.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionRequestBuilder(NativeTransactionRequestBuilder);

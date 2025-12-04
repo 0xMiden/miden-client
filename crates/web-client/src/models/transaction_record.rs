@@ -7,7 +7,7 @@ use super::transaction_id::TransactionId;
 use super::transaction_status::TransactionStatus;
 use super::word::Word;
 
-/// Stored transaction with details and status.
+/// Describes a transaction that has been executed and is being tracked on the Client.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionRecord(NativeTransactionRecord);

@@ -1,7 +1,7 @@
 use miden_client::note::NoteLocation as NativeNoteLocation;
 use wasm_bindgen::prelude::*;
 
-/// Location of a note commitment within a block's note tree.
+/// Contains information about the location of a note.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteLocation(NativeNoteLocation);

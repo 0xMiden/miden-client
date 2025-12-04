@@ -8,7 +8,8 @@ use crate::models::output_notes::OutputNotes;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// Update describing the effects of a stored transaction.
+/// Represents the changes that need to be applied to the client store as a result of a transaction
+/// execution.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionStoreUpdate(NativeTransactionStoreUpdate);

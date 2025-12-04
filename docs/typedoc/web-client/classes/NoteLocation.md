@@ -6,7 +6,7 @@
 
 # Class: NoteLocation
 
-Location of a note commitment within a block's note tree.
+Contains information about the location of a note.
 
 ## Methods
 

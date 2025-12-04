@@ -6,7 +6,7 @@
 
 # Class: NoteInclusionProof
 
-Proof that a note commitment exists at a specific position in the note tree.
+Contains the data required to prove inclusion of a note in the canonical chain.
 
 ## Methods
 

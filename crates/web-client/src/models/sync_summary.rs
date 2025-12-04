@@ -7,7 +7,7 @@ use crate::models::note_id::NoteId;
 use crate::models::transaction_id::TransactionId;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// Summary of changes observed during a sync step.
+/// Contains stats about the sync operation.
 #[wasm_bindgen]
 pub struct SyncSummary(NativeSyncSummary);
 

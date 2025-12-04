@@ -6,7 +6,13 @@
 
 # Class: PartialNote
 
-Note variant exposing assets and metadata but hiding full recipient details.
+Partial information about a note.
+
+Partial note consists of [`NoteMetadata`], [`NoteAssets`], and a recipient digest (see
+[`super::NoteRecipient`]). However, it does not contain detailed recipient info, including note
+script, note inputs, and note's serial number. This means that a partial note is sufficient to
+compute note ID and note header, but not sufficient to compute note nullifier, and generally
+does not have enough info to execute the note.
 
 ## Methods
 

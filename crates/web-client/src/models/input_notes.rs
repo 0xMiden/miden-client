@@ -4,7 +4,11 @@ use wasm_bindgen::prelude::*;
 use super::input_note::InputNote;
 use super::word::Word;
 
-/// Collection of input notes consumed by a transaction.
+/// Input notes for a transaction, empty if the transaction does not consume notes.
+///
+/// This structure is generic over `T`, so it can be used to create the input notes for transaction
+/// execution, which require the note's details to run the transaction kernel, and the input notes
+/// for proof verification, which require only the commitment data.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct InputNotes(NativeInputNotes<NativeInputNote>);

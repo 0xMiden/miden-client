@@ -4,7 +4,15 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
-/// Storage commitment and slots for an account.
+/// Account storage is composed of a variable number of index-addressable [StorageSlot]s up to 255
+/// slots in total.
+///
+/// Each slot has a type which defines its size and structure. Currently, the following types are
+/// supported:
+/// - [`StorageSlot::Value`]: contains a single [Word] of data (i.e., 32 bytes).
+/// - [`StorageSlot::Map`]: contains a [`StorageMap`] which is a key-value map where both keys and
+///   values are [Word]s. The value of a storage slot containing a map is the commitment to the
+///   underlying map.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountStorage(NativeAccountStorage);

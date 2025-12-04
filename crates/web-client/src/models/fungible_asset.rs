@@ -6,7 +6,10 @@ use wasm_bindgen::prelude::*;
 use super::account_id::AccountId;
 use super::word::Word;
 
-/// A fungible asset issued by a faucet account.
+/// A fungible asset.
+///
+/// A fungible asset consists of a faucet ID of the faucet which issued the asset as well as the
+/// asset amount. Asset amount is guaranteed to be 2^63 - 1 or smaller.
 #[derive(Clone, Copy)]
 #[wasm_bindgen]
 pub struct FungibleAsset(FungibleAssetNative);

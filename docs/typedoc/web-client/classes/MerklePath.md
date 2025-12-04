@@ -6,7 +6,7 @@
 
 # Class: MerklePath
 
-Authentication path in a Merkle tree.
+Represents a Merkle path.
 
 ## Methods
 
