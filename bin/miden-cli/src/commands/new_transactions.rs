@@ -48,7 +48,8 @@ use crate::utils::{
     parse_account_id,
 };
 
-/// Simple wrapper around the faucet HTTP API to avoid passing HTTP bits around.
+/// HTTP client for interacting with a `miden-faucet` service to request PoW challenges,
+/// mint assets, and download notes.
 #[derive(Clone)]
 struct FaucetHttpClient {
     http_client: HttpClient,
