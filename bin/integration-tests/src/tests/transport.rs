@@ -215,7 +215,7 @@ async fn run_flow(
 
     // Re-sync to verify cursor dedup (or still nothing if no transport)
     if recipient_should_receive {
-        wait_for_blocks(&mut recipient, 2).await;
+        wait_for_blocks(&mut recipient, 1).await;
         let notes = recipient.get_input_notes(NoteFilter::All).await?;
         assert_eq!(
             notes[0].commitment().unwrap(), // we should have a commitment at this point
