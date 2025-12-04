@@ -6,7 +6,7 @@
 
 # Class: AccountVaultDelta
 
-[`AccountVaultDelta`] stores the difference between the initial and final account vault states.
+`AccountVaultDelta` stores the difference between the initial and final account vault states.
 
 The difference is represented as follows:
 - `fungible`: a binary tree map of fungible asset balance changes in the account vault.

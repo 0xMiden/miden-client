@@ -6,7 +6,7 @@
 
 # Class: AccountStorageDelta
 
-[`AccountStorageDelta`] stores the differences between two states of account storage.
+`AccountStorageDelta` stores the differences between two states of account storage.
 
 The delta consists of two maps:
 - A map containing the updates to value storage slots. The keys in this map are indexes of the

@@ -6,11 +6,11 @@ use crate::models::account_id::AccountId;
 use crate::models::felt::Felt;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// [`AccountDelta`] stores the differences between two account states.
+/// `AccountDelta` stores the differences between two account states.
 ///
 /// The differences are represented as follows:
-/// - `storage`: an [`AccountStorageDelta`] that contains the changes to the account storage.
-/// - `vault`: an [`AccountVaultDelta`] object that contains the changes to the account vault.
+/// - `storage`: an `AccountStorageDelta` that contains the changes to the account storage.
+/// - `vault`: an `AccountVaultDelta` object that contains the changes to the account vault.
 /// - `nonce`: if the nonce of the account has changed, the new nonce is stored here.
 #[derive(Clone)]
 #[wasm_bindgen]

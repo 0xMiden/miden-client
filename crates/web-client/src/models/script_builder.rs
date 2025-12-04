@@ -81,7 +81,7 @@ impl ScriptBuilder {
         Ok(())
     }
 
-    /// This is useful to dynamically link the [`Library`] of a foreign account
+    /// This is useful to dynamically link the {@link Library} of a foreign account
     /// that is invoked using foreign procedure invocation (FPI). Its code is available
     /// on-chain and so it does not have to be copied into the script code.
     ///

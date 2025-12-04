@@ -8,7 +8,7 @@
 
 Details of a note consisting of assets, script, inputs, and a serial number.
 
-See [`super::Note`] for more details.
+See the [Note](Note.md) type for more details.
 
 ## Constructors
 

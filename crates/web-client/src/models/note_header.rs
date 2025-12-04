@@ -7,7 +7,7 @@ use super::word::Word;
 
 /// Holds the strictly required, public information of a note.
 ///
-/// See [`NoteId`] and [`NoteMetadata`] for additional details.
+/// See `NoteId` and `NoteMetadata` for additional details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteHeader(NativeNoteHeader);

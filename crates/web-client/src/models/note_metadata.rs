@@ -16,7 +16,7 @@ use super::note_type::NoteType;
 ///
 /// # Word layout & validity
 ///
-/// [`NoteMetadata`] can be encoded into a [`Word`] with the following layout:
+/// `NoteMetadata` can be encoded into a `Word` with the following layout:
 ///
 /// ```text
 /// 1st felt: [sender_id_prefix (64 bits)]

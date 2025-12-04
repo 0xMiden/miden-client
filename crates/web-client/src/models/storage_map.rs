@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
-/// An account storage map is a sparse merkle tree of depth [`Self::TREE_DEPTH`] (64).
+/// An account storage map is a sparse merkle tree of depth 64.
 ///
 /// It can be used to store a large amount of data in an account than would be otherwise possible
 /// using just the account's storage slots. This works by storing the root of the map's underlying

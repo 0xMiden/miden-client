@@ -27,8 +27,8 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// changed). Other components may be mutated throughout the lifetime of the account. However,
 /// account state can be changed only by invoking one of account interface methods.
 ///
-/// The recommended way to build an account is through an [`AccountBuilder`], which can be
-/// instantiated directly from a 32-byte seed. See the type's documentation for details.
+/// The recommended way to build an account is through an `AccountBuilder`, which can be
+/// instantiated directly from a 32-byte seed. 
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct Account(NativeAccount);

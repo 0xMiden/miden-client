@@ -6,7 +6,7 @@
 
 # Class: TokenSymbol
 
-Represents a string token symbol (e.g. "POL", "ETH") as a single [`Felt`] value.
+Represents a string token symbol (e.g. "POL", "ETH") as a single [\`Felt\`](Felt.md) value.
 
 Token Symbols can consists of up to 6 capital Latin characters, e.g. "C", "ETH", "MIDENC".
 

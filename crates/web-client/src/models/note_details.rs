@@ -7,7 +7,7 @@ use super::note_recipient::NoteRecipient;
 
 /// Details of a note consisting of assets, script, inputs, and a serial number.
 ///
-/// See [`super::Note`] for more details.
+/// See the {@link Note} type for more details.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteDetails(NativeNoteDetails);

@@ -29,9 +29,9 @@ use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
 
-/// A builder for a [`TransactionRequest`].
+/// A builder for a `TransactionRequest`.
 ///
-/// Use this builder to construct a [`TransactionRequest`] by adding input notes, specifying
+/// Use this builder to construct a `TransactionRequest` by adding input notes, specifying
 /// scripts, and setting other transaction parameters.
 #[derive(Clone)]
 #[wasm_bindgen]

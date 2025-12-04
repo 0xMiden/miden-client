@@ -8,8 +8,8 @@
 
 Note tags are best-effort filters for notes registered with the network. They hint whether a
 note is meant for network or local execution and optionally embed a target (like part of an
-[`AccountId`]) or a use-case payload. Public notes are required for network execution so that
-full details are available for validation.
+`AccountId`) or a use-case payload. Public notes are required for network execution so that full
+details are available for validation.
 
 ## Methods
 

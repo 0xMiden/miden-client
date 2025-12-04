@@ -5,7 +5,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// [`AccountStorageDelta`] stores the differences between two states of account storage.
+/// `AccountStorageDelta` stores the differences between two states of account storage.
 ///
 /// The delta consists of two maps:
 /// - A map containing the updates to value storage slots. The keys in this map are indexes of the

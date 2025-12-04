@@ -8,12 +8,12 @@ use super::word::Word;
 /// A header of an account which contains information that succinctly describes the state of the
 /// components of the account.
 ///
-/// The [`AccountHeader`] is composed of:
-/// - `id`: the account ID ([`AccountId`]) of the account.
+/// The account header is composed of:
+/// - `id`: the account ID (`AccountId`).
 /// - `nonce`: the nonce of the account.
-/// - `vault_root`: a commitment to the account's vault ([`super::AssetVault`]).
-/// - `storage_commitment`: a commitment to the account's storage ([`super::AccountStorage`]).
-/// - `code_commitment`: a commitment to the account's code ([`super::AccountCode`]).
+/// - `vault_root`: a commitment to the account's vault (`AssetVault`).
+/// - `storage_commitment`: a commitment to the account's storage (`AccountStorage`).
+/// - `code_commitment`: a commitment to the account's code (`AccountCode`).
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountHeader(NativeAccountHeader);

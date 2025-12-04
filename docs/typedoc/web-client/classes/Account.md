@@ -22,8 +22,8 @@ Out of the above components account ID is always immutable (once defined it can 
 changed). Other components may be mutated throughout the lifetime of the account. However,
 account state can be changed only by invoking one of account interface methods.
 
-The recommended way to build an account is through an [`AccountBuilder`], which can be
-instantiated directly from a 32-byte seed. See the type's documentation for details.
+The recommended way to build an account is through an `AccountBuilder`, which can be
+instantiated directly from a 32-byte seed.
 
 ## Methods
 
