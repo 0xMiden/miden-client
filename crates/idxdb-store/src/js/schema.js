@@ -98,6 +98,15 @@ var Table;
     Table["Settings"] = "settings";
     Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
+if (runningInNode) {
+    const globalWithIDB = globalThis;
+    if (globalWithIDB.indexedDB) {
+        Dexie.dependencies.indexedDB = globalWithIDB.indexedDB;
+    }
+    if (globalWithIDB.IDBKeyRange) {
+        Dexie.dependencies.IDBKeyRange = globalWithIDB.IDBKeyRange;
+    }
+}
 const db = new Dexie(DATABASE_NAME);
 db.version(1).stores({
     [Table.AccountCode]: indexes("root"),
@@ -195,4 +204,4 @@ async function persistClientVersion(clientVersion) {
         value: textEncoder.encode(clientVersion),
     });
 }
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, nodeIndexedDbBasePath, };
