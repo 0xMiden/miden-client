@@ -189,6 +189,21 @@ impl FaucetHttpClient {
             .decode(response.data_base64)
             .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))
     }
+
+    /// Mint a note by handling the proof-of-work challenge and token request.
+    async fn mint_note(
+        &self,
+        target_account: AccountId,
+        amount: u64,
+        note_type: NoteType,
+    ) -> Result<String, CliError> {
+        let (pow_challenge, pow_target) = self.request_pow(&target_account, amount).await?;
+
+        let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
+
+        self.request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
@@ -252,19 +267,9 @@ impl MintCmd {
         )?;
 
         println!("Requesting tokens from faucet...");
-        let (pow_challenge, pow_target) =
-            faucet_client.request_pow(&target_account_id, self.amount).await?;
-
-        let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
 
         let note_id_str = faucet_client
-            .request_tokens(
-                &pow_challenge,
-                nonce,
-                &target_account_id,
-                self.amount,
-                NoteType::Private,
-            )
+            .mint_note(target_account_id, self.amount, NoteType::Private)
             .await?;
 
         println!("Faucet accepted mint request");
