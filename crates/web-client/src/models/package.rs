@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::library::Library;
+use crate::models::package_manifest::PackageManifest;
 use crate::models::program::Program;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -42,6 +43,10 @@ impl Package {
 
         let native_program = self.0.unwrap_program();
         Ok((*native_program).clone().into())
+    }
+
+    pub fn manifest(&self) -> PackageManifest {
+        self.0.manifest.clone().into()
     }
 }
 

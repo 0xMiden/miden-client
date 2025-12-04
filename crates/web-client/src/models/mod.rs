@@ -78,6 +78,8 @@ pub mod note_type;
 pub mod output_note;
 pub mod output_notes;
 pub mod package;
+pub mod package_export;
+pub mod package_manifest;
 pub mod partial_note;
 pub mod program;
 pub mod proven_transaction;
