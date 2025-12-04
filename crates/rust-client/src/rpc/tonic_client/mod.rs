@@ -34,9 +34,9 @@ use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated as proto;
 use crate::rpc::generated::rpc_store::BlockRange;
 use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -190,24 +190,28 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        let request = proto::note::NoteIdList {
-            ids: note_ids.iter().map(|id| (*id).into()).collect(),
-        };
+        let mut notes = Vec::with_capacity(note_ids.len());
+        for chunk in note_ids.chunks(NOTE_IDS_LIMIT) {
+            let request = proto::note::NoteIdList {
+                ids: chunk.iter().map(|id| (*id).into()).collect(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
-        })?;
+            let api_response = rpc_api.get_notes_by_id(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetNotesById, status)
+            })?;
 
-        let response_notes = api_response
-            .into_inner()
-            .notes
-            .into_iter()
-            .map(FetchedNote::try_from)
-            .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
+            let response_notes = api_response
+                .into_inner()
+                .notes
+                .into_iter()
+                .map(FetchedNote::try_from)
+                .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-        Ok(response_notes)
+            notes.extend(response_notes);
+        }
+        Ok(notes)
     }
 
     /// Sends a sync state request to the Miden node, validates and converts the response
@@ -474,23 +478,26 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let request = proto::rpc_store::NullifierList {
-            nullifiers: nullifiers.iter().map(|nul| nul.as_word().into()).collect(),
-        };
+        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
+        for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
+            let request = proto::rpc_store::NullifierList {
+                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
+            };
 
-        let mut rpc_api = self.ensure_connected().await?;
+            let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
-        })?;
+            let response = rpc_api.check_nullifiers(request).await.map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::CheckNullifiers, status)
+            })?;
 
-        let mut response = response.into_inner();
-        let proofs = response
-            .proofs
-            .iter_mut()
-            .map(|r| r.to_owned().try_into())
-            .collect::<Result<_, _>>()?;
-
+            let mut response = response.into_inner();
+            let chunk_proofs = response
+                .proofs
+                .iter_mut()
+                .map(|r| r.to_owned().try_into())
+                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
+            proofs.extend(chunk_proofs);
+        }
         Ok(proofs)
     }
 

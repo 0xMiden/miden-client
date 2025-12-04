@@ -1,6 +1,19 @@
 import loadWasm from "../../dist/wasm.js";
-const wasm = await loadWasm();
 import { MethodName, WorkerAction } from "../constants.js";
+
+let wasmModule = null;
+
+const getWasmOrThrow = async () => {
+  if (!wasmModule) {
+    wasmModule = await loadWasm();
+  }
+  if (!wasmModule) {
+    throw new Error(
+      "Miden WASM bindings are unavailable in the worker environment."
+    );
+  }
+  return wasmModule;
+};
 
 const serializeUnknown = (value) => {
   if (typeof value === "string") {
@@ -36,7 +49,6 @@ const serializeError = (error) => {
     message: serializeUnknown(error),
   };
 };
-
 /**
  * Worker for executing WebClient methods in a separate thread.
  *
@@ -79,6 +91,7 @@ let processing = false; // Flag to ensure one message is processed at a time.
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
   [MethodName.NEW_WALLET]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [walletStorageModeStr, mutable, authSchemeId, seed] = args;
     const walletStorageMode =
       wasm.AccountStorageMode.tryFromStr(walletStorageModeStr);
@@ -92,6 +105,7 @@ const methodHandlers = {
     return serializedWallet.buffer;
   },
   [MethodName.NEW_FAUCET]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [
       faucetStorageModeStr,
       nonFungible,
@@ -120,6 +134,7 @@ const methodHandlers = {
     return serializedSyncSummary.buffer;
   },
   [MethodName.EXECUTE_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [accountIdHex, serializedTransactionRequest] = args;
     const accountId = wasm.AccountId.fromHex(accountIdHex);
     const transactionRequestBytes = new Uint8Array(
@@ -136,6 +151,7 @@ const methodHandlers = {
     return serializedResult.buffer;
   },
   [MethodName.PROVE_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [serializedTransactionResult, proverPayload] = args;
     const transactionResultBytes = new Uint8Array(serializedTransactionResult);
     const transactionResult = wasm.TransactionResult.deserialize(
@@ -165,6 +181,7 @@ const methodHandlers = {
     return serializedProven.buffer;
   },
   [MethodName.SUBMIT_NEW_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
     const [accountIdHex, serializedTransactionRequest] = args;
     const accountId = wasm.AccountId.fromHex(accountIdHex);
     const transactionRequestBytes = new Uint8Array(
@@ -217,6 +234,7 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
 };
 
 methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
+  const wasm = await getWasmOrThrow();
   let serializedMockNoteTransportNode = args.pop();
   let serializedMockChain = args.pop();
   serializedMockChain = new Uint8Array(serializedMockChain);
@@ -253,6 +271,7 @@ async function processMessage(event) {
     if (action === WorkerAction.INIT) {
       const [rpcUrl, noteTransportUrl, seed] = args;
       // Initialize the WASM WebClient.
+      const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
       await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
 

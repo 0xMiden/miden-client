@@ -4,7 +4,9 @@ use miden_client::account::component::AccountComponent as NativeAccountComponent
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
+    AuthSchemeId,
     AuthSecretKey as NativeSecretKey,
+    PublicKeyCommitment,
 };
 use miden_client::vm::Package as NativePackage;
 use miden_core::mast::MastNodeExt;
@@ -125,6 +127,28 @@ impl AccountComponent {
             // this is a compiler error.
             _unimplemented => Err(JsValue::from_str(
                 "Building auth component for this auth scheme is not supported yet",
+            )),
+        }
+    }
+
+    #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
+    pub fn create_auth_component_from_commitment(
+        commitment: &Word,
+        auth_scheme_id: u8,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_word: NativeWord = commitment.into();
+        let pkc = PublicKeyCommitment::from(native_word);
+        match AuthSchemeId::try_from(auth_scheme_id) {
+            Ok(AuthSchemeId::RpoFalcon512) => {
+                let auth = NativeRpoFalcon512::new(pkc);
+                Ok(AccountComponent(auth.into()))
+            },
+            Ok(AuthSchemeId::EcdsaK256Keccak) => {
+                let auth = NativeEcdsaK256Keccak::new(pkc);
+                Ok(AccountComponent(auth.into()))
+            },
+            _unimplemented => Err(JsValue::from_str(
+                "building auth component for this auth scheme is not supported yet",
             )),
         }
     }
