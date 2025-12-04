@@ -33,13 +33,40 @@ const baseCargoArgs = [
   "--no-default-features",
 ].concat(devMode ? cargoArgsUseDebugSymbols : []);
 
+const nodeRequireBanner = `
+import { createRequire as __createRequire } from "node:module";
+const require =
+  typeof globalThis !== "undefined" && globalThis.require
+    ? globalThis.require
+    : __createRequire(import.meta.url);
+if (typeof globalThis !== "undefined" && typeof globalThis.require === "undefined") {
+  globalThis.require = require;
+}
+`;
+
+const createRustPlugin = ({ nodejs = false, emitTypes = false } = {}) =>
+  rust({
+    verbose: true,
+    nodejs,
+    extraArgs: {
+      cargo: [...baseCargoArgs],
+      wasmOpt: wasmOptArgs,
+      // Keep debug symbols if in dev mode.
+      wasmBindgen: devMode ? ["--keep-debug"] : [],
+    },
+    experimental: {
+      typescriptDeclarationDir: emitTypes ? "dist/crates" : null,
+    },
+    optimize: { release: true, rustc: !devMode },
+  });
+
 /**
  * Rollup configuration file for building a Cargo project and creating a WebAssembly (WASM) module,
  * as well as bundling a dedicated web worker file.
  *
  * The configuration sets up three build processes:
  *
- * 1. **WASM Module Build:**
+ * 1. **Browser WASM Module Build:**
  *    Compiles Rust code into WASM using the @wasm-tool/rollup-plugin-rust plugin. This process
  *    applies specific cargo arguments to enable necessary WebAssembly features (such as atomics,
  *    bulk memory operations, and mutable globals) and to set maximum memory limits. For testing builds,
@@ -50,9 +77,9 @@ const baseCargoArgs = [
  *    This configuration resolves WASM module imports and uses the copy plugin to ensure that the generated
  *    WASM assets are available to the worker.
  *
- * 3. **Main Entry Point Build:**
- *    Resolves and bundles the main JavaScript file (`index.js`) for the primary entry point of the application
- *    into the `dist` directory.
+ * 3. **Node.js Entry Build:**
+ *    Produces a Node-friendly bundle (`dist/node`) that loads the WASM module via the filesystem instead
+ *    of relying on `fetch`, enabling SSR and Node scripts to consume the SDK.
  *
  * Each build configuration outputs ES module format files with source maps to facilitate easier debugging.
  */
@@ -65,23 +92,7 @@ export default [
       sourcemap: true,
       assetFileNames: "assets/[name][extname]",
     },
-    plugins: [
-      rust({
-        verbose: true,
-        extraArgs: {
-          cargo: [...baseCargoArgs],
-          wasmOpt: wasmOptArgs,
-          // Keep debug symbols if in dev mode.
-          wasmBindgen: devMode ? ["--keep-debug"] : [],
-        },
-        experimental: {
-          typescriptDeclarationDir: "dist/crates",
-        },
-        optimize: { release: true, rustc: !devMode },
-      }),
-      resolve(),
-      commonjs(),
-    ],
+    plugins: [createRustPlugin({ emitTypes: true }), resolve(), commonjs()],
   },
   // Build the worker file
   {
@@ -101,6 +112,22 @@ export default [
         ],
         verbose: true,
       }),
+    ],
+  },
+  // Build the Node.js-friendly bundle
+  {
+    input: ["./js/wasm.js", "./js/index.js"],
+    output: {
+      dir: `dist/node`,
+      format: "es",
+      sourcemap: true,
+      assetFileNames: "assets/[name][extname]",
+      banner: nodeRequireBanner,
+    },
+    plugins: [
+      createRustPlugin({ nodejs: true }),
+      resolve({ preferBuiltins: true }),
+      commonjs(),
     ],
   },
 ];

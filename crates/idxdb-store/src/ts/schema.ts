@@ -18,6 +18,9 @@ export async function openDatabase(clientVersion: string): Promise<boolean> {
       shimReady = ensureNodeIndexedDbShim();
     }
     await shimReady;
+    if (runningInNode) {
+      reinitializeDbForNode();
+    }
     await db.open();
     await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
@@ -34,60 +37,66 @@ async function ensureNodeIndexedDbShim(): Promise<void> {
   }
   if (!nodeIndexedDbPromise) {
     nodeIndexedDbPromise = (async () => {
-      const [
-        { default: setGlobalVars },
-        pathModule,
-        fsPromises,
-      ] = await Promise.all([
-        import("indexeddbshim"),
-        import("node:path"),
-        import("node:fs/promises"),
-      ]);
-      const resolveBasePath = () => {
-        const configuredPath = process.env.MIDEN_NODE_INDEXEDDB_BASE_PATH;
-        if (configuredPath && configuredPath.trim().length > 0) {
-          return pathModule.resolve(configuredPath);
+      try {
+        const globals = globalThis as typeof globalThis & {
+          window?: Window & typeof globalThis;
+          navigator?: Navigator;
+          self?: Window & typeof globalThis;
+          indexedDB?: IDBFactory;
+          IDBKeyRange?: typeof IDBKeyRange;
+        };
+        if (!globals.window) {
+          globals.window = globals as unknown as Window & typeof globalThis;
         }
-        return pathModule.join(process.cwd(), "miden-webclient-indexeddb");
-      };
-      const globals = globalThis as typeof globalThis & {
-        window?: Window & typeof globalThis;
-        navigator?: Navigator;
-        self?: Window & typeof globalThis;
-        indexedDB?: IDBFactory;
-        IDBKeyRange?: typeof IDBKeyRange;
-      };
-      if (!globals.window) {
-        globals.window = globals as unknown as Window & typeof globalThis;
-      }
-      if (!globals.self) {
-        globals.self = globals.window;
-      }
-      if (!globals.navigator) {
-        globals.navigator = { userAgent: "node" } as Navigator;
-      }
-      const databaseBasePath = resolveBasePath();
-      await fsPromises.mkdir(databaseBasePath, { recursive: true });
-      nodeIndexedDbBasePath = databaseBasePath;
-      const shimmed = setGlobalVars(globals, {
-        checkOrigin: false,
-        addNonIDBGlobals: true,
-        databaseBasePath,
-      });
-      if (!globals.indexedDB) {
-        globals.indexedDB = shimmed.indexedDB;
-      }
-      if (!globals.IDBKeyRange) {
-        globals.IDBKeyRange = shimmed.IDBKeyRange;
+        if (!globals.self) {
+          globals.self = globals.window;
+        }
+        if (!globals.navigator) {
+          globals.navigator = { userAgent: "node" } as Navigator;
+        }
+        const [
+          { default: setGlobalVars },
+          pathModule,
+          fsPromises,
+        ] = await Promise.all([
+          import("indexeddbshim"),
+          import("node:path"),
+          import("node:fs/promises"),
+        ]);
+        const resolveBasePath = () => {
+          const configuredPath = process.env.MIDEN_NODE_INDEXEDDB_BASE_PATH;
+          if (configuredPath && configuredPath.trim().length > 0) {
+            return pathModule.resolve(configuredPath);
+          }
+          return pathModule.join(process.cwd(), "miden-webclient-indexeddb");
+        };
+        const databaseBasePath = resolveBasePath();
+        await fsPromises.mkdir(databaseBasePath, { recursive: true });
+        nodeIndexedDbBasePath = databaseBasePath;
+        const shimmed = setGlobalVars(globals, {
+          checkOrigin: false,
+          addNonIDBGlobals: true,
+          databaseBasePath,
+        });
+       if (!globals.indexedDB) {
+         globals.indexedDB = shimmed.indexedDB;
+       }
+       if (!globals.IDBKeyRange) {
+         globals.IDBKeyRange = shimmed.IDBKeyRange;
+       }
+        if (globals.indexedDB) {
+          Dexie.dependencies.indexedDB = globals.indexedDB;
+        }
+        if (globals.IDBKeyRange) {
+          Dexie.dependencies.IDBKeyRange = globals.IDBKeyRange;
+        }
+      } catch (error) {
+        console.error("Failed to initialize IndexedDB shim for Node.js", error);
+        throw error;
       }
     })();
   }
   return nodeIndexedDbPromise;
-}
-
-if (runningInNode) {
-  shimReady = ensureNodeIndexedDbShim();
-  await shimReady;
 }
 
 enum Table {
@@ -252,61 +261,113 @@ if (runningInNode) {
   }
 }
 
-const db = new Dexie(DATABASE_NAME) as Dexie & {
-  accountCodes: Dexie.Table<IAccountCode, string>;
-  accountStorages: Dexie.Table<IAccountStorage, string>;
-  accountAssets: Dexie.Table<IAccountAsset, string>;
-  storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
-  accountAuths: Dexie.Table<IAccountAuth, string>;
-  accounts: Dexie.Table<IAccount, string>;
-  addresses: Dexie.Table<IAddress, string>;
-  transactions: Dexie.Table<ITransaction, string>;
-  transactionScripts: Dexie.Table<ITransactionScript, string>;
-  inputNotes: Dexie.Table<IInputNote, string>;
-  outputNotes: Dexie.Table<IOutputNote, string>;
-  notesScripts: Dexie.Table<INotesScript, string>;
-  stateSync: Dexie.Table<IStateSync, number>;
-  blockHeaders: Dexie.Table<IBlockHeader, string>;
-  partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
-  tags: Dexie.Table<ITag, number>;
-  foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
-  settings: Dexie.Table<ISetting, string>;
-  trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+let db = new Dexie(DATABASE_NAME);
+
+const configureDatabase = (instance: Dexie) => {
+  instance.version(1).stores({
+    [Table.AccountCode]: indexes("root"),
+    [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+    [Table.AccountAuth]: indexes("pubKey"),
+    [Table.Accounts]: indexes(
+      "&accountCommitment",
+      "id",
+      "[id+nonce]",
+      "codeRoot",
+      "storageRoot",
+      "vaultRoot"
+    ),
+    [Table.Addresses]: indexes("address", "id"),
+    [Table.Transactions]: indexes("id", "statusVariant"),
+    [Table.TransactionScripts]: indexes("scriptRoot"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.OutputNotes]: indexes(
+      "noteId",
+      "recipientDigest",
+      "stateDiscriminant",
+      "nullifier"
+    ),
+    [Table.NotesScripts]: indexes("scriptRoot"),
+    [Table.StateSync]: indexes("id"),
+    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+    [Table.PartialBlockchainNodes]: indexes("id"),
+    [Table.Tags]: indexes(
+      "id++",
+      "tag",
+      "source_note_id",
+      "source_account_id"
+    ),
+    [Table.ForeignAccountCode]: indexes("accountId"),
+    [Table.Settings]: indexes("key"),
+    [Table.TrackedAccounts]: indexes("&id"),
+  });
 };
 
-db.version(1).stores({
-  [Table.AccountCode]: indexes("root"),
-  [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
-  [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-  [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-  [Table.AccountAuth]: indexes("pubKey"),
-  [Table.Accounts]: indexes(
-    "&accountCommitment",
-    "id",
-    "[id+nonce]",
-    "codeRoot",
-    "storageRoot",
-    "vaultRoot"
-  ),
-  [Table.Addresses]: indexes("address", "id"),
-  [Table.Transactions]: indexes("id", "statusVariant"),
-  [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-  [Table.OutputNotes]: indexes(
-    "noteId",
-    "recipientDigest",
-    "stateDiscriminant",
-    "nullifier"
-  ),
-  [Table.NotesScripts]: indexes("scriptRoot"),
-  [Table.StateSync]: indexes("id"),
-  [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-  [Table.PartialBlockchainNodes]: indexes("id"),
-  [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-  [Table.ForeignAccountCode]: indexes("accountId"),
-  [Table.Settings]: indexes("key"),
-  [Table.TrackedAccounts]: indexes("&id"),
-});
+let accountCodes: Dexie.Table<IAccountCode, string>;
+let accountStorages: Dexie.Table<IAccountStorage, string>;
+let storageMapEntries: Dexie.Table<IStorageMapEntry, string>;
+let accountAssets: Dexie.Table<IAccountAsset, string>;
+let accountAuths: Dexie.Table<IAccountAuth, string>;
+let accounts: Dexie.Table<IAccount, string>;
+let addresses: Dexie.Table<IAddress, string>;
+let transactions: Dexie.Table<ITransaction, string>;
+let transactionScripts: Dexie.Table<ITransactionScript, string>;
+let inputNotes: Dexie.Table<IInputNote, string>;
+let outputNotes: Dexie.Table<IOutputNote, string>;
+let notesScripts: Dexie.Table<INotesScript, string>;
+let stateSync: Dexie.Table<IStateSync, number>;
+let blockHeaders: Dexie.Table<IBlockHeader, string>;
+let partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, string>;
+let tags: Dexie.Table<ITag, number>;
+let foreignAccountCode: Dexie.Table<IForeignAccountCode, string>;
+let settings: Dexie.Table<ISetting, string>;
+let trackedAccounts: Dexie.Table<ITrackedAccount, string>;
+
+const bindTables = () => {
+  accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
+  accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
+  storageMapEntries = db.table<IStorageMapEntry, string>(
+    Table.StorageMapEntries
+  );
+  accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
+  accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
+  accounts = db.table<IAccount, string>(Table.Accounts);
+  addresses = db.table<IAddress, string>(Table.Addresses);
+  transactions = db.table<ITransaction, string>(Table.Transactions);
+  transactionScripts = db.table<ITransactionScript, string>(
+    Table.TransactionScripts
+  );
+  inputNotes = db.table<IInputNote, string>(Table.InputNotes);
+  outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
+  notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
+  stateSync = db.table<IStateSync, number>(Table.StateSync);
+  blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
+  partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
+    Table.PartialBlockchainNodes
+  );
+  tags = db.table<ITag, number>(Table.Tags);
+  foreignAccountCode = db.table<IForeignAccountCode, string>(
+    Table.ForeignAccountCode
+  );
+  settings = db.table<ISetting, string>(Table.Settings);
+  trackedAccounts = db.table<ITrackedAccount, string>(Table.TrackedAccounts);
+};
+
+configureDatabase(db);
+bindTables();
+let dexieInitialized = !runningInNode;
+
+const reinitializeDbForNode = () => {
+  if (dexieInitialized) {
+    return;
+  }
+  db.close();
+  db = new Dexie(DATABASE_NAME);
+  configureDatabase(db);
+  bindTables();
+  dexieInitialized = true;
+};
 
 function indexes(...items: string[]): string {
   return items.join(",");
