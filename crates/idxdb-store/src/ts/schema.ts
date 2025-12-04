@@ -1,15 +1,18 @@
 import Dexie from "dexie";
 import * as semver from "semver";
-import { logWebStoreError } from "./utils.js";
+import { isNodeRuntime, logWebStoreError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const runningInNode = isNodeRuntime();
+let nodeIndexedDbPromise: Promise<void> | null = null;
 
 export async function openDatabase(clientVersion: string): Promise<boolean> {
   console.log(`Opening database for client version ${clientVersion}...`);
   try {
+    await ensureNodeIndexedDbShim();
     await db.open();
     await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
@@ -18,6 +21,40 @@ export async function openDatabase(clientVersion: string): Promise<boolean> {
     logWebStoreError(err, "Failed to open database");
     return false;
   }
+}
+
+async function ensureNodeIndexedDbShim(): Promise<void> {
+  if (!runningInNode) {
+    return;
+  }
+  if (!nodeIndexedDbPromise) {
+    nodeIndexedDbPromise = (async () => {
+      const [{ default: setGlobalVars }, pathModule] = await Promise.all([
+        import("indexeddbshim"),
+        import("node:path"),
+      ]);
+      const globals = globalThis as typeof globalThis & {
+        window?: Window & typeof globalThis;
+        navigator?: Navigator;
+      };
+      if (!globals.window) {
+        globals.window = globals as unknown as Window & typeof globalThis;
+      }
+      if (!globals.navigator) {
+        globals.navigator = { userAgent: "node" } as Navigator;
+      }
+      const databaseBasePath = pathModule.join(
+        process.cwd(),
+        "miden-webclient-indexeddb"
+      );
+      setGlobalVars(globals, {
+        checkOrigin: false,
+        addNonIDBGlobals: true,
+        databaseBasePath,
+      });
+    })();
+  }
+  return nodeIndexedDbPromise;
 }
 
 enum Table {
