@@ -16,6 +16,7 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_fungible_faucet,
     insert_new_wallet,
+    wait_for_blocks,
     wait_for_node,
 };
 use miden_client::transaction::TransactionRequestBuilder;
@@ -213,15 +214,17 @@ async fn run_flow(
     }
 
     // Re-sync to verify cursor dedup (or still nothing if no transport)
-    recipient.sync_state().await?;
-    let notes = recipient.get_input_notes(NoteFilter::All).await?;
     if recipient_should_receive {
+        wait_for_blocks(&mut recipient, 1).await;
+        let notes = recipient.get_input_notes(NoteFilter::All).await?;
         assert_eq!(
-            notes.len(),
-            1,
-            "recipient should still have exactly 1 input note after re-sync"
+            notes[0].commitment().unwrap(), // we should have a commitment at this point
+            note.commitment(),
+            "re-synced note id should match minted note id"
         );
-        assert_eq!(notes[0].id(), note.id(), "re-synced note id should match minted note id");
+
+        let consumable_notes = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
+        assert_eq!(consumable_notes.len(), 1, "recipient should have 1 consumable note");
     } else {
         assert!(notes.is_empty(), "recipient should still have 0 input notes");
     }

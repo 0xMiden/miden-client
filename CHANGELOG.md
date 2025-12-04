@@ -10,6 +10,7 @@
 * Added RPC limit handling for `check_nullifiers` and `get_notes_by_id` ([#1558](https://github.com/0xMiden/miden-client/pull/1558)).
 * Fixed account rollback bug by not loading already discarded transaction on sync state ([#1567](https://github.com/0xMiden/miden-client/pull/1567)).
 * Added `--version` flag to client CLI ([#1586](https://github.com/0xMiden/miden-client/pull/1586)).
+* Refactored note fetching from the transport layer, calling now `import_note()` on retrieved notes ([#1579](https://github.com/0xMiden/miden-client/pull/1579)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 

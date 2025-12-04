@@ -44,11 +44,7 @@ use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
-use crate::note_transport::{
-    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
-    NoteTransportCursor,
-    NoteTransportUpdate,
-};
+use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
@@ -401,20 +397,6 @@ pub trait Store: Send + Sync {
         let cursor_bytes = cursor.value().to_be_bytes().to_vec();
         self.set_setting(NOTE_TRANSPORT_CURSOR_STORE_SETTING.into(), cursor_bytes)
             .await?;
-        Ok(())
-    }
-
-    /// Applies a note transport update
-    ///
-    /// An update involves:
-    /// - Insert fetched notes;
-    /// - Update pagination cursor used in note fetching.
-    async fn apply_note_transport_update(
-        &self,
-        note_transport_update: NoteTransportUpdate,
-    ) -> Result<(), StoreError> {
-        self.update_note_transport_cursor(note_transport_update.cursor).await?;
-        self.upsert_input_notes(&note_transport_update.note_updates).await?;
         Ok(())
     }
 
