@@ -126,7 +126,12 @@ export default [
     },
     plugins: [
       createRustPlugin({ nodejs: true }),
-      resolve({ preferBuiltins: true }),
+      resolve({
+        preferBuiltins: true,
+        browser: false,
+        mainFields: ["main", "module"],
+        exportConditions: ["node", "default"],
+      }),
       commonjs(),
     ],
   },

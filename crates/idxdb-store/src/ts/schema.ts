@@ -31,6 +31,22 @@ export async function openDatabase(clientVersion: string): Promise<boolean> {
   }
 }
 
+async function loadNodeIndexedDbShim() {
+  const nodeGlobal = globalThis as typeof globalThis & {
+    require?: NodeRequire;
+  };
+  if (typeof nodeGlobal.require === "function") {
+    const shimModule = nodeGlobal.require(
+      "indexeddbshim/dist/indexeddbshim-node.js"
+    );
+    return shimModule.default ?? shimModule;
+  }
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const shimModule = require("indexeddbshim/dist/indexeddbshim-node.js");
+  return shimModule.default ?? shimModule;
+}
+
 async function ensureNodeIndexedDbShim(): Promise<void> {
   if (!runningInNode) {
     return;
@@ -54,12 +70,8 @@ async function ensureNodeIndexedDbShim(): Promise<void> {
         if (!globals.navigator) {
           globals.navigator = { userAgent: "node" } as Navigator;
         }
-        const [
-          { default: setGlobalVars },
-          pathModule,
-          fsPromises,
-        ] = await Promise.all([
-          import("indexeddbshim"),
+        const [setGlobalVars, pathModule, fsPromises] = await Promise.all([
+          loadNodeIndexedDbShim(),
           import("node:path"),
           import("node:fs/promises"),
         ]);
@@ -379,36 +391,6 @@ db.on("populate", () => {
     .put({ id: 1, blockNum: "0" } as IStateSync)
     .catch((err: unknown) => logWebStoreError(err, "Failed to populate DB"));
 });
-
-const accountCodes = db.table<IAccountCode, string>(Table.AccountCode);
-const accountStorages = db.table<IAccountStorage, string>(Table.AccountStorage);
-const storageMapEntries = db.table<IStorageMapEntry, string>(
-  Table.StorageMapEntries
-);
-const accountAssets = db.table<IAccountAsset, string>(Table.AccountAssets);
-const accountAuths = db.table<IAccountAuth, string>(Table.AccountAuth);
-const accounts = db.table<IAccount, string>(Table.Accounts);
-const addresses = db.table<IAddress, string>(Table.Addresses);
-const transactions = db.table<ITransaction, string>(Table.Transactions);
-const transactionScripts = db.table<ITransactionScript, string>(
-  Table.TransactionScripts
-);
-const inputNotes = db.table<IInputNote, string>(Table.InputNotes);
-const outputNotes = db.table<IOutputNote, string>(Table.OutputNotes);
-const notesScripts = db.table<INotesScript, string>(Table.NotesScripts);
-const stateSync = db.table<IStateSync, number>(Table.StateSync);
-const blockHeaders = db.table<IBlockHeader, string>(Table.BlockHeaders);
-const partialBlockchainNodes = db.table<IPartialBlockchainNode, string>(
-  Table.PartialBlockchainNodes
-);
-const tags = db.table<ITag, number>(Table.Tags);
-const foreignAccountCode = db.table<IForeignAccountCode, string>(
-  Table.ForeignAccountCode
-);
-const settings = db.table<ISetting, string>(Table.Settings);
-const trackedAccounts = db.table<ITrackedAccount, string>(
-  Table.TrackedAccounts
-);
 
 async function ensureClientVersion(clientVersion: string): Promise<void> {
   if (!clientVersion) {

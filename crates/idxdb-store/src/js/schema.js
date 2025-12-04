@@ -29,6 +29,17 @@ export async function openDatabase(clientVersion) {
         return false;
     }
 }
+async function loadNodeIndexedDbShim() {
+    const nodeGlobal = globalThis;
+    if (typeof nodeGlobal.require === "function") {
+        const shimModule = nodeGlobal.require("indexeddbshim/dist/indexeddbshim-node.js");
+        return shimModule.default ?? shimModule;
+    }
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const shimModule = require("indexeddbshim/dist/indexeddbshim-node.js");
+    return shimModule.default ?? shimModule;
+}
 async function ensureNodeIndexedDbShim() {
     if (!runningInNode) {
         return;
@@ -46,8 +57,8 @@ async function ensureNodeIndexedDbShim() {
                 if (!globals.navigator) {
                     globals.navigator = { userAgent: "node" };
                 }
-                const [{ default: setGlobalVars }, pathModule, fsPromises,] = await Promise.all([
-                    import("indexeddbshim"),
+                const [setGlobalVars, pathModule, fsPromises] = await Promise.all([
+                    loadNodeIndexedDbShim(),
                     import("node:path"),
                     import("node:fs/promises"),
                 ]);
@@ -67,22 +78,22 @@ async function ensureNodeIndexedDbShim() {
                     databaseBasePath,
                 });
                 if (!globals.indexedDB) {
-                globals.indexedDB = shimmed.indexedDB;
+                    globals.indexedDB = shimmed.indexedDB;
+                }
+                if (!globals.IDBKeyRange) {
+                    globals.IDBKeyRange = shimmed.IDBKeyRange;
+                }
+                if (globals.indexedDB) {
+                    Dexie.dependencies.indexedDB = globals.indexedDB;
+                }
+                if (globals.IDBKeyRange) {
+                    Dexie.dependencies.IDBKeyRange = globals.IDBKeyRange;
+                }
             }
-            if (!globals.IDBKeyRange) {
-                globals.IDBKeyRange = shimmed.IDBKeyRange;
+            catch (error) {
+                console.error("Failed to initialize IndexedDB shim for Node.js", error);
+                throw error;
             }
-            if (globals.indexedDB) {
-                Dexie.dependencies.indexedDB = globals.indexedDB;
-            }
-            if (globals.IDBKeyRange) {
-                Dexie.dependencies.IDBKeyRange = globals.IDBKeyRange;
-            }
-        }
-        catch (error) {
-            console.error("Failed to initialize IndexedDB shim for Node.js", error);
-            throw error;
-        }
         })();
     }
     return nodeIndexedDbPromise;

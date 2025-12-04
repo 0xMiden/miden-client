@@ -310,20 +310,19 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   // Write everything in a single transaction, this transaction will atomically do the operations
   // below, since every operation here (or at least, most of them), is done in a nested transaction.
   // For more information on this, check: https://dexie.org/docs/Dexie/Dexie.transaction()
-  return await db.transaction("rw", tablesToAccess, async (tx) => {
+  return await db.transaction("rw", tablesToAccess, async () => {
     // Everything is under a single promise since otherwise the tx expires.
     await Promise.all([
       inputNotesWriteOp,
       outputNotesWriteOp,
       transactionWriteOp,
       accountUpdatesWriteOp,
-      updateSyncHeight(tx, blockNum),
-      updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
-      updateCommittedNoteTags(tx, committedNoteIds),
+      updateSyncHeight(blockNum),
+      updatePartialBlockchainNodes(serializedNodeIds, serializedNodes),
+      updateCommittedNoteTags(committedNoteIds),
       Promise.all(
         newBlockHeaders.map((newBlockHeader, i) => {
           return updateBlockHeader(
-            tx,
             newBlockNums[i],
             newBlockHeader,
             partialBlockchainPeaks[i],
@@ -335,19 +334,15 @@ export async function applyStateSync(stateUpdate: JsStateSyncUpdate) {
   });
 }
 
-async function updateSyncHeight(
-  tx: Transaction & { stateSync: typeof stateSync },
-  blockNum: string
-) {
+async function updateSyncHeight(blockNum: string) {
   try {
-    await tx.stateSync.update(1, { blockNum: blockNum });
+    await stateSync.update(1, { blockNum: blockNum });
   } catch (error) {
     logWebStoreError(error, "Failed to update sync height");
   }
 }
 
 async function updateBlockHeader(
-  tx: Transaction & { blockHeaders: typeof blockHeaders },
   blockNum: string,
   blockHeader: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
@@ -361,10 +356,10 @@ async function updateBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    const existingBlockHeader = await tx.blockHeaders.get(blockNum);
+    const existingBlockHeader = await blockHeaders.get(blockNum);
 
     if (!existingBlockHeader) {
-      await tx.blockHeaders.add(data);
+      await blockHeaders.add(data);
     }
   } catch (err) {
     logWebStoreError(err, "Failed to insert block header");
@@ -372,7 +367,6 @@ async function updateBlockHeader(
 }
 
 async function updatePartialBlockchainNodes(
-  tx: Transaction & { partialBlockchainNodes: typeof partialBlockchainNodes },
   nodeIndexes: string[],
   nodes: string[]
 ) {
@@ -394,21 +388,18 @@ async function updatePartialBlockchainNodes(
       node: node,
     }));
     // Use bulkPut to add/overwrite the entries
-    await tx.partialBlockchainNodes.bulkPut(data);
+    await partialBlockchainNodes.bulkPut(data);
   } catch (err) {
     logWebStoreError(err, "Failed to update partial blockchain nodes");
   }
 }
 
-async function updateCommittedNoteTags(
-  tx: Transaction & { tags: typeof tags },
-  inputNoteIds: string[]
-) {
+async function updateCommittedNoteTags(inputNoteIds: string[]) {
   try {
     for (let i = 0; i < inputNoteIds.length; i++) {
       const noteId = inputNoteIds[i];
       // Remove note tags
-      await tx.tags.where("source_note_id").equals(noteId).delete();
+      await tags.where("source_note_id").equals(noteId).delete();
     }
   } catch (error) {
     logWebStoreError(error, "Failed to pudate committed note tags");
