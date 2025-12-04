@@ -8,11 +8,16 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const runningInNode = isNodeRuntime();
 let nodeIndexedDbPromise: Promise<void> | null = null;
+let shimReady: Promise<void> | null = null;
+let nodeIndexedDbBasePath: string | null = null;
 
 export async function openDatabase(clientVersion: string): Promise<boolean> {
   console.log(`Opening database for client version ${clientVersion}...`);
   try {
-    await ensureNodeIndexedDbShim();
+    if (runningInNode && !shimReady) {
+      shimReady = ensureNodeIndexedDbShim();
+    }
+    await shimReady;
     await db.open();
     await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
@@ -29,32 +34,60 @@ async function ensureNodeIndexedDbShim(): Promise<void> {
   }
   if (!nodeIndexedDbPromise) {
     nodeIndexedDbPromise = (async () => {
-      const [{ default: setGlobalVars }, pathModule] = await Promise.all([
+      const [
+        { default: setGlobalVars },
+        pathModule,
+        fsPromises,
+      ] = await Promise.all([
         import("indexeddbshim"),
         import("node:path"),
+        import("node:fs/promises"),
       ]);
+      const resolveBasePath = () => {
+        const configuredPath = process.env.MIDEN_NODE_INDEXEDDB_BASE_PATH;
+        if (configuredPath && configuredPath.trim().length > 0) {
+          return pathModule.resolve(configuredPath);
+        }
+        return pathModule.join(process.cwd(), "miden-webclient-indexeddb");
+      };
       const globals = globalThis as typeof globalThis & {
         window?: Window & typeof globalThis;
         navigator?: Navigator;
+        self?: Window & typeof globalThis;
+        indexedDB?: IDBFactory;
+        IDBKeyRange?: typeof IDBKeyRange;
       };
       if (!globals.window) {
         globals.window = globals as unknown as Window & typeof globalThis;
       }
+      if (!globals.self) {
+        globals.self = globals.window;
+      }
       if (!globals.navigator) {
         globals.navigator = { userAgent: "node" } as Navigator;
       }
-      const databaseBasePath = pathModule.join(
-        process.cwd(),
-        "miden-webclient-indexeddb"
-      );
-      setGlobalVars(globals, {
+      const databaseBasePath = resolveBasePath();
+      await fsPromises.mkdir(databaseBasePath, { recursive: true });
+      nodeIndexedDbBasePath = databaseBasePath;
+      const shimmed = setGlobalVars(globals, {
         checkOrigin: false,
         addNonIDBGlobals: true,
         databaseBasePath,
       });
+      if (!globals.indexedDB) {
+        globals.indexedDB = shimmed.indexedDB;
+      }
+      if (!globals.IDBKeyRange) {
+        globals.IDBKeyRange = shimmed.IDBKeyRange;
+      }
     })();
   }
   return nodeIndexedDbPromise;
+}
+
+if (runningInNode) {
+  shimReady = ensureNodeIndexedDbShim();
+  await shimReady;
 }
 
 enum Table {
@@ -204,6 +237,19 @@ export interface ISetting {
 
 export interface ITrackedAccount {
   id: string;
+}
+
+if (runningInNode) {
+  const globalWithIDB = globalThis as typeof globalThis & {
+    indexedDB?: IDBFactory;
+    IDBKeyRange?: typeof IDBKeyRange;
+  };
+  if (globalWithIDB.indexedDB) {
+    Dexie.dependencies.indexedDB = globalWithIDB.indexedDB;
+  }
+  if (globalWithIDB.IDBKeyRange) {
+    Dexie.dependencies.IDBKeyRange = globalWithIDB.IDBKeyRange;
+  }
 }
 
 const db = new Dexie(DATABASE_NAME) as Dexie & {
@@ -384,4 +430,5 @@ export {
   foreignAccountCode,
   settings,
   trackedAccounts,
+  nodeIndexedDbBasePath,
 };
