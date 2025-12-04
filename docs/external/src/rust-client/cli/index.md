@@ -238,9 +238,52 @@ After a transaction gets executed, two entities start being tracked:
 
 #### `mint`
 
-Requests faucet tokens via the faucet API, imports the resulting note, and auto-consumes it into the target account. Defaults to a private note and the default account; uses the faucet URL from the config. Note that requesting faucet tokens from the miden-faucet entails performing and solving a small Proof of Work (PoW) challenge.
+Requests faucet tokens via the faucet API, imports the resulting note, and auto-consumes it into the target account. Defaults to a private note and the default account; uses the faucet URL from the config. Note that requesting 
+faucet tokens from the miden-faucet entails performing and solving a small Proof of Work (PoW) challenge.
 
-Usage: `miden-client mint --amount <AMOUNT> [--target <TARGET ACCOUNT ID>] [--api-key <KEY>] [--note-path <FILE>]`
+This command requires performing and solving a Proof of Work (PoW) challenge. The more tokens requested, the longer solving the PoW challenge will take. Nevertheless, it's usually only a matter of seconds.
+
+Usage: `miden-client mint --amount <AMOUNT> [--target <TARGET ACCOUNT ID>] [--api-key <KEY>]`
+
+:::note
+This command is only available when the client is configured for testnet or devnet. For local development with a locally tracked faucet account, use the [`mint-faucet`](#mint-faucet) command instead.
+:::
+
+#### `mint-faucet`
+
+Mints tokens from a locally tracked faucet account. This is the legacy mint command used primarily for local development and testing.
+
+Unlike the [`mint`](#mint) command which uses the faucet API and requires solving a PoW challenge, this command directly creates a mint transaction from a faucet account that is tracked in your local client.
+
+Usage: `miden-client mint-faucet --target <TARGET ACCOUNT ID> --asset <AMOUNT>::<FAUCET ID> --note-type <NOTE_TYPE> [--force] [--delegate-proving]`
+
+##### Flags
+
+| Flag                 | Description                                                          | Short Flag |
+| -------------------- | -------------------------------------------------------------------- | ---------- |
+| `--target`           | Target account ID or its hex prefix                                  | `-t`       |
+| `--asset`            | Asset to be minted in the format `<AMOUNT>::<FAUCET ID>`            | `-a`       |
+| `--note-type`        | Type of note to create (`public` or `private`)                      | `-n`       |
+| `--force`            | Submit transaction without confirmation                              |            |
+| `--delegate-proving` | Delegate proving to the remote prover specified in the config file  |            |
+
+##### Examples
+
+```sh
+# Mint 100 tokens from a tracked faucet to a target account (private note)
+miden-client mint-faucet --target 0x8fd4b86a6387f8d8 --asset 100::0xa99c5c8764d4e011 --note-type private
+
+# Mint tokens with force flag (no confirmation)
+miden-client mint-faucet -t 0x8fd4b86 -a 100::0xa99c5c8764d4e011 -n private --force
+```
+
+:::tip
+The `--asset` flag uses the format `<AMOUNT>::<FAUCET ID>`, where the faucet ID is the full account ID of the faucet account you control. You can also use token symbols defined in your token symbol map file (e.g., `100::USDC`).
+:::
+
+:::note
+This command requires that you have a faucet account tracked in your local client. To create a faucet account, use the `new-account` command with `--account-type fungible-faucet`.
+:::
 
 #### `consume-notes`
 
