@@ -13,8 +13,6 @@ The differences are represented as follows:
 - `vault`: an [`AccountVaultDelta`] object that contains the changes to the account vault.
 - `nonce`: if the nonce of the account has changed, the new nonce is stored here.
 
-TODO: add ability to trace account code updates.
-
 ## Methods
 
 ### \[dispose\]()

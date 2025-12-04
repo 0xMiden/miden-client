@@ -12,8 +12,6 @@ use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 /// - `storage`: an [`AccountStorageDelta`] that contains the changes to the account storage.
 /// - `vault`: an [`AccountVaultDelta`] object that contains the changes to the account vault.
 /// - `nonce`: if the nonce of the account has changed, the new nonce is stored here.
-///
-/// TODO: add ability to trace account code updates.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountDelta(NativeAccountDelta);
