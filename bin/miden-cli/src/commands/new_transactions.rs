@@ -116,7 +116,7 @@ impl FaucetHttpClient {
         account_id: &AccountId,
         amount: u64,
         note_type: NoteType,
-    ) -> Result<String, CliError> {
+    ) -> Result<NoteId, CliError> {
         let url = self.base_url.join("get_tokens").map_err(|err| {
             CliError::Faucet(format!(
                 "Failed to construct get_tokens endpoint from {}: {err}",
@@ -153,10 +153,11 @@ impl FaucetHttpClient {
             CliError::Faucet(format!("Failed to parse get_tokens response: {err}"))
         })?;
 
-        Ok(response.note_id)
+        Ok(NoteId::try_from_hex(&response.note_id)
+            .map_err(|err| CliError::Faucet(format!("Failed to parse note ID: {err}")))?)
     }
 
-    async fn download_note(&self, note_id: &str) -> Result<Vec<u8>, CliError> {
+    async fn download_note(&self, note_id: &NoteId) -> Result<NoteFile, CliError> {
         let url = self.base_url.join("get_note").map_err(|err| {
             CliError::Faucet(format!(
                 "Failed to construct get_note endpoint from {}: {err}",
@@ -185,9 +186,12 @@ impl FaucetHttpClient {
             .await
             .map_err(|err| CliError::Faucet(format!("Failed to parse get_note response: {err}")))?;
 
-        BASE64_STANDARD
+        let note_bytes = BASE64_STANDARD
             .decode(response.data_base64)
-            .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))
+            .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))?;
+
+        NoteFile::read_from_bytes(&note_bytes)
+            .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))
     }
 
     /// Mint a note by handling the proof-of-work challenge and token request.
@@ -196,17 +200,18 @@ impl FaucetHttpClient {
         target_account: AccountId,
         amount: u64,
         note_type: NoteType,
-    ) -> Result<String, CliError> {
+    ) -> Result<NoteId, CliError> {
         let (pow_challenge, pow_target) = self.request_pow(&target_account, amount).await?;
 
-        println!("Solving faucet PoW challenge...");
+        println!("Solving faucet PoW challenge, this might take a few minutes...");
 
         let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
 
         println!("Solved faucet PoW challenge");
 
-        self.request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
-            .await
+        Ok(self
+            .request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
+            .await?)
     }
 }
 
@@ -272,19 +277,17 @@ impl MintCmd {
 
         println!("Requesting tokens from faucet...");
 
-        let note_id_str = faucet_client
+        let note_id = faucet_client
             .mint_note(target_account_id, self.amount, NoteType::Private)
             .await?;
 
-        let note_bytes = faucet_client.download_note(&note_id_str).await?;
+        let note_file = faucet_client.download_note(&note_id).await?;
 
         println!("Waiting for note containing tokens to be consumable...");
 
-        let note_file = NoteFile::read_from_bytes(&note_bytes)
-            .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))?;
-        let imported_note_id = client.import_note(note_file.clone()).await?;
+        client.import_note(note_file.clone()).await?;
 
-        let note_id = wait_for_authenticated_note(&mut client, imported_note_id, note_file).await?;
+        wait_for_authenticated_note(&mut client, note_id, note_file).await?;
 
         let transaction_request = TransactionRequestBuilder::new()
             .authenticated_input_notes(vec![(note_id, None)])
@@ -371,7 +374,7 @@ async fn wait_for_authenticated_note<AUTH: TransactionAuthenticator + Sync + 'st
     note_id: NoteId,
     note_file: NoteFile,
 ) -> Result<NoteId, CliError> {
-    const NOTE_READY_TIMEOUT_SECS: u64 = 180;
+    const NOTE_READY_TIMEOUT_SECS: u64 = 60;
     const RETRY_DELAY_SECS: u64 = 2;
 
     if let NoteFile::NoteWithProof(note, proof) = note_file {
@@ -381,15 +384,9 @@ async fn wait_for_authenticated_note<AUTH: TransactionAuthenticator + Sync + 'st
 
     let start = std::time::Instant::now();
     loop {
-        let sync_summary = client.sync_state().await?;
+        client.sync_state().await?;
 
-        if sync_summary.committed_notes.contains(&note_id) {
-            if let Some(note_record) = client.get_input_note(note_id).await?
-                && note_record.is_authenticated()
-            {
-                return Ok(note_record.id());
-            }
-        } else if let Some(note_record) = client.get_input_note(note_id).await?
+        if let Some(note_record) = client.get_input_note(note_id).await?
             && note_record.is_authenticated()
         {
             return Ok(note_record.id());
