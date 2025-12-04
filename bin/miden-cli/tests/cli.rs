@@ -577,7 +577,6 @@ fn cli_empty_commands() {
 /// This test is opt-in and exercises the network faucet mint flow against a real testnet endpoint.
 /// Run with: `cargo test -p miden-cli --test cli mint_using_testnet_faucet -- --ignored`
 #[tokio::test]
-#[ignore = "requires live testnet access and funded faucet"]
 async fn mint_using_testnet_faucet() -> Result<()> {
     let endpoint = Endpoint::testnet();
     let amount = 100_000u64;
