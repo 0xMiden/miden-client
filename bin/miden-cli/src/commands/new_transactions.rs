@@ -199,7 +199,11 @@ impl FaucetHttpClient {
     ) -> Result<String, CliError> {
         let (pow_challenge, pow_target) = self.request_pow(&target_account, amount).await?;
 
+        println!("Solving faucet PoW challenge...");
+
         let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
+
+        println!("Solved faucet PoW challenge");
 
         self.request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
             .await
@@ -272,9 +276,9 @@ impl MintCmd {
             .mint_note(target_account_id, self.amount, NoteType::Private)
             .await?;
 
-        println!("Faucet accepted mint request");
-
         let note_bytes = faucet_client.download_note(&note_id_str).await?;
+
+        println!("Waiting for note containing tokens to be consumable...");
 
         let note_file = NoteFile::read_from_bytes(&note_bytes)
             .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))?;
@@ -291,6 +295,8 @@ impl MintCmd {
                     "Failed to build consume notes transaction".to_string(),
                 )
             })?;
+
+        println!("Executing consume notes transaction to add tokens to the wallet...");
 
         let transaction_id =
             execute_transaction(&mut client, target_account_id, transaction_request, true, false)
