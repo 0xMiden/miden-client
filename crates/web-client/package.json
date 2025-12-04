@@ -49,6 +49,8 @@
   "dependencies": {
     "@rollup/plugin-typescript": "^12.3.0",
     "dexie": "^4.0.1",
-    "glob": "^11.0.0"
+    "glob": "^11.0.0",
+    "indexeddbshim": "^10.1.0",
+    "sqlite3": "^5.1.7"
   }
 }
