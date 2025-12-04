@@ -4,8 +4,10 @@
   "license": "MIT",
   "dependencies": {
     "dexie": "^4.0.11",
-    "typescript": "^5.9.2",
-    "semver": "^7.6.3"
+    "indexeddbshim": "^10.1.0",
+    "sqlite3": "^5.1.7",
+    "semver": "^7.6.3",
+    "typescript": "^5.9.2"
   },
   "scripts": {
     "build": "yarn tsc --build --force ./tsconfig.json",
@@ -17,6 +19,7 @@
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "eslint": "^9.33.0",
     "typescript-eslint": "^8.39.1",
-    "@types/semver": "^7.5.8"
+    "@types/semver": "^7.5.8",
+    "@types/node": "^22.10.1"
   }
 }
