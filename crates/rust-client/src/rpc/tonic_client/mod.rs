@@ -654,7 +654,7 @@ impl TryFrom<&Status> for AppLevelError {
     ///
     /// Application-level errors are returned as `tonic::Status` errors with the error code encoded
     /// in the Status details as a `u8` byte, and the error message in the Status message string.
-    /// See: <https://github.com/0xMiden/miden-node/pull/1266>
+    /// <https://github.com/0xMiden/miden-node/pull/1266>
     fn try_from(status: &Status) -> Result<Self, Self::Error> {
         // The node encodes application-level errors as Status with:
         // - Error code (u8) in Status details: `vec![api_error.api_code()].into()`

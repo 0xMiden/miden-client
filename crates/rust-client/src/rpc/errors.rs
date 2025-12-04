@@ -20,7 +20,8 @@ use super::NodeRpcClientEndpoint;
 /// These errors represent application-specific failures (e.g., transaction validation failures)
 /// that are distinct from gRPC transport-level errors. The error includes a numeric code and
 /// a human-readable message.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("Application error (code: {code}): {message}")]
 pub struct AppLevelError {
     /// Numeric error code specific to the application.
     pub code: u32,
@@ -34,14 +35,6 @@ impl AppLevelError {
         Self { code, message }
     }
 }
-
-impl core::fmt::Display for AppLevelError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Application error (code: {}): {}", self.code, self.message)
-    }
-}
-
-impl Error for AppLevelError {}
 
 // RPC ERROR
 // ================================================================================================
