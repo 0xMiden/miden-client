@@ -10,6 +10,7 @@
 * Added RPC limit handling for `check_nullifiers` and `get_notes_by_id` ([#1558](https://github.com/0xMiden/miden-client/pull/1558)).
 * Fixed account rollback bug by not loading already discarded transaction on sync state ([#1567](https://github.com/0xMiden/miden-client/pull/1567)).
 * Added `--version` flag to client CLI ([#1586](https://github.com/0xMiden/miden-client/pull/1586)).
+* Changed the `miden-client mint` command to allow minting from our standard testnet faucet ([#1508](https://github.com/0xMiden/miden-client/pull/1508)).
 
 ## Miden Client CLI - 0.12.4 (2025-11-17)
 

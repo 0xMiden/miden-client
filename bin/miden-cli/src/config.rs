@@ -16,6 +16,8 @@ pub const TOKEN_SYMBOL_MAP_FILENAME: &str = "token_symbol_map.toml";
 pub const DEFAULT_PACKAGES_DIR: &str = "packages";
 pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
+pub const DEFAULT_TESTNET_FAUCET_API_URL: &str = "https://faucet-api.testnet.miden.io";
+pub const DEFAULT_DEVNET_FAUCET_API_URL: &str = "https://faucet-api.devnet.miden.io";
 
 /// Returns the global miden directory path in the user's home directory
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
@@ -38,6 +40,9 @@ pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
 pub struct CliConfig {
     /// Describes settings related to the RPC endpoint.
     pub rpc: RpcConfig,
+    /// Settings related to the faucet API endpoint.
+    #[serde(default)]
+    pub faucet: FaucetConfig,
     /// Path to the `SQLite` store file.
     pub store_filepath: PathBuf,
     /// Path to the directory that contains the secret key files.
@@ -77,6 +82,7 @@ impl Default for CliConfig {
         // These will be resolved relative to the .miden directory when the config is loaded
         Self {
             rpc: RpcConfig::default(),
+            faucet: FaucetConfig::default(),
             store_filepath: PathBuf::from(STORE_FILENAME),
             secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
             token_symbol_map_filepath: PathBuf::from(TOKEN_SYMBOL_MAP_FILENAME),
@@ -128,6 +134,69 @@ impl Default for NoteTransportConfig {
             timeout_ms: 10000,
         }
     }
+}
+
+// FAUCET CONFIG
+// ================================================================================================
+
+/// Default timeout for faucet requests in milliseconds.
+///
+/// Note: This must be a module-level function (not a method in an impl block) because
+/// `#[serde(default = "...")]` requires a string path that serde can resolve during macro
+/// expansion. Method paths like `Self::method_name` cannot be used in this context.
+fn default_faucet_timeout_ms() -> u64 {
+    30_000
+}
+
+/// Settings for the faucet API client.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FaucetConfig {
+    /// Optional override for the faucet API base URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+    /// Timeout for faucet requests in milliseconds.
+    #[serde(default = "default_faucet_timeout_ms")]
+    pub timeout_ms: u64,
+}
+
+impl Default for FaucetConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: None,
+            timeout_ms: default_faucet_timeout_ms(),
+        }
+    }
+}
+
+impl FaucetConfig {
+    /// Returns the faucet endpoint corresponding to the provided RPC endpoint, unless a custom
+    /// faucet endpoint was explicitly configured.
+    pub fn resolve_endpoint(&self, rpc_endpoint: &Endpoint) -> String {
+        let default_endpoint = default_faucet_endpoint_for_rpc(rpc_endpoint);
+
+        match &self.endpoint {
+            // Treat legacy configs that hard-coded the other network's faucet as "unset" so we
+            // transparently switch to the faucet that matches the current RPC endpoint.
+            Some(configured) if is_other_network_default(rpc_endpoint, configured) => {
+                default_endpoint.to_string()
+            },
+            Some(configured) => configured.clone(),
+            None => default_endpoint.to_string(),
+        }
+    }
+}
+
+fn default_faucet_endpoint_for_rpc(rpc_endpoint: &Endpoint) -> &'static str {
+    if rpc_endpoint == &Endpoint::devnet() {
+        DEFAULT_DEVNET_FAUCET_API_URL
+    } else {
+        DEFAULT_TESTNET_FAUCET_API_URL
+    }
+}
+
+fn is_other_network_default(rpc_endpoint: &Endpoint, configured: &str) -> bool {
+    (rpc_endpoint == &Endpoint::devnet() && configured == DEFAULT_TESTNET_FAUCET_API_URL)
+        || (rpc_endpoint == &Endpoint::testnet() && configured == DEFAULT_DEVNET_FAUCET_API_URL)
 }
 
 // CLI ENDPOINT

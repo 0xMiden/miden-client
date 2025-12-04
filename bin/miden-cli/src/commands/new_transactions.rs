@@ -1,16 +1,22 @@
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use clap::{Parser, ValueEnum};
 use miden_client::account::AccountId;
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::auth::TransactionAuthenticator;
 use miden_client::note::{
     BlockNumber,
+    NoteFile,
+    NoteId,
     NoteType as MidenNoteType,
     build_swap_tag,
     get_input_note_with_id_prefix,
 };
+use miden_client::rpc::Endpoint;
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     ExecutedTransaction,
@@ -18,11 +24,19 @@ use miden_client::transaction::{
     OutputNote,
     PaymentNoteDescription,
     SwapTransactionData,
+    TransactionId,
     TransactionRequest,
     TransactionRequestBuilder,
 };
-use miden_client::{Client, RemoteTransactionProver};
+use miden_client::{Client, Deserializable, RemoteTransactionProver};
+use rand::Rng;
+use reqwest::{Client as HttpClient, Url};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use tokio::task;
+use tokio::time::sleep;
 use tracing::info;
+use {hex, serde_json};
 
 use crate::create_dynamic_table;
 use crate::errors::CliError;
@@ -34,7 +48,173 @@ use crate::utils::{
     parse_account_id,
 };
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+/// HTTP client for interacting with a `miden-faucet` service to request `PoW` challenges,
+/// mint assets, and download notes.
+#[derive(Clone)]
+struct FaucetHttpClient {
+    http_client: HttpClient,
+    base_url: Url,
+    api_key: Option<String>,
+}
+
+impl FaucetHttpClient {
+    fn new(endpoint: &str, timeout_ms: u64, api_key: Option<String>) -> Result<Self, CliError> {
+        let base_url = Url::parse(endpoint)
+            .map_err(|err| CliError::Faucet(format!("Invalid faucet URL `{endpoint}`: {err}")))?;
+
+        let http_client = HttpClient::builder()
+            .timeout(Duration::from_millis(timeout_ms))
+            .build()
+            .map_err(|err| CliError::Faucet(format!("Failed to build HTTP client: {err}")))?;
+
+        Ok(Self { http_client, base_url, api_key })
+    }
+
+    async fn request_pow(
+        &self,
+        account_id: &AccountId,
+        amount: u64,
+    ) -> Result<(String, u64), CliError> {
+        let pow_url = self.base_url.join("pow").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct PoW endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let mut request = self
+            .http_client
+            .get(pow_url)
+            .query(&[("account_id", account_id.to_hex()), ("amount", amount.to_string())]);
+
+        if let Some(key) = &self.api_key {
+            request = request.query(&[("api_key", key)]);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("PoW request failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!("Faucet PoW request failed ({status}): {body}")));
+        }
+
+        let body = response.text().await.unwrap_or_default();
+        let response: PowResponse = serde_json::from_str(&body)
+            .map_err(|err| CliError::Faucet(format!("Failed to parse PoW response: {err}")))?;
+
+        Ok((response.challenge, response.target))
+    }
+
+    async fn request_tokens(
+        &self,
+        challenge: &str,
+        nonce: u64,
+        account_id: &AccountId,
+        amount: u64,
+        note_type: NoteType,
+    ) -> Result<NoteId, CliError> {
+        let url = self.base_url.join("get_tokens").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct get_tokens endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let mut request = self.http_client.get(url).query(&[
+            ("account_id", account_id.to_hex()),
+            ("asset_amount", amount.to_string()),
+            ("is_private_note", (note_type == NoteType::Private).to_string()),
+            ("challenge", challenge.to_string()),
+            ("nonce", nonce.to_string()),
+        ]);
+
+        if let Some(key) = &self.api_key {
+            request = request.query(&[("api_key", key)]);
+        }
+
+        let response = request
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("get_tokens request failed: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!(
+                "Faucet get_tokens request failed ({status}): {body}"
+            )));
+        }
+
+        let response: MintResponse = response.json().await.map_err(|err| {
+            CliError::Faucet(format!("Failed to parse get_tokens response: {err}"))
+        })?;
+
+        NoteId::try_from_hex(&response.note_id)
+            .map_err(|err| CliError::Faucet(format!("Failed to parse note ID: {err}")))
+    }
+
+    async fn download_note(&self, note_id: &NoteId) -> Result<NoteFile, CliError> {
+        let url = self.base_url.join("get_note").map_err(|err| {
+            CliError::Faucet(format!(
+                "Failed to construct get_note endpoint from {}: {err}",
+                self.base_url
+            ))
+        })?;
+
+        let response = self
+            .http_client
+            .get(url)
+            .query(&[("note_id", note_id.to_string())])
+            .send()
+            .await
+            .map_err(|err| CliError::Faucet(format!("Failed to download note: {err}")))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CliError::Faucet(format!(
+                "Faucet get_note request failed ({status}): {body}"
+            )));
+        }
+
+        let response: NoteResponse = response
+            .json()
+            .await
+            .map_err(|err| CliError::Faucet(format!("Failed to parse get_note response: {err}")))?;
+
+        let note_bytes = BASE64_STANDARD
+            .decode(response.data_base64)
+            .map_err(|err| CliError::Import(format!("Failed to decode note payload: {err}")))?;
+
+        NoteFile::read_from_bytes(&note_bytes)
+            .map_err(|err| CliError::Import(format!("Failed to decode faucet note: {err}")))
+    }
+
+    /// Mint a note by handling the proof-of-work challenge and token request.
+    async fn mint_note(
+        &self,
+        target_account: AccountId,
+        amount: u64,
+        note_type: NoteType,
+    ) -> Result<NoteId, CliError> {
+        let (pow_challenge, pow_target) = self.request_pow(&target_account, amount).await?;
+
+        println!("Solving faucet PoW challenge, this might take a few minutes...");
+
+        let nonce = solve_challenge(pow_challenge.clone(), pow_target).await?;
+
+        println!("Solved faucet PoW challenge");
+
+        self.request_tokens(&pow_challenge, nonce, &target_account, amount, note_type)
+            .await
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
 pub enum NoteType {
     Public,
     Private,
@@ -49,15 +229,104 @@ impl From<&NoteType> for MidenNoteType {
     }
 }
 
-/// Mint tokens from a fungible faucet to a wallet.
+/// Mint tokens by requesting them from the faucet API.
 #[derive(Debug, Parser, Clone)]
 pub struct MintCmd {
+    /// Amount to be minted.
+    #[arg(short = 'a', long = "amount", help = "Amount to be minted from the faucet.")]
+    amount: u64,
+
+    /// Target account ID or its hex prefix for the minted tokens. If none is provided, the default
+    /// account's ID is used instead.
+    #[arg(short = 't', long = "target")]
+    target_account_id: Option<String>,
+
+    /// Optional faucet API key.
+    #[arg(long = "api-key")]
+    api_key: Option<String>,
+}
+
+impl MintCmd {
+    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        if self.amount == 0 {
+            return Err(CliError::Input("Amount must be greater than zero".to_string()));
+        }
+
+        let target_account_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.target_account_id.clone()).await?;
+
+        let (cli_config, _) = load_config_file()?;
+        let current_endpoint: Endpoint = (&cli_config.rpc.endpoint).into();
+        if current_endpoint != Endpoint::testnet() && current_endpoint != Endpoint::devnet() {
+            return Err(CliError::Input(
+                "The `mint` command can only be used when the client is configured for testnet or devnet. Use the `mint-faucet` command instead to mint tokens from a local faucet."
+                    .to_string(),
+            ));
+        }
+        let faucet_config = cli_config.faucet;
+        let faucet_endpoint = faucet_config.resolve_endpoint(&current_endpoint);
+
+        let faucet_client = FaucetHttpClient::new(
+            &faucet_endpoint,
+            faucet_config.timeout_ms,
+            self.api_key.clone(),
+        )?;
+
+        println!("Requesting tokens from faucet...");
+
+        let note_id = faucet_client
+            .mint_note(target_account_id, self.amount, NoteType::Private)
+            .await?;
+
+        let note_file = faucet_client.download_note(&note_id).await?;
+
+        println!("Waiting for note containing tokens to be consumable...");
+
+        client.import_note(note_file.clone()).await?;
+
+        wait_for_authenticated_note(&mut client, note_id, note_file).await?;
+
+        let transaction_request = TransactionRequestBuilder::new()
+            .authenticated_input_notes(vec![(note_id, None)])
+            .build()
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build consume notes transaction".to_string(),
+                )
+            })?;
+
+        println!("Executing consume notes transaction to add tokens to the wallet...");
+
+        let transaction_id =
+            execute_transaction(&mut client, target_account_id, transaction_request, true, false)
+                .await?;
+
+        let network_prefix = if current_endpoint == Endpoint::devnet() {
+            "devnet."
+        } else {
+            ""
+        };
+        println!(
+            "View the mint transaction on Midenscan: https://{network_prefix}midenscan.com/transaction/{transaction_id}"
+        );
+
+        Ok(())
+    }
+}
+
+/// Mint tokens from an existing faucet account tracked by the client.
+#[derive(Debug, Parser, Clone)]
+pub struct MintFaucetCmd {
     /// Target account ID or its hex prefix.
     #[arg(short = 't', long = "target")]
     target_account_id: String,
 
     /// Asset to be minted.
-    #[arg(short, long, help=format!("Asset to be minted.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    #[arg(short, long, help = format!("Asset to be minted.\n{SHARED_TOKEN_DOCUMENTATION}"))]
     asset: String,
 
     #[arg(short, long, value_enum)]
@@ -71,12 +340,11 @@ pub struct MintCmd {
     delegate_proving: bool,
 }
 
-impl MintCmd {
+impl MintFaucetCmd {
     pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let force = self.force;
         let faucet_details_map = load_faucet_details_map()?;
 
         let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
@@ -98,11 +366,100 @@ impl MintCmd {
             &mut client,
             fungible_asset.faucet_id(),
             transaction_request,
-            force,
+            self.force,
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
+}
+
+/// Wait for a faucet note to be authenticated in the local store (or time out).
+async fn wait_for_authenticated_note<AUTH: TransactionAuthenticator + Sync + 'static>(
+    client: &mut Client<AUTH>,
+    note_id: NoteId,
+    note_file: NoteFile,
+) -> Result<NoteId, CliError> {
+    const NOTE_READY_TIMEOUT_SECS: u64 = 60;
+    const RETRY_DELAY_SECS: u64 = 2;
+
+    if let NoteFile::NoteWithProof(note, proof) = note_file {
+        client.import_note(NoteFile::NoteWithProof(note.clone(), proof)).await?;
+        return Ok(note.id());
+    }
+
+    let start = std::time::Instant::now();
+    loop {
+        client.sync_state().await?;
+
+        if let Some(note_record) = client.get_input_note(note_id).await?
+            && note_record.is_authenticated()
+        {
+            return Ok(note_record.id());
+        }
+
+        if start.elapsed().as_secs() >= NOTE_READY_TIMEOUT_SECS {
+            return Err(CliError::Transaction(
+                "Imported faucet note is not yet consumable; timed out waiting for metadata/proof"
+                    .into(),
+                "Faucet note not yet consumable".to_string(),
+            ));
+        }
+
+        sleep(Duration::from_secs(RETRY_DELAY_SECS)).await;
+    }
+}
+
+// FAUCET HELPERS
+// ================================================================================================
+
+#[derive(Debug, Deserialize)]
+struct PowResponse {
+    challenge: String,
+    target: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct MintResponse {
+    note_id: String,
+}
+
+/// Response from the faucet API for a private note.
+#[derive(Debug, Deserialize)]
+struct NoteResponse {
+    data_base64: String,
+}
+
+/// Solve a `PoW` challenge for the given challenge and target from the faucet API.
+async fn solve_challenge(challenge_hex: String, target: u64) -> Result<u64, CliError> {
+    if target == 0 {
+        return Err(CliError::Faucet("Received PoW target of 0 from faucet".to_string()));
+    }
+
+    let challenge_bytes = hex::decode(challenge_hex).map_err(|err| {
+        CliError::Faucet(format!("Invalid challenge bytes returned by faucet: {err}"))
+    })?;
+
+    task::spawn_blocking(move || {
+        let mut rng = rand::rng();
+
+        loop {
+            let nonce: u64 = rng.random();
+
+            let mut hasher = Sha256::new();
+            hasher.update(&challenge_bytes);
+            hasher.update(nonce.to_be_bytes());
+            let hash = hasher.finalize();
+            let digest =
+                u64::from_be_bytes(hash[..8].try_into().expect("hash should be 32 bytes long"));
+
+            if digest < target {
+                return Ok(nonce);
+            }
+        }
+    })
+    .await
+    .map_err(|err| CliError::Faucet(format!("PoW solving task failed: {err}")))?
 }
 
 /// Create a pay-to-id transaction.
@@ -188,6 +545,7 @@ impl SendCmd {
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
 }
 
@@ -266,7 +624,8 @@ impl SwapCmd {
             force,
             self.delegate_proving,
         )
-        .await?;
+        .await
+        .map(|_| ())?;
 
         let payback_note_tag: u32 = build_swap_tag(
             (&self.note_type).into(),
@@ -316,7 +675,9 @@ impl ConsumeNotesCmd {
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
                 .await
-                .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
+                .map_err(|_| CliError::Input(format!(
+                    "The provided note ID '{note_id}' could not be found. Please check that you entered a valid full note ID or a known note ID prefix."
+                )))?;
 
             if note_record.is_authenticated() {
                 authenticated_notes.push(note_record.id());
@@ -369,6 +730,7 @@ impl ConsumeNotesCmd {
             self.delegate_proving,
         )
         .await
+        .map(|_| ())
     }
 }
 
@@ -381,7 +743,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
     transaction_request: TransactionRequest,
     force: bool,
     delegated_proving: bool,
-) -> Result<(), CliError> {
+) -> Result<TransactionId, CliError> {
     println!("Executing transaction...");
     let transaction_result = client.execute_transaction(account_id, transaction_request).await?;
 
@@ -397,8 +759,11 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         io::stdin().read_line(&mut proceed_str).expect("Should read line");
 
         if proceed_str.trim().to_lowercase() != "y" {
-            println!("Transaction was cancelled.");
-            return Ok(());
+            return Err(CliError::Transaction(
+                std::io::Error::new(std::io::ErrorKind::Interrupted, "transaction cancelled")
+                    .into(),
+                "Transaction was cancelled".to_string(),
+            ));
         }
     }
 
@@ -446,7 +811,7 @@ async fn execute_transaction<AUTH: TransactionAuthenticator + Sync + 'static>(
         }
     }
 
-    Ok(())
+    Ok(transaction_id)
 }
 
 fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
@@ -539,4 +904,30 @@ fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), Cl
     println!("Nonce incremented by: {}.", account_delta.nonce_delta());
 
     Ok(())
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use sha2::{Digest, Sha256};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn solve_challenge_finds_valid_nonce() {
+        let challenge = "00".repeat(120);
+        let target = u64::MAX;
+
+        let nonce = solve_challenge(challenge.clone(), target)
+            .await
+            .expect("should solve challenge");
+
+        let mut hasher = Sha256::new();
+        hasher.update(vec![0u8; 120]);
+        hasher.update(nonce.to_be_bytes());
+        let digest = u64::from_be_bytes(hasher.finalize()[..8].try_into().unwrap());
+        assert!(digest < target, "nonce should satisfy target");
+    }
 }

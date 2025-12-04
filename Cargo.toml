@@ -48,6 +48,7 @@ miden-remote-prover-client       = { default-features = false, features = ["tx-p
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
 async-trait = { version = "0.1" }
+base64      = { version = "0.22" }
 chrono      = { version = "0.4" }
 hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }

@@ -324,7 +324,7 @@ async fn token_symbol_mapping() -> Result<()> {
 
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
-        "mint",
+        "mint-faucet",
         "--target",
         AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex().as_str(),
         "--asset",
@@ -572,6 +572,41 @@ fn cli_empty_commands() {
 
     let mut swam_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
+}
+
+/// This test is opt-in and exercises the network faucet mint flow against a real testnet endpoint.
+/// Run with: `cargo test -p miden-cli --test cli mint_using_testnet_faucet -- --ignored`
+#[tokio::test]
+async fn mint_using_testnet_faucet() -> Result<()> {
+    let endpoint = Endpoint::testnet();
+    let amount = 100_000u64;
+
+    let store_path = create_test_store_path();
+    let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
+    let target_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    let _ = mint_cli_using_testnet_faucet(&temp_dir, &target_account_id, amount);
+
+    // Ensure local store catches up after the transaction
+    sync_cli(&temp_dir);
+
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let account = client
+        .get_account(AccountId::from_hex(&target_account_id)?)
+        .await?
+        .expect("wallet account should exist after mint");
+
+    let vault_asset_amount = account
+        .account()
+        .vault()
+        .get_balance(AccountId::from_hex("0x54bf4e12ef20082070758b022456c7")?)
+        .unwrap();
+
+    assert_eq!(
+        vault_asset_amount, amount,
+        "wallet should hold the correct amount of assets after mint"
+    );
+    Ok(())
 }
 
 #[tokio::test]
@@ -923,7 +958,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
     mint_cmd.args([
-        "mint",
+        "mint-faucet",
         "--target",
         target_account_id,
         "--asset",
@@ -941,6 +976,31 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
         .split_whitespace()
         .skip_while(|&word| word != "Output")
         .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string()
+}
+
+/// Mints tokens using the faucet API (with `PoW`) and checks that the command runs
+/// successfully given account using the CLI given by `cli_path`.
+fn mint_cli_using_testnet_faucet(cli_path: &Path, target_account_id: &str, amount: u64) -> String {
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.args(["mint", "--target", target_account_id, "--amount", &amount.to_string()]);
+
+    let output = mint_cmd.current_dir(cli_path).output().unwrap();
+    println!("Mint output: {output:?}");
+    assert!(output.status.success());
+
+    // Parse transaction ID from output. Format: "Transaction ID: 0x..."
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .find_map(|line| {
+            if line.starts_with("Transaction ID:") {
+                line.split_whitespace().nth(2)
+            } else {
+                None
+            }
+        })
         .unwrap()
         .to_string()
 }
