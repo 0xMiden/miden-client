@@ -1,6 +1,7 @@
 {
   "name": "web_store",
   "version": "1.0.0",
+  "type": "module",
   "license": "MIT",
   "dependencies": {
     "dexie": "^4.0.11",
@@ -12,7 +13,8 @@
   "scripts": {
     "build": "yarn tsc --build --force ./tsconfig.json",
     "build:bundler": "yarn tsc --build --force ./tsconfig.bundler.json",
-    "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts"
+    "lint": "yarn build && yarn eslint --config ./ts/eslint.config.mjs ./ts",
+    "test:node": "yarn build && node --test ./js/tests/node_indexeddb_shim.test.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
