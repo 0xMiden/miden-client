@@ -126,12 +126,13 @@ where
             notes.push(note);
         }
 
+        let sync_height = self.get_sync_height().await?;
         // Import fetched notes
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
                 details: note.into(),
-                after_block_num: self.get_sync_height().await?,
+                after_block_num: sync_height,
                 tag: Some(tag),
             };
             self.import_note(note_file).await?;
