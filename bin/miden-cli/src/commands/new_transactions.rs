@@ -262,14 +262,15 @@ impl MintCmd {
         let current_endpoint: Endpoint = (&cli_config.rpc.endpoint).into();
         if current_endpoint != Endpoint::testnet() && current_endpoint != Endpoint::devnet() {
             return Err(CliError::Input(
-                "The `mint` command can only be used when the client is configured for testnet. Use the `mint-faucet` command instead to mint tokens from a local faucet."
+                "The `mint` command can only be used when the client is configured for testnet or devnet. Use the `mint-faucet` command instead to mint tokens from a local faucet."
                     .to_string(),
             ));
         }
         let faucet_config = cli_config.faucet;
+        let faucet_endpoint = faucet_config.resolve_endpoint(&current_endpoint);
 
         let faucet_client = FaucetHttpClient::new(
-            &faucet_config.endpoint,
+            &faucet_endpoint,
             faucet_config.timeout_ms,
             self.api_key.clone(),
         )?;
@@ -303,8 +304,14 @@ impl MintCmd {
         let transaction_id =
             execute_transaction(&mut client, target_account_id, transaction_request, true, false)
                 .await?;
+
+        let network_prefix = if current_endpoint == Endpoint::devnet() {
+            "devnet."
+        } else {
+            ""
+        };
         println!(
-            "View the mint transaction on Midenscan: https://midenscan.com/transaction/{transaction_id}"
+            "View the mint transaction on Midenscan: https://{network_prefix}midenscan.com/transaction/{transaction_id}"
         );
 
         Ok(())

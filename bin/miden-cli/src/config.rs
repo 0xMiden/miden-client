@@ -16,6 +16,8 @@ pub const TOKEN_SYMBOL_MAP_FILENAME: &str = "token_symbol_map.toml";
 pub const DEFAULT_PACKAGES_DIR: &str = "packages";
 pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
+pub const DEFAULT_TESTNET_FAUCET_API_URL: &str = "https://faucet-api.testnet.miden.io";
+pub const DEFAULT_DEVNET_FAUCET_API_URL: &str = "https://faucet-api.devnet.miden.io";
 
 /// Returns the global miden directory path in the user's home directory
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
@@ -149,8 +151,9 @@ fn default_faucet_timeout_ms() -> u64 {
 /// Settings for the faucet API client.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FaucetConfig {
-    /// Base URL of the faucet API (e.g. `https://faucet.testnet.miden.io`).
-    pub endpoint: String,
+    /// Optional override for the faucet API base URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
     /// Timeout for faucet requests in milliseconds.
     #[serde(default = "default_faucet_timeout_ms")]
     pub timeout_ms: u64,
@@ -159,10 +162,41 @@ pub struct FaucetConfig {
 impl Default for FaucetConfig {
     fn default() -> Self {
         Self {
-            endpoint: "https://faucet-api.testnet.miden.io".to_string(),
+            endpoint: None,
             timeout_ms: default_faucet_timeout_ms(),
         }
     }
+}
+
+impl FaucetConfig {
+    /// Returns the faucet endpoint corresponding to the provided RPC endpoint, unless a custom
+    /// faucet endpoint was explicitly configured.
+    pub fn resolve_endpoint(&self, rpc_endpoint: &Endpoint) -> String {
+        let default_endpoint = default_faucet_endpoint_for_rpc(rpc_endpoint);
+
+        match &self.endpoint {
+            // Treat legacy configs that hard-coded the other network's faucet as "unset" so we
+            // transparently switch to the faucet that matches the current RPC endpoint.
+            Some(configured) if is_other_network_default(rpc_endpoint, configured) => {
+                default_endpoint.to_string()
+            },
+            Some(configured) => configured.clone(),
+            None => default_endpoint.to_string(),
+        }
+    }
+}
+
+fn default_faucet_endpoint_for_rpc(rpc_endpoint: &Endpoint) -> &'static str {
+    if rpc_endpoint == &Endpoint::devnet() {
+        DEFAULT_DEVNET_FAUCET_API_URL
+    } else {
+        DEFAULT_TESTNET_FAUCET_API_URL
+    }
+}
+
+fn is_other_network_default(rpc_endpoint: &Endpoint, configured: &str) -> bool {
+    (rpc_endpoint == &Endpoint::devnet() && configured == DEFAULT_TESTNET_FAUCET_API_URL)
+        || (rpc_endpoint == &Endpoint::testnet() && configured == DEFAULT_DEVNET_FAUCET_API_URL)
 }
 
 // CLI ENDPOINT
