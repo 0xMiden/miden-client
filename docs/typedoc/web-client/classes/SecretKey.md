@@ -128,7 +128,7 @@ Generates an ECDSA k256 Keccak secret key using an optional deterministic seed.
 
 > `static` **rpoFalconWithRNG**(`seed?`): `SecretKey`
 
-Generates an RpoFalcon512 secret key using an optional deterministic seed.
+Generates an `RpoFalcon512` secret key using an optional deterministic seed.
 
 #### Parameters
 

@@ -118,7 +118,7 @@ Deserializes a public key from bytes.
 
 > `static` **recoverFrom**(`message`, `signature`): `PublicKey`
 
-Recovers a public key from a signature (only supported for RpoFalcon512).
+Recovers a public key from a signature (only supported for `RpoFalcon512`).
 
 #### Parameters
 

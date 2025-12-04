@@ -56,7 +56,7 @@ Returns the public key commitment as a word.
 
 > **getRpoFalcon512SecretKeyAsFelts**(): [`Felt`](Felt.md)[]
 
-Returns the RpoFalcon512 secret key bytes encoded as felts.
+Returns the `RpoFalcon512` secret key bytes encoded as felts.
 
 #### Returns
 
