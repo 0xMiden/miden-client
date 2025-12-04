@@ -122,6 +122,24 @@ jobs:
           name: web-client-artifacts
           path: ./crates/web-client/dist
 
+  idxdb-node-tests:
+    name: Node IndexedDB shim tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install idxdb-store dependencies
+        run: |
+          cd ./crates/idxdb-store/src
+          yarn install --frozen-lockfile
+      - name: Run Node IndexedDB shim tests
+        run: |
+          cd ./crates/idxdb-store/src
+          yarn test:node
+
   integration-tests-web-client:
     name: Run integration tests for web client on ubuntu-latest
     runs-on: ubuntu-latest
