@@ -408,7 +408,7 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-        
+
         let mut all_nullifiers = BTreeSet::new();
 
         // Establish RPC connection once before the loop
