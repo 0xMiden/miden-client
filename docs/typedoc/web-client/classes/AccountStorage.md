@@ -12,9 +12,9 @@ slots in total.
 Each slot has a type which defines its size and structure. Currently, the following types are
 supported:
 - `StorageSlot::Value`: contains a single Word of data (i.e., 32 bytes).
-- `StorageSlot::Map`: contains a `StorageMap` which is a key-value map where both keys and values
-  are Words. The value of a storage slot containing a map is the commitment to the underlying
-  map.
+- `StorageSlot::Map`: contains a `StorageMap` which is a key-value map where both keys and
+  values are Words. The value of a storage slot containing a map is the commitment to the
+  underlying map.
 
 ## Methods
 
