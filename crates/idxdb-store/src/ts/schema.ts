@@ -1,12 +1,17 @@
 import Dexie from "dexie";
+import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 const DATABASE_NAME = "MidenClientDB";
+export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
-export async function openDatabase(): Promise<boolean> {
-  console.log("Opening database...");
+export async function openDatabase(clientVersion: string): Promise<boolean> {
+  console.log(`Opening database for client version ${clientVersion}...`);
   try {
     await db.open();
+    await ensureClientVersion(clientVersion);
     console.log("Database opened successfully");
     return true;
   } catch (err) {
@@ -260,6 +265,66 @@ const settings = db.table<ISetting, string>(Table.Settings);
 const trackedAccounts = db.table<ITrackedAccount, string>(
   Table.TrackedAccounts
 );
+
+async function ensureClientVersion(clientVersion: string): Promise<void> {
+  if (!clientVersion) {
+    console.warn(
+      "openDatabase called without a client version; skipping version enforcement."
+    );
+    return;
+  }
+
+  const storedVersion = await getStoredClientVersion();
+  if (!storedVersion) {
+    await persistClientVersion(clientVersion);
+    return;
+  }
+
+  if (storedVersion === clientVersion) {
+    return;
+  }
+
+  const validCurrent = semver.valid(clientVersion);
+  const validStored = semver.valid(storedVersion);
+  if (validCurrent && validStored) {
+    const parsedCurrent = semver.parse(validCurrent);
+    const parsedStored = semver.parse(validStored);
+    const sameMajorMinor =
+      parsedCurrent?.major === parsedStored?.major &&
+      parsedCurrent?.minor === parsedStored?.minor;
+    if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+      await persistClientVersion(clientVersion);
+      return;
+    }
+  } else {
+    console.warn(
+      `Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`
+    );
+  }
+
+  console.warn(
+    `IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`
+  );
+  db.close();
+  await db.delete();
+  await db.open();
+  await persistClientVersion(clientVersion);
+}
+
+async function getStoredClientVersion(): Promise<string | null> {
+  const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
+  if (!record) {
+    return null;
+  }
+  return textDecoder.decode(record.value);
+}
+
+async function persistClientVersion(clientVersion: string): Promise<void> {
+  await settings.put({
+    key: CLIENT_VERSION_SETTING_KEY,
+    value: textEncoder.encode(clientVersion),
+  });
+}
 
 export {
   db,

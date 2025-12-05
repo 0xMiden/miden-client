@@ -18,7 +18,7 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
-use miden_client::rpc::NodeRpcClient;
+use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
@@ -1574,6 +1574,7 @@ async fn get_output_notes() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn account_rollback() {
     let (builder, mock_rpc_api, authenticator) = Box::pin(create_test_client_builder()).await;
 
@@ -1673,6 +1674,72 @@ async fn account_rollback() {
     assert_eq!(
         account_commitment_after_sync, account_commitment_before_tx,
         "Account commitment should be rolled back to the value before the transaction"
+    );
+
+    // Submit a new transaction after the rollback
+
+    // Store the account state before applying the transaction
+    let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_before_tx = account_before_tx.account().commitment();
+
+    // Apply a new transaction
+    let tx_request = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id, account_id),
+            NoteType::Public,
+            client.rng(),
+        )
+        .unwrap();
+    let transaction_result =
+        Box::pin(client.execute_transaction(account_id, tx_request)).await.unwrap();
+    let tx_id = transaction_result.id();
+    let submission_height = client.get_sync_height().await.unwrap();
+    Box::pin(client.apply_transaction(&transaction_result, submission_height))
+        .await
+        .unwrap();
+
+    // Check that the account state has changed after applying the transaction
+    let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_after_tx = account_after_tx.account().commitment();
+
+    assert_ne!(
+        account_commitment_after_tx, account_commitment_before_tx,
+        "Account commitment should have changed after applying the new transaction"
+    );
+
+    // Submit the transaction
+    let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
+    Box::pin(client.submit_proven_transaction(proven_transaction, &transaction_result))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+
+    mock_rpc_api.advance_blocks(1);
+    client.sync_state().await.unwrap();
+
+    // Verify the transaction is now committed
+    let tx_record = client
+        .get_transactions(TransactionFilter::All)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|tx| tx.id == tx_id)
+        .unwrap();
+
+    assert!(matches!(tx_record.status, TransactionStatus::Committed { .. }));
+
+    // Check that the account state has not been updated
+    let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
+    let account_commitment_after_sync = account_after_sync.account().commitment();
+
+    assert_ne!(
+        account_commitment_after_sync, account_commitment_before_tx,
+        "Account commitment should not have been rolled back after sync"
+    );
+
+    assert_eq!(
+        account_commitment_after_sync, account_commitment_after_tx,
+        "Account commitment should not have changed after sync"
     );
 }
 
@@ -2340,6 +2407,55 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
+}
+
+#[tokio::test]
+async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // add note tags until the limit is exceeded
+    for i in 0..NOTE_TAG_LIMIT {
+        client.add_note_tag(NoteTag::from(u32::try_from(i).unwrap())).await.unwrap();
+    }
+
+    // try to add a note tag
+    let tag = NoteTag::from(u32::try_from(NOTE_TAG_LIMIT).unwrap());
+    let result = client.add_note_tag(tag).await;
+
+    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT))));
+}
+
+#[tokio::test]
+async fn add_account_fails_if_accounts_limit_is_exceeded() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // add accounts until the limit is exceeded
+    for i in 0..ACCOUNT_ID_LIMIT {
+        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
+        client
+            .add_account(
+                &Account::mock(
+                    (i << 8) as u128,
+                    AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+                ),
+                false,
+            )
+            .await
+            .unwrap();
+    }
+
+    // try to add an account
+    let result = client
+        .add_account(
+            &Account::mock(
+                (ACCOUNT_ID_LIMIT << 8) as u128,
+                AuthRpoFalcon512::new(PublicKeyCommitment::from(EMPTY_WORD)),
+            ),
+            false,
+        )
+        .await;
+
+    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT))));
 }
 
 // HELPERS

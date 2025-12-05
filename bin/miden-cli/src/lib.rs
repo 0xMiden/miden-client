@@ -75,6 +75,7 @@ const TX_GRACEFUL_BLOCK_DELTA: u32 = 20;
     name = "miden-client",
     about = "The Miden client",
     version,
+    propagate_version = true,
     rename_all = "kebab-case"
 )]
 #[command(multicall(true))]
