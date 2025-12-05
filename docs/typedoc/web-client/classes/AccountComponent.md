@@ -114,6 +114,26 @@ Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak)
 
 ***
 
+### createAuthComponentFromCommitment()
+
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme_id`): `AccountComponent`
+
+#### Parameters
+
+##### commitment
+
+[`Word`](Word.md)
+
+##### auth\_scheme\_id
+
+`number`
+
+#### Returns
+
+`AccountComponent`
+
+***
+
 ### fromPackage()
 
 > `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`

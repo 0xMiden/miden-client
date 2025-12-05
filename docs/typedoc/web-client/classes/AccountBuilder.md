@@ -112,6 +112,16 @@ Adds an authentication component to the account.
 
 ***
 
+### withBasicWalletComponent()
+
+> **withBasicWalletComponent**(): `AccountBuilder`
+
+#### Returns
+
+`AccountBuilder`
+
+***
+
 ### withComponent()
 
 > **withComponent**(`account_component`): `AccountBuilder`

@@ -1,4 +1,5 @@
 use miden_client::account::AccountBuilder as NativeAccountBuilder;
+use miden_client::account::component::BasicWallet;
 use miden_client::auth::NoAuth;
 use wasm_bindgen::prelude::*;
 
@@ -78,6 +79,12 @@ impl AccountBuilder {
     #[wasm_bindgen(js_name = "withNoAuthComponent")]
     pub fn with_no_auth_component(mut self) -> Self {
         self.0 = self.0.with_auth_component(NoAuth);
+        self
+    }
+
+    #[wasm_bindgen(js_name = "withBasicWalletComponent")]
+    pub fn with_basic_wallet_component(mut self) -> Self {
+        self.0 = self.0.with_component(BasicWallet);
         self
     }
 
