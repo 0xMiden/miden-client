@@ -11,6 +11,7 @@ use miden_client::note::ToInputNoteCommitments;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
+    TransactionId,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -254,7 +255,7 @@ fn parse_transaction(
         .transpose()?;
 
     Ok(TransactionRecord {
-        id: id.into(),
+        id: TransactionId::new_unchecked(id),
         details: TransactionDetails::read_from_bytes(&details)?,
         script,
         status: TransactionStatus::read_from_bytes(&status)?,

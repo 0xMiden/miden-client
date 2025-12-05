@@ -29,17 +29,6 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
-dependencies = [
- "getrandom 0.2.16",
- "once_cell",
- "version_check",
-]
-
-[[package]]
-name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
@@ -1088,7 +1077,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1267,7 +1256,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1601,9 +1590,6 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-dependencies = [
- "ahash 0.7.8",
-]
 
 [[package]]
 name = "hashbrown"
@@ -2448,7 +2434,7 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "miden-objects",
  "thiserror 2.0.17",
@@ -2692,7 +2678,7 @@ dependencies = [
 [[package]]
 name = "miden-lib"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -2763,7 +2749,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "futures",
@@ -2791,7 +2777,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "quote",
  "syn 2.0.110",
@@ -2800,7 +2786,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "futures",
@@ -2820,7 +2806,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -2842,7 +2828,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "fs-err",
  "miette",
@@ -2853,7 +2839,7 @@ dependencies = [
 [[package]]
 name = "miden-node-rpc"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "futures",
@@ -2880,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "deadpool",
@@ -2913,7 +2899,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2943,7 +2929,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "miden-lib",
@@ -2973,7 +2959,7 @@ dependencies = [
 [[package]]
 name = "miden-objects"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "bech32",
  "getrandom 0.3.4",
@@ -2983,6 +2969,7 @@ dependencies = [
  "miden-crypto",
  "miden-mast-package",
  "miden-processor",
+ "miden-protocol-macros",
  "miden-stdlib",
  "miden-utils-sync",
  "miden-verifier",
@@ -3016,6 +3003,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "miden-protocol-macros"
+version = "0.13.0"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.110",
+]
+
+[[package]]
 name = "miden-prover"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3032,7 +3029,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3077,7 +3074,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-fix-account-upsert#0ba2ba58c20f16ef4ec8a0e4b6bffdedfc6be399"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=next#89918eaf72536c6b0d6fad53d2b4546e1b2f9107"
 dependencies = [
  "fs-err",
  "getrandom 0.3.4",
@@ -3113,7 +3110,7 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "anyhow",
  "itertools",
@@ -3131,7 +3128,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "miden-lib",
  "miden-objects",
@@ -3144,7 +3141,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.13.0"
-source = "git+https://github.com/0xMiden/miden-base.git?branch=next#0cd80afdbd9b9d26e27341fad895063ac53eacdc"
+source = "git+https://github.com/0xMiden/miden-base.git?branch=next#15e787d2c9ee4744be2fedbc5cdd10abf639a5cb"
 dependencies = [
  "miden-objects",
  "miden-tx",
@@ -3392,7 +3389,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3773,7 +3770,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef622051fbb2cb98a524df3a8112f02d0919ccda600a44d705ec550f1a28fe2"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "blake2",
  "bytes",
@@ -3809,7 +3806,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76f63d3f67d99c95a1f85623fc43242fd644dd12ccbaa18c38a54e1580c6846a"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
  "async-trait",
  "brotli",
  "bytes",
@@ -3899,7 +3896,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b93c897e8cc04ff0d077ee2a655142910618222aeefc83f7f99f5b9fc59ccb13"
 dependencies = [
- "ahash 0.8.12",
+ "ahash",
 ]
 
 [[package]]
@@ -3931,7 +3928,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba89e4400cb978f0d7be1c14bd7ab4168c8e2c00d97ff19f964fc0048780237c"
 dependencies = [
  "arrayvec",
- "hashbrown 0.12.3",
+ "hashbrown 0.16.0",
  "parking_lot",
  "rand 0.8.5",
 ]
@@ -4760,7 +4757,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5392,7 +5389,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5401,7 +5398,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2111ef44dae28680ae9752bb89409e7310ca33a8c621ebe7b106cf5c928b3ac0"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6370,7 +6367,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

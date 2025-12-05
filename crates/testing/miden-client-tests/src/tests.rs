@@ -1889,7 +1889,7 @@ async fn input_note_checks() {
     // Check that adding an authenticated note that is not tracked by the client will return an
     // error
     let missing_authenticated_note_tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![EMPTY_WORD.into()])
+        .build_consume_notes(vec![NoteId::new_unchecked(EMPTY_WORD)])
         .unwrap();
     let error =
         Box::pin(client.submit_new_transaction(wallet.id(), missing_authenticated_note_tx_request))

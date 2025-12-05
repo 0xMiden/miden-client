@@ -1,10 +1,16 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::AccountId;
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteHeader, Nullifier};
-use miden_objects::transaction::{InputNotes, TransactionHeader, TransactionId};
+use miden_objects::transaction::{
+    InputNoteCommitment,
+    InputNotes,
+    TransactionHeader,
+    TransactionId,
+};
 
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
@@ -16,7 +22,7 @@ impl TryFrom<proto::primitives::Digest> for TransactionId {
 
     fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
-        Ok(word.into())
+        Ok(Self::new_unchecked(word))
     }
 }
 
@@ -153,13 +159,16 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             },
         )?;
 
-        let input_notes = InputNotes::new_unchecked(
-            value
-                .nullifiers
-                .into_iter()
-                .map(|d| d.try_into().map(Word::into).map(Nullifier::into))
-                .collect::<Result<Vec<_>, _>>()?,
-        );
+        let note_commitments = value
+            .nullifiers
+            .into_iter()
+            .map(|d| {
+                Nullifier::from_hex(&d.to_string())
+                    .map(InputNoteCommitment::from)
+                    .map_err(|e| RpcError::InvalidResponse(e.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let input_notes = InputNotes::new_unchecked(note_commitments);
 
         let output_notes = value
             .output_notes
