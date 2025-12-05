@@ -90,12 +90,12 @@ async function ensureNodeIndexedDbShim(): Promise<void> {
           addNonIDBGlobals: true,
           databaseBasePath,
         });
-       if (!globals.indexedDB) {
-         globals.indexedDB = shimmed.indexedDB;
-       }
-       if (!globals.IDBKeyRange) {
-         globals.IDBKeyRange = shimmed.IDBKeyRange;
-       }
+        if (!globals.indexedDB) {
+          globals.indexedDB = shimmed.indexedDB;
+        }
+        if (!globals.IDBKeyRange) {
+          globals.IDBKeyRange = shimmed.IDBKeyRange;
+        }
         if (globals.indexedDB) {
           Dexie.dependencies.indexedDB = globals.indexedDB;
         }
@@ -304,12 +304,7 @@ const configureDatabase = (instance: Dexie) => {
     [Table.StateSync]: indexes("id"),
     [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
     [Table.PartialBlockchainNodes]: indexes("id"),
-    [Table.Tags]: indexes(
-      "id++",
-      "tag",
-      "source_note_id",
-      "source_account_id"
-    ),
+    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
     [Table.ForeignAccountCode]: indexes("accountId"),
     [Table.Settings]: indexes("key"),
     [Table.TrackedAccounts]: indexes("&id"),

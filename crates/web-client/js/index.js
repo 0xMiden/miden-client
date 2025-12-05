@@ -95,7 +95,12 @@ export class WebClient {
     const canUseBrowserWorker =
       typeof window !== "undefined" && typeof Worker !== "undefined";
     // Check if Web Workers are available in a browser context.
-    if (canUseBrowserWorker && !this.getKeyCb && !this.insertKeyCb && !this.signCb) {
+    if (
+      canUseBrowserWorker &&
+      !this.getKeyCb &&
+      !this.insertKeyCb &&
+      !this.signCb
+    ) {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
       this.worker = new Worker(
