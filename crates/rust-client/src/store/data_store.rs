@@ -106,26 +106,37 @@ impl DataStore for ClientDataStore {
         Ok((partial_account, block_header, partial_blockchain))
     }
 
-    async fn get_vault_asset_witness(
+    fn get_vault_asset_witnesses(
         &self,
         account_id: AccountId,
         vault_root: Word,
-        vault_key: AssetVaultKey,
-    ) -> Result<AssetWitness, DataStoreError> {
-        //TODO: Refactor `get_account_asset` for this.
-        let vault = self.store.get_account_vault(account_id).await?;
+        vault_keys: BTreeSet<AssetVaultKey>,
+    ) -> impl FutureMaybeSend<Result<Vec<AssetWitness>, DataStoreError>> {
+        async move {
+            //TODO: Refactor `get_account_asset` for this.
+            let vault = self.store.get_account_vault(account_id).await?;
 
-        if vault.root() != vault_root {
-            return Err(DataStoreError::Other {
-                error_msg: "Vault root mismatch".into(),
-                source: None,
-            });
+            if vault.root() != vault_root {
+                return Err(DataStoreError::Other {
+                    error_msg: "Vault root mismatch".into(),
+                    source: None,
+                });
+            }
+
+            let mut asset_witnesses = vec![];
+            for vault_key in vault_keys {
+                let asset_witness =
+                    AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
+                        DataStoreError::Other {
+                            error_msg: "Failed to open vault asset tree".into(),
+                            source: Some(Box::new(err)),
+                        }
+                    })?;
+                asset_witnesses.push(asset_witness);
+            }
+
+            Ok(asset_witnesses)
         }
-
-        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
-            error_msg: "Failed to open vault asset tree".into(),
-            source: Some(Box::new(err)),
-        })
     }
 
     async fn get_storage_map_witness(
@@ -171,12 +182,12 @@ impl DataStore for ClientDataStore {
     fn get_note_script(
         &self,
         script_root: Word,
-    ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
+    ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         let store = self.store.clone();
 
         async move {
             if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(note_script)
+                Ok(Some(note_script))
             } else {
                 // If no matching note found, return an error
                 // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
