@@ -6,6 +6,8 @@
 
 # Enumeration: NoteType
 
+Visibility level for note contents when published to the network.
+
 ## Enumeration Members
 
 ### Encrypted

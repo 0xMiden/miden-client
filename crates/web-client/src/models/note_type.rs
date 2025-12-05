@@ -1,6 +1,7 @@
 use miden_client::note::NoteType as NativeNoteType;
 use wasm_bindgen::prelude::*;
 
+/// Visibility level for note contents when published to the network.
 // Keep these masks in sync with `miden-lib/asm/miden/kernels/tx/tx.masm`
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -12,6 +12,8 @@
 
 > **new AccountStorageRequirements**(): `AccountStorageRequirements`
 
+Creates empty storage requirements.
+
 #### Returns
 
 `AccountStorageRequirements`
@@ -41,6 +43,8 @@
 ### fromSlotAndKeysArray()
 
 > `static` **fromSlotAndKeysArray**(`slots_and_keys`): `AccountStorageRequirements`
+
+Builds storage requirements from a list of slot/key pairs.
 
 #### Parameters
 

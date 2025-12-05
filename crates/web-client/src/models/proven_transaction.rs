@@ -9,7 +9,8 @@ use crate::models::transaction_id::TransactionId;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
-/// WASM wrapper around the native [`ProvenTransaction`].
+/// Result of executing and proving a transaction. Contains all the data required to verify that a
+/// transaction was executed correctly.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct ProvenTransaction(NativeProvenTransaction);

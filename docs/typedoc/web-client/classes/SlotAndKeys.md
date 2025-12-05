@@ -6,11 +6,15 @@
 
 # Class: SlotAndKeys
 
+Storage slot index paired with map keys that must be present.
+
 ## Constructors
 
 ### Constructor
 
 > **new SlotAndKeys**(`storage_slot_index`, `storage_map_keys`): `SlotAndKeys`
+
+Creates a new slot-and-keys entry.
 
 #### Parameters
 
@@ -52,6 +56,8 @@
 
 > **storage\_map\_keys**(): [`Word`](Word.md)[]
 
+Returns the storage map keys required for this slot.
+
 #### Returns
 
 [`Word`](Word.md)[]
@@ -61,6 +67,8 @@
 ### storage\_slot\_index()
 
 > **storage\_slot\_index**(): `number`
+
+Returns the slot index.
 
 #### Returns
 

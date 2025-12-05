@@ -101,6 +101,8 @@ return it as a struct.
 
 > `static` **fromInputNote**(`note`): `NoteFile`
 
+Creates a `NoteFile` from an input note, preserving proof when available.
+
 #### Parameters
 
 ##### note
@@ -116,6 +118,8 @@ return it as a struct.
 ### fromNoteDetails()
 
 > `static` **fromNoteDetails**(`note_details`): `NoteFile`
+
+Creates a `NoteFile` from note details.
 
 #### Parameters
 
@@ -133,6 +137,8 @@ return it as a struct.
 
 > `static` **fromNoteId**(`note_details`): `NoteFile`
 
+Creates a `NoteFile` from a note ID.
+
 #### Parameters
 
 ##### note\_details
@@ -148,6 +154,8 @@ return it as a struct.
 ### fromOutputNote()
 
 > `static` **fromOutputNote**(`note`): `NoteFile`
+
+Creates a `NoteFile` from an output note, choosing details when present.
 
 #### Parameters
 
