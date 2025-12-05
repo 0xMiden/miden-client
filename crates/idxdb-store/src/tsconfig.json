@@ -12,8 +12,10 @@
     "moduleResolution": "Node",
     "outDir": "./js",
     "strict": true,
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"],
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
-  "include": ["./ts/*.ts"],
+  "include": ["./ts/**/*.ts", "./ts/**/*.d.ts"],
   "exclude": ["./js/**/*"]
 }

@@ -124,9 +124,11 @@ export class WebClient {
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
 
-    // Check if Web Workers are available.
+    const canUseBrowserWorker =
+      typeof window !== "undefined" && typeof Worker !== "undefined";
+    // Check if Web Workers are available in a browser context.
     if (
-      typeof Worker !== "undefined" &&
+      canUseBrowserWorker &&
       !this.getKeyCb &&
       !this.insertKeyCb &&
       !this.signCb

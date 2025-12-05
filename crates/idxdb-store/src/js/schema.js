@@ -1,13 +1,24 @@
 import Dexie from "dexie";
 import * as semver from "semver";
-import { logWebStoreError } from "./utils.js";
+import { isNodeRuntime, logWebStoreError } from "./utils.js";
 const DATABASE_NAME = "MidenClientDB";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const runningInNode = isNodeRuntime();
+let nodeIndexedDbPromise = null;
+let shimReady = null;
+let nodeIndexedDbBasePath = null;
 export async function openDatabase(clientVersion) {
     console.log(`Opening database for client version ${clientVersion}...`);
     try {
+        if (runningInNode && !shimReady) {
+            shimReady = ensureNodeIndexedDbShim();
+        }
+        await shimReady;
+        if (runningInNode) {
+            reinitializeDbForNode();
+        }
         await db.open();
         await ensureClientVersion(clientVersion);
         console.log("Database opened successfully");
@@ -17,6 +28,75 @@ export async function openDatabase(clientVersion) {
         logWebStoreError(err, "Failed to open database");
         return false;
     }
+}
+async function loadNodeIndexedDbShim() {
+    const nodeGlobal = globalThis;
+    if (typeof nodeGlobal.require === "function") {
+        const shimModule = nodeGlobal.require("indexeddbshim/dist/indexeddbshim-node.js");
+        return shimModule.default ?? shimModule;
+    }
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const shimModule = require("indexeddbshim/dist/indexeddbshim-node.js");
+    return shimModule.default ?? shimModule;
+}
+async function ensureNodeIndexedDbShim() {
+    if (!runningInNode) {
+        return;
+    }
+    if (!nodeIndexedDbPromise) {
+        nodeIndexedDbPromise = (async () => {
+            try {
+                const globals = globalThis;
+                if (!globals.window) {
+                    globals.window = globals;
+                }
+                if (!globals.self) {
+                    globals.self = globals.window;
+                }
+                if (!globals.navigator) {
+                    globals.navigator = { userAgent: "node" };
+                }
+                const [setGlobalVars, pathModule, fsPromises] = await Promise.all([
+                    loadNodeIndexedDbShim(),
+                    import("node:path"),
+                    import("node:fs/promises"),
+                ]);
+                const resolveBasePath = () => {
+                    const configuredPath = process.env.MIDEN_NODE_INDEXEDDB_BASE_PATH;
+                    if (configuredPath && configuredPath.trim().length > 0) {
+                        return pathModule.resolve(configuredPath);
+                    }
+                    return pathModule.join(process.cwd(), "miden-webclient-indexeddb");
+                };
+                const databaseBasePath = resolveBasePath();
+                await fsPromises.mkdir(databaseBasePath, { recursive: true });
+                nodeIndexedDbBasePath = databaseBasePath;
+                const shimmed = setGlobalVars(globals, {
+                    checkOrigin: false,
+                    addNonIDBGlobals: true,
+                    databaseBasePath,
+                });
+                if (!globals.indexedDB) {
+                    globals.indexedDB = shimmed.indexedDB;
+                }
+                if (!globals.IDBKeyRange) {
+                    globals.IDBKeyRange = shimmed.IDBKeyRange;
+                }
+                if (globals.indexedDB) {
+                    Dexie.dependencies.indexedDB = globals.indexedDB;
+                }
+                if (globals.IDBKeyRange) {
+                    Dexie.dependencies.IDBKeyRange = globals.IDBKeyRange;
+                }
+            }
+            catch (error) {
+                console.error("Failed to initialize IndexedDB shim for Node.js", error);
+                throw error;
+            }
+        })();
+    }
+    return nodeIndexedDbPromise;
 }
 var Table;
 (function (Table) {
@@ -40,28 +120,92 @@ var Table;
     Table["Settings"] = "settings";
     Table["TrackedAccounts"] = "trackedAccounts";
 })(Table || (Table = {}));
-const db = new Dexie(DATABASE_NAME);
-db.version(1).stores({
-    [Table.AccountCode]: indexes("root"),
-    [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
-    [Table.StorageMapEntries]: indexes("[root+key]", "root"),
-    [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
-    [Table.AccountAuth]: indexes("pubKey"),
-    [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
-    [Table.Addresses]: indexes("address", "id"),
-    [Table.Transactions]: indexes("id", "statusVariant"),
-    [Table.TransactionScripts]: indexes("scriptRoot"),
-    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
-    [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
-    [Table.NotesScripts]: indexes("scriptRoot"),
-    [Table.StateSync]: indexes("id"),
-    [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
-    [Table.PartialBlockchainNodes]: indexes("id"),
-    [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
-    [Table.ForeignAccountCode]: indexes("accountId"),
-    [Table.Settings]: indexes("key"),
-    [Table.TrackedAccounts]: indexes("&id"),
-});
+if (runningInNode) {
+    const globalWithIDB = globalThis;
+    if (globalWithIDB.indexedDB) {
+        Dexie.dependencies.indexedDB = globalWithIDB.indexedDB;
+    }
+    if (globalWithIDB.IDBKeyRange) {
+        Dexie.dependencies.IDBKeyRange = globalWithIDB.IDBKeyRange;
+    }
+}
+let db = new Dexie(DATABASE_NAME);
+const configureDatabase = (instance) => {
+    instance.version(1).stores({
+        [Table.AccountCode]: indexes("root"),
+        [Table.AccountStorage]: indexes("[commitment+slotIndex]", "commitment"),
+        [Table.StorageMapEntries]: indexes("[root+key]", "root"),
+        [Table.AccountAssets]: indexes("[root+vaultKey]", "root", "faucetIdPrefix"),
+        [Table.AccountAuth]: indexes("pubKey"),
+        [Table.Accounts]: indexes("&accountCommitment", "id", "[id+nonce]", "codeRoot", "storageRoot", "vaultRoot"),
+        [Table.Addresses]: indexes("address", "id"),
+        [Table.Transactions]: indexes("id", "statusVariant"),
+        [Table.TransactionScripts]: indexes("scriptRoot"),
+        [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+        [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
+        [Table.NotesScripts]: indexes("scriptRoot"),
+        [Table.StateSync]: indexes("id"),
+        [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
+        [Table.PartialBlockchainNodes]: indexes("id"),
+        [Table.Tags]: indexes("id++", "tag", "source_note_id", "source_account_id"),
+        [Table.ForeignAccountCode]: indexes("accountId"),
+        [Table.Settings]: indexes("key"),
+        [Table.TrackedAccounts]: indexes("&id"),
+    });
+};
+let accountCodes;
+let accountStorages;
+let storageMapEntries;
+let accountAssets;
+let accountAuths;
+let accounts;
+let addresses;
+let transactions;
+let transactionScripts;
+let inputNotes;
+let outputNotes;
+let notesScripts;
+let stateSync;
+let blockHeaders;
+let partialBlockchainNodes;
+let tags;
+let foreignAccountCode;
+let settings;
+let trackedAccounts;
+const bindTables = () => {
+    accountCodes = db.table(Table.AccountCode);
+    accountStorages = db.table(Table.AccountStorage);
+    storageMapEntries = db.table(Table.StorageMapEntries);
+    accountAssets = db.table(Table.AccountAssets);
+    accountAuths = db.table(Table.AccountAuth);
+    accounts = db.table(Table.Accounts);
+    addresses = db.table(Table.Addresses);
+    transactions = db.table(Table.Transactions);
+    transactionScripts = db.table(Table.TransactionScripts);
+    inputNotes = db.table(Table.InputNotes);
+    outputNotes = db.table(Table.OutputNotes);
+    notesScripts = db.table(Table.NotesScripts);
+    stateSync = db.table(Table.StateSync);
+    blockHeaders = db.table(Table.BlockHeaders);
+    partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
+    tags = db.table(Table.Tags);
+    foreignAccountCode = db.table(Table.ForeignAccountCode);
+    settings = db.table(Table.Settings);
+    trackedAccounts = db.table(Table.TrackedAccounts);
+};
+configureDatabase(db);
+bindTables();
+let dexieInitialized = !runningInNode;
+const reinitializeDbForNode = () => {
+    if (dexieInitialized) {
+        return;
+    }
+    db.close();
+    db = new Dexie(DATABASE_NAME);
+    configureDatabase(db);
+    bindTables();
+    dexieInitialized = true;
+};
 function indexes(...items) {
     return items.join(",");
 }
@@ -71,25 +215,6 @@ db.on("populate", () => {
         .put({ id: 1, blockNum: "0" })
         .catch((err) => logWebStoreError(err, "Failed to populate DB"));
 });
-const accountCodes = db.table(Table.AccountCode);
-const accountStorages = db.table(Table.AccountStorage);
-const storageMapEntries = db.table(Table.StorageMapEntries);
-const accountAssets = db.table(Table.AccountAssets);
-const accountAuths = db.table(Table.AccountAuth);
-const accounts = db.table(Table.Accounts);
-const addresses = db.table(Table.Addresses);
-const transactions = db.table(Table.Transactions);
-const transactionScripts = db.table(Table.TransactionScripts);
-const inputNotes = db.table(Table.InputNotes);
-const outputNotes = db.table(Table.OutputNotes);
-const notesScripts = db.table(Table.NotesScripts);
-const stateSync = db.table(Table.StateSync);
-const blockHeaders = db.table(Table.BlockHeaders);
-const partialBlockchainNodes = db.table(Table.PartialBlockchainNodes);
-const tags = db.table(Table.Tags);
-const foreignAccountCode = db.table(Table.ForeignAccountCode);
-const settings = db.table(Table.Settings);
-const trackedAccounts = db.table(Table.TrackedAccounts);
 async function ensureClientVersion(clientVersion) {
     if (!clientVersion) {
         console.warn("openDatabase called without a client version; skipping version enforcement.");
@@ -137,4 +262,4 @@ async function persistClientVersion(clientVersion) {
         value: textEncoder.encode(clientVersion),
     });
 }
-export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
+export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, nodeIndexedDbBasePath, };

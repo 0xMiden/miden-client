@@ -93,7 +93,7 @@ export async function getNoteScript(scriptRoot) {
     }
 }
 export async function upsertInputNote(noteId, assets, serialNumber, inputs, scriptRoot, serializedNoteScript, nullifier, serializedCreatedAt, stateDiscriminant, state) {
-    return db.transaction("rw", inputNotes, notesScripts, async (tx) => {
+    return db.transaction("rw", inputNotes, notesScripts, async () => {
         try {
             const data = {
                 noteId,
@@ -106,12 +106,12 @@ export async function upsertInputNote(noteId, assets, serialNumber, inputs, scri
                 stateDiscriminant,
                 serializedCreatedAt,
             };
-            await tx.inputNotes.put(data);
+            await inputNotes.put(data);
             const noteScriptData = {
                 scriptRoot,
                 serializedNoteScript,
             };
-            await tx.notesScripts.put(noteScriptData);
+            await notesScripts.put(noteScriptData);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
@@ -119,7 +119,7 @@ export async function upsertInputNote(noteId, assets, serialNumber, inputs, scri
     });
 }
 export async function upsertOutputNote(noteId, assets, recipientDigest, metadata, nullifier, expectedHeight, stateDiscriminant, state) {
-    return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+    return db.transaction("rw", outputNotes, notesScripts, async () => {
         try {
             const data = {
                 noteId,
@@ -131,7 +131,7 @@ export async function upsertOutputNote(noteId, assets, recipientDigest, metadata
                 stateDiscriminant,
                 state,
             };
-            await tx.outputNotes.put(data);
+            await outputNotes.put(data);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
@@ -176,13 +176,13 @@ async function processOutputNotes(notes) {
     }));
 }
 export async function upsertNoteScript(scriptRoot, serializedNoteScript) {
-    return db.transaction("rw", outputNotes, notesScripts, async (tx) => {
+    return db.transaction("rw", outputNotes, notesScripts, async () => {
         try {
             const noteScriptData = {
                 scriptRoot,
                 serializedNoteScript,
             };
-            await tx.notesScripts.put(noteScriptData);
+            await notesScripts.put(noteScriptData);
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note script: ${scriptRoot}`);
