@@ -15,20 +15,24 @@ pub struct PublicKey(NativePublicKey);
 
 #[wasm_bindgen]
 impl PublicKey {
+    /// Serializes the public key into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a public key from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<PublicKey, JsValue> {
         let native_public_key = NativePublicKey::read_from_bytes(&bytes.to_vec())
             .map_err(|e| js_error_with_context(e, "Failed to deserialize public key"))?;
         Ok(PublicKey(native_public_key))
     }
 
+    /// Verifies a blind message word against the signature.
     pub fn verify(&self, message: &Word, signature: &Signature) -> bool {
         self.verify_data(&SigningInputs::new_blind(message), signature)
     }
 
+    /// Returns the commitment corresponding to this public key.
     #[wasm_bindgen(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
         let commitment = self.0.to_commitment();
@@ -36,6 +40,7 @@ impl PublicKey {
         native_word.into()
     }
 
+    /// Recovers a public key from a signature (only supported for `RpoFalcon512`).
     #[wasm_bindgen(js_name = "recoverFrom")]
     pub fn recover_from(message: &Word, signature: &Signature) -> Result<PublicKey, JsValue> {
         let native_message: NativeWord = message.into();
@@ -55,6 +60,7 @@ impl PublicKey {
         }
     }
 
+    /// Verifies a signature over arbitrary signing inputs.
     #[wasm_bindgen(js_name = "verifyData")]
     pub fn verify_data(&self, signing_inputs: &SigningInputs, signature: &Signature) -> bool {
         let native_public_key: NativePublicKey = self.into();

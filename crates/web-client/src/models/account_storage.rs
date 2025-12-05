@@ -4,21 +4,33 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
 
+/// Account storage is composed of a variable number of index-addressable storage slots up to 255
+/// slots in total.
+///
+/// Each slot has a type which defines its size and structure. Currently, the following types are
+/// supported:
+/// - `StorageSlot::Value`: contains a single Word of data (i.e., 32 bytes).
+/// - `StorageSlot::Map`: contains a `StorageMap` which is a key-value map where both keys and
+///   values are Words. The value of a storage slot containing a map is the commitment to the
+///   underlying map.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountStorage(NativeAccountStorage);
 
 #[wasm_bindgen]
 impl AccountStorage {
+    /// Returns the commitment to the full account storage.
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
     }
 
+    /// Returns the value stored at the given slot index, if any.
     #[wasm_bindgen(js_name = "getItem")]
     pub fn get_item(&self, index: u8) -> Option<Word> {
         self.0.get_item(index).ok().map(Into::into)
     }
 
+    /// Returns the value for a key in the map stored at the given slot, if any.
     #[wasm_bindgen(js_name = "getMapItem")]
     pub fn get_map_item(&self, index: u8, key: &Word) -> Option<Word> {
         self.0.get_map_item(index, key.into()).ok().map(Into::into)

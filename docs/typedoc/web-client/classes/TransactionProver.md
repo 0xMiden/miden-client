@@ -6,6 +6,8 @@
 
 # Class: TransactionProver
 
+Wrapper over local or remote transaction proving backends.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### endpoint()
 
 > **endpoint**(): `string`
+
+Returns the endpoint if this is a remote prover.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **serialize**(): `string`
 
+Serializes the prover configuration into a string descriptor.
+
 #### Returns
 
 `string`
@@ -51,6 +57,8 @@
 ### deserialize()
 
 > `static` **deserialize**(`prover_type`, `endpoint?`, `timeout_ms?`): `TransactionProver`
+
+Reconstructs a prover from its serialized descriptor.
 
 #### Parameters
 
@@ -75,6 +83,8 @@
 ### newLocalProver()
 
 > `static` **newLocalProver**(): `TransactionProver`
+
+Creates a prover that uses the local proving backend.
 
 #### Returns
 

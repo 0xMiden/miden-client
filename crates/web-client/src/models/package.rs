@@ -6,16 +6,19 @@ use crate::models::library::Library;
 use crate::models::program::Program;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
+/// Compiled VM package containing libraries and metadata.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct Package(NativePackage);
 
 #[wasm_bindgen]
 impl Package {
+    /// Serializes the package into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a package from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<Package, JsValue> {
         deserialize_from_uint8array::<NativePackage>(bytes).map(Package)
     }
