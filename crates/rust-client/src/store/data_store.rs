@@ -14,7 +14,9 @@ use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{PartialBlockchainFilter, Store};
+use crate::rpc::NodeRpcClient;
 use crate::store::StoreError;
+use crate::transaction::ForeignAccount;
 use crate::utils::RwLock;
 
 // DATA STORE
@@ -28,14 +30,34 @@ pub struct ClientDataStore {
     transaction_mast_store: Arc<TransactionMastStore>,
     /// Cache of foreign account inputs that should be returned to the executor on demand.
     foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
+    /// Optional RPC client for lazy loading of data not found in local store.
+    rpc_client: Option<Arc<dyn NodeRpcClient>>,
 }
 
 impl ClientDataStore {
+    /// Creates a new `ClientDataStore` with an optional RPC client for lazy loading.
+    ///
+    /// If an RPC client is provided, the data store will attempt to fetch missing data
+    /// (such as note scripts and foreign account data) from the network when not found locally.
     pub fn new(store: alloc::sync::Arc<dyn Store>) -> Self {
         Self {
             store,
             transaction_mast_store: Arc::new(TransactionMastStore::new()),
             foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            rpc_client: None,
+        }
+    }
+
+    /// Creates a new `ClientDataStore` with an RPC client for lazy loading.
+    pub fn with_rpc(
+        store: alloc::sync::Arc<dyn Store>,
+        rpc_client: Arc<dyn NodeRpcClient>,
+    ) -> Self {
+        Self {
+            store,
+            transaction_mast_store: Arc::new(TransactionMastStore::new()),
+            foreign_account_inputs: RwLock::new(BTreeMap::new()),
+            rpc_client: Some(rpc_client),
         }
     }
 
@@ -158,14 +180,84 @@ impl DataStore for ClientDataStore {
         foreign_account_id: AccountId,
         _ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
-        let cache = self.foreign_account_inputs.read();
+        // First, check the cache
+        {
+            let cache = self.foreign_account_inputs.read();
+            if let Some(inputs) = cache.get(&foreign_account_id) {
+                return Ok(inputs.clone());
+            }
+        }
 
-        let inputs = cache
-            .get(&foreign_account_id)
-            .cloned()
-            .ok_or(DataStoreError::AccountNotFound(foreign_account_id))?;
+        // If not in cache and RPC client is available, try fetching from the network
+        if let Some(rpc) = &self.rpc_client {
+            // Try to fetch as a public account with empty storage requirements
+            // This will work for public accounts, but won't work for private accounts
+            // (which require PartialAccount to be provided upfront)
+            if foreign_account_id.is_public() {
+                let foreign_account = ForeignAccount::Public(
+                    foreign_account_id,
+                    crate::rpc::domain::account::AccountStorageRequirements::default(),
+                );
 
-        Ok(inputs)
+                let known_account_codes = self
+                    .store
+                    .get_foreign_account_code(vec![foreign_account_id])
+                    .await
+                    .map_err(|err| {
+                        DataStoreError::other(format!("Failed to get foreign account code: {err}"))
+                    })?;
+
+                match rpc
+                    .get_account_proofs(
+                        &[foreign_account].into_iter().collect(),
+                        known_account_codes,
+                    )
+                    .await
+                {
+                    Ok((_block_num, account_proofs)) => {
+                        if let Some(account_proof) = account_proofs
+                            .into_iter()
+                            .find(|proof| proof.account_id() == foreign_account_id)
+                        {
+                            let account_inputs: AccountInputs =
+                                account_proof.try_into().map_err(|err| {
+                                    DataStoreError::other(format!(
+                                        "Failed to convert account proof to AccountInputs: {err}"
+                                    ))
+                                })?;
+
+                            // Cache the fetched account inputs for future use
+                            {
+                                let mut cache = self.foreign_account_inputs.write();
+                                cache.insert(foreign_account_id, account_inputs.clone());
+                            }
+
+                            // Update the foreign account code cache
+                            if let Err(err) = self
+                                .store
+                                .upsert_foreign_account_code(
+                                    foreign_account_id,
+                                    account_inputs.code().clone(),
+                                )
+                                .await
+                            {
+                                // Log but don't fail - we still have the account inputs to return
+                                let _ = err;
+                            }
+
+                            return Ok(account_inputs);
+                        }
+                    },
+                    Err(rpc_err) => {
+                        return Err(DataStoreError::other(format!(
+                            "Failed to fetch foreign account {foreign_account_id} via RPC: {rpc_err}",
+                        )));
+                    },
+                }
+            }
+        }
+
+        Err(DataStoreError::AccountNotFound(foreign_account_id))
     }
 
     fn get_note_script(
@@ -173,17 +265,38 @@ impl DataStore for ClientDataStore {
         script_root: Word,
     ) -> impl FutureMaybeSend<Result<NoteScript, DataStoreError>> {
         let store = self.store.clone();
+        let rpc_client = self.rpc_client.clone();
 
         async move {
-            if let Ok(note_script) = store.get_note_script(script_root).await {
-                Ok(note_script)
-            } else {
-                // If no matching note found, return an error
-                // TODO: refactor to make RPC call to `GetNoteScriptByRoot` in case notes are not
-                // found https://github.com/0xMiden/miden-client/issues/1410
-                Err(DataStoreError::other(
-                    format!("Note script with root {script_root} not found",),
-                ))
+            // First, try to get the note script from the local store
+            match store.get_note_script(script_root).await {
+                Ok(note_script) => Ok(note_script),
+                Err(_) => {
+                    // If not found locally and RPC client is available, try fetching from the network
+                    if let Some(rpc) = rpc_client {
+                        match rpc.get_note_script_by_root(script_root).await {
+                            Ok(note_script) => {
+                                // Cache the fetched script in the local store for future use
+                                if let Err(err) = store
+                                    .upsert_note_scripts(core::slice::from_ref(&note_script))
+                                    .await
+                                {
+                                    // Log but don't fail - we still have the script to return
+                                    // In a no_std environment, we can't easily log, so we just continue
+                                    let _ = err;
+                                }
+                                Ok(note_script)
+                            },
+                            Err(rpc_err) => Err(DataStoreError::other(format!(
+                                "Note script with root {script_root} not found locally or via RPC: {rpc_err}",
+                            ))),
+                        }
+                    } else {
+                        Err(DataStoreError::other(format!(
+                            "Note script with root {script_root} not found in local store",
+                        )))
+                    }
+                },
             }
         }
     }

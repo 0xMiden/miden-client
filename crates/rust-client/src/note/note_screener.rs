@@ -14,6 +14,7 @@ use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
 use thiserror::Error;
 
 use crate::ClientError;
+use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
@@ -56,6 +57,8 @@ pub struct NoteScreener<AUTH> {
     store: Arc<dyn Store>,
     /// A reference to the transaction authenticator
     authenticator: Option<Arc<AUTH>>,
+    /// Optional RPC client for lazy loading of data not found in local store.
+    rpc_client: Option<Arc<dyn NodeRpcClient>>,
 }
 
 impl<AUTH> NoteScreener<AUTH>
@@ -63,7 +66,19 @@ where
     AUTH: TransactionAuthenticator + Sync,
 {
     pub fn new(store: Arc<dyn Store>, authenticator: Option<Arc<AUTH>>) -> Self {
-        Self { store, authenticator }
+        Self { store, authenticator, rpc_client: None }
+    }
+
+    pub fn with_rpc(
+        store: Arc<dyn Store>,
+        authenticator: Option<Arc<AUTH>>,
+        rpc_client: Arc<dyn NodeRpcClient>,
+    ) -> Self {
+        Self {
+            store,
+            authenticator,
+            rpc_client: Some(rpc_client),
+        }
     }
 
     /// Returns a vector of tuples describing the relevance of the provided note to the
@@ -123,7 +138,11 @@ where
 
         let tx_args = transaction_request.clone().into_transaction_args(tx_script);
 
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = if let Some(rpc) = &self.rpc_client {
+            ClientDataStore::with_rpc(self.store.clone(), rpc.clone())
+        } else {
+            ClientDataStore::new(self.store.clone())
+        };
         let mut transaction_executor = TransactionExecutor::new(&data_store);
         if let Some(authenticator) = &self.authenticator {
             transaction_executor = transaction_executor.with_authenticator(authenticator.as_ref());

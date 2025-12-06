@@ -81,10 +81,7 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync};
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
+    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
@@ -122,7 +119,11 @@ where
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
-        let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
+        let note_screener = NoteScreener::with_rpc(
+            self.store.clone(),
+            self.authenticator.clone(),
+            self.rpc_api.clone(),
+        );
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_graceful_blocks);
 
