@@ -281,13 +281,9 @@ async function processMessage(event) {
   const { action, args, methodName, requestId } = event.data;
   try {
     if (action === WorkerAction.INIT) {
-<<<<<<< HEAD
-      const [rpcUrl, noteTransportUrl, seed] = args;
       // Initialize the WASM WebClient.
-      const wasm = await getWasmOrThrow();
-=======
       const [rpcUrl, noteTransportUrl, seed, getKey, insertKey, sign] = args;
->>>>>>> f0c47b8a (feat: enable external keystore through callbacks in worker thread)
+      const wasm = await getWasmOrThrow();
       wasmWebClient = new wasm.WebClient();
       // Initialize the WASM WebClient.
       if (getKey || insertKey || sign) {
