@@ -102,6 +102,23 @@ export declare class WebClient extends WasmWebClient {
     seed?: string
   ): Promise<WebClient & WasmWebClient>;
 
+  static createClientWithExternalKeystore(
+    rpcUrl?: string,
+    noteTransportUrl?: string,
+    seed?: string,
+    getKeyCb?: (
+      pubKey: Uint8Array
+    ) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined,
+    insertKeyCb?: (
+      pubKey: Uint8Array,
+      secretKey: Uint8Array
+    ) => Promise<void> | void,
+    signCb?: (
+      pubKey: Uint8Array,
+      signingInputs: Uint8Array
+    ) => Promise<Uint8Array> | Uint8Array
+  ): Promise<WebClient & WasmWebClient>;
+
   /** Returns the default transaction prover configured on the client. */
   defaultTransactionProver(): TransactionProver;
 
