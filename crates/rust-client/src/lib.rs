@@ -310,8 +310,6 @@ use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
 use rpc::NodeRpcClient;
 use store::Store;
-use web_sys::wasm_bindgen::JsValue;
-use web_sys::{console, js_sys};
 
 use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
 use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
@@ -405,16 +403,13 @@ where
         let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
             tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
-        console::log(&js_sys::Array::from(&JsValue::from_str("creating client")));
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
-            console::log(&js_sys::Array::from(&JsValue::from_str("setting genesis commitment")));
-
             // Set the genesis commitment in the RPC API client for future requests.
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Initialize the note transport cursor if the client uses it
         if note_transport_api.is_some() {
-            // Initialize the note transport cursor
             init_note_transport_cursor(store.clone()).await?;
         }
 
