@@ -120,7 +120,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 > `static` **createAuthComponentFromSecretKey**(`secret_key`): `AccountComponent`
 
-Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
+Builds an auth component from a secret key, inferring the auth scheme from the key type.
 
 #### Parameters
 
