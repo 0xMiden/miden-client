@@ -31,7 +31,7 @@ miden-objects = { workspace = true }
 console_error_panic_hook = { version = "0.1.7" }
 hex                      = { version = "0.4" }
 js-sys                   = { version = "0.3" }
-miden-core               = { version = "0.19.0" }                              # TODO: used only to access MastNodeExt trait, consider re-exporting through base/client crate
+miden-core               = { version = "0.19.0" }                                  # TODO: used only to access MastNodeExt trait, consider re-exporting through base/client crate
 rand                     = { workspace = true }
 serde-wasm-bindgen       = { version = "0.6" }
 thiserror.workspace      = true
