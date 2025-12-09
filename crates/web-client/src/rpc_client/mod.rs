@@ -66,13 +66,14 @@ impl RpcClient {
         let web_notes: Vec<FetchedNote> = fetched_notes
             .into_iter()
             .map(|native_note| match native_note {
-                NativeFetchedNote::Private(header, _inclusion_proof) => {
-                    FetchedNote::from_header(header, None)
+                NativeFetchedNote::Private(header, inclusion_proof) => {
+                    FetchedNote::from_header(header, None, inclusion_proof)
                 },
                 NativeFetchedNote::Public(note, inclusion_proof) => {
-                    let input_note = NativeInputNote::authenticated(note.clone(), inclusion_proof);
+                    let input_note =
+                        NativeInputNote::authenticated(note.clone(), inclusion_proof.clone());
                     let header = miden_client::note::NoteHeader::new(note.id(), *note.metadata());
-                    FetchedNote::from_header(header, Some(input_note.into()))
+                    FetchedNote::from_header(header, Some(input_note.into()), inclusion_proof)
                 },
             })
             .collect();

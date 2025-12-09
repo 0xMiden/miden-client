@@ -1,9 +1,11 @@
 use miden_client::note::NoteHeader as NativeNoteHeader;
+use miden_client::note::NoteInclusionProof as NativeNoteInclusionProof;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::models::input_note::InputNote;
 use crate::models::note_header::NoteHeader;
 use crate::models::note_id::NoteId;
+use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::models::note_metadata::NoteMetadata;
 use crate::models::note_type::NoteType;
 
@@ -13,6 +15,7 @@ use crate::models::note_type::NoteType;
 pub struct FetchedNote {
     header: NoteHeader,
     input_note: Option<InputNote>,
+    inclusion_proof: NoteInclusionProof,
 }
 
 #[wasm_bindgen]
@@ -23,13 +26,14 @@ impl FetchedNote {
         note_id: NoteId,
         metadata: NoteMetadata,
         input_note: Option<InputNote>,
+        inclusion_proof: NoteInclusionProof,
     ) -> FetchedNote {
         // Convert note_id and metadata to NativeNoteHeader, then to web NoteHeader
         let native_note_id = note_id.into();
         let native_metadata = metadata.into();
         let native_header = NativeNoteHeader::new(native_note_id, native_metadata);
         let header = native_header.into();
-        FetchedNote { header, input_note }
+        FetchedNote { header, input_note, inclusion_proof }
     }
 
     /// The unique identifier of the note.
@@ -55,11 +59,20 @@ impl FetchedNote {
     /// The full [`InputNote`] with inclusion proof.
     ///
     /// For public notes, it contains the complete note data and inclusion proof.
-    /// For private notes, it will be ``None`.
+    /// For private notes, it will be `None`.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "inputNote")]
     pub fn input_note(&self) -> Option<InputNote> {
         self.input_note.clone()
+    }
+
+    /// The note's inclusion proof.
+    ///
+    /// Contains the data required to prove inclusion of the note in the canonical chain.
+    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "inclusionProof")]
+    pub fn inclusion_proof(&self) -> NoteInclusionProof {
+        self.inclusion_proof.clone()
     }
 
     #[wasm_bindgen(getter)]
@@ -71,7 +84,15 @@ impl FetchedNote {
 
 impl FetchedNote {
     /// Create a `FetchedNote` from a native `NoteHeader` (internal use).
-    pub(super) fn from_header(header: NativeNoteHeader, input_note: Option<InputNote>) -> Self {
-        FetchedNote { header: header.into(), input_note }
+    pub(super) fn from_header(
+        header: NativeNoteHeader,
+        input_note: Option<InputNote>,
+        inclusion_proof: NativeNoteInclusionProof,
+    ) -> Self {
+        FetchedNote {
+            header: header.into(),
+            input_note,
+            inclusion_proof: inclusion_proof.into(),
+        }
     }
 }
