@@ -81,19 +81,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: |
-          cd ./crates/web-client
-          set +e
-          attempt=1
-          until yarn install; do
-            if [ $attempt -ge 3 ]; then
-              echo "yarn install failed after $attempt attempts"
-              exit 1
-            fi
-            echo "yarn install failed (attempt $attempt/3), retrying in 5s..."
-            attempt=$((attempt+1))
-            sleep 5
-          done
+        run: ./scripts/retry-yarn-install.sh crates/web-client
 
       - name: Check TSC output equals commited JS
         run: |
