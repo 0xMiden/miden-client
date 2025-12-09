@@ -6,6 +6,11 @@
 
 # Class: TransactionRequestBuilder
 
+A builder for a `TransactionRequest`.
+
+Use this builder to construct a `TransactionRequest` by adding input notes, specifying
+scripts, and setting other transaction parameters.
+
 ## Constructors
 
 ### Constructor

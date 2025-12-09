@@ -6,6 +6,8 @@
 
 # Class: Address
 
+Representation of a Miden address (account ID plus routing parameters).
+
 ## Methods
 
 ### \[dispose\]()

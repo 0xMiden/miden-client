@@ -6,6 +6,8 @@
 
 # Class: JsVaultAsset
 
+An object that contains a serialized vault asset
+
 ## Properties
 
 ### asset

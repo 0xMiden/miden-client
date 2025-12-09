@@ -6,6 +6,9 @@
 
 # Class: ProvenTransaction
 
+Result of executing and proving a transaction. Contains all the data required to verify that a
+transaction was executed correctly.
+
 ## Methods
 
 ### \[dispose\]()

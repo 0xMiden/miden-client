@@ -35,7 +35,7 @@ miden-core               = { version = "0.19.0" }                              #
 rand                     = { workspace = true }
 serde-wasm-bindgen       = { version = "0.6" }
 thiserror.workspace      = true
-wasm-bindgen             = { features = ["serde-serialize"], version = "0.2" }
+wasm-bindgen             = { features = ["serde-serialize"], version = "0.2.105" }
 wasm-bindgen-futures     = { version = "0.4" }
 
 [dev-dependencies]

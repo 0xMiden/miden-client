@@ -6,6 +6,8 @@
 
 # Class: FungibleAssetDeltaItem
 
+A single fungible asset change in the vault delta.
+
 ## Properties
 
 ### amount

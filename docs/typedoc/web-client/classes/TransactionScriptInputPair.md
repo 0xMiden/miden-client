@@ -6,6 +6,8 @@
 
 # Class: TransactionScriptInputPair
 
+A script argument represented as a word plus additional felts.
+
 ## Constructors
 
 ### Constructor

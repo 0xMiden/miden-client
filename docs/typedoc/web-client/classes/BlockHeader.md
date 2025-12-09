@@ -6,6 +6,15 @@
 
 # Class: BlockHeader
 
+Public header for a block, containing commitments to the chain state and the proof attesting to
+the block's validity.
+
+Key fields include the previous block commitment, block number, chain/nullifier/note roots,
+transaction commitments (including the kernel), proof commitment, and a timestamp. Two derived
+values are exposed:
+- `sub_commitment`: sequential hash of all fields except the `note_root`.
+- `commitment`: a 2-to-1 hash of the `sub_commitment` and the `note_root`.
+
 ## Methods
 
 ### \[dispose\]()

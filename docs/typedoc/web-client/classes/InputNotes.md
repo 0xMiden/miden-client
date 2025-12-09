@@ -6,6 +6,8 @@
 
 # Class: InputNotes
 
+Input notes for a transaction, empty if the transaction does not consume notes.
+
 ## Methods
 
 ### \[dispose\]()

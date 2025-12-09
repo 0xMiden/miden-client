@@ -6,6 +6,10 @@
 
 # Class: JsStateSyncUpdate
 
+An object that contains data for a sync update,
+which will be received by the applyStateSync JS function.
+under sync.js
+
 ## Properties
 
 ### accountUpdates

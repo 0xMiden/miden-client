@@ -6,6 +6,8 @@
 
 # Class: ConsumableNoteRecord
 
+Input note record annotated with consumption conditions.
+
 ## Constructors
 
 ### Constructor

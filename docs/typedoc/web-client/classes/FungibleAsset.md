@@ -6,6 +6,11 @@
 
 # Class: FungibleAsset
 
+A fungible asset.
+
+A fungible asset consists of a faucet ID of the faucet which issued the asset as well as the
+asset amount. Asset amount is guaranteed to be 2^63 - 1 or smaller.
+
 ## Constructors
 
 ### Constructor

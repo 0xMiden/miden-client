@@ -6,6 +6,13 @@
 
 # Class: AccountDelta
 
+`AccountDelta` stores the differences between two account states.
+
+The differences are represented as follows:
+- `storage`: an `AccountStorageDelta` that contains the changes to the account storage.
+- `vault`: an `AccountVaultDelta` object that contains the changes to the account vault.
+- `nonce`: if the nonce of the account has changed, the new nonce is stored here.
+
 ## Methods
 
 ### \[dispose\]()

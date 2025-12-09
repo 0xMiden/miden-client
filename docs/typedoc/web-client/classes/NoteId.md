@@ -6,6 +6,21 @@
 
 # Class: NoteId
 
+Returns a unique identifier of a note, which is simultaneously a commitment to the note.
+
+Note ID is computed as:
+
+> `hash(recipient, asset_commitment)`
+
+where `recipient` is defined as:
+
+> `hash(hash(hash(serial_num, ZERO), script_root), input_commitment)`
+
+This achieves the following properties:
+- Every note can be reduced to a single unique ID.
+- To compute a note ID, we do not need to know the note's `serial_num`. Knowing the hash of the
+  `serial_num` (as well as script root, input commitment, and note assets) is sufficient.
+
 ## Constructors
 
 ### Constructor

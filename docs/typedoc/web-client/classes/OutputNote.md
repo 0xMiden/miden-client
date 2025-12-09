@@ -6,6 +6,8 @@
 
 # Class: OutputNote
 
+Representation of a note produced by a transaction (full, partial, or header-only).
+
 ## Methods
 
 ### \[dispose\]()

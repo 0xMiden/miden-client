@@ -6,6 +6,10 @@
 
 # Class: NoteHeader
 
+Holds the strictly required, public information of a note.
+
+See `NoteId` and `NoteMetadata` for additional details.
+
 ## Methods
 
 ### \[dispose\]()

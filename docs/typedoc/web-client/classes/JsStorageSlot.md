@@ -6,6 +6,8 @@
 
 # Class: JsStorageSlot
 
+A JavaScript representation of a storage slot in an account.
+
 ## Properties
 
 ### commitment

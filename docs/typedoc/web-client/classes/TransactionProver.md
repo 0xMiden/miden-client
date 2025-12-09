@@ -6,6 +6,8 @@
 
 # Class: TransactionProver
 
+Wrapper over local or remote transaction proving backends.
+
 ## Methods
 
 ### \[dispose\]()

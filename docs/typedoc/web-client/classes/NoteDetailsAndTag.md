@@ -6,6 +6,8 @@
 
 # Class: NoteDetailsAndTag
 
+Pair of note details and tag used when declaring expected notes.
+
 ## Constructors
 
 ### Constructor

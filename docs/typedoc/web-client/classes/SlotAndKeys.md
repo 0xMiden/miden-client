@@ -6,6 +6,8 @@
 
 # Class: SlotAndKeys
 
+Storage slot index paired with map keys that must be present.
+
 ## Constructors
 
 ### Constructor

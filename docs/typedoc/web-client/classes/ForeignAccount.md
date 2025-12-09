@@ -6,6 +6,8 @@
 
 # Class: ForeignAccount
 
+Description of a foreign account referenced by a transaction.
+
 ## Methods
 
 ### \[dispose\]()

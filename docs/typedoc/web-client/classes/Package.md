@@ -6,6 +6,8 @@
 
 # Class: Package
 
+Compiled VM package containing libraries and metadata.
+
 ## Methods
 
 ### \[dispose\]()

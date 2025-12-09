@@ -6,6 +6,8 @@
 
 # Class: JsAccountUpdate
 
+Represents an update to a single account's state.
+
 ## Properties
 
 ### accountCommitment

@@ -6,6 +6,17 @@
 
 # Class: ExecutedTransaction
 
+Describes the result of executing a transaction program for the Miden protocol.
+
+Executed transaction serves two primary purposes:
+- It contains a complete description of the effects of the transaction. Specifically, it
+  contains all output notes created as the result of the transaction and describes all the
+  changes made to the involved account (i.e., the account delta).
+- It contains all the information required to re-execute and prove the transaction in a
+  stateless manner. This includes all public transaction inputs, but also all nondeterministic
+  inputs that the host provided to Miden VM while executing the transaction (i.e., advice
+  witness).
+
 ## Methods
 
 ### \[dispose\]()

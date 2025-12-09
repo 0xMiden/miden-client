@@ -6,6 +6,8 @@
 
 # Class: TransactionFilter
 
+Filter used when querying stored transactions.
+
 ## Methods
 
 ### \[dispose\]()

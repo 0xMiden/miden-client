@@ -6,6 +6,8 @@
 
 # Class: SyncSummary
 
+Contains stats about the sync operation.
+
 ## Methods
 
 ### \[dispose\]()

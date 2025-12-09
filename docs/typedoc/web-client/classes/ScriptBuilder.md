@@ -6,6 +6,8 @@
 
 # Class: ScriptBuilder
 
+Utility for linking libraries and compiling transaction/note scripts.
+
 ## Methods
 
 ### \[dispose\]()

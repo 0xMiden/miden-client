@@ -6,6 +6,11 @@
 
 # Class: AccountId
 
+Uniquely identifies a specific account.
+
+A Miden account ID is a 120-bit value derived from the commitments to account code and storage,
+and a random user-provided seed.
+
 ## Methods
 
 ### \[dispose\]()
