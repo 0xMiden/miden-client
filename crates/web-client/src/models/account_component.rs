@@ -4,7 +4,6 @@ use miden_client::account::component::AccountComponent as NativeAccountComponent
 use miden_client::auth::{
     AuthEcdsaK256Keccak as NativeEcdsaK256Keccak,
     AuthRpoFalcon512 as NativeRpoFalcon512,
-    AuthSchemeId,
     AuthSecretKey as NativeSecretKey,
     PublicKeyCommitment,
 };
@@ -13,6 +12,7 @@ use miden_core::mast::MastNodeExt;
 use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
+use crate::models::auth::AuthScheme;
 use crate::models::miden_arrays::StorageSlotArray;
 use crate::models::package::Package;
 use crate::models::script_builder::ScriptBuilder;
@@ -115,50 +115,58 @@ impl AccountComponent {
         self.0.get_procedures().iter().map(Into::into).collect()
     }
 
-    /// Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
-    #[wasm_bindgen(js_name = "createAuthComponent")]
-    pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
-        let native_secret_key: NativeSecretKey = secret_key.into();
-        match native_secret_key {
-            NativeSecretKey::EcdsaK256Keccak(_) => {
-                let commitment = native_secret_key.public_key().to_commitment();
-                let auth = NativeEcdsaK256Keccak::new(commitment);
-                Ok(AccountComponent(auth.into()))
-            },
-            NativeSecretKey::RpoFalcon512(_) => {
-                let commitment = native_secret_key.public_key().to_commitment();
+    fn create_auth_component(
+        commitment: PublicKeyCommitment,
+        auth_scheme: AuthScheme,
+    ) -> Result<AccountComponent, JsValue> {
+        match auth_scheme {
+            AuthScheme::AuthRpoFalcon512 => {
                 let auth = NativeRpoFalcon512::new(commitment);
                 Ok(AccountComponent(auth.into()))
             },
-            // This is because the definition of NativeSecretKey has the
-            // '#[non_exhaustive]' attribute, without this catch-all clause,
-            // this is a compiler error.
-            _unimplemented => Err(JsValue::from_str(
-                "Building auth component for this auth scheme is not supported yet",
-            )),
-        }
-    }
-
-    #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
-    pub fn create_auth_component_from_commitment(
-        commitment: &Word,
-        auth_scheme_id: u8,
-    ) -> Result<AccountComponent, JsValue> {
-        let native_word: NativeWord = commitment.into();
-        let pkc = PublicKeyCommitment::from(native_word);
-        match AuthSchemeId::try_from(auth_scheme_id) {
-            Ok(AuthSchemeId::RpoFalcon512) => {
-                let auth = NativeRpoFalcon512::new(pkc);
-                Ok(AccountComponent(auth.into()))
-            },
-            Ok(AuthSchemeId::EcdsaK256Keccak) => {
-                let auth = NativeEcdsaK256Keccak::new(pkc);
+            AuthScheme::AuthEcdsaK256Keccak => {
+                let auth = NativeEcdsaK256Keccak::new(commitment);
                 Ok(AccountComponent(auth.into()))
             },
             _unimplemented => Err(JsValue::from_str(
                 "building auth component for this auth scheme is not supported yet",
             )),
         }
+    }
+
+    /// Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
+    #[wasm_bindgen(js_name = "createAuthComponentFromSecretKey")]
+    pub fn create_auth_component_from_secret_key(
+        secret_key: &SecretKey,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_secret_key: NativeSecretKey = secret_key.into();
+        let commitment = native_secret_key.public_key().to_commitment();
+
+        let auth_scheme = match native_secret_key {
+            NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
+            NativeSecretKey::RpoFalcon512(_) => AuthScheme::AuthRpoFalcon512,
+            // This is because the definition of NativeSecretKey has the
+            // '#[non_exhaustive]' attribute, without this catch-all clause,
+            // this is a compiler error.
+            _unimplemented => {
+                return Err(JsValue::from_str(
+                    "building auth component for this auth scheme is not supported yet",
+                ));
+            },
+        };
+
+        AccountComponent::create_auth_component(commitment, auth_scheme)
+    }
+
+    #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
+    pub fn create_auth_component_from_commitment(
+        commitment: &Word,
+        auth_scheme: AuthScheme,
+    ) -> Result<AccountComponent, JsValue> {
+        let native_word: NativeWord = commitment.into();
+        let pkc = PublicKeyCommitment::from(native_word);
+
+        AccountComponent::create_auth_component(pkc, auth_scheme)
     }
 
     /// Creates an account component from a compiled package and storage slots.

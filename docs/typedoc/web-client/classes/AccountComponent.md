@@ -96,9 +96,29 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ***
 
-### createAuthComponent()
+### createAuthComponentFromCommitment()
 
-> `static` **createAuthComponent**(`secret_key`): `AccountComponent`
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
+
+#### Parameters
+
+##### commitment
+
+[`Word`](Word.md)
+
+##### auth\_scheme
+
+[`AuthScheme`](AuthScheme.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### createAuthComponentFromSecretKey()
+
+> `static` **createAuthComponentFromSecretKey**(`secret_key`): `AccountComponent`
 
 Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
 
@@ -107,26 +127,6 @@ Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak)
 ##### secret\_key
 
 [`SecretKey`](SecretKey.md)
-
-#### Returns
-
-`AccountComponent`
-
-***
-
-### createAuthComponentFromCommitment()
-
-> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme_id`): `AccountComponent`
-
-#### Parameters
-
-##### commitment
-
-[`Word`](Word.md)
-
-##### auth\_scheme\_id
-
-`number`
 
 #### Returns
 
