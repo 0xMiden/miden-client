@@ -131,7 +131,7 @@ impl AccountComponent {
         }
     }
 
-    /// Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
+    /// Builds an auth component from a secret key, inferring the auth scheme from the key type.
     #[wasm_bindgen(js_name = "createAuthComponentFromSecretKey")]
     pub fn create_auth_component_from_secret_key(
         secret_key: &SecretKey,
