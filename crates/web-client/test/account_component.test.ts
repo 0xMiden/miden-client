@@ -9,7 +9,7 @@ const SCHEMES = [
 const proceduresFromComponent = (component: any) =>
   component
     .getProcedures()
-    .map((procedure: any) => procedure.digest().toHex())
+    .map((procedure: any) => procedure.digest.toHex())
     .sort();
 
 test.describe("account component auth constructors", () => {
@@ -33,7 +33,7 @@ test.describe("account component auth constructors", () => {
           const toHexList = (component: any) =>
             component
               .getProcedures()
-              .map((procedure: any) => procedure.digest().toHex())
+              .map((procedure: any) => procedure.digest.toHex())
               .sort();
 
           return (
