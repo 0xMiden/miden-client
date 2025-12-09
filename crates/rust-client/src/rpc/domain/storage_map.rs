@@ -9,7 +9,7 @@ use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 // STORAGE MAP INFO
 // ================================================================================================
 
-/// Represents a `proto::rpc_store::SyncStorageMapsResponse` with fields converted into domain
+/// Represents a `proto::rpc::SyncStorageMapsResponse` with fields converted into domain
 /// types. Contains information of updated map slots in a given range of blocks specified on
 /// request. Also provides the current chain tip while processing the request.
 pub struct StorageMapInfo {
@@ -24,12 +24,12 @@ pub struct StorageMapInfo {
 // STORAGE MAP INFO CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::rpc_store::SyncStorageMapsResponse> for StorageMapInfo {
+impl TryFrom<proto::rpc::SyncStorageMapsResponse> for StorageMapInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncStorageMapsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncStorageMapsResponse) -> Result<Self, Self::Error> {
         let pagination_info = value.pagination_info.ok_or(
-            proto::rpc_store::SyncStorageMapsResponse::missing_field(stringify!(pagination_info)),
+            proto::rpc::SyncStorageMapsResponse::missing_field(stringify!(pagination_info)),
         )?;
         let chain_tip = pagination_info.chain_tip;
         let block_number = pagination_info.block_num;
@@ -51,7 +51,7 @@ impl TryFrom<proto::rpc_store::SyncStorageMapsResponse> for StorageMapInfo {
 // STORAGE MAP UPDATE
 // ================================================================================================
 
-/// Represents a `proto::rpc_store::StorageMapUpdate`
+/// Represents a `proto::rpc::StorageMapUpdate`
 pub struct StorageMapUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,
@@ -66,22 +66,22 @@ pub struct StorageMapUpdate {
 // STORAGE MAP UPDATE CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::rpc_store::StorageMapUpdate> for StorageMapUpdate {
+impl TryFrom<proto::rpc::StorageMapUpdate> for StorageMapUpdate {
     type Error = RpcConversionError;
 
-    fn try_from(value: proto::rpc_store::StorageMapUpdate) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::StorageMapUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
 
         let slot_index = value.slot_index;
 
         let key: Word = value
             .key
-            .ok_or(proto::rpc_store::StorageMapUpdate::missing_field(stringify!(key)))?
+            .ok_or(proto::rpc::StorageMapUpdate::missing_field(stringify!(key)))?
             .try_into()?;
 
         let value: Word = value
             .value
-            .ok_or(proto::rpc_store::StorageMapUpdate::missing_field(stringify!(value)))?
+            .ok_or(proto::rpc::StorageMapUpdate::missing_field(stringify!(value)))?
             .try_into()?;
 
         Ok(Self {
