@@ -1,4 +1,7 @@
 import type { WebClient as WasmWebClient } from "./crates/miden_client_web";
+// Import the full namespace to derive the concrete Miden array constructor map so the
+// declaration matches the actual WASM exports rather than a generic ArrayBufferView.
+import type * as WasmExports from "./crates/miden_client_web";
 
 export type { WebClient as WasmWebClient } from "./crates/miden_client_web";
 
@@ -126,10 +129,11 @@ export {
   Word,
 } from "./crates/miden_client_web";
 
-export declare const MidenArrays: Record<
-  string,
-  new (...args: any[]) => ArrayBufferView
->;
+type MidenArrayConstructors = {
+  [K in keyof typeof WasmExports as K extends `${string}Array` ? K : never]: typeof WasmExports[K];
+};
+
+export declare const MidenArrays: MidenArrayConstructors;
 
 // Extend WASM WebClient but override methods that use workers
 export declare class WebClient extends WasmWebClient {
