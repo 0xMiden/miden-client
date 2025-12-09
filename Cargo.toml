@@ -29,10 +29,12 @@ opt-level = 1
 
 [workspace.dependencies]
 # Miden base/protocol dependencies
-miden-lib     = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-objects = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-lib = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-objects = { branch = "next", default-features = false, features = [
+  "testing",
+], git = "https://github.com/0xMiden/miden-base.git" }
 miden-testing = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
-miden-tx      = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
+miden-tx = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-base.git" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "igamigo-skip-check", git = "https://github.com/0xMiden/miden-node.git" }
@@ -43,7 +45,9 @@ miden-node-store = { branch = "igamigo-skip-check", git = "https://github.com/0x
 miden-node-utils = { branch = "igamigo-skip-check", git = "https://github.com/0xMiden/miden-node.git" }
 miden-node-validator = { branch = "igamigo-skip-check", git = "https://github.com/0xMiden/miden-node.git" }
 miden-note-transport-proto-build = { branch = "main", default-features = false, git = "https://github.com/0xMiden/miden-note-transport.git" }
-miden-remote-prover = { branch = "igamigo-skip-check", features = ["concurrent"], git = "https://github.com/0xMiden/miden-node.git" }
+miden-remote-prover = { branch = "igamigo-skip-check", features = [
+  "concurrent",
+], git = "https://github.com/0xMiden/miden-node.git" }
 miden-remote-prover-client = { branch = "igamigo-skip-check", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/miden-node.git" }
