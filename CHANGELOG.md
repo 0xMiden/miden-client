@@ -12,6 +12,7 @@
 * Surface WASM worker errors to the JS wrapper with their original stacks for clearer diagnostics ([#1565](https://github.com/0xMiden/miden-client/issues/1565)).
 * Added doc_cfg as top level cfg_attr to turn on feature annotations in docs.rs and added make targets to serve the docs ([#1543](https://github.com/0xMiden/miden-client/pull/1543)).
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
+* Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 
 ## 0.12.5 (2025-12-01)
 
