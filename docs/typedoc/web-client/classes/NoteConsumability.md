@@ -22,6 +22,8 @@
 
 > **accountId**(): [`AccountId`](AccountId.md)
 
+Returns the account that can consume the note.
+
 #### Returns
 
 [`AccountId`](AccountId.md)
@@ -31,6 +33,8 @@
 ### consumableAfterBlock()
 
 > **consumableAfterBlock**(): `number`
+
+Returns the block number after which the note becomes consumable (if any).
 
 #### Returns
 

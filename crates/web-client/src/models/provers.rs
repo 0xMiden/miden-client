@@ -9,6 +9,7 @@ use miden_client::transaction::{
 };
 use wasm_bindgen::prelude::*;
 
+/// Wrapper over local or remote transaction proving backends.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct TransactionProver {
@@ -19,6 +20,7 @@ pub struct TransactionProver {
 
 #[wasm_bindgen]
 impl TransactionProver {
+    /// Creates a prover that uses the local proving backend.
     #[wasm_bindgen(js_name = "newLocalProver")]
     pub fn new_local_prover() -> TransactionProver {
         let local_prover = LocalTransactionProver::new(ProvingOptions::default());
@@ -53,6 +55,7 @@ impl TransactionProver {
         }
     }
 
+    /// Serializes the prover configuration into a string descriptor.
     pub fn serialize(&self) -> String {
         match (&self.endpoint, &self.timeout) {
             (Some(ep), Some(timeout)) => {
@@ -68,6 +71,7 @@ impl TransactionProver {
         }
     }
 
+    /// Reconstructs a prover from its serialized descriptor.
     pub fn deserialize(
         prover_type: &str,
         endpoint: Option<String>,
@@ -86,12 +90,14 @@ impl TransactionProver {
         }
     }
 
+    /// Returns the endpoint if this is a remote prover.
     pub fn endpoint(&self) -> Option<String> {
         self.endpoint.clone()
     }
 }
 
 impl TransactionProver {
+    /// Returns the underlying proving trait object.
     pub fn get_prover(&self) -> Arc<dyn TransactionProverTrait + Send + Sync> {
         self.prover.clone()
     }

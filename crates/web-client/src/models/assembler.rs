@@ -13,6 +13,7 @@ pub struct Assembler(NativeAssembler);
 
 #[wasm_bindgen]
 impl Assembler {
+    /// Adds a dynamic library to this assembler.
     #[wasm_bindgen(js_name = "withLibrary")]
     pub fn with_library(self, library: &Library) -> Result<Assembler, JsValue> {
         let native_lib: NativeLibrary = library.into();
@@ -25,12 +26,14 @@ impl Assembler {
         Ok(Assembler(new_native_asm))
     }
 
+    /// Enables or disables debug mode.
     #[wasm_bindgen(js_name = "withDebugMode")]
     pub fn with_debug_mode(mut self, yes: bool) -> Assembler {
         self.0 = self.0.with_debug_mode(yes);
         self
     }
 
+    /// Compiles a note script source string into a `NoteScript`.
     #[wasm_bindgen(js_name = "compileNoteScript")]
     pub fn compile_note_script(self, note_script: &str) -> Result<NoteScript, JsValue> {
         let code = self
@@ -42,6 +45,7 @@ impl Assembler {
         Ok(NativeNoteScript::new(code).into())
     }
 
+    /// Compiles a transaction script source string into a `TransactionScript`.
     #[wasm_bindgen(js_name = "compileTransactionScript")]
     pub fn compile_transaction_script(
         self,

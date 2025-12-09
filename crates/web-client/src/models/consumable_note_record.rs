@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 use super::account_id::AccountId;
 use super::input_note_record::InputNoteRecord;
 
+/// Input note record annotated with consumption conditions.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct ConsumableNoteRecord {
@@ -31,11 +32,13 @@ impl NoteConsumability {
         NoteConsumability { account_id, consumable_after_block }
     }
 
+    /// Returns the account that can consume the note.
     #[wasm_bindgen(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.account_id
     }
 
+    /// Returns the block number after which the note becomes consumable (if any).
     #[wasm_bindgen(js_name = "consumableAfterBlock")]
     pub fn consumable_after_block(&self) -> Option<u32> {
         self.consumable_after_block
@@ -44,6 +47,7 @@ impl NoteConsumability {
 
 #[wasm_bindgen]
 impl ConsumableNoteRecord {
+    /// Creates a new consumable note record from an input note record and consumability metadata.
     #[wasm_bindgen(constructor)]
     pub fn new(
         input_note_record: InputNoteRecord,
@@ -52,11 +56,13 @@ impl ConsumableNoteRecord {
         ConsumableNoteRecord { input_note_record, note_consumability }
     }
 
+    /// Returns the underlying input note record.
     #[wasm_bindgen(js_name = "inputNoteRecord")]
     pub fn input_note_record(&self) -> InputNoteRecord {
         self.input_note_record.clone()
     }
 
+    /// Returns the consumability entries.
     #[wasm_bindgen(js_name = "noteConsumability")]
     pub fn note_consumability(&self) -> Vec<NoteConsumability> {
         self.note_consumability.clone()
