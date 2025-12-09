@@ -130,7 +130,9 @@ export {
 } from "./crates/miden_client_web";
 
 type MidenArrayConstructors = {
-  [K in keyof typeof WasmExports as K extends `${string}Array` ? K : never]: typeof WasmExports[K];
+  [K in keyof typeof WasmExports as K extends `${string}Array`
+    ? K
+    : never]: (typeof WasmExports)[K];
 };
 
 export declare const MidenArrays: MidenArrayConstructors;
