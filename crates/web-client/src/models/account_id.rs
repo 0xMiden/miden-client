@@ -1,12 +1,9 @@
 use std::str::FromStr;
 
 use miden_client::Felt as NativeFelt;
-use miden_client::account::AccountId as NativeAccountId;
+use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
-    Address,
-    AddressInterface as NativeAccountInterface,
-    NetworkId as NativeNetworkId,
-    RoutingParameters,
+    Address, AddressInterface as NativeAccountInterface, RoutingParameters,
 };
 use wasm_bindgen::prelude::*;
 
@@ -120,6 +117,26 @@ impl AccountId {
             .with_routing_parameters(routing_params)
             .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
         Ok(address.encode(network_id))
+    }
+
+    /// Given a bech32 encoded string, return the matching Account ID for it.
+    #[wasm_bindgen(js_name = "fromBech32")]
+    pub fn from_bech32(bech_32_encoded_id: &str) -> Result<AccountId, JsValue> {
+        let to_decode = {
+            // Since a bech32 string can have additional data, this split
+            // should be able to fetch the account id, which is what we want
+            // to decode.
+            // Reference: https://github.com/0xMiden/miden-base/blob/150a8066c5a4b4011c4f3e55f9435921ad3835f3/docs/src/account/address.md#structure
+            if let Some((account_id, _routing_params)) = bech_32_encoded_id.split_once("_") {
+                account_id
+            } else {
+                bech_32_encoded_id
+            }
+        };
+        let (_, account_id) = NativeAccountId::from_bech32(to_decode).map_err(|err| {
+            js_error_with_context(err, "could not interpret input as a bech32-encoded account id")
+        })?;
+        Ok(account_id.into())
     }
 
     /// Returns the prefix field element storing metadata about version, type, and storage mode.
