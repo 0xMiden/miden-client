@@ -125,7 +125,10 @@ export {
   Word,
 } from "./crates/miden_client_web";
 
-export declare const MidenArrays: Record<string, new (...args: any[]) => ArrayBufferView>;
+export declare const MidenArrays: Record<
+  string,
+  new (...args: any[]) => ArrayBufferView
+>;
 
 // Extend WASM WebClient but override methods that use workers
 export declare class WebClient extends WasmWebClient {
