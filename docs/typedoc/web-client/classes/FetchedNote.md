@@ -12,9 +12,9 @@ Represents a note fetched from a Miden node via RPC.
 
 ### Constructor
 
-> **new FetchedNote**(`note_id`, `metadata`, `input_note?`): `FetchedNote`
+> **new FetchedNote**(`note_id`, `metadata`, `note`, `inclusion_proof`): `FetchedNote`
 
-Create a note with an optional `InputNote`.
+Create a `FetchedNote` with an optional [`Note`].
 
 #### Parameters
 
@@ -26,9 +26,13 @@ Create a note with an optional `InputNote`.
 
 [`NoteMetadata`](NoteMetadata.md)
 
-##### input\_note?
+##### note
 
-[`InputNote`](InputNote.md)
+[`Note`](Note.md)
+
+##### inclusion\_proof
+
+[`NoteInclusionProof`](NoteInclusionProof.md)
 
 #### Returns
 
@@ -44,14 +48,13 @@ The note's header, containing the ID and metadata.
 
 ***
 
-### inputNote
+### inclusionProof
 
-> `readonly` **inputNote**: [`InputNote`](InputNote.md)
+> `readonly` **inclusionProof**: [`NoteInclusionProof`](NoteInclusionProof.md)
 
-The full [`InputNote`] with inclusion proof.
+The note's inclusion proof.
 
-For public notes, it contains the complete note data and inclusion proof.
-For private notes, it will be ``None`.
+Contains the data required to prove inclusion of the note in the canonical chain.
 
 ***
 
@@ -61,6 +64,17 @@ For private notes, it will be ``None`.
 
 The note's metadata, including sender, tag, and other properties.
 Available for both private and public notes.
+
+***
+
+### note
+
+> `readonly` **note**: [`Note`](Note.md)
+
+The full [`Note`] data.
+
+For public notes, it contains the complete note data.
+For private notes, it will be `None`.
 
 ***
 

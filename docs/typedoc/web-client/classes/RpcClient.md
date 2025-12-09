@@ -69,10 +69,9 @@ Array of [`NoteId`] objects to fetch
 `Promise`\<[`FetchedNote`](FetchedNote.md)[]\>
 
 Promise that resolves to different data depending on the note type:
-- Private notes: Returns only `note_id` and `metadata` (from the note header). The
-  `input_note` field will be `null`.
-- Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
-  ID.
+- Private notes: Returns the `noteHeader`, and the  `inclusionProof`. The `note` field will
+  be `null`.
+- Public notes: Returns the full `note` with `inclusionProof`, alongside its header.
 
 ***
 
