@@ -535,7 +535,7 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, seed);
+    super(null, null, seed);
   }
 
   /**
