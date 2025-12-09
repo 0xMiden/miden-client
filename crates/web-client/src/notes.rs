@@ -33,7 +33,7 @@ impl WebClient {
         note_id: String,
     ) -> Result<Option<InputNoteRecord>, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id: NoteId = NoteId::new_unchecked(
+            let note_id: NoteId = NoteId::from_raw(
                 Word::try_from(note_id)
                     .map_err(|err| js_error_with_context(err, "failed to parse input note id"))?,
             );
@@ -66,7 +66,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = "getOutputNote")]
     pub async fn get_output_note(&mut self, note_id: String) -> Result<JsValue, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id: NoteId = NoteId::new_unchecked(
+            let note_id: NoteId = NoteId::from_raw(
                 Word::try_from(note_id)
                     .map_err(|err| js_error_with_context(err, "failed to parse output note id"))?,
             );

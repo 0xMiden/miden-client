@@ -72,7 +72,7 @@ impl WebStore {
                 let status = TransactionStatus::read_from_bytes(&tx_idxdb.status)?;
 
                 Ok(TransactionRecord {
-                    id: TransactionId::new_unchecked(id),
+                    id: TransactionId::from_raw(id),
                     details,
                     script,
                     status,

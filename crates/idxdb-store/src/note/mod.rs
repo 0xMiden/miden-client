@@ -89,7 +89,7 @@ impl WebStore {
 
         nullifiers_as_str
             .into_iter()
-            .map(|s| Word::try_from(s).map(Nullifier::new_unchecked).map_err(StoreError::WordError))
+            .map(|s| Word::try_from(s).map(Nullifier::from_raw).map_err(StoreError::WordError))
             .collect::<Result<Vec<Nullifier>, _>>()
     }
 

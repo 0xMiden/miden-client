@@ -19,7 +19,7 @@ impl WebClient {
         export_type: String,
     ) -> Result<NoteFile, JsValue> {
         if let Some(client) = self.get_mut_inner() {
-            let note_id = NoteId::new_unchecked(Word::try_from(note_id).map_err(|err| {
+            let note_id = NoteId::from_raw(Word::try_from(note_id).map_err(|err| {
                 js_error_with_context(
                     err,
                     "error exporting note file: failed to parse input note id",

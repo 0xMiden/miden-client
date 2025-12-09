@@ -3,8 +3,10 @@ use alloc::vec::Vec;
 
 use miden_objects::Word;
 use miden_objects::account::AccountId;
+use miden_objects::asset::FungibleAsset;
 use miden_objects::block::BlockNumber;
 use miden_objects::note::{NoteHeader, Nullifier};
+use miden_objects::testing::account_id::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
 use miden_objects::transaction::{
     InputNoteCommitment,
     InputNotes,
@@ -22,7 +24,7 @@ impl TryFrom<proto::primitives::Digest> for TransactionId {
 
     fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         let word: Word = value.try_into()?;
-        Ok(Self::new_unchecked(word))
+        Ok(Self::from_raw(word))
     }
 }
 
@@ -182,6 +184,8 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
             final_state_commitment.try_into()?,
             input_notes,
             output_notes,
+            // TODO: handle this; should we open an issue in miden-node?
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().unwrap(), 0u64).unwrap(),
         );
         Ok(transaction_header)
     }

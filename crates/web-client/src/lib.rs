@@ -198,6 +198,17 @@ impl WebClient {
         self.store = Some(web_store);
         self.keystore = Some(keystore);
 
+        // Ensure genesis block is fetched and stored in IndexedDB.
+        // This is important for web workers that create their own client instances -
+        // they will read the genesis from the shared IndexedDB and automatically
+        // set the genesis commitment on their RPC client.
+        if let Some(client) = self.inner.as_mut() {
+            client
+                .ensure_genesis_in_place()
+                .await
+                .map_err(|err| js_error_with_context(err, "Failed to ensure genesis in place"))?;
+        }
+
         Ok(())
     }
 

@@ -103,19 +103,20 @@ impl GrpcClient {
 impl NodeRpcClient for GrpcClient {
     /// Sets the genesis commitment for the client. If the client is already connected, it will be
     /// updated to use the new commitment on subsequent requests. If the client is not connected,
-    /// the commitment will be used when it connects. If the genesis commitment is already set,
-    /// this method does nothing.
+    /// the commitment will be stored and used when the client connects. If the genesis commitment
+    /// is already set, this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
-        self.ensure_connected().await?;
+        // Check if already set before doing anything else
+        // if self.genesis_commitment.read().is_some() {
+        //     // Genesis commitment is already set, ignoring the new value.
+        //     return Ok(());
+        // }
 
-        if self.genesis_commitment.read().is_some() {
-            // Genesis commitment is already set, ignoring the new value.
-            return Ok(());
-        }
-
+        // Store the commitment for future connections
         self.genesis_commitment.write().replace(commitment);
 
-        // If a client is connected, we modify it to use the new genesis commitment.
+        // If a client is already connected, update it to use the new genesis commitment.
+        // If not connected, the commitment will be used when connect() is called.
         let mut client_guard = self.client.write();
         if let Some(client) = client_guard.as_mut() {
             client.set_genesis_commitment(commitment);

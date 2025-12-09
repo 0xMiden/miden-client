@@ -31,7 +31,7 @@ impl TryFrom<proto::note::NoteId> for NoteId {
     fn try_from(value: proto::note::NoteId) -> Result<Self, Self::Error> {
         let word =
             Word::try_from(value.id.ok_or(proto::note::NoteId::missing_field(stringify!(id)))?)?;
-        Ok(Self::new_unchecked(word))
+        Ok(Self::from_raw(word))
     }
 }
 
