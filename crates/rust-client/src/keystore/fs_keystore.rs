@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
 
+use crate::account::AccountId;
 use miden_objects::Word;
 use miden_objects::account::auth::{AuthSecretKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
@@ -44,7 +45,11 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
     }
 
     /// Adds a secret key to the keystore.
-    pub fn add_key(&self, key: &AuthSecretKey) -> Result<(), KeyStoreError> {
+    pub fn add_key(
+        &self,
+        key: &AuthSecretKey,
+        account_id: &AccountId,
+    ) -> Result<(), KeyStoreError> {
         let pub_key = match key {
             AuthSecretKey::RpoFalcon512(k) => k.public_key().to_commitment(),
             AuthSecretKey::EcdsaK256Keccak(k) => k.public_key().to_commitment(),
@@ -65,7 +70,8 @@ impl<R: Rng + Send + Sync> FilesystemKeyStore<R> {
 
         let mut writer = BufWriter::new(file);
         let key_pair_hex = hex::encode(key.to_bytes());
-        writer.write_all(key_pair_hex.as_bytes()).map_err(|err| {
+        let serialized = (key_pair_hex, account_id).to_bytes();
+        writer.write_all(&serialized).map_err(|err| {
             KeyStoreError::StorageError(format!("error writing secret key file: {err:?}"))
         })?;
 

@@ -7,18 +7,13 @@ use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::Word;
 use miden_objects::account::{
-    AccountBuilder,
-    AccountComponent,
-    AccountStorageMode,
-    StorageMap,
-    StorageSlot,
+    AccountBuilder, AccountComponent, AccountStorageMode, StorageMap, StorageSlot,
 };
 use miden_objects::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_objects::asset::{Asset, FungibleAsset};
 use miden_objects::note::NoteType;
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 
@@ -39,7 +34,6 @@ async fn transaction_creates_two_notes() {
 
     let secret_key = AuthSecretKey::new_rpo_falcon512();
     let pub_key = secret_key.public_key();
-    keystore.add_key(&secret_key).unwrap();
 
     let wallet_component = AccountComponent::compile(
         "
@@ -58,6 +52,8 @@ async fn transaction_creates_two_notes() {
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
+
+    keystore.add_key(&secret_key, &account.id()).unwrap();
 
     client.add_account(&account, false).await.unwrap();
     client.sync_state().await.unwrap();

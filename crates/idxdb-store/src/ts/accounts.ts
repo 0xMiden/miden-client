@@ -400,12 +400,17 @@ export async function upsertAccountRecord(
   }
 }
 
-export async function insertAccountAuth(pubKey: string, secretKey: string) {
+export async function insertAccountAuth(
+  pubKey: string,
+  secretKey: string,
+  accountIdHex: string
+) {
   try {
     // Prepare the data object to insert
     const data = {
-      pubKey: pubKey,
-      secretKey: secretKey,
+      pubKey,
+      secretKey,
+      accountIdHex,
     };
 
     // Perform the insert using Dexie
