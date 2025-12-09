@@ -128,9 +128,6 @@ impl AccountComponent {
                 let auth = NativeEcdsaK256Keccak::new(commitment);
                 Ok(AccountComponent(auth.into()))
             },
-            _unimplemented => Err(JsValue::from_str(
-                "building auth component for this auth scheme is not supported yet",
-            )),
         }
     }
 

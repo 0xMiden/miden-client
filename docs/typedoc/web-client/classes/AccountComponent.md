@@ -108,7 +108,7 @@ Compiles account code with the given storage slots using the provided assembler.
 
 ##### auth\_scheme
 
-[`AuthScheme`](AuthScheme.md)
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
