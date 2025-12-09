@@ -118,15 +118,15 @@ impl AccountComponent {
     fn create_auth_component(
         commitment: PublicKeyCommitment,
         auth_scheme: AuthScheme,
-    ) -> Result<AccountComponent, JsValue> {
+    ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
                 let auth = NativeRpoFalcon512::new(commitment);
-                Ok(AccountComponent(auth.into()))
+                AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {
                 let auth = NativeEcdsaK256Keccak::new(commitment);
-                Ok(AccountComponent(auth.into()))
+                AccountComponent(auth.into())
             },
         }
     }
@@ -152,7 +152,7 @@ impl AccountComponent {
             },
         };
 
-        AccountComponent::create_auth_component(commitment, auth_scheme)
+        Ok(AccountComponent::create_auth_component(commitment, auth_scheme))
     }
 
     #[wasm_bindgen(js_name = "createAuthComponentFromCommitment")]
@@ -163,7 +163,7 @@ impl AccountComponent {
         let native_word: NativeWord = commitment.into();
         let pkc = PublicKeyCommitment::from(native_word);
 
-        AccountComponent::create_auth_component(pkc, auth_scheme)
+        Ok(AccountComponent::create_auth_component(pkc, auth_scheme))
     }
 
     /// Creates an account component from a compiled package and storage slots.
