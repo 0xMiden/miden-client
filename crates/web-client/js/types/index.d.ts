@@ -75,6 +75,7 @@ export {
   TransactionId,
   TransactionKernel,
   TransactionProver,
+  TransactionRecord,
   TransactionRequest,
   TransactionResult,
   TransactionStoreUpdate,
