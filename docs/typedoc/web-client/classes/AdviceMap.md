@@ -6,8 +6,6 @@
 
 # Class: AdviceMap
 
-Map of advice values keyed by words for script execution.
-
 ## Constructors
 
 ### Constructor

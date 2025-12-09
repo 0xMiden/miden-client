@@ -6,8 +6,6 @@
 
 # Class: MerklePath
 
-Represents a Merkle path.
-
 ## Methods
 
 ### \[dispose\]()

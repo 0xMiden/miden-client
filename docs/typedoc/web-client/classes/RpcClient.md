@@ -6,8 +6,6 @@
 
 # Class: RpcClient
 
-RPC Client for interacting with Miden nodes directly.
-
 ## Constructors
 
 ### Constructor

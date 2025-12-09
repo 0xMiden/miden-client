@@ -6,8 +6,6 @@
 
 # Class: GetProceduresResultItem
 
-Procedure digest paired with whether it is an auth procedure.
-
 ## Properties
 
 ### digest

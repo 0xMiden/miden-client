@@ -6,8 +6,6 @@
 
 # Class: AdviceInputs
 
-Advice inputs provided to a transaction or note script.
-
 ## Methods
 
 ### \[dispose\]()

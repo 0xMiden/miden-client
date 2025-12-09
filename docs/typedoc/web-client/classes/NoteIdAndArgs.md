@@ -6,8 +6,6 @@
 
 # Class: NoteIdAndArgs
 
-Note ID paired with optional arguments for inclusion in a transaction request.
-
 ## Constructors
 
 ### Constructor

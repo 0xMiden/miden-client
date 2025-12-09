@@ -6,13 +6,6 @@
 
 # Class: AccountVaultDelta
 
-`AccountVaultDelta` stores the difference between the initial and final account vault states.
-
-The difference is represented as follows:
-- `fungible`: a binary tree map of fungible asset balance changes in the account vault.
-- `non_fungible`: a binary tree map of non-fungible assets that were added to or removed from
-  the account vault.
-
 ## Methods
 
 ### \[dispose\]()

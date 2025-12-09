@@ -6,8 +6,6 @@
 
 # Class: Felt
 
-Field element wrapper exposed to JavaScript.
-
 ## Constructors
 
 ### Constructor

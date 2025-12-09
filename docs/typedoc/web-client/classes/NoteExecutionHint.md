@@ -6,8 +6,6 @@
 
 # Class: NoteExecutionHint
 
-Hint describing when a note can be consumed.
-
 ## Methods
 
 ### \[dispose\]()

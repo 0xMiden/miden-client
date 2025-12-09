@@ -6,8 +6,6 @@
 
 # Class: TransactionSummary
 
-Represents a transaction summary.
-
 ## Methods
 
 ### \[dispose\]()

@@ -6,8 +6,6 @@
 
 # Class: NoteExecutionMode
 
-Specifies whether a note is executable locally or across the network.
-
 ## Methods
 
 ### \[dispose\]()

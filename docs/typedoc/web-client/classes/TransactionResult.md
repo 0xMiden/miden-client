@@ -6,11 +6,6 @@
 
 # Class: TransactionResult
 
-Represents the result of executing a transaction by the client.
-
-It contains an `ExecutedTransaction`, and a list of `future_notes`
-that we expect to receive in the future (you can check at swap notes for an example of this).
-
 ## Methods
 
 ### \[dispose\]()

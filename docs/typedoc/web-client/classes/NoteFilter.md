@@ -6,8 +6,6 @@
 
 # Class: NoteFilter
 
-Filter options for querying notes from the store.
-
 ## Constructors
 
 ### Constructor

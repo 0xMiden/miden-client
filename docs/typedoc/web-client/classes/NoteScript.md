@@ -6,11 +6,6 @@
 
 # Class: NoteScript
 
-An executable program of a note.
-
-A note's script represents a program which must be executed for a note to be consumed. As such
-it defines the rules and side effects of consuming a given note.
-
 ## Methods
 
 ### \[dispose\]()

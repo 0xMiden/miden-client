@@ -6,8 +6,6 @@
 
 # Class: NoteFile
 
-A serialized representation of a note.
-
 ## Methods
 
 ### \[dispose\]()

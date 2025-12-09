@@ -6,8 +6,6 @@
 
 # Class: NoteInclusionProof
 
-Contains the data required to prove inclusion of a note in the canonical chain.
-
 ## Methods
 
 ### \[dispose\]()

@@ -6,9 +6,6 @@
 
 # Class: TransactionStoreUpdate
 
-Represents the changes that need to be applied to the client store as a result of a transaction
-execution.
-
 ## Methods
 
 ### \[dispose\]()
