@@ -6,8 +6,6 @@
 
 # Class: AccountStorageMode
 
-Storage visibility mode for an account.
-
 ## Methods
 
 ### \[dispose\]()

@@ -6,8 +6,6 @@
 
 # Class: StorageSlot
 
-A single storage slot value or map for an account component.
-
 ## Methods
 
 ### \[dispose\]()

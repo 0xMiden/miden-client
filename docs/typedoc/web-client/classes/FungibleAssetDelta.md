@@ -6,8 +6,6 @@
 
 # Class: FungibleAssetDelta
 
-Aggregated fungible deltas keyed by faucet ID.
-
 ## Methods
 
 ### \[dispose\]()

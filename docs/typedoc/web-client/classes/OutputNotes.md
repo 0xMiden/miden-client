@@ -6,9 +6,6 @@
 
 # Class: OutputNotes
 
-Contains a list of output notes of a transaction. The list can be empty if the transaction does
-not produce any notes.
-
 ## Methods
 
 ### \[dispose\]()

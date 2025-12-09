@@ -6,12 +6,6 @@
 
 # Class: Note
 
-A note bundles public metadata with private details: assets, script, inputs, and a serial number
-grouped into a recipient. The public identifier (`NoteId`) commits to those
-details, while the nullifier stays hidden until the note is consumed. Assets move by
-transferring them into the note; the script and inputs define how and when consumption can
-happen. See `NoteRecipient` for the shape of the recipient data.
-
 ## Constructors
 
 ### Constructor

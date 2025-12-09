@@ -6,8 +6,6 @@
 
 # Class: JsStorageMapEntry
 
-A JavaScript representation of a storage map entry in an account.
-
 ## Properties
 
 ### key

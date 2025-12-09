@@ -33,7 +33,7 @@ use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
+use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{NodeRpcClient, RpcError};
 use crate::transaction::ForeignAccount;

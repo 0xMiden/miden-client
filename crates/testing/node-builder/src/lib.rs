@@ -17,6 +17,7 @@ use miden_node_block_producer::{
     BlockProducer,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
     DEFAULT_MAX_TXS_PER_BATCH,
+    DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
@@ -311,6 +312,7 @@ impl NodeBuilder {
                     max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
                     max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
                     production_checkpoint: checkpoint,
+                    mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
                 }
                 .serve()
                 .await

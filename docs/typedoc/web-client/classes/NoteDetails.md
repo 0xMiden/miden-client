@@ -6,10 +6,6 @@
 
 # Class: NoteDetails
 
-Details of a note consisting of assets, script, inputs, and a serial number.
-
-See the [Note](Note.md) type for more details.
-
 ## Constructors
 
 ### Constructor

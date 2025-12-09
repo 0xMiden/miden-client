@@ -582,6 +582,8 @@ export class MockWebClient extends WebClient {
       serializedMockNoteTransportNode
     );
 
+    await instance.initWorker();
+
     // Wait for the worker to be ready
     await instance.ready;
 

@@ -6,8 +6,6 @@
 
 # Class: TransactionStatus
 
-Status of a transaction in the node or store.
-
 ## Methods
 
 ### \[dispose\]()

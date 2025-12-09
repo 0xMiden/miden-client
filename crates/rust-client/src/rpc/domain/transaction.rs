@@ -76,10 +76,10 @@ pub struct TransactionsInfo {
     pub transaction_records: Vec<TransactionRecord>,
 }
 
-impl TryFrom<proto::rpc_store::SyncTransactionsResponse> for TransactionsInfo {
+impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncTransactionsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncTransactionsResponse) -> Result<Self, Self::Error> {
         let pagination_info = value.pagination_info.ok_or(
             RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "SyncTransactionsResponse",
@@ -117,10 +117,10 @@ pub struct TransactionRecord {
     pub transaction_header: TransactionHeader,
 }
 
-impl TryFrom<proto::rpc_store::TransactionRecord> for TransactionRecord {
+impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::TransactionRecord) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::TransactionRecord) -> Result<Self, Self::Error> {
         let block_num = value.block_num.into();
         let transaction_header =
             value.header.ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {

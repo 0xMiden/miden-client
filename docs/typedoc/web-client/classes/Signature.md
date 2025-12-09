@@ -6,8 +6,6 @@
 
 # Class: Signature
 
-Cryptographic signature produced by supported auth schemes.
-
 ## Methods
 
 ### \[dispose\]()

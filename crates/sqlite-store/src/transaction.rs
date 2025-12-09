@@ -255,7 +255,7 @@ fn parse_transaction(
         .transpose()?;
 
     Ok(TransactionRecord {
-        id: TransactionId::new_unchecked(id),
+        id: TransactionId::from_raw(id),
         details: TransactionDetails::read_from_bytes(&details)?,
         script,
         status: TransactionStatus::read_from_bytes(&status)?,

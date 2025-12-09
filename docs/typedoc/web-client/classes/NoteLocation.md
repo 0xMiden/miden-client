@@ -6,8 +6,6 @@
 
 # Class: NoteLocation
 
-Contains information about the location of a note.
-
 ## Methods
 
 ### \[dispose\]()

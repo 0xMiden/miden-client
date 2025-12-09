@@ -6,8 +6,6 @@
 
 # Class: FetchedNote
 
-Represents a note fetched from a Miden node via RPC.
-
 ## Constructors
 
 ### Constructor

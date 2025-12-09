@@ -106,24 +106,24 @@ pub struct NoteSyncInfo {
     pub notes: Vec<CommittedNote>,
 }
 
-impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
+impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncNotesResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
         let chain_tip = value
             .pagination_info
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
             .chain_tip;
 
         // Validate and convert block header
         let block_header = value
             .block_header
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(block_header)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_header)))?
             .try_into()?;
 
         let mmr_path = value
             .mmr_path
-            .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
             .try_into()?;
 
         // Validate and convert account note inclusions into an (AccountId, Word) tuple
@@ -131,23 +131,19 @@ impl TryFrom<proto::rpc_store::SyncNotesResponse> for NoteSyncInfo {
         for note in value.notes {
             let note_id: NoteId = note
                 .note_id
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
-                    notes.note_id
-                )))?
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
                 .try_into()?;
 
             let inclusion_path = note
                 .inclusion_path
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
                     notes.inclusion_path
                 )))?
                 .try_into()?;
 
             let metadata = note
                 .metadata
-                .ok_or(proto::rpc_store::SyncNotesResponse::missing_field(stringify!(
-                    notes.metadata
-                )))?
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
                 .try_into()?;
 
             let committed_note = CommittedNote::new(

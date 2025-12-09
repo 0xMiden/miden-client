@@ -6,8 +6,6 @@
 
 # Class: TransactionRecord
 
-Describes a transaction that has been executed and is being tracked on the Client.
-
 ## Methods
 
 ### \[dispose\]()

@@ -6,8 +6,6 @@
 
 # Class: BasicFungibleFaucetComponent
 
-Provides metadata for a basic fungible faucet account component.
-
 ## Methods
 
 ### \[dispose\]()

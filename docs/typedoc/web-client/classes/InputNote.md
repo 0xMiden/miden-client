@@ -6,8 +6,6 @@
 
 # Class: InputNote
 
-Note supplied as an input to a transaction, optionally with authentication data.
-
 ## Methods
 
 ### \[dispose\]()
