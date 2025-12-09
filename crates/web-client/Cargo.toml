@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["no-std"]
 description            = "Web Client library that facilitates interaction with the Miden network"
-documentation          = "https://docs.rs/miden-client-web/0.13.0"
+documentation          = "https://docs.rs/miden-client-web"
 edition.workspace      = true
 keywords               = ["client", "miden", "wasm", "web"]
 license.workspace      = true
@@ -23,8 +23,8 @@ testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies
-idxdb-store   = { package = "miden-idxdb-store", path = "../idxdb-store", version = "0.13" }
-miden-client  = { default-features = false, features = ["testing", "tonic"], path = "../rust-client", version = "0.13" }
+idxdb-store   = { package = "miden-idxdb-store", path = "../idxdb-store" }
+miden-client  = { default-features = false, features = ["testing", "tonic"], path = "../rust-client" }
 miden-objects = { workspace = true }
 
 # External dependencies

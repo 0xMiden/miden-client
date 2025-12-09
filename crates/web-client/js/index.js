@@ -200,7 +200,7 @@ export class WebClient {
           ],
         });
       });
-        } else {
+    } else {
       console.log("WebClient: Web Workers are not available.");
       // Worker not available; set up fallback values.
       this.worker = null;
@@ -561,7 +561,7 @@ export class MockWebClient extends WebClient {
       serializedMockChain,
       serializedMockNoteTransportNode
     );
-    
+
     // Wait for the worker to be ready
     await instance.ready;
 
