@@ -20,6 +20,7 @@ use crate::models::secret_key::SecretKey;
 use crate::models::storage_slot::StorageSlot;
 use crate::models::word::Word;
 
+/// Procedure digest paired with whether it is an auth procedure.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct GetProceduresResultItem {
@@ -29,11 +30,13 @@ pub struct GetProceduresResultItem {
 
 #[wasm_bindgen]
 impl GetProceduresResultItem {
+    /// Returns the MAST root digest for the procedure.
     #[wasm_bindgen(getter)]
     pub fn digest(&self) -> Word {
         self.digest.clone()
     }
 
+    /// Returns true if the procedure is used for authentication.
     #[wasm_bindgen(getter, js_name = "isAuth")]
     pub fn is_auth(&self) -> bool {
         self.is_auth
@@ -55,6 +58,7 @@ pub struct AccountComponent(NativeAccountComponent);
 
 #[wasm_bindgen]
 impl AccountComponent {
+    /// Compiles account code with the given storage slots using the provided assembler.
     pub fn compile(
         account_code: &str,
         builder: &ScriptBuilder,
@@ -68,12 +72,14 @@ impl AccountComponent {
             .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
     }
 
+    /// Marks the component as supporting all account types.
     #[wasm_bindgen(js_name = "withSupportsAllTypes")]
     pub fn with_supports_all_types(mut self) -> Self {
         self.0 = self.0.with_supports_all_types();
         self
     }
 
+    /// Returns the hex-encoded MAST root for a procedure by name.
     #[wasm_bindgen(js_name = "getProcedureHash")]
     pub fn get_procedure_hash(&self, procedure_name: &str) -> Result<String, JsValue> {
         let get_proc_export = self
@@ -103,11 +109,13 @@ impl AccountComponent {
         Ok(digest_hex)
     }
 
+    /// Returns all procedures exported by this component.
     #[wasm_bindgen(js_name = "getProcedures")]
     pub fn get_procedures(&self) -> Vec<GetProceduresResultItem> {
         self.0.get_procedures().iter().map(Into::into).collect()
     }
 
+    /// Builds an auth component from a secret key (`RpoFalcon512` or ECDSA k256 Keccak).
     #[wasm_bindgen(js_name = "createAuthComponent")]
     pub fn create_auth_component(secret_key: &SecretKey) -> Result<AccountComponent, JsValue> {
         let native_secret_key: NativeSecretKey = secret_key.into();
@@ -153,6 +161,7 @@ impl AccountComponent {
         }
     }
 
+    /// Creates an account component from a compiled package and storage slots.
     #[wasm_bindgen(js_name = "fromPackage")]
     pub fn from_package(
         package: &Package,

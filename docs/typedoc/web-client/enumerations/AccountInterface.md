@@ -11,3 +11,5 @@
 ### BasicWallet
 
 > **BasicWallet**: `0`
+
+Basic wallet address interface.
