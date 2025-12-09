@@ -30,7 +30,7 @@ impl InputNote {
     /// An unauthenticated note can be consumed in a transaction as long as the note exists in the
     /// network as of the transaction batch in which the consume transaction is included.
     pub fn unauthenticated(note: &Note) -> InputNote {
-        InputNote(NativeInputNote::unauthenticated(note.into().clone()))
+        InputNote(NativeInputNote::unauthenticated(note.clone().into()))
     }
 
     /// Returns the identifier of the input note.
