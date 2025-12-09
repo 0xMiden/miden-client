@@ -25,6 +25,7 @@ export {
   AdviceInputs,
   AdviceMap,
   AssetVault,
+  AuthScheme,
   AuthSecretKey,
   BasicFungibleFaucetComponent,
   BlockHeader,
