@@ -99,7 +99,7 @@ If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ##### seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Returns
 
@@ -126,7 +126,7 @@ callbacks. If `node_url` is `None`, it defaults to the testnet endpoint.
 
 ##### seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 ##### get\_key\_cb?
 
@@ -157,15 +157,15 @@ applications as it uses a mock chain that simulates the behavior of a real node.
 
 ##### seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 ##### serialized\_mock\_chain?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 ##### serialized\_mock\_note\_transport\_node?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Returns
 
@@ -797,7 +797,7 @@ Returns all the existing setting keys from the store.
 
 ##### init\_seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Returns
 

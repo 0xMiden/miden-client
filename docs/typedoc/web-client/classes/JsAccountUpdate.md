@@ -94,13 +94,13 @@ Serialized storage slot data for this account.
 
 #### Get Signature
 
-> **get** **accountSeed**(): `Uint8Array`\<`ArrayBufferLike`\>
+> **get** **accountSeed**(): `Uint8Array`
 
 Optional seed data for the account.
 
 ##### Returns
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Set Signature
 
@@ -112,7 +112,7 @@ Optional seed data for the account.
 
 ###### value
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 ##### Returns
 

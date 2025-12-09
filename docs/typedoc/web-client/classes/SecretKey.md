@@ -116,7 +116,7 @@ Generates an ECDSA k256 Keccak secret key using an optional deterministic seed.
 
 ##### seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Returns
 
@@ -134,7 +134,7 @@ Generates an `RpoFalcon512` secret key using an optional deterministic seed.
 
 ##### seed?
 
-`Uint8Array`\<`ArrayBufferLike`\>
+`Uint8Array`
 
 #### Returns
 
