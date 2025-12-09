@@ -70,6 +70,7 @@ export interface IAccountAsset {
 export interface IAccountAuth {
   pubKey: string;
   secretKey: string;
+  accountIdHex: string;
 }
 
 export interface IAccount {

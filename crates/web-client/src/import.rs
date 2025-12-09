@@ -63,7 +63,7 @@ impl WebClient {
 
         keystore
             .expect("KeyStore should be initialized")
-            .add_key(&key_pair)
+            .add_key(&key_pair, &native_id)
             .await
             .map_err(|err| err.to_string())?;
 

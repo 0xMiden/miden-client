@@ -196,7 +196,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let second_client_target_account_id = second_client_first_regular_account.id();
     let faucet_account_id = faucet_account_header.id();
 
-    keystore_2.add_key(&secret_key)?;
+    keystore_2.add_key(&secret_key, &faucet_account_header.id())?;
     client_2.add_account(&faucet_account_header, false).await?;
 
     // First Mint necessary token
@@ -388,7 +388,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
         build_wallet_id(user_seed, &secret_key.public_key(), AccountStorageMode::Public, false)?;
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await?;
-    keystore_2.add_key(&secret_key)?;
+    keystore_2.add_key(&secret_key, &first_regular_account.id())?;
 
     let original_account =
         client_1.get_account(first_regular_account.id()).await?.with_context(|| {

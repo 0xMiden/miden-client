@@ -20,11 +20,7 @@ use rand::rngs::StdRng;
 use uuid::Uuid;
 
 use crate::account::component::{
-    AccountComponent,
-    AuthEcdsaK256Keccak,
-    AuthRpoFalcon512,
-    BasicFungibleFaucet,
-    BasicWallet,
+    AccountComponent, AuthEcdsaK256Keccak, AuthRpoFalcon512, BasicFungibleFaucet, BasicWallet,
 };
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
@@ -36,12 +32,8 @@ use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
 use crate::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use crate::transaction::{
-    NoteArgs,
-    TransactionKernel,
-    TransactionRequest,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    NoteArgs, TransactionKernel, TransactionRequest, TransactionRequestBuilder,
+    TransactionRequestError, TransactionStatus,
 };
 use crate::{Client, ClientError};
 
@@ -103,8 +95,6 @@ pub async fn insert_new_wallet_with_seed(
         },
     };
 
-    keystore.add_key(&key_pair).unwrap();
-
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
@@ -112,6 +102,8 @@ pub async fn insert_new_wallet_with_seed(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -145,8 +137,6 @@ pub async fn insert_new_fungible_faucet(
         },
     };
 
-    keystore.add_key(&key_pair).unwrap();
-
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -162,6 +152,8 @@ pub async fn insert_new_fungible_faucet(
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await?;
     Ok((account, key_pair))
@@ -546,7 +538,6 @@ pub async fn insert_account_with_custom_component(
 
     let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
-    keystore.add_key(&key_pair).unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -557,6 +548,7 @@ pub async fn insert_account_with_custom_component(
         .build()
         .map_err(ClientError::AccountError)?;
 
+    keystore.add_key(&key_pair, &account.id()).unwrap();
     client.add_account(&account, false).await?;
 
     Ok((account, key_pair))

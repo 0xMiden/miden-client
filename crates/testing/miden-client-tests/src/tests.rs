@@ -10,10 +10,7 @@ use std::sync::Arc;
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
 use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthSecretKey,
-    PublicKeyCommitment,
-    RPO_FALCON_SCHEME_ID,
+    AuthEcdsaK256Keccak, AuthSecretKey, PublicKeyCommitment, RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
@@ -24,31 +21,15 @@ use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, Transacti
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    TestClientKeyStore,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    create_test_store_path,
-    execute_failing_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+    TestClientKeyStore, assert_account_has_single_asset, assert_note_cannot_be_consumed_twice,
+    consume_notes, create_test_store_path, execute_failing_tx, mint_and_consume, mint_note,
+    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionExecutorError,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
+    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
@@ -62,37 +43,19 @@ use miden_lib::testing::note::NoteBuilder;
 use miden_lib::transaction::TransactionKernel;
 use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable};
 use miden_objects::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageSlot,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountHeader, AccountId,
+    AccountStorageMode, AccountType, StorageMap, StorageSlot,
 };
 use miden_objects::assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind};
 use miden_objects::asset::{Asset, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 use miden_objects::note::{
-    Note,
-    NoteAssets,
-    NoteExecutionHint,
-    NoteExecutionMode,
-    NoteFile,
-    NoteInputs,
-    NoteMetadata,
-    NoteRecipient,
-    NoteTag,
-    NoteType,
+    Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteFile, NoteInputs, NoteMetadata,
+    NoteRecipient, NoteTag, NoteType,
 };
 use miden_objects::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -2090,8 +2053,6 @@ async fn empty_storage_map() {
     let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2105,6 +2066,8 @@ async fn empty_storage_map() {
         .unwrap();
 
     let account_id = account.id();
+
+    keystore.add_key(&key_pair, &account_id).unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2179,8 +2142,6 @@ async fn storage_and_vault_proofs() {
     let key_pair = AuthSecretKey::new_rpo_falcon512();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2192,6 +2153,8 @@ async fn storage_and_vault_proofs() {
         .with_component(bump_item_component)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
@@ -2583,8 +2546,6 @@ async fn insert_new_wallet(
     let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2595,6 +2556,8 @@ async fn insert_new_wallet(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2612,8 +2575,6 @@ async fn insert_new_ecdsa_wallet(
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(storage_mode)
@@ -2621,6 +2582,8 @@ async fn insert_new_ecdsa_wallet(
         .with_component(BasicWallet)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await?;
 
@@ -2634,8 +2597,6 @@ async fn insert_new_fungible_faucet(
 ) -> Result<Account, ClientError> {
     let key_pair = AuthSecretKey::new_rpo_falcon512_with_rng(client.rng());
     let pub_key = key_pair.public_key();
-
-    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2653,6 +2614,8 @@ async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
+    keystore.add_key(&key_pair, &account.id()).unwrap();
+
     client.add_account(&account, false).await?;
     Ok(account)
 }
@@ -2667,8 +2630,6 @@ async fn insert_new_ecdsa_fungible_faucet(
 
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
     let pub_key = key_pair.public_key();
-
-    keystore.add_key(&key_pair).unwrap();
 
     // we need to use an initial seed to create the wallet account
     let mut init_seed = [0u8; 32];
@@ -2685,6 +2646,8 @@ async fn insert_new_ecdsa_fungible_faucet(
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await?;
     Ok(account)
@@ -2734,8 +2697,6 @@ async fn storage_and_vault_proofs_ecdsa() {
     let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
     let pub_key = key_pair.public_key();
 
-    keystore.add_key(&key_pair).unwrap();
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
@@ -2747,6 +2708,8 @@ async fn storage_and_vault_proofs_ecdsa() {
         .with_component(bump_item_component)
         .build()
         .unwrap();
+
+    keystore.add_key(&key_pair, &account.id()).unwrap();
 
     client.add_account(&account, false).await.unwrap();
 
