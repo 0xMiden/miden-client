@@ -186,10 +186,21 @@ export class WebClient {
         }
       });
 
-      // Note: Worker initialization is deferred until initWorker() is called.
-      // This ensures the main thread has stored the genesis block in IndexedDB
-      // before the worker creates its client (so it can read genesis from the store).
-    } else {
+      // Once the worker script has loaded, initialize the worker.
+      this.loaded.then(() => {
+        this.worker.postMessage({
+          action: WorkerAction.INIT,
+          args: [
+            this.rpcUrl,
+            this.noteTransportUrl,
+            this.seed,
+            this.getKeyCb,
+            this.insertKeyCb,
+            this.signCb,
+          ],
+        });
+      });
+        } else {
       console.log("WebClient: Web Workers are not available.");
       // Worker not available; set up fallback values.
       this.worker = null;
@@ -219,28 +230,6 @@ export class WebClient {
   }
 
   /**
-   * Initialize the worker after the main thread has stored the genesis block.
-   * This ensures the worker can read genesis from IndexedDB when it creates its client.
-   */
-  async initWorker() {
-    if (!this.worker) {
-      return;
-    }
-    await this.loaded;
-    this.worker.postMessage({
-      action: WorkerAction.INIT,
-      args: [
-        this.rpcUrl,
-        this.noteTransportUrl,
-        this.seed,
-        this.getKeyCb,
-        this.insertKeyCb,
-        this.signCb,
-      ],
-    });
-  }
-
-  /**
    * Factory method to create and initialize a WebClient instance.
    * This method is async so you can await the asynchronous call to createClient().
    *
@@ -254,13 +243,8 @@ export class WebClient {
     const instance = new WebClient(rpcUrl, noteTransportUrl, seed);
 
     // Wait for the underlying wasmWebClient to be initialized.
-    // This also fetches and stores the genesis block in IndexedDB.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClient(rpcUrl, noteTransportUrl, seed);
-
-    // Now that genesis is stored, initialize the worker.
-    // The worker will read genesis from IndexedDB and set the commitment on its RPC client.
-    await instance.initWorker();
 
     // Wait for the worker to be ready
     await instance.ready;
@@ -325,10 +309,6 @@ export class WebClient {
       insertKeyCb,
       signCb
     );
-
-    // Now that genesis is stored, initialize the worker (if available).
-    // Note: Workers are disabled when external keystore callbacks are provided.
-    await instance.initWorker();
 
     await instance.ready;
     // Return a proxy that forwards missing properties to wasmWebClient.
@@ -581,9 +561,7 @@ export class MockWebClient extends WebClient {
       serializedMockChain,
       serializedMockNoteTransportNode
     );
-
-    await instance.initWorker();
-
+    
     // Wait for the worker to be ready
     await instance.ready;
 
