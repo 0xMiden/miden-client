@@ -1,0 +1,34 @@
+name = "multisig_auth"
+description = "Multisig authentication component based on RPO Falcon512 signatures. Enforces a threshold of approver signatures for every transaction."
+version = "0.1.0"
+supported-types = ["RegularAccountUpdatableCode", "RegularAccountImmutableCode", "FungibleFaucet", "NonFungibleFaucet"]
+
+[[storage]]
+name = "threshold_and_count"
+description = "Contains default threshold and number of approvers: [threshold, num_approvers, 0, 0]"
+slot = 0
+value = [
+    { name = "threshold", type = "u32", description = "Default threshold of signatures required" },
+    { name = "num_approvers", type = "u32", description = "Number of approvers" },
+    { value = "0" },
+    { value = "0" },
+]
+
+[[storage]]
+name = "approvers"
+description = "Map with approver public keys (index -> pubkey)"
+slot = 1
+type = "map"
+
+[[storage]]
+name = "executed_transactions"
+description = "Map which stores executed transactions"
+slot = 2
+type = "map"
+values = []
+
+[[storage]]
+name = "proc_thresholds"
+description = "Map which stores procedure thresholds (PROC_ROOT -> threshold)"
+slot = 3
+type = "map"

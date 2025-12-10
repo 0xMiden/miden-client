@@ -155,6 +155,7 @@ declare global {
     TransactionScript: typeof TransactionScript;
     TransactionScriptInputPair: typeof TransactionScriptInputPair;
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
+    TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
     WebClient: typeof WebClient;
     Word: typeof Word;
@@ -174,6 +175,7 @@ declare global {
       waitForBlocks: (amountOfBlocks: number) => Promise<void>;
       refreshClient: (initSeed?: Uint8Array) => Promise<void>;
       parseNetworkId: (networkId: string) => NetworkId;
+      generateKeyWithScheme: (signatureScheme: string) => SecretKey;
     };
   }
 }

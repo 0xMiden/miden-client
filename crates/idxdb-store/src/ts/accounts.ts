@@ -419,14 +419,14 @@ export async function insertAccountAuth(pubKey: string, secretKey: string) {
 }
 
 export async function insertAccountAddress(
-  address: Uint8Array,
-  accountId: string
+  accountId: string,
+  address: Uint8Array
 ) {
   try {
     // Prepare the data object to insert
     const data = {
-      address,
       id: accountId,
+      address,
     };
 
     // Perform the insert using Dexie

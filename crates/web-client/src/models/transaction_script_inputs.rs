@@ -5,6 +5,7 @@ use super::miden_arrays::FeltArray;
 use super::word::Word;
 use crate::models::miden_arrays::TransactionScriptInputPairArray;
 
+/// A script argument represented as a word plus additional felts.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct TransactionScriptInputPair {
@@ -14,15 +15,18 @@ pub struct TransactionScriptInputPair {
 
 #[wasm_bindgen]
 impl TransactionScriptInputPair {
+    /// Creates a new script input pair.
     #[wasm_bindgen(constructor)]
     pub fn new(word: Word, felts: &FeltArray) -> TransactionScriptInputPair {
         TransactionScriptInputPair { word, felts: felts.clone() }
     }
 
+    /// Returns the word part of the input.
     pub fn word(&self) -> Word {
         self.word.clone()
     }
 
+    /// Returns the remaining felts for the input.
     pub fn felts(&self) -> FeltArray {
         self.felts.clone()
     }

@@ -34,6 +34,8 @@ try {
   console.log(account.nonce().toString()); // Current account nonce
   console.log(account.commitment().toHex()); // Account commitment hash
   console.log(account.isPublic()); // Whether the account is public
+  console.log(account.isPrivate()); // Whether the account is private
+  console.log(account.isNetwork()); // Whether the account is network
   console.log(account.isUpdatable()); // Whether the account code can be updated
   console.log(account.isFaucet()); // Whether the account is a faucet
   console.log(account.isRegularAccount()); // Whether it's a regular account

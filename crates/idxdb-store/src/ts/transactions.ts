@@ -11,7 +11,7 @@ interface ProcessedTransaction {
   details?: string;
   id: string;
   txScript?: string;
-  blockNum: string;
+  blockNum: number;
   statusVariant: number;
   status?: string;
 }
@@ -19,6 +19,7 @@ interface ProcessedTransaction {
 const IDS_FILTER_PREFIX = "Ids:";
 const EXPIRED_BEFORE_FILTER_PREFIX = "ExpiredPending:";
 
+const STATUS_PENDING_VARIANT = 0;
 const STATUS_COMMITTED_VARIANT = 1;
 const STATUS_DISCARDED_VARIANT = 2;
 
@@ -28,7 +29,7 @@ export async function getTransactions(filter: string) {
   try {
     if (filter === "Uncommitted") {
       transactionRecords = await transactions
-        .filter((tx) => tx.statusVariant !== STATUS_COMMITTED_VARIANT)
+        .filter((tx) => tx.statusVariant === STATUS_PENDING_VARIANT)
         .toArray();
     } else if (filter.startsWith(IDS_FILTER_PREFIX)) {
       const idsString = filter.substring(IDS_FILTER_PREFIX.length);
@@ -103,7 +104,7 @@ export async function getTransactions(filter: string) {
           details: detailsBase64,
           scriptRoot: transactionRecord.scriptRoot,
           txScript: txScriptBase64,
-          blockNum: transactionRecord.blockNum.toString(),
+          blockNum: transactionRecord.blockNum,
           statusVariant: transactionRecord.statusVariant,
           status: statusBase64,
         };
@@ -140,7 +141,7 @@ export async function insertTransactionScript(
 export async function upsertTransactionRecord(
   transactionId: string,
   details: Uint8Array,
-  blockNum: string,
+  blockNum: number,
   statusVariant: number,
   status: Uint8Array,
   scriptRoot?: Uint8Array
@@ -150,7 +151,7 @@ export async function upsertTransactionRecord(
       id: transactionId,
       details,
       scriptRoot: mapOption(scriptRoot, (root) => uint8ArrayToBase64(root)),
-      blockNum: parseInt(blockNum, 10),
+      blockNum,
       statusVariant,
       status,
     };

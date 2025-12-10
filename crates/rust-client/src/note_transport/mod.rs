@@ -10,14 +10,15 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_lib::utils::Serializable;
 use miden_objects::address::Address;
-use miden_objects::note::{Note, NoteDetails, NoteHeader, NoteTag};
+use miden_objects::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, SliceReader};
 
 pub use self::errors::NoteTransportError;
-use crate::store::{InputNoteRecord, Store};
+use crate::store::Store;
 use crate::{Client, ClientError};
 
-pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "http://localhost:57292";
+pub const NOTE_TRANSPORT_DEFAULT_ENDPOINT: &str = "https://transport.miden.io";
 pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
 /// Client note transport methods.
@@ -25,6 +26,15 @@ impl<AUTH> Client<AUTH> {
     /// Check if note transport connection is configured
     pub fn is_note_transport_enabled(&self) -> bool {
         self.note_transport_api.is_some()
+    }
+
+    /// Returns the Note Transport client
+    ///
+    /// Errors if the note transport is not configured.
+    pub(crate) fn get_note_transport_api(
+        &self,
+    ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
+        self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
     }
 
     /// Send a note through the note transport network.
@@ -48,7 +58,12 @@ impl<AUTH> Client<AUTH> {
 
         Ok(())
     }
+}
 
+impl<AUTH> Client<AUTH>
+where
+    AUTH: TransactionAuthenticator + Sync + 'static,
+{
     /// Fetch notes for tracked note tags.
     ///
     /// The client will query the configured note transport node for all tracked note tags.
@@ -62,16 +77,12 @@ impl<AUTH> Client<AUTH> {
     /// To fetch the full history of private notes for the tracked tags, use
     /// [`Client::fetch_all_private_notes`].
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        let api = self.get_note_transport_api()?;
-
         // Unique tags
         let note_tags = self.store.get_unique_note_tags().await?;
         // Get global cursor
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        let update = NoteTransport::new(api).fetch_notes(cursor, note_tags).await?;
-
-        self.store.apply_note_transport_update(update).await?;
+        self.fetch_transport_notes(cursor, note_tags).await?;
 
         Ok(())
     }
@@ -82,24 +93,55 @@ impl<AUTH> Client<AUTH> {
     /// fetching all notes stored in the note transport network for the tracked tags.
     /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
-        let api = self.get_note_transport_api()?;
-
         let note_tags = self.store.get_unique_note_tags().await?;
 
-        let update = NoteTransport::new(api)
-            .fetch_notes(NoteTransportCursor::init(), note_tags)
-            .await?;
-
-        self.store.apply_note_transport_update(update).await?;
+        self.fetch_transport_notes(NoteTransportCursor::init(), note_tags).await?;
 
         Ok(())
     }
 
-    /// Returns the Note Transport client, if configured
-    pub(crate) fn get_note_transport_api(
-        &self,
-    ) -> Result<Arc<dyn NoteTransportClient>, NoteTransportError> {
-        self.note_transport_api.clone().ok_or(NoteTransportError::Disabled)
+    /// Fetch notes from the note transport network for provided note tags
+    ///
+    /// Pagination is employed, where only notes after the provided cursor are requested.
+    /// Downloaded notes are imported.
+    pub(crate) async fn fetch_transport_notes<I>(
+        &mut self,
+        cursor: NoteTransportCursor,
+        tags: I,
+    ) -> Result<(), ClientError>
+    where
+        I: IntoIterator<Item = NoteTag>,
+    {
+        let mut notes = Vec::new();
+        // Fetch notes
+        let (note_infos, rcursor) = self
+            .get_note_transport_api()?
+            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
+            .await?;
+        for note_info in &note_infos {
+            // e2ee impl hint:
+            // for key in self.store.decryption_keys() try
+            // key.decrypt(details_bytes_encrypted)
+            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
+            notes.push(note);
+        }
+
+        let sync_height = self.get_sync_height().await?;
+        // Import fetched notes
+        for note in notes {
+            let tag = note.metadata().tag();
+            let note_file = NoteFile::NoteDetails {
+                details: note.into(),
+                after_block_num: sync_height,
+                tag: Some(tag),
+            };
+            self.import_note(note_file).await?;
+        }
+
+        // Update cursor (pagination)
+        self.store.update_note_transport_cursor(rcursor).await?;
+
+        Ok(())
     }
 }
 
@@ -111,11 +153,6 @@ pub(crate) async fn init_note_transport_cursor(store: Arc<dyn Store>) -> Result<
         store.set_setting(setting.into(), initial_cursor).await?;
     }
     Ok(())
-}
-
-/// Note Transport methods
-pub struct NoteTransport {
-    api: Arc<dyn NoteTransportClient>,
 }
 
 /// Note transport cursor
@@ -130,42 +167,7 @@ pub struct NoteTransportUpdate {
     /// Pagination cursor for next fetch
     pub cursor: NoteTransportCursor,
     /// Fetched notes
-    pub note_updates: Vec<InputNoteRecord>,
-}
-
-impl NoteTransport {
-    pub fn new(api: Arc<dyn NoteTransportClient>) -> Self {
-        Self { api }
-    }
-
-    /// Fetch notes for provided note tags with pagination
-    ///
-    /// Only notes after the provided cursor are requested.
-    pub(crate) async fn fetch_notes<I>(
-        &mut self,
-        cursor: NoteTransportCursor,
-        tags: I,
-    ) -> Result<NoteTransportUpdate, ClientError>
-    where
-        I: IntoIterator<Item = NoteTag>,
-    {
-        let mut note_updates = vec![];
-        // Fetch notes
-        let (note_infos, rcursor) =
-            self.api.fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor).await?;
-        for note_info in &note_infos {
-            // e2ee impl hint:
-            // for key in self.store.decryption_keys() try
-            // key.decrypt(details_bytes_encrypted)
-            let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            let input_note = InputNoteRecord::from(note);
-            note_updates.push(input_note);
-        }
-
-        let update = NoteTransportUpdate { note_updates, cursor: rcursor };
-
-        Ok(update)
-    }
+    pub notes: Vec<Note>,
 }
 
 impl NoteTransportCursor {

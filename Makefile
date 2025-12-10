@@ -72,10 +72,13 @@ rust-client-ts-lint:
 # --- Documentation -------------------------------------------------------------------------------
 
 .PHONY: doc
-doc: ## Generate & check rust documentation. You'll need `jq` in order for this to run.
+doc: ## Generate & check rust documentation. Ensure you have the nightly toolchain installed.
 	@cd crates/rust-client && \
-	FEATURES=$$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "miden-client") | .features | keys[] | select(. != "web-tonic" and . != "idxdb")' | tr '\n' ',') && \
-	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --features "$$FEATURES" --keep-going --release
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release
+
+doc-open: ## Generate & open rust documentation in browser. Ensure you have the nightly toolchain installed.
+	@cd crates/rust-client && \
+	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release --open
 
 .PHONY: serve-docs
 serve-docs: ## Serves the docs
@@ -211,6 +214,12 @@ check-tools: ## Checks if development tools are installed
 .PHONY: install-tools
 install-tools: ## Installs Rust + Node tools required by the Makefile
 	@echo "Installing development tools..."
+	@rustup show active-toolchain >/dev/null 2>&1 || (echo "Rust toolchain not detected. Install rustup + toolchain first." && exit 1)
+	@echo "Ensuring wasm32-unknown-unknown target is installed..."
+	@rustup target add wasm32-unknown-unknown >/dev/null
+	@RUST_TC=$$(rustup show active-toolchain | awk '{print $$1}'); \
+		echo "Ensuring required Rust components are installed for $$RUST_TC..."; \
+		rustup component add --toolchain $$RUST_TC clippy rust-src rustfmt >/dev/null
 	# Rust-related
 	cargo install mdbook --locked
 	cargo install typos-cli --locked

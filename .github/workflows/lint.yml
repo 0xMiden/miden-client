@@ -90,6 +90,35 @@ jobs:
       - name: make - format-check
         run: make format-check
 
+  wasm-bindgen-types:
+    name: wasm bindgen types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            crates/web-client/yarn.lock
+            crates/idxdb-store/src/yarn.lock
+      - name: Install Rust with wasm target
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install dependencies
+        working-directory: crates/web-client
+        run: yarn install --frozen-lockfile
+      - name: Build web client
+        working-directory: crates/web-client
+        run: yarn build
+      - name: Check bindgen type coverage
+        working-directory: crates/web-client
+        run: yarn check:wasm-types
+
   rustdocs:
     name: build rust documentation
     runs-on: ubuntu-latest

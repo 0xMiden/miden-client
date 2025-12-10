@@ -89,6 +89,45 @@ yarn test
 
 This runs a suite of integration tests to verify the SDK’s functionality in a web context.
 
+### Building the npm package
+
+Follow the steps below to produce the contents that get published to npm (`dist/` plus the license file). All commands are executed from `crates/web-client`.
+
+1. **Install prerequisites**
+   - Install the Rust toolchain version specified in `rust-toolchain.toml`.
+   - Install Node.js ≥18 and Yarn.
+2. **Install dependencies**
+   ```bash
+   yarn install
+   ```
+   This installs both the JavaScript tooling and the `@wasm-tool/rollup-plugin-rust` dependency that compiles the Rust crate.
+3. **Build the package**
+   ```bash
+   yarn build
+   ```
+   The `build` script (see `package.json`) performs the following:
+   - Removes the previous `dist/` directory (`rimraf dist`).
+   - Runs `npm run build-rust-client-js`, which builds the `idxdb-store` TypeScript helper that the SDK imports.
+   - Invokes Rollup with `RUSTFLAGS="--cfg getrandom_backend=\"wasm_js\""` so the Rust `getrandom` crate targets browser entropy and so that atomics/bulk-memory WebAssembly features are enabled.
+   - Copies the generated TypeScript declarations from `js/types` into `dist/`.
+   - Executes `node clean.js` to strip paths from the generated `.js` files, leaving only the artifacts needed on npm.
+4. **Inspect the artifacts**
+   - `dist/index.js` is the ESM entry point referenced by `"main"`/`"browser"`/`"exports"`.
+   - `dist/index.d.ts` and the rest of the `.d.ts` files provide the TypeScript surface.
+   Use `npm pack` if you want to preview the exact tarball that would be published.
+
+> Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output. This debugging metadata also includes debug symbols for the generated wasm binary
+
+### Checking the generated TypeScript bindings
+
+The script at `crates/web-client/scripts/check-bindgen-types.js` verifies that every type exported by the generated wasm bindings (`dist/crates/miden_client_web.d.ts`) is re-exported from the public declarations (`js/types/index.d.ts`). Run it after a build with:
+
+```
+yarn check:wasm-types
+```
+
+`WebClient` is intentionally excluded because the wrapper defines its own implementation. If the check reports missing exports, update `js/types/index.d.ts` so consumers get the full generated surface.
+
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).
@@ -110,6 +149,8 @@ const account = await webClient.newWallet(accountStorageMode, mutable);
 
 console.log(account.id().toString()); // account id as hex
 console.log(account.isPublic()); // false
+console.log(account.isPrivate()); // true
+console.log(account.isNetwork()); // false
 console.log(account.isFaucet()); // false
 ```
 

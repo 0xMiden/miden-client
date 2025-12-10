@@ -5,7 +5,8 @@ export const deserializePackageFromBytes = async (
   testingPage: Page
 ): Promise<void> => {
   await testingPage.evaluate(async () => {
-    const testPackageBytes = window.TestUtils.createMockSerializedPackage();
+    const testPackageBytes =
+      window.TestUtils.createMockSerializedLibraryPackage();
     window.Package.deserialize(testPackageBytes);
   });
 };
@@ -14,7 +15,8 @@ export const createAccountComponentFromPackage = async (
   testingPage: Page
 ): Promise<void> => {
   return await testingPage.evaluate(async () => {
-    const testPackageBytes = window.TestUtils.createMockSerializedPackage();
+    const testPackageBytes =
+      window.TestUtils.createMockSerializedLibraryPackage();
     const deserializedPackage = window.Package.deserialize(testPackageBytes);
     let emptyStorageSlot = window.StorageSlot.emptyValue();
     let storageMap = new window.StorageMap();
@@ -30,6 +32,18 @@ export const createAccountComponentFromPackage = async (
   });
 };
 
+export const createNoteScriptFromPackage = async (
+  testingPage: Page
+): Promise<void> => {
+  return await testingPage.evaluate(async () => {
+    const testPackageBytes =
+      window.TestUtils.createMockSerializedProgramPackage();
+    const deserializedPackage = window.Package.deserialize(testPackageBytes);
+
+    window.NoteScript.fromPackage(deserializedPackage);
+  });
+};
+
 test.describe("package tests", () => {
   test("successfully deserializes a package from bytes", async ({ page }) => {
     await deserializePackageFromBytes(page);
@@ -39,5 +53,9 @@ test.describe("package tests", () => {
     page,
   }) => {
     await createAccountComponentFromPackage(page);
+  });
+
+  test("creates a note script from a package", async ({ page }) => {
+    await createNoteScriptFromPackage(page);
   });
 });

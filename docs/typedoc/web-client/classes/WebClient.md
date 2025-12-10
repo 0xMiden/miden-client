@@ -335,7 +335,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 ### getAccountAuthByPubKey()
 
-> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`SecretKey`](SecretKey.md)\>
+> **getAccountAuthByPubKey**(`pub_key`): `Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 #### Parameters
 
@@ -345,7 +345,7 @@ Uses an internal pagination mechanism to avoid fetching duplicate notes.
 
 #### Returns
 
-`Promise`\<[`SecretKey`](SecretKey.md)\>
+`Promise`\<[`AuthSecretKey`](AuthSecretKey.md)\>
 
 ***
 
@@ -533,7 +533,7 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 
 ### importPublicAccountFromSeed()
 
-> **importPublicAccountFromSeed**(`init_seed`, `mutable`): `Promise`\<[`Account`](Account.md)\>
+> **importPublicAccountFromSeed**(`init_seed`, `mutable`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -544,6 +544,10 @@ Retrieves the setting value for `key`, or `None` if it hasn’t been set.
 ##### mutable
 
 `boolean`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -631,7 +635,7 @@ Returns all the existing setting keys from the store.
 
 ### newFaucet()
 
-> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`): `Promise`\<[`Account`](Account.md)\>
+> **newFaucet**(`storage_mode`, `non_fungible`, `token_symbol`, `decimals`, `max_supply`, `auth_scheme`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -654,6 +658,10 @@ Returns all the existing setting keys from the store.
 ##### max\_supply
 
 `bigint`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 #### Returns
 
@@ -771,7 +779,7 @@ Returns all the existing setting keys from the store.
 
 ### newWallet()
 
-> **newWallet**(`storage_mode`, `mutable`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
+> **newWallet**(`storage_mode`, `mutable`, `auth_scheme`, `init_seed?`): `Promise`\<[`Account`](Account.md)\>
 
 #### Parameters
 
@@ -782,6 +790,10 @@ Returns all the existing setting keys from the store.
 ##### mutable
 
 `boolean`
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
 
 ##### init\_seed?
 

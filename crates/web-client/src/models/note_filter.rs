@@ -5,6 +5,7 @@ use super::note_id::NoteId;
 
 // TODO: Add nullfiier support
 
+/// Filter options for querying notes from the store.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteFilter {
@@ -14,6 +15,7 @@ pub struct NoteFilter {
 
 #[wasm_bindgen]
 impl NoteFilter {
+    /// Creates a new filter for the given type and optional note IDs.
     #[wasm_bindgen(constructor)]
     pub fn new(note_type: NoteFilterTypes, note_ids: Option<Vec<NoteId>>) -> NoteFilter {
         NoteFilter { note_type, note_ids }

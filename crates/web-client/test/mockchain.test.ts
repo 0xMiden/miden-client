@@ -4,19 +4,33 @@ import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
+    // Web Client tests share the same browser database "MidenClientDB"
+    // Across all tests. This is error prone as the mockChainTest will
+    // run this test with a previously loaded DB which doesn't correspond
+    // to the actual context.
+    // https://github.com/0xMiden/miden-client/issues/1611
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase("MidenClientDB");
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => resolve();
+    });
+
     const client = await window.MockWebClient.createClient();
     await client.syncState();
 
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
-      true
+      true,
+      0
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
       false,
       "DAG",
       8,
-      BigInt(10000000)
+      BigInt(10000000),
+      0
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(

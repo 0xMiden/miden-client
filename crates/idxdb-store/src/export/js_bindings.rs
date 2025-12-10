@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasm_bindgen_futures::js_sys;
 
 #[wasm_bindgen(module = "/src/js/export.js")]
 extern "C" {

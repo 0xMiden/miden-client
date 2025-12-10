@@ -1,5 +1,4 @@
-use miden_client::auth::Signature as NativeSignature;
-use miden_client::crypto::rpo_falcon512::SecretKey as NativeSecretKey;
+use miden_client::auth::AuthSecretKey as NativeSecretKey;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use wasm_bindgen::prelude::*;
@@ -17,43 +16,57 @@ pub struct SecretKey(NativeSecretKey);
 
 #[wasm_bindgen]
 impl SecretKey {
-    #[wasm_bindgen(js_name = "withRng")]
-    pub fn with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
-        let mut rng = match seed {
+    /// Generates an `RpoFalcon512` secret key using an optional deterministic seed.
+    #[wasm_bindgen(js_name = "rpoFalconWithRNG")]
+    pub fn rpo_falcon_with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
+        let mut rng = Self::try_rng_from_seed(seed)?;
+        Ok(NativeSecretKey::new_rpo_falcon512_with_rng(&mut rng).into())
+    }
+
+    /// Generates an ECDSA k256 Keccak secret key using an optional deterministic seed.
+    #[wasm_bindgen(js_name = "ecdsaWithRNG")]
+    pub fn ecdsa_with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
+        let mut rng = Self::try_rng_from_seed(seed)?;
+        Ok(NativeSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng).into())
+    }
+
+    fn try_rng_from_seed(seed: Option<Vec<u8>>) -> Result<StdRng, JsValue> {
+        match seed {
             Some(seed_bytes) => {
                 // Attempt to convert the seed slice into a 32-byte array.
                 let seed_array: [u8; 32] = seed_bytes
                     .try_into()
                     .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
-                StdRng::from_seed(seed_array)
+                Ok(StdRng::from_seed(seed_array))
             },
-            None => StdRng::from_os_rng(),
-        };
-        Ok(SecretKey(NativeSecretKey::with_rng(&mut rng)))
+            None => Ok(StdRng::from_os_rng()),
+        }
     }
 
+    /// Returns the public key associated with this secret key.
     #[wasm_bindgen(js_name = "publicKey")]
     pub fn public_key(&self) -> PublicKey {
         self.0.public_key().into()
     }
 
-    // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto 0.16
+    /// Signs a message word (blind signature).
     pub fn sign(&self, message: &Word) -> Signature {
         self.sign_data(&SigningInputs::new_blind(message))
     }
 
-    // TODO: update to sign instead of sign_with_rng once miden-objects uses miden-crypto 0.16
+    /// Signs arbitrary signing inputs.
     #[wasm_bindgen(js_name = "signData")]
     pub fn sign_data(&self, signing_inputs: &SigningInputs) -> Signature {
-        let mut rng = StdRng::from_os_rng();
         let native_word = signing_inputs.to_commitment().into();
-        NativeSignature::from(self.0.sign_with_rng(native_word, &mut rng)).into()
+        (self.0.sign(native_word)).into()
     }
 
+    /// Serializes the secret key into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a secret key from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<SecretKey, JsValue> {
         let native_secret_key = deserialize_from_uint8array::<NativeSecretKey>(bytes)?;
         Ok(SecretKey(native_secret_key))
@@ -84,5 +97,11 @@ impl From<SecretKey> for NativeSecretKey {
 impl From<&SecretKey> for NativeSecretKey {
     fn from(secret_key: &SecretKey) -> Self {
         secret_key.0.clone()
+    }
+}
+
+impl<'a> From<&'a SecretKey> for &'a NativeSecretKey {
+    fn from(secret_key: &'a SecretKey) -> Self {
+        &secret_key.0
     }
 }

@@ -1,10 +1,15 @@
 import Dexie from "dexie";
+import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 const DATABASE_NAME = "MidenClientDB";
-export async function openDatabase() {
-    console.log("Opening database...");
+export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+export async function openDatabase(clientVersion) {
+    console.log(`Opening database for client version ${clientVersion}...`);
     try {
         await db.open();
+        await ensureClientVersion(clientVersion);
         console.log("Database opened successfully");
         return true;
     }
@@ -85,5 +90,51 @@ const tags = db.table(Table.Tags);
 const foreignAccountCode = db.table(Table.ForeignAccountCode);
 const settings = db.table(Table.Settings);
 const trackedAccounts = db.table(Table.TrackedAccounts);
+async function ensureClientVersion(clientVersion) {
+    if (!clientVersion) {
+        console.warn("openDatabase called without a client version; skipping version enforcement.");
+        return;
+    }
+    const storedVersion = await getStoredClientVersion();
+    if (!storedVersion) {
+        await persistClientVersion(clientVersion);
+        return;
+    }
+    if (storedVersion === clientVersion) {
+        return;
+    }
+    const validCurrent = semver.valid(clientVersion);
+    const validStored = semver.valid(storedVersion);
+    if (validCurrent && validStored) {
+        const parsedCurrent = semver.parse(validCurrent);
+        const parsedStored = semver.parse(validStored);
+        const sameMajorMinor = parsedCurrent?.major === parsedStored?.major &&
+            parsedCurrent?.minor === parsedStored?.minor;
+        if (sameMajorMinor || !semver.gt(clientVersion, storedVersion)) {
+            await persistClientVersion(clientVersion);
+            return;
+        }
+    }
+    else {
+        console.warn(`Failed to parse semver (${storedVersion} vs ${clientVersion}), forcing store reset.`);
+    }
+    console.warn(`IndexedDB client version mismatch (stored=${storedVersion}, expected=${clientVersion}). Resetting store.`);
+    db.close();
+    await db.delete();
+    await db.open();
+    await persistClientVersion(clientVersion);
+}
+async function getStoredClientVersion() {
+    const record = await settings.get(CLIENT_VERSION_SETTING_KEY);
+    if (!record) {
+        return null;
+    }
+    return textDecoder.decode(record.value);
+}
+async function persistClientVersion(clientVersion) {
+    await settings.put({
+        key: CLIENT_VERSION_SETTING_KEY,
+        value: textEncoder.encode(clientVersion),
+    });
+}
 export { db, accountCodes, accountStorages, storageMapEntries, accountAssets, accountAuths, accounts, addresses, transactions, transactionScripts, inputNotes, outputNotes, notesScripts, stateSync, blockHeaders, partialBlockchainNodes, tags, foreignAccountCode, settings, trackedAccounts, };
-//# sourceMappingURL=schema.js.map

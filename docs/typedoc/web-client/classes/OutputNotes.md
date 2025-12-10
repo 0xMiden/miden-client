@@ -6,6 +6,9 @@
 
 # Class: OutputNotes
 
+Contains a list of output notes of a transaction. The list can be empty if the transaction does
+not produce any notes.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +24,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to all output notes.
 
 #### Returns
 
@@ -42,6 +47,8 @@
 
 > **getNote**(`index`): [`OutputNote`](OutputNote.md)
 
+Returns the output note at the specified index.
+
 #### Parameters
 
 ##### index
@@ -58,6 +65,8 @@
 
 > **isEmpty**(): `boolean`
 
+Returns true if there are no output notes.
+
 #### Returns
 
 `boolean`
@@ -68,6 +77,8 @@
 
 > **notes**(): [`OutputNote`](OutputNote.md)[]
 
+Returns all output notes as a vector.
+
 #### Returns
 
 [`OutputNote`](OutputNote.md)[]
@@ -77,6 +88,8 @@
 ### numNotes()
 
 > **numNotes**(): `number`
+
+Returns the number of notes emitted.
 
 #### Returns
 

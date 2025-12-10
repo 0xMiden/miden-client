@@ -7,11 +7,13 @@ use super::felt::Felt;
 use super::token_symbol::TokenSymbol;
 use crate::js_error_with_context;
 
+/// Provides metadata for a basic fungible faucet account component.
 #[wasm_bindgen]
 pub struct BasicFungibleFaucetComponent(NativeBasicFungibleFaucet);
 
 #[wasm_bindgen]
 impl BasicFungibleFaucetComponent {
+    /// Extracts faucet metadata from an account.
     #[wasm_bindgen(js_name = "fromAccount")]
     pub fn from_account(account: Account) -> Result<Self, JsValue> {
         let native_account: NativeAccount = account.into();
@@ -21,14 +23,17 @@ impl BasicFungibleFaucetComponent {
         Ok(native_faucet.into())
     }
 
+    /// Returns the faucet's token symbol.
     pub fn symbol(&self) -> TokenSymbol {
         self.0.symbol().into()
     }
 
+    /// Returns the number of decimal places for the token.
     pub fn decimals(&self) -> u8 {
         self.0.decimals()
     }
 
+    /// Returns the maximum token supply.
     #[wasm_bindgen(js_name = "maxSupply")]
     pub fn max_supply(&self) -> Felt {
         self.0.max_supply().into()
