@@ -4,6 +4,14 @@ import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
+    // Mockchain tests share the same database with the rest of the
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase("MidenClientDB");
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => resolve();
+    });
+
     const client = await window.MockWebClient.createClient();
     await client.syncState();
 
