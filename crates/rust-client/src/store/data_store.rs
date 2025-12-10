@@ -152,6 +152,10 @@ impl DataStore for ClientDataStore {
                 let witness = map.open(&map_key);
                 Ok(witness)
             },
+            Some(StorageSlot::Value(value)) => Err(DataStoreError::Other {
+                error_msg: format!("found StorageSlot::Value with {value} as its value.").into(),
+                source: None,
+            }),
             _ => Err(DataStoreError::Other {
                 error_msg: format!("did not find map with {map_root} as a root for {account_id}")
                     .into(),
