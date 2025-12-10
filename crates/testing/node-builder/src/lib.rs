@@ -298,7 +298,7 @@ impl NodeBuilder {
             .spawn(async move {
                 let store_url = Url::parse(&format!("http://{store_address}"))
                     .context("Failed to parse URL")?;
-                let validator_url = Url::parse(&format!("http://{validator_address}")) // TODO: replace for validator_address
+                let validator_url = Url::parse(&format!("http://{validator_address}"))
                     .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,

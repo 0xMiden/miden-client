@@ -299,7 +299,6 @@ export class WebClient {
       signCb
     );
     // Wait for the underlying wasmWebClient to be initialized.
-    // This also fetches and stores the genesis block in IndexedDB.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
       rpcUrl,
