@@ -104,37 +104,46 @@ impl DataStore for ClientDataStore {
         Ok((partial_account, block_header, partial_blockchain))
     }
 
-    fn get_vault_asset_witnesses(
+    async fn get_vault_asset_witnesses(
         &self,
         account_id: AccountId,
         vault_root: Word,
         vault_keys: BTreeSet<AssetVaultKey>,
-    ) -> impl FutureMaybeSend<Result<Vec<AssetWitness>, DataStoreError>> {
-        async move {
-            //TODO: Refactor `get_account_asset` for this.
-            let vault = self.store.get_account_vault(account_id).await?;
+    ) -> Result<Vec<AssetWitness>, DataStoreError> {
+        let mut asset_witnesses = vec![];
+        for vault_key in vault_keys {
+            match self.store.get_account_asset(account_id, vault_key.faucet_id_prefix()).await {
+                Ok(Some((_, asset_witness))) => {
+                    asset_witnesses.push(asset_witness);
+                },
+                Ok(_) => {
+                    let vault = self.store.get_account_vault(account_id).await?;
 
-            if vault.root() != vault_root {
-                return Err(DataStoreError::Other {
-                    error_msg: "Vault root mismatch".into(),
-                    source: None,
-                });
+                    if vault.root() != vault_root {
+                        return Err(DataStoreError::Other {
+                            error_msg: "Vault root mismatch".into(),
+                            source: None,
+                        });
+                    }
+
+                    let asset_witness =
+                        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
+                            DataStoreError::Other {
+                                error_msg: "Failed to open vault asset tree".into(),
+                                source: Some(Box::new(err)),
+                            }
+                        })?;
+                    asset_witnesses.push(asset_witness);
+                },
+                Err(err) => {
+                    return Err(DataStoreError::Other {
+                        error_msg: "Failed to get account asset".into(),
+                        source: Some(Box::new(err)),
+                    });
+                },
             }
-
-            let mut asset_witnesses = vec![];
-            for vault_key in vault_keys {
-                let asset_witness =
-                    AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
-                        DataStoreError::Other {
-                            error_msg: "Failed to open vault asset tree".into(),
-                            source: Some(Box::new(err)),
-                        }
-                    })?;
-                asset_witnesses.push(asset_witness);
-            }
-
-            Ok(asset_witnesses)
         }
+        Ok(asset_witnesses)
     }
 
     async fn get_storage_map_witness(
