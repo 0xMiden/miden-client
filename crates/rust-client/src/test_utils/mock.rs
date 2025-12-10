@@ -33,7 +33,7 @@ use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc_store::{BlockRange, SyncStateResponse};
+use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
 use crate::rpc::{NodeRpcClient, RpcError};
 use crate::transaction::ForeignAccount;
@@ -88,6 +88,7 @@ impl MockRpcApi {
         let mut account_commitment_updates = self.account_commitment_updates.write();
         let block_num = proven_block.header().block_num();
         let updates: BTreeMap<AccountId, Word> = proven_block
+            .body()
             .updated_accounts()
             .iter()
             .map(|update| (update.account_id(), update.final_state_commitment()))
@@ -158,7 +159,7 @@ impl MockRpcApi {
                     && block.header().block_num() <= next_block_num
             })
             .flat_map(|block| {
-                block.transactions().as_slice().iter().map(|tx| TransactionSummary {
+                block.body().transactions().as_slice().iter().map(|tx| TransactionSummary {
                     transaction_id: Some(tx.id().into()),
                     block_num: next_block_num.as_u32(),
                     account_id: Some(tx.account_id().into()),
@@ -208,6 +209,7 @@ impl MockRpcApi {
             }
 
             for update in block
+                .body()
                 .updated_accounts()
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
@@ -258,7 +260,7 @@ impl MockRpcApi {
                 continue;
             }
 
-            for transaction_header in block.transactions().as_slice() {
+            for transaction_header in block.body().transactions().as_slice() {
                 if !account_ids.contains(&transaction_header.account_id()) {
                     continue;
                 }
@@ -296,6 +298,7 @@ impl MockRpcApi {
             }
 
             for update in block
+                .body()
                 .updated_accounts()
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
@@ -726,7 +729,7 @@ fn build_account_updates(
         let block_num = block.header().block_num();
         let mut updates = BTreeMap::new();
 
-        for update in block.updated_accounts() {
+        for update in block.body().updated_accounts() {
             updates.insert(update.account_id(), update.final_state_commitment());
         }
 

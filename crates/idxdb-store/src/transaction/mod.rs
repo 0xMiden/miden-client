@@ -6,6 +6,7 @@ use miden_client::account::Account;
 use miden_client::store::{StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
+    TransactionId,
     TransactionRecord,
     TransactionScript,
     TransactionStatus,
@@ -70,7 +71,12 @@ impl WebStore {
 
                 let status = TransactionStatus::read_from_bytes(&tx_idxdb.status)?;
 
-                Ok(TransactionRecord { id: id.into(), details, script, status })
+                Ok(TransactionRecord {
+                    id: TransactionId::from_raw(id),
+                    details,
+                    script,
+                    status,
+                })
             })
             .collect();
 
