@@ -6,6 +6,7 @@ use crate::models::miden_arrays::NoteIdAndArgsArray;
 use crate::models::note_id::NoteId;
 use crate::models::transaction_request::note_and_args::NoteArgs;
 
+/// Note ID paired with optional arguments for inclusion in a transaction request.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct NoteIdAndArgs {
@@ -15,6 +16,7 @@ pub struct NoteIdAndArgs {
 
 #[wasm_bindgen]
 impl NoteIdAndArgs {
+    /// Creates a new NoteId/args pair.
     #[wasm_bindgen(constructor)]
     pub fn new(note_id: NoteId, args: Option<NoteArgs>) -> NoteIdAndArgs {
         NoteIdAndArgs { note_id, args }

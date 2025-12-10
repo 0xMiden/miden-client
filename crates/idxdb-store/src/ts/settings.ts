@@ -1,5 +1,7 @@
-import { settings } from "./schema.js";
+import { settings, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
+
+const INTERNAL_SETTING_KEYS = new Set([CLIENT_VERSION_SETTING_KEY]);
 
 export async function getSetting(key: string) {
   try {
@@ -60,7 +62,7 @@ export async function listSettingKeys() {
     const keys: string[] = await settings
       .toArray()
       .then((settings) => settings.map((setting) => setting.key));
-    return keys;
+    return keys.filter((key) => !INTERNAL_SETTING_KEYS.has(key));
   } catch (error) {
     logWebStoreError(error, `Error listing setting keys`);
   }

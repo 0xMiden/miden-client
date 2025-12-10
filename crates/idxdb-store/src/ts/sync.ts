@@ -132,7 +132,7 @@ interface SerializedOutputNoteData {
 interface SerializedTransactionData {
   id: string;
   details: Uint8Array;
-  blockNum: string;
+  blockNum: number;
   scriptRoot?: Uint8Array;
   statusVariant: number;
   status: Uint8Array;

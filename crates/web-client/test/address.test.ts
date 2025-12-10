@@ -140,6 +140,24 @@ test.describe("Bech32 tests", () => {
       49
     );
   });
+
+  test("fromBech32 returns correct account id", async ({ page }) => {
+    const success = await page.evaluate(async () => {
+      const newAccount = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const accountId = newAccount.id();
+      const asBech32 = accountId.toBech32(
+        window.NetworkId.Mainnet,
+        window.AccountInterface.BasicWallet
+      );
+      const fromBech32 = window.AccountId.fromBech32(asBech32).toString();
+      return accountId == fromBech32;
+    });
+    expect(success).toBe(true);
+  });
 });
 
 test.describe("Note tag tests", () => {
@@ -154,28 +172,43 @@ test.describe("Note tag tests", () => {
 const instanceAddressRemoveThenInsert = async (page: Page) => {
   return await page.evaluate(async () => {
     const client = window.client;
+    const parsedNetworkId = window.helpers.parseNetworkId("mtst");
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
       0
     );
-    console.log("newAccount ID:", newAccount.id());
-
+    const accountId = newAccount.id().toString();
     const address = window.Address.fromAccountId(newAccount.id(), null);
-
-    console.log("address:", address);
 
     // First we remove the address tracked by default
     await client.removeAccountAddress(newAccount.id(), address);
 
     // Then we add it again
     await client.insertAccountAddress(newAccount.id(), address);
-    return true;
+
+    const store = await client.exportStore();
+    const parsedStore = JSON.parse(store);
+    const retrievedAddressRecord = parsedStore.addresses[0];
+    const retrievedAddress = window.Address.deserialize(
+      retrievedAddressRecord.address
+    );
+    const retrievedId = retrievedAddressRecord.id;
+
+    return {
+      accountId: accountId,
+      address: address.toBech32(parsedNetworkId),
+      retrievedAccountId: retrievedId,
+      retrievedAddress: retrievedAddress.toBech32(parsedNetworkId),
+    };
   });
 };
 
 test.describe("Address insertion & deletion tests", () => {
-  test("address can be remove and then re-inserted", async ({ page }) => {
-    await expect(instanceAddressRemoveThenInsert(page)).resolves.toBeTruthy();
+  test("address can be removed and then re-inserted", async ({ page }) => {
+    const { accountId, address, retrievedAccountId, retrievedAddress } =
+      await instanceAddressRemoveThenInsert(page);
+    expect(retrievedAccountId).toBe(accountId);
+    expect(address).toBe(retrievedAddress);
   });
 });

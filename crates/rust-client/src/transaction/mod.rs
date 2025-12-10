@@ -257,14 +257,12 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
+        // Upsert note scripts for later retrieval from the client's DataStore
         let output_note_scripts: Vec<NoteScript> = transaction_request
-            .expected_output_own_notes()
-            .iter()
+            .expected_output_recipients()
             .map(|n| n.script().clone())
             .collect();
         self.store.upsert_note_scripts(&output_note_scripts).await?;
-
-        let tx_args = transaction_request.into_transaction_args(tx_script);
 
         let block_num = if let Some(block_num) = fpi_block_num {
             block_num
@@ -272,14 +270,18 @@ where
             self.store.get_sync_height().await?
         };
 
+        // Load account code into MAST forest store
         // TODO: Refactor this to get account code only?
         let account_record = self
             .store
             .get_account(account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
+        let account: Account = account_record.try_into()?;
         data_store.mast_store().load_account_code(account.code());
+
+        // Get transaction args
+        let tx_args = transaction_request.into_transaction_args(tx_script);
 
         if ignore_invalid_notes {
             // Remove invalid notes
@@ -430,7 +432,7 @@ where
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
 
-        let account: Account = account_record.into();
+        let account: Account = account_record.try_into()?;
 
         let data_store = ClientDataStore::new(self.store.clone());
 
@@ -693,7 +695,7 @@ where
             }
         }
 
-        let account: Account = self.try_get_account(account_id).await?.into();
+        let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
         if account.is_faucet() {
             // TODO(SantiagoPittella): Add faucet validations.
@@ -749,7 +751,7 @@ where
         &self,
         account_id: AccountId,
     ) -> Result<AccountInterface, ClientError> {
-        let account: Account = self.try_get_account(account_id).await?.into();
+        let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
         Ok(AccountInterface::from(&account))
     }

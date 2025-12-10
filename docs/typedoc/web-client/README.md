@@ -8,6 +8,7 @@
 
 - [AccountInterface](enumerations/AccountInterface.md)
 - [AccountType](enumerations/AccountType.md)
+- [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
 - [NetworkId](enumerations/NetworkId.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
@@ -95,6 +96,7 @@
 - [OutputNotesArray](classes/OutputNotesArray.md)
 - [Package](classes/Package.md)
 - [PartialNote](classes/PartialNote.md)
+- [Program](classes/Program.md)
 - [ProvenTransaction](classes/ProvenTransaction.md)
 - [PublicKey](classes/PublicKey.md)
 - [RpcClient](classes/RpcClient.md)

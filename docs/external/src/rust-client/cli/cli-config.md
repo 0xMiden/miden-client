@@ -1,5 +1,6 @@
 ---
 title: Config
+sidebar-position: 2
 ---
 
 After [installation](../install-and-run.md#install-the-client), use the client by running the following and adding the [relevant commands](index.md#commands):

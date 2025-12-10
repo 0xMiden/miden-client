@@ -12,11 +12,15 @@
 
 > `readonly` **account**: [`Account`](Account.md)
 
+Returns the built account.
+
 ***
 
 ### seed
 
 > `readonly` **seed**: [`Word`](Word.md)
+
+Returns the seed used to derive the account ID.
 
 ## Methods
 

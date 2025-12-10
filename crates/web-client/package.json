@@ -1,6 +1,6 @@
 {
   "name": "@demox-labs/miden-sdk",
-  "version": "0.12.4",
+  "version": "0.13.0",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden",
@@ -21,6 +21,7 @@
     "build-rust-client-js": "cd ../idxdb-store/src/ && yarn && yarn build",
     "build": "rimraf dist && npm run build-rust-client-js && cross-env RUSTFLAGS=\"--cfg getrandom_backend=\\\"wasm_js\\\"\" rollup -c rollup.config.js && cpr js/types dist && node clean.js",
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
+    "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
     "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
     "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test "

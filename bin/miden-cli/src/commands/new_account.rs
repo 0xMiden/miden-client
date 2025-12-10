@@ -509,7 +509,7 @@ fn process_packages(
             placeholders.insert(placeholder_key, input_value.to_string());
         }
 
-        let account_component = AccountComponent::from_package_with_init_data(
+        let account_component = AccountComponent::from_package(
             &package,
             &InitStorageData::new(placeholders, map_entries),
         )
