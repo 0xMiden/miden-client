@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use miden_client::EMPTY_WORD;
-use miden_client::account::{AccountStorageMode, build_wallet_id};
+use miden_client::account::{Account, AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{NoteFile, NoteType};
@@ -268,22 +268,18 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let to_account_id = second_client_target_account_id;
 
     // get initial balances
-    let from_account_balance = client_1
+    let account_client_1: Account = client_1
         .get_account(from_account_id)
         .await?
         .context("failed to find from account for balance check")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let to_account_balance = client_2
+        .try_into()?;
+    let from_account_balance = account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let account_client_2: Account = client_2
         .get_account(to_account_id)
         .await?
-        .context("failed to find to account for balance check")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+        .context("failed to find from account for balance check")?
+        .try_into()?;
+    let to_account_balance = account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
 
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT)?;
 
@@ -319,22 +315,20 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
         .with_context(|| format!("input note {} not found", notes[0].id()))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
-    let new_from_account_balance = client_1
+    let account_client_1: Account = client_1
         .get_account(from_account_id)
         .await?
         .context("failed to find from account after transfer")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let new_to_account_balance = client_2
+        .try_into()?;
+    let new_from_account_balance =
+        account_client_1.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let account_client_2: Account = client_2
         .get_account(to_account_id)
         .await?
-        .context("failed to find to account after transfer")?
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+        .context("failed to find from account after transfer")?
+        .try_into()?;
+    let new_to_account_balance =
+        account_client_2.vault().get_balance(faucet_account_id).unwrap_or(0);
 
     assert_eq!(new_from_account_balance, from_account_balance - TRANSFER_AMOUNT);
     assert_eq!(new_to_account_balance, to_account_balance + TRANSFER_AMOUNT);
@@ -398,7 +392,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
         client_2.get_account(first_regular_account.id()).await?.with_context(|| {
             format!("Imported account {} not found in client_2", first_regular_account.id())
         })?;
-    assert_eq!(imported_account.account().commitment(), original_account.account().commitment());
+    assert_eq!(imported_account.commitment(), original_account.commitment());
 
     // Now use the wallet in the second client to consume the generated note
     println!("Second client consuming note");

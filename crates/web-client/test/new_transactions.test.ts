@@ -804,7 +804,7 @@ export const customAccountComponent = async (
 
       let secretKey = window.SecretKey[schemeSecretKeyFunction](walletSeed);
       let authComponent =
-        window.AccountComponent.createAuthComponent(secretKey);
+        window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
       let accountBuilderResult = new window.AccountBuilder(walletSeed)
         .accountType(window.AccountType.RegularAccountImmutableCode)
@@ -1292,7 +1292,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     crypto.getRandomValues(walletSeed);
 
     let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+    let authComponent =
+      window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
     let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
       .withAuthComponent(authComponent)

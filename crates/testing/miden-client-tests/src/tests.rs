@@ -20,7 +20,13 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteId, NoteRelevance};
 use miden_client::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT, NodeRpcClient};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
-use miden_client::store::{InputNoteRecord, InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::store::{
+    AccountStorageFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    TransactionFilter,
+};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::account_id::ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET;
 use miden_client::testing::common::{
@@ -197,7 +203,7 @@ where
 
     let fetched_record = client.get_account(account.id()).await.unwrap().unwrap();
     let fetched_seed = fetched_record.seed();
-    let fetched_account: Account = fetched_record.into();
+    let fetched_account: Account = fetched_record.try_into().unwrap();
 
     assert_eq!(account.id(), fetched_account.id());
     assert_eq!(account.nonce(), fetched_account.nonce());
@@ -304,7 +310,7 @@ async fn account_code() {
 
     client.add_account(&account, false).await.unwrap();
     let retrieved_acc = client.get_account(account.id()).await.unwrap().unwrap();
-    assert_eq!(*account.code(), *retrieved_acc.account().code());
+    assert_eq!(*account.code(), retrieved_acc.code());
 }
 
 #[tokio::test]
@@ -996,7 +1002,7 @@ async fn p2id_transfer() {
 
     let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
     let seed = regular_account.seed();
-    let regular_account: Account = regular_account.into();
+    let regular_account: Account = regular_account.try_into().unwrap();
 
     // The seed should not be retrieved due to the account not being new
     assert!(!regular_account.is_new() && seed.is_none());
@@ -1010,7 +1016,8 @@ async fn p2id_transfer() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
@@ -1125,24 +1132,12 @@ async fn p2ide_transfer_consumed_by_target() {
 
     // Do a transfer from first account to second account with Recall. In this situation we'll do
     // the happy path where the `to_account_id` consumes the note
-    let from_account_balance = client
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
-    let to_account_balance = client
-        .get_account(to_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+    let from_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let from_account_balance = from_account.vault().get_balance(faucet_account_id).unwrap_or(0);
+    let to_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let to_account_balance = to_account.vault().get_balance(faucet_account_id).unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     println!("Running P2IDE tx...");
@@ -1178,12 +1173,13 @@ async fn p2ide_transfer_consumed_by_target() {
         .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-    let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
+    let regular_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
 
     // The seed should not be retrieved due to the account not being new
-    assert!(!regular_account.account().is_new() && regular_account.seed().is_none());
-    assert_eq!(regular_account.account().vault().assets().count(), 1);
-    let asset = regular_account.account().vault().assets().next().unwrap();
+    assert!(!regular_account.is_new() && regular_account.seed().is_none());
+    assert_eq!(regular_account.vault().assets().count(), 1);
+    let asset = regular_account.vault().assets().next().unwrap();
 
     // Validate the transferred amounts
     if let Asset::Fungible(fungible_asset) = asset {
@@ -1192,7 +1188,8 @@ async fn p2ide_transfer_consumed_by_target() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();
 
@@ -1230,15 +1227,9 @@ async fn p2ide_transfer_consumed_by_sender() {
 
     // Do a transfer from first account to second account with Recall. In this situation we'll do
     // the happy path where the `to_account_id` consumes the note
-    let from_account_balance = client
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .account()
-        .vault()
-        .get_balance(faucet_account_id)
-        .unwrap_or(0);
+    let from_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
+    let from_account_balance = from_account.vault().get_balance(faucet_account_id).unwrap_or(0);
     let current_block_num = client.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     println!("Running P2IDE tx...");
@@ -1297,11 +1288,12 @@ async fn p2ide_transfer_consumed_by_sender() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let regular_account = client.get_account(from_account_id).await.unwrap().unwrap();
+    let regular_account: Account =
+        client.get_account(from_account_id).await.unwrap().unwrap().try_into().unwrap();
     // The seed should not be retrieved due to the account not being new
-    assert!(!regular_account.account().is_new() && regular_account.seed().is_none());
-    assert_eq!(regular_account.account().vault().assets().count(), 1);
-    let asset = regular_account.account().vault().assets().next().unwrap();
+    assert!(!regular_account.is_new() && regular_account.seed().is_none());
+    assert_eq!(regular_account.vault().assets().count(), 1);
+    let asset = regular_account.vault().assets().next().unwrap();
 
     // Validate the sender hasn't lost funds
     if let Asset::Fungible(fungible_asset) = asset {
@@ -1310,7 +1302,8 @@ async fn p2ide_transfer_consumed_by_sender() {
         panic!("Error: Account should have a fungible asset");
     }
 
-    let regular_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(regular_account.vault().assets().count(), 0);
 
     // Check that the target can't consume the note anymore
@@ -1393,7 +1386,8 @@ async fn p2ide_timelocked() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let target_account: Account = client.get_account(to_account_id).await.unwrap().unwrap().into();
+    let target_account: Account =
+        client.get_account(to_account_id).await.unwrap().unwrap().try_into().unwrap();
     assert_eq!(target_account.vault().get_balance(faucet_account_id).unwrap(), TRANSFER_AMOUNT);
 }
 
@@ -1621,7 +1615,7 @@ async fn account_rollback() {
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_before_tx = account_before_tx.account().commitment();
+    let account_commitment_before_tx = account_before_tx.commitment();
 
     // Apply the transaction
     let submission_height = client.get_sync_height().await.unwrap();
@@ -1631,7 +1625,7 @@ async fn account_rollback() {
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_tx = account_after_tx.account().commitment();
+    let account_commitment_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_commitment_before_tx, account_commitment_after_tx,
@@ -1665,7 +1659,7 @@ async fn account_rollback() {
 
     // Check that the account state has been rolled back after the transaction was discarded
     let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_sync = account_after_sync.account().commitment();
+    let account_commitment_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_commitment_after_sync, account_commitment_after_tx,
@@ -1680,7 +1674,7 @@ async fn account_rollback() {
 
     // Store the account state before applying the transaction
     let account_before_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_before_tx = account_before_tx.account().commitment();
+    let account_commitment_before_tx = account_before_tx.commitment();
 
     // Apply a new transaction
     let tx_request = TransactionRequestBuilder::new()
@@ -1700,7 +1694,7 @@ async fn account_rollback() {
 
     // Check that the account state has changed after applying the transaction
     let account_after_tx = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_tx = account_after_tx.account().commitment();
+    let account_commitment_after_tx = account_after_tx.commitment();
 
     assert_ne!(
         account_commitment_after_tx, account_commitment_before_tx,
@@ -1730,7 +1724,7 @@ async fn account_rollback() {
 
     // Check that the account state has not been updated
     let account_after_sync = client.get_account(account_id).await.unwrap().unwrap();
-    let account_commitment_after_sync = account_after_sync.account().commitment();
+    let account_commitment_after_sync = account_after_sync.commitment();
 
     assert_ne!(
         account_commitment_after_sync, account_commitment_before_tx,
@@ -1844,10 +1838,7 @@ async fn subsequent_discarded_transactions() {
     ));
 
     // Check that the account state has been rolled back to the value before both transactions
-    assert_eq!(
-        account_after_sync.account().commitment(),
-        account_before_tx.account().commitment(),
-    );
+    assert_eq!(account_after_sync.commitment(), account_before_tx.commitment(),);
 }
 
 #[tokio::test]
@@ -2059,15 +2050,9 @@ async fn swap_chain_test() {
     Box::pin(client.submit_new_transaction(last_wallet, tx_request)).await.unwrap();
 
     // At the end, the last wallet should have the asset of the first wallet.
-    let last_wallet_account = client.get_account(last_wallet).await.unwrap().unwrap();
-    assert_eq!(
-        last_wallet_account
-            .account()
-            .vault()
-            .get_balance(account_pairs[0].1.id())
-            .unwrap(),
-        1
-    );
+    let last_wallet_account: Account =
+        client.get_account(last_wallet).await.unwrap().unwrap().try_into().unwrap();
+    assert_eq!(last_wallet_account.vault().get_balance(account_pairs[0].1.id()).unwrap(), 1);
 }
 
 #[tokio::test]
@@ -2108,9 +2093,10 @@ async fn empty_storage_map() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let fetched_account = client.get_account(account_id).await.unwrap().unwrap();
+    let fetched_account: Account =
+        client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-    assert_eq!(account.storage(), fetched_account.account().storage());
+    assert_eq!(account.storage(), fetched_account.storage());
 }
 
 const MAP_KEY: [Felt; 4] = [Felt::new(42), Felt::new(42), Felt::new(42), Felt::new(42)];
@@ -2193,7 +2179,11 @@ async fn storage_and_vault_proofs() {
         .build()
         .unwrap();
 
-    client.add_account(&account, false).await.unwrap();
+    client
+        .test_store()
+        .insert_account(&account, Address::new(account.id()))
+        .await
+        .unwrap();
 
     let account_id = account.id();
 
@@ -2219,9 +2209,14 @@ async fn storage_and_vault_proofs() {
         client.sync_state().await.unwrap();
 
         // Check that retrieved vault and storage match with the account.
-        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let account: Account =
+            client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let storage = client
+            .test_store()
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
         assert_eq!(account.storage().commitment(), storage.commitment());
@@ -2774,9 +2769,14 @@ async fn storage_and_vault_proofs_ecdsa() {
         client.sync_state().await.unwrap();
 
         // Check that retrieved vault and storage match with the account.
-        let account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+        let account: Account =
+            client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
-        let storage = client.test_store().get_account_storage(account_id).await.unwrap();
+        let storage = client
+            .test_store()
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .unwrap();
         let vault = client.test_store().get_account_vault(account_id).await.unwrap();
 
         assert_eq!(account.storage().commitment(), storage.commitment());

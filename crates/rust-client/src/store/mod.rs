@@ -16,9 +16,9 @@
 //! These are all used by the Miden client to provide transaction execution in the correct contexts.
 //!
 //! In addition to the main [`Store`] trait, the module provides types for filtering queries, such
-//! as [`TransactionFilter`] and [`NoteFilter`], to narrow down the set of returned transactions or
-//! notes. For more advanced usage, see the documentation of individual methods in the [`Store`]
-//! trait.
+//! as [`TransactionFilter`], [`NoteFilter`], `StorageFilter` to narrow down the set of returned
+//! transactions, account data, or notes. For more advanced usage, see the documentation of
+//! individual methods in the [`Store`] trait.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -60,7 +60,7 @@ mod errors;
 pub use errors::*;
 
 mod account;
-pub use account::{AccountRecord, AccountStatus, AccountUpdates};
+pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -467,9 +467,14 @@ pub trait Store: Send + Sync {
     }
 
     /// Retrieves the storage for a specific account.
+    ///
+    /// Can take an optional map root to retrieve only part of the storage,
+    /// If it does, it will either return an account storage with a single
+    /// slot (the one requested), or an error if not found.
     async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
 
     /// Retrieves a specific item from the account's storage map along with its Merkle proof.
@@ -481,16 +486,29 @@ pub trait Store: Send + Sync {
         index: u8,
         key: Word,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        let storage = self.get_account_storage(account_id).await?;
-        let Some(StorageSlot::Map(map)) = storage.slots().get(index as usize) else {
-            return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
-        };
+        let storage = self
+            .get_account_storage(account_id, AccountStorageFilter::Index(index as usize))
+            .await?;
+        match storage.slots().first() {
+            Some(StorageSlot::Map(map)) => {
+                let value = map.get(&key);
+                let witness = map.open(&key);
 
-        let value = map.get(&key);
-        let witness = map.open(&key);
-
-        Ok((value, witness))
+                Ok((value, witness))
+            },
+            _ => Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index))),
+        }
     }
+
+    // PARTIAL ACCOUNTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Retrieves an [`AccountRecord`] object, this contains the account's latest partial
+    /// state along with its status. Returns `None` if the partial account is not found.
+    async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER
@@ -621,4 +639,18 @@ impl From<bool> for BlockRelevance {
             BlockRelevance::Irrelevant
         }
     }
+}
+
+// STORAGE FILTER
+// ================================================================================================
+
+/// Filters for narrowing the storage slots returned by the client's store.
+#[derive(Debug, Clone)]
+pub enum AccountStorageFilter {
+    /// Return an [`AccountStorage`] with all available slots.
+    All,
+    /// Return an [`AccountStorage`] with a single slot that matches the provided [`Word`] map root.
+    Root(Word),
+    /// Return an [`AccountStorage`] with a single slot that matches the provided index.
+    Index(usize),
 }

@@ -15,7 +15,13 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault};
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::store::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountStorageFilter,
+    StoreError,
+};
 use miden_client::utils::Serializable;
 use miden_client::{Felt, Word};
 
@@ -161,7 +167,9 @@ impl WebStore {
         };
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
-        let account_storage = self.get_storage(account_header.storage_commitment()).await?;
+        let account_storage = self
+            .get_storage(account_header.storage_commitment(), AccountStorageFilter::All)
+            .await?;
         let assets = self.get_vault_assets(account_header.vault_root()).await?;
         let account_vault = AssetVault::new(&assets)?;
 
@@ -175,8 +183,41 @@ impl WebStore {
         )?;
 
         let addresses = self.get_account_addresses(account_id).await?;
+        let account_data = AccountRecordData::Full(account);
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+    }
 
-        Ok(Some(AccountRecord::new(account, status, addresses)))
+    // TODO: current implementation is a copy of `get_account`,
+    // refactor for correct implementation.
+    // https://github.com/0xMiden/miden-client/issues/1515
+    pub(crate) async fn get_minimal_partial_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        let (account_header, status) = match self.get_account_header(account_id).await? {
+            None => return Ok(None),
+            Some((account_header, status)) => (account_header, status),
+        };
+        let account_code = self.get_account_code(account_header.code_commitment()).await?;
+
+        let account_storage = self
+            .get_storage(account_header.storage_commitment(), AccountStorageFilter::All)
+            .await?;
+        let assets = self.get_vault_assets(account_header.vault_root()).await?;
+        let account_vault = AssetVault::new(&assets)?;
+
+        let account = Account::new(
+            account_header.id(),
+            account_vault,
+            account_storage,
+            account_code,
+            account_header.nonce(),
+            status.seed().copied(),
+        )?;
+
+        let account_data = AccountRecordData::Partial((&account).into());
+        let addresses = self.get_account_addresses(account_id).await?;
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
     }
 
     pub(super) async fn get_account_code(&self, root: Word) -> Result<AccountCode, StoreError> {
@@ -192,16 +233,39 @@ impl WebStore {
         Ok(code)
     }
 
-    pub(super) async fn get_storage(&self, commitment: Word) -> Result<AccountStorage, StoreError> {
+    pub(super) async fn get_storage(
+        &self,
+        commitment: Word,
+        filter: AccountStorageFilter,
+    ) -> Result<AccountStorage, StoreError> {
         let commitment_serialized = commitment.to_string();
 
         let promise = idxdb_get_account_storage(commitment_serialized);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
-        let promise = idxdb_get_account_storage_maps(
-            account_storage_idxdb.iter().map(|s| s.slot_value.clone()).collect(),
-        );
+        let roots = match filter {
+            AccountStorageFilter::All => account_storage_idxdb
+                .iter()
+                .map(|s| s.slot_value.clone())
+                .collect::<Vec<String>>(),
+            AccountStorageFilter::Root(map_root) => {
+                if !account_storage_idxdb.iter().any(|a| a.slot_value == map_root.to_hex()) {
+                    return Err(StoreError::AccountStorageRootNotFound(map_root));
+                }
+                vec![map_root.to_hex()]
+            },
+            AccountStorageFilter::Index(index) => {
+                match account_storage_idxdb.iter().find(|a| a.slot_index as usize == index) {
+                    Some(account_storage) => {
+                        vec![account_storage.slot_value.clone()]
+                    },
+                    None => return Err(StoreError::AccountStorageIndexNotFound(index)),
+                }
+            },
+        };
+
+        let promise = idxdb_get_account_storage_maps(roots);
         let account_maps_idxdb: Vec<StorageMapEntryIdxdbObject> =
             await_js(promise, "failed to fetch account storage maps").await?;
 
@@ -311,6 +375,7 @@ impl WebStore {
     pub(crate) async fn get_account_storage(
         &self,
         account_id: AccountId,
+        filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         let account_header = self
             .get_account_header(account_id)
@@ -318,7 +383,7 @@ impl WebStore {
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        self.get_storage(account_header.storage_commitment()).await
+        self.get_storage(account_header.storage_commitment(), filter).await
     }
 
     pub(crate) async fn upsert_foreign_account_code(
