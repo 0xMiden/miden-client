@@ -111,24 +111,6 @@ impl AccountId {
         Ok(address.encode(network_id))
     }
 
-    /// Turn this Account ID into its bech32 string representation. This method accepts a custom
-    /// network ID.
-    #[wasm_bindgen(js_name = "toBech32Custom")]
-    pub fn to_bech32_custom(
-        &self,
-        custom_network_id: &str,
-        account_interface: AccountInterface,
-    ) -> Result<String, JsValue> {
-        let network_id = NativeNetworkId::from_str(custom_network_id)
-            .map_err(|err| js_error_with_context(err, "given network id is not valid"))?;
-
-        let routing_params = RoutingParameters::new(account_interface.into());
-        let address = Address::new(self.0)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
-        Ok(address.encode(network_id))
-    }
-
     /// Given a bech32 encoded string, return the matching Account ID for it.
     #[wasm_bindgen(js_name = "fromBech32")]
     pub fn from_bech32(bech_32_encoded_id: &str) -> Result<AccountId, JsValue> {
