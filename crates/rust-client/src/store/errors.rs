@@ -10,7 +10,6 @@ use miden_objects::{
     AddressError,
     AssetError,
     AssetVaultError,
-    // PartialAssetVaultError, // TODO: export this in miden-objects
     NoteError,
     StorageMapError,
     TransactionScriptError,
