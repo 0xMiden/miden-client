@@ -122,15 +122,15 @@ Returns the suffix field element derived from the account seed.
 > **toBech32**(`network_id`, `account_interface`): `string`
 
 Will turn the Account ID into its bech32 string representation. To avoid a potential
-wrongful encoding, this function will expect only IDs for either mainnet ("mm"),
-testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
-`Self::to_bech_32_custom`.
+wrongful encoding, this function is infallible for either mainnet ("mm"),
+testnet ("mtst") or devnet ("mdev"). It may fail for custom network IDs, if the
+provided prefix is not recognized.
 
 #### Parameters
 
 ##### network\_id
 
-[`NetworkId`](../enumerations/NetworkId.md)
+[`NetworkId`](NetworkId.md)
 
 ##### account\_interface
 

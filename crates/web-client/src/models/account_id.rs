@@ -21,15 +21,22 @@ use crate::js_error_with_context;
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
-#[wasm_bindgen]
-#[repr(u8)]
-pub enum NetworkId {
+pub enum InnerNetworkId {
     /// Main network prefix (`mm`).
     Mainnet = 0,
     /// Public test network prefix (`mtst`).
     Testnet = 1,
     /// Developer network prefix (`mdev`).
     Devnet = 2,
+    /// Custom network prefix.
+    Custom = 3,
+}
+
+#[wasm_bindgen]
+pub struct NetworkId {
+    inner: InnerNetworkId,
+    /// prefix name is only used when the inner network is set to custom
+    name: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -86,16 +93,16 @@ impl AccountId {
     }
 
     /// Will turn the Account ID into its bech32 string representation. To avoid a potential
-    /// wrongful encoding, this function will expect only IDs for either mainnet ("mm"),
-    /// testnet ("mtst") or devnet ("mdev"). To use a custom bech32 prefix, see
-    /// `Self::to_bech_32_custom`.
+    /// wrongful encoding, this function is infallible for either mainnet ("mm"),
+    /// testnet ("mtst") or devnet ("mdev"). It may fail for custom network IDs, if the
+    /// provided prefix is not recognized.
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(
         &self,
         network_id: NetworkId,
         account_interface: AccountInterface,
     ) -> Result<String, JsValue> {
-        let network_id: NativeNetworkId = network_id.into();
+        let network_id: NativeNetworkId = network_id.try_into()?;
 
         let routing_params = RoutingParameters::new(account_interface.into());
         let address = Address::new(self.0)
@@ -179,12 +186,20 @@ impl From<&AccountId> for NativeAccountId {
     }
 }
 
-impl From<NetworkId> for NativeNetworkId {
-    fn from(value: NetworkId) -> Self {
-        match value {
-            NetworkId::Mainnet => NativeNetworkId::Mainnet,
-            NetworkId::Testnet => NativeNetworkId::Testnet,
-            NetworkId::Devnet => NativeNetworkId::Devnet,
+impl TryFrom<NetworkId> for NativeNetworkId {
+    type Error = JsValue;
+
+    fn try_from(value: NetworkId) -> Result<Self, Self::Error> {
+        match value.inner {
+            InnerNetworkId::Mainnet => Ok(NativeNetworkId::Mainnet),
+            InnerNetworkId::Testnet => Ok(NativeNetworkId::Testnet),
+            InnerNetworkId::Devnet => Ok(NativeNetworkId::Devnet),
+            InnerNetworkId::Custom => {
+                let custom_prefix =
+                    value.name.ok_or(JsValue::from_str("Missing required custom id prefix"))?;
+                NativeNetworkId::new(&custom_prefix)
+                    .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))
+            },
         }
     }
 }

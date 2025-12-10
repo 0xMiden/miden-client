@@ -97,7 +97,7 @@ impl Address {
     /// Encodes the address using the provided network prefix.
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(&self, network_id: NetworkId) -> Result<String, JsValue> {
-        let net_id: NativeNetworkId = network_id.into();
+        let net_id: NativeNetworkId = network_id.try_into()?;
         Ok(self.0.encode(net_id))
     }
 }
