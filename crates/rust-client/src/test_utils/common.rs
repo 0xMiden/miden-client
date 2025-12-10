@@ -268,6 +268,28 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
     }
 }
 
+/// Idles until `amount_of_blocks` have been created onchain compared to client's sync height
+pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: u32) {
+    let current_block = client.get_sync_height().await.unwrap();
+    let final_block = current_block + amount_of_blocks;
+    println!("Waiting until block {final_block}...",);
+    loop {
+        let (latest_block, _) =
+            client.test_rpc_api().get_block_header_by_number(None, false).await.unwrap();
+        println!(
+            "Waited up to block {} (waiting until {})...",
+            latest_block.block_num(),
+            final_block
+        );
+
+        if latest_block.block_num() >= final_block {
+            return;
+        }
+
+        std::thread::sleep(Duration::from_secs(3));
+    }
+}
+
 /// Waits for node to be running.
 ///
 /// # Panics

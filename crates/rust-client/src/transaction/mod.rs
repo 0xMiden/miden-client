@@ -789,7 +789,7 @@ where
             self.store.get_foreign_account_code(account_ids.collect()).await?;
 
         // Fetch account proofs
-        let (block_num, account_proofs) =
+        let (_, account_proofs) =
             self.rpc_api.get_account_proofs(&foreign_accounts, known_account_codes).await?;
 
         let mut account_proofs: BTreeMap<AccountId, AccountProof> =
@@ -804,7 +804,7 @@ where
 
                     let foreign_account_inputs: AccountInputs = account_proof.try_into()?;
 
-                    // Update  our foreign account code cache
+                    // Update our foreign account code cache
                     self.store
                         .upsert_foreign_account_code(
                             *account_id,
@@ -828,20 +828,7 @@ where
             return_foreign_account_inputs.push(foreign_account_inputs);
         }
 
-        // Optionally retrieve block header if we don't have it
-        if self.store.get_block_header_by_num(block_num).await?.is_none() {
-            info!(
-                "Getting current block header data to execute transaction with foreign account requirements"
-            );
-            let summary = self.sync_state().await?;
-
-            if summary.block_num != block_num {
-                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-                self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
-                    .await?;
-            }
-        }
-
+        let block_num = self.get_sync_height().await?;
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 

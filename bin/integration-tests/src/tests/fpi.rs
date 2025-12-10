@@ -363,7 +363,12 @@ async fn standard_fpi(
     )
     .await?;
 
-    _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+    let block_before_wait = client2.get_sync_height().await.unwrap();
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Second client should be able to submit a transaction
+    // Without being sync to latest state
+    assert!(client2.submit_new_transaction(native_account.id(), tx_request).await.is_ok());
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {
@@ -371,6 +376,18 @@ async fn standard_fpi(
             client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
         assert_eq!(foreign_accounts.len(), 1);
     }
+
+    let block_after_wait = client2.get_sync_height().await.unwrap();
+
+    // Submitted transaction should not have provoked a sync
+    assert_eq!(block_before_wait, block_after_wait);
+
+    client2.sync_state().await?;
+    let block_after_sync = client2.get_sync_height().await.unwrap();
+
+    // After syncing with the network, the client should be synced to the latest block
+    assert!(block_after_wait < block_after_sync);
+
     Ok(())
 }
 
