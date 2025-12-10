@@ -4,6 +4,7 @@ use miden_client::note::{
 };
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use crate::models::input_note::InputNote;
 use crate::models::note::Note;
 use crate::models::note_header::NoteHeader;
 use crate::models::note_id::NoteId;
@@ -11,13 +12,16 @@ use crate::models::note_inclusion_proof::NoteInclusionProof;
 use crate::models::note_metadata::NoteMetadata;
 use crate::models::note_type::NoteType;
 
-/// Represents a note fetched from a Miden node via RPC.
+/// Wrapper for a note fetched over RPC.
+///
+/// It contains the note header and inclusion proof. The note details are only present for
+/// public notes.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct FetchedNote {
     header: NoteHeader,
-    note: Option<Note>,
     inclusion_proof: NoteInclusionProof,
+    note: Option<Note>,
 }
 
 #[wasm_bindgen]
@@ -27,16 +31,19 @@ impl FetchedNote {
     pub fn new(
         note_id: NoteId,
         metadata: NoteMetadata,
-        note: Option<Note>,
         inclusion_proof: NoteInclusionProof,
+        note: Option<Note>,
     ) -> FetchedNote {
         // Convert note_id and metadata to NativeNoteHeader, then to web NoteHeader
         let native_note_id = note_id.into();
         let native_metadata = metadata.into();
         let native_header = NativeNoteHeader::new(native_note_id, native_metadata);
         let header = native_header.into();
-        FetchedNote { header, note, inclusion_proof }
+        FetchedNote { header, inclusion_proof, note }
     }
+
+    // GETTERS
+    // --------------------------------------------------------------------------------------------
 
     /// The unique identifier of the note.
     #[wasm_bindgen(getter)]
@@ -61,7 +68,7 @@ impl FetchedNote {
     /// The full [`Note`] data.
     ///
     /// For public notes, it contains the complete note data.
-    /// For private notes, it will be `None`.
+    /// For private notes, it will be undefined.
     #[wasm_bindgen(getter)]
     pub fn note(&self) -> Option<Note> {
         self.note.clone()
@@ -76,10 +83,23 @@ impl FetchedNote {
         self.inclusion_proof.clone()
     }
 
+    /// Returns whether the note is private, encrypted, or public.
     #[wasm_bindgen(getter)]
     #[wasm_bindgen(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
         self.header.metadata().note_type()
+    }
+
+    // CONVERSIONS
+    // --------------------------------------------------------------------------------------------
+
+    /// Returns an [`InputNote`] when the fetched note is public.
+    ///
+    /// Returns `undefined` when the note body is missing (e.g. private notes); in that case build
+    /// an `InputNote` manually using the inclusion proof and note data obtained elsewhere.
+    #[wasm_bindgen(js_name = "asInputNote")]
+    pub fn as_input_note(&self) -> Option<InputNote> {
+        self.note().map(|note| InputNote::authenticated(&note, &self.inclusion_proof))
     }
 }
 

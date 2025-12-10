@@ -95,7 +95,8 @@ impl WebStore {
             .get_account(delta.id())
             .await?
             .ok_or(StoreError::AccountDataNotFound(delta.id()))?
-            .into();
+            .try_into()
+            .map_err(|_| StoreError::AccountDataNotFound(delta.id()))?;
 
         if delta.is_full_state() {
             account =

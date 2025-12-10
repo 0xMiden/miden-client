@@ -278,7 +278,7 @@ where
             .get_account(account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.into();
+        let account: Account = account_record.try_into()?;
         data_store.mast_store().load_account_code(account.code());
 
         // Get transaction args
@@ -440,7 +440,7 @@ where
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
 
-        let account: Account = account_record.into();
+        let account: Account = account_record.try_into()?;
 
         let data_store = ClientDataStore::new(self.store.clone());
 
@@ -703,7 +703,7 @@ where
             }
         }
 
-        let account: Account = self.try_get_account(account_id).await?.into();
+        let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
         if account.is_faucet() {
             // TODO(SantiagoPittella): Add faucet validations.
@@ -759,7 +759,7 @@ where
         &self,
         account_id: AccountId,
     ) -> Result<AccountInterface, ClientError> {
-        let account: Account = self.try_get_account(account_id).await?.into();
+        let account: Account = self.try_get_account(account_id).await?.try_into()?;
 
         Ok(AccountInterface::from(&account))
     }

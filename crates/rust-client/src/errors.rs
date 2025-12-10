@@ -139,6 +139,10 @@ pub enum ClientError {
     AccountsLimitExceeded(usize),
     #[error("unsupported authentication scheme ID: {0}")]
     UnsupportedAuthSchemeId(u8),
+    #[error("account error is not full: {0}")]
+    AccountRecordNotFull(AccountId),
+    #[error("account error is not partial: {0}")]
+    AccountRecordNotPartial(AccountId),
 }
 
 // CONVERSIONS

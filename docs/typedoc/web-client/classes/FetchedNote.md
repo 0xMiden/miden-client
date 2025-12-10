@@ -6,13 +6,16 @@
 
 # Class: FetchedNote
 
-Represents a note fetched from a Miden node via RPC.
+Wrapper for a note fetched over RPC.
+
+It contains the note header and inclusion proof. The note details are only present for
+public notes.
 
 ## Constructors
 
 ### Constructor
 
-> **new FetchedNote**(`note_id`, `metadata`, `note`, `inclusion_proof`): `FetchedNote`
+> **new FetchedNote**(`note_id`, `metadata`, `inclusion_proof`, `note?`): `FetchedNote`
 
 Create a `FetchedNote` with an optional [`Note`].
 
@@ -26,13 +29,13 @@ Create a `FetchedNote` with an optional [`Note`].
 
 [`NoteMetadata`](NoteMetadata.md)
 
-##### note
-
-[`Note`](Note.md)
-
 ##### inclusion\_proof
 
 [`NoteInclusionProof`](NoteInclusionProof.md)
+
+##### note?
+
+[`Note`](Note.md)
 
 #### Returns
 
@@ -74,7 +77,7 @@ Available for both private and public notes.
 The full [`Note`] data.
 
 For public notes, it contains the complete note data.
-For private notes, it will be `None`.
+For private notes, it will be undefined.
 
 ***
 
@@ -90,6 +93,8 @@ The unique identifier of the note.
 
 > `readonly` **noteType**: [`NoteType`](../enumerations/NoteType.md)
 
+Returns whether the note is private, encrypted, or public.
+
 ## Methods
 
 ### \[dispose\]()
@@ -99,6 +104,21 @@ The unique identifier of the note.
 #### Returns
 
 `void`
+
+***
+
+### asInputNote()
+
+> **asInputNote**(): [`InputNote`](InputNote.md)
+
+Returns an [`InputNote`] when the fetched note is public.
+
+Returns `undefined` when the note body is missing (e.g. private notes); in that case build
+an `InputNote` manually using the inclusion proof and note data obtained elsewhere.
+
+#### Returns
+
+[`InputNote`](InputNote.md)
 
 ***
 

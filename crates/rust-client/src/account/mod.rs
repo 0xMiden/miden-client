@@ -193,7 +193,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.account().nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_int() > account.nonce().as_int() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }

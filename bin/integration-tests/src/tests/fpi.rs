@@ -331,7 +331,7 @@ async fn standard_fpi(
             .get_account(foreign_account_id)
             .await?
             .context("failed to find foreign account after deploiyng")?
-            .into();
+            .try_into()?;
 
         let (id, _vault, storage, code, nonce, seed) = foreign_account.into_parts();
         let acc = PartialAccount::new(
@@ -469,7 +469,8 @@ async fn deploy_foreign_account(
 
     // NOTE: We get the new account state here since the first transaction updates the nonce from
     // to 1
-    let foreign_account: Account = client.get_account(foreign_account_id).await?.unwrap().into();
+    let foreign_account: Account =
+        client.get_account(foreign_account_id).await?.unwrap().try_into().unwrap();
 
     Ok((foreign_account, proc_root))
 }

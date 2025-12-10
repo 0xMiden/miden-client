@@ -133,7 +133,8 @@ pub async fn show_account<AUTH>(
     with_code: bool,
 ) -> Result<(), CliError> {
     let account = if let Some(account) = client.get_account(account_id).await? {
-        account.into()
+        // TODO: Show partial accounts through CLI
+        account.try_into().map_err(|_| CliError::InvalidAccount(account_id))?
     } else {
         println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
 
@@ -314,8 +315,9 @@ async fn account_bech_32<AUTH>(
     cli_config: &CliConfig,
 ) -> Result<String, CliError> {
     let account_record = client.try_get_account(account_id).await?;
-
-    let account_interface: AccountInterface = account_record.account().into();
+    let account: Account =
+        account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
+    let account_interface: AccountInterface = (&account).into();
 
     let mut address = Address::new(account_id);
     if account_interface

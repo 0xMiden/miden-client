@@ -49,7 +49,9 @@ pub enum StoreError {
     #[error("public key {0} not found")]
     AccountKeyNotFound(String),
     #[error("account storage data with root {0} not found")]
-    AccountStorageNotFound(Word),
+    AccountStorageRootNotFound(Word),
+    #[error("account storage data with index {0} not found")]
+    AccountStorageIndexNotFound(usize),
     #[error("partial blockchain node at index {0} not found")]
     PartialBlockchainNodeNotFound(u64),
     #[error("error deserializing data from the store")]

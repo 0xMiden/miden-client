@@ -81,9 +81,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: |
-          cd ./crates/web-client
-          yarn install
+        run: ./scripts/retry-yarn-install.sh crates/web-client
 
       - name: Check TSC output equals commited JS
         run: |
