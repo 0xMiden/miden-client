@@ -6,6 +6,8 @@
 
 # Class: StorageSlot
 
+A single storage slot value or map for an account component.
+
 ## Methods
 
 ### \[dispose\]()
@@ -32,6 +34,8 @@
 
 > `static` **emptyValue**(): `StorageSlot`
 
+Returns an empty value slot (zeroed).
+
 #### Returns
 
 `StorageSlot`
@@ -41,6 +45,8 @@
 ### fromValue()
 
 > `static` **fromValue**(`value`): `StorageSlot`
+
+Creates a storage slot holding a single value.
 
 #### Parameters
 
@@ -57,6 +63,8 @@
 ### map()
 
 > `static` **map**(`storage_map`): `StorageSlot`
+
+Creates a storage slot backed by a map.
 
 #### Parameters
 

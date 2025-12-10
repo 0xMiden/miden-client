@@ -6,6 +6,8 @@
 
 # Class: InputNote
 
+Note supplied as an input to a transaction, optionally with authentication data.
+
 ## Methods
 
 ### \[dispose\]()
@@ -21,6 +23,8 @@
 ### commitment()
 
 > **commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the note ID and metadata.
 
 #### Returns
 
@@ -42,6 +46,8 @@
 
 > **id**(): [`NoteId`](NoteId.md)
 
+Returns the identifier of the input note.
+
 #### Returns
 
 [`NoteId`](NoteId.md)
@@ -51,6 +57,8 @@
 ### location()
 
 > **location**(): [`NoteLocation`](NoteLocation.md)
+
+Returns the note's location within the commitment tree when available.
 
 #### Returns
 
@@ -62,6 +70,8 @@
 
 > **note**(): [`Note`](Note.md)
 
+Returns the underlying note contents.
+
 #### Returns
 
 [`Note`](Note.md)
@@ -71,6 +81,8 @@
 ### proof()
 
 > **proof**(): [`NoteInclusionProof`](NoteInclusionProof.md)
+
+Returns the inclusion proof if the note is authenticated.
 
 #### Returns
 

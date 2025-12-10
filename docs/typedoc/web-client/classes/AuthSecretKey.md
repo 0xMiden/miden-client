@@ -28,19 +28,11 @@
 
 ***
 
-### getEcdsaK256KeccakPublicKeyAsWord()
-
-> **getEcdsaK256KeccakPublicKeyAsWord**(): [`Word`](Word.md)
-
-#### Returns
-
-[`Word`](Word.md)
-
-***
-
 ### getEcdsaK256KeccakSecretKeyAsFelts()
 
 > **getEcdsaK256KeccakSecretKeyAsFelts**(): [`Felt`](Felt.md)[]
+
+Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
 
 #### Returns
 
@@ -48,9 +40,11 @@
 
 ***
 
-### getRpoFalcon512PublicKeyAsWord()
+### getPublicKeyAsWord()
 
-> **getRpoFalcon512PublicKeyAsWord**(): [`Word`](Word.md)
+> **getPublicKeyAsWord**(): [`Word`](Word.md)
+
+Returns the public key commitment as a word.
 
 #### Returns
 
@@ -61,6 +55,8 @@
 ### getRpoFalcon512SecretKeyAsFelts()
 
 > **getRpoFalcon512SecretKeyAsFelts**(): [`Felt`](Felt.md)[]
+
+Returns the `RpoFalcon512` secret key bytes encoded as felts.
 
 #### Returns
 

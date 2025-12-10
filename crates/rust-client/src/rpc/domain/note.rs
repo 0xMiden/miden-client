@@ -5,6 +5,7 @@ use miden_objects::crypto::merkle::{MerklePath, SparseMerklePath};
 use miden_objects::note::{
     Note,
     NoteDetails,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -221,9 +222,9 @@ impl CommittedNote {
 /// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
-    /// Details for a private note only include its [`NoteMetadata`] and [`NoteInclusionProof`].
+    /// Details for a private note only include its [`NoteHeader`] and [`NoteInclusionProof`].
     /// Other details needed to consume the note are expected to be stored locally, off-chain.
-    Private(NoteId, NoteMetadata, NoteInclusionProof),
+    Private(NoteHeader, NoteInclusionProof),
     /// Contains the full [`Note`] object alongside its [`NoteInclusionProof`].
     Public(Note, NoteInclusionProof),
 }
@@ -232,15 +233,16 @@ impl FetchedNote {
     /// Returns the note's inclusion details.
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         match self {
-            FetchedNote::Private(_, _, inclusion_proof)
-            | FetchedNote::Public(_, inclusion_proof) => inclusion_proof,
+            FetchedNote::Private(_, inclusion_proof) | FetchedNote::Public(_, inclusion_proof) => {
+                inclusion_proof
+            },
         }
     }
 
     /// Returns the note's metadata.
     pub fn metadata(&self) -> &NoteMetadata {
         match self {
-            FetchedNote::Private(_, metadata, _) => metadata,
+            FetchedNote::Private(header, _) => header.metadata(),
             FetchedNote::Public(note, _) => note.metadata(),
         }
     }
@@ -248,7 +250,7 @@ impl FetchedNote {
     /// Returns the note's ID.
     pub fn id(&self) -> NoteId {
         match self {
-            FetchedNote::Private(id, ..) => *id,
+            FetchedNote::Private(header, _) => header.id(),
             FetchedNote::Public(note, _) => note.id(),
         }
     }
@@ -286,7 +288,8 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
 
             Ok(FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_proof))
         } else {
-            Ok(FetchedNote::Private(note_id, metadata, inclusion_proof))
+            let note_header = NoteHeader::new(note_id, metadata);
+            Ok(FetchedNote::Private(note_header, inclusion_proof))
         }
     }
 }

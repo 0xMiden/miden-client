@@ -16,12 +16,14 @@ pub struct SecretKey(NativeSecretKey);
 
 #[wasm_bindgen]
 impl SecretKey {
+    /// Generates an `RpoFalcon512` secret key using an optional deterministic seed.
     #[wasm_bindgen(js_name = "rpoFalconWithRNG")]
     pub fn rpo_falcon_with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
         let mut rng = Self::try_rng_from_seed(seed)?;
         Ok(NativeSecretKey::new_rpo_falcon512_with_rng(&mut rng).into())
     }
 
+    /// Generates an ECDSA k256 Keccak secret key using an optional deterministic seed.
     #[wasm_bindgen(js_name = "ecdsaWithRNG")]
     pub fn ecdsa_with_rng(seed: Option<Vec<u8>>) -> Result<SecretKey, JsValue> {
         let mut rng = Self::try_rng_from_seed(seed)?;
@@ -41,25 +43,30 @@ impl SecretKey {
         }
     }
 
+    /// Returns the public key associated with this secret key.
     #[wasm_bindgen(js_name = "publicKey")]
     pub fn public_key(&self) -> PublicKey {
         self.0.public_key().into()
     }
 
+    /// Signs a message word (blind signature).
     pub fn sign(&self, message: &Word) -> Signature {
         self.sign_data(&SigningInputs::new_blind(message))
     }
 
+    /// Signs arbitrary signing inputs.
     #[wasm_bindgen(js_name = "signData")]
     pub fn sign_data(&self, signing_inputs: &SigningInputs) -> Signature {
         let native_word = signing_inputs.to_commitment().into();
         (self.0.sign(native_word)).into()
     }
 
+    /// Serializes the secret key into bytes.
     pub fn serialize(&self) -> Uint8Array {
         serialize_to_uint8array(&self.0)
     }
 
+    /// Deserializes a secret key from bytes.
     pub fn deserialize(bytes: &Uint8Array) -> Result<SecretKey, JsValue> {
         let native_secret_key = deserialize_from_uint8array::<NativeSecretKey>(bytes)?;
         Ok(SecretKey(native_secret_key))

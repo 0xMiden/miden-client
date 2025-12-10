@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{AuthSchemeId, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::NoteType;
 use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
@@ -16,6 +16,7 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_fungible_faucet,
     insert_new_wallet,
+    wait_for_blocks,
     wait_for_node,
 };
 use miden_client::transaction::TransactionRequestBuilder;
@@ -140,7 +141,7 @@ async fn run_flow(
     mut recipient: TestClient,
     recipient_keystore: &TestClientKeyStore,
     recipient_should_receive: bool,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<()> {
     // Ensure node is up
     wait_for_node(&mut sender).await;
@@ -150,7 +151,7 @@ async fn run_flow(
         &mut recipient,
         AccountStorageMode::Private,
         recipient_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert recipient wallet")?;
@@ -160,7 +161,7 @@ async fn run_flow(
         &mut sender,
         AccountStorageMode::Private,
         sender_keystore,
-        auth_scheme_id,
+        auth_scheme,
     )
     .await
     .context("failed to insert faucet in sender")?;
@@ -213,15 +214,17 @@ async fn run_flow(
     }
 
     // Re-sync to verify cursor dedup (or still nothing if no transport)
-    recipient.sync_state().await?;
-    let notes = recipient.get_input_notes(NoteFilter::All).await?;
     if recipient_should_receive {
+        wait_for_blocks(&mut recipient, 1).await;
+        let notes = recipient.get_input_notes(NoteFilter::All).await?;
         assert_eq!(
-            notes.len(),
-            1,
-            "recipient should still have exactly 1 input note after re-sync"
+            notes[0].commitment().unwrap(), // we should have a commitment at this point
+            note.commitment(),
+            "re-synced note id should match minted note id"
         );
-        assert_eq!(notes[0].id(), note.id(), "re-synced note id should match minted note id");
+
+        let consumable_notes = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
+        assert_eq!(consumable_notes.len(), 1, "recipient should have 1 consumable note");
     } else {
         assert!(notes.is_empty(), "recipient should still have 0 input notes");
     }

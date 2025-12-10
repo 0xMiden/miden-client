@@ -44,11 +44,7 @@ use miden_objects::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_objects::transaction::TransactionId;
 use miden_objects::{AccountError, Word};
 
-use crate::note_transport::{
-    NOTE_TRANSPORT_CURSOR_STORE_SETTING,
-    NoteTransportCursor,
-    NoteTransportUpdate,
-};
+use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
@@ -404,20 +400,6 @@ pub trait Store: Send + Sync {
         Ok(())
     }
 
-    /// Applies a note transport update
-    ///
-    /// An update involves:
-    /// - Insert fetched notes;
-    /// - Update pagination cursor used in note fetching.
-    async fn apply_note_transport_update(
-        &self,
-        note_transport_update: NoteTransportUpdate,
-    ) -> Result<(), StoreError> {
-        self.update_note_transport_cursor(note_transport_update.cursor).await?;
-        self.upsert_input_notes(&note_transport_update.note_updates).await?;
-        Ok(())
-    }
-
     // PARTIAL MMR
     // --------------------------------------------------------------------------------------------
 
@@ -574,9 +556,8 @@ impl TransactionFilter {
         match self {
             TransactionFilter::All => QUERY.to_string(),
             TransactionFilter::Uncommitted => format!(
-                "{QUERY} WHERE tx.status_variant IN ({}, {})",
+                "{QUERY} WHERE tx.status_variant = {}",
                 TransactionStatusVariant::Pending as u8,
-                TransactionStatusVariant::Discarded as u8
             ),
             TransactionFilter::Ids(_) => {
                 // Use SQLite's array parameter binding

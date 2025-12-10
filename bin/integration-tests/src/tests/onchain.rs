@@ -378,13 +378,8 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     wait_for_tx(&mut client_1, tx_id).await?;
 
     // Import the public account by id
-    let built_wallet_id = build_wallet_id(
-        user_seed,
-        &secret_key.public_key(),
-        AccountStorageMode::Public,
-        false,
-        RPO_FALCON_SCHEME_ID,
-    )?;
+    let built_wallet_id =
+        build_wallet_id(user_seed, &secret_key.public_key(), AccountStorageMode::Public, false)?;
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await?;
     keystore_2.add_key(&secret_key)?;

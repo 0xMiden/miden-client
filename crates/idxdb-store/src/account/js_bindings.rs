@@ -6,7 +6,7 @@ use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{js_sys, wasm_bindgen};
+use wasm_bindgen_futures::js_sys;
 
 // INDEXED DB BINDINGS
 // ================================================================================================

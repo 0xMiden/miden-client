@@ -12,16 +12,22 @@ pub struct AuthSecretKey(NativeAuthSecretKey);
 
 #[wasm_bindgen]
 impl AuthSecretKey {
-    #[wasm_bindgen(js_name = "getRpoFalcon512PublicKeyAsWord")]
-    pub fn get_rpo_falcon_512_public_key_as_word(&self) -> Word {
-        let public_key = match &self.0 {
-            NativeAuthSecretKey::RpoFalcon512(key) => key.public_key(),
-            _ => todo!(), // TODO: what to do with other cases
-        };
-        let public_key_as_native_word: NativeWord = public_key.to_commitment();
-        public_key_as_native_word.into()
+    /// Returns the public key commitment associated with this secret key.
+    fn public_key_commitment(&self) -> NativeWord {
+        match &self.0 {
+            NativeAuthSecretKey::RpoFalcon512(key) => key.public_key().to_commitment(),
+            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key().to_commitment(),
+            _ => todo!("auth scheme currently not supported"),
+        }
     }
 
+    /// Returns the public key commitment as a word.
+    #[wasm_bindgen(js_name = "getPublicKeyAsWord")]
+    pub fn get_public_key_as_word(&self) -> Word {
+        self.public_key_commitment().into()
+    }
+
+    /// Returns the `RpoFalcon512` secret key bytes encoded as felts.
     #[wasm_bindgen(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match &self.0 {
@@ -37,16 +43,7 @@ impl AuthSecretKey {
         secret_key_as_native_felts.into_iter().map(Into::into).collect()
     }
 
-    #[wasm_bindgen(js_name = "getEcdsaK256KeccakPublicKeyAsWord")]
-    pub fn get_ecdsa_k256_keccak_public_key_as_word(&self) -> Word {
-        let public_key = match &self.0 {
-            NativeAuthSecretKey::EcdsaK256Keccak(key) => key.public_key(),
-            _ => todo!(), // TODO: what to do with other cases
-        };
-        let public_key_as_native_word: NativeWord = public_key.to_commitment();
-        public_key_as_native_word.into()
-    }
-
+    /// Returns the ECDSA k256 Keccak secret key bytes encoded as felts.
     #[wasm_bindgen(js_name = "getEcdsaK256KeccakSecretKeyAsFelts")]
     pub fn get_ecdsa_k256_keccak_secret_key_as_felts(&self) -> Vec<Felt> {
         let secret_key_as_bytes = match &self.0 {
