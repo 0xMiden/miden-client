@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
