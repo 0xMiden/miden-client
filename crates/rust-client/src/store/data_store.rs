@@ -3,7 +3,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_objects::account::{Account, AccountId, PartialAccount, StorageSlot};
+use miden_objects::account::{AccountId, PartialAccount, StorageSlot};
 use miden_objects::asset::{AssetVaultKey, AssetWitness};
 use miden_objects::block::{BlockHeader, BlockNumber};
 use miden_objects::crypto::merkle::{InOrderIndex, MerklePath, PartialMmr};
@@ -13,7 +13,7 @@ use miden_objects::vm::FutureMaybeSend;
 use miden_objects::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
-use super::{PartialBlockchainFilter, Store};
+use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
 use crate::store::StoreError;
 use crate::utils::RwLock;
 
@@ -67,16 +67,14 @@ impl DataStore for ClientDataStore {
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
-        //TODO: Only retrieve partial account. This should be done in the `tomyrd-partial-accounts`
-        // branch (and future PR). Construct Account
-        let account_record = self
+        let partial_account_record = self
             .store
-            .get_account(account_id)
+            .get_minimal_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
-
-        let account: Account = account_record.into();
-        let partial_account = PartialAccount::from(&account);
+        let partial_account: PartialAccount = partial_account_record
+            .try_into()
+            .map_err(|_| DataStoreError::AccountNotFound(account_id))?;
 
         // Get header data
         let (block_header, _had_notes) = self
@@ -112,20 +110,30 @@ impl DataStore for ClientDataStore {
         vault_root: Word,
         vault_key: AssetVaultKey,
     ) -> Result<AssetWitness, DataStoreError> {
-        //TODO: Refactor `get_account_asset` for this.
-        let vault = self.store.get_account_vault(account_id).await?;
+        match self.store.get_account_asset(account_id, vault_key.faucet_id_prefix()).await {
+            Ok(Some((_, asset_witness))) => Ok(asset_witness),
+            Ok(None) => {
+                let vault = self.store.get_account_vault(account_id).await?;
 
-        if vault.root() != vault_root {
-            return Err(DataStoreError::Other {
-                error_msg: "Vault root mismatch".into(),
-                source: None,
-            });
+                if vault.root() != vault_root {
+                    return Err(DataStoreError::Other {
+                        error_msg: "Vault root mismatch".into(),
+                        source: None,
+                    });
+                }
+
+                AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
+                    DataStoreError::Other {
+                        error_msg: "Failed to open vault asset tree".into(),
+                        source: Some(Box::new(err)),
+                    }
+                })
+            },
+            Err(err) => Err(DataStoreError::Other {
+                error_msg: "Failed to get account asset".into(),
+                source: Some(Box::new(err)),
+            }),
         }
-
-        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| DataStoreError::Other {
-            error_msg: "Failed to open vault asset tree".into(),
-            source: Some(Box::new(err)),
-        })
     }
 
     async fn get_storage_map_witness(
@@ -134,23 +142,26 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: Word,
     ) -> Result<miden_objects::account::StorageMapWitness, DataStoreError> {
-        // TODO: Refactor the store call to be able to retrieve by map root.
-        let account_storage = self.store.get_account_storage(account_id).await?;
+        let account_storage = self
+            .store
+            .get_account_storage(account_id, AccountStorageFilter::Root(map_root))
+            .await?;
 
-        for slot in account_storage.slots() {
-            if let StorageSlot::Map(map) = slot
-                && map.root() == map_root
-            {
+        match account_storage.slots().first() {
+            Some(StorageSlot::Map(map)) => {
                 let witness = map.open(&map_key);
-                return Ok(witness);
-            }
+                Ok(witness)
+            },
+            Some(StorageSlot::Value(value)) => Err(DataStoreError::Other {
+                error_msg: format!("found StorageSlot::Value with {value} as its value.").into(),
+                source: None,
+            }),
+            _ => Err(DataStoreError::Other {
+                error_msg: format!("did not find map with {map_root} as a root for {account_id}")
+                    .into(),
+                source: None,
+            }),
         }
-
-        Err(DataStoreError::Other {
-            error_msg: format!("did not find map with {map_root} as a root for {account_id}")
-                .into(),
-            source: None,
-        })
     }
 
     async fn get_foreign_account_inputs(

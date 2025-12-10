@@ -15,18 +15,28 @@ use miden_client::account::{
     AccountIdPrefix,
     AccountStorage,
     Address,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
     StorageMap,
     StorageSlot,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::crypto::{MerkleStore, SmtLeaf, SmtProof};
-use miden_client::store::{AccountRecord, AccountStatus, StoreError};
+use miden_client::store::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountStorageFilter,
+    StoreError,
+};
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
-use miden_objects::account::StorageMapWitness;
-use miden_objects::asset::AssetVaultKey;
+use miden_objects::account::{AccountStorageHeader, StorageMapWitness};
+use miden_objects::asset::{AssetVaultKey, PartialVault};
+use miden_objects::crypto::merkle::SparseMerklePath;
 use rusqlite::types::Value;
 use rusqlite::{Connection, Params, Transaction, named_params, params};
 
@@ -181,7 +191,76 @@ impl SqliteStore {
         );
 
         let addresses = query_account_addresses(conn, header.id())?;
-        Ok(Some(AccountRecord::new(account, status, addresses)))
+        let account_data = AccountRecordData::Full(account);
+        Ok(Some(AccountRecord::new(account_data, status, addresses)))
+    }
+
+    pub(crate) fn get_minimal_partial_account(
+        conn: &mut Connection,
+        merkle_store: &Arc<RwLock<MerkleStore>>,
+        account_id: AccountId,
+    ) -> Result<Option<AccountRecord>, StoreError> {
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+            return Ok(None);
+        };
+
+        // Partial vault retrieval
+        let merkle_store = merkle_store.read().expect("merkle_store read lock not poisoned");
+        let partial_vault = PartialVault::new(header.vault_root());
+
+        // Partial storage retrieval
+        let mut storage_header = vec![];
+        let mut maps = vec![];
+
+        let storage_values = query_storage_values(
+            conn,
+            "commitment = ?",
+            params![header.storage_commitment().to_hex()],
+        )?;
+
+        for (slot_type, value) in storage_values.into_values() {
+            storage_header.push((slot_type, value));
+            if slot_type == StorageSlotType::Map {
+                // TODO: querying the database for a single map is not performant
+                // consider retrieving all storage maps in a single transaction.
+                let storage_map_root = value;
+                let mut query = query_storage_maps(conn, "root = ?", [storage_map_root.to_hex()])?;
+                if let Some(map) = query.remove(&value) {
+                    let mut partial_storage_map = PartialStorageMap::new(value);
+
+                    for (k, v) in map.entries() {
+                        let (_, path) = get_storage_map_item_proof(&merkle_store, value, *k)?;
+                        let path = SparseMerklePath::try_from(path)
+                            .map_err(StoreError::MerkleStoreError)?;
+                        let leaf = SmtLeaf::Single((StorageMap::hash_key(*k), *v));
+                        let proof = SmtProof::new(path, leaf).map_err(StoreError::SmtProofError)?;
+
+                        let witness = StorageMapWitness::new(proof, vec![*k])
+                            .map_err(StoreError::StorageMapError)?;
+                        partial_storage_map.add(witness).map_err(StoreError::MerkleStoreError)?;
+                    }
+                    maps.push(partial_storage_map);
+                }
+            }
+        }
+        let partial_storage = PartialStorage::new(AccountStorageHeader::new(storage_header), maps)
+            .map_err(StoreError::AccountError)?;
+
+        let Some(account_code) = query_account_code(conn, header.code_commitment())? else {
+            return Ok(None);
+        };
+
+        let partial_account = PartialAccount::new(
+            header.id(),
+            header.nonce(),
+            account_code,
+            partial_storage,
+            partial_vault,
+            status.seed().copied(),
+        )?;
+        let account_record_data = AccountRecordData::Partial(partial_account);
+        let addresses = query_account_addresses(conn, header.id())?;
+        Ok(Some(AccountRecord::new(account_record_data, status, addresses)))
     }
 
     pub(crate) fn insert_account(
@@ -317,14 +396,24 @@ impl SqliteStore {
     pub fn get_account_storage(
         conn: &Connection,
         account_id: AccountId,
+        filter: &AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
-        let slots = query_storage_slots(
-            conn,
-            "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
-            params![account_id.to_hex()],
-        )?
-        .into_values()
-        .collect();
+        let (where_clause, params) = match filter {
+            AccountStorageFilter::All => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1)",
+                params![account_id.to_hex()],
+            ),
+            AccountStorageFilter::Root(root) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_value = ?",
+                params![account_id.to_hex(), root.to_hex()],
+            ),
+            AccountStorageFilter::Index(index) => (
+                "commitment = (SELECT storage_commitment FROM accounts WHERE id = ? ORDER BY nonce DESC LIMIT 1) AND slot_index = ?",
+                params![account_id.to_hex(), index.clone()],
+            ),
+        };
+
+        let slots = query_storage_slots(conn, where_clause, params)?.into_values().collect();
 
         Ok(AccountStorage::new(slots)?)
     }
@@ -378,7 +467,7 @@ impl SqliteStore {
             params![header.storage_commitment().to_hex(), index],
         )?
         .remove(&index)
-        .ok_or(StoreError::AccountStorageNotFound(header.storage_commitment()))?
+        .ok_or(StoreError::AccountStorageRootNotFound(header.storage_commitment()))?
         else {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(index)));
         };
@@ -1030,6 +1119,30 @@ fn query_storage_maps(
     Ok(maps)
 }
 
+fn query_storage_values(
+    conn: &Connection,
+    where_clause: &str,
+    params: impl Params,
+) -> Result<BTreeMap<u8, (StorageSlotType, Word)>, StoreError> {
+    const STORAGE_QUERY: &str = "SELECT slot_index, slot_value, slot_type FROM account_storage";
+
+    let query = format!("{STORAGE_QUERY} WHERE {where_clause}");
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map(params, |row| {
+            let index: u8 = row.get(0)?;
+            let value: String = row.get(1)?;
+            let slot_type: Vec<u8> = row.get(2)?;
+            Ok((index, value, slot_type))
+        })
+        .into_store_error()?
+        .map(|result| {
+            let (index, value, slot_type) = result.into_store_error()?;
+            Ok((index, (StorageSlotType::read_from_bytes(&slot_type)?, Word::try_from(value)?)))
+        })
+        .collect()
+}
+
 fn query_vault_assets(
     conn: &Connection,
     where_clause: &str,
@@ -1297,7 +1410,7 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
 
@@ -1386,7 +1499,7 @@ mod tests {
             .get_account(account_id)
             .await?
             .context("failed to find inserted account")?
-            .into();
+            .try_into()?;
 
         assert_eq!(updated_account, account_after_delta);
         assert!(updated_account.vault().is_empty());
