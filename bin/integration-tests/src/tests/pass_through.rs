@@ -55,15 +55,15 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
 
     // Create Client basic wallet (We'll call it accountA)
     let (sender, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator_1, 0).await?;
+        insert_new_wallet(&mut client, AccountStorageMode::Private, &authenticator_1, miden_client::auth::AuthSchemeId::RpoFalcon512).await?;
     let (target, ..) =
-        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2, 0).await?;
+        insert_new_wallet(&mut client_2, AccountStorageMode::Private, &authenticator_2, miden_client::auth::AuthSchemeId::RpoFalcon512).await?;
 
     let pass_through_account = create_pass_through_account(&mut client).await?;
 
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) =
-        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator_1, 0)
+        insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &authenticator_1, miden_client::auth::AuthSchemeId::RpoFalcon512)
             .await?;
 
     // mint 1000 BTC for accountA
@@ -131,7 +131,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         .expect("pass-through account should exist");
 
     // Storing commitment to check later that (final_acc.commitment == initial_acc.commitment)
-    let commitment_before_second_tx = pass_through_before_second_tx.account().commitment();
+    let commitment_before_second_tx = pass_through_before_second_tx.account_data().commitment();
 
     // now try another transaction against the pass-through account
     let tx_request = TransactionRequestBuilder::new()
@@ -162,7 +162,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         .expect("pass-through account should exist");
 
     assert_eq!(
-        pass_through_after_second_tx.account().commitment(),
+        pass_through_after_second_tx.account_data().commitment(),
         commitment_before_second_tx,
         "pass-through transaction should not change account commitment"
     );
