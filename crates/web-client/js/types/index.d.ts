@@ -61,6 +61,7 @@ export {
   Library,
   MerklePath,
   NetworkId,
+  NetworkType,
   Note,
   NoteAndArgs,
   NoteAndArgsArray,
