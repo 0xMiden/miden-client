@@ -41,7 +41,8 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
 
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+    let authComponent =
+      window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
     let getItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
       .withAuthComponent(authComponent)

@@ -70,6 +70,7 @@ pub use miden_objects::{
 };
 
 use super::Client;
+use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::store::{AccountRecord, AccountStatus};
@@ -139,11 +140,18 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
+    /// - If the client has reached the accounts limit
+    ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_account(
         &mut self,
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
+        self.check_account_limit().await?;
+        self.check_note_tag_limit().await?;
+
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
@@ -185,7 +193,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.account().nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_int() > account.nonce().as_int() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -233,6 +241,8 @@ impl<AUTH> Client<AUTH> {
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
+    /// - If the client has reached the note tags limit
+    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
     pub async fn add_address(
         &mut self,
         address: Address,
@@ -259,6 +269,7 @@ impl<AUTH> Client<AUTH> {
                     ));
                 }
 
+                self.check_note_tag_limit().await?;
                 self.store.insert_address(address, account_id).await?;
                 Ok(())
             },
@@ -351,13 +362,13 @@ impl<AUTH> Client<AUTH> {
 /// `Client::import_account_by_id` to import a public account from the network (provided that the
 /// used seed is known).
 ///
-/// This function will only work for accounts with the [`BasicWallet`] and [`AuthRpoFalcon512`]
-/// components.
+/// This function currently supports accounts composed of the [`BasicWallet`] component and one of
+/// the supported authentication schemes ([`AuthRpoFalcon512`] or [`AuthEcdsaK256Keccak`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
-/// - `public_key`: Public key of the account used in the [`AuthRpoFalcon512`] component.
+/// - `public_key`: Public key of the account used for the authentication component.
 /// - `storage_mode`: Storage mode of the account.
 /// - `is_mutable`: Whether the account is mutable or not.
 ///
@@ -368,7 +379,6 @@ pub fn build_wallet_id(
     public_key: &PublicKey,
     storage_mode: AccountStorageMode,
     is_mutable: bool,
-    auth_scheme_id: u8,
 ) -> Result<AccountId, ClientError> {
     let account_type = if is_mutable {
         AccountType::RegularAccountUpdatableCode
@@ -376,19 +386,20 @@ pub fn build_wallet_id(
         AccountType::RegularAccountImmutableCode
     };
 
-    let auth_component = match auth_scheme_id {
-        0 => {
+    let auth_scheme = public_key.auth_scheme();
+    let auth_component = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(public_key.to_commitment()).into();
             auth_component
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
             auth_component
         },
-        _ => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme_id));
+        auth_scheme => {
+            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
         },
     };
 

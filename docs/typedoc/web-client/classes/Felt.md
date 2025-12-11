@@ -6,11 +6,15 @@
 
 # Class: Felt
 
+Field element wrapper exposed to JavaScript.
+
 ## Constructors
 
 ### Constructor
 
 > **new Felt**(`value`): `Felt`
+
+Creates a new field element from a u64 value.
 
 #### Parameters
 
@@ -38,6 +42,8 @@
 
 > **asInt**(): `bigint`
 
+Returns the integer representation of the field element.
+
 #### Returns
 
 `bigint`
@@ -57,6 +63,8 @@
 ### toString()
 
 > **toString**(): `string`
+
+Returns the string representation of the field element.
 
 #### Returns
 

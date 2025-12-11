@@ -2,7 +2,7 @@
 authors.workspace      = true
 categories             = ["command-line-utilities"]
 description            = "The official command line client for interacting with the Miden network"
-documentation          = "https://docs.rs/miden-client-cli/0.12.0"
+documentation          = "https://docs.rs/miden-client-cli"
 edition.workspace      = true
 keywords               = ["cli", "client", "miden"]
 license.workspace      = true
@@ -10,7 +10,7 @@ name                   = "miden-client-cli"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
-version                = "0.12.4"
+version.workspace      = true
 
 [[bin]]
 name = "miden-client"
@@ -18,8 +18,8 @@ path = "src/main.rs"
 
 [dependencies]
 # Workspace dependencies
-miden-client              = { features = ["tonic"], path = "../../crates/rust-client", version = "0.12" }
-miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store", version = "0.12" }
+miden-client              = { features = ["tonic"], path = "../../crates/rust-client" }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../../crates/sqlite-store" }
 
 # External dependencies
 clap               = { features = ["derive"], version = "4.5" }
@@ -36,12 +36,12 @@ tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client = { path = "../../crates/rust-client", version = "0.12" }
+miden-client = { path = "../../crates/rust-client" }
 
 [dev-dependencies]
 anyhow       = { workspace = true }
 assert_cmd   = { version = "2.0" }
-miden-client = { features = ["testing"], path = "../../crates/rust-client", version = "0.12" }
+miden-client = { features = ["testing"], path = "../../crates/rust-client" }
 predicates   = { version = "3.0" }
 regex        = { version = "1.0" }
 serial_test  = { version = "3.0" }

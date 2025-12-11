@@ -164,7 +164,12 @@ pub mod assembly {
     pub use miden_objects::assembly::diagnostics::Report;
     pub use miden_objects::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_objects::assembly::{
-        Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind,
+        Assembler,
+        DefaultSourceManager,
+        Library,
+        LibraryPath,
+        Module,
+        ModuleKind,
     };
 }
 
@@ -172,11 +177,19 @@ pub mod assembly {
 pub mod asset {
     pub use miden_objects::AssetError;
     pub use miden_objects::account::delta::{
-        AccountStorageDelta, AccountVaultDelta, FungibleAssetDelta, NonFungibleAssetDelta,
+        AccountStorageDelta,
+        AccountVaultDelta,
+        FungibleAssetDelta,
+        NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
     pub use miden_objects::asset::{
-        Asset, AssetVault, AssetWitness, FungibleAsset, NonFungibleAsset, NonFungibleAssetDetails,
+        Asset,
+        AssetVault,
+        AssetWitness,
+        FungibleAsset,
+        NonFungibleAsset,
+        NonFungibleAssetDetails,
         TokenSymbol,
     };
 }
@@ -184,14 +197,19 @@ pub mod asset {
 /// Provides authentication-related types and functionalities for the Miden
 /// network.
 pub mod auth {
-    pub const RPO_FALCON_SCHEME_ID: u8 = 0;
-    pub const ECDSA_K256_KECCAK_SCHEME_ID: u8 = 1;
     pub use miden_lib::AuthScheme;
     pub use miden_lib::account::auth::{AuthEcdsaK256Keccak, AuthRpoFalcon512, NoAuth};
     pub use miden_objects::account::auth::{
-        AuthSecretKey, PublicKey, PublicKeyCommitment, Signature,
+        AuthScheme as AuthSchemeId,
+        AuthSecretKey,
+        PublicKey,
+        PublicKeyCommitment,
+        Signature,
     };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
+
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::RpoFalcon512;
+    pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
 /// Provides types for working with blocks within the Miden network.
@@ -209,8 +227,19 @@ pub mod crypto {
     pub use miden_objects::crypto::hash::blake::{Blake3_160, Blake3Digest};
     pub use miden_objects::crypto::hash::rpo::Rpo256;
     pub use miden_objects::crypto::merkle::{
-        Forest, InOrderIndex, LeafIndex, MerklePath, MerkleStore, MerkleTree, MmrDelta, MmrPeaks,
-        MmrProof, NodeIndex, SMT_DEPTH, SmtLeaf, SmtProof,
+        Forest,
+        InOrderIndex,
+        LeafIndex,
+        MerklePath,
+        MerkleStore,
+        MerkleTree,
+        MmrDelta,
+        MmrPeaks,
+        MmrProof,
+        NodeIndex,
+        SMT_DEPTH,
+        SmtLeaf,
+        SmtProof,
     };
     pub use miden_objects::crypto::rand::{FeltRng, RpoRandomCoin};
 }
@@ -218,15 +247,27 @@ pub mod crypto {
 /// Provides types for working with addresses within the Miden network.
 pub mod address {
     pub use miden_objects::address::{
-        Address, AddressId, AddressInterface, NetworkId, RoutingParameters,
+        Address,
+        AddressId,
+        AddressInterface,
+        NetworkId,
+        RoutingParameters,
     };
 }
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
     pub use miden_objects::vm::{
-        AdviceInputs, AdviceMap, AttributeSet, MastArtifact, Package, PackageExport,
-        PackageManifest, QualifiedProcedureName, Section, SectionId,
+        AdviceInputs,
+        AdviceMap,
+        AttributeSet,
+        MastArtifact,
+        Package,
+        PackageExport,
+        PackageManifest,
+        QualifiedProcedureName,
+        Section,
+        SectionId,
     };
 }
 
@@ -234,8 +275,15 @@ pub use async_trait::async_trait;
 pub use errors::*;
 use miden_objects::assembly::{DefaultSourceManager, SourceManagerSync};
 pub use miden_objects::{
-    EMPTY_WORD, Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES, ONE, PrettyPrint,
-    StarkField, Word, ZERO,
+    EMPTY_WORD,
+    Felt,
+    MAX_TX_EXECUTION_CYCLES,
+    MIN_TX_EXECUTION_CYCLES,
+    ONE,
+    PrettyPrint,
+    StarkField,
+    Word,
+    ZERO,
 };
 pub use miden_remote_prover_client::remote_prover::tx_prover::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
@@ -255,7 +303,6 @@ pub mod testing {
 use alloc::sync::Arc;
 
 pub use miden_lib::utils::{Deserializable, ScriptBuilder, Serializable, SliceReader};
-pub use miden_objects::account::StorageMap;
 pub use miden_objects::block::BlockNumber;
 use miden_objects::crypto::rand::FeltRng;
 use miden_tx::LocalTransactionProver;
@@ -265,6 +312,7 @@ use rpc::NodeRpcClient;
 use store::Store;
 
 use crate::note_transport::{NoteTransportClient, init_note_transport_cursor};
+use crate::rpc::{ACCOUNT_ID_LIMIT, NOTE_TAG_LIMIT};
 use crate::transaction::TransactionProver;
 
 // MIDEN CLIENT
@@ -360,8 +408,8 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Initialize the note transport cursor if the client uses it
         if note_transport_api.is_some() {
-            // Initialize the note transport cursor
             init_note_transport_cursor(store.clone()).await?;
         }
 
@@ -399,6 +447,27 @@ where
 
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
+    }
+}
+
+impl<AUTH> Client<AUTH> {
+    // LIMITS
+    // --------------------------------------------------------------------------------------------
+
+    /// Checks if the note tag limit has been exceeded.
+    pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_unique_note_tags().await?.len() >= NOTE_TAG_LIMIT {
+            return Err(ClientError::NoteTagsLimitExceeded(NOTE_TAG_LIMIT));
+        }
+        Ok(())
+    }
+
+    /// Checks if the account limit has been exceeded.
+    pub async fn check_account_limit(&self) -> Result<(), ClientError> {
+        if self.store.get_account_ids().await?.len() >= ACCOUNT_ID_LIMIT {
+            return Err(ClientError::AccountsLimitExceeded(ACCOUNT_ID_LIMIT));
+        }
+        Ok(())
     }
 
     // TEST HELPERS

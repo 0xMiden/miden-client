@@ -108,7 +108,7 @@ import { NoteType, TransactionProver, WebClient } from "@demox-labs/miden-sdk";
 try {
     const webClient = await WebClient.createClient();
 
-    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com");
+    const remoteProver = TransactionProver.newRemoteProver("https://prover.example.com", 10_000);
 
     const transactionRequest = webClient.newMintTransactionRequest(
         targetAccountId,

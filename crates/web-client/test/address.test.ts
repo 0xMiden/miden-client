@@ -140,6 +140,24 @@ test.describe("Bech32 tests", () => {
       49
     );
   });
+
+  test("fromBech32 returns correct account id", async ({ page }) => {
+    const success = await page.evaluate(async () => {
+      const newAccount = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        0
+      );
+      const accountId = newAccount.id();
+      const asBech32 = accountId.toBech32(
+        window.NetworkId.Mainnet,
+        window.AccountInterface.BasicWallet
+      );
+      const fromBech32 = window.AccountId.fromBech32(asBech32).toString();
+      return accountId == fromBech32;
+    });
+    expect(success).toBe(true);
+  });
 });
 
 test.describe("Note tag tests", () => {

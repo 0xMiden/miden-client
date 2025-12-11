@@ -863,7 +863,8 @@ interface SetupWalletFaucetResult {
 }
 
 export const setupWalletAndFaucet = async (
-  testingPage: Page
+  testingPage: Page,
+  authSchemeID: Number = 0
 ): Promise<SetupWalletFaucetResult> => {
   return await testingPage.evaluate(async () => {
     const client = window.client;

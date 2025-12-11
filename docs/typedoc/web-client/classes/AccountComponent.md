@@ -32,6 +32,8 @@
 
 > **getProcedureHash**(`procedure_name`): `string`
 
+Returns the hex-encoded MAST root for a procedure by name.
+
 #### Parameters
 
 ##### procedure\_name
@@ -48,6 +50,8 @@
 
 > **getProcedures**(): [`GetProceduresResultItem`](GetProceduresResultItem.md)[]
 
+Returns all procedures exported by this component.
+
 #### Returns
 
 [`GetProceduresResultItem`](GetProceduresResultItem.md)[]
@@ -58,6 +62,8 @@
 
 > **withSupportsAllTypes**(): `AccountComponent`
 
+Marks the component as supporting all account types.
+
 #### Returns
 
 `AccountComponent`
@@ -67,6 +73,8 @@
 ### compile()
 
 > `static` **compile**(`account_code`, `builder`, `storage_slots`): `AccountComponent`
+
+Compiles account code with the given storage slots using the provided assembler.
 
 #### Parameters
 
@@ -88,9 +96,31 @@
 
 ***
 
-### createAuthComponent()
+### createAuthComponentFromCommitment()
 
-> `static` **createAuthComponent**(`secret_key`): `AccountComponent`
+> `static` **createAuthComponentFromCommitment**(`commitment`, `auth_scheme`): `AccountComponent`
+
+#### Parameters
+
+##### commitment
+
+[`Word`](Word.md)
+
+##### auth\_scheme
+
+[`AuthScheme`](../enumerations/AuthScheme.md)
+
+#### Returns
+
+`AccountComponent`
+
+***
+
+### createAuthComponentFromSecretKey()
+
+> `static` **createAuthComponentFromSecretKey**(`secret_key`): `AccountComponent`
+
+Builds an auth component from a secret key, inferring the auth scheme from the key type.
 
 #### Parameters
 
@@ -107,6 +137,8 @@
 ### fromPackage()
 
 > `static` **fromPackage**(`_package`, `storage_slots`): `AccountComponent`
+
+Creates an account component from a compiled package and storage slots.
 
 #### Parameters
 

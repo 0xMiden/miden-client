@@ -15,7 +15,7 @@ use crate::rpc::{RpcError, generated as proto};
 // STATE SYNC INFO
 // ================================================================================================
 
-/// Represents a `proto::rpc_store::SyncStateResponse` with fields converted into domain types.
+/// Represents a `proto::rpc::SyncStateResponse` with fields converted into domain types.
 pub struct StateSyncInfo {
     /// The block number of the chain tip at the moment of the response.
     pub chain_tip: BlockNumber,
@@ -36,22 +36,22 @@ pub struct StateSyncInfo {
 // STATE SYNC INFO CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
+impl TryFrom<proto::rpc::SyncStateResponse> for StateSyncInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::SyncStateResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::SyncStateResponse) -> Result<Self, Self::Error> {
         let chain_tip = value.chain_tip;
 
         // Validate and convert block header
         let block_header: BlockHeader = value
             .block_header
-            .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(block_header)))?
+            .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(block_header)))?
             .try_into()?;
 
         // Validate and convert MMR Delta
         let mmr_delta = value
             .mmr_delta
-            .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(mmr_delta)))?
+            .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(mmr_delta)))?
             .try_into()?;
 
         // Validate and convert account commitment updates into an (AccountId, Word) tuple
@@ -59,13 +59,13 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
         for update in value.accounts {
             let account_id = update
                 .account_id
-                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
                     accounts.account_id
                 )))?
                 .try_into()?;
             let account_commitment = update
                 .account_commitment
-                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
                     accounts.account_commitment
                 )))?
                 .try_into()?;
@@ -77,23 +77,19 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
         for note in value.notes {
             let note_id: NoteId = note
                 .note_id
-                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
-                    notes.note_id
-                )))?
+                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(notes.note_id)))?
                 .try_into()?;
 
             let inclusion_path = note
                 .inclusion_path
-                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
                     notes.inclusion_path
                 )))?
                 .try_into()?;
 
             let metadata = note
                 .metadata
-                .ok_or(proto::rpc_store::SyncStateResponse::missing_field(stringify!(
-                    notes.metadata
-                )))?
+                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(notes.metadata)))?
                 .try_into()?;
 
             let committed_note = super::note::CommittedNote::new(
@@ -111,7 +107,7 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
             .iter()
             .map(|transaction_summary| {
                 let transaction_id = transaction_summary.transaction_id.ok_or(
-                    proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    proto::rpc::SyncStateResponse::missing_field(stringify!(
                         transactions.transaction_id
                     )),
                 )?;
@@ -120,7 +116,7 @@ impl TryFrom<proto::rpc_store::SyncStateResponse> for StateSyncInfo {
                 let transaction_block_num = transaction_summary.block_num;
 
                 let transaction_account_id = transaction_summary.account_id.clone().ok_or(
-                    proto::rpc_store::SyncStateResponse::missing_field(stringify!(
+                    proto::rpc::SyncStateResponse::missing_field(stringify!(
                         transactions.account_id
                     )),
                 )?;

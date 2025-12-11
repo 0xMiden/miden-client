@@ -27,6 +27,7 @@ use crate::account::component::{
     BasicWallet,
 };
 use crate::account::{AccountBuilder, AccountType, StorageSlot};
+use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 use crate::keystore::FilesystemKeyStore;
 use crate::note::{Note, create_p2id_note};
@@ -66,12 +67,12 @@ pub async fn insert_new_wallet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    insert_new_wallet_with_seed(client, storage_mode, keystore, init_seed, auth_scheme_id).await
+    insert_new_wallet_with_seed(client, storage_mode, keystore, init_seed, auth_scheme).await
 }
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
@@ -80,24 +81,24 @@ pub async fn insert_new_wallet_with_seed(
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
     init_seed: [u8; 32],
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme_id {
-        0 => {
+    let (key_pair, auth_component) = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        _ => {
+        scheme => {
             return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(auth_scheme_id),
+                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
             ));
         },
     };
@@ -122,24 +123,24 @@ pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
     storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let (key_pair, auth_component) = match auth_scheme_id {
-        0 => {
+    let (key_pair, auth_component) = match auth_scheme {
+        AuthSchemeId::RpoFalcon512 => {
             let key_pair = AuthSecretKey::new_rpo_falcon512();
             let auth_component: AccountComponent =
                 AuthRpoFalcon512::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        1 => {
+        AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
             let auth_component: AccountComponent =
                 AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
             (key_pair, auth_component)
         },
-        _ => {
+        scheme => {
             return Err(ClientError::TransactionRequestError(
-                TransactionRequestError::UnsupportedAuthSchemeId(auth_scheme_id),
+                TransactionRequestError::UnsupportedAuthSchemeId(scheme.as_u8()),
             ));
         },
     };
@@ -304,7 +305,7 @@ pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account, Account)> {
     // Ensure clean state
     let account_headers = client
@@ -327,18 +328,18 @@ pub async fn setup_two_wallets_and_faucet(
 
     // Create faucet account
     let (faucet_account, _) =
-        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme_id)
+        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert new fungible faucet account")?;
 
     // Create regular accounts
     let (first_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme_id)
+        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert first basic wallet account")?;
 
     let (second_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme_id)
+        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert second basic wallet account")?;
 
@@ -355,15 +356,15 @@ pub async fn setup_wallet_and_faucet(
     client: &mut TestClient,
     accounts_storage_mode: AccountStorageMode,
     keystore: &TestClientKeyStore,
-    auth_scheme_id: u8,
+    auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account)> {
     let (faucet_account, _) =
-        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme_id)
+        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert new fungible faucet account")?;
 
     let (basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme_id)
+        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert new wallet account")?;
 
@@ -415,7 +416,8 @@ pub async fn assert_account_has_single_asset(
     asset_account_id: AccountId,
     expected_amount: u64,
 ) {
-    let regular_account: Account = client.get_account(account_id).await.unwrap().unwrap().into();
+    let regular_account: Account =
+        client.get_account(account_id).await.unwrap().unwrap().try_into().unwrap();
 
     assert_eq!(regular_account.vault().assets().count(), 1);
     let asset = regular_account.vault().assets().next().unwrap();

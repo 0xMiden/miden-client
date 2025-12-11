@@ -5,7 +5,12 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_objects::Word;
 use miden_objects::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    AccountStorageHeader,
+    StorageSlotType,
 };
 use miden_objects::asset::Asset;
 use miden_objects::block::{AccountWitness, BlockNumber};
@@ -23,7 +28,7 @@ use crate::rpc::generated::{self as proto};
 // FETCHED ACCOUNT
 // ================================================================================================
 
-/// Describes the possible responses from the `GetAccount` endpoint for an account.
+/// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
     /// shared with the network. The full account state is to be tracked locally.
@@ -219,7 +224,7 @@ impl TryInto<AccountStorageHeader> for proto::account::AccountStorageHeader {
 // ================================================================================================
 
 #[cfg(feature = "tonic")]
-impl proto::rpc_store::account_response::AccountDetails {
+impl proto::rpc::account_proof_response::AccountDetails {
     /// Converts the RPC response into `StateHeaders`.
     ///
     /// The RPC response may omit unchanged account codes. If so, this function uses
@@ -236,20 +241,20 @@ impl proto::rpc_store::account_response::AccountDetails {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
-        let proto::rpc_store::account_response::AccountDetails {
+        let proto::rpc::account_proof_response::AccountDetails {
             header,
             storage_details,
             code,
             vault_details,
         } = self;
         let header: AccountHeader = header
-            .ok_or(proto::rpc_store::account_response::AccountDetails::missing_field(stringify!(
+            .ok_or(proto::rpc::account_proof_response::AccountDetails::missing_field(stringify!(
                 header
             )))?
             .try_into()?;
 
         let storage_details = storage_details
-            .ok_or(proto::rpc_store::account_response::AccountDetails::missing_field(stringify!(
+            .ok_or(proto::rpc::account_proof_response::AccountDetails::missing_field(stringify!(
                 storage_details
             )))?
             .try_into()?;
@@ -272,7 +277,7 @@ impl proto::rpc_store::account_response::AccountDetails {
         };
 
         let vault_details = vault_details
-            .ok_or(proto::rpc_store::AccountVaultDetails::missing_field(stringify!(vault_details)))?
+            .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(vault_details)))?
             .try_into()?;
 
         Ok(AccountDetails {
@@ -314,10 +319,10 @@ pub struct AccountStorageDetails {
     pub map_details: Vec<AccountStorageMapDetails>,
 }
 
-impl TryFrom<proto::rpc_store::AccountStorageDetails> for AccountStorageDetails {
+impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::AccountStorageDetails) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::AccountStorageDetails) -> Result<Self, Self::Error> {
         let header = value
             .header
             .ok_or(proto::account::AccountStorageHeader::missing_field(stringify!(header)))?
@@ -347,24 +352,22 @@ pub struct AccountStorageMapDetails {
     pub entries: Vec<StorageMapEntry>,
 }
 
-impl TryFrom<proto::rpc_store::account_storage_details::AccountStorageMapDetails>
+impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
     for AccountStorageMapDetails
 {
     type Error = RpcError;
 
     fn try_from(
-        value: proto::rpc_store::account_storage_details::AccountStorageMapDetails,
+        value: proto::rpc::account_storage_details::AccountStorageMapDetails,
     ) -> Result<Self, Self::Error> {
         let slot_index = value.slot_index;
         let too_many_entries = value.too_many_entries;
 
         let entries = value
             .entries
-            .ok_or(
-                proto::rpc_store::account_storage_details::AccountStorageMapDetails::missing_field(
-                    stringify!(entries),
-                ),
-            )?
+            .ok_or(proto::rpc::account_storage_details::AccountStorageMapDetails::missing_field(
+                stringify!(entries),
+            ))?
             .entries
             .iter_mut()
             .map(|entry| entry.to_owned().try_into())
@@ -383,19 +386,19 @@ pub struct StorageMapEntry {
     pub value: Word,
 }
 
-impl TryFrom<proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry>
+impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry>
     for StorageMapEntry
 {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
         let key = value.key.ok_or(
-            proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
+            proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
                 stringify!(key),
             ))?.try_into()?;
 
         let value = value.value.ok_or(
-            proto::rpc_store::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
+            proto::rpc::account_storage_details::account_storage_map_details::map_entries::StorageMapEntry::missing_field(
                 stringify!(value),
             ))?.try_into()?;
 
@@ -420,10 +423,10 @@ pub struct AccountVaultDetails {
     pub assets: Vec<Asset>,
 }
 
-impl TryFrom<proto::rpc_store::AccountVaultDetails> for AccountVaultDetails {
+impl TryFrom<proto::rpc::AccountVaultDetails> for AccountVaultDetails {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc_store::AccountVaultDetails) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::rpc::AccountVaultDetails) -> Result<Self, Self::Error> {
         let too_many_assets = value.too_many_assets;
         let assets = value
             .assets
@@ -431,9 +434,7 @@ impl TryFrom<proto::rpc_store::AccountVaultDetails> for AccountVaultDetails {
             .map(|asset| {
                 let native_digest: Word = asset
                     .asset
-                    .ok_or(proto::rpc_store::AccountVaultDetails::missing_field(stringify!(
-                        assets
-                    )))?
+                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(assets)))?
                     .try_into()?;
                 native_digest
                     .try_into()
@@ -593,14 +594,14 @@ impl AccountStorageRequirements {
 }
 
 impl From<AccountStorageRequirements>
-    for Vec<proto::rpc_store::account_request::account_detail_request::StorageMapDetailRequest>
+    for Vec<proto::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest>
 {
     fn from(
         value: AccountStorageRequirements,
-    ) -> Vec<proto::rpc_store::account_request::account_detail_request::StorageMapDetailRequest>
+    ) -> Vec<proto::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest>
     {
-        use proto::rpc_store::account_request::account_detail_request;
-        use proto::rpc_store::account_request::account_detail_request::storage_map_detail_request;
+        use proto::rpc::account_proof_request::account_detail_request;
+        use proto::rpc::account_proof_request::account_detail_request::storage_map_detail_request;
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_index, map_keys) in request_map {

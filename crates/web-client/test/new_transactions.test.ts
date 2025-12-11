@@ -714,10 +714,12 @@ test.describe("custom transaction with multiple output notes", () => {
 // =======================================================================================================
 
 export const customAccountComponent = async (
-  testingPage: Page
+  testingPage: Page,
+  schemeSecretKeyFunction: string
 ): Promise<void> => {
-  return await testingPage.evaluate(async () => {
-    const accountCode = `
+  return await testingPage.evaluate(
+    async ({ schemeSecretKeyFunction }) => {
+      const accountCode = `
         use.miden::active_account
         use.miden::native_account
         use.std::sys
@@ -759,7 +761,7 @@ export const customAccountComponent = async (
             # => [CURRENT_ROOT]
         end
       `;
-    const scriptCode = `
+      const scriptCode = `
         use.miden_by_example::mapping_example_contract
         use.std::sys
 
@@ -786,79 +788,91 @@ export const customAccountComponent = async (
             exec.sys::truncate_stack
         end
       `;
-    const client = window.client;
-    let builder = client.createScriptBuilder();
-    let storageMap = new window.StorageMap();
-    let storageSlotMap = window.StorageSlot.map(storageMap);
+      const client = window.client;
+      let builder = client.createScriptBuilder();
+      let storageMap = new window.StorageMap();
+      let storageSlotMap = window.StorageSlot.map(storageMap);
 
-    let mappingAccountComponent = window.AccountComponent.compile(
-      accountCode,
-      builder,
-      [storageSlotMap]
-    ).withSupportsAllTypes();
+      let mappingAccountComponent = window.AccountComponent.compile(
+        accountCode,
+        builder,
+        [storageSlotMap]
+      ).withSupportsAllTypes();
 
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(walletSeed);
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
 
-    let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+      let secretKey = window.SecretKey[schemeSecretKeyFunction](walletSeed);
+      let authComponent =
+        window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
-    let accountBuilderResult = new window.AccountBuilder(walletSeed)
-      .accountType(window.AccountType.RegularAccountImmutableCode)
-      .storageMode(window.AccountStorageMode.public())
-      .withAuthComponent(authComponent)
-      .withComponent(mappingAccountComponent)
-      .build();
+      let accountBuilderResult = new window.AccountBuilder(walletSeed)
+        .accountType(window.AccountType.RegularAccountImmutableCode)
+        .storageMode(window.AccountStorageMode.public())
+        .withAuthComponent(authComponent)
+        .withComponent(mappingAccountComponent)
+        .build();
 
-    await client.addAccountSecretKeyToWebStore(secretKey);
-    await client.newAccount(accountBuilderResult.account, false);
+      await client.addAccountSecretKeyToWebStore(secretKey);
+      await client.newAccount(accountBuilderResult.account, false);
 
-    await client.syncState();
+      await client.syncState();
 
-    let accountCodeLib = builder.buildLibrary(
-      "miden_by_example::mapping_example_contract",
-      accountCode
-    );
-
-    builder.linkStaticLibrary(accountCodeLib);
-
-    let txScript = builder.compileTxScript(scriptCode);
-
-    let txIncrementRequest = new window.TransactionRequestBuilder()
-      .withCustomScript(txScript)
-      .build();
-
-    let txResult = await window.helpers.executeAndApplyTransaction(
-      accountBuilderResult.account.id(),
-      txIncrementRequest
-    );
-
-    await window.helpers.waitForTransaction(
-      txResult.executedTransaction().id().toHex()
-    );
-
-    // Fetch the updated account state from the client
-    const updated = await client.getAccount(accountBuilderResult.account.id());
-
-    // Read a map value from storage slot 1 with key 0x0
-    const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
-    const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
-
-    const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-
-    if (retrieveMapKey?.toHex() !== expected.toHex()) {
-      throw new Error(
-        `unexpected Word: got ${retrieveMapKey?.toHex()} expected ${expected.toHex()}`
+      let accountCodeLib = builder.buildLibrary(
+        "miden_by_example::mapping_example_contract",
+        accountCode
       );
-    }
-  });
+
+      builder.linkStaticLibrary(accountCodeLib);
+
+      let txScript = builder.compileTxScript(scriptCode);
+
+      let txIncrementRequest = new window.TransactionRequestBuilder()
+        .withCustomScript(txScript)
+        .build();
+
+      let txResult = await window.helpers.executeAndApplyTransaction(
+        accountBuilderResult.account.id(),
+        txIncrementRequest
+      );
+
+      await window.helpers.waitForTransaction(
+        txResult.executedTransaction().id().toHex()
+      );
+
+      // Fetch the updated account state from the client
+      const updated = await client.getAccount(
+        accountBuilderResult.account.id()
+      );
+
+      // Read a map value from storage slot 1 with key 0x0
+      const keyZero = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
+      const retrieveMapKey = updated?.storage().getMapItem(1, keyZero);
+
+      const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+
+      if (retrieveMapKey?.toHex() !== expected.toHex()) {
+        throw new Error(
+          `unexpected Word: got ${retrieveMapKey?.toHex()} expected ${expected.toHex()}`
+        );
+      }
+    },
+    { schemeSecretKeyFunction }
+  );
 };
 
 test.describe("custom account component tests", () => {
-  test("custom account component transaction completes successfully", async ({
-    page,
-  }) => {
-    await expect(customAccountComponent(page)).resolves.toBeUndefined();
+  [
+    { authScheme: "ECDSA", schemeSecretKeyFunction: "ecdsaWithRNG" },
+    { authScheme: "Falcon", schemeSecretKeyFunction: "rpoFalconWithRNG" },
+  ].forEach(({ authScheme, schemeSecretKeyFunction }) => {
+    test(`custom account component transaction completes successfully (${authScheme})`, async ({
+      page,
+    }) => {
+      await expect(
+        customAccountComponent(page, schemeSecretKeyFunction)
+      ).resolves.toBeUndefined();
+    });
   });
 });
 
@@ -1278,7 +1292,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
     crypto.getRandomValues(walletSeed);
 
     let secretKey = window.SecretKey.rpoFalconWithRNG(walletSeed);
-    let authComponent = window.AccountComponent.createAuthComponent(secretKey);
+    let authComponent =
+      window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
 
     let bumpItemAccountBuilderResult = new window.AccountBuilder(walletSeed)
       .withAuthComponent(authComponent)

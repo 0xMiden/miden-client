@@ -81,8 +81,11 @@ where
                 .get_account(id)
                 .await?
                 .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
+            let account: Account = account_record
+                .try_into()
+                .map_err(|_| NoteScreenerError::AccountDataNotFound(id))?;
 
-            match self.check_standard_consumability(account_record.account(), note).await {
+            match self.check_standard_consumability(&account, note).await {
                 Ok(Some(relevance)) => {
                     note_relevances.push((id, relevance));
                 },
