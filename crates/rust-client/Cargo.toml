@@ -82,7 +82,7 @@ miden-client              = { features = ["std", "testing"], path = "." }
 miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store" }
 miden-lib                 = { features = ["testing"], workspace = true }
 miden-objects             = { default-features = false, features = ["testing"], workspace = true }
-miden-testing             = { default-features = false, workspace = true }
+miden-testing             = { workspace = true }
 tokio                     = { workspace = true }
 web-sys                   = { features = ["console"], version = "0.3" }
 

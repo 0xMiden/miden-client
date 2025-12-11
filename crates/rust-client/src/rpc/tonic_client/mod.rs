@@ -4,8 +4,11 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
+use miden_objects::asset::{Asset, AssetVault};
 
-use miden_objects::account::{Account, AccountCode, AccountId};
+use miden_objects::account::{
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
+};
 use miden_objects::address::NetworkId;
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
@@ -21,21 +24,18 @@ use tracing::info;
 use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
+use super::generated::rpc::account_proof_request::AccountDetailRequest;
+use super::generated::rpc::{AccountProofRequest, SyncAccountVaultRequest};
 use super::{
-    Endpoint,
-    FetchedAccount,
-    NodeRpcClient,
-    NodeRpcClientEndpoint,
-    NoteSyncInfo,
-    RpcError,
+    Endpoint, FetchedAccount, NodeRpcClient, NodeRpcClientEndpoint, NoteSyncInfo, RpcError,
     StateSyncInfo,
 };
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc::{BlockRange, SyncStorageMapsRequest};
 use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
@@ -253,36 +253,152 @@ impl NodeRpcClient for GrpcClient {
     ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let request = proto::account::AccountId { id: account_id.to_bytes() };
+        let request = AccountProofRequest {
+            account_id: Some(account_id.into()),
+            // FIXME: Should we add a block number here?
+            block_num: None,
+            // FIXME: Write a test that retrieves a private account
+            // to see if this yields an error or not.
+            details: Some(AccountDetailRequest {
+                // FIXME: Should these fields be other
+                // than none? Then again, I'm not sure from
+                // where this data would come from if needed.
+                code_commitment: Some(EMPTY_WORD.into()),
+                asset_vault_commitment: Some(EMPTY_WORD.into()),
+                // FIXME: Should this field be something else?
+                storage_maps: vec![],
+            }),
+        };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api.get_account_details(request).await.map_err(|status| {
-            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
-        })?;
-        let response = response.into_inner();
-        let account_summary = response.summary.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails response should have an `summary`".to_string(),
-        ))?;
+        let response = rpc_api
+            .get_account_proof(request)
+            .await
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
+            })?
+            .into_inner();
 
-        let commitment =
-            account_summary.account_commitment.ok_or(RpcError::ExpectedDataMissing(
-                "GetAccountDetails response's account should have an `account_commitment`"
-                    .to_string(),
-            ))?;
+        let Some(witness) = response.witness else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account without witness".to_owned(),
+            ));
+        };
+
+        let Some(commitment) = witness.commitment else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account witness without commitment".to_owned(),
+            ));
+        };
+
+        let Some(block_number) = response.block_num.map(|bn| bn.block_num) else {
+            return Err(RpcError::ExpectedDataMissing(
+                "GetAccountDetails returned an account without a matching block number for the witness".to_owned(),
+            ));
+        };
 
         let commitment = commitment.try_into()?;
 
-        let update_summary = AccountUpdateSummary::new(commitment, account_summary.block_num);
+        let update_summary = AccountUpdateSummary::new(commitment, block_number);
+
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            let account = Account::read_from_bytes(&response.details.ok_or(
-                RpcError::ExpectedDataMissing(
-                    "GetAccountDetails response should have an `account`".to_string(),
-                ),
-            )?)?;
+            // FIXME:
+            // - Double check passing an empty map is OK.
+            // - We probably want to split the steps below into one or more functions
+            let details = response
+                .details
+                .ok_or(RpcError::ExpectedDataMissing(
+                    "GetAccountDetails returned a public account without details".to_owned(),
+                ))
+                .and_then(|details| details.into_domain(&Default::default()))?;
+            let account_id = details.header.id();
+            let nonce = details.header.nonce();
+            let assets: Vec<Asset> = {
+                if details.vault_details.too_many_assets {
+                    let req = SyncAccountVaultRequest {
+                        // FIXME: What should this parameter be?
+                        block_range: None,
+                        account_id: Some(details.header.id().clone().into()),
+                    };
+                    rpc_api
+                        .sync_account_vault(req)
+                        .await
+                        .unwrap()
+                        .into_inner()
+                        .updates
+                        .into_iter()
+                        .map(|update| Asset::try_from(update.asset.unwrap()).unwrap())
+                        .collect()
+                } else {
+                    // FIXME: Remove unwrap
+                    details.vault_details.assets
+                }
+            };
+            let response_slots = details.storage_details.header.slots();
+            let mut slots = vec![];
+            for (index, (slot_type, slot_value)) in response_slots.enumerate() {
+                match slot_type {
+                    // FIXME:
+                    // - Should we specify a BlockRange?.
+                    // - Remove unwraps.
+                    // - Avoid nesting so much.
+                    // - Each entry from the storage details has a
+                    // 'too_many_entries' should this be only a single request?
+                    // - Avoid using 'extend' 2 times.
+                    StorageSlotType::Value => slots.push(StorageSlot::Value(*slot_value)),
+                    StorageSlotType::Map => {
+                        let map_details = &details.storage_details.map_details[index];
+                        let mut map_entries = vec![];
+                        if map_details.too_many_entries {
+                            map_entries.extend(
+                                rpc_api
+                            .sync_storage_maps(SyncStorageMapsRequest {
+                                block_range: None,
+                                account_id: Some(account_id.clone().into()),
+                            })
+                            .await
+                            .unwrap()
+                        // FIXME: SyncStorageMapsResponse has 'pagination' field, should we
+                        // do something with it?
+                            .into_inner()
+                            .updates
+                            .into_iter()
+                        // FIXME:
+                        // - Avoid these unwraps
+                        // - Use better names
+                            .map(|u| {
+                                let key: Word = u.key.unwrap().try_into().unwrap();
+                                let value: Word = u.value.unwrap().try_into().unwrap();
+                                (key, value)
+                            }),
+                            )
+                        } else {
+                            map_entries.extend(map_details.entries.iter().map(|e| {
+                                let key: Word = e.key.into();
+                                let value: Word = e.value.into();
+                                (key, value)
+                            }))
+                        }
 
+                        slots.push(StorageSlot::Map(StorageMap::with_entries(map_entries).unwrap()))
+                    },
+                }
+            }
+            // FIXME: Is this correct?
+            let seed = None;
+            let account = Account::new(
+                account_id,
+                // FIXME: Remove unwraps
+                AssetVault::new(&assets).unwrap(),
+                AccountStorage::new(slots).unwrap(),
+                details.code,
+                nonce,
+                seed,
+            )
+            .unwrap();
             Ok(FetchedAccount::new_public(account, update_summary))
         }
     }
