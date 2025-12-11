@@ -19,9 +19,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{
-    self, AccountDetails, AccountProof, AccountProofs, AccountUpdateSummary,
-};
+use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::account_proof_request::AccountDetailRequest;
@@ -263,7 +261,7 @@ impl NodeRpcClient for GrpcClient {
                 // FIXME: Should these fields be other
                 // than none? Then again, I'm not sure from
                 // where this data would come from if needed.
-                code_commitment: None,
+                code_commitment: Some(EMPTY_WORD),
                 asset_vault_commitment: None,
                 // FIXME: Should this field be something else?
                 storage_maps: vec![],
