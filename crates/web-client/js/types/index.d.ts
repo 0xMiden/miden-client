@@ -130,6 +130,20 @@ export {
   Word,
 } from "./crates/miden_client_web";
 
+export type GetKeyCallback = (
+  pubKey: Uint8Array
+) => Promise<Uint8Array | null | undefined> | Uint8Array | null | undefined;
+
+export type InsertKeyCallback = (
+  pubKey: Uint8Array,
+  secretKey: Uint8Array
+) => Promise<void> | void;
+
+export type SignCallback = (
+  pubKey: Uint8Array,
+  signingInputs: Uint8Array
+) => Promise<Uint8Array> | Uint8Array;
+
 type MidenArrayConstructors = {
   [K in keyof typeof WasmExports as K extends `${string}Array`
     ? K
@@ -151,14 +165,49 @@ export declare class WebClient extends WasmWebClient {
   static createClient(
     rpcUrl?: string,
     noteTransportUrl?: string,
-    seed?: string
+    seed?: Uint8Array
   ): Promise<WebClient & WasmWebClient>;
 
-  /** Returns the default transaction prover configured on the client. */
-  defaultTransactionProver(): TransactionProver;
+  /**
+   * Factory method to create and initialize a new wrapped WebClient with a remote keystore.
+   *
+   * @param rpcUrl - The RPC URL (optional).
+   * @param noteTransportUrl - The note transport URL (optional).
+   * @param seed - The seed for the account (optional).
+   * @param getKeyCb - Callback used to retrieve secret keys for a given public key.
+   * @param insertKeyCb - Callback used to persist secret keys in the external store.
+   * @param signCb - Callback used to create signatures for the provided inputs.
+   * @returns A promise that resolves to a fully initialized WebClient.
+   */
+  static createClientWithExternalKeystore(
+    rpcUrl?: string,
+    noteTransportUrl?: string,
+    seed?: Uint8Array,
+    getKeyCb?: GetKeyCallback,
+    insertKeyCb?: InsertKeyCallback,
+    signCb?: SignCallback
+  ): Promise<WebClient & WasmWebClient>;
 
   /**
    * Terminates the underlying worker.
    */
   terminate(): void;
+}
+
+export declare class MockWebClient extends WebClient {
+  /**
+   * Factory method to create and initialize a new wrapped MockWebClient.
+   *
+   * @param serializedMockChain - Serialized mock chain (optional).
+   * @param serializedMockNoteTransportNode - Serialized mock note transport node (optional).
+   * @param seed - Seed for account initialization (optional).
+   * @returns A promise that resolves to a fully initialized MockWebClient.
+   */
+  static createClient(
+    serializedMockChain?: ArrayBuffer | Uint8Array,
+    serializedMockNoteTransportNode?: ArrayBuffer | Uint8Array,
+    seed?: Uint8Array
+  ): Promise<MockWebClient & WasmWebClient>;
+  /** Syncs the mock state and returns the resulting summary. */
+  syncState(): Promise<SyncSummary>;
 }
