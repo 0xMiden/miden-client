@@ -143,9 +143,9 @@ export const test = base.extend<{ forEachTest: void }>({
 
           window.helpers.parseNetworkId = (networkId) => {
             const map = {
-              mm: window.NetworkId.Mainnet,
-              mtst: window.NetworkId.Testnet,
-              mdev: window.NetworkId.Devnet,
+              mm: window.NetworkId.mainnet(),
+              mtst: window.NetworkId.testnet(),
+              mdev: window.NetworkId.devnet(),
             };
             const parsedNetworkId = map[networkId];
             if (parsedNetworkId === undefined) {

@@ -16,7 +16,7 @@
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
 * Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 * [BREAKING] Refactored the fields in retrieved notes in the WebClient: now the inclusion proof has been factored out and is always accessible ([#1606](https://github.com/0xMiden/miden-client/pull/1606)).
-* [BREAKING] Removed `toBech32Custom` and implemented custom id conversion for wasm derived class `NetworkId` ([#1612](https://github.com/0xMiden/miden-client/pull/1612)).
+* [BREAKING] `NetworkId` has been refactored and is now a struct with inner field containing the previously exposed network id, and additionally the optional prefix name. The struct is no longer buildable from an enum, it is now created through constructor methods (e.g `mainnet` binding). Removed `toBech32Custom` and implemented custom id conversion for wasm derived class `NetworkId`. ([#1612](https://github.com/0xMiden/miden-client/pull/1612)).
 
 ## 0.12.5 (2025-12-01)
 

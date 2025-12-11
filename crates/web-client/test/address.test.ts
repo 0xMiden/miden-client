@@ -150,7 +150,7 @@ test.describe("Bech32 tests", () => {
       );
       const accountId = newAccount.id();
       const asBech32 = accountId.toBech32(
-        window.NetworkId.Mainnet,
+        window.NetworkId.mainnet(),
         window.AccountInterface.BasicWallet
       );
       const fromBech32 = window.AccountId.fromBech32(asBech32).toString();
@@ -172,7 +172,6 @@ test.describe("Note tag tests", () => {
 const instanceAddressRemoveThenInsert = async (page: Page) => {
   return await page.evaluate(async () => {
     const client = window.client;
-    const parsedNetworkId = window.helpers.parseNetworkId("mtst");
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
@@ -197,9 +196,9 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
 
     return {
       accountId: accountId,
-      address: address.toBech32(parsedNetworkId),
+      address: address.toBech32(window.NetworkId.testnet()),
       retrievedAccountId: retrievedId,
-      retrievedAddress: retrievedAddress.toBech32(parsedNetworkId),
+      retrievedAddress: retrievedAddress.toBech32(window.NetworkId.testnet()),
     };
   });
 };

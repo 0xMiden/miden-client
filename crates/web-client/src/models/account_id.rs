@@ -1,3 +1,5 @@
+use alloc::str::FromStr;
+
 use miden_client::Felt as NativeFelt;
 use miden_client::account::{AccountId as NativeAccountId, NetworkId as NativeNetworkId};
 use miden_client::address::{
@@ -6,6 +8,7 @@ use miden_client::address::{
     AddressInterface as NativeAccountInterface,
     RoutingParameters,
 };
+use miden_objects::address::CustomNetworkId;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -19,7 +22,7 @@ use crate::js_error_with_context;
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
-pub enum InnerNetworkId {
+enum InnerNetworkId {
     /// Main network prefix (`mm`).
     Mainnet = 0,
     /// Public test network prefix (`mtst`).
@@ -30,11 +33,50 @@ pub enum InnerNetworkId {
     Custom = 3,
 }
 
+/// The identifier of a Miden network.
 #[wasm_bindgen]
 pub struct NetworkId {
+    // Inner representation of the network ID.
     inner: InnerNetworkId,
-    /// prefix name is only used when the inner network is set to custom
-    name: Option<String>,
+    // custom prefix is only used when the inner network is set to custom
+    custom: Option<CustomNetworkId>,
+}
+
+#[wasm_bindgen]
+impl NetworkId {
+    pub fn mainnet() -> NetworkId {
+        NetworkId {
+            inner: InnerNetworkId::Mainnet,
+            custom: None,
+        }
+    }
+
+    pub fn testnet() -> NetworkId {
+        NetworkId {
+            inner: InnerNetworkId::Testnet,
+            custom: None,
+        }
+    }
+
+    pub fn devnet() -> NetworkId {
+        NetworkId {
+            inner: InnerNetworkId::Devnet,
+            custom: None,
+        }
+    }
+
+    /// Builds a custom network ID from a provided custom prefix.
+    ///
+    /// Returns an error if the prefix is invalid.
+    pub fn custom(custom_prefix: &str) -> Result<NetworkId, JsValue> {
+        let custom = CustomNetworkId::from_str(custom_prefix)
+            .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))?;
+
+        Ok(NetworkId {
+            inner: InnerNetworkId::Custom,
+            custom: Some(custom),
+        })
+    }
 }
 
 #[wasm_bindgen]
@@ -90,17 +132,14 @@ impl AccountId {
         self.0.to_string()
     }
 
-    /// Will turn the Account ID into its bech32 string representation. To avoid a potential
-    /// wrongful encoding, this function is infallible for either mainnet ("mm"),
-    /// testnet ("mtst") or devnet ("mdev"). It may fail for custom network IDs, if the
-    /// provided prefix is not recognized.
+    /// Will turn the Account ID into its bech32 string representation.
     #[wasm_bindgen(js_name = "toBech32")]
     pub fn to_bech32(
         &self,
         network_id: NetworkId,
         account_interface: AccountInterface,
     ) -> Result<String, JsValue> {
-        let network_id: NativeNetworkId = network_id.try_into()?;
+        let network_id: NativeNetworkId = network_id.into();
 
         let routing_params = RoutingParameters::new(account_interface.into());
         let address = Address::new(self.0)
@@ -166,19 +205,17 @@ impl From<&AccountId> for NativeAccountId {
     }
 }
 
-impl TryFrom<NetworkId> for NativeNetworkId {
-    type Error = JsValue;
-
-    fn try_from(value: NetworkId) -> Result<Self, Self::Error> {
+impl From<NetworkId> for NativeNetworkId {
+    fn from(value: NetworkId) -> Self {
         match value.inner {
-            InnerNetworkId::Mainnet => Ok(NativeNetworkId::Mainnet),
-            InnerNetworkId::Testnet => Ok(NativeNetworkId::Testnet),
-            InnerNetworkId::Devnet => Ok(NativeNetworkId::Devnet),
+            InnerNetworkId::Mainnet => NativeNetworkId::Mainnet,
+            InnerNetworkId::Testnet => NativeNetworkId::Testnet,
+            InnerNetworkId::Devnet => NativeNetworkId::Devnet,
             InnerNetworkId::Custom => {
                 let custom_prefix =
-                    value.name.ok_or(JsValue::from_str("Missing required custom id prefix"))?;
-                NativeNetworkId::new(&custom_prefix)
-                    .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))
+                    value.custom.expect("custom network id constructor implies existing prefix");
+                NativeNetworkId::from_str(custom_prefix.as_str())
+                    .expect("custom network id constructor implies valid prefix")
             },
         }
     }
