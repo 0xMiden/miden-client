@@ -22,7 +22,9 @@ use crate::js_error_with_context;
 #[derive(Clone, Copy, Debug)]
 pub struct AccountId(NativeAccountId);
 
-enum InnerNetworkId {
+/// The type of a Miden network.
+#[wasm_bindgen]
+pub enum NetworkType {
     /// Main network prefix (`mm`).
     Mainnet = 0,
     /// Public test network prefix (`mtst`).
@@ -36,8 +38,8 @@ enum InnerNetworkId {
 /// The identifier of a Miden network.
 #[wasm_bindgen]
 pub struct NetworkId {
-    // Inner representation of the network ID.
-    inner: InnerNetworkId,
+    // Specific type of the network ID.
+    network_type: NetworkType,
     // custom prefix is only used when the inner network is set to custom
     custom: Option<CustomNetworkId>,
 }
@@ -46,21 +48,21 @@ pub struct NetworkId {
 impl NetworkId {
     pub fn mainnet() -> NetworkId {
         NetworkId {
-            inner: InnerNetworkId::Mainnet,
+            network_type: NetworkType::Mainnet,
             custom: None,
         }
     }
 
     pub fn testnet() -> NetworkId {
         NetworkId {
-            inner: InnerNetworkId::Testnet,
+            network_type: NetworkType::Testnet,
             custom: None,
         }
     }
 
     pub fn devnet() -> NetworkId {
         NetworkId {
-            inner: InnerNetworkId::Devnet,
+            network_type: NetworkType::Devnet,
             custom: None,
         }
     }
@@ -73,7 +75,7 @@ impl NetworkId {
             .map_err(|err| js_error_with_context(err, "Error building custom id prefix"))?;
 
         Ok(NetworkId {
-            inner: InnerNetworkId::Custom,
+            network_type: NetworkType::Custom,
             custom: Some(custom),
         })
     }
@@ -207,11 +209,11 @@ impl From<&AccountId> for NativeAccountId {
 
 impl From<NetworkId> for NativeNetworkId {
     fn from(value: NetworkId) -> Self {
-        match value.inner {
-            InnerNetworkId::Mainnet => NativeNetworkId::Mainnet,
-            InnerNetworkId::Testnet => NativeNetworkId::Testnet,
-            InnerNetworkId::Devnet => NativeNetworkId::Devnet,
-            InnerNetworkId::Custom => {
+        match value.network_type {
+            NetworkType::Mainnet => NativeNetworkId::Mainnet,
+            NetworkType::Testnet => NativeNetworkId::Testnet,
+            NetworkType::Devnet => NativeNetworkId::Devnet,
+            NetworkType::Custom => {
                 let custom_prefix =
                     value.custom.expect("custom network id constructor implies existing prefix");
                 NativeNetworkId::from_str(custom_prefix.as_str())

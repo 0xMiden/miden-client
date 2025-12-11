@@ -10,6 +10,7 @@
 - [AccountType](enumerations/AccountType.md)
 - [AuthScheme](enumerations/AuthScheme.md)
 - [InputNoteState](enumerations/InputNoteState.md)
+- [NetworkType](enumerations/NetworkType.md)
 - [NoteFilterTypes](enumerations/NoteFilterTypes.md)
 - [NoteType](enumerations/NoteType.md)
 - [SigningInputsType](enumerations/SigningInputsType.md)
