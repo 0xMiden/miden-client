@@ -100,26 +100,12 @@ where
         self.store.get_sync_height().await.map_err(Into::into)
     }
 
-    /// Syncs the client's state with the current state of the Miden network and returns a
-    /// [`SyncSummary`] corresponding to the local state update.
+    /// Performs a sync against the network and returns the raw [`StateSyncUpdate`].
     ///
-    /// The sync process is done in multiple steps:
-    /// 1. A request is sent to the node to get the state updates. This request includes tracked
-    ///    account IDs and the tags of notes that might have changed or that might be of interest to
-    ///    the client.
-    /// 2. A response is received with the current state of the network. The response includes
-    ///    information about new/committed/consumed notes, updated accounts, and committed
-    ///    transactions.
-    /// 3. Tracked notes are updated with their new states.
-    /// 4. New notes are checked, and only relevant ones are stored. Relevant notes are those that
-    ///    can be consumed by accounts the client is tracking (this is checked by the
-    ///    [`crate::note::NoteScreener`])
-    /// 5. Transactions are updated with their new states.
-    /// 6. Tracked public accounts are updated and private accounts are validated against the node
-    ///    state.
-    /// 7. The MMR is updated with the new peaks and authentication nodes.
-    /// 8. All updates are applied to the store to be persisted.
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
+    /// This does **not** apply the update to the store. Consumers can either call
+    /// [`Client::apply_state_sync`] manually or use [`Client::sync_state`], which wraps this
+    /// method and applies the update automatically.
+    pub async fn sync_state_update(&mut self) -> Result<StateSyncUpdate, ClientError> {
         _ = self.ensure_genesis_in_place().await?;
 
         let note_screener = NoteScreener::new(self.store.clone(), self.authenticator.clone());
@@ -165,17 +151,25 @@ where
             )
             .await?;
 
+        Ok(state_sync_update)
+    }
+
+    /// Syncs the client's state with the current state of the Miden network and returns a
+    /// [`SyncSummary`] corresponding to the local state update.
+    ///
+    /// This wraps [`Client::sync_state_update`] and applies the resulting update to the store.
+    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
+        let state_sync_update = self.sync_state_update().await?;
+
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
-        // Apply received and computed updates to the store
         self.store
             .apply_state_sync(state_sync_update)
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Remove irrelevant block headers
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
@@ -196,7 +190,7 @@ where
 // ================================================================================================
 
 /// Contains stats about the sync operation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncSummary {
     /// Block number up to which the client has been synced.
     pub block_num: BlockNumber,

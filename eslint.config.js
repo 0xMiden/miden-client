@@ -54,7 +54,7 @@ module.exports = [
   },
   {
     files: ["**/*.ts", "**/*.tsx"],
-    ignores: ["crates/rust-client/*"],
+    ignores: ["crates/miden-client-core/*"],
     languageOptions: {
       parser: require("@typescript-eslint/parser"),
       parserOptions: {

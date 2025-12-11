@@ -24,7 +24,7 @@ testing = ["miden-client/testing"]
 [dependencies]
 # Workspace dependencies
 idxdb-store   = { package = "miden-idxdb-store", path = "../idxdb-store" }
-miden-client  = { default-features = false, features = ["testing", "tonic"], path = "../rust-client" }
+miden-client  = { default-features = false, features = ["testing", "tonic"], package = "miden-client-core", path = "../miden-client-core" }
 miden-objects = { workspace = true }
 
 # External dependencies

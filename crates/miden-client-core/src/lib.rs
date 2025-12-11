@@ -46,7 +46,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! miden-client = "0.10"
+//! miden-client-core = "0.13"
 //! ```
 //!
 //! ## Example
@@ -56,13 +56,13 @@
 //! ```rust
 //! use std::sync::Arc;
 //!
-//! use miden_client::crypto::RpoRandomCoin;
-//! use miden_client::keystore::FilesystemKeyStore;
-//! use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
-//! use miden_client::note_transport::grpc::GrpcNoteTransportClient;
-//! use miden_client::rpc::{Endpoint, GrpcClient};
-//! use miden_client::store::Store;
-//! use miden_client::{Client, ExecutionOptions, Felt};
+//! use miden_client_core::crypto::RpoRandomCoin;
+//! use miden_client_core::keystore::FilesystemKeyStore;
+//! use miden_client_core::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+//! use miden_client_core::note_transport::grpc::GrpcNoteTransportClient;
+//! use miden_client_core::rpc::{Endpoint, GrpcClient};
+//! use miden_client_core::store::Store;
+//! use miden_client_core::{Client, ExecutionOptions, Felt};
 //! use miden_client_sqlite_store::SqliteStore;
 //! use miden_objects::crypto::rand::FeltRng;
 //! use miden_objects::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};

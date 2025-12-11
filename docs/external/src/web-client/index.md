@@ -23,7 +23,7 @@ The SDK is built from the `web-client` crate, which:
 
 - Is implemented in Rust and compiled to WebAssembly
 - Uses `wasm-bindgen` to expose JavaScript-compatible bindings
-- Depends on the rust-client crate, which contains core logic for blockchain interaction
+- Depends on the `miden-client-core` crate, which contains core logic for blockchain interaction
 
 A custom `rollup.config.js` bundles the WASM module, JS bindings, and web worker into a distributable NPM package.
 

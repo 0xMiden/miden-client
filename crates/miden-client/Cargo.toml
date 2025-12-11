@@ -1,0 +1,37 @@
+[package]
+authors.workspace      = true
+description            = "Std client facade with background service for the Miden network"
+edition.workspace      = true
+keywords               = ["client", "miden"]
+license.workspace      = true
+name                   = "miden-client"
+readme                 = "README.md"
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = ["std"]
+std = ["miden-client-core/std"]
+testing = ["miden-client-core/testing"]
+tonic = ["miden-client-core/tonic"]
+
+[dependencies]
+# Workspace dependencies
+miden-client-core = { default-features = false, path = "../miden-client-core" }
+
+thiserror = { workspace = true }
+tokio     = { workspace = true }
+tracing   = { workspace = true }
+
+[dev-dependencies]
+miden-client-core         = { path = "../miden-client-core", features = ["testing"] }
+miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store" }
+rand                      = { workspace = true }
+miden-testing             = { workspace = true, default-features = false }
+
+[lints]
+workspace = true
