@@ -16,7 +16,7 @@ WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
 WEB_CLIENT_DIR=crates/web-client
-RUST_CLIENT_DIR=crates/rust-client
+RUST_CLIENT_DIR=crates/miden-client-core
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
 
@@ -73,11 +73,11 @@ rust-client-ts-lint:
 
 .PHONY: doc
 doc: ## Generate & check rust documentation. Ensure you have the nightly toolchain installed.
-	@cd crates/rust-client && \
+	@cd crates/miden-client-core && \
 	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release
 
 doc-open: ## Generate & open rust documentation in browser. Ensure you have the nightly toolchain installed.
-	@cd crates/rust-client && \
+	@cd crates/miden-client-core && \
 	RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo +nightly doc --lib --no-deps --all-features --keep-going --release --open
 
 .PHONY: serve-docs

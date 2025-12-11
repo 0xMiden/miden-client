@@ -1,13 +1,13 @@
-# Rust Client Library
+# Miden Client Core
 
-Rust library, which can be used by other project to programmatically interact with the Miden rollup.
+Rust library, which can be used by other project to programmatically interact with the Miden rollup. This crate is no_std-compatible and is re-exported by the std-only `miden-client` facade.
 
-## Adding miden-client as a dependency
+## Adding miden-client-core as a dependency
 
-In order to utilize the `miden-client` library, you can add the dependency to your project's `Cargo.toml` file:
+In order to utilize the `miden-client-core` library, you can add the dependency to your project's `Cargo.toml` file:
 
 ````toml
-miden-client = { version = "0.13" }
+miden-client-core = { version = "0.13" }
 ````
 
 ## Crate Features

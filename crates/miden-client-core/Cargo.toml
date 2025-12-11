@@ -1,12 +1,12 @@
 [package]
 authors.workspace      = true
 categories             = ["no-std"]
-description            = "Client library that facilitates interaction with the Miden network"
-documentation          = "https://docs.rs/miden-client"
+description            = "Core client library that facilitates interaction with the Miden network"
+documentation          = "https://docs.rs/miden-client-core"
 edition.workspace      = true
 keywords               = ["client", "miden"]
 license.workspace      = true
-name                   = "miden-client"
+name                   = "miden-client-core"
 readme                 = "README.md"
 repository.workspace   = true
 rust-version.workspace = true
@@ -78,7 +78,7 @@ tonic-prost                      = { version = "0.14" }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
-miden-client              = { features = ["std", "testing"], path = "." }
+miden-client              = { features = ["std", "testing"], package = "miden-client-core", path = "." }
 miden-client-sqlite-store = { package = "miden-client-sqlite-store", path = "../sqlite-store" }
 miden-lib                 = { features = ["testing"], workspace = true }
 miden-objects             = { default-features = false, features = ["testing"], workspace = true }

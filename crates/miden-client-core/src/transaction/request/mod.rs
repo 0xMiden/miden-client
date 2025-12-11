@@ -99,6 +99,10 @@ pub struct TransactionRequest {
 }
 
 impl TransactionRequest {
+    pub fn builder() -> TransactionRequestBuilder {
+        TransactionRequestBuilder::new()
+    }
+
     // PUBLIC ACCESSORS
     // --------------------------------------------------------------------------------------------
 
