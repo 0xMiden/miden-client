@@ -408,8 +408,8 @@ where
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         }
 
+        // Initialize the note transport cursor if the client uses it
         if note_transport_api.is_some() {
-            // Initialize the note transport cursor
             init_note_transport_cursor(store.clone()).await?;
         }
 

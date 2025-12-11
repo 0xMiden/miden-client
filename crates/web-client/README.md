@@ -118,6 +118,16 @@ Follow the steps below to produce the contents that get published to npm (`dist/
 
 > Tip: during development you can set `MIDEN_WEB_DEV=true` before running `yarn build` (or run `npm run build-dev`) to skip the clean step and keep extra debugging metadata in the bundled output. This debugging metadata also includes debug symbols for the generated wasm binary
 
+### Checking the generated TypeScript bindings
+
+The script at `crates/web-client/scripts/check-bindgen-types.js` verifies that every type exported by the generated wasm bindings (`dist/crates/miden_client_web.d.ts`) is re-exported from the public declarations (`js/types/index.d.ts`). Run it after a build with:
+
+```
+yarn check:wasm-types
+```
+
+`WebClient` is intentionally excluded because the wrapper defines its own implementation. If the check reports missing exports, update `js/types/index.d.ts` so consumers get the full generated surface.
+
 ## Usage
 
 The following are just a few simple examples to get started. For more details, see the [API Reference](../../docs/typedoc/web-client/README.md).

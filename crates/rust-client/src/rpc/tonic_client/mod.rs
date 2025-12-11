@@ -35,8 +35,8 @@ use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, AppLevelError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc_store::BlockRange;
-use crate::rpc::generated::rpc_store::account_proof_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc::BlockRange;
+use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
@@ -104,19 +104,20 @@ impl GrpcClient {
 impl NodeRpcClient for GrpcClient {
     /// Sets the genesis commitment for the client. If the client is already connected, it will be
     /// updated to use the new commitment on subsequent requests. If the client is not connected,
-    /// the commitment will be used when it connects. If the genesis commitment is already set,
-    /// this method does nothing.
+    /// the commitment will be stored and used when the client connects. If the genesis commitment
+    /// is already set, this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError> {
-        self.ensure_connected().await?;
-
+        // Check if already set before doing anything else
         if self.genesis_commitment.read().is_some() {
             // Genesis commitment is already set, ignoring the new value.
             return Ok(());
         }
 
+        // Store the commitment for future connections
         self.genesis_commitment.write().replace(commitment);
 
-        // If a client is connected, we modify it to use the new genesis commitment.
+        // If a client is already connected, update it to use the new genesis commitment.
+        // If not connected, the commitment will be used when connect() is called.
         let mut client_guard = self.client.write();
         if let Some(client) = client_guard.as_mut() {
             client.set_genesis_commitment(commitment);
@@ -141,8 +142,7 @@ impl NodeRpcClient for GrpcClient {
             RpcError::from_grpc_error(NodeRpcClientEndpoint::SubmitProvenTx, status)
         })?;
 
-        let response = api_response.into_inner();
-        Ok(BlockNumber::from(response.block_height))
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
 
     async fn get_block_header_by_number(
@@ -150,7 +150,7 @@ impl NodeRpcClient for GrpcClient {
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
     ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
-        let request = proto::shared::BlockHeaderByNumberRequest {
+        let request = proto::rpc::BlockHeaderByNumberRequest {
             block_num: block_num.as_ref().map(BlockNumber::as_u32),
             include_mmr_proof: Some(include_mmr_proof),
         };
@@ -228,7 +228,7 @@ impl NodeRpcClient for GrpcClient {
 
         let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
 
-        let request = proto::rpc_store::SyncStateRequest {
+        let request = proto::rpc::SyncStateRequest {
             block_num: block_num.as_u32(),
             account_ids,
             note_tags,
@@ -327,7 +327,7 @@ impl NodeRpcClient for GrpcClient {
             // Only request details for public accounts; include known code commitment for this
             // account when available
             let account_details = if account_id.is_public() {
-                Some(proto::rpc_store::account_proof_request::AccountDetailRequest {
+                Some(proto::rpc::account_proof_request::AccountDetailRequest {
                     code_commitment: Some(EMPTY_WORD.into()),
                     // TODO: implement a way to request asset vaults
                     // https://github.com/0xMiden/miden-client/issues/1412
@@ -338,7 +338,7 @@ impl NodeRpcClient for GrpcClient {
                 None
             };
 
-            let request = proto::rpc_store::AccountProofRequest {
+            let request = proto::rpc::AccountProofRequest {
                 account_id: Some(account_id.into()),
                 block_num: Some(block_num.into()),
                 details: account_details,
@@ -392,7 +392,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncNotesRequest { block_range, note_tags };
+        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
 
         let mut rpc_api = self.ensure_connected().await?;
 
@@ -422,7 +422,7 @@ impl NodeRpcClient for GrpcClient {
             let mut current_block_from = block_num.as_u32();
 
             for _ in 0..MAX_ITERATIONS {
-                let request = proto::rpc_store::SyncNullifiersRequest {
+                let request = proto::rpc::SyncNullifiersRequest {
                     nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
                     prefix_len: 16,
                     block_range: Some(BlockRange {
@@ -477,7 +477,7 @@ impl NodeRpcClient for GrpcClient {
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
         let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
         for chunk in nullifiers.chunks(NULLIFIER_PREFIXES_LIMIT) {
-            let request = proto::rpc_store::NullifierList {
+            let request = proto::rpc::NullifierList {
                 nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
             };
 
@@ -546,7 +546,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncStorageMapsRequest {
+        let request = proto::rpc::SyncStorageMapsRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -571,7 +571,7 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc_store::SyncAccountVaultRequest {
+        let request = proto::rpc::SyncAccountVaultRequest {
             block_range,
             account_id: Some(account_id.into()),
         };
@@ -598,7 +598,7 @@ impl NodeRpcClient for GrpcClient {
 
         let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
 
-        let request = proto::rpc_store::SyncTransactionsRequest { block_range, account_ids };
+        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
 
         let mut rpc_api = self.ensure_connected().await?;
 

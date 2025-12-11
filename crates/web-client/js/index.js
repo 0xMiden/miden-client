@@ -110,11 +110,11 @@ export class WebClient {
    *   - Callback to persist a secret key. `pubKey` is the serialized public key, and
    *   `secretKey` is the serialized secret key (from `SecretKey.serialize()`). May return
    *   `void` or a `Promise<void>`.
-   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Array<number | string>> | Array<number | string>} [signCb]
-   *   - Callback to produce signature elements for the provided inputs. `pubKey` is the
+   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} [signCb]
+   *   - Callback to produce serialized signature bytes for the provided inputs. `pubKey` is the
    *   serialized public key, and `signingInputs` is a `Uint8Array` produced by
-   *   `SigningInputs.serialize()`. Must return an array of numeric values (numbers or numeric
-   *   strings) representing the signature elements, either directly or wrapped in a `Promise`.
+   *   `SigningInputs.serialize()`. Must return a `Uint8Array` containing the serialized
+   *   signature, either directly or wrapped in a `Promise`.
    */
   constructor(rpcUrl, noteTransportUrl, seed, getKeyCb, insertKeyCb, signCb) {
     this.rpcUrl = rpcUrl;
@@ -298,6 +298,7 @@ export class WebClient {
       insertKeyCb,
       signCb
     );
+    // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createClientWithExternalKeystore(
       rpcUrl,
@@ -307,6 +308,7 @@ export class WebClient {
       insertKeyCb,
       signCb
     );
+
     await instance.ready;
     // Return a proxy that forwards missing properties to wasmWebClient.
     return new Proxy(instance, {
@@ -476,52 +478,6 @@ export class WebClient {
     }
   }
 
-  async submitTransaction(transactionResult, prover) {
-    try {
-      if (!this.worker) {
-        const wasmWebClient = await this.getWasmWebClient();
-        const proven = await wasmWebClient.proveTransaction(
-          transactionResult,
-          prover
-        );
-        const submissionHeight = await wasmWebClient.submitProvenTransaction(
-          proven,
-          transactionResult
-        );
-        return await wasmWebClient.applyTransaction(
-          transactionResult,
-          submissionHeight
-        );
-      }
-
-      const wasm = await getWasmOrThrow();
-      const serializedTransactionResult = transactionResult.serialize();
-      const proverPayload = prover ? prover.serialize() : null;
-
-      const { submissionHeight, serializedTransactionUpdate } =
-        await this.callMethodWithWorker(
-          MethodName.SUBMIT_TRANSACTION,
-          serializedTransactionResult,
-          proverPayload
-        );
-
-      if (this instanceof MockWebClient) {
-        return wasm.TransactionStoreUpdate.deserialize(
-          new Uint8Array(serializedTransactionUpdate)
-        );
-      }
-
-      const wasmWebClient = await this.getWasmWebClient();
-      return await wasmWebClient.applyTransaction(
-        transactionResult,
-        submissionHeight
-      );
-    } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error);
-      throw error;
-    }
-  }
-
   async proveTransaction(transactionResult, prover) {
     try {
       if (!this.worker) {
@@ -578,7 +534,7 @@ export class WebClient {
 
 export class MockWebClient extends WebClient {
   constructor(seed) {
-    super(null, seed);
+    super(null, null, seed);
   }
 
   /**
@@ -652,56 +608,6 @@ export class MockWebClient extends WebClient {
       );
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
-      throw error;
-    }
-  }
-
-  async submitTransaction(transactionResult, prover) {
-    try {
-      if (!this.worker) {
-        return await super.submitTransaction(transactionResult, prover);
-      }
-
-      const wasmWebClient = await this.getWasmWebClient();
-      const wasm = await getWasmOrThrow();
-      const serializedTransactionResult = transactionResult.serialize();
-      const proverPayload = prover ? prover.serialize() : null;
-      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      const serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
-
-      const result = await this.callMethodWithWorker(
-        MethodName.SUBMIT_TRANSACTION_MOCK,
-        serializedTransactionResult,
-        proverPayload,
-        serializedMockChain,
-        serializedMockNoteTransportNode
-      );
-      const newMockChain = new Uint8Array(result.serializedMockChain);
-      const newMockNoteTransportNode = result.serializedMockNoteTransportNode
-        ? new Uint8Array(result.serializedMockNoteTransportNode)
-        : undefined;
-
-      if (!(this instanceof MockWebClient)) {
-        return await wasmWebClient.applyTransaction(
-          transactionResult,
-          result.submissionHeight
-        );
-      }
-
-      this.wasmWebClient = new wasm.WebClient();
-      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
-      await this.wasmWebClient.createMockClient(
-        this.seed,
-        newMockChain,
-        newMockNoteTransportNode
-      );
-
-      return wasm.TransactionStoreUpdate.deserialize(
-        new Uint8Array(result.serializedTransactionUpdate)
-      );
-    } catch (error) {
-      console.error("INDEX.JS: Error in submitTransaction:", error);
       throw error;
     }
   }

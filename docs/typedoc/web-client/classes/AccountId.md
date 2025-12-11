@@ -177,6 +177,24 @@ Returns the canonical hex representation of the account ID.
 
 ***
 
+### fromBech32()
+
+> `static` **fromBech32**(`bech_32_encoded_id`): `AccountId`
+
+Given a bech32 encoded string, return the matching Account ID for it.
+
+#### Parameters
+
+##### bech\_32\_encoded\_id
+
+`string`
+
+#### Returns
+
+`AccountId`
+
+***
+
 ### fromHex()
 
 > `static` **fromHex**(`hex`): `AccountId`

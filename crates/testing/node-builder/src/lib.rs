@@ -17,11 +17,13 @@ use miden_node_block_producer::{
     BlockProducer,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
     DEFAULT_MAX_TXS_PER_BATCH,
+    DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
 use miden_node_rpc::Rpc;
 use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
+use miden_node_validator::Validator;
 use miden_objects::account::auth::AuthSecretKey;
 use miden_objects::account::{Account, AccountFile};
 use miden_objects::asset::TokenSymbol;
@@ -154,6 +156,10 @@ impl NodeBuilder {
             .await
             .context("failed to bind to block-producer gRPC endpoint")?;
 
+        let validator_address = available_socket_addr()
+            .await
+            .context("failed to bind to validator gRPC endpoint")?;
+
         // Start components
 
         let mut join_set = JoinSet::new();
@@ -178,9 +184,24 @@ impl NodeBuilder {
         let block_producer_id = self.start_block_producer(
             block_producer_address,
             store_block_producer_address,
+            validator_address,
             checkpoint,
             &mut join_set,
         );
+
+        let validator_id = join_set
+            .spawn({
+                async move {
+                    Validator {
+                        address: validator_address,
+                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    }
+                    .serve()
+                    .await
+                    .context("failed while serving validator component")
+                }
+            })
+            .id();
 
         let rpc_id = join_set
             .spawn(async move {
@@ -206,6 +227,7 @@ impl NodeBuilder {
         let component_ids = HashMap::from([
             (store_id, "store"),
             (block_producer_id, "block-producer"),
+            (validator_id, "validator"),
             (rpc_id, "rpc"),
             (ntx_builder_id, "ntx-builder"),
         ]);
@@ -266,6 +288,7 @@ impl NodeBuilder {
         &self,
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
+        validator_address: SocketAddr,
         checkpoint: Arc<Barrier>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
@@ -275,17 +298,21 @@ impl NodeBuilder {
             .spawn(async move {
                 let store_url = Url::parse(&format!("http://{store_address}"))
                     .context("Failed to parse URL")?;
+                let validator_url = Url::parse(&format!("http://{validator_address}"))
+                    .context("Failed to parse URL")?;
                 BlockProducer {
                     block_producer_address,
                     store_url,
                     grpc_timeout: DEFAULT_TIMEOUT_DURATION,
                     batch_prover_url: None,
                     block_prover_url: None,
+                    validator_url,
                     batch_interval,
                     block_interval,
                     max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
                     max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
                     production_checkpoint: checkpoint,
+                    mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
                 }
                 .serve()
                 .await

@@ -141,7 +141,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -175,7 +176,8 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();
@@ -343,7 +345,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_a.id())
         .await?
         .context("failed to find account A after private swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_a_assets = account_a.vault().assets();
     assert_eq!(account_a_assets.count(), 2);
     let mut account_a_assets = account_a.vault().assets();
@@ -377,7 +380,8 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .get_account(account_b.id())
         .await?
         .context("failed to find account B after swap transaction")?
-        .into();
+        .try_into()
+        .unwrap();
     let account_b_assets = account_b.vault().assets();
     assert_eq!(account_b_assets.count(), 2);
     let mut account_b_assets = account_b.vault().assets();

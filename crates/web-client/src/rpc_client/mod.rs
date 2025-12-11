@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use miden_client::note::NoteId as NativeNoteId;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
-use miden_client::transaction::InputNote as NativeInputNote;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -42,12 +41,9 @@ impl RpcClient {
     ///
     /// @param note_ids - Array of [`NoteId`] objects to fetch
     /// @returns Promise that resolves to different data depending on the note type:
-    /// - Private notes: Returns only `note_id` and `metadata` (from the note header). The
-    ///   `input_note` field will be `null`.
-    /// - Public notes: Returns the full `input_note` with inclusion proof, alongside metadata and
-    ///   ID.
-    // TODO: try to remove this allow - conflicts with the above "note_ids" and with what typedoc
-    // expects
+    /// - Private notes: Returns the `noteHeader`, and the  `inclusionProof`. The `note` field will
+    ///   be `null`.
+    /// - Public notes: Returns the full `note` with `inclusionProof`, alongside its header.
     #[allow(clippy::doc_markdown)]
     #[wasm_bindgen(js_name = "getNotesById")]
     pub async fn get_notes_by_id(
@@ -66,13 +62,12 @@ impl RpcClient {
         let web_notes: Vec<FetchedNote> = fetched_notes
             .into_iter()
             .map(|native_note| match native_note {
-                NativeFetchedNote::Private(header, _inclusion_proof) => {
-                    FetchedNote::from_header(header, None)
+                NativeFetchedNote::Private(header, inclusion_proof) => {
+                    FetchedNote::from_header(header, None, inclusion_proof)
                 },
                 NativeFetchedNote::Public(note, inclusion_proof) => {
-                    let input_note = NativeInputNote::authenticated(note.clone(), inclusion_proof);
                     let header = miden_client::note::NoteHeader::new(note.id(), *note.metadata());
-                    FetchedNote::from_header(header, Some(input_note.into()))
+                    FetchedNote::from_header(header, Some(note.into()), inclusion_proof)
                 },
             })
             .collect();
