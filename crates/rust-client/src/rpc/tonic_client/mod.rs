@@ -6,7 +6,9 @@ use alloc::vec::Vec;
 use core::error::Error;
 use miden_objects::asset::{Asset, AssetVault};
 
-use miden_objects::account::{Account, AccountCode, AccountId, AccountStorage};
+use miden_objects::account::{
+    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
+};
 use miden_objects::address::NetworkId;
 use miden_objects::block::{AccountWitness, BlockHeader, BlockNumber, ProvenBlock};
 use miden_objects::crypto::merkle::{Forest, MerklePath, MmrProof, SmtProof};
@@ -261,8 +263,8 @@ impl NodeRpcClient for GrpcClient {
                 // FIXME: Should these fields be other
                 // than none? Then again, I'm not sure from
                 // where this data would come from if needed.
-                code_commitment: Some(EMPTY_WORD),
-                asset_vault_commitment: None,
+                code_commitment: Some(EMPTY_WORD.into()),
+                asset_vault_commitment: Some(EMPTY_WORD.into()),
                 // FIXME: Should this field be something else?
                 storage_maps: vec![],
             }),
@@ -335,15 +337,10 @@ impl NodeRpcClient for GrpcClient {
                     details.vault_details.assets
                 }
             };
-            let storage = {
-                let slots = details
-                    .storage_details
-                    .header
-                    .slots()
-                    .map(|(_type, value)| Word::from(*value))
-                    .map(crate::account::StorageSlot::Value);
-                let mut new_map_entries = vec![];
-                for entry in details.storage_details.map_details {
+            let response_slots = details.storage_details.header.slots();
+            let mut slots = vec![];
+            for (index, (slot_type, slot_value)) in response_slots.enumerate() {
+                match slot_type {
                     // FIXME:
                     // - Should we specify a BlockRange?.
                     // - Remove unwraps.
@@ -351,9 +348,13 @@ impl NodeRpcClient for GrpcClient {
                     // - Each entry from the storage details has a
                     // 'too_many_entries' should this be only a single request?
                     // - Avoid using 'extend' 2 times.
-                    if entry.too_many_entries {
-                        new_map_entries.extend(
-                            rpc_api
+                    StorageSlotType::Value => slots.push(StorageSlot::Value(*slot_value)),
+                    StorageSlotType::Map => {
+                        let map_details = &details.storage_details.map_details[index];
+                        let mut map_entries = vec![];
+                        if map_details.too_many_entries {
+                            map_entries.extend(
+                                rpc_api
                             .sync_storage_maps(SyncStorageMapsRequest {
                                 block_range: None,
                                 account_id: Some(account_id.clone().into()),
@@ -373,31 +374,26 @@ impl NodeRpcClient for GrpcClient {
                                 let value: Word = u.value.unwrap().try_into().unwrap();
                                 (key, value)
                             }),
-                        )
-                    } else {
-                        new_map_entries.extend(entry.entries.into_iter().map(|e| {
-                            let key: Word = e.key.into();
-                            let value: Word = e.value.into();
-                            (key, value)
-                        }))
-                    }
+                            )
+                        } else {
+                            map_entries.extend(map_details.entries.iter().map(|e| {
+                                let key: Word = e.key.into();
+                                let value: Word = e.value.into();
+                                (key, value)
+                            }))
+                        }
+
+                        slots.push(StorageSlot::Map(StorageMap::with_entries(map_entries).unwrap()))
+                    },
                 }
-
-                let mut storage = vec![crate::account::StorageSlot::Map(
-                    crate::account::StorageMap::with_entries(new_map_entries).unwrap(),
-                )];
-
-                storage.extend(slots);
-
-                storage
-            };
+            }
             // FIXME: Is this correct?
             let seed = None;
             let account = Account::new(
                 account_id,
                 // FIXME: Remove unwraps
                 AssetVault::new(&assets).unwrap(),
-                AccountStorage::new(storage).unwrap(),
+                AccountStorage::new(slots).unwrap(),
                 details.code,
                 nonce,
                 seed,
