@@ -367,7 +367,7 @@ async fn standard_fpi(
     wait_for_blocks_no_sync(&mut client2, 2).await;
 
     // Second client should be able to submit a transaction
-    // Without being sync to latest state
+    // Without being synced to latest state
     assert!(client2.submit_new_transaction(native_account.id(), tx_request).await.is_ok());
 
     // After the transaction the foreign account should be cached (for public accounts only)
