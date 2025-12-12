@@ -205,11 +205,15 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
     /// specified foreign accounts, using the `GetAccountProofs` endpoint.
     ///
-    /// The `code_commitments` parameter is a list of known code commitments
+    /// The `block_num` parameter specifies the block number from which to retrieve
+    /// the account proof from (the state of the account at that block).
+    ///
+    /// The `known_account_codes` parameter is a list of known code commitments
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// one of the tracked accounts is not found in the node, the method will return an error.
-    async fn get_account_proofs(
+    async fn get_account_proof(
         &self,
+        block_num: Option<BlockNumber>,
         account_storage_requests: &BTreeSet<ForeignAccount>,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;

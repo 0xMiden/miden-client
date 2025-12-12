@@ -298,14 +298,21 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proofs(
+    async fn get_account_proof(
         &self,
+        block_num: Option<BlockNumber>,
         account_requests: &BTreeSet<ForeignAccount>,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
-        let (header, _) = self.get_block_header_by_number(None, false).await?;
+        let block_num = if let Some(number) = block_num {
+            number
+        } else {
+            let (header, _) = self.get_block_header_by_number(None, false).await?;
+            header.block_num()
+        };
+
         if account_requests.is_empty() {
-            return Ok((header.block_num(), Vec::new()));
+            return Ok((block_num, Vec::new()));
         }
 
         let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
@@ -313,7 +320,6 @@ impl NodeRpcClient for GrpcClient {
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let block_num = header.block_num();
         let mut account_proofs = Vec::with_capacity(account_requests.len());
 
         // Request proofs one-by-one using the singular API

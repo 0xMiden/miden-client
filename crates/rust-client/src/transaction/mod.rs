@@ -789,8 +789,11 @@ where
             self.store.get_foreign_account_code(account_ids.collect()).await?;
 
         // Fetch account proofs
-        let (_, account_proofs) =
-            self.rpc_api.get_account_proofs(&foreign_accounts, known_account_codes).await?;
+        let block_num = self.get_sync_height().await?;
+        let (_, account_proofs) = self
+            .rpc_api
+            .get_account_proof(Some(block_num), &foreign_accounts, known_account_codes)
+            .await?;
 
         let mut account_proofs: BTreeMap<AccountId, AccountProof> =
             account_proofs.into_iter().map(|proof| (proof.account_id(), proof)).collect();
@@ -828,7 +831,6 @@ where
             return_foreign_account_inputs.push(foreign_account_inputs);
         }
 
-        let block_num = self.get_sync_height().await?;
         Ok((Some(block_num), return_foreign_account_inputs))
     }
 

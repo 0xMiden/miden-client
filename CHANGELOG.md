@@ -16,6 +16,7 @@
 * Added RPC limit handling for `sync_nullifiers` endpoint ([#1590](https://github.com/0xMiden/miden-client/pull/1590)).
 * Added a convenience function `fromBech32` to turn a bech32 string into an AccountId ([#1607](https://github.com/0xMiden/miden-client/pull/1607)).
 * [BREAKING] Refactored the fields in retrieved notes in the WebClient: now the inclusion proof has been factored out and is always accessible ([#1606](https://github.com/0xMiden/miden-client/pull/1606)).
+* [BREAKING] Renamed `NodeRpcClient` `get_account_proofs` method to `get_account_proof` & added optional `block_num` parameter (block at which we want to retrieve the proof) ([#1616](https://github.com/0xMiden/miden-client/pull/1616)).
 
 ## 0.12.5 (2025-12-01)
 

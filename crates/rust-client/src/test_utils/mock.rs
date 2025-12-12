@@ -542,14 +542,20 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the account proofs for the specified accounts. The `known_account_codes` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account_proofs(
+    async fn get_account_proof(
         &self,
+        block_num: Option<BlockNumber>,
         account_storage_requests: &BTreeSet<ForeignAccount>,
         _known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let mock_chain = self.mock_chain.read();
 
-        let chain_tip = mock_chain.latest_block_header().block_num();
+        let block_number = if let Some(number) = block_num {
+            number
+        } else {
+            mock_chain.latest_block_header().block_num()
+        };
+
         let mut proofs = vec![];
         for account in account_storage_requests {
             let headers = match account {
@@ -608,7 +614,7 @@ impl NodeRpcClient for MockRpcApi {
             proofs.push(AccountProof::new(witness, headers).unwrap());
         }
 
-        Ok((chain_tip, proofs))
+        Ok((block_number, proofs))
     }
 
     /// Returns the nullifiers created after the specified block number that match the provided
