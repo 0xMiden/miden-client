@@ -302,10 +302,12 @@ impl NodeRpcClient for GrpcClient {
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        known_account_code: AccountCode,
+        known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
-            [known_account_code].iter().map(|c| (c.commitment(), c.clone())).collect();
+        let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
+        if let Some(account_code) = known_account_code {
+            known_codes_by_commitment.insert(account_code.commitment(), account_code);
+        }
 
         let mut rpc_api = self.ensure_connected().await?;
 

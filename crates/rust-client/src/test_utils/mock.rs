@@ -545,7 +545,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        _known_account_code: AccountCode,
+        _known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 

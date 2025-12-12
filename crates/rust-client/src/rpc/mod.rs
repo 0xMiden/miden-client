@@ -223,7 +223,7 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        known_account_code: AccountCode,
+        known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,

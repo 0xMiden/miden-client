@@ -368,7 +368,7 @@ async fn standard_fpi(
 
     // Second client should be able to submit a transaction
     // Without being synced to latest state
-    assert!(client2.submit_new_transaction(native_account.id(), tx_request).await.is_ok());
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
     if storage_mode == AccountStorageMode::Public {

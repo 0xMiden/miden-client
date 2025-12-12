@@ -792,8 +792,7 @@ where
                 .get_foreign_account_code(vec![account_id])
                 .await?
                 .pop_first()
-                .ok_or(ClientError::AccountDataNotFound(account_id))?
-                .1;
+                .map(|(_, code)| code);
 
             let (_, account_proof) = self
                 .rpc_api
