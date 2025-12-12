@@ -112,7 +112,7 @@ test.describe("Address instantiation tests", () => {
 test.describe("Bech32 tests", () => {
   test("to bech32 fails with non-valid-prefix", async ({ page }) => {
     await expect(
-      instanceNewAddressBech32(page, "non-valid-prefix")
+      instanceNewAddressBech32(page, "non valid prefix")
     ).rejects.toThrow();
   });
   test("encoding from bech32 and going back results in the same address", async ({
