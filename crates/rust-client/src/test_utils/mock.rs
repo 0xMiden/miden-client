@@ -17,7 +17,6 @@ use crate::Client;
 use crate::rpc::domain::account::{
     AccountDetails,
     AccountProof,
-    AccountProofs,
     AccountStorageDetails,
     AccountStorageMapDetails,
     AccountUpdateSummary,
@@ -540,14 +539,14 @@ impl NodeRpcClient for MockRpcApi {
         }
     }
 
-    /// Returns the account proofs for the specified accounts. The `known_account_codes` parameter
+    /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
     async fn get_account_proof(
         &self,
-        account_storage_requests: &BTreeSet<ForeignAccount>,
+        foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        _known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
+        _known_account_code: AccountCode,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 
         let block_number = match account_state {
@@ -555,65 +554,62 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let mut proofs = vec![];
-        for account in account_storage_requests {
-            let headers = match account {
-                ForeignAccount::Public(account_id, account_storage_requirements) => {
-                    let account = mock_chain.committed_account(*account_id).unwrap();
+        let headers = match &foreign_account {
+            ForeignAccount::Public(account_id, account_storage_requirements) => {
+                let account = mock_chain.committed_account(*account_id).unwrap();
 
-                    let mut map_details = vec![];
-                    for index in account_storage_requirements.inner().keys() {
-                        if let Some(StorageSlot::Map(storage_map)) =
-                            account.storage().slots().get(*index as usize)
-                        {
-                            let entries = storage_map
-                                .entries()
-                                .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                                .collect::<Vec<StorageMapEntry>>();
+                let mut map_details = vec![];
+                for index in account_storage_requirements.inner().keys() {
+                    if let Some(StorageSlot::Map(storage_map)) =
+                        account.storage().slots().get(*index as usize)
+                    {
+                        let entries = storage_map
+                            .entries()
+                            .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                            .collect::<Vec<StorageMapEntry>>();
 
-                            let too_many_entries = entries.len() > 1000;
-                            let account_storage_map_detail = AccountStorageMapDetails {
-                                slot_index: u32::from(*index),
-                                too_many_entries,
-                                entries,
-                            };
+                        let too_many_entries = entries.len() > 1000;
+                        let account_storage_map_detail = AccountStorageMapDetails {
+                            slot_index: u32::from(*index),
+                            too_many_entries,
+                            entries,
+                        };
 
-                            map_details.push(account_storage_map_detail);
-                        } else {
-                            panic!("Storage slot at index {} is not a map", index);
-                        }
+                        map_details.push(account_storage_map_detail);
+                    } else {
+                        panic!("Storage slot at index {} is not a map", index);
                     }
+                }
 
-                    let storage_details = AccountStorageDetails {
-                        header: account.storage().to_header(),
-                        map_details,
-                    };
+                let storage_details = AccountStorageDetails {
+                    header: account.storage().to_header(),
+                    map_details,
+                };
 
-                    let mut assets = vec![];
-                    for asset in account.vault().assets() {
-                        assets.push(asset);
-                    }
-                    let vault_details = AccountVaultDetails {
-                        too_many_assets: assets.len() > 1000,
-                        assets,
-                    };
+                let mut assets = vec![];
+                for asset in account.vault().assets() {
+                    assets.push(asset);
+                }
+                let vault_details = AccountVaultDetails {
+                    too_many_assets: assets.len() > 1000,
+                    assets,
+                };
 
-                    Some(AccountDetails {
-                        header: account.into(),
-                        storage_details,
-                        code: account.code().clone(),
-                        vault_details,
-                    })
-                },
-                ForeignAccount::Private(_) => None,
-            };
+                Some(AccountDetails {
+                    header: account.into(),
+                    storage_details,
+                    code: account.code().clone(),
+                    vault_details,
+                })
+            },
+            ForeignAccount::Private(_) => None,
+        };
 
-            let witness = mock_chain.account_tree().open(account.account_id());
+        let witness = mock_chain.account_tree().open(foreign_account.account_id());
 
-            proofs.push(AccountProof::new(witness, headers).unwrap());
-        }
+        let proof = AccountProof::new(witness, headers).unwrap();
 
-        Ok((block_number, proofs))
+        Ok((block_number, proof))
     }
 
     /// Returns the nullifiers created after the specified block number that match the provided

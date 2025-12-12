@@ -18,7 +18,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountProofs, AccountUpdateSummary};
+use super::domain::account::{AccountProof, AccountUpdateSummary};
 use super::domain::note::FetchedNote;
 use super::domain::nullifier::NullifierUpdate;
 use super::{
@@ -287,121 +287,94 @@ impl NodeRpcClient for GrpcClient {
         }
     }
 
-    /// Sends a `GetAccountProofs` request to the Miden node, and extracts a list of [AccountProof]
-    /// from the response, as well as the block number that they were retrieved for.
+    /// Sends a `GetAccountProof` request to the Miden node, and extracts the [AccountProof]
+    /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
     ///
-    /// - One of the requested Accounts isn't returned by the node.
+    /// - The requested Account isn't returned by the node.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
     async fn get_account_proof(
         &self,
-        account_requests: &BTreeSet<ForeignAccount>,
+        foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError> {
-        if account_requests.is_empty() {
-            let block_num = match account_state {
-                AccountStateAt::Block(number) => number,
-                AccountStateAt::ChainTip => {
-                    let (header, _) = self.get_block_header_by_number(None, false).await?;
-                    header.block_num()
-                },
-            };
-
-            return Ok((block_num, Vec::new()));
-        }
-
+        known_account_code: AccountCode,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let known_codes_by_commitment: BTreeMap<Word, AccountCode> =
-            known_account_codes.values().cloned().map(|c| (c.commitment(), c)).collect();
+            [known_account_code].iter().map(|c| (c.commitment(), c.clone())).collect();
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let mut account_proofs = Vec::with_capacity(account_requests.len());
-
         // Request proofs one-by-one using the singular API
-        let mut retrieved_block_num = None;
-        for foreign_account in account_requests {
-            let account_id = foreign_account.account_id();
-            let storage_requirements = foreign_account.storage_slot_requirements();
+        let account_id = foreign_account.account_id();
+        let storage_requirements = foreign_account.storage_slot_requirements();
 
-            let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
 
-            // Only request details for public accounts; include known code commitment for this
-            // account when available
-            let account_details = if account_id.is_public() {
-                Some(proto::rpc::account_proof_request::AccountDetailRequest {
-                    code_commitment: Some(EMPTY_WORD.into()),
-                    // TODO: implement a way to request asset vaults
-                    // https://github.com/0xMiden/miden-client/issues/1412
-                    asset_vault_commitment: None,
-                    storage_maps,
-                })
-            } else {
-                None
-            };
-
-            let block_num = match account_state {
-                AccountStateAt::Block(number) => Some(number.into()),
-                AccountStateAt::ChainTip => None,
-            };
-
-            let request = proto::rpc::AccountProofRequest {
-                account_id: Some(account_id.into()),
-                block_num,
-                details: account_details,
-            };
-
-            let response = rpc_api
-                .get_account_proof(request)
-                .await
-                .map_err(|status| {
-                    RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
-                })?
-                .into_inner();
-
-            let account_witness: AccountWitness = response
-                .witness
-                .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
-                .try_into()?;
-
-            // For public accounts, details should be present when requested
-            let headers = if account_witness.id().is_public() {
-                Some(
-                    response
-                        .details
-                        .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                        .into_domain(&known_codes_by_commitment)?,
-                )
-            } else {
-                None
-            };
-
-            let proof = AccountProof::new(account_witness, headers)
-                .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
-            account_proofs.push(proof);
-
-            if let Some(block_number) = response.block_num
-                && retrieved_block_num.is_none()
-            {
-                retrieved_block_num = Some(BlockNumber::from(block_number.block_num));
-            }
-        }
-
-        let final_block_num = match retrieved_block_num {
-            Some(block_num) => block_num,
-            None => match account_state {
-                AccountStateAt::Block(number) => number,
-                AccountStateAt::ChainTip => {
-                    self.get_block_header_by_number(None, false).await?.0.block_num()
-                },
-            },
+        // Only request details for public accounts; include known code commitment for this
+        // account when available
+        let account_details = if account_id.is_public() {
+            Some(proto::rpc::account_proof_request::AccountDetailRequest {
+                code_commitment: Some(EMPTY_WORD.into()),
+                // TODO: implement a way to request asset vaults
+                // https://github.com/0xMiden/miden-client/issues/1412
+                asset_vault_commitment: None,
+                storage_maps,
+            })
+        } else {
+            None
         };
-        Ok((final_block_num, account_proofs))
+
+        let block_num = match account_state {
+            AccountStateAt::Block(number) => Some(number.into()),
+            AccountStateAt::ChainTip => None,
+        };
+
+        let request = proto::rpc::AccountProofRequest {
+            account_id: Some(account_id.into()),
+            block_num,
+            details: account_details,
+        };
+
+        let response = rpc_api
+            .get_account_proof(request)
+            .await
+            .map_err(|status| {
+                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountProofs, status)
+            })?
+            .into_inner();
+
+        let account_witness: AccountWitness = response
+            .witness
+            .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
+            .try_into()?;
+
+        // For public accounts, details should be present when requested
+        let headers = if account_witness.id().is_public() {
+            Some(
+                response
+                    .details
+                    .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
+                    .into_domain(&known_codes_by_commitment)?,
+            )
+        } else {
+            None
+        };
+
+        let proof = AccountProof::new(account_witness, headers)
+            .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
+
+        let block_num = response
+            .block_num
+            .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
+            .block_num
+            .into();
+
+        Ok((block_num, proof))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the

@@ -41,12 +41,12 @@
 //! [`NodeRpcClient`] trait.
 
 use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountProofs, FetchedAccount};
+use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::StateSyncInfo;
@@ -211,20 +211,20 @@ pub trait NodeRpcClient: Send + Sync {
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign accounts, using the `GetAccountProofs` endpoint.
+    /// specified foreign account, using the `GetAccountProof` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
     ///
-    /// The `known_account_codes` parameter is a list of known code commitments
+    /// The `known_account_code` parameter is the known code commitment
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// one of the tracked accounts is not found in the node, the method will return an error.
+    /// the tracked account is not found in the node, the method will return an error.
     async fn get_account_proof(
         &self,
-        account_storage_requests: &BTreeSet<ForeignAccount>,
+        foreign_account: ForeignAccount,
         account_state: AccountStateAt,
-        known_account_codes: BTreeMap<AccountId, AccountCode>,
-    ) -> Result<AccountProofs, RpcError>;
+        known_account_code: AccountCode,
+    ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
