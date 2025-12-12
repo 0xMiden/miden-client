@@ -79,6 +79,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreener, NoteUpdateTracker};
+use crate::rpc::AccountState;
 use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -792,7 +793,11 @@ where
         let block_num = self.get_sync_height().await?;
         let (_, account_proofs) = self
             .rpc_api
-            .get_account_proof(Some(block_num), &foreign_accounts, known_account_codes)
+            .get_account_proof(
+                &foreign_accounts,
+                AccountState::AtBlock(block_num),
+                known_account_codes,
+            )
             .await?;
 
         let mut account_proofs: BTreeMap<AccountId, AccountProof> =

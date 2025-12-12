@@ -85,6 +85,14 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
+/// Represents the state that we want to retrieve from the network
+pub enum AccountState {
+    /// Gets the latest state, for the current chain tip
+    Last,
+    /// Gets the state at a specific block number
+    AtBlock(BlockNumber),
+}
+
 // RPC ENDPOINT LIMITS
 // ================================================================================================
 
@@ -205,18 +213,16 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
     /// specified foreign accounts, using the `GetAccountProofs` endpoint.
     ///
-    /// The `block_num` parameter specifies the block number from which to retrieve
-    /// the account proof from (the state of the account at that block). 
-    /// When `block_num` is `None`, the latest state will be fetched. There is a
-    /// maximum amount of historical values that can be retrieved, defined by the node.
+    /// The `account_state` parameter specifies the block number from which to retrieve
+    /// the account proof from (the state of the account at that block).
     ///
     /// The `known_account_codes` parameter is a list of known code commitments
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
     /// one of the tracked accounts is not found in the node, the method will return an error.
     async fn get_account_proof(
         &self,
-        block_num: Option<BlockNumber>,
         account_storage_requests: &BTreeSet<ForeignAccount>,
+        account_state: AccountState,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 

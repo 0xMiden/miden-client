@@ -36,7 +36,7 @@ use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
-use crate::rpc::{NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
+use crate::rpc::{AccountState, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -300,15 +300,16 @@ impl NodeRpcClient for GrpcClient {
     /// - There is an error during storage deserialization.
     async fn get_account_proof(
         &self,
-        block_num: Option<BlockNumber>,
         account_requests: &BTreeSet<ForeignAccount>,
+        account_state: AccountState,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
-        let block_num = if let Some(number) = block_num {
-            number
-        } else {
-            let (header, _) = self.get_block_header_by_number(None, false).await?;
-            header.block_num()
+        let block_num = match account_state {
+            AccountState::AtBlock(number) => number,
+            AccountState::Last => {
+                let (header, _) = self.get_block_header_by_number(None, false).await?;
+                header.block_num()
+            },
         };
 
         if account_requests.is_empty() {

@@ -268,7 +268,8 @@ pub async fn wait_for_blocks(client: &mut TestClient, amount_of_blocks: u32) -> 
     }
 }
 
-/// Idles until `amount_of_blocks` have been created onchain compared to client's sync height without advancing the client's sync height
+/// Idles until `amount_of_blocks` have been created onchain compared to client's sync height
+/// without advancing the client's sync height
 pub async fn wait_for_blocks_no_sync(client: &mut TestClient, amount_of_blocks: u32) {
     let current_block = client.get_sync_height().await.unwrap();
     let final_block = current_block + amount_of_blocks;
