@@ -86,11 +86,11 @@ use crate::store::input_note_states::UnverifiedNoteState;
 use crate::transaction::ForeignAccount;
 
 /// Represents the state that we want to retrieve from the network
-pub enum AccountState {
+pub enum AccountStateAt {
     /// Gets the latest state, for the current chain tip
-    Last,
+    ChainTip,
     /// Gets the state at a specific block number
-    AtBlock(BlockNumber),
+    Block(BlockNumber),
 }
 
 // RPC ENDPOINT LIMITS
@@ -222,7 +222,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn get_account_proof(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        account_state: AccountState,
+        account_state: AccountStateAt,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError>;
 

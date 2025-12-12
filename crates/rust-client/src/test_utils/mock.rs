@@ -35,7 +35,7 @@ use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
 use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
 use crate::rpc::generated::transaction::TransactionSummary;
-use crate::rpc::{AccountState, NodeRpcClient, RpcError};
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
 use crate::transaction::ForeignAccount;
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -545,14 +545,14 @@ impl NodeRpcClient for MockRpcApi {
     async fn get_account_proof(
         &self,
         account_storage_requests: &BTreeSet<ForeignAccount>,
-        account_state: AccountState,
+        account_state: AccountStateAt,
         _known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
         let mock_chain = self.mock_chain.read();
 
         let block_number = match account_state {
-            AccountState::AtBlock(number) => number,
-            AccountState::Last => mock_chain.latest_block_header().block_num(),
+            AccountStateAt::Block(number) => number,
+            AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
         let mut proofs = vec![];

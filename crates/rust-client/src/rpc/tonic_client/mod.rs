@@ -36,7 +36,7 @@ use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::rpc::errors::{AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::generated::rpc::account_proof_request::account_detail_request::StorageMapDetailRequest;
-use crate::rpc::{AccountState, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
+use crate::rpc::{AccountStateAt, NOTE_IDS_LIMIT, NULLIFIER_PREFIXES_LIMIT, generated as proto};
 use crate::transaction::ForeignAccount;
 
 mod api_client;
@@ -301,18 +301,18 @@ impl NodeRpcClient for GrpcClient {
     async fn get_account_proof(
         &self,
         account_requests: &BTreeSet<ForeignAccount>,
-        account_state: AccountState,
+        account_state: AccountStateAt,
         known_account_codes: BTreeMap<AccountId, AccountCode>,
     ) -> Result<AccountProofs, RpcError> {
-        let block_num = match account_state {
-            AccountState::AtBlock(number) => number,
-            AccountState::Last => {
-                let (header, _) = self.get_block_header_by_number(None, false).await?;
-                header.block_num()
-            },
-        };
-
         if account_requests.is_empty() {
+            let block_num = match account_state {
+                AccountStateAt::Block(number) => number,
+                AccountStateAt::ChainTip => {
+                    let (header, _) = self.get_block_header_by_number(None, false).await?;
+                    header.block_num()
+                },
+            };
+
             return Ok((block_num, Vec::new()));
         }
 
@@ -324,6 +324,7 @@ impl NodeRpcClient for GrpcClient {
         let mut account_proofs = Vec::with_capacity(account_requests.len());
 
         // Request proofs one-by-one using the singular API
+        let mut retrieved_block_num = None;
         for foreign_account in account_requests {
             let account_id = foreign_account.account_id();
             let storage_requirements = foreign_account.storage_slot_requirements();
@@ -344,9 +345,14 @@ impl NodeRpcClient for GrpcClient {
                 None
             };
 
+            let block_num = match account_state {
+                AccountStateAt::Block(number) => Some(number.into()),
+                AccountStateAt::ChainTip => None,
+            };
+
             let request = proto::rpc::AccountProofRequest {
                 account_id: Some(account_id.into()),
-                block_num: Some(block_num.into()),
+                block_num,
                 details: account_details,
             };
 
@@ -378,9 +384,24 @@ impl NodeRpcClient for GrpcClient {
             let proof = AccountProof::new(account_witness, headers)
                 .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
             account_proofs.push(proof);
+
+            if let Some(block_number) = response.block_num
+                && retrieved_block_num.is_none()
+            {
+                retrieved_block_num = Some(BlockNumber::from(block_number.block_num));
+            }
         }
 
-        Ok((block_num, account_proofs))
+        let final_block_num = match retrieved_block_num {
+            Some(block_num) => block_num,
+            None => match account_state {
+                AccountStateAt::Block(number) => number,
+                AccountStateAt::ChainTip => {
+                    self.get_block_header_by_number(None, false).await?.0.block_num()
+                },
+            },
+        };
+        Ok((final_block_num, account_proofs))
     }
 
     /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the

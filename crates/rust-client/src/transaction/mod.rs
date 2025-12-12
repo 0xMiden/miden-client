@@ -79,7 +79,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreener, NoteUpdateTracker};
-use crate::rpc::AccountState;
+use crate::rpc::AccountStateAt;
 use crate::rpc::domain::account::AccountProof;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -795,7 +795,7 @@ where
             .rpc_api
             .get_account_proof(
                 &foreign_accounts,
-                AccountState::AtBlock(block_num),
+                AccountStateAt::Block(block_num),
                 known_account_codes,
             )
             .await?;
