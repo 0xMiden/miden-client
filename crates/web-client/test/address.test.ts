@@ -141,6 +141,12 @@ test.describe("Bech32 tests", () => {
     );
   });
 
+  test("bech32 succeeds with custom prefix", async ({ page }) => {
+    await expect(instanceNewAddressBech32(page, "cstm")).resolves.toHaveLength(
+      49
+    );
+  });
+
   test("fromBech32 returns correct account id", async ({ page }) => {
     const success = await page.evaluate(async () => {
       const newAccount = await window.client.newWallet(
