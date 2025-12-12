@@ -206,7 +206,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// specified foreign accounts, using the `GetAccountProofs` endpoint.
     ///
     /// The `block_num` parameter specifies the block number from which to retrieve
-    /// the account proof from (the state of the account at that block).
+    /// the account proof from (the state of the account at that block). 
+    /// When `block_num` is `None`, the latest state will be fetched. There is a
+    /// maximum amount of historical values that can be retrieved, defined by the node.
     ///
     /// The `known_account_codes` parameter is a list of known code commitments
     /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
