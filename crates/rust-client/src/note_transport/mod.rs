@@ -128,6 +128,7 @@ where
 
         let sync_height = self.get_sync_height().await?;
         // Import fetched notes
+        let mut note_requests = vec![];
         for note in notes {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
@@ -135,8 +136,9 @@ where
                 after_block_num: sync_height,
                 tag: Some(tag),
             };
-            self.import_note(note_file).await?;
+            note_requests.push(note_file);
         }
+        self.import_notes(note_requests).await?;
 
         // Update cursor (pagination)
         self.store.update_note_transport_cursor(rcursor).await?;
