@@ -143,15 +143,19 @@ export const test = base.extend<{ forEachTest: void }>({
 
           window.helpers.parseNetworkId = (networkId) => {
             const map = {
-              mm: window.NetworkId.Mainnet,
-              mtst: window.NetworkId.Testnet,
-              mdev: window.NetworkId.Devnet,
+              mm: window.NetworkId.mainnet(),
+              mtst: window.NetworkId.testnet(),
+              mdev: window.NetworkId.devnet(),
             };
-            const parsedNetworkId = map[networkId];
+            let parsedNetworkId = map[networkId];
             if (parsedNetworkId === undefined) {
-              throw new Error(
-                `Invalid network ID: ${networkId}. Expected one of: ${Object.keys(map).join(", ")}`
-              );
+              try {
+                parsedNetworkId = window.NetworkId.custom(networkId);
+              } catch (error) {
+                throw new Error(
+                  `Invalid network ID: ${networkId}. Expected one of: ${Object.keys(map).join(", ")}, or a valid custom network ID`
+                );
+              }
             }
             return parsedNetworkId;
           };
