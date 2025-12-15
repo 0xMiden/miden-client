@@ -79,7 +79,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreener, NoteUpdateTracker};
-use crate::rpc::domain::account::AccountProof;
+use crate::rpc::AccountStateAt;
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -782,32 +782,34 @@ where
             return Ok((None, Vec::new()));
         }
 
+        let block_num = self.get_sync_height().await?;
         let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
 
-        let account_ids = foreign_accounts.iter().map(ForeignAccount::account_id);
-        let known_account_codes =
-            self.store.get_foreign_account_code(account_ids.collect()).await?;
+        for foreign_account in foreign_accounts {
+            let account_id = foreign_account.account_id();
+            let known_account_code = self
+                .store
+                .get_foreign_account_code(vec![account_id])
+                .await?
+                .pop_first()
+                .map(|(_, code)| code);
 
-        // Fetch account proofs
-        let (block_num, account_proofs) =
-            self.rpc_api.get_account_proofs(&foreign_accounts, known_account_codes).await?;
-
-        let mut account_proofs: BTreeMap<AccountId, AccountProof> =
-            account_proofs.into_iter().map(|proof| (proof.account_id(), proof)).collect();
-
-        for foreign_account in &foreign_accounts {
+            let (_, account_proof) = self
+                .rpc_api
+                .get_account_proof(
+                    foreign_account.clone(),
+                    AccountStateAt::Block(block_num),
+                    known_account_code,
+                )
+                .await?;
             let foreign_account_inputs = match foreign_account {
                 ForeignAccount::Public(account_id, ..) => {
-                    let account_proof = account_proofs
-                        .remove(account_id)
-                        .expect("proof was requested and received");
-
                     let foreign_account_inputs: AccountInputs = account_proof.try_into()?;
 
-                    // Update  our foreign account code cache
+                    // Update our foreign account code cache
                     self.store
                         .upsert_foreign_account_code(
-                            *account_id,
+                            account_id,
                             foreign_account_inputs.code().clone(),
                         )
                         .await?;
@@ -815,31 +817,13 @@ where
                     foreign_account_inputs
                 },
                 ForeignAccount::Private(partial_account) => {
-                    let account_id = partial_account.id();
-                    let (witness, _) = account_proofs
-                        .remove(&account_id)
-                        .expect("proof was requested and received")
-                        .into_parts();
+                    let (witness, _) = account_proof.into_parts();
 
                     AccountInputs::new(partial_account.clone(), witness)
                 },
             };
 
             return_foreign_account_inputs.push(foreign_account_inputs);
-        }
-
-        // Optionally retrieve block header if we don't have it
-        if self.store.get_block_header_by_num(block_num).await?.is_none() {
-            info!(
-                "Getting current block header data to execute transaction with foreign account requirements"
-            );
-            let summary = self.sync_state().await?;
-
-            if summary.block_num != block_num {
-                let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-                self.get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
-                    .await?;
-            }
         }
 
         Ok((Some(block_num), return_foreign_account_inputs))
