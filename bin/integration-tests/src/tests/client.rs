@@ -205,7 +205,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // Importing a public note before it's committed onchain should fail
     assert!(matches!(
-        client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap_err(),
+        client_2.import_notes(&[NoteFile::NoteId(note.id())]).await.unwrap_err(),
         ClientError::NoteNotFoundOnChain(_)
     ));
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
@@ -216,7 +216,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     let new_sync_data = client_2.sync_state().await.unwrap();
 
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
-    client_2.import_note(NoteFile::NoteId(note.clone().id())).await.unwrap();
+    client_2.import_notes(&[NoteFile::NoteId(note.clone().id())]).await.unwrap();
     client_2.sync_state().await.unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
     // If imported after execution and syncing then the inclusion proof should be Some
@@ -246,11 +246,11 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     // Import the node before it's committed onchain works if we have full `NoteDetails`
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: client_1.get_sync_height().await.unwrap(),
             tag: Some(note.metadata().unwrap().tag()),
-        })
+        }])
         .await
         .unwrap();
     let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
@@ -313,12 +313,12 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
 
     // If the verification is requested before execution then the import should fail
     let imported_note_id = client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.into(),
             after_block_num: 0.into(),
             tag: None,
-        })
-        .await?;
+        }])
+        .await?[0];
 
     let imported_note = client_2.get_input_note(imported_note_id).await.unwrap().unwrap();
 
@@ -363,12 +363,12 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     // importing the note before client_2 is synced will result in a note with `Expected` state
     let note_id = client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: block_height_before,
             tag: Some(note.metadata().unwrap().tag()),
-        })
-        .await?;
+        }])
+        .await?[0];
 
     let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
 
@@ -378,12 +378,12 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     // import the note after syncing the client
     let note_id = client_2
-        .import_note(NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: block_height_before,
             tag: Some(note.metadata().unwrap().tag()),
-        })
-        .await?;
+        }])
+        .await?[0];
 
     let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
 
@@ -821,10 +821,10 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
 
     // Import the consumed note
     client_2
-        .import_note(NoteFile::NoteWithProof(
+        .import_notes(&[NoteFile::NoteWithProof(
             note.clone().try_into().unwrap(),
             note.inclusion_proof().unwrap().clone(),
-        ))
+        )])
         .await?;
 
     let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
@@ -886,7 +886,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     client_2.sync_state().await.unwrap();
 
     // Import the consumed note
-    client_2.import_note(NoteFile::NoteId(note.id())).await.unwrap();
+    client_2.import_notes(&[NoteFile::NoteId(note.id())]).await.unwrap();
 
     let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
@@ -942,10 +942,10 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
 
     // Import the consumed note
     client_2
-        .import_note(NoteFile::NoteWithProof(
+        .import_notes(&[NoteFile::NoteWithProof(
             note.clone().try_into().unwrap(),
             note.inclusion_proof().unwrap().clone(),
-        ))
+        )])
         .await?;
 
     let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();

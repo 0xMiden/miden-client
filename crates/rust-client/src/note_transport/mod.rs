@@ -138,7 +138,7 @@ where
             };
             note_requests.push(note_file);
         }
-        self.import_notes(note_requests).await?;
+        self.import_notes(&note_requests).await?;
 
         // Update cursor (pagination)
         self.store.update_note_transport_cursor(rcursor).await?;

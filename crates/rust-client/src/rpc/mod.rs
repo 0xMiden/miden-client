@@ -220,17 +220,29 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
-    async fn get_nullifier_commit_height(
+    async fn get_nullifiers_commit_height(
         &self,
-        nullifier: &Nullifier,
+        requested_nullifiers: &[Nullifier],
         block_num: BlockNumber,
-    ) -> Result<Option<BlockNumber>, RpcError> {
-        let nullifiers = self.sync_nullifiers(&[nullifier.prefix()], block_num, None).await?;
-
-        Ok(nullifiers
+    ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
+        let prefixes: Vec<u16> = requested_nullifiers
             .iter()
-            .find(|update| update.nullifier == *nullifier)
-            .map(|update| update.block_num))
+            .map(miden_objects::note::Nullifier::prefix)
+            .collect();
+        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_num, None).await?;
+
+        let mut nullifiers_height = BTreeMap::new();
+        for nullifier in requested_nullifiers {
+            if let Some(update) =
+                retrieved_nullifiers.iter().find(|update| update.nullifier == *nullifier)
+            {
+                nullifiers_height.insert(*nullifier, Some(update.block_num));
+            } else {
+                nullifiers_height.insert(*nullifier, None);
+            }
+        }
+
+        Ok(nullifiers_height)
     }
 
     /// Fetches public note-related data for a list of [`NoteId`] and builds [`InputNoteRecord`]s
