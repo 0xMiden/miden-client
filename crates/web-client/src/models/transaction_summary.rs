@@ -47,6 +47,13 @@ impl TransactionSummary {
     pub fn salt(&self) -> Result<Word, JsValue> {
         Ok(self.0.salt().into())
     }
+
+    /// Computes the commitment to this TransactionSummary.
+    /// This commitment is used as the message to sign for multisig proposals.
+    #[wasm_bindgen(js_name = "toCommitment")]
+    pub fn to_commitment(&self) -> Word {
+        self.0.to_commitment().into()
+    }
 }
 
 // CONVERSIONS
