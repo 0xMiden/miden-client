@@ -1395,8 +1395,8 @@ test.describe("storage map test", () => {
   });
 });
 
-test.describe("executeForSummary tests", () => {
-  test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
+test.describe("executeUnauthorized tests", () => {
+  test("executeUnauthorized returns TransactionSummary for unauthorized transaction", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -1519,7 +1519,7 @@ end
       const consumeSentNoteRequest =
         client.newConsumeTransactionRequest(sentNoteIds);
 
-      const summary = await client.executeForSummary(
+      const summary = await client.executeUnauthorized(
         accountBuilderResult.account.id(),
         consumeSentNoteRequest
       );
@@ -1540,7 +1540,7 @@ end
     expect(result.inputNoteIds).toEqual(result.sentNoteIds);
   });
 
-  test("executeForSummary throws error when transaction succeeds", async ({
+  test("executeUnauthorized returns TransactionSummary for authorized transaction with matching salt", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -1552,83 +1552,33 @@ end
         0
       );
 
-      const receiverAccount = await client.newWallet(
-        window.AccountStorageMode.private(),
-        false,
-        0
-      );
-
-      const faucetAccount = await client.newFaucet(
-        window.AccountStorageMode.private(),
-        false,
-        "DAG",
-        8,
-        BigInt(10000000),
-        0
-      );
-
       await client.syncState();
 
-      const mintTransactionRequest = client.newMintTransactionRequest(
+      // Create a known salt value
+      const expectedSalt = new window.Word(
+        new BigUint64Array([BigInt(1), BigInt(2), BigInt(3), BigInt(4)])
+      );
+
+      // Build transaction request with the salt as auth_arg
+      const transactionRequest = new window.TransactionRequestBuilder()
+        .withAuthArg(expectedSalt)
+        .build();
+
+      const summary = await client.executeUnauthorized(
         senderAccount.id(),
-        faucetAccount.id(),
-        window.NoteType.Public,
-        BigInt(1000)
+        transactionRequest
       );
 
-      const mintTransactionUpdate =
-        await window.helpers.executeAndApplyTransaction(
-          faucetAccount.id(),
-          mintTransactionRequest
-        );
-
-      const createdNoteIds = mintTransactionUpdate
-        .executedTransaction()
-        .outputNotes()
-        .notes()
-        .map((note: Note) => note.id().toString());
-
-      await window.helpers.waitForTransaction(
-        mintTransactionUpdate.executedTransaction().id().toHex()
-      );
-
-      const consumeTransactionRequest =
-        client.newConsumeTransactionRequest(createdNoteIds);
-
-      const consumeTransactionUpdate =
-        await window.helpers.executeAndApplyTransaction(
-          senderAccount.id(),
-          consumeTransactionRequest
-        );
-
-      await window.helpers.waitForTransaction(
-        consumeTransactionUpdate.executedTransaction().id().toHex()
-      );
-
-      const sendTransactionRequest = client.newSendTransactionRequest(
-        senderAccount.id(),
-        receiverAccount.id(),
-        faucetAccount.id(),
-        window.NoteType.Public,
-        BigInt(100),
-        null,
-        null
-      );
-
-      try {
-        await client.executeForSummary(
-          senderAccount.id(),
-          sendTransactionRequest
-        );
-        return { threw: false, errorMessage: "" };
-      } catch (e) {
-        return { threw: true, errorMessage: String(e) };
-      }
+      return {
+        inputNotesCount: summary.inputNotes().numNotes(),
+        outputNotesCount: summary.outputNotes().numNotes(),
+        saltHex: summary.salt().toHex(),
+        expectedSaltHex: expectedSalt.toHex(),
+      };
     });
 
-    expect(result.threw).toBe(true);
-    expect(result.errorMessage).toContain(
-      "expected transaction to be unauthorized, but it succeeded"
-    );
+    expect(result.inputNotesCount).toBe(0);
+    expect(result.outputNotesCount).toBe(0);
+    expect(result.saltHex).toBe(result.expectedSaltHex);
   });
 });
