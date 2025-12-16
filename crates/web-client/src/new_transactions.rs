@@ -1,3 +1,4 @@
+use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, NoteId as NativeNoteId};
 use miden_client::transaction::{
@@ -5,12 +6,11 @@ use miden_client::transaction::{
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
     TransactionExecutorError,
+    TransactionRequest as NativeTransactionRequest,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
     TransactionSummary as NativeTransactionSummary,
-    TransactionRequest as NativeTransactionRequest
 };
-use miden_client::ClientError;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -106,7 +106,7 @@ impl WebClient {
                         salt,
                     );
                     Ok(TransactionSummary::from(summary))
-                }
+                },
                 Err(ClientError::TransactionExecutorError(
                     TransactionExecutorError::Unauthorized(summary),
                 )) => Ok(TransactionSummary::from(*summary)),
