@@ -159,3 +159,14 @@ test.describe("getAccounts tests", () => {
     expect(result.resultTypes.length).toEqual(0);
   });
 });
+
+test.describe("get account with details", () => {
+  test("get account with details", async ({ page }) => {
+    await page.evaluate(() => {
+      const accountID = window.AccountId.fromHex(
+        "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a"
+      );
+      window.client.importAccountById(accountID);
+    }, {});
+  });
+});

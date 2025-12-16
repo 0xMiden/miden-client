@@ -253,32 +253,31 @@ impl NodeRpcClient for GrpcClient {
     ///   `account_commitment`, `details`).
     /// - There is an error during [Account] deserialization.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
+        let details_request = {
+            if account_id.is_private() {
+                None
+            } else {
+                Some(AccountDetailRequest {
+                    code_commitment: Some(EMPTY_WORD.into()),
+                    asset_vault_commitment: Some(EMPTY_WORD.into()),
+                    storage_maps: vec![],
+                })
+            }
+        };
+
         let request = AccountProofRequest {
             account_id: Some(account_id.into()),
-            // FIXME: Should we add a block number here?
             block_num: None,
-            // FIXME: Write a test that retrieves a private account
-            // to see if this yields an error or not.
-            details: Some(AccountDetailRequest {
-                // FIXME: Should these fields be other
-                // than none? Then again, I'm not sure from
-                // where this data would come from if needed.
-                code_commitment: Some(EMPTY_WORD.into()),
-                asset_vault_commitment: Some(EMPTY_WORD.into()),
-                // FIXME: Should this field be something else?
-                storage_maps: vec![],
-            }),
+            details: details_request,
         };
 
         let mut rpc_api = self.ensure_connected().await?;
 
-        let response = rpc_api
-            .get_account_proof(request)
-            .await
-            .map_err(|status| {
-                RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
-            })?
-            .into_inner();
+        let response = rpc_api.get_account_proof(request).await.map_err(|status| {
+            RpcError::from_grpc_error(NodeRpcClientEndpoint::GetAccountDetails, status)
+        });
+
+        let response = response?.into_inner();
 
         let Some(witness) = response.witness else {
             return Err(RpcError::ExpectedDataMissing(
@@ -326,7 +325,12 @@ impl NodeRpcClient for GrpcClient {
                     rpc_api
                         .sync_account_vault(req)
                         .await
-                        .unwrap()
+                        .map_err(|status| {
+                            RpcError::from_grpc_error(
+                                NodeRpcClientEndpoint::SyncAccountVault,
+                                status,
+                            )
+                        })?
                         .into_inner()
                         .updates
                         .into_iter()
@@ -360,7 +364,12 @@ impl NodeRpcClient for GrpcClient {
                                 account_id: Some(account_id.clone().into()),
                             })
                             .await
-                            .unwrap()
+                        .map_err(|status| {
+                            RpcError::from_grpc_error(
+                                NodeRpcClientEndpoint::SyncAccountVault,
+                                status,
+                            )
+                        })?
                         // FIXME: SyncStorageMapsResponse has 'pagination' field, should we
                         // do something with it?
                             .into_inner()

@@ -9,14 +9,14 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
-use anyhow::{Context, Result};
+use anyhow::{Context, Error, Result, bail};
 use miden_lib::AuthScheme;
-use miden_lib::account::faucets::create_basic_fungible_faucet;
+use miden_lib::account::auth::AuthRpoFalcon512;
+use miden_lib::account::faucets::{self, create_basic_fungible_faucet};
+use miden_lib::account::wallets::BasicWallet;
 use miden_lib::utils::Serializable;
 use miden_node_block_producer::{
-    BlockProducer,
-    DEFAULT_MAX_BATCHES_PER_BLOCK,
-    DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NetworkTransactionBuilder;
@@ -25,8 +25,8 @@ use miden_node_store::{GenesisState, Store};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::Validator;
 use miden_objects::account::auth::AuthSecretKey;
-use miden_objects::account::{Account, AccountFile};
-use miden_objects::asset::TokenSymbol;
+use miden_objects::account::{Account, AccountBuilder, AccountComponent, AccountFile};
+use miden_objects::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_objects::block::FeeParameters;
 use miden_objects::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_objects::{Felt, ONE};
@@ -94,6 +94,8 @@ impl NodeBuilder {
             miden_node_utils::logging::OpenTelemetry::Disabled,
         )?;
 
+        let test_faucets_and_account = build_test_faucets_and_account()?;
+
         let account_file =
             generate_genesis_account().context("failed to create genesis account")?;
 
@@ -116,7 +118,7 @@ impl NodeBuilder {
             .try_into()
             .expect("timestamp should fit into u32");
         let genesis_state = GenesisState::new(
-            vec![account_file.account],
+            [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
             FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
                 .unwrap(),
             version,
@@ -383,6 +385,61 @@ impl NodeHandle {
 
 // UTILS
 // ================================================================================================
+const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
+
+fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
+    let mut rng = ChaCha20Rng::from_seed(random());
+    let secret = AuthSecretKey::new_rpo_falcon512_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let faucets = (0_u128..=1500_u128)
+        .map(|i| -> anyhow::Result<Account> {
+            let init_seed = [i.to_be_bytes(), i.to_be_bytes()]
+                .concat()
+                .try_into()
+                .expect("this won't fail because we have exactly 32 bytes");
+            let symbol = TokenSymbol::new("TKN")?;
+            let decimals = 12;
+            let max_supply = Felt::from(1_u32 << 30);
+            let account_storage_mode = miden_objects::account::AccountStorageMode::Public;
+
+            let auth_scheme = AuthScheme::RpoFalcon512 {
+                pub_key: secret.public_key().to_commitment(),
+            };
+            let faucet = create_basic_fungible_faucet(
+                init_seed,
+                symbol,
+                decimals,
+                max_supply,
+                account_storage_mode,
+                auth_scheme,
+            )?;
+            let (id, vault, storage, code, ..) = faucet.into_parts();
+            Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
+        })
+        .collect::<Result<Vec<_>>>()
+        .map_err(|err| Error::msg(format!("could not instance tests faucets got: {}", err)))?;
+
+    let seed = [0xA; 32];
+    let sk = AuthSecretKey::new_rpo_falcon512_with_rng(&mut ChaCha20Rng::from_seed(seed));
+    let account = AccountBuilder::new(seed)
+        .with_auth_component(miden_lib::account::auth::AuthRpoFalcon512::new(
+            sk.public_key().to_commitment(),
+        ))
+        .account_type(miden_objects::account::AccountType::RegularAccountUpdatableCode)
+        .with_component(BasicWallet)
+        .storage_mode(miden_objects::account::AccountStorageMode::Public)
+        .with_assets(faucets.iter().map(|faucet| {
+            Asset::Fungible(FungibleAsset::new(faucet.id(), 100).expect("should be a valid faucet"))
+        }))
+        .build_existing()?;
+
+    assert_eq!(
+        account.id().to_hex(),
+        TEST_ACCOUNT_ID,
+        "test account with a large number of assets was generated with a different id than the one expected"
+    );
+
+    Ok([&faucets[..], &[account][..]].concat())
+}
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
