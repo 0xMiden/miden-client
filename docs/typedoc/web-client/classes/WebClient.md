@@ -211,6 +211,36 @@ the chain tip is performed, and the required block header is retrieved.
 
 ***
 
+### executeUnauthorized()
+
+> **executeUnauthorized**(`account_id`, `transaction_request`): `Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+
+Executes a transaction and returns the `TransactionSummary`.
+
+If the transaction is unauthorized (auth script emits the unauthorized event),
+returns the summary from the error. If the transaction succeeds, constructs
+a summary from the executed transaction using the auth_arg from the transaction
+request as the salt (or a zero salt if not provided).
+
+# Errors
+- If there is an internal failure during execution.
+
+#### Parameters
+
+##### account\_id
+
+[`AccountId`](AccountId.md)
+
+##### transaction\_request
+
+[`TransactionRequest`](TransactionRequest.md)
+
+#### Returns
+
+`Promise`\<[`TransactionSummary`](TransactionSummary.md)\>
+
+***
+
 ### exportAccountFile()
 
 > **exportAccountFile**(`account_id`): `Promise`\<[`AccountFile`](AccountFile.md)\>

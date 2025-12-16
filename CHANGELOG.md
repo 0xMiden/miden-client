@@ -3,6 +3,7 @@
 ## 0.12.6 (TBD)
 
 * Enables Workers with `createClientWithExternalKeystore` via callbacks ([#1569](https://github.com/0xMiden/miden-client/pull/1569))
+* Added `executeUnauthorized` method to WebClient that executes a transaction and returns a `TransactionSummary`, handling both authorized and unauthorized (multisig) transactions
 
 ## 0.12.5 (2025-12-01)
 
