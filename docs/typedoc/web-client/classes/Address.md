@@ -64,7 +64,7 @@ Encodes the address using the provided network prefix.
 
 ##### network\_id
 
-[`NetworkId`](../enumerations/NetworkId.md)
+[`NetworkId`](NetworkId.md)
 
 #### Returns
 
