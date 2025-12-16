@@ -40,6 +40,12 @@ impl TransactionSummary {
     pub fn salt(&self) -> Result<Word, JsValue> {
         Ok(self.0.salt().into())
     }
+
+    /// Computes the commitment to this TransactionSummary.
+    #[wasm_bindgen(js_name = "toCommitment")]
+    pub fn to_commitment(&self) -> Word {
+        self.0.to_commitment().into()
+    }
 }
 
 // CONVERSIONS

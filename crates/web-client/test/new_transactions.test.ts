@@ -1394,3 +1394,241 @@ test.describe("storage map test", () => {
     expect(mapEntries.expectedValue).toBe("2");
   });
 });
+
+test.describe("executeForSummary tests", () => {
+  test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const alwaysUnauthorizedAuthMasm = `
+use.miden::native_account
+use.miden::auth
+
+const AUTH_UNAUTHORIZED_EVENT = event("miden::auth::unauthorized")
+
+pub proc auth_tx.1(salt: struct @bigendian { a: felt, b: felt, c: felt, d: felt })
+  exec.native_account::incr_nonce drop
+  exec.auth::create_tx_summary
+  exec.auth::adv_insert_hqword
+  exec.auth::hash_tx_summary
+  emit.AUTH_UNAUTHORIZED_EVENT
+  push.0 assert
+end
+      `;
+
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
+
+      const builder = client.createScriptBuilder();
+      const alwaysUnauthorizedComponent = window.AccountComponent.compile(
+        alwaysUnauthorizedAuthMasm,
+        builder,
+        []
+      ).withSupportsAllTypes();
+
+      const accountBuilderResult = new window.AccountBuilder(walletSeed)
+        .accountType(window.AccountType.RegularAccountImmutableCode)
+        .storageMode(window.AccountStorageMode.private())
+        .withAuthComponent(alwaysUnauthorizedComponent)
+        .withBasicWalletComponent()
+        .build();
+
+      await client.newAccount(accountBuilderResult.account, false);
+
+      const targetAccount = await client.newWallet(
+        window.AccountStorageMode.private(),
+        false,
+        0
+      );
+
+      const faucetAccount = await client.newFaucet(
+        window.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        BigInt(10000000),
+        0
+      );
+
+      await client.syncState();
+
+      const mintTransactionRequest = client.newMintTransactionRequest(
+        targetAccount.id(),
+        faucetAccount.id(),
+        window.NoteType.Public,
+        BigInt(1000)
+      );
+
+      const mintTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccount.id(),
+          mintTransactionRequest
+        );
+
+      const createdNoteIds = mintTransactionUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()
+        .map((note: Note) => note.id().toString());
+
+      await window.helpers.waitForTransaction(
+        mintTransactionUpdate.executedTransaction().id().toHex()
+      );
+
+      const consumeTransactionRequest =
+        client.newConsumeTransactionRequest(createdNoteIds);
+
+      const consumeTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          targetAccount.id(),
+          consumeTransactionRequest
+        );
+
+      await window.helpers.waitForTransaction(
+        consumeTransactionUpdate.executedTransaction().id().toHex()
+      );
+
+      const sendTransactionRequest = client.newSendTransactionRequest(
+        targetAccount.id(),
+        accountBuilderResult.account.id(),
+        faucetAccount.id(),
+        window.NoteType.Public,
+        BigInt(100),
+        null,
+        null
+      );
+
+      const sendTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          targetAccount.id(),
+          sendTransactionRequest
+        );
+
+      const sentNoteIds = sendTransactionUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()
+        .map((note: Note) => note.id().toString());
+
+      await window.helpers.waitForTransaction(
+        sendTransactionUpdate.executedTransaction().id().toHex()
+      );
+
+      const consumeSentNoteRequest =
+        client.newConsumeTransactionRequest(sentNoteIds);
+
+      const summary = await client.executeForSummary(
+        accountBuilderResult.account.id(),
+        consumeSentNoteRequest
+      );
+
+      return {
+        inputNotesCount: summary.inputNotes().numNotes(),
+        outputNotesCount: summary.outputNotes().numNotes(),
+        inputNoteIds: summary
+          .inputNotes()
+          .notes()
+          .map((note: any) => note.id().toString()),
+        sentNoteIds,
+      };
+    });
+
+    expect(result.inputNotesCount).toBe(1);
+    expect(result.outputNotesCount).toBe(0);
+    expect(result.inputNoteIds).toEqual(result.sentNoteIds);
+  });
+
+  test("executeForSummary throws error when transaction succeeds", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const senderAccount = await client.newWallet(
+        window.AccountStorageMode.private(),
+        false,
+        0
+      );
+
+      const receiverAccount = await client.newWallet(
+        window.AccountStorageMode.private(),
+        false,
+        0
+      );
+
+      const faucetAccount = await client.newFaucet(
+        window.AccountStorageMode.private(),
+        false,
+        "DAG",
+        8,
+        BigInt(10000000),
+        0
+      );
+
+      await client.syncState();
+
+      const mintTransactionRequest = client.newMintTransactionRequest(
+        senderAccount.id(),
+        faucetAccount.id(),
+        window.NoteType.Public,
+        BigInt(1000)
+      );
+
+      const mintTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          faucetAccount.id(),
+          mintTransactionRequest
+        );
+
+      const createdNoteIds = mintTransactionUpdate
+        .executedTransaction()
+        .outputNotes()
+        .notes()
+        .map((note: Note) => note.id().toString());
+
+      await window.helpers.waitForTransaction(
+        mintTransactionUpdate.executedTransaction().id().toHex()
+      );
+
+      const consumeTransactionRequest =
+        client.newConsumeTransactionRequest(createdNoteIds);
+
+      const consumeTransactionUpdate =
+        await window.helpers.executeAndApplyTransaction(
+          senderAccount.id(),
+          consumeTransactionRequest
+        );
+
+      await window.helpers.waitForTransaction(
+        consumeTransactionUpdate.executedTransaction().id().toHex()
+      );
+
+      const sendTransactionRequest = client.newSendTransactionRequest(
+        senderAccount.id(),
+        receiverAccount.id(),
+        faucetAccount.id(),
+        window.NoteType.Public,
+        BigInt(100),
+        null,
+        null
+      );
+
+      try {
+        await client.executeForSummary(
+          senderAccount.id(),
+          sendTransactionRequest
+        );
+        return { threw: false, errorMessage: "" };
+      } catch (e) {
+        return { threw: true, errorMessage: String(e) };
+      }
+    });
+
+    expect(result.threw).toBe(true);
+    expect(result.errorMessage).toContain(
+      "expected transaction to be unauthorized, but it succeeded"
+    );
+  });
+});

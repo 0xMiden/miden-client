@@ -4,9 +4,11 @@ use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
+    TransactionExecutorError,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionStoreUpdate as NativeTransactionStoreUpdate,
 };
+use miden_client::ClientError;
 use wasm_bindgen::prelude::*;
 
 use crate::models::account_id::AccountId;
@@ -17,6 +19,7 @@ use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
+use crate::models::transaction_summary::TransactionSummary;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -64,6 +67,37 @@ impl WebClient {
                 .await
                 .map(TransactionResult::from)
                 .map_err(|err| js_error_with_context(err, "failed to execute transaction"))
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Executes a transaction and returns the `TransactionSummary` if the transaction
+    /// requires authorization (i.e., the auth script is not satisfied).
+    ///
+    /// # Errors
+    /// - If the transaction succeeds (auth was not requested) 
+    /// - If there is an internal failure.
+    #[wasm_bindgen(js_name = "executeForSummary")]
+    pub async fn execute_for_summary(
+        &mut self,
+        account_id: &AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<TransactionSummary, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            match Box::pin(client.execute_transaction(account_id.into(), transaction_request.into()))
+                .await
+            {
+                Ok(_res) => {
+                    Err(JsValue::from_str("expected transaction to be unauthorized, but it succeeded"))
+                }
+                Err(ClientError::TransactionExecutorError(
+                    TransactionExecutorError::Unauthorized(summary),
+                )) => {
+                    Ok(TransactionSummary::from(*summary))
+                }
+                Err(err) => Err(js_error_with_context(err, "failed to execute transaction")),
+            }
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
